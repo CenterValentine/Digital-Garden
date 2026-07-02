@@ -1,9 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { X } from "lucide-react";
 import { toast } from "sonner";
 import { clientLogger } from "@/lib/core/logger/client";
+
+interface PeopleGroup {
+  id: string;
+  name: string;
+  parentGroupId: string | null;
+  isDefault: boolean;
+}
+
+export interface CreatedPersonData {
+  personId: string;
+  label: string;
+  slug: string;
+}
 
 interface PeopleCreateDialogProps {
   mode: "person" | "group";
@@ -12,11 +25,16 @@ interface PeopleCreateDialogProps {
   parentGroupId?: string | null;
   onClose: () => void;
   onCreated: () => void;
+  onCreatedWithData?: (person: CreatedPersonData) => void;
 }
 
 interface PeopleCreateResponse {
   success: boolean;
-  data?: unknown;
+  data?: {
+    personId: string;
+    label: string;
+    slug: string;
+  } | null;
   error?: {
     code: string;
     message: string;
@@ -30,8 +48,11 @@ export function PeopleCreateDialog({
   parentGroupId = null,
   onClose,
   onCreated,
+  onCreatedWithData,
 }: PeopleCreateDialogProps) {
   const [name, setName] = useState(initialName);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(primaryGroupId ?? null);
+  const [groups, setGroups] = useState<PeopleGroup[]>([]);
   const [givenName, setGivenName] = useState("");
   const [familyName, setFamilyName] = useState("");
   const [email, setEmail] = useState("");
@@ -52,6 +73,24 @@ export function PeopleCreateDialog({
 
   const isPerson = mode === "person";
 
+  useEffect(() => {
+    if (!isPerson) return;
+    fetch("/api/people/groups", { credentials: "include" })
+      .then((r) => r.json())
+      .then((result: { success: boolean; data?: { groups: PeopleGroup[] } }) => {
+        if (result.success && result.data) {
+          setGroups(result.data.groups);
+          // Default to the first non-default group if no primaryGroupId was passed
+          if (!selectedGroupId) {
+            const first = result.data.groups.find((g) => !g.isDefault) ?? result.data.groups[0];
+            if (first) setSelectedGroupId(first.id);
+          }
+        }
+      })
+      .catch(() => { /* groups dropdown is optional — silent */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPerson]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     const trimmedName = name.trim();
@@ -70,7 +109,7 @@ export function PeopleCreateDialog({
           isPerson
             ? {
                 displayName: trimmedName,
-                primaryGroupId,
+                primaryGroupId: selectedGroupId,
                 givenName: givenName.trim() || null,
                 familyName: familyName.trim() || null,
                 email: email.trim() || null,
@@ -104,6 +143,9 @@ export function PeopleCreateDialog({
         description: trimmedName,
       });
       window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      if (isPerson && result.data) {
+        onCreatedWithData?.({ personId: result.data.personId, label: result.data.label, slug: result.data.slug });
+      }
       onCreated();
       onClose();
     } catch (err) {
@@ -161,6 +203,25 @@ export function PeopleCreateDialog({
 
           {isPerson ? (
             <>
+              {groups.length > 0 && (
+                <label className="block">
+                  <span className="mb-1 block text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Group
+                  </span>
+                  <select
+                    value={selectedGroupId ?? ""}
+                    onChange={(e) => setSelectedGroupId(e.target.value || null)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-gold-primary/60 dark:border-white/10 dark:bg-white/5 dark:text-gray-100"
+                  >
+                    <option value="">No group</option>
+                    {groups.map((g) => (
+                      <option key={g.id} value={g.id}>
+                        {g.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <TextField label="Given name" value={givenName} onChange={setGivenName} placeholder="Optional" />
                 <TextField label="Family name" value={familyName} onChange={setFamilyName} placeholder="Optional" />

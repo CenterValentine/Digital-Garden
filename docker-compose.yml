@@ -1,0 +1,37 @@
+# Local development Postgres for Digital Garden.
+#
+# See docs/notes-feature/guides/database/LOCAL-POSTGRES.md for the full workflow.
+#
+# Quick start:
+#   pnpm db:local:up        # bring up Postgres
+#   pnpm db:target          # confirm DATABASE_URL points at localhost
+#   npx prisma migrate deploy
+#   pnpm db:seed
+#
+# This file is for local dev only. It does not replace Neon for preview/production.
+
+name: digital-garden-dev
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: digital-garden-postgres
+    restart: unless-stopped
+    ports:
+      - "${LOCAL_POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: digital_garden_dev
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d digital_garden_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  pg_data:
+    name: digital-garden-dev-pg-data

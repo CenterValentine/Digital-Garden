@@ -57,19 +57,86 @@ export function inferCapabilities(modelId: string): string[] {
     out.push("image-generation");
   }
 
+  // Text-to-speech (audio output) models:
+  //   - OpenAI tts-1 / tts-1-hd / gpt-4o-mini-tts
+  //   - ElevenLabs `eleven_*` model ids
+  //   - Google Cloud TTS voice families (Neural2 / WaveNet / Chirp / Studio)
+  //     and any id ending in `-tts`.
+  if (
+    /\btts\b/i.test(bare) ||
+    /^eleven/i.test(bare) ||
+    /-tts$/i.test(bare) ||
+    /\b(wavenet|neural2|chirp|studio)\b/i.test(bare)
+  ) {
+    out.push("speech");
+  }
+
+  // Speech-to-text (transcription) models:
+  //   - OpenAI whisper-1 / gpt-4o-transcribe
+  //   - ElevenLabs Scribe
+  if (
+    /\bwhisper\b/i.test(bare) ||
+    /transcribe/i.test(bare) ||
+    /\bscribe\b/i.test(bare)
+  ) {
+    out.push("transcription");
+  }
+
+  // Audio-understanding (audio input) models — models that can *hear* a sound
+  // and reason about it (distinct from transcription, which returns words).
+  // Inference is deliberately weak here: "can this model hear?" is hard to read
+  // from an id, so prefer the connection's explicit `capabilities`. We only
+  // flag the well-known audio-capable multimodal stems.
+  if (
+    /gpt-4o.*audio/i.test(bare) ||
+    /^gemini-(1\.5|2|2\.5|3)/i.test(bare)
+  ) {
+    out.push("audio-input");
+  }
+
   return out;
+}
+
+/**
+ * Capability aliases. The model catalog/fetcher and the feature
+ * registry speak the `CapabilityFlag` token `"image"` ("image
+ * output"); id inference (above) emits the more descriptive
+ * `"image-generation"`. They name the SAME capability — collapse the
+ * alias to the registry's canonical token so a feature requiring
+ * `"image"` matches an id-inferred image model, and the AIConnections
+ * badge filter, the feature-routing compatible-pairs filter, and the
+ * server route resolver all agree. Add future synonym pairs here, not
+ * at each call site.
+ */
+const CAPABILITY_ALIASES: Record<string, string> = {
+  "image-generation": "image",
+  "text-to-speech": "speech",
+  tts: "speech",
+  "speech-to-text": "transcription",
+  stt: "transcription",
+  "audio-output": "speech",
+};
+
+/** Canonical form of a capability token (collapses known aliases). */
+export function normalizeCapability(cap: string): string {
+  return CAPABILITY_ALIASES[cap] ?? cap;
 }
 
 /**
  * Effective capability set for a saved model: union of the explicit
  * `capabilities` array (catalog/fetcher-derived) and any flags
- * inferred from the model id. Use this anywhere a feature-routing
- * filter wants to know what a model can do.
+ * inferred from the model id, each normalized to its canonical token.
+ * Use this anywhere a feature-routing filter wants to know what a
+ * model can do. Because tokens are normalized, an id-inferred image
+ * model (`"image-generation"`) satisfies a feature requiring `"image"`.
  */
 export function effectiveCapabilities(
   model: { id: string; capabilities?: string[] },
 ): Set<string> {
-  const have = new Set<string>(model.capabilities ?? []);
-  for (const inferred of inferCapabilities(model.id)) have.add(inferred);
+  const have = new Set<string>();
+  for (const c of model.capabilities ?? []) have.add(normalizeCapability(c));
+  for (const inferred of inferCapabilities(model.id)) {
+    have.add(normalizeCapability(inferred));
+  }
   return have;
 }

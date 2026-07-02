@@ -72,6 +72,7 @@ const { schema: habitTrackerSchema, defaults: habitTrackerDefaults } =
 
 registerBlock({
   type: "habitTracker",
+  ttsSkip: true, // interactive widget — not narratable prose
   label: "Habit Tracker",
   description: "Preset-driven habit tracking block with stats and period navigation",
   iconName: "CalendarCheck2",

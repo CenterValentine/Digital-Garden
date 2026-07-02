@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { ExternalLink, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
@@ -81,58 +81,75 @@ export function ExternalLinkViewer({
     setPreviewError(null);
   }, [url, preview.cached]);
 
-  const handleRefreshPreview = async () => {
-    try {
-      setIsRefreshing(true);
-      setPreviewError(null);
+  const handleRefreshPreview = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      try {
+        setIsRefreshing(true);
+        setPreviewError(null);
 
-      const response = await fetch("/api/content/external/preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        const errorCode = result.error?.code || "UNKNOWN_ERROR";
-        const errorMessage = result.error?.message || "Failed to fetch preview";
-        const fullError = `${errorMessage} (${errorCode})`;
-
-        clientLogger.error({
-          layer: "ui",
-          event: "external_preview_fetch:failed",
-          summary: "external preview api rejected",
-          attrs: {
-            content_id: contentId,
-            status: response.status,
-            error_code: errorCode,
-          },
+        const response = await fetch("/api/content/external/preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
         });
 
-        setPreviewError(fullError);
-        toast.error(fullError);
-        return;
-      }
+        const result = await response.json();
 
-      setPreviewData(result.data.metadata);
-      toast.success("Preview refreshed");
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "Failed to fetch preview";
-      clientLogger.error({
-        layer: "ui",
-        event: "external_preview_fetch:caught",
-        summary: "external preview handler caught",
-        attrs: { content_id: contentId },
-        error: err,
-      });
-      setPreviewError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsRefreshing(false);
+        if (!response.ok || !result.success) {
+          const errorCode = result.error?.code || "UNKNOWN_ERROR";
+          const errorMessage = result.error?.message || "Failed to fetch preview";
+          const fullError = `${errorMessage} (${errorCode})`;
+
+          clientLogger.error({
+            layer: "ui",
+            event: "external_preview_fetch:failed",
+            summary: "external preview api rejected",
+            attrs: {
+              content_id: contentId,
+              status: response.status,
+              error_code: errorCode,
+              silent: options.silent ?? false,
+            },
+          });
+
+          setPreviewError(fullError);
+          if (!options.silent) toast.error(fullError);
+          return;
+        }
+
+        setPreviewData(result.data.metadata);
+        if (!options.silent) toast.success("Preview refreshed");
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Failed to fetch preview";
+        clientLogger.error({
+          layer: "ui",
+          event: "external_preview_fetch:caught",
+          summary: "external preview handler caught",
+          attrs: { content_id: contentId, silent: options.silent ?? false },
+          error: err,
+        });
+        setPreviewError(errorMessage);
+        if (!options.silent) toast.error(errorMessage);
+      } finally {
+        setIsRefreshing(false);
+      }
+    },
+    [url, contentId],
+  );
+
+  // Auto-fetch preview once per URL when there's no cached data. The ref
+  // guard ensures we don't re-fire if isRefreshing flips or React re-runs
+  // the effect for an unrelated reason. Silent mode skips toasts so the
+  // automatic path doesn't pop a green "refreshed" toast on every view —
+  // the inline card/error state is enough signal.
+  const autoFetchedUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (url && autoFetchedUrlRef.current !== url && !preview.cached) {
+      autoFetchedUrlRef.current = url;
+      void handleRefreshPreview({ silent: true });
     }
-  };
+  }, [url, preview.cached, handleRefreshPreview]);
 
   const handleOpenLink = () => {
     window.open(url, "_blank", "noopener,noreferrer");
@@ -199,22 +216,22 @@ export function ExternalLinkViewer({
           )}
           <div className="p-4 space-y-2">
             {previewData?.title && (
-              <h3 className="text-lg font-semibold text-gray-900">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {previewData.title}
               </h3>
             )}
             {previewData?.description && (
-              <p className="text-sm text-gray-700 line-clamp-3">
+              <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-3">
                 {previewData.description}
               </p>
             )}
             {previewData?.siteName && (
-              <p className="text-xs text-gray-600">{previewData.siteName}</p>
+              <p className="text-xs text-gray-600 dark:text-gray-400">{previewData.siteName}</p>
             )}
 
             {/* Show info about missing fields if any */}
             {missingFields && (missingFields.title || missingFields.description) && (
-              <p className="text-xs text-gray-500 italic pt-2 border-t border-gray-900/10">
+              <p className="text-xs text-gray-500 dark:text-gray-400 italic pt-2 border-t border-gray-900/10 dark:border-white/10">
                 This site provides limited preview metadata
                 {missingFields.title && missingFields.description && " (no title or description)"}
                 {missingFields.title && !missingFields.description && " (no title)"}
@@ -253,10 +270,10 @@ export function ExternalLinkViewer({
             <ExternalLink className="h-5 w-5 text-gray-600 mt-0.5 flex-shrink-0" />
           )}
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-gray-900 mb-1">
+            <div className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
               External Link
             </div>
-            <div className="text-xs text-gray-700 break-all">{url}</div>
+            <div className="text-xs text-gray-700 dark:text-gray-300 break-all">{url}</div>
             <div className="mt-3 flex flex-wrap gap-2">
               {readingStatus && (
                 <span className="inline-block px-2 py-0.5 bg-amber-500/15 text-amber-600 text-xs rounded-full">
@@ -294,7 +311,7 @@ export function ExternalLinkViewer({
                 </span>
               )}
             </div>
-            <div className="mt-3 space-y-1 text-xs text-gray-600">
+            <div className="mt-3 space-y-1 text-xs text-gray-600 dark:text-gray-400">
               {sourceDomain && <div>Domain: {sourceDomain}</div>}
               {!sourceDomain && sourceHostname && <div>Host: {sourceHostname}</div>}
               {savedAt && (
@@ -317,13 +334,13 @@ export function ExternalLinkViewer({
               )}
             </div>
             {description && (
-              <p className="mt-3 text-sm text-gray-700 whitespace-pre-wrap">
+              <p className="mt-3 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {description}
               </p>
             )}
             {previewData?.description &&
               previewData.description !== description && (
-              <p className="mt-3 text-xs text-gray-700 line-clamp-3">
+              <p className="mt-3 text-xs text-gray-700 dark:text-gray-300 line-clamp-3">
                 {previewData.description}
               </p>
               )}
@@ -341,9 +358,9 @@ export function ExternalLinkViewer({
           Open Link
         </button>
         <button
-          onClick={handleRefreshPreview}
+          onClick={() => handleRefreshPreview()}
           disabled={isRefreshing}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900/10 hover:bg-gray-900/20 border border-gray-900/20 rounded-lg text-sm font-medium text-gray-900 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 border border-gray-900/20 dark:border-white/15 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <RefreshCw
             className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`}

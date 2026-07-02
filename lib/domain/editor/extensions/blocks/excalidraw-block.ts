@@ -93,6 +93,7 @@ const { schema: excalidrawBlockSchema, defaults: excalidrawBlockDefaults } =
 
 registerBlock({
   type: "excalidrawBlock",
+  ttsSkip: true, // diagram canvas — not narratable prose
   label: "Drawing",
   description: "Embedded hand-drawn canvas — collapses to a pill when not in use",
   iconName: "PenLine",

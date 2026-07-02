@@ -26,12 +26,14 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage, type FileUIPart } from "ai";
 import { toast } from "sonner";
+import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
 import {
   BASE_TOOL_METADATA,
   BASE_TOOL_IDS,
 } from "@/lib/domain/ai/tools/metadata";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import {
   useModelSelection,
 } from "@/components/content/ai/ModelPicker";
@@ -99,6 +101,12 @@ export interface UseConversationEngineParams {
    * preferences for that conversation.
    */
   conversationId?: string | null;
+  /**
+   * Selected custom-instruction context id, forwarded with each turn so
+   * the chat route can append the context body to the system prompt.
+   * Null/undefined sends no personalization (base prompt).
+   */
+  activeContextId?: string | null;
   /**
    * Optional initial messages used to seed the chat (e.g. when a full-
    * page chat loads a previously-persisted conversation on mount).
@@ -189,7 +197,14 @@ export interface UseConversationEngineResult {
   clearFollowUps: () => void;
 
   // ── scroll ──
+  /** RefObject for reads (e.g. scroll-to-message). Attach via `setScrollEl`. */
   scrollRef: React.RefObject<HTMLDivElement | null>;
+  /** Callback ref for the scroll container — binds the stick-to-bottom listener. */
+  setScrollEl: (el: HTMLDivElement | null) => void;
+  /** True when the user has scrolled up and auto-scroll is released. */
+  showJumpToLatest: boolean;
+  /** Scroll to the bottom and re-engage auto-scroll. */
+  scrollToBottom: () => void;
 
   // ── per-message stamping ──
   /**
@@ -223,11 +238,12 @@ export interface ChatAttachment {
   name: string;
   /**
    * image → sent as a file part (vision);
+   * audio → sent as a file part (audio-input models), else placeholder;
    * text  → inlined into the prompt;
    * document (PDF) → native file part for capable models, else inlined
    * extracted text.
    */
-  kind: "image" | "text" | "document";
+  kind: "image" | "audio" | "text" | "document";
   status: "uploading" | "ready" | "error";
   /** Image/document: the hosted URL the model fetches. */
   url?: string;
@@ -249,6 +265,7 @@ export function useConversationEngine({
   conversationKey,
   contentId,
   conversationId,
+  activeContextId,
   initialMessages,
   onFinish,
   onError,
@@ -256,6 +273,41 @@ export function useConversationEngine({
   pendingUserPartsRef,
 }: UseConversationEngineParams): UseConversationEngineResult {
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ── stick-to-bottom scroll ──
+  // Auto-scroll only while the user is near the bottom. Scrolling up
+  // "breaks" the lock so the reply can be read mid-stream; returning to the
+  // bottom re-engages it. A scroll listener (bound via the `setScrollEl`
+  // callback ref) keeps `pinnedRef` current without re-rendering on scroll.
+  const SCROLL_BOTTOM_THRESHOLD = 80;
+  const pinnedRef = useRef(true);
+  const scrollCleanupRef = useRef<(() => void) | null>(null);
+  const [showJumpToLatest, setShowJumpToLatest] = useState(false);
+
+  const setScrollEl = useCallback((el: HTMLDivElement | null) => {
+    // Detach any prior listener (element swapped on chat switch / unmount).
+    scrollCleanupRef.current?.();
+    scrollCleanupRef.current = null;
+    scrollRef.current = el;
+    if (!el) return;
+    const onScroll = () => {
+      const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+      const atBottom = distance <= SCROLL_BOTTOM_THRESHOLD;
+      pinnedRef.current = atBottom;
+      setShowJumpToLatest(!atBottom);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    scrollCleanupRef.current = () =>
+      el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  const scrollToBottom = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+    pinnedRef.current = true;
+    setShowJumpToLatest(false);
+  }, []);
 
   // ── Sticky drafts ──
   // Persist the in-progress prompt per chat to localStorage so users
@@ -466,6 +518,51 @@ export function useConversationEngine({
         });
       }
 
+      // Surface AI note writes to any open MainPanelContent so the
+      // chat's notes panel (or any other editor pointed at the same
+      // contentId) reloads without a manual refresh. This MUST live
+      // here (one-shot per real completion) instead of in ChatMessage
+      // — putting it in the render path re-fires the dispatch every
+      // time historical messages mount, which previously caused a
+      // refetch loop on page open.
+      try {
+        const fresh = e.message;
+        if (fresh && typeof window !== "undefined") {
+          for (const part of fresh.parts ?? []) {
+            const output = (part as { output?: unknown }).output;
+            if (output === undefined) continue;
+            const str =
+              typeof output === "string" ? output : JSON.stringify(output);
+            if (!str.includes('"__notePayload"')) continue;
+            try {
+              const parsed = JSON.parse(str) as {
+                __notePayload?: boolean;
+                contentId?: string;
+              };
+              if (parsed.__notePayload && typeof parsed.contentId === "string") {
+                window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                // Surgical notes-only refresh — narrower than the
+                // existing `content-updated` event which triggers
+                // MainPanelContent's full `fetchNote` (which resets
+                // loading + outline + tab title + content + clears
+                // error state). Only the pane whose `selectedContentId`
+                // matches this contentId reacts, and only `noteContent`
+                // gets updated. Outline / title / tab unchanged.
+                window.dispatchEvent(
+                  new CustomEvent("dg:notes-refresh", {
+                    detail: { contentId: parsed.contentId },
+                  }),
+                );
+              }
+            } catch {
+              /* unparseable tool output — skip */
+            }
+          }
+        }
+      } catch {
+        /* never let dispatch errors break the chat */
+      }
+
       // Fire suggested follow-ups (Session 7). Decorative, soft-fails
       // to an empty list — never blocks the chat UX.
       try {
@@ -561,24 +658,41 @@ export function useConversationEngine({
     return Boolean(model?.capabilities?.includes("vision"));
   }, [providerId, modelId]);
 
+  // Does the active model accept audio inputs (audio-input capability)? Uses
+  // effectiveCapabilities so id-inferred audio models (Gemini, gpt-4o-audio)
+  // count even when the catalog row doesn't declare the flag.
+  const supportsAudioAttachments = useMemo(() => {
+    const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
+    const model = provider?.models.find((m) => m.id === modelId);
+    return effectiveCapabilities({
+      id: modelId,
+      capabilities: model?.capabilities,
+    }).has("audio-input");
+  }, [providerId, modelId]);
+
   const addAttachmentFiles = useCallback((files: File[] | FileList) => {
     const list = Array.from(files);
     for (const file of list) {
       const id = `att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
       const initialKind: ChatAttachment["kind"] = file.type.startsWith("image/")
         ? "image"
-        : file.type === "application/pdf" ||
-            file.name.toLowerCase().endsWith(".pdf")
-          ? "document"
-          : "text";
+        : file.type.startsWith("audio/")
+          ? "audio"
+          : file.type === "application/pdf" ||
+              file.name.toLowerCase().endsWith(".pdf")
+            ? "document"
+            : "text";
       setAttachments((prev) => [
         ...prev,
         { id, name: file.name, kind: initialKind, status: "uploading" },
       ]);
       void (async () => {
         try {
+          // Convert Apple HEIC/HEIF to JPEG in the browser before upload so
+          // it renders cross-browser and vision models can read it.
+          const uploadFile = await convertHeicToJpegFile(file);
           const form = new FormData();
-          form.append("file", file);
+          form.append("file", uploadFile);
           const res = await fetch("/api/ai/attachments/upload", {
             method: "POST",
             credentials: "include",
@@ -628,6 +742,7 @@ export function useConversationEngine({
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
+    const hasAudioParts = ready.some((a) => a.kind === "audio");
 
     // Nothing to send (no text, no ready attachments).
     if (!text && ready.length === 0) return;
@@ -642,6 +757,15 @@ export function useConversationEngine({
     if (hasImageParts && !supportsImageAttachments) {
       toast.error(
         "The selected model can't read images. Switch to a vision-capable model or remove the image.",
+      );
+      return;
+    }
+
+    // Audio guard: only audio-input-capable models can hear a clip. Without
+    // this the model silently gets a placeholder and ignores the audio.
+    if (hasAudioParts && !supportsAudioAttachments) {
+      toast.error(
+        "The selected model can't process audio. Switch to an audio-input model (e.g. Gemini) or remove the audio.",
       );
       return;
     }
@@ -697,12 +821,17 @@ export function useConversationEngine({
 
     setInput("");
     setAttachments([]);
+    // Sending implies the user wants to watch the reply — re-engage
+    // auto-scroll even if they'd scrolled up reading earlier turns.
+    pinnedRef.current = true;
+    setShowJumpToLatest(false);
     sendMessage(
       { parts },
       {
         body: {
           contentId,
           conversationId,
+          contextId: activeContextId ?? null,
           providerId,
           modelId,
           mentionedContentIds: ids,
@@ -714,10 +843,12 @@ export function useConversationEngine({
     attachments,
     attachmentsUploading,
     supportsImageAttachments,
+    supportsAudioAttachments,
     pendingUserPartsRef,
     sendMessage,
     contentId,
     conversationId,
+    activeContextId,
     providerId,
     modelId,
   ]);
@@ -775,8 +906,9 @@ export function useConversationEngine({
     };
   }, []);
 
-  // ── auto-scroll on new messages ──
+  // ── auto-scroll on new messages — only while pinned to the bottom ──
   useEffect(() => {
+    if (!pinnedRef.current) return;
     const el = scrollRef.current;
     if (el) {
       el.scrollTop = el.scrollHeight;
@@ -810,6 +942,9 @@ export function useConversationEngine({
     followUps,
     clearFollowUps,
     scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     getProviderForMessage,
     seedMessageStamps,

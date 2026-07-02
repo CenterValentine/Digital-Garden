@@ -12,8 +12,12 @@ import {
 } from "@/lib/domain/flashcards";
 import type { FlashcardDeckDto } from "@/lib/domain/flashcards";
 // Deep import — legacy-compat has a Prisma value import and is NOT
-// re-exported through the barrel.
-import { resolveLegacyDeckId } from "@/lib/domain/flashcards/legacy-compat";
+// re-exported through the barrel. `ensureDeckPath` walks a full path and
+// creates any missing ancestor decks (shared with POST /api/flashcards).
+import {
+  ensureDeckPath,
+  resolveLegacyDeckId,
+} from "@/lib/domain/flashcards/legacy-compat";
 
 export async function GET() {
   try {
@@ -26,6 +30,7 @@ export async function GET() {
         select: {
           id: true,
           name: true,
+          path: true,
           parentDeckId: true,
           parent: { select: { name: true } },
         },
@@ -101,6 +106,8 @@ export async function GET() {
           masteredCount,
           reviewedCount: totals.reviewedCount,
           viewedCount: totals.viewedCount,
+          deckId: deck.id,
+          path: deck.path,
         },
       ];
     });
@@ -141,13 +148,13 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Sprint 6: locate the deck this (category, subcategory) pair
-    // points to. Same slug rule as resolveLegacyDeckId — but we don't
+    // points to. Same path rule as resolveLegacyDeckId — we don't
     // auto-create here, since a rename of a non-existent deck is a 404.
-    const sourceSlug = subcategory
-      ? `${slugifyDeckName(category)}-${slugifyDeckName(subcategory)}`
+    const sourcePath = subcategory
+      ? `${slugifyDeckName(category)}/${slugifyDeckName(subcategory)}`
       : slugifyDeckName(category);
     const sourceDeck = await prisma.flashcardDeck.findUnique({
-      where: { ownerId_slug: { ownerId: session.user.id, slug: sourceSlug } },
+      where: { ownerId_path: { ownerId: session.user.id, path: sourcePath } },
       select: { id: true, parentDeckId: true, path: true },
     });
     if (!sourceDeck) {
@@ -265,6 +272,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Resolve parent in one of three ways (in order of preference):
+    //   1. parentDeckId — explicit existing deck id, fastest lookup.
+    //   2. parentDeckPath — walk the path and create missing
+    //      ancestors. Used by the propose_deck_with_cards absorb flow
+    //      when the model proposed a sub-deck whose parent doesn't
+    //      exist yet (e.g. "vietnamese/tones" with no Vietnamese
+    //      deck). The user clicks Create-deck-and-add once and the
+    //      server cascades through ancestors atomically.
+    //   3. Neither → deck lands at root.
     let parentDeckId: string | null = null;
     let parentPath: string | null = null;
     if (typeof body.parentDeckId === "string" && body.parentDeckId) {
@@ -283,6 +299,32 @@ export async function POST(request: NextRequest) {
       }
       parentDeckId = parent.id;
       parentPath = parent.path;
+    } else if (
+      typeof body.parentDeckPath === "string" &&
+      body.parentDeckPath.trim()
+    ) {
+      try {
+        const resolved = await ensureDeckPath(
+          session.user.id,
+          body.parentDeckPath.trim(),
+        );
+        parentDeckId = resolved.deckId;
+        parentPath = resolved.path;
+      } catch (err) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message:
+                err instanceof Error
+                  ? err.message
+                  : "Failed to resolve parent path.",
+            },
+          },
+          { status: 400 },
+        );
+      }
     }
 
     const slug = slugifyDeckName(name);

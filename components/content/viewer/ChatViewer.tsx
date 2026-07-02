@@ -11,12 +11,13 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
-import { Bot } from "lucide-react";
+import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
+import { ChatContextPicker } from "../ai/ChatContextPicker";
 import { AssociatedContentChips } from "../ai/AssociatedContentChips";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
@@ -197,6 +198,10 @@ function ChatViewerInner({
   // attachments persist reliably.
   const pendingUserPartsRef = useRef<UIMessage["parts"] | null>(null);
 
+  // Selected custom-instruction context for this chat (seeded from the
+  // bound conversation below, forwarded to the engine per turn).
+  const [activeContextId, setActiveContextId] = useState<string | null>(null);
+
   const {
     messages,
     setMessages,
@@ -223,12 +228,16 @@ function ChatViewerInner({
     followUps,
     clearFollowUps,
     scrollRef,
+    setScrollEl,
+    showJumpToLatest,
+    scrollToBottom,
     getMessageStamp,
     seedMessageStamps,
   } = useConversationEngine({
     conversationKey: conversationId ?? contentId,
     contentId,
     conversationId: conversationId ?? undefined,
+    activeContextId,
     initialMessages,
     onFinish: (event) => {
       // Forward the SDK's fresh assistant message (with metadata) so
@@ -250,24 +259,60 @@ function ChatViewerInner({
 
   // Bound mode: load/persist/title against the Conversation store — the
   // SAME hook the sidebar ChatPanel uses, so the surfaces stay identical.
-  const { loadingInitial, conversationTitle } = useConversationBinding({
-    conversationId: conversationId ?? null,
-    messages,
-    setMessages: setMessages as unknown as (messages: unknown) => void,
-    getMessageStamp,
-    seedMessageStamps,
-    providerId,
-    modelId,
-    persistRef,
-    truncateRef,
-    pendingUserPartsRef,
-  });
+  const { loadingInitial, conversationTitle, initialActiveContextId } =
+    useConversationBinding({
+      conversationId: conversationId ?? null,
+      messages,
+      setMessages: setMessages as unknown as (messages: unknown) => void,
+      getMessageStamp,
+      seedMessageStamps,
+      providerId,
+      modelId,
+      persistRef,
+      truncateRef,
+      pendingUserPartsRef,
+    });
+
+  // Seed local context selection from the bound conversation on (re)load.
+  useEffect(() => {
+    setActiveContextId(initialActiveContextId);
+  }, [initialActiveContextId]);
+
+  // Persist context changes to the conversation when bound; otherwise hold
+  // in-session. Fire-and-forget.
+  const handleContextChange = useCallback(
+    (id: string | null) => {
+      setActiveContextId(id);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ activeContextId: id }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
 
   // Branch (bound mode only): fork up to the message, materialize the new
   // branch to its own content node, and navigate there.
   const handleBranch = useCallback(
     async (messageId: string) => {
       if (!conversationId) return;
+      // Helper: pull the most useful error string out of a non-OK response.
+      // The server now returns shape `{ success: false, error: string }`
+      // with a code-bearing tag (e.g. "Fork failed (P2002)"). Falling back
+      // to status text + status code if the body isn't parseable keeps the
+      // toast informative even when the server crashed pre-body.
+      const readErr = async (res: Response, fallback: string) => {
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body?.error) return body.error;
+        } catch {
+          /* unparseable */
+        }
+        return `${fallback} (${res.status})`;
+      };
       try {
         const forkRes = await fetch(
           `/api/conversations/${encodeURIComponent(conversationId)}/fork`,
@@ -278,22 +323,25 @@ function ChatViewerInner({
             body: JSON.stringify({ uptoMessageId: messageId }),
           },
         );
-        if (!forkRes.ok) throw new Error("Branch failed");
+        if (!forkRes.ok) throw new Error(await readErr(forkRes, "Fork failed"));
         const newId = (await forkRes.json())?.data?.conversationId as
           | string
           | undefined;
-        if (!newId) return;
+        if (!newId) throw new Error("Fork returned no conversation id");
+
         const openRes = await fetch(
           `/api/conversations/${encodeURIComponent(newId)}/open-in-page`,
           { method: "POST", credentials: "include" },
         );
+        if (!openRes.ok)
+          throw new Error(await readErr(openRes, "Open-in-page failed"));
         const nodeId = (await openRes.json())?.data?.contentNodeId as
           | string
           | undefined;
-        if (nodeId) {
-          toast.success("Branched into a new chat");
-          useContentStore.getState().setSelectedContentId(nodeId);
-        }
+        if (!nodeId) throw new Error("Open-in-page returned no content node id");
+
+        toast.success("Branched into a new chat");
+        useContentStore.getState().setSelectedContentId(nodeId);
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Branch failed");
       }
@@ -590,7 +638,8 @@ function ChatViewerInner({
       {/* Messages — bound mode shows a loader until the conversation
           history hydrates, so the user can't type into a soon-to-be-
           overwritten session. */}
-      <div ref={scrollRef} className="scrollbar-hide flex-1 overflow-y-auto">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div ref={setScrollEl} className="scrollbar-hide flex-1 overflow-y-auto">
         {loadingInitial ? (
           <ChatLoadingBody />
         ) : hasMessages ? (
@@ -625,6 +674,16 @@ function ChatViewerInner({
           <EmptyState title={displayTitle} />
         )}
       </div>
+      {showJumpToLatest && (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-3 py-1 text-xs text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+        >
+          <ChevronDown className="h-3.5 w-3.5" /> Jump to latest
+        </button>
+      )}
+      </div>
 
       {/* Suggested follow-ups (Session 7) */}
       <FollowUpsStrip
@@ -651,13 +710,20 @@ function ChatViewerInner({
         attachmentsUploading={attachmentsUploading}
         supportsImages={supportsImageAttachments}
         footerLeading={
-          <MakeAndModelPicker
-            providerId={providerId}
-            modelId={modelId}
-            onChange={handleModelChange}
-            disabled={isActive}
-            contributors={mixed.contributors as AIProviderId[]}
-          />
+          <div className="flex min-w-0 items-center">
+            <MakeAndModelPicker
+              providerId={providerId}
+              modelId={modelId}
+              onChange={handleModelChange}
+              disabled={isActive}
+              contributors={mixed.contributors as AIProviderId[]}
+            />
+            <ChatContextPicker
+              value={activeContextId}
+              onChange={handleContextChange}
+              disabled={isActive}
+            />
+          </div>
         }
       />
     </div>

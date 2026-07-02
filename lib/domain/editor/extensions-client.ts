@@ -67,12 +67,15 @@ import { Stopwatch } from "./extensions/blocks/stopwatch";
 import { PullQuote } from "./extensions/blocks/pull-quote";
 import { TableOfContents } from "./extensions/blocks/table-of-contents";
 import { FlashcardEmbed } from "./extensions/blocks/flashcard-embed-client";
+import { AudioEmbed } from "./extensions/blocks/audio-embed-client";
 import { FlashcardSelect } from "./extensions/flashcard-select";
+import { ClozeDeletion } from "./extensions/cloze-deletion";
 import {
   UnsupportedBlock,
   UnsupportedInline,
 } from "./extensions/blocks/unsupported-content";
 import { getExtensionClientEditorExtensions } from "@/lib/extensions/editor-client-registry";
+import { Clipboard } from "./extensions/clipboard";
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -301,7 +304,9 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     PullQuote,
     TableOfContents,
     FlashcardEmbed,
+    AudioEmbed,
     FlashcardSelect,
+    ClozeDeletion,
     UnsupportedBlock,
     UnsupportedInline,
     ...getExtensionClientEditorExtensions(),
@@ -325,6 +330,7 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // causing slash-command insertion to fail with
     // "RangeError: Unknown node type: inlineTimestamp".
     InlineTimestamp,
+    Clipboard,
   ];
 }
 

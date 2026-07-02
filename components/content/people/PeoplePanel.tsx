@@ -828,43 +828,40 @@ export function PeoplePanel() {
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="border-b border-white/10 px-3 py-3">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-700 dark:text-gray-200">People</h3>
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Groups, subgroups, and contacts</p>
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
+      <div className="border-b border-white/10 px-3 pt-3 pb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+          People
+        </p>
+        <div className="mt-1.5 flex items-center gap-1">
+          <div className="relative">
             <button
+              ref={addButtonRef}
               type="button"
-              onClick={() => selectedPersonId ? openProfile(selectedPersonId) : null}
-              disabled={!selectedPersonId}
-              className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-              title={selectedPersonId ? "Edit selected contact" : "Select one contact to edit profile"}
+              onClick={(event) => {
+                event.stopPropagation();
+                setShowAddMenu((current) => !current);
+              }}
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-gold-primary/40 text-gold-primary transition-colors hover:bg-gold-primary/10"
+              title="Add to People"
             >
-              <Pencil className="h-4 w-4" />
+              <Plus className="h-4 w-4" />
             </button>
-            <div className="relative">
-              <button
-                ref={addButtonRef}
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  setShowAddMenu((current) => !current);
-                }}
-                className="rounded p-1.5 text-gray-500 dark:text-gray-400 transition-colors hover:bg-gray-100 dark:hover:bg-white/10 hover:text-gray-900 dark:hover:text-white"
-                title="Add to People"
-              >
-                <Plus className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="rounded-full bg-gray-100 dark:bg-white/10 px-2 py-0.5 text-xs text-gray-500 dark:text-gray-300">
-              {isLoadingTree ? "Loading" : tree ? `${tree.stats.people} people` : "Loading"}
-            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => selectedPersonId ? openProfile(selectedPersonId) : null}
+            disabled={!selectedPersonId}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-gray-500 dark:text-gray-400 transition-colors hover:bg-black/[0.05] dark:hover:bg-white/[0.06] hover:text-gray-900 dark:hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+            title={selectedPersonId ? "Edit selected contact" : "Select one contact to edit profile"}
+          >
+            <Pencil className="h-4 w-4" />
+          </button>
+          <div className="ml-auto rounded-full bg-black/[0.05] dark:bg-white/10 px-2 py-0.5 text-[10px] text-gray-500 dark:text-gray-300">
+            {isLoadingTree ? "…" : tree ? `${tree.stats.people} people` : "…"}
           </div>
         </div>
 
-        <label className="relative block">
+        <label className="relative mt-2 block">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500 dark:text-gray-400" />
           <input
             value={query}

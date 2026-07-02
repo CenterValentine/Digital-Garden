@@ -91,6 +91,22 @@ interface UseConversationBindingParams {
   pendingUserPartsRef?: RefObject<unknown[] | null>;
   /** Notified after a successful auto-title so the caller can refresh UI. */
   onTitleChanged?: (conversationId: string) => void;
+  /**
+   * Single-fire flag for the transient-promote case (Stage 2). When the
+   * caller just created the conversation locally (so we know the server
+   * has zero messages for it) and the local in-memory chat is the
+   * source of truth, set this ref to `true` before the conversationId
+   * transitions from null → set. The load effect detects it on the
+   * first run, SKIPS the fetch + setMessages call (which would wipe
+   * the in-flight message), and resets the ref to false so subsequent
+   * navigations load normally.
+   *
+   * Without this, the binding hook's initial-load effect fetches the
+   * just-created conversation, gets `messages: []` from the server,
+   * and calls setMessages([]) — wiping the user's first message
+   * before it ever streams.
+   */
+  skipNextLoadRef?: RefObject<boolean>;
 }
 
 interface UseConversationBindingResult {
@@ -98,6 +114,12 @@ interface UseConversationBindingResult {
   loadingInitial: boolean;
   /** The loaded conversation title (null until loaded / for transient). */
   conversationTitle: string | null;
+  /**
+   * The conversation's persisted custom-instruction context id at load
+   * time (null until loaded / for transient). Consumers seed their local
+   * picker selection from this.
+   */
+  initialActiveContextId: string | null;
 }
 
 export function useConversationBinding({
@@ -112,6 +134,7 @@ export function useConversationBinding({
   truncateRef,
   pendingUserPartsRef,
   onTitleChanged,
+  skipNextLoadRef,
 }: UseConversationBindingParams): UseConversationBindingResult {
   // Ids already persisted to the DB — populated on load + each append.
   const savedIdsRef = useRef<Set<string>>(new Set());
@@ -126,6 +149,9 @@ export function useConversationBinding({
   const [conversationTitle, setConversationTitle] = useState<string | null>(
     null,
   );
+  const [initialActiveContextId, setInitialActiveContextId] = useState<
+    string | null
+  >(null);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -138,6 +164,20 @@ export function useConversationBinding({
       dbIdByClientIdRef.current = new Map();
       setLoadingInitial(false);
       setConversationTitle(null);
+      setInitialActiveContextId(null);
+      return;
+    }
+    // Stage 2 — transient promote: when the caller just created this
+    // conversation locally (so the server has no messages for it yet)
+    // the in-memory chat is authoritative. Skipping the fetch avoids
+    // a setMessages([]) call that would wipe the in-flight first
+    // message. Consume the ref so the next conversationId change
+    // loads normally.
+    if (skipNextLoadRef?.current) {
+      skipNextLoadRef.current = false;
+      savedIdsRef.current = new Set();
+      dbIdByClientIdRef.current = new Map();
+      setLoadingInitial(false);
       return;
     }
     savedIdsRef.current = new Set();
@@ -184,10 +224,15 @@ export function useConversationBinding({
         }
         if (cancelled) return;
         const data = (body as {
-          data?: { messages?: unknown[]; title?: string | null };
+          data?: {
+            messages?: unknown[];
+            title?: string | null;
+            activeContextId?: string | null;
+          };
         })?.data;
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
+        setInitialActiveContextId(data?.activeContextId ?? null);
 
         clientLogger.info({
           layer: "ui",
@@ -262,7 +307,13 @@ export function useConversationBinding({
     return () => {
       cancelled = true;
     };
-  }, [conversationId, setMessages, setActiveModelSelection, seedMessageStamps]);
+  }, [
+    conversationId,
+    setMessages,
+    setActiveModelSelection,
+    seedMessageStamps,
+    skipNextLoadRef,
+  ]);
 
   // ─── Persist-on-finish ───
   const persistTurns = useCallback(async (payload?: PersistFinishPayload) => {
@@ -396,5 +447,48 @@ export function useConversationBinding({
     };
   }, [conversationId, truncateRef]);
 
-  return { loadingInitial, conversationTitle };
+  // Live title sync: subscribe to /api/conversations/events for
+  // `conversation.updated` matching THIS conversationId. Without this,
+  // renaming the underlying ContentNode (which now mirrors title to the
+  // Conversation server-side) wouldn't reach an already-open ChatViewer —
+  // it only refetches `/api/conversations/[id]` on mount. The cache store
+  // also subscribes to the same endpoint; the duplicate EventSource is
+  // acceptable here because (a) the work this effect does is tiny, (b) we
+  // need a focused subscription tied to ChatViewer's lifecycle, and (c)
+  // HTTP/2 multiplexes the two streams over one connection in dev/prod.
+  //
+  // NB: the server uses NAMED SSE events (`event: conversation\ndata: …`)
+  // not generic messages, so we must `addEventListener(EVENT_NAME)` —
+  // `es.onmessage` would silently drop every event (and produced the
+  // initial "title doesn't update in the header" report).
+  useEffect(() => {
+    if (!conversationId) return;
+    if (typeof EventSource === "undefined") return;
+    const es = new EventSource("/api/conversations/events", {
+      withCredentials: true,
+    });
+    const handler = (e: MessageEvent) => {
+      try {
+        const event = JSON.parse(e.data) as
+          | { type: string; conversationId?: string; title?: string | null }
+          | null;
+        if (!event) return;
+        if (
+          event.type === "conversation.updated" &&
+          event.conversationId === conversationId
+        ) {
+          setConversationTitle(event.title ?? null);
+        }
+      } catch {
+        /* malformed event — ignore */
+      }
+    };
+    es.addEventListener("conversation", handler as EventListener);
+    return () => {
+      es.removeEventListener("conversation", handler as EventListener);
+      es.close();
+    };
+  }, [conversationId]);
+
+  return { loadingInitial, conversationTitle, initialActiveContextId };
 }

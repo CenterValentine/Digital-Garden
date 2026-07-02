@@ -46,6 +46,8 @@ export interface ToolDefinition {
   shortcut?: string;
   /** Whether this tool has an active/inactive toggle state */
   isToggle?: boolean;
+  /** Show icon only, hide label (for toolbar space optimization) */
+  iconOnly?: boolean;
   /** For sidebar-tab surface: the tab key used by RightSidebar */
   tabKey?: string;
 }

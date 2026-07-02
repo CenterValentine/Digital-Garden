@@ -49,9 +49,14 @@ const TAB_TITLES: Record<string, string> = {
 interface RightSidebarHeaderProps {
   activeTab: RightSidebarTab;
   onTabChange: (tab: RightSidebarTab) => void;
+  /**
+   * Sideview tabs are non-interactive until the active sidepanel has loaded
+   * (spec §3.4) — prevents the "clickable but no-op / wrong tab" window.
+   */
+  disabled?: boolean;
 }
 
-export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeaderProps) {
+export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }: RightSidebarHeaderProps) {
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -103,7 +108,10 @@ export function RightSidebarHeader({ activeTab, onTabChange }: RightSidebarHeade
             <button
               key={tool.id}
               onClick={() => onTabChange(tabKey)}
+              disabled={disabled}
               className={`flex flex-1 items-center justify-center px-4 py-3 transition-colors ${
+                disabled ? "cursor-default opacity-40" : ""
+              } ${
                 activeTab === tabKey
                   ? "border-b-2 border-gold-primary text-gold-primary"
                   : "text-gray-400 hover:text-gray-300"

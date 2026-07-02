@@ -37,6 +37,7 @@ next-env.d.ts
 
 # ── env files (opt-in for committing if needed) ─────────────────────────────
 .env*
+!.env.docker.example
 
 # ── local-only AI/developer artifacts ───────────────────────────────────────
 # Local agent / AI assistant working files. The `.claude/worktrees/` path

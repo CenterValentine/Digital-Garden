@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorContent, useEditor } from "@tiptap/react";
 import Document from "@tiptap/extension-document";
 import Paragraph from "@tiptap/extension-paragraph";
 import Text from "@tiptap/extension-text";
 import Placeholder from "@tiptap/extension-placeholder";
 import type { Editor, JSONContent } from "@tiptap/core";
-import { ImagePlus } from "lucide-react";
+import { Bold, Code, ImagePlus, Italic, Loader2, Volume2 } from "lucide-react";
+import { toast } from "sonner";
 import { getEditorExtensions } from "@/lib/domain/editor/extensions-client";
 import { useImagePasteHandler } from "@/lib/domain/editor/hooks/use-image-paste";
 import { EMPTY_TIPTAP_DOC, normalizeTiptapDoc } from "@/lib/domain/flashcards";
@@ -20,6 +21,14 @@ interface AdaptiveFlashcardEditorProps {
   editable?: boolean;
   ariaLabel: string;
   compact?: boolean;
+  /**
+   * One step smaller than `compact`. Removes the min-height entirely so
+   * the editor hugs its content (one line tall by default) and grows
+   * vertically as text wraps. Vertical padding is reduced too. Use for
+   * terse, one-line-default surfaces like the AI flashcard proposal
+   * card's front side. Overrides `compact` when both are set.
+   */
+  tight?: boolean;
 }
 
 function serialize(value: JSONContent) {
@@ -34,6 +43,7 @@ export function AdaptiveFlashcardEditor({
   editable = true,
   ariaLabel,
   compact = false,
+  tight = false,
 }: AdaptiveFlashcardEditorProps) {
   const lastValueRef = useRef(serialize(value || EMPTY_TIPTAP_DOC));
   const extensions = useMemo(() => {
@@ -68,10 +78,18 @@ export function AdaptiveFlashcardEditor({
     editorProps: {
       attributes: {
         "aria-label": ariaLabel,
-        class:
-          mode === "plain"
-            ? "flashcard-editor flashcard-editor-plain"
-            : "flashcard-editor flashcard-editor-rich",
+        // Class composes mode + tight. The tight class targets a
+        // globals.css override for `.ProseMirror.flashcard-editor-tight`
+        // which strips the 4rem bottom padding the main editor uses for
+        // the block-`+` button affordance — that padding doesn't apply
+        // here.
+        class: [
+          "flashcard-editor",
+          mode === "plain" ? "flashcard-editor-plain" : "flashcard-editor-rich",
+          tight ? "flashcard-editor-tight" : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
       },
       handleKeyDown: (_view, event) => {
         if (mode !== "plain" || event.key !== "Enter") return false;
@@ -116,50 +134,129 @@ export function AdaptiveFlashcardEditor({
   // OS file picker. Same pattern as MarkdownEditor's image upload.
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Mode A pronunciation: clicking 🔊 synthesizes speech for THIS side's text
+  // and appends an autoplay-on-flip audioEmbed. The click is the opt-in (no
+  // auto-spend); the speech route is auto-discovered server-side.
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const handleGeneratePronunciation = useCallback(async () => {
+    if (!editor || isGeneratingAudio) return;
+    const term = editor.getText().trim();
+    if (!term) {
+      toast.error("Add some text first", {
+        description: "Type the term you want pronounced, then click 🔊.",
+      });
+      return;
+    }
+    setIsGeneratingAudio(true);
+    const toastId = toast.loading("Generating pronunciation…");
+    try {
+      const res = await fetch("/api/flashcards/generate-card-audio", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ cards: [{ term }] }),
+      });
+      const json = (await res.json().catch(() => null)) as {
+        success?: boolean;
+        data?: { results?: Array<{ audioUrl?: string; error?: string }> };
+      } | null;
+      const result = json?.data?.results?.[0];
+      if (!res.ok || !json?.success || !result?.audioUrl) {
+        throw new Error(result?.error || "Speech generation failed");
+      }
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "audioEmbed",
+          attrs: {
+            blockId: crypto.randomUUID(),
+            src: result.audioUrl,
+            filename: term,
+            autoplayOnFlip: true,
+          },
+        })
+        .run();
+      toast.success("Pronunciation added", { id: toastId });
+    } catch (error) {
+      toast.error("Couldn't generate pronunciation", {
+        id: toastId,
+        description:
+          error instanceof Error ? error.message : "Speech generation failed",
+      });
+    } finally {
+      setIsGeneratingAudio(false);
+    }
+  }, [editor, isGeneratingAudio]);
+
   const isToolbarVisible = mode === "rich" && editable;
+
+  // Sizing: `tight` is the smallest — no min-height, the editor hugs
+  // its content and grows with wrapping. `compact` is the intermediate
+  // size used by the in-panel inline editor. Default is the full-size
+  // editor used by the dialog flows. When both flags are set, `tight`
+  // wins (the override-compact case for the AI proposal cards).
+  const sizingClassName = tight
+    ? ""
+    : compact
+      ? "min-h-[120px]"
+      : "min-h-[180px]";
 
   return (
     <div
-      className={`rounded-md border border-black/[0.06] dark:border-white/[0.06] bg-black/[0.04] dark:bg-white/[0.02] ${
-        compact ? "min-h-[120px]" : "min-h-[180px]"
-      }`}
+      className={`rounded-md border border-black/[0.08] dark:border-white/[0.12] bg-black/[0.04] dark:bg-white/[0.05] ${sizingClassName}`}
     >
       {isToolbarVisible ? (
-        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.06] dark:border-white/[0.06] px-2 py-1 text-xs">
+        <div className="flex min-h-11 items-center gap-1 overflow-x-auto border-b border-black/[0.08] dark:border-white/[0.12] px-2 py-1 text-xs">
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleBold().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Bold"
+            aria-label="Bold"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Bold
+            <Bold className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleItalic().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Italic"
+            aria-label="Italic"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Italic
+            <Italic className="h-3.5 w-3.5" />
           </button>
           <button
             type="button"
             onClick={() => editor?.chain().focus().toggleCodeBlock().run()}
-            className="min-h-9 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            title="Code block"
+            aria-label="Code block"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
-            Code
+            <Code className="h-3.5 w-3.5" />
           </button>
-          {/* Sprint 7: image-insert button. Opens the OS file picker;
-              on file pick we hand off to the same insertImageFromFile
-              the paste/drop pipeline uses, so all three paths share
-              upload + placeholder + swap-to-final logic. */}
+          <button
+            type="button"
+            onClick={handleGeneratePronunciation}
+            disabled={isGeneratingAudio}
+            title="Generate pronunciation"
+            aria-label="Generate pronunciation"
+            className="ml-auto flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10 disabled:opacity-50"
+          >
+            {isGeneratingAudio ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Volume2 className="h-3.5 w-3.5" />
+            )}
+          </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
             title="Insert image"
             aria-label="Insert image"
-            className="ml-auto inline-flex min-h-9 items-center gap-1 rounded px-2 text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
+            className="flex h-8 w-8 items-center justify-center rounded text-gray-700 dark:text-gray-300 hover:bg-black/[0.05] dark:hover:bg-white/10"
           >
             <ImagePlus className="h-3.5 w-3.5" />
-            Image
           </button>
           <input
             ref={fileInputRef}
@@ -175,7 +272,13 @@ export function AdaptiveFlashcardEditor({
           />
         </div>
       ) : null}
-      <div className="px-4 py-3 md:px-5 md:py-4">
+      <div
+        className={
+          tight
+            ? "px-3 py-1.5"
+            : "px-4 py-3 md:px-5 md:py-4"
+        }
+      >
         <EditorContent editor={editor} />
       </div>
     </div>

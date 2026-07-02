@@ -128,16 +128,27 @@ export function OutlinePanel({
                 style={{ paddingLeft: `${12 + indentation}px` }}
                 title={`Jump to: ${heading.text}`}
               >
-                {/* Heading level indicator (visual only) */}
-                <span
-                  className={`shrink-0 inline-block rounded-full ${
-                    isActive ? "bg-gold-primary" : "bg-gray-400"
-                  }`}
-                  style={{
-                    width: heading.level === 1 ? "6px" : heading.level === 2 ? "4px" : "3px",
-                    height: heading.level === 1 ? "6px" : heading.level === 2 ? "4px" : "3px",
-                  }}
-                />
+                {/* Heading level / type indicator */}
+                {heading.kind === "accordion" ? (
+                  <span
+                    className={`shrink-0 text-[8px] leading-none ${
+                      isActive ? "text-gold-primary" : "text-gray-400"
+                    }`}
+                    aria-label="accordion"
+                  >
+                    ▶
+                  </span>
+                ) : (
+                  <span
+                    className={`shrink-0 inline-block rounded-full ${
+                      isActive ? "bg-gold-primary" : "bg-gray-400"
+                    }`}
+                    style={{
+                      width: heading.level === 1 ? "6px" : heading.level === 2 ? "4px" : "3px",
+                      height: heading.level === 1 ? "6px" : heading.level === 2 ? "4px" : "3px",
+                    }}
+                  />
+                )}
 
                 {/* Heading text - truncate if too long */}
                 <span className="truncate">{heading.text}</span>

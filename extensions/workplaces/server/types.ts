@@ -72,6 +72,14 @@ export interface ContentWorkspaceResponse {
   createdAt: string;
   updatedAt: string;
   items: WorkspaceItemResponse[];
+  /**
+   * Title + type for every content id referenced by the saved pane layout
+   * (open tabs), keyed by contentId. This is a *superset* of `items` — open
+   * tabs are not always formal workspace assignments — so tabs paint named on
+   * the first frame regardless of assignment status (spec §3.8). Populated on
+   * read paths (list/get); may be empty on mutation responses.
+   */
+  contentMeta: Record<string, { title: string; contentType: string }>;
 }
 
 export interface WorkspaceOpenConflict {

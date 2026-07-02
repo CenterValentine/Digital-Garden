@@ -99,6 +99,7 @@ const { schema: mermaidBlockSchema, defaults: mermaidBlockDefaults } =
 
 registerBlock({
   type: "mermaidBlock",
+  ttsSkip: true, // diagram source — not narratable prose
   label: "Mermaid Diagram",
   description: "Embedded text-based diagram — collapses to a pill when not in use",
   iconName: "GitBranch",

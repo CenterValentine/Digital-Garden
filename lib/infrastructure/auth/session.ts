@@ -8,6 +8,10 @@ import {
   invalidateCachedSession,
   setCachedSession,
 } from "./session-cache";
+import { logger } from "@/lib/core/logger";
+
+// Renew when less than this much time remains on the session
+const SESSION_RENEW_THRESHOLD_MS = 2 * 24 * 60 * 60 * 1000; // 2 days
 
 const SESSION_COOKIE_NAME = "session_token";
 const EMBED_SESSION_HEADER = "x-embed-session";
@@ -82,6 +86,11 @@ export async function validateSession(
   }
 
   if (!sessionToken) {
+    logger.warn({
+      layer: "auth",
+      event: "session_validate:no_token",
+      summary: "validateSession: no session token in cookie or embed header — returning null",
+    });
     return null;
   }
 
@@ -113,11 +122,27 @@ export async function validateSession(
     // cost a DB hit. The TTL bounds correctness if the token is ever
     // legitimately created later.
     setCachedSession(sessionToken, null);
+    logger.warn({
+      layer: "auth",
+      event: "session_validate:not_in_db",
+      summary: "validateSession: token not found in DB — negative-cached and returning null",
+      attrs: { tokenPrefix: sessionToken.slice(0, 8) },
+    });
     return null;
   }
 
   // Check if session is expired
   if (new Date() > session.expiresAt) {
+    logger.warn({
+      layer: "auth",
+      event: "session_validate:expired",
+      summary: "validateSession: session found but expired — deleting and returning null",
+      attrs: {
+        sessionId: session.id,
+        expiresAt: session.expiresAt.toISOString(),
+        now: new Date().toISOString(),
+      },
+    });
     // Delete expired session
     await prisma.session.delete({ where: { id: session.id } });
     invalidateCachedSession(sessionToken);
@@ -129,6 +154,32 @@ export async function validateSession(
     sessionId: session.id,
     expiresAt: session.expiresAt,
   };
+
+  // Rolling renewal: extend the session if it's approaching expiry.
+  // This ensures active users never get signed out due to a stale session.
+  // We only touch the DB when renewal is needed (bounded by the threshold).
+  if (session.expiresAt.getTime() - Date.now() < SESSION_RENEW_THRESHOLD_MS) {
+    try {
+      const newExpiry = new Date(Date.now() + SESSION_DURATION_MS);
+      await prisma.session.update({
+        where: { id: session.id },
+        data: { expiresAt: newExpiry },
+      });
+      result.expiresAt = newExpiry;
+
+      const cookieStore = await cookies();
+      cookieStore.set(SESSION_COOKIE_NAME, sessionToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        expires: newExpiry,
+        path: "/",
+      });
+    } catch {
+      // Renewal is best-effort — don't break auth if the update fails.
+    }
+  }
+
   setCachedSession(sessionToken, result);
   return result;
 }

@@ -1,12 +1,39 @@
+import { loadUrlPresets, resolvePreset, applyUrlStrategy } from "../url-strategy.js";
+
 const DG_OVERLAY_ROOT_ID = "dg-browser-overlay-root";
 const DG_OVERLAY_APP_ROUTE = "/content/";
 const DG_OVERLAY_IDLE_MS = 2400;
 const DG_OVERLAY_MAX_CONNECTIONS = 5;
 const DG_LAUNCHER_SIZE = 58;
+// Stale threshold: force-refetch data older than this when re-opening the panel
+const DG_OVERLAY_STALE_MS = 5 * 60 * 1000;
+// How long to wait for the background service worker before giving up
+const DG_RUNTIME_MSG_TIMEOUT_MS = 10000;
+
+// chrome.storage.local keys for persistent UI state
+const DG_STORAGE_WORKSPACE_KEY = "dgSelectedWorkspaceId";
+const DG_STORAGE_TREE_SORT_KEY = "dgTreeSortMode";
+const DG_STORAGE_TREE_EXPANDED_PREFIX = "dgTreeExpanded:";
+const DG_STORAGE_RECENTLY_VIEWED_KEY = "dgRecentlyViewed";
 
 function runtimeMessage(message) {
   return new Promise((resolve, reject) => {
+    let settled = false;
+
+    // Guard against MV3 service worker timing out: if the background worker
+    // was terminated and hasn't restarted, the sendMessage callback never
+    // fires — leaving the promise pending forever. Rejecting after a timeout
+    // surfaces a recoverable error instead of an infinite loading state.
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("__timeout__"));
+    }, DG_RUNTIME_MSG_TIMEOUT_MS);
+
     chrome.runtime.sendMessage(message, (response) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
       if (chrome.runtime.lastError) {
         reject(new Error(chrome.runtime.lastError.message));
         return;
@@ -36,6 +63,17 @@ function normalizeComparableUrl(url) {
   } catch {
     return String(url || "").trim();
   }
+}
+
+// ── URL strategy state (populated async on init) ──────────────────────────
+// Falls back to normalizeComparableUrl (exact-URL matching) until presets load.
+let _urlPresetMap = null;
+let _urlStrategyOverrides = {};
+
+function applyUrlStrategyToHref(href) {
+  if (!_urlPresetMap) return normalizeComparableUrl(href);
+  const preset = resolvePreset(href, _urlPresetMap, _urlStrategyOverrides);
+  return applyUrlStrategy(href, preset);
 }
 
 function getCanonicalUrl() {
@@ -139,6 +177,22 @@ function treeIconMarkup(node, isOpen) {
   return svg('<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/>');
 }
 
+function treeNodeTitle(node) {
+  const candidates = [
+    node.title,
+    node.name,
+    node.displayName,
+    node.contentTitle,
+    node.label,
+    node.slug,
+  ];
+  const value = candidates.find(
+    (candidate) => typeof candidate === "string" && candidate.trim()
+  );
+  if (value) return value.trim();
+  return `Untitled ${node.contentType || "content"}`;
+}
+
 function initials(label) {
   return String(label || "")
     .split(/\s+/)
@@ -190,10 +244,11 @@ function selectorForElement(element) {
   return segments.join(" > ") || "body";
 }
 
-function openAppContent(appBaseUrl, contentId) {
+function openAppContent(appBaseUrl, contentId, workspaceId) {
   if (!appBaseUrl || !contentId) return;
   const url = new URL(DG_OVERLAY_APP_ROUTE, appBaseUrl);
   url.searchParams.set("content", contentId);
+  if (workspaceId) url.searchParams.set("workspace", workspaceId);
   window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
@@ -237,6 +292,35 @@ async function saveDomainMemory(hostname, data, scope) {
     } else {
       await chrome.storage.local.set({ dgSnapDefault: value });
     }
+  } catch { /* best-effort */ }
+}
+
+async function saveDomainDefaultDeck(hostname, deckId) {
+  try {
+    const existing = await loadDomainMemory(hostname);
+    await saveDomainMemory(hostname, { ...existing, defaultDeckId: deckId }, "hostname");
+  } catch { /* best-effort */ }
+}
+
+const DG_FLASHCARD_HISTORY_MAX = 50;
+
+async function loadLocalFlashcardHistory(hostname) {
+  try {
+    const etld1 = getEtld1(hostname);
+    const result = await chrome.storage.local.get(`dgFlashcardHistory:${etld1}`);
+    return result[`dgFlashcardHistory:${etld1}`] || [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveLocalFlashcard(hostname, card) {
+  try {
+    const etld1 = getEtld1(hostname);
+    const key = `dgFlashcardHistory:${etld1}`;
+    const existing = await loadLocalFlashcardHistory(hostname);
+    existing.push(card);
+    await chrome.storage.local.set({ [key]: existing.slice(-DG_FLASHCARD_HISTORY_MAX) });
   } catch { /* best-effort */ }
 }
 
@@ -303,6 +387,20 @@ async function openSnapPanel(state) {
   state.root.setAttribute("data-panel-open", "true");
   if (state.snap === "floating") applyFloatingPanelPosition(state);
   markActivity(state);
+
+  // Evict cached data that is older than DG_OVERLAY_STALE_MS (5 min).
+  // This handles tabs that have been sitting open for a long time —
+  // associations change, content tree grows, sessions expire. Better to
+  // show a brief loading flash than silently display hours-old state.
+  const now = Date.now();
+  if (state.resourceContext && (now - (state.fetchedAt?.associations ?? 0)) > DG_OVERLAY_STALE_MS) {
+    state.resourceContext = null;
+    state.domainAssociations = null;
+  }
+  if (state.contentTree && (now - (state.fetchedAt?.tree ?? 0)) > DG_OVERLAY_STALE_MS) {
+    state.contentTree = null;
+  }
+
   const renderAssoc = async () => {
     if (!state.resourceContext) {
       renderStatus(state.popoverBodies.associations, "Loading page context…");
@@ -310,9 +408,14 @@ async function openSnapPanel(state) {
         await loadResourceContext(state);
         renderAssociationsPopover(state);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Failed to load";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.associations, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+        renderLoadError(state.popoverBodies.associations, e, {
+          onRetry: () => {
+            renderStatus(state.popoverBodies.associations, "Retrying…");
+            loadResourceContext(state)
+              .then(() => renderAssociationsPopover(state))
+              .catch((re) => renderLoadError(state.popoverBodies.associations, re));
+          },
+        });
       }
     } else {
       renderAssociationsPopover(state);
@@ -326,9 +429,14 @@ async function openSnapPanel(state) {
         await loadContentTree(state, { workspaceId });
         renderTreePopover(state);
       } catch (e) {
-        const msg = e instanceof Error ? e.message : "Failed to load tree";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
+        renderLoadError(state.popoverBodies.tree, e, {
+          onRetry: () => {
+            renderStatus(state.popoverBodies.tree, "Retrying…");
+            loadContentTree(state, { workspaceId })
+              .then(() => renderTreePopover(state))
+              .catch((re) => renderLoadError(state.popoverBodies.tree, re));
+          },
+        });
       }
     } else {
       renderTreePopover(state);
@@ -445,6 +553,25 @@ async function loadWorkspaces(state) {
   } catch {
     state.workspaces = [];
   }
+  // Default the content tree to the user's MAIN workspace. Prefer isMain
+  // unconditionally — even when main has no view-root (it then shows the global
+  // root, which the picker's role filter keeps clean) — because "default to
+  // main" is the user's stated preference. Only fall back to a view-root'd
+  // workspace if there's no main at all. Auto-selects once, and never overrides
+  // an explicit user choice (including a deliberate "All content" selection).
+  if (!state.workspaceAutoSelected && !state.selectedWorkspaceId) {
+    const list = state.workspaces || [];
+    const preferred =
+      list.find((w) => w.isMain) ||
+      list.find((w) => w.viewRootContentId) ||
+      list[0] ||
+      null;
+    if (preferred) {
+      state.selectedWorkspaceId = preferred.id;
+      state.loadedForWorkspaceId = null; // force the next tree load to refetch
+    }
+  }
+  state.workspaceAutoSelected = true;
 }
 
 function renderWorkspaceSelector(state) {
@@ -664,6 +791,11 @@ function overlayStyles() {
       line-height: 1.45;
     }
     .dg-status[data-tone="error"] { color: #ffd6d6; }
+    .dg-error-card { margin: 10px 13px; padding: 10px 12px; border-radius: 8px; background: rgba(200,60,60,0.1); border: 1px solid rgba(200,60,60,0.22); display: flex; flex-direction: column; gap: 5px; }
+    .dg-error-heading { font-size: 12px; font-weight: 600; color: #ffd6d6; }
+    .dg-error-body { font-size: 11px; color: rgba(255,200,200,0.72); line-height: 1.45; }
+    .dg-error-action { margin-top: 4px; padding: 4px 10px; border-radius: 5px; border: 1px solid rgba(255,180,180,0.25); background: rgba(255,120,120,0.1); color: #ffcece; font: inherit; font-size: 11px; cursor: pointer; align-self: flex-start; }
+    .dg-error-action:hover { background: rgba(255,120,120,0.18); }
 
     /* ── Association list ── */
     .dg-list-item {
@@ -708,9 +840,9 @@ function overlayStyles() {
     .dg-tree-kind { width: 15px; height: 15px; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; color: rgba(255,255,255,0.62); }
     .dg-tree-svg { width: 15px; height: 15px; display: block; }
     .dg-tree-emoji { font-size: 13px; line-height: 1; }
-    .dg-tree-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
-    .dg-tree-title { color: rgba(255,255,255,0.88); font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .dg-tree-subtitle { color: rgba(255,255,255,0.4); font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-meta { display: flex; flex-direction: column; gap: 1px; min-width: 0; width: 0; flex: 1 1 auto; }
+    .dg-tree-title { display: block; color: rgba(255,255,255,0.88); font-size: 12px; font-weight: 500; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dg-tree-subtitle { display: block; color: rgba(255,255,255,0.4); font-size: 10px; line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .dg-tree-actions { display: flex; align-items: center; gap: 3px; flex-shrink: 0; opacity: 0; transition: opacity 0.12s; }
     .dg-tree-row:hover .dg-tree-actions { opacity: 1; }
 
@@ -752,6 +884,9 @@ function overlayStyles() {
     .dg-panel-content {
       height: calc(100% - 53px); display: flex; flex-direction: column;
       gap: 12px; padding: 14px; overflow: auto;
+    }
+    .dg-floating-panel[data-content-kind="note"] .dg-panel-content {
+      gap: 0; padding: 0; overflow: hidden;
     }
     .dg-panel-content[data-loading="true"] { opacity: 0.62; pointer-events: none; }
     .dg-editor-stack { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
@@ -816,6 +951,47 @@ function overlayStyles() {
     .dg-domain-search-input:focus { border-color: rgba(255,255,255,0.2); }
     .dg-delete-assoc { flex-shrink: 0; color: rgba(255,100,100,0.72); border-color: rgba(255,100,100,0.2); }
     .dg-delete-assoc:hover { color: #ff9090; background: rgba(255,80,80,0.12); }
+    .dg-assoc-flashcards { border-top: 1px solid rgba(255,255,255,0.05); padding: 4px 0 0; }
+    .dg-section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.06em; color: rgba(255,255,255,0.28); padding: 6px 12px 4px; text-transform: uppercase; }
+    .dg-flashcard-hist-item { padding: 5px 12px; border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .dg-flashcard-hist-item:last-child { border-bottom: 0; }
+    .dg-flashcard-hist-front { font-size: 11px; color: rgba(255,255,255,0.72); font-weight: 500; line-height: 1.3; }
+    .dg-flashcard-hist-back { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 1px; line-height: 1.3; }
+    .dg-flashcard-hist-meta { font-size: 10px; color: rgba(255,255,255,0.28); margin-top: 2px; }
+    .dg-flashcard-section { border-top: 1px solid rgba(255,255,255,0.05); }
+    .dg-flashcard-toggle { width:100%; display:flex; align-items:center; gap:6px; padding:7px 12px; border:0; background:transparent; color:rgba(255,255,255,0.42); font:inherit; font-size:11px; cursor:pointer; text-align:left; }
+    .dg-flashcard-toggle:hover { background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.72); }
+    .dg-flashcard-toggle-icon { font-size:9px; flex-shrink:0; }
+    .dg-flashcard-toggle-badge { margin-left:auto; background:rgba(201,168,108,0.18); color:#c9a86c; border-radius:4px; padding:1px 5px; font-size:10px; font-weight:600; }
+    .dg-flashcard-body { border-top:1px solid rgba(255,255,255,0.05); padding:8px 12px 10px; display:flex; flex-direction:column; gap:7px; }
+    .dg-flashcard-hint { font-size:11px; color:rgba(255,255,255,0.38); line-height:1.4; }
+    .dg-flashcard-hint em { color:rgba(255,255,255,0.65); font-style:normal; }
+    .dg-flashcard-side-btns { display:flex; gap:6px; }
+    .dg-flashcard-side-btn { flex:1; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font:inherit; font-size:11px; cursor:pointer; }
+    .dg-flashcard-side-btn:hover:not(:disabled) { background:rgba(255,255,255,0.08); }
+    .dg-flashcard-side-btn:disabled { opacity:0.32; cursor:not-allowed; }
+    .dg-flashcard-side-btn--secondary { opacity:0.65; }
+    .dg-flashcard-label { font-size:10px; color:rgba(255,255,255,0.38); margin-bottom:2px; }
+    .dg-flashcard-textarea { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.25); color:rgba(255,255,255,0.85); font:inherit; font-size:11px; resize:vertical; min-height:36px; box-sizing:border-box; }
+    .dg-flashcard-textarea:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-flashcard-deck-select { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(20,20,20,0.85); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; }
+    .dg-flashcard-deck-select:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-deck-ac { position:relative; }
+    .dg-deck-ac-input { width:100%; padding:5px 8px; border-radius:6px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.25); color:rgba(255,255,255,0.85); font:inherit; font-size:11px; box-sizing:border-box; }
+    .dg-deck-ac-input:focus { outline:none; border-color:rgba(255,255,255,0.2); }
+    .dg-deck-dropdown { position:absolute; z-index:10; top:calc(100% + 2px); left:0; right:0; max-height:140px; overflow-y:auto; border-radius:6px; border:1px solid rgba(255,255,255,0.12); background:rgba(22,24,30,0.97); box-shadow:0 4px 16px rgba(0,0,0,0.5); }
+    .dg-deck-dropdown[hidden] { display:none; }
+    .dg-deck-option { display:block; width:100%; padding:5px 9px; border:0; background:transparent; color:rgba(255,255,255,0.75); font:inherit; font-size:11px; text-align:left; cursor:pointer; }
+    .dg-deck-option:hover, .dg-deck-option[data-selected] { background:rgba(201,168,108,0.14); color:#c9a86c; }
+    .dg-flashcard-inline-capture { background:none; border:none; color:rgba(201,168,108,0.8); font:inherit; font-size:10px; cursor:pointer; padding:0; text-decoration:underline; }
+    .dg-flashcard-actions { display:flex; gap:6px; justify-content:flex-end; margin-top:2px; }
+    .dg-flashcard-btn { padding:4px 10px; border-radius:5px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.75); font:inherit; font-size:11px; cursor:pointer; }
+    .dg-flashcard-btn:hover:not(:disabled) { background:rgba(255,255,255,0.1); }
+    .dg-flashcard-btn[data-primary] { background:rgba(201,168,108,0.18); border-color:rgba(201,168,108,0.35); color:#c9a86c; }
+    .dg-flashcard-btn[data-primary]:hover:not(:disabled) { background:rgba(201,168,108,0.26); }
+    .dg-flashcard-btn:disabled { opacity:0.45; cursor:not-allowed; }
+    .dg-flashcard-error { font-size:11px; color:rgba(220,80,80,0.9); }
+    .dg-flashcard-success { font-size:11px; color:rgba(120,200,120,0.9); text-align:center; padding:4px 0; }
     .dg-panel-collapsed {
       position: fixed; left: 18px; bottom: 18px; display: none;
       align-items: center; gap: 8px; border-radius: 999px;
@@ -958,6 +1134,10 @@ function createOverlayApp(state) {
 }
 
 function schedulePersist(state, contentId) {
+  // Every per-resource persist is also a signal that the tab's open-panel set
+  // may have changed (geometry, collapse, reopen, drag) — keep the tab-scoped
+  // snapshot in sync so navigation restores the latest layout.
+  scheduleTabPersist(state);
   const timer = state.persistTimers.get(contentId);
   if (timer) {
     clearTimeout(timer);
@@ -995,6 +1175,80 @@ function schedulePersist(state, contentId) {
       });
     }, 220)
   );
+}
+
+// ── Tab-scoped panel persistence ─────────────────────────────────────────────
+// Open panels are bound to a page's WebResource (URL) for restore-on-reload.
+// That means in-tab navigation (browsing the same site) drops them. To keep a
+// note open while the user explores, we ALSO snapshot the currently-open panels
+// to tab-scoped session storage (via the background, keyed by sender.tab.id)
+// and restore them when navigating within the same hostname.
+function scheduleTabPersist(state) {
+  if (state.tabPersistTimer) clearTimeout(state.tabPersistTimer);
+  state.tabPersistTimer = setTimeout(() => {
+    state.tabPersistTimer = null;
+    const panels = Array.from(state.openPanels.values())
+      .filter((panel) => panel.state !== "closed")
+      .map((panel) => ({
+        contentId: panel.contentId,
+        kind: panel.kind,
+        title: panel.title || null,
+        state: panel.state,
+        host: window.location.hostname,
+        // Embedded panels anchor to a page element that won't exist after
+        // navigation — restore them as floating.
+        layoutMode: panel.layoutMode === "embedded" ? "floating" : panel.layoutMode,
+        dockSide: panel.dockSide || null,
+        positionX: panel.positionX,
+        positionY: panel.positionY,
+        width: panel.width,
+        height: panel.height,
+        opacity: panel.opacity,
+      }));
+    runtimeMessage({ type: "save-tab-panels", payload: { panels } }).catch(
+      () => {}
+    );
+  }, 250);
+}
+
+// Re-open the panels that were open in this tab on the same hostname.
+// Runs after restorePanelsFromState, so resource-bound panels win and we only
+// add the ones not already open (dedupe by contentId).
+async function restoreTabStickyPanels(state) {
+  let descriptors;
+  try {
+    descriptors = await runtimeMessage({ type: "get-tab-panels" });
+  } catch {
+    return;
+  }
+  if (!Array.isArray(descriptors)) return;
+  const currentHost = window.location.hostname;
+  for (const descriptor of descriptors) {
+    if (!descriptor?.contentId || state.openPanels.has(descriptor.contentId)) {
+      continue;
+    }
+    // Skip panels opened on a different hostname — they belong to another site.
+    if (descriptor.host && descriptor.host !== currentHost) {
+      continue;
+    }
+    const item = { id: descriptor.contentId, title: descriptor.title || null };
+    const persisted = {
+      state: descriptor.state === "collapsed" ? "collapsed" : "open",
+      layoutMode:
+        descriptor.layoutMode === "embedded"
+          ? "floating"
+          : descriptor.layoutMode || "floating",
+      dockSide: descriptor.dockSide || "right",
+      positionX: descriptor.positionX ?? null,
+      positionY: descriptor.positionY ?? null,
+      width: descriptor.width ?? 420,
+      height: descriptor.height ?? null,
+      opacity: descriptor.opacity ?? 1,
+      embeddedSelector: null, // page changed — no element to anchor to
+      metadata: {},
+    };
+    createContentPanel(state, item, descriptor.kind || "note", persisted);
+  }
 }
 
 function setIdle(state, idle) {
@@ -1081,9 +1335,67 @@ function renderStatus(container, text, tone = "") {
   container.innerHTML = `<div class="dg-status"${tone ? ` data-tone="${tone}"` : ""}>${escapeHtml(text)}</div>`;
 }
 
+// Renders a structured error card for auth and service failures — more
+// actionable than a plain renderStatus error string.
+function renderErrorCard(container, { heading, body, action = null }) {
+  const actionHtml = action
+    ? `<button class="dg-error-action" type="button" data-error-action="${escapeHtml(action.type)}">${escapeHtml(action.label)}</button>`
+    : "";
+  container.innerHTML = `
+    <div class="dg-error-card">
+      <div class="dg-error-heading">${escapeHtml(heading)}</div>
+      <div class="dg-error-body">${escapeHtml(body)}</div>
+      ${actionHtml}
+    </div>
+  `;
+}
+
+function classifyLoadError(err) {
+  const msg = err instanceof Error ? err.message : String(err);
+  if (msg === "__timeout__") return "timeout";
+  if (/token|trusted|unauthorized|401|auth/i.test(msg)) return "auth";
+  if (/network|fetch|reach/i.test(msg)) return "network";
+  return "unknown";
+}
+
+function renderLoadError(container, err, { onRetry = null } = {}) {
+  const kind = classifyLoadError(err);
+  if (kind === "timeout") {
+    renderErrorCard(container, {
+      heading: "Extension waking up…",
+      body: "The background service is restarting. Click Retry to load.",
+      action: onRetry ? { type: "retry-load", label: "Retry" } : null,
+    });
+    // Auto-retry once after 2 s — service workers usually restart within that window
+    if (onRetry) setTimeout(onRetry, 2000);
+    return;
+  }
+  if (kind === "auth") {
+    renderErrorCard(container, {
+      heading: "Not signed in",
+      body: "Your Digital Garden session has expired. Sign in to reconnect.",
+      action: { type: "open-dg-app", label: "Open Digital Garden" },
+    });
+    return;
+  }
+  if (kind === "network") {
+    renderErrorCard(container, {
+      heading: "Can't reach Digital Garden",
+      body: "Check your connection or app URL in extension settings.",
+      action: onRetry ? { type: "retry-load", label: "Retry" } : { type: "open-settings", label: "Open settings" },
+    });
+    return;
+  }
+  const raw = err instanceof Error ? err.message : String(err);
+  renderStatus(container, raw, "error");
+}
+
 function resourcePayload() {
+  // Apply the domain's URL strategy before sending to the server so that
+  // note association uses the same canonical form as _onUrlChange comparisons.
+  const strategyUrl = applyUrlStrategyToHref(window.location.href);
   return {
-    url: window.location.href,
+    url: strategyUrl ?? window.location.href,
     canonicalUrl: getCanonicalUrl(),
     title: document.title || window.location.hostname,
     faviconUrl: getFaviconUrl(),
@@ -1104,6 +1416,7 @@ async function loadResourceContext(state) {
     type: "fetch-resource-context",
     payload: resourcePayload(),
   });
+  state.fetchedAt = { ...state.fetchedAt, associations: Date.now() };
   if (prevId !== state.resourceContext?.resource?.id) {
     state.domainAssociations = null;
     state.domainAssociationsExpanded = false;
@@ -1121,6 +1434,15 @@ async function loadContentTree(state, { workspaceId = null, force = false } = {}
     payload: { workspaceId: workspaceId || null },
   });
   state.loadedForWorkspaceId = workspaceId || null;
+  state.fetchedAt = { ...state.fetchedAt, tree: Date.now() };
+
+  // Restore persisted folder expansion for this workspace
+  const storageKey = `${DG_STORAGE_TREE_EXPANDED_PREFIX}${workspaceId || "all"}`;
+  const stored = await chrome.storage.local.get(storageKey).catch(() => ({}));
+  state.expandedTreeIds = Array.isArray(stored[storageKey])
+    ? new Set(stored[storageKey])
+    : new Set();
+
   return state.contentTree;
 }
 
@@ -1175,6 +1497,188 @@ function schedulePanelAutosave(panel, saveFn, message = "Saving…") {
   }, 1400);
 }
 
+function renderFlashcardSection(state) {
+  const fc = state.flashcard;
+  const isExpanded = fc.expanded || fc.phase !== "idle";
+  const hasSel = Boolean(state._pendingSelectionText);
+
+  let headerLabel = "Flashcard from page";
+  if (fc.phase === "has-front") headerLabel = "Flashcard — add back side";
+  else if (fc.phase === "confirming") headerLabel = "Create flashcard";
+
+  const badge = (hasSel && fc.phase === "idle")
+    ? `<span class="dg-flashcard-toggle-badge">text selected</span>` : "";
+
+  const section = document.createElement("div");
+  section.className = "dg-flashcard-section";
+  section.innerHTML = `
+    <button class="dg-flashcard-toggle" type="button" data-action="toggle-flashcard">
+      <span class="dg-flashcard-toggle-icon">${isExpanded ? "▾" : "▸"}</span>
+      <span>${escapeHtml(headerLabel)}</span>
+      ${badge}
+    </button>
+  `;
+
+  if (!isExpanded) return section;
+
+  const body = document.createElement("div");
+  body.className = "dg-flashcard-body";
+
+  if (fc.phase === "idle") {
+    const selPreview = hasSel
+      ? `Selected: "<em>${escapeHtml(state._pendingSelectionText.slice(0, 80))}${state._pendingSelectionText.length > 80 ? "…" : ""}</em>"`
+      : null;
+    body.innerHTML = `
+      ${selPreview ? `<div class="dg-flashcard-hint">${selPreview}</div>` : ""}
+      ${hasSel ? `
+        <button class="dg-flashcard-side-btn" type="button" data-action="flashcard-capture-front" style="width:100%">
+          Use selection as front side →
+        </button>
+      ` : ""}
+      <button class="dg-flashcard-side-btn${hasSel ? " dg-flashcard-side-btn--secondary" : ""}" type="button"
+        data-action="flashcard-type-manually" style="width:100%">
+        Add flashcard
+      </button>
+    `;
+  } else if (fc.phase === "has-front") {
+    const currentPath = (fc.decks || []).find((d) => d.id === fc.deckId)?.path ?? fc.deckPath ?? "";
+    const deckListItems = (fc.decks || [])
+      .map((d) => `<button class="dg-deck-option" type="button" data-action="fc-deck-pick" data-deck-id="${escapeHtml(d.id)}" data-deck-path="${escapeHtml(d.path)}">${escapeHtml(d.path)}</button>`)
+      .join("");
+    const deckPicker = fc.decks === null
+      ? `<div class="dg-flashcard-hint">Loading decks…</div>`
+      : fc.decks.length === 0
+        ? `<div class="dg-flashcard-hint">No decks found — create one in Digital Garden first.</div>`
+        : `<div class="dg-deck-ac">
+            <input type="text" class="dg-deck-ac-input" data-fc-field="deck-path"
+              placeholder="Type to search decks…" value="${escapeHtml(currentPath)}"
+              autocomplete="off" spellcheck="false">
+            <div class="dg-deck-dropdown" hidden>${deckListItems}</div>
+          </div>`;
+
+    body.innerHTML = `
+      ${fc.error ? `<div class="dg-flashcard-error">${escapeHtml(fc.error)}</div>` : ""}
+      <div>
+        <div class="dg-flashcard-label">Front</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="front" rows="2" placeholder="Type front side…">${escapeHtml(fc.frontText)}</textarea>
+      </div>
+      <div>
+        <div class="dg-flashcard-label">Back${hasSel ? ` — <button class="dg-flashcard-inline-capture" type="button" data-action="flashcard-capture-back">capture selection</button>` : ""}</div>
+        <textarea class="dg-flashcard-textarea" data-fc-field="back" rows="2" placeholder="Type back side…">${escapeHtml(fc.backText)}</textarea>
+      </div>
+      <div>
+        <div class="dg-flashcard-label">Skill path</div>
+        ${deckPicker}
+      </div>
+      <div class="dg-flashcard-actions">
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-cancel">Cancel</button>
+        <button class="dg-flashcard-btn" type="button" data-action="flashcard-submit" data-primary
+          ${fc.submitting ? "disabled" : ""}>${fc.submitting ? "Saving…" : "Create"}</button>
+      </div>
+    `;
+  }
+
+  section.appendChild(body);
+  return section;
+}
+
+async function loadFlashcardDecksIfNeeded(state) {
+  if (state.flashcard.decks !== null) return;
+  try {
+    const result = await runtimeMessage({ type: "fetch-flashcard-decks" });
+    const decks = result?.decks || [];
+    state.flashcard.decks = decks;
+    if (!state.flashcard.deckId && decks.length > 0) {
+      // Prefer the domain's last-used deck, fall back to first
+      const preferred = decks.find((d) => d.id === state.flashcard.defaultDeckId);
+      const chosen = preferred ?? decks[0];
+      state.flashcard.deckId = chosen.id;
+      state.flashcard.deckPath = chosen.path ?? "";
+    }
+  } catch (_err) {
+    state.flashcard.decks = [];
+    state.flashcard.error = "Could not load skill decks — is the Digital Garden app running?";
+  }
+  if (state.panelOpen && state.popoverBodies.associations) {
+    renderAssociationsPopover(state);
+  }
+}
+
+async function submitFlashcard(state) {
+  const body = state.popoverBodies.associations?.querySelector(".dg-flashcard-body");
+  const frontText = (body?.querySelector("[data-fc-field='front']")?.value ?? state.flashcard.frontText).trim();
+  const backText = (body?.querySelector("[data-fc-field='back']")?.value ?? state.flashcard.backText).trim();
+  const typedPath = (body?.querySelector("[data-fc-field='deck-path']")?.value ?? "").trim();
+  const matchedDeck = typedPath ? (state.flashcard.decks || []).find((d) => d.path === typedPath) : null;
+  const deckId = matchedDeck?.id ?? state.flashcard.deckId;
+
+  if (!frontText || !backText) {
+    state.flashcard.error = "Both sides need text before saving.";
+    renderAssociationsPopover(state);
+    return;
+  }
+  if (!deckId) {
+    state.flashcard.error = typedPath
+      ? `No deck matches "${typedPath}" — pick one from the list.`
+      : "Please select a deck.";
+    renderAssociationsPopover(state);
+    return;
+  }
+
+  state.flashcard.frontText = frontText;
+  state.flashcard.backText = backText;
+  state.flashcard.deckId = deckId;
+  state.flashcard.submitting = true;
+  state.flashcard.error = null;
+  renderAssociationsPopover(state);
+
+  try {
+    const result = await runtimeMessage({
+      type: "create-flashcard",
+      payload: { frontText, backText, deckId, sourceUrl: window.location.href, sourceTitle: document.title || null },
+    });
+    // runtimeMessage rejects on failure — if we reach here the card was created.
+    const cardId = result?.id || null;
+
+    // Persist the chosen deck for this domain and save to local history
+    const hostname = window.location.hostname;
+    const deckName = (state.flashcard.decks || []).find((d) => d.id === deckId)?.name || null;
+    void saveDomainDefaultDeck(hostname, deckId);
+    void saveLocalFlashcard(hostname, {
+      cardId, frontText, backText, deckId, deckName,
+      createdAt: new Date().toISOString(),
+      pageUrl: window.location.href,
+      pageTitle: document.title || null,
+    }).then(() => {
+      loadLocalFlashcardHistory(hostname).then((history) => { state.localFlashcards = history; });
+    });
+
+    // Reset to idle, preserving deck selection for the next card
+    const savedDeckPath = matchedDeck?.path ?? state.flashcard.deckPath ?? "";
+    state.flashcard = {
+      phase: "idle", frontText: "", backText: "",
+      deckId, deckPath: savedDeckPath, defaultDeckId: state.flashcard.defaultDeckId,
+      decks: state.flashcard.decks,
+      expanded: false, submitting: false, error: null,
+    };
+    // Brief success flash by expanding with a success state, then collapsing
+    state.flashcard.expanded = true;
+    renderAssociationsPopover(state);
+    const successEl = state.popoverBodies.associations?.querySelector(".dg-flashcard-body");
+    if (successEl) {
+      successEl.innerHTML = `<div class="dg-flashcard-success">✓ Flashcard saved</div>`;
+    }
+    setTimeout(() => {
+      state.flashcard.expanded = false;
+      if (state.panelOpen && state.popoverBodies.associations) renderAssociationsPopover(state);
+    }, 1800);
+  } catch (err) {
+    state.flashcard.submitting = false;
+    state.flashcard.error = err instanceof Error ? err.message : "Failed to save flashcard";
+    renderAssociationsPopover(state);
+  }
+}
+
 function renderDomainBody(state) {
   const data = state.domainAssociations;
   if (data === "loading") {
@@ -1219,6 +1723,8 @@ function renderAssociationsPopover(state) {
   const context = state.resourceContext;
   if (!context) {
     renderStatus(container, "This page is not connected to Digital Garden yet.");
+    appendLocalFlashcardHistorySection(container, state);
+    container.appendChild(renderFlashcardSection(state));
     return;
   }
 
@@ -1227,10 +1733,23 @@ function renderAssociationsPopover(state) {
   const externalContents = context.externalContents || [];
 
   if (associations.length === 0 && externalContents.length === 0) {
-    renderStatus(
-      container,
-      "No associated content was found for this webpage yet. Use the content tree to associate a note or content item."
-    );
+    container.innerHTML = `<div class="dg-status">No associated content was found for this webpage yet. Use the content tree to associate a note or content item.</div>`;
+    const hostname = state.resourceContext?.resource?.sourceHostname;
+    if (hostname) {
+      const domainSection = document.createElement("div");
+      domainSection.className = "dg-domain-section";
+      const isExpanded = state.domainAssociationsExpanded;
+      domainSection.innerHTML = `
+        <button class="dg-domain-toggle" type="button" data-action="toggle-domain-assoc">
+          <span class="dg-domain-toggle-icon">${isExpanded ? "▾" : "▸"}</span>
+          <span>More from ${escapeHtml(hostname)}</span>
+        </button>
+        ${isExpanded ? `<div class="dg-domain-body">${renderDomainBody(state)}</div>` : ""}
+      `;
+      container.appendChild(domainSection);
+    }
+    appendLocalFlashcardHistorySection(container, state);
+    container.appendChild(renderFlashcardSection(state));
     return;
   }
 
@@ -1297,6 +1816,25 @@ function renderAssociationsPopover(state) {
     `;
     container.appendChild(domainSection);
   }
+
+  appendLocalFlashcardHistorySection(container, state);
+  container.appendChild(renderFlashcardSection(state));
+}
+
+function appendLocalFlashcardHistorySection(container, state) {
+  const cards = state.localFlashcards;
+  if (!cards || cards.length === 0) return;
+  const section = document.createElement("div");
+  section.className = "dg-assoc-flashcards";
+  section.innerHTML = `<div class="dg-section-label">Flashcards from this domain</div>` +
+    cards.slice().reverse().slice(0, 10).map((c) => `
+      <div class="dg-flashcard-hist-item">
+        <div class="dg-flashcard-hist-front">${escapeHtml(c.frontText.slice(0, 80))}${c.frontText.length > 80 ? "…" : ""}</div>
+        <div class="dg-flashcard-hist-back">${escapeHtml(c.backText.slice(0, 80))}${c.backText.length > 80 ? "…" : ""}</div>
+        <div class="dg-flashcard-hist-meta">${escapeHtml(c.deckName || "Unknown deck")} · ${new Date(c.createdAt).toLocaleDateString()}</div>
+      </div>
+    `).join("");
+  container.appendChild(section);
 }
 
 function renderConnectionsPopover(state) {
@@ -1337,11 +1875,137 @@ function renderConnectionsPopover(state) {
   `;
 }
 
+function relativeTime(isoString) {
+  const diff = Date.now() - new Date(isoString).getTime();
+  const secs = Math.floor(diff / 1000);
+  if (secs < 60) return "just now";
+  const mins = Math.floor(secs / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  return `${Math.floor(months / 12)}y ago`;
+}
+
+function trackRecentlyViewed(state, contentId) {
+  const now = new Date().toISOString();
+  const prev = (state.recentlyViewed || []).filter((e) => e.id !== contentId);
+  state.recentlyViewed = [{ id: contentId, viewedAt: now }, ...prev].slice(0, 50);
+  chrome.storage.local.set({ [DG_STORAGE_RECENTLY_VIEWED_KEY]: state.recentlyViewed });
+}
+
+function flattenTreeByDate(nodes, pathParts = [], parentFolderId = null) {
+  const results = [];
+  for (const node of nodes) {
+    if (node.contentType === "folder") {
+      flattenTreeByDate(node.children || [], [...pathParts, node.title], node.id).forEach((n) =>
+        results.push(n)
+      );
+    } else {
+      results.push({ ...node, _path: pathParts.join(" / "), _parentFolderId: parentFolderId });
+    }
+  }
+  return results;
+}
+
+function renderSortedList(state, visibleTree) {
+  const mode = state.treeSortMode; // "updated" | "viewed"
+  const allFlat = flattenTreeByDate(visibleTree);
+
+  // Sibling counts for /+N — computed from full list before filtering
+  const siblingCounts = {};
+  allFlat.forEach((n) => {
+    const key = n._parentFolderId || "__root__";
+    siblingCounts[key] = (siblingCounts[key] || 0) + 1;
+  });
+
+  // Apply optional folder filter
+  const folderFilter = state.recentFolderFilter;
+  let flat = folderFilter ? allFlat.filter((n) => n._parentFolderId === folderFilter) : allFlat;
+  let filterLabel = null;
+  if (folderFilter && flat.length > 0 && flat[0]._path) {
+    const parts = flat[0]._path.split(" / ");
+    filterLabel = parts[parts.length - 1] || flat[0]._path;
+  }
+
+  // Sort
+  if (mode === "updated") {
+    flat.sort((a, b) => {
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  } else if (mode === "viewed") {
+    const viewedMap = new Map(
+      (state.recentlyViewed || []).map((e, i) => [e.id, { viewedAt: e.viewedAt, rank: i }])
+    );
+    flat.sort((a, b) => {
+      const va = viewedMap.get(a.id);
+      const vb = viewedMap.get(b.id);
+      if (va && vb) return va.rank - vb.rank;
+      if (va) return -1;
+      if (vb) return 1;
+      if (!a.updatedAt && !b.updatedAt) return 0;
+      if (!a.updatedAt) return 1;
+      if (!b.updatedAt) return -1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+  }
+
+  if (flat.length === 0) {
+    return mode === "viewed"
+      ? `<div class="dg-status">No content viewed yet. Open notes from the tree to start tracking views.</div>`
+      : `<div class="dg-status">No items found.</div>`;
+  }
+
+  const filterHeader = folderFilter && filterLabel
+    ? `<div class="dg-status" style="display:flex;align-items:center;gap:8px;">
+        <button class="dg-mini-action" type="button" data-clear-folder-filter>← All</button>
+        <span style="font-size:11px;opacity:0.65;">📁 ${escapeHtml(filterLabel)}</span>
+      </div>`
+    : "";
+
+  return filterHeader + flat.map((node) => {
+    const sibCount = (siblingCounts[node._parentFolderId || "__root__"] || 1) - 1;
+    const viewed = mode === "viewed"
+      ? (state.recentlyViewed || []).find((e) => e.id === node.id)
+      : null;
+    const timeLabel = mode === "updated" && node.updatedAt
+      ? ` · ${escapeHtml(relativeTime(node.updatedAt))}`
+      : mode === "viewed" && viewed
+        ? ` · seen ${escapeHtml(relativeTime(viewed.viewedAt))}`
+        : "";
+    const siblingAffordances = !folderFilter && sibCount > 0 ? `
+      <button class="dg-mini-action" type="button" data-filter-by-folder="${escapeHtml(node._parentFolderId || "")}" title="Show ${sibCount} more from this folder">/+${sibCount}</button>
+      <button class="dg-mini-action" type="button" data-create-tree-item="note" data-parent-content="${escapeHtml(node._parentFolderId || "")}" title="Create a note in this folder">+N Sibling</button>
+    ` : "";
+    return `
+      <div class="dg-tree-row" style="--depth:0">
+        <button class="dg-tree-expand" type="button">•</button>
+        <span class="dg-tree-kind">${treeIconMarkup(node, false)}</span>
+        <div class="dg-tree-meta">
+          <div class="dg-tree-title" title="${escapeHtml(node.title)}">${escapeHtml(node.title)}</div>
+          <div class="dg-tree-subtitle">${node._path ? escapeHtml(node._path) : escapeHtml(node.contentType)}${timeLabel}</div>
+        </div>
+        <div class="dg-tree-actions">
+          ${siblingAffordances}
+          <button class="dg-mini-action" type="button" data-associate-content="${escapeHtml(node.id)}" data-content-kind="${escapeHtml(node.contentType)}">Open</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
 function renderTreeRows(state, nodes, depth = 0) {
   return nodes
     .map((node) => {
       const isFolder = node.contentType === "folder";
       const expanded = state.expandedTreeIds.has(node.id);
+      const title = treeNodeTitle(node);
       const children =
         isFolder && expanded && node.children?.length
           ? renderTreeRows(state, node.children, depth + 1)
@@ -1355,7 +2019,7 @@ function renderTreeRows(state, nodes, depth = 0) {
             }>${isFolder ? (expanded ? "▾" : "▸") : "•"}</button>
             <span class="dg-tree-kind">${treeIconMarkup(node, expanded)}</span>
             <div class="dg-tree-meta">
-              <div class="dg-tree-title">${escapeHtml(node.title)}</div>
+              <div class="dg-tree-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
               <div class="dg-tree-subtitle">${escapeHtml(node.contentType)}</div>
             </div>
             <div class="dg-tree-actions">
@@ -1389,22 +2053,58 @@ function renderTreePopover(state) {
   const container = state.popoverBodies.tree;
   if (!container) return;
   const visibleTree = state.contentTree;
+  const mode = state.treeSortMode; // "default" | "updated" | "viewed"
+
   if (!visibleTree || visibleTree.length === 0) {
-    renderStatus(container, "No content is available to associate yet.");
+    container.innerHTML = `
+      <div class="dg-status">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>No content is available to associate yet.</span>
+          <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻ Refresh</button>
+        </div>
+      </div>
+    `;
     return;
   }
+
+  const sortBtn = (id, label) => {
+    const isActive = mode === id;
+    const activeStyle = isActive
+      ? ' style="background:rgba(91,175,255,0.18);border-color:rgba(91,175,255,0.45);"'
+      : "";
+    return `<button class="dg-mini-action" type="button" data-tree-sort-mode="${id}"${activeStyle} title="${isActive ? "Return to folder tree" : `Sort by ${label.toLowerCase()}`}">${escapeHtml(label)}</button>`;
+  };
+
+  const statusText = mode === "updated"
+    ? "Sorted by last updated."
+    : mode === "viewed"
+      ? "Sorted by last viewed."
+      : "Create content at the root, or use the compact actions on folders to add nested items.";
+
+  const createBtns = mode === "default" ? `
+    <button class="dg-mini-action" type="button" data-create-tree-item="folder">+ Folder</button>
+    <button class="dg-mini-action" type="button" data-create-tree-item="note">+ Note</button>
+    <button class="dg-mini-action" type="button" data-create-tree-item="external">+ Link</button>
+  ` : "";
+
   container.innerHTML = `
     <div class="dg-status">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-        <span>Create content at the root, or use the compact actions on folders to add nested items.</span>
-        <span style="display:flex;gap:6px;">
-          <button class="dg-mini-action" type="button" data-create-tree-item="folder">+ Folder</button>
-          <button class="dg-mini-action" type="button" data-create-tree-item="note">+ Note</button>
-          <button class="dg-mini-action" type="button" data-create-tree-item="external">+ Link</button>
-        </span>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <span>${statusText}</span>
+          <span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+            <button class="dg-mini-action" type="button" data-reload-tree title="Refresh file tree">↻</button>
+            ${createBtns}
+          </span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          ${sortBtn("default", "File Tree")}
+          ${sortBtn("updated", "Last Updated")}
+          ${sortBtn("viewed", "Last Viewed")}
+        </div>
       </div>
     </div>
-    ${renderTreeRows(state, visibleTree)}
+    ${mode === "default" ? renderTreeRows(state, visibleTree) : renderSortedList(state, visibleTree)}
   `;
 }
 
@@ -1748,7 +2448,9 @@ function closePanel(state, contentId, nextState = "closed") {
     panel.container.remove();
     panel.collapsedChip.remove();
     state.openPanels.delete(contentId);
-    // schedulePersist intentionally NOT called here — we persisted above
+    // schedulePersist intentionally NOT called here — we persisted above.
+    // Drop the closed panel from the tab snapshot so it doesn't re-open on nav.
+    scheduleTabPersist(state);
   } else {
     panel.container.style.display = "none";
     if (!state.tileOrder.includes(contentId)) {
@@ -1814,6 +2516,7 @@ function createContentPanel(state, item, kind, persisted = null) {
 
   const container = document.createElement("section");
   container.className = "dg-floating-panel";
+  container.dataset.contentKind = kind;
   const title = item.title || (kind === "note" ? "Note" : kind === "embed" ? "Content" : "External link");
   const kindLabel = kind === "note" ? "Web note overlay" : kind === "embed" ? "Content overlay" : "External metadata overlay";
   container.innerHTML = `
@@ -1826,6 +2529,7 @@ function createContentPanel(state, item, kind, persisted = null) {
         <span class="dg-panel-ready" style="font-size:11px;color:rgba(255,255,255,0.46)"></span>
         <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -1844,6 +2548,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const panel = {
     contentId: item.id,
     kind,
+    title,
     container,
     toolbar: container.querySelector(".dg-panel-toolbar"),
     toolbarTitle: container.querySelector(".dg-panel-toolbar-title strong"),
@@ -1871,6 +2576,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   };
 
   state.openPanels.set(item.id, panel);
+  scheduleTabPersist(state); // remember this note for in-tab navigation
   makePanelDraggable(state, panel);
   wirePanelDirectEditor(state, panel);
   applyPanelGeometry(state, panel);
@@ -1927,7 +2633,18 @@ function createContentPanel(state, item, kind, persisted = null) {
     }
 
     if (action === "app") {
-      openAppContent(state.config.appBaseUrl, panel.contentId);
+      openAppContent(state.config.appBaseUrl, panel.contentId, state.selectedWorkspaceId || null);
+      return;
+    }
+
+    if (action === "refresh") {
+      // Force a full iframe reload by clearing the cached content ID,
+      // then re-running openEmbedForPanel which will re-fetch the session
+      // token and reload the src from scratch.
+      if (state.iframePanel === panel) {
+        state.iframeContentId = null;
+      }
+      openEmbedForPanel(state, panel);
       return;
     }
 
@@ -2213,19 +2930,48 @@ function wireRootEvents(state) {
   // only patches the content-script copy — the page's framework calls its own.
   // window.location.href IS shared across worlds, so polling is the reliable path.
   let _lastTrackedHref = window.location.href;
+  // Track the strategy-normalized form so that navigations that map to the same
+  // note (e.g. github.com/owner/repo/issues → github.com/owner/repo/pulls when
+  // path-depth is 2) don't trigger a reload at all.
+  let _lastTrackedNormalizedHref = applyUrlStrategyToHref(window.location.href);
+
   function _onUrlChange() {
     const current = window.location.href;
     if (current === _lastTrackedHref) return;
     _lastTrackedHref = current;
-    state.resourceContext = null;
+
+    const normalizedCurrent = applyUrlStrategyToHref(current);
+
+    // Strategy says ignore this domain — clear context but don't re-fetch.
+    if (normalizedCurrent === null) {
+      state.resourceContext = null;
+      state.domainAssociations = null;
+      state.domainAssociationsExpanded = false;
+      state.domainAssociationsSearch = "";
+      return;
+    }
+
+    // Same normalized URL = same note association → no reload needed.
+    if (normalizedCurrent === _lastTrackedNormalizedHref) return;
+    _lastTrackedNormalizedHref = normalizedCurrent;
+
+    // Domain associations are always page-specific — always clear.
     state.domainAssociations = null;
     state.domainAssociationsExpanded = false;
     state.domainAssociationsSearch = "";
+
     if (state.panelOpen) {
-      renderStatus(state.popoverBodies.associations, "Loading…");
+      // Soft reload: keep the old notes visible while fetching the new context,
+      // then swap in one paint. This avoids the "Loading…" flash on navigation.
       void loadResourceContext(state)
         .then(() => renderAssociationsPopover(state))
-        .catch(() => {});
+        .catch(() => {
+          state.resourceContext = null;
+          renderAssociationsPopover(state);
+        });
+    } else {
+      // Panel is closed — discard stale context so the next open is fresh.
+      state.resourceContext = null;
     }
   }
   // popstate fires in isolated world for Back/Forward
@@ -2235,6 +2981,24 @@ function wireRootEvents(state) {
   try { if (window.navigation) window.navigation.addEventListener("navigate", _onUrlChange); } catch (_) {}
   // Polling — universal fallback, location.href is readable from isolated world
   setInterval(_onUrlChange, 1000);
+
+  // Track text selected on the host page for flashcard creation.
+  // selectionchange fires on every selection update; we read the text and
+  // update state._pendingSelectionText for the flashcard capture buttons.
+  document.addEventListener("selectionchange", () => {
+    const sel = window.getSelection();
+    const text = sel ? sel.toString().trim() : "";
+    // Ignore selections inside our shadow DOM (editor text etc.)
+    const anchor = sel?.anchorNode;
+    const inShadow = anchor && state.shadow && state.shadow.contains(anchor);
+    const prev = state._pendingSelectionText;
+    state._pendingSelectionText = (!inShadow && text.length >= 3 && text.length <= 2000) ? text : "";
+    // Update the flashcard section badge if the panel is open and the value changed
+    if (state.panelOpen && state.popoverBodies.associations && prev !== state._pendingSelectionText) {
+      const existing = state.popoverBodies.associations.querySelector(".dg-flashcard-section");
+      if (existing) existing.replaceWith(renderFlashcardSection(state));
+    }
+  });
 
   document.addEventListener(
     "click",
@@ -2376,6 +3140,52 @@ function wireRootEvents(state) {
       })();
       return true;
     }
+
+    if (message?.type === "dg-associate-and-open") {
+      void (async () => {
+        try {
+          await associateAndOpen(
+            state,
+            message.payload?.contentId,
+            message.payload?.contentKind || "note"
+          );
+          sendResponse?.({ ok: true });
+        } catch (error) {
+          sendResponse?.({
+            ok: false,
+            error: error instanceof Error ? error.message : "Failed to open content",
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message?.type === "dg-refresh-embed") {
+      const panel = message.payload?.contentId
+        ? state.openPanels.get(message.payload.contentId)
+        : state.iframePanel;
+      if (panel) {
+        if (state.iframePanel === panel) state.iframeContentId = null;
+        openEmbedForPanel(state, panel);
+      }
+      sendResponse?.({ ok: true });
+      return true;
+    }
+
+    if (message?.type === "dg-quick-capture") {
+      try {
+        if (state.panelOpen) closeSnapPanel(state);
+        state.embedIframe?.blur();
+        startQuickCaptureMode();
+        sendResponse?.({ ok: true });
+      } catch (error) {
+        sendResponse?.({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to start Quick Capture",
+        });
+      }
+      return true;
+    }
   });
 
   // ── Floating launcher button ───────────────────────────────────────────────
@@ -2470,14 +3280,11 @@ function wireRootEvents(state) {
   state.workspaceSelect.addEventListener("change", () => {
     const workspaceId = state.workspaceSelect.value || null;
     state.selectedWorkspaceId = workspaceId;
+    chrome.storage.local.set({ [DG_STORAGE_WORKSPACE_KEY]: workspaceId ?? "" });
     renderStatus(state.popoverBodies.tree, "Loading…");
     void loadContentTree(state, { workspaceId, force: true })
       .then(() => renderTreePopover(state))
-      .catch((e) => {
-        const msg = e instanceof Error ? e.message : "Failed to load tree";
-        const isAuth = /token|trusted|unauthorized|auth/i.test(msg);
-        renderStatus(state.popoverBodies.tree, isAuth ? "Re-trust required — open Digital Garden settings to reconnect." : msg, "error");
-      });
+      .catch((e) => renderLoadError(state.popoverBodies.tree, e));
   });
 
   // ── Shadow-delegated click events ─────────────────────────────────────────
@@ -2500,6 +3307,23 @@ function wireRootEvents(state) {
     }
 
     // ── Associations section: refresh + domain toggle ─────────────────────────
+    const errorActionBtn = event.target.closest("[data-error-action]");
+    if (errorActionBtn) {
+      const errAction = errorActionBtn.getAttribute("data-error-action");
+      if (errAction === "open-dg-app") {
+        const appUrl = (state.config?.appBaseUrl || "").replace(/\/$/, "") + "/";
+        window.open(appUrl, "_blank");
+      } else if (errAction === "open-settings") {
+        window.open(chrome.runtime.getURL("options.html"), "_blank", "noopener");
+      } else if (errAction === "retry-load") {
+        // Re-run openSnapPanel which will re-fetch both panels
+        state.resourceContext = null;
+        state.contentTree = null;
+        void openSnapPanel(state);
+      }
+      return;
+    }
+
     const actionBtn = event.target.closest("[data-action]");
     if (actionBtn) {
       const action = actionBtn.getAttribute("data-action");
@@ -2514,7 +3338,7 @@ function wireRootEvents(state) {
           await loadResourceContext(state);
           renderAssociationsPopover(state);
         } catch (e) {
-          renderStatus(state.popoverBodies.associations, "Refresh failed — check connection", "error");
+          renderLoadError(state.popoverBodies.associations, e);
         }
         return;
       }
@@ -2538,13 +3362,82 @@ function wireRootEvents(state) {
         renderAssociationsPopover(state);
         return;
       }
+
+      if (action === "toggle-flashcard") {
+        state.flashcard.expanded = !state.flashcard.expanded;
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-capture-front") {
+        const text = state._pendingSelectionText;
+        if (!text) return;
+        state.flashcard.frontText = text;
+        state.flashcard.phase = "has-front";
+        state.flashcard.expanded = true;
+        void loadFlashcardDecksIfNeeded(state);
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-type-manually") {
+        state.flashcard.phase = "has-front";
+        state.flashcard.frontText = "";
+        state.flashcard.backText = "";
+        state.flashcard.expanded = true;
+        state.flashcard.error = null;
+        void loadFlashcardDecksIfNeeded(state);
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-capture-back") {
+        const text = state._pendingSelectionText;
+        if (!text || state.flashcard.phase !== "has-front") return;
+        // Inject the selection into the back textarea directly without a full re-render
+        const fcBody = event.target.closest(".dg-flashcard-body");
+        const backField = fcBody?.querySelector("[data-fc-field='back']");
+        if (backField) {
+          backField.value = text;
+          state.flashcard.backText = text;
+        }
+        return;
+      }
+      if (action === "fc-deck-pick") {
+        const btn = event.target.closest("[data-action='fc-deck-pick']");
+        if (!btn) return;
+        state.flashcard.deckId = btn.getAttribute("data-deck-id");
+        state.flashcard.deckPath = btn.getAttribute("data-deck-path");
+        // Update the input value and hide the dropdown without a full re-render
+        const ac = btn.closest(".dg-deck-ac");
+        if (ac) {
+          const inp = ac.querySelector(".dg-deck-ac-input");
+          if (inp) inp.value = state.flashcard.deckPath;
+          const dd = ac.querySelector(".dg-deck-dropdown");
+          if (dd) dd.hidden = true;
+        }
+        return;
+      }
+      if (action === "flashcard-cancel") {
+        state.flashcard = {
+          phase: "idle", frontText: "", backText: "",
+          deckId: state.flashcard.deckId, deckPath: state.flashcard.deckPath,
+          defaultDeckId: state.flashcard.defaultDeckId,
+          decks: state.flashcard.decks, expanded: false, submitting: false, error: null,
+        };
+        renderAssociationsPopover(state);
+        return;
+      }
+      if (action === "flashcard-submit") {
+        void submitFlashcard(state);
+        return;
+      }
     }
 
     const openButton = event.target.closest("[data-open-content]");
     if (openButton) {
+      const openContentId = openButton.getAttribute("data-open-content");
+      trackRecentlyViewed(state, openContentId);
       await openAssociatedContent(
         state,
-        openButton.getAttribute("data-open-content"),
+        openContentId,
         openButton.getAttribute("data-content-kind")
       );
       return;
@@ -2559,15 +3452,51 @@ function wireRootEvents(state) {
         state.expandedTreeIds.add(id);
       }
       renderTreePopover(state);
+      const wsKey = `${DG_STORAGE_TREE_EXPANDED_PREFIX}${state.selectedWorkspaceId || "all"}`;
+      chrome.storage.local.set({ [wsKey]: Array.from(state.expandedTreeIds) });
+      return;
+    }
+
+    const sortModeBtn = event.target.closest("[data-tree-sort-mode]");
+    if (sortModeBtn) {
+      const newMode = sortModeBtn.getAttribute("data-tree-sort-mode");
+      state.treeSortMode = newMode;
+      state.recentFolderFilter = null;
+      chrome.storage.local.set({ [DG_STORAGE_TREE_SORT_KEY]: state.treeSortMode });
+      if (state.treeSortMode === "updated") {
+        // Force fresh fetch to guarantee updatedAt is present on all nodes
+        renderStatus(state.popoverBodies.tree, "Loading…");
+        void loadContentTree(state, { workspaceId: state.selectedWorkspaceId || null, force: true })
+          .then(() => renderTreePopover(state))
+          .catch((e) => renderLoadError(state.popoverBodies.tree, e));
+      } else {
+        renderTreePopover(state);
+      }
+      return;
+    }
+
+    const filterFolderBtn = event.target.closest("[data-filter-by-folder]");
+    if (filterFolderBtn) {
+      state.recentFolderFilter = filterFolderBtn.getAttribute("data-filter-by-folder") || null;
+      renderTreePopover(state);
+      return;
+    }
+
+    const clearFilterBtn = event.target.closest("[data-clear-folder-filter]");
+    if (clearFilterBtn) {
+      state.recentFolderFilter = null;
+      renderTreePopover(state);
       return;
     }
 
     const associateButton = event.target.closest("[data-associate-content]");
     if (associateButton) {
       try {
+        const assocContentId = associateButton.getAttribute("data-associate-content");
+        trackRecentlyViewed(state, assocContentId);
         await associateAndOpen(
           state,
-          associateButton.getAttribute("data-associate-content"),
+          assocContentId,
           associateButton.getAttribute("data-content-kind")
         );
       } catch (error) {
@@ -2593,6 +3522,23 @@ function wireRootEvents(state) {
         renderStatus(
           state.popoverBodies.associations,
           error instanceof Error ? error.message : "Failed to remove association",
+          "error"
+        );
+      }
+      return;
+    }
+
+    const reloadTreeButton = event.target.closest("[data-reload-tree]");
+    if (reloadTreeButton) {
+      renderStatus(state.popoverBodies.tree, "Refreshing…");
+      state.contentTree = null;
+      try {
+        await loadContentTree(state, { workspaceId: state.selectedWorkspaceId || null });
+        renderTreePopover(state);
+      } catch (error) {
+        renderStatus(
+          state.popoverBodies.tree,
+          error instanceof Error ? error.message : "Failed to refresh",
           "error"
         );
       }
@@ -2633,13 +3579,28 @@ function wireRootEvents(state) {
         renderTreePopover(state);
         if (created.contentType === "note" || created.contentType === "external") {
           if (created.contentType === "note" && state.resourceContext?.resource?.id) {
-            await createResourceAssociation({
-              webResourceId: state.resourceContext.resource.id,
-              contentId: created.id,
+            // Optimistic: show the new note immediately before the server round-trip
+            if (!state.resourceContext.associations) state.resourceContext.associations = [];
+            state.resourceContext.associations.push({
+              content: { id: created.id, title: created.title || title, contentType: created.contentType },
             });
+            renderAssociationsPopover(state);
+
+            await runtimeMessage({
+              type: "create-resource-association",
+              payload: { webResourceId: state.resourceContext.resource.id, contentId: created.id },
+            });
+            // Refresh from server for accuracy (association IDs, full metadata)
             state.resourceContext = await loadResourceContext(state);
             renderAssociationsPopover(state);
           } else if (created.contentType === "external") {
+            // Optimistic: external association is auto-created server-side during content creation
+            if (!state.resourceContext.externalContents) state.resourceContext.externalContents = [];
+            state.resourceContext.externalContents.push({
+              id: created.id, title: created.title || title, contentType: "external",
+            });
+            renderAssociationsPopover(state);
+
             state.resourceContext = await loadResourceContext(state);
             renderAssociationsPopover(state);
           }
@@ -2657,10 +3618,48 @@ function wireRootEvents(state) {
 
   // ── Domain search input ────────────────────────────────────────────────────
   state.shadow.addEventListener("input", (event) => {
-    if (!event.target.closest("[data-domain-search]")) return;
-    state.domainAssociationsSearch = event.target.value || "";
-    const domainBody = state.popoverBodies.associations?.querySelector(".dg-domain-body");
-    if (domainBody) domainBody.innerHTML = renderDomainBody(state);
+    if (event.target.closest("[data-domain-search]")) {
+      state.domainAssociationsSearch = event.target.value || "";
+      const domainBody = state.popoverBodies.associations?.querySelector(".dg-domain-body");
+      if (domainBody) domainBody.innerHTML = renderDomainBody(state);
+      return;
+    }
+    if (event.target.matches(".dg-deck-ac-input")) {
+      const query = event.target.value.toLowerCase();
+      const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+      if (!dd) return;
+      dd.hidden = false;
+      for (const opt of dd.querySelectorAll(".dg-deck-option")) {
+        const path = opt.getAttribute("data-deck-path") || "";
+        opt.hidden = query.length > 0 && !path.toLowerCase().includes(query);
+      }
+      return;
+    }
+  });
+
+  state.shadow.addEventListener("focus", (event) => {
+    if (event.target.matches(".dg-deck-ac-input")) {
+      const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+      if (dd) dd.hidden = false;
+    }
+  }, true);
+
+  state.shadow.addEventListener("blur", (event) => {
+    if (event.target.matches(".dg-deck-ac-input")) {
+      // Delay so a click on a dropdown option fires before we hide it
+      setTimeout(() => {
+        const dd = event.target.parentElement?.querySelector(".dg-deck-dropdown");
+        if (dd) dd.hidden = true;
+      }, 150);
+    }
+  }, true);
+
+  // Persist deck selection changes immediately so submitFlashcard reads the right value
+  state.shadow.addEventListener("change", (event) => {
+    const deckField = event.target.closest("[data-fc-field='deck']");
+    if (deckField) {
+      state.flashcard.deckId = deckField.value;
+    }
   });
 }
 
@@ -2704,6 +3703,19 @@ async function initOverlay() {
     return;
   }
 
+  // Load URL strategy presets non-blocking. The module-level vars are used by
+  // applyUrlStrategyToHref(); they fall back to exact-URL matching until ready.
+  loadUrlPresets().then(({ presetMap, overrides }) => {
+    _urlPresetMap = presetMap;
+    _urlStrategyOverrides = overrides;
+    // Re-seed the normalized URL tracker now that we have real strategies —
+    // avoids a false-reload on the first navigation after presets load.
+    // (The _lastTrackedNormalizedHref variable lives in the _onUrlChange closure
+    //  below and is initialized from applyUrlStrategyToHref at definition time,
+    //  which at that point falls back to exact-URL. It corrects itself naturally
+    //  on the next URL change; no action needed here.)
+  }).catch(() => {});
+
   const state = {
     config,
     extensionContext,
@@ -2721,6 +3733,10 @@ async function initOverlay() {
     panelOpen: false,
     workspaces: [],
     selectedWorkspaceId: null,
+    workspaceAutoSelected: false,
+    treeSortMode: "default",
+    recentFolderFilter: null,
+    recentlyViewed: [],
     isIdle: false,
     idleTimer: null,
     resourceContext: null,
@@ -2728,12 +3744,28 @@ async function initOverlay() {
     domainAssociationsExpanded: false,
     domainAssociationsSearch: "",
     edgeTabOffset: 0.5,
+    fetchedAt: { associations: 0, tree: 0 },
+    _pendingSelectionText: "",
+    flashcard: {
+      phase: "idle",       // "idle" | "has-front" | "confirming"
+      frontText: "",
+      backText: "",
+      deckId: null,
+      deckPath: "",        // the path string matching deckId, kept in sync
+      defaultDeckId: null, // loaded from domain memory; persists across sessions
+      decks: null,         // null = not yet loaded
+      expanded: false,
+      submitting: false,
+      error: null,
+    },
+    localFlashcards: null,  // null = not yet loaded; array of cards made on this etld1
     contentTree: null,
     loadedForWorkspaceId: null,
     expandedTreeIds: new Set(),
     tileOrder: [],
     openPanels: new Map(),
     persistTimers: new Map(),
+    tabPersistTimer: null,
     lastHoveredSelector: "body",
     launcherPosition: null,
     targetBanner: null,
@@ -2782,7 +3814,30 @@ async function initOverlay() {
   const hostname = window.location.hostname;
   const domainMemory = await loadDomainMemory(hostname).catch(() => ({ snap: "right" }));
   state.edgeTabOffset = domainMemory.edgeTabOffset ?? 0.5;
+  state.flashcard.defaultDeckId = domainMemory.defaultDeckId || null;
   setSnap(state, domainMemory.snap || "right");
+
+  // Pre-load local flashcard history so it's ready when the panel opens
+  loadLocalFlashcardHistory(hostname).then((h) => { state.localFlashcards = h; }).catch(() => { state.localFlashcards = []; });
+
+  // Restore persisted UI preferences before loading workspaces so that
+  // auto-select is correctly skipped when the user had a prior choice.
+  const storedUiPrefs = await chrome.storage.local.get([
+    DG_STORAGE_WORKSPACE_KEY,
+    DG_STORAGE_TREE_SORT_KEY,
+    DG_STORAGE_RECENTLY_VIEWED_KEY,
+  ]).catch(() => ({}));
+  if (storedUiPrefs[DG_STORAGE_WORKSPACE_KEY]) {
+    state.selectedWorkspaceId = storedUiPrefs[DG_STORAGE_WORKSPACE_KEY];
+  }
+  if (storedUiPrefs[DG_STORAGE_TREE_SORT_KEY]) {
+    // Normalize legacy "recent" value (renamed to "updated")
+    const stored = storedUiPrefs[DG_STORAGE_TREE_SORT_KEY];
+    state.treeSortMode = stored === "recent" ? "updated" : stored;
+  }
+  if (Array.isArray(storedUiPrefs[DG_STORAGE_RECENTLY_VIEWED_KEY])) {
+    state.recentlyViewed = storedUiPrefs[DG_STORAGE_RECENTLY_VIEWED_KEY];
+  }
 
   void loadWorkspaces(state).then(() => renderWorkspaceSelector(state));
 
@@ -2790,6 +3845,9 @@ async function initOverlay() {
     await loadResourceContext(state);
     renderAssociationsPopover(state);
     await restorePanelsFromState(state);
+    // Re-open notes the user had open in this tab, regardless of the URL they
+    // started on — so a note persists while they browse the site.
+    await restoreTabStickyPanels(state);
   } catch (error) {
     console.warn("[DG Overlay] Initial resource context load failed", {
       error: error instanceof Error ? error.message : error,
@@ -2803,4 +3861,304 @@ async function initOverlay() {
 
 initOverlay().catch((error) => {
   console.warn("[DG Overlay] Failed to initialize overlay", error);
+});
+
+// ─── Quick Capture picker ─────────────────────────────────────────────────────
+
+function startQuickCaptureMode() {
+  if (document.getElementById("dg-quick-capture-root")) return;
+
+  const style = document.createElement("style");
+  style.id = "dg-qc-styles";
+  style.textContent = `
+    .dg-qc-highlight {
+      outline: 2px dashed rgba(100, 210, 230, 0.75) !important;
+      outline-offset: 2px !important;
+      background-color: rgba(100, 210, 230, 0.06) !important;
+    }
+    #dg-qc-banner {
+      position: fixed;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.92);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: rgba(100, 210, 230, 0.95);
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 16px;
+      border-radius: 20px;
+      border: 1px solid rgba(100, 210, 230, 0.25);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.45);
+    }
+    #dg-qc-cancel-btn {
+      pointer-events: auto;
+      cursor: pointer;
+      border-bottom: 1px dotted rgba(100, 210, 230, 0.5);
+      padding-bottom: 1px;
+      transition: opacity 0.12s;
+    }
+    #dg-qc-cancel-btn:hover { opacity: 0.65; }
+    #dg-qc-tooltip {
+      position: fixed;
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.9);
+      color: #f4f6f8;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 9px;
+      border-radius: 5px;
+      border: 1px solid rgba(100, 210, 230, 0.22);
+      pointer-events: none;
+      white-space: nowrap;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+      opacity: 0;
+      transition: opacity 0.1s;
+    }
+    #dg-qc-tooltip.dg-qc-tip-visible { opacity: 1; }
+    #dg-qc-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%) translateY(10px);
+      z-index: 2147483647;
+      background: rgba(10, 14, 20, 0.95);
+      color: #8fe0b3;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px 20px;
+      border-radius: 20px;
+      border: 1px solid rgba(143, 224, 179, 0.3);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transition: opacity 0.2s, transform 0.2s;
+      pointer-events: none;
+    }
+    #dg-qc-toast.dg-qc-toast-in { opacity: 1; transform: translateX(-50%) translateY(0); }
+  `;
+  document.head.appendChild(style);
+
+  const root = document.createElement("span");
+  root.id = "dg-quick-capture-root";
+  root.style.display = "none";
+  document.body.appendChild(root);
+
+  const banner = document.createElement("div");
+  banner.id = "dg-qc-banner";
+  banner.innerHTML = 'Click any block to copy &nbsp;&nbsp;<span id="dg-qc-cancel-btn">Click here to cancel or press ESC</span>';
+  document.body.appendChild(banner);
+  banner.querySelector("#dg-qc-cancel-btn").addEventListener("click", (e) => {
+    e.stopPropagation();
+    cleanup();
+  });
+
+  const tooltip = document.createElement("div");
+  tooltip.id = "dg-qc-tooltip";
+  document.body.appendChild(tooltip);
+
+  const toast = document.createElement("div");
+  toast.id = "dg-qc-toast";
+  document.body.appendChild(toast);
+
+  // Steal keyboard focus from any iframe (panel, embeds) so keydown fires on main window
+  const focusTrap = document.createElement("input");
+  Object.assign(focusTrap.style, {
+    position: "fixed", top: "-9999px", left: "-9999px",
+    width: "1px", height: "1px", opacity: "0", pointerEvents: "none",
+  });
+  document.body.appendChild(focusTrap);
+  requestAnimationFrame(() => focusTrap.focus({ preventScroll: true }));
+
+  const prevCursor = document.body.style.cursor;
+  document.body.style.cursor = "crosshair";
+  let currentTarget = null;
+
+  const PICKABLE = new Set([
+    "article", "section", "main", "aside", "header", "footer", "nav",
+    "div", "p", "blockquote", "pre", "figure", "figcaption",
+    "ul", "ol", "li", "table", "tbody", "thead", "tr",
+    "h1", "h2", "h3", "h4", "h5", "h6", "details", "summary",
+  ]);
+  const TAG_LABELS = {
+    article: "Article", section: "Section", main: "Main", aside: "Aside",
+    header: "Header", footer: "Footer", nav: "Nav", p: "Paragraph",
+    blockquote: "Blockquote", pre: "Code block", figure: "Figure",
+    ul: "List", ol: "Ordered list", li: "List item", table: "Table",
+    h1: "Heading 1", h2: "Heading 2", h3: "Heading 3",
+    h4: "Heading 4", h5: "Heading 5", h6: "Heading 6",
+    div: "Block",
+  };
+
+  function findTarget(el) {
+    let cur = el;
+    while (cur && cur !== document.body) {
+      const tag = cur.tagName?.toLowerCase();
+      if (PICKABLE.has(tag)) {
+        const rect = cur.getBoundingClientRect();
+        if (rect.width >= 20 && rect.height >= 10) return cur;
+      }
+      cur = cur.parentElement;
+    }
+    return null;
+  }
+
+  function sanitizeHtml(el) {
+    const clone = el.cloneNode(true);
+    for (const sel of ["script", "style", "noscript", "svg", "canvas", "video", "audio", "iframe", "object", "embed"]) {
+      clone.querySelectorAll(sel).forEach((n) => n.remove());
+    }
+    clone.querySelectorAll("*").forEach((n) => {
+      for (const attr of Array.from(n.attributes)) {
+        if (attr.name.startsWith("on") || attr.name === "style") n.removeAttribute(attr.name);
+      }
+    });
+    return clone.innerHTML;
+  }
+
+  async function writeToClipboard(html, text) {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "text/html": new Blob([html], { type: "text/html" }),
+          "text/plain": new Blob([text], { type: "text/plain" }),
+        }),
+      ]);
+    } catch {
+      const div = document.createElement("div");
+      div.contentEditable = "true";
+      div.innerHTML = html;
+      Object.assign(div.style, { position: "fixed", top: "-9999px", left: "-9999px", whiteSpace: "pre-wrap" });
+      document.body.appendChild(div);
+      try {
+        const sel = window.getSelection();
+        const range = document.createRange();
+        range.selectNodeContents(div);
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+        document.execCommand("copy");
+      } finally {
+        document.body.removeChild(div);
+        window.getSelection()?.removeAllRanges();
+      }
+    }
+  }
+
+  function showToast(msg, isError = false) {
+    toast.textContent = msg;
+    toast.style.color = isError ? "#ff8a8a" : "#8fe0b3";
+    toast.style.borderColor = isError ? "rgba(255,138,138,0.3)" : "rgba(143,224,179,0.3)";
+    toast.classList.add("dg-qc-toast-in");
+    setTimeout(() => toast.classList.remove("dg-qc-toast-in"), 2200);
+  }
+
+  function cleanup() {
+    if (currentTarget) { currentTarget.classList.remove("dg-qc-highlight"); currentTarget = null; }
+    document.body.style.cursor = prevCursor;
+    document.removeEventListener("mouseover", onMouseOver, true);
+    document.removeEventListener("mousemove", onMouseMove, true);
+    document.removeEventListener("click", onClick, true);
+    window.removeEventListener("keydown", onKeyDown, true);
+    setTimeout(() => { style.remove(); banner.remove(); tooltip.remove(); toast.remove(); focusTrap.remove(); root.remove(); }, 350);
+  }
+
+  function onMouseOver(e) {
+    const target = findTarget(e.target);
+    if (target === currentTarget) return;
+    currentTarget?.classList.remove("dg-qc-highlight");
+    currentTarget = target;
+    if (currentTarget) {
+      currentTarget.classList.add("dg-qc-highlight");
+      const tag = currentTarget.tagName.toLowerCase();
+      tooltip.textContent = `${TAG_LABELS[tag] || tag} · click to copy`;
+      tooltip.classList.add("dg-qc-tip-visible");
+    } else {
+      tooltip.classList.remove("dg-qc-tip-visible");
+    }
+  }
+
+  function onMouseMove(e) {
+    tooltip.style.left = `${e.clientX + 14}px`;
+    tooltip.style.top = `${e.clientY + 14}px`;
+    const rect = tooltip.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) tooltip.style.left = `${e.clientX - rect.width - 10}px`;
+    if (rect.bottom > window.innerHeight - 8) tooltip.style.top = `${e.clientY - rect.height - 10}px`;
+  }
+
+  function onClick(e) {
+    if (!currentTarget) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const html = sanitizeHtml(currentTarget);
+    const text = currentTarget.innerText || currentTarget.textContent || "";
+    currentTarget.classList.remove("dg-qc-highlight");
+    const captured = currentTarget;
+    captured.style.outline = "2px solid rgba(143,224,179,0.7)";
+    captured.style.outlineOffset = "2px";
+    setTimeout(() => { captured.style.outline = ""; captured.style.outlineOffset = ""; }, 550);
+    cleanup();
+    writeToClipboard(html, text)
+      .then(() => showToast("✓ Copied to clipboard"))
+      .catch(() => showToast("Failed to copy", true));
+  }
+
+  function onKeyDown(e) {
+    if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cleanup(); }
+  }
+
+  document.addEventListener("mouseover", onMouseOver, true);
+  document.addEventListener("mousemove", onMouseMove, true);
+  document.addEventListener("click", onClick, true);
+  window.addEventListener("keydown", onKeyDown, true);
+}
+
+// ─── Read aloud (TTS) playback ─────────────────────────────────
+// The background service worker has no DOM and can't play audio, so it hands us
+// either the synthesized bytes (cloud) or the raw text (Web Speech fallback) to
+// play here in the page context.
+let dgTtsAudio = null;
+
+function dgStopTts() {
+  if (dgTtsAudio) {
+    dgTtsAudio.pause();
+    dgTtsAudio.src = "";
+    dgTtsAudio = null;
+  }
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    window.speechSynthesis.cancel();
+  }
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (!message || typeof message.type !== "string") return;
+
+  if (message.type === "dg-tts-play") {
+    dgStopTts();
+    const src = `data:${message.mimeType || "audio/mpeg"};base64,${message.audioBase64}`;
+    dgTtsAudio = new Audio(src);
+    dgTtsAudio.addEventListener("ended", () => {
+      dgTtsAudio = null;
+    });
+    dgTtsAudio.play().catch((error) => {
+      console.warn("[DG Overlay] TTS playback failed", error);
+    });
+  } else if (message.type === "dg-tts-fallback") {
+    dgStopTts();
+    try {
+      const utterance = new SpeechSynthesisUtterance(message.text || "");
+      window.speechSynthesis.speak(utterance);
+    } catch (error) {
+      console.warn("[DG Overlay] Web Speech fallback failed", error);
+    }
+  } else if (message.type === "dg-tts-stop") {
+    dgStopTts();
+  }
 });

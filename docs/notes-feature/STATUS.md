@@ -1,8 +1,8 @@
 ---
-last_updated: 2026-05-31
-current_epoch: 13
+last_updated: 2026-06-11
+current_epoch: 18
 current_sprint: 58
-sprint_status: planned
+sprint_status: in-progress
 ---
 
 # Digital Garden Content IDE - Status
@@ -35,23 +35,35 @@ before planning and executing. There may be additions or modifications.
 
 ## Current Work
 
-### Active Epoch: Epoch 13 - People + Collaboration
-**Duration**: 6 sprints (58-63)
-**Theme**: People/domain tree mirroring, person mentions, safe sharing, and Hocuspocus-backed collaboration
+> **Reconciled 2026-06-11.** This project runs **multiple parallel feature epochs/worktrees**, not a single linear sprint ladder. The frontmatter `current_epoch`/`current_sprint` reflect the primary in-flight focus; the lists below reflect reality across worktrees.
 
-**Sprint Plan**:
-- Sprint 58: Foundations (planned)
-- Sprint 59: People View + Mount UX (planned)
-- Sprint 60: Tree Policy Hardening (planned)
-- Sprint 61: Person Mentions (planned)
-- Sprint 62: Hocuspocus Collaboration (planned)
-- Sprint 63: Share + Media Prototype (planned)
+### Active Epoch: Epoch 18 — Multi-Tenancy Foundation
+**Status**: In progress (Phase 1) — worktree `feature+multi-tenancy`, dev DB isolated (Neon `dev-david`, `pg_trgm` enabled). Phase 0 ✅; additive schema + tenancy helpers + backfill underway.
+**Theme**: Additive multi-tenant schema, tenancy helper module, backfill
+**Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-18-multi-tenancy.md` (+ `MULTI-TENANCY-PLAN.md`)
 
-**Worktree**: `/Users/davidvalentine/Documents/Digital-Garden/.worktrees/epoch-13-people-collab`
-**Branch**: `codex/epoch-13-people-collab`
+**Other in-flight worktrees** (parallel): Epoch 19 — Flashcards FSRS (`flashcards-fsrs`); `ai-chat-polish`; `ai-flashcards-tools`; `mobile-webview-spike`; `speed-reader`.
+
+### Next (booked, not started): Epoch 13 — People + Collaboration
+**Duration**: 6 sprints (58–63) — Foundations · People View + Mount UX · Tree Policy Hardening · Person Mentions · Hocuspocus Collaboration · Share + Media Prototype
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-13-people-and-collaboration.md`
 
+### Planned: Offline Work epoch (number TBD)
+Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
+
 ## Recent Completions (Last 30 Days)
+
+**June 11, 2026**: Canonical `bodyHash` save-conflict hotfix — PR #56 (open)
+
+- Fixes a production false-positive: **every** content save tripped the "This note changed elsewhere" conflict banner. Root cause — the `If-Match` optimistic-concurrency hash used `JSON.stringify` (key-order sensitive), but a note body's key order isn't stable across a save round-trip (`sanitizeTipTapJsonWithExtensions` rebuilds the node tree; Postgres JSONB doesn't preserve key order), so the client's echoed hash never matched the server's recompute for identical content.
+- Fix: hash a **canonical (deep key-sorted) serialization** so the check compares content, not byte order. Array order preserved. Client echoes the server's hash, so one server function fixes GET baseline + PATCH response + If-Match check together. No migration. Gates green (typecheck/lint/build).
+
+**June 11, 2026**: Audio Subsystem epoch merged via PR #55
+
+- Speech generation (OpenAI / ElevenLabs / Google) + flashcard audio + **TTS read-aloud**: content-type-aware Listen (note text vs file extracted text), BubbleMenu Read-selection, persistent mini-player, draggable **PDF text reader** (extracted text in own DOM → select → right-click → Speak), and a **bearer-auth `/tts` proxy** for the browser extension (provider key never leaves the server) with Web Speech fallback. Session LRU audio cache; speed via `playbackRate`.
+- Workplaces chores in the same PR: progressive-disclosure borrow dialog + lazy borrowed-tab expiry badge.
+
+**May 31, 2026**: AI Chat Revamp follow-up polish merged via PR #49 (commit `abaad12`)
 
 **May 31, 2026**: AI Chat Revamp follow-up polish merged via PR #49 (commit `abaad12`)
 

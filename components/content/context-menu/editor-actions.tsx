@@ -15,6 +15,17 @@ import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
 import { toast } from "sonner";
+import {
+  BOTTOM_LEFT_PANE_ID,
+  BOTTOM_RIGHT_PANE_ID,
+  TOP_LEFT_PANE_ID,
+  TOP_RIGHT_PANE_ID,
+  getPaneLabel,
+  getVisiblePaneIds,
+  useContentStore,
+  type WorkspacePaneId,
+} from "@/state/content-store";
+import { ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight } from "lucide-react";
 
 /** Captured selection data — frozen when the context menu opens */
 interface SelectionCapture {
@@ -553,6 +564,75 @@ function buildSnippetSaveMenu(
 }
 
 /**
+ * Trigger a browser download from a Blob.
+ */
+function triggerBlobDownload(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Download an image — either from the server (via contentId) or directly from its URL.
+ */
+async function downloadImage(src: string, contentId: string | null) {
+  try {
+    if (contentId) {
+      const res = await fetch(`/api/content/content/${contentId}/download?download=true`);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const disposition = res.headers.get("content-disposition") ?? "";
+      const fileNameMatch = disposition.match(/filename="([^"]+)"/);
+      const fileName = fileNameMatch?.[1] ?? `image-${contentId}`;
+      triggerBlobDownload(blob, fileName);
+    } else {
+      const res = await fetch(src);
+      if (!res.ok) throw new Error("Download failed");
+      const blob = await res.blob();
+      const fileName = src.split("/").pop()?.split("?")[0] ?? "image";
+      triggerBlobDownload(blob, fileName);
+    }
+    toast.success("Image downloaded");
+  } catch {
+    toast.error("Failed to download image");
+  }
+}
+
+/** Resolve a wiki-link title to a content ID, then open in the given pane. */
+async function resolveWikiLinkAndOpen(targetTitle: string, paneId: WorkspacePaneId) {
+  const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
+  try {
+    const params = new URLSearchParams({ search: targetTitle, limit: "5" });
+    const res = await fetch(`/api/content/content?${params}`, { credentials: "include" });
+    if (!res.ok) { toast.error("Could not find note"); return; }
+
+    const data = await res.json() as {
+      data?: { items?: Array<{ id: string; title: string; contentType: string }> };
+    };
+    const items = data?.data?.items ?? [];
+    const match =
+      items.find((n) => n.title.toLowerCase() === targetTitle.toLowerCase()) ?? items[0];
+    if (!match) { toast.error(`"${targetTitle}" not found`); return; }
+
+    const visible = new Set(getVisiblePaneIds(layoutMode));
+    if (!visible.has(paneId)) setLayoutMode("dual-vertical");
+
+    openContentInPane(match.id, paneId, {
+      title: match.title,
+      contentType: match.contentType,
+      pin: true,
+    });
+  } catch {
+    toast.error("Failed to open note in pane");
+  }
+}
+
+/**
  * Editor context menu action provider.
  *
  * IMPORTANT: Selection is captured HERE (while menu is open and selection active),
@@ -561,6 +641,68 @@ function buildSnippetSaveMenu(
 export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   const hasSelection = ctx.hasSelection === true;
   const sections: ContextMenuSection[] = [];
+
+  // --- Wiki-link actions (Open / Open in Pane) ---
+  const contextTarget = ctx.contextTarget as Element | null;
+  const wikiLinkEl = contextTarget?.closest?.('[data-type="wiki-link"]');
+  if (wikiLinkEl) {
+    const targetTitle = wikiLinkEl.getAttribute("data-target-title");
+    if (targetTitle) {
+      const { layoutMode } = useContentStore.getState();
+      const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
+
+      const paneOptions = [
+        { id: TOP_LEFT_PANE_ID, fallback: "Left Pane", icon: <ArrowUpLeft className="h-4 w-4" /> },
+        { id: TOP_RIGHT_PANE_ID, fallback: "Right Pane", icon: <ArrowUpRight className="h-4 w-4" /> },
+        { id: BOTTOM_LEFT_PANE_ID, fallback: "Bottom Left Pane", icon: <ArrowDownLeft className="h-4 w-4" /> },
+        { id: BOTTOM_RIGHT_PANE_ID, fallback: "Bottom Right Pane", icon: <ArrowDownRight className="h-4 w-4" /> },
+      ] as Array<{ id: WorkspacePaneId; fallback: string; icon: React.ReactNode }>;
+
+      sections.push({
+        actions: [
+          {
+            id: "open-wiki-link",
+            label: "Open",
+            onClick: () => {
+              window.dispatchEvent(
+                new CustomEvent("open-wiki-link", { detail: { targetTitle } })
+              );
+            },
+          },
+          {
+            id: "open-wiki-link-in-pane",
+            label: "Open in Pane",
+            submenu: paneOptions.map((pane) => ({
+              id: `open-wiki-link-${pane.id}`,
+              label: visiblePaneIds.has(pane.id)
+                ? getPaneLabel(layoutMode, pane.id)
+                : `${pane.fallback} (expand layout)`,
+              icon: pane.icon,
+              onClick: () => { void resolveWikiLinkAndOpen(targetTitle, pane.id); },
+            })),
+          },
+        ],
+      });
+    }
+  }
+
+  // --- Image actions (Download) ---
+  const imageWrapper = contextTarget?.closest?.(".image-resize-wrapper");
+  const imgEl = imageWrapper?.querySelector?.("img") ?? null;
+  const imageSrc = imgEl?.getAttribute("src") ?? null;
+  const imageContentId = imgEl?.getAttribute("data-content-id") ?? null;
+
+  if (imageSrc) {
+    sections.push({
+      actions: [
+        {
+          id: "download-image",
+          label: "Download Image",
+          onClick: () => { void downloadImage(imageSrc, imageContentId); },
+        },
+      ],
+    });
+  }
 
   // Capture selection NOW, before any menu interaction
   const capture = hasSelection ? captureSelection() : null;
@@ -834,31 +976,15 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
 
   // --- Dev tools (local development only) ---
   if (process.env.NODE_ENV === "development") {
-    const devActions: ContextMenuAction[] = [];
-
-    devActions.push({
-      id: "inspect-element",
-      label: "Inspect Element",
-      shortcut: "⌥+Click",
-      onClick: () => {
-        const target = ctx.contextTarget as Element | undefined;
-        const x = (ctx.contextX as number) ?? 0;
-        const y = (ctx.contextY as number) ?? 0;
-        if (target) {
-          // Set pass-through flag so the MarkdownEditor handler yields to browser
-          (window as Window & { __passNativeContextMenu?: boolean }).__passNativeContextMenu = true;
-          const nativeEvent = new MouseEvent("contextmenu", {
-            bubbles: true,
-            clientX: x,
-            clientY: y,
-            button: 2,
-          });
-          setTimeout(() => target.dispatchEvent(nativeEvent), 50);
-        }
-      },
+    sections.push({
+      actions: [
+        {
+          id: "browser-cm-hint",
+          label: "Use ⌥+Click for browser context menu",
+          disabled: true,
+        },
+      ],
     });
-
-    sections.push({ actions: devActions });
   }
 
   return sections;

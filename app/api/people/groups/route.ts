@@ -5,6 +5,24 @@ import { createPeopleGroup } from "@/lib/domain/people";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger } from "@/lib/core/logger";
 
+export async function GET(_request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    const groups = await prisma.peopleGroup.findMany({
+      where: { ownerId: session.user.id },
+      select: { id: true, name: true, parentGroupId: true, isDefault: true },
+      orderBy: { name: "asc" },
+    });
+    return NextResponse.json({ success: true, data: { groups } });
+  } catch (error) {
+    logger.error({ layer: "content", event: "people_group_list:caught", summary: "GET caught", error });
+    return NextResponse.json(
+      { success: false, error: { code: "SERVER_ERROR", message: "Failed to list People groups" } },
+      { status: 500 }
+    );
+  }
+}
+
 interface CreatePeopleGroupRequest {
   name?: string;
   parentGroupId?: string | null;

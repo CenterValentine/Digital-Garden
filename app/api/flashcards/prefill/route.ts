@@ -3,6 +3,15 @@ import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { resolveContentAccess } from "@/lib/domain/collaboration/access";
 import { getUserSettings } from "@/lib/features/settings/operations";
+import { slugifyDeckName } from "@/lib/domain/flashcards";
+
+// Build a canonical slug path ("latin/grammar") from a legacy
+// category/subcategory pair so the path-based builder can prefill it.
+function buildDeckPath(category: string, subcategory: string): string {
+  const cat = slugifyDeckName(category || "General");
+  const sub = subcategory.trim() ? slugifyDeckName(subcategory) : "";
+  return sub ? `${cat}/${sub}` : cat;
+}
 
 function getMetadataFlashcards(value: unknown) {
   if (!value || typeof value !== "object") return null;
@@ -75,6 +84,14 @@ export async function GET(request: NextRequest) {
     const subcategory =
       metadataSubcategory || settings.flashcards?.lastUsedSubcategory || "";
 
+    // Path-based builder prefill. Prefer a source-note override, then the
+    // user's last full deck path (captures 3+ levels), then a path built
+    // from the resolved category/subcategory pair.
+    const deckPath = metadataCategory
+      ? buildDeckPath(metadataCategory, metadataSubcategory)
+      : settings.flashcards?.lastUsedDeckPath ||
+        buildDeckPath(category, subcategory);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -82,6 +99,7 @@ export async function GET(request: NextRequest) {
         sourceTitle,
         category,
         subcategory,
+        deckPath,
         frontLabel: settings.flashcards?.defaultFrontLabel || "Question",
         backLabel: settings.flashcards?.defaultBackLabel || "Answer",
         reviewMode: settings.flashcards?.defaultReviewMode || "front_to_back",

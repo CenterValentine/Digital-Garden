@@ -224,6 +224,15 @@ export type ChatPayload = $Result.DefaultSelection<Prisma.$ChatPayloadPayload>
  */
 export type Conversation = $Result.DefaultSelection<Prisma.$ConversationPayload>
 /**
+ * Model ChatContext
+ * User-authored custom-instruction presets ("chat contexts"). Each is a
+ * named block of guidance that, when active, is appended to the chat
+ * system prompt to shape the assistant's voice/output. Created, edited,
+ * and deleted on the spot from the chat composer. Soft-deleted so an
+ * in-flight conversation reference degrades gracefully.
+ */
+export type ChatContext = $Result.DefaultSelection<Prisma.$ChatContextPayload>
+/**
  * Model ConversationMessage
  * 
  */
@@ -1321,6 +1330,16 @@ export class PrismaClient<
   get conversation(): Prisma.ConversationDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.chatContext`: Exposes CRUD operations for the **ChatContext** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ChatContexts
+    * const chatContexts = await prisma.chatContext.findMany()
+    * ```
+    */
+  get chatContext(): Prisma.ChatContextDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.conversationMessage`: Exposes CRUD operations for the **ConversationMessage** model.
     * Example usage:
     * ```ts
@@ -2115,6 +2134,7 @@ export namespace Prisma {
     ExternalPayload: 'ExternalPayload',
     ChatPayload: 'ChatPayload',
     Conversation: 'Conversation',
+    ChatContext: 'ChatContext',
     ConversationMessage: 'ConversationMessage',
     ConversationAssociation: 'ConversationAssociation',
     AIConnection: 'AIConnection',
@@ -2162,7 +2182,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -5274,6 +5294,80 @@ export namespace Prisma {
           }
         }
       }
+      ChatContext: {
+        payload: Prisma.$ChatContextPayload<ExtArgs>
+        fields: Prisma.ChatContextFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ChatContextFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ChatContextFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          findFirst: {
+            args: Prisma.ChatContextFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ChatContextFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          findMany: {
+            args: Prisma.ChatContextFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>[]
+          }
+          create: {
+            args: Prisma.ChatContextCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          createMany: {
+            args: Prisma.ChatContextCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ChatContextCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>[]
+          }
+          delete: {
+            args: Prisma.ChatContextDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          update: {
+            args: Prisma.ChatContextUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          deleteMany: {
+            args: Prisma.ChatContextDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ChatContextUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ChatContextUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>[]
+          }
+          upsert: {
+            args: Prisma.ChatContextUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ChatContextPayload>
+          }
+          aggregate: {
+            args: Prisma.ChatContextAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateChatContext>
+          }
+          groupBy: {
+            args: Prisma.ChatContextGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ChatContextGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ChatContextCountArgs<ExtArgs>
+            result: $Utils.Optional<ChatContextCountAggregateOutputType> | number
+          }
+        }
+      }
       ConversationMessage: {
         payload: Prisma.$ConversationMessagePayload<ExtArgs>
         fields: Prisma.ConversationMessageFieldRefs
@@ -7792,6 +7886,7 @@ export namespace Prisma {
     externalPayload?: ExternalPayloadOmit
     chatPayload?: ChatPayloadOmit
     conversation?: ConversationOmit
+    chatContext?: ChatContextOmit
     conversationMessage?: ConversationMessageOmit
     conversationAssociation?: ConversationAssociationOmit
     aIConnection?: AIConnectionOmit
@@ -8204,6 +8299,7 @@ export namespace Prisma {
     contentHistory: number
     contentNodes: number
     conversations: number
+    chatContexts: number
     sessions: number
     storageConfigs: number
     tags: number
@@ -8253,6 +8349,7 @@ export namespace Prisma {
     contentHistory?: boolean | UserCountOutputTypeCountContentHistoryArgs
     contentNodes?: boolean | UserCountOutputTypeCountContentNodesArgs
     conversations?: boolean | UserCountOutputTypeCountConversationsArgs
+    chatContexts?: boolean | UserCountOutputTypeCountChatContextsArgs
     sessions?: boolean | UserCountOutputTypeCountSessionsArgs
     storageConfigs?: boolean | UserCountOutputTypeCountStorageConfigsArgs
     tags?: boolean | UserCountOutputTypeCountTagsArgs
@@ -8364,6 +8461,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountConversationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ConversationWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountChatContextsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ChatContextWhereInput
   }
 
   /**
@@ -9023,6 +9127,37 @@ export namespace Prisma {
    */
   export type ConversationCountOutputTypeCountAssociationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ConversationAssociationWhereInput
+  }
+
+
+  /**
+   * Count Type ChatContextCountOutputType
+   */
+
+  export type ChatContextCountOutputType = {
+    conversations: number
+  }
+
+  export type ChatContextCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    conversations?: boolean | ChatContextCountOutputTypeCountConversationsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * ChatContextCountOutputType without action
+   */
+  export type ChatContextCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContextCountOutputType
+     */
+    select?: ChatContextCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * ChatContextCountOutputType without action
+   */
+  export type ChatContextCountOutputTypeCountConversationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConversationWhereInput
   }
 
 
@@ -28186,6 +28321,7 @@ export namespace Prisma {
     passwordHash: string | null
     email: string | null
     role: $Enums.UserRole | null
+    canClaimCustomHosts: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
     settingsVersion: number | null
@@ -28201,6 +28337,7 @@ export namespace Prisma {
     passwordHash: string | null
     email: string | null
     role: $Enums.UserRole | null
+    canClaimCustomHosts: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
     settingsVersion: number | null
@@ -28216,6 +28353,7 @@ export namespace Prisma {
     passwordHash: number
     email: number
     role: number
+    canClaimCustomHosts: number
     createdAt: number
     updatedAt: number
     settings: number
@@ -28247,6 +28385,7 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
+    canClaimCustomHosts?: true
     createdAt?: true
     updatedAt?: true
     settingsVersion?: true
@@ -28262,6 +28401,7 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
+    canClaimCustomHosts?: true
     createdAt?: true
     updatedAt?: true
     settingsVersion?: true
@@ -28277,6 +28417,7 @@ export namespace Prisma {
     passwordHash?: true
     email?: true
     role?: true
+    canClaimCustomHosts?: true
     createdAt?: true
     updatedAt?: true
     settings?: true
@@ -28381,6 +28522,7 @@ export namespace Prisma {
     passwordHash: string | null
     email: string
     role: $Enums.UserRole
+    canClaimCustomHosts: boolean
     createdAt: Date
     updatedAt: Date
     settings: JsonValue | null
@@ -28417,6 +28559,7 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
+    canClaimCustomHosts?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     settings?: boolean
@@ -28435,6 +28578,7 @@ export namespace Prisma {
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
     conversations?: boolean | User$conversationsArgs<ExtArgs>
+    chatContexts?: boolean | User$chatContextsArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
     storageConfigs?: boolean | User$storageConfigsArgs<ExtArgs>
     tags?: boolean | User$tagsArgs<ExtArgs>
@@ -28482,6 +28626,7 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
+    canClaimCustomHosts?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     settings?: boolean
@@ -28500,6 +28645,7 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
+    canClaimCustomHosts?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     settings?: boolean
@@ -28518,6 +28664,7 @@ export namespace Prisma {
     passwordHash?: boolean
     email?: boolean
     role?: boolean
+    canClaimCustomHosts?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     settings?: boolean
@@ -28529,7 +28676,7 @@ export namespace Prisma {
     primaryTenantId?: boolean
   }
 
-  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "passwordHash" | "email" | "role" | "createdAt" | "updatedAt" | "settings" | "settingsVersion" | "fsrsParameters" | "desiredRetention" | "fsrsMaxInterval" | "defaultFlashcardDeckId" | "primaryTenantId", ExtArgs["result"]["user"]>
+  export type UserOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "username" | "passwordHash" | "email" | "role" | "canClaimCustomHosts" | "createdAt" | "updatedAt" | "settings" | "settingsVersion" | "fsrsParameters" | "desiredRetention" | "fsrsMaxInterval" | "defaultFlashcardDeckId" | "primaryTenantId", ExtArgs["result"]["user"]>
   export type UserInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     accounts?: boolean | User$accountsArgs<ExtArgs>
     aiConnections?: boolean | User$aiConnectionsArgs<ExtArgs>
@@ -28540,6 +28687,7 @@ export namespace Prisma {
     contentHistory?: boolean | User$contentHistoryArgs<ExtArgs>
     contentNodes?: boolean | User$contentNodesArgs<ExtArgs>
     conversations?: boolean | User$conversationsArgs<ExtArgs>
+    chatContexts?: boolean | User$chatContextsArgs<ExtArgs>
     sessions?: boolean | User$sessionsArgs<ExtArgs>
     storageConfigs?: boolean | User$storageConfigsArgs<ExtArgs>
     tags?: boolean | User$tagsArgs<ExtArgs>
@@ -28599,6 +28747,7 @@ export namespace Prisma {
       contentHistory: Prisma.$ContentHistoryPayload<ExtArgs>[]
       contentNodes: Prisma.$ContentNodePayload<ExtArgs>[]
       conversations: Prisma.$ConversationPayload<ExtArgs>[]
+      chatContexts: Prisma.$ChatContextPayload<ExtArgs>[]
       sessions: Prisma.$SessionPayload<ExtArgs>[]
       storageConfigs: Prisma.$StorageProviderConfigPayload<ExtArgs>[]
       tags: Prisma.$TagPayload<ExtArgs>[]
@@ -28644,6 +28793,7 @@ export namespace Prisma {
       passwordHash: string | null
       email: string
       role: $Enums.UserRole
+      canClaimCustomHosts: boolean
       createdAt: Date
       updatedAt: Date
       settings: Prisma.JsonValue | null
@@ -29056,6 +29206,7 @@ export namespace Prisma {
     contentHistory<T extends User$contentHistoryArgs<ExtArgs> = {}>(args?: Subset<T, User$contentHistoryArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentHistoryPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     contentNodes<T extends User$contentNodesArgs<ExtArgs> = {}>(args?: Subset<T, User$contentNodesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     conversations<T extends User$conversationsArgs<ExtArgs> = {}>(args?: Subset<T, User$conversationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    chatContexts<T extends User$chatContextsArgs<ExtArgs> = {}>(args?: Subset<T, User$chatContextsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     sessions<T extends User$sessionsArgs<ExtArgs> = {}>(args?: Subset<T, User$sessionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     storageConfigs<T extends User$storageConfigsArgs<ExtArgs> = {}>(args?: Subset<T, User$storageConfigsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StorageProviderConfigPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     tags<T extends User$tagsArgs<ExtArgs> = {}>(args?: Subset<T, User$tagsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TagPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -29128,6 +29279,7 @@ export namespace Prisma {
     readonly passwordHash: FieldRef<"User", 'String'>
     readonly email: FieldRef<"User", 'String'>
     readonly role: FieldRef<"User", 'UserRole'>
+    readonly canClaimCustomHosts: FieldRef<"User", 'Boolean'>
     readonly createdAt: FieldRef<"User", 'DateTime'>
     readonly updatedAt: FieldRef<"User", 'DateTime'>
     readonly settings: FieldRef<"User", 'Json'>
@@ -29746,6 +29898,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ConversationScalarFieldEnum | ConversationScalarFieldEnum[]
+  }
+
+  /**
+   * User.chatContexts
+   */
+  export type User$chatContextsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    where?: ChatContextWhereInput
+    orderBy?: ChatContextOrderByWithRelationInput | ChatContextOrderByWithRelationInput[]
+    cursor?: ChatContextWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ChatContextScalarFieldEnum | ChatContextScalarFieldEnum[]
   }
 
   /**
@@ -60098,6 +60274,7 @@ export namespace Prisma {
     ownerId: string | null
     title: string | null
     archivedToContentNodeId: string | null
+    activeContextId: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -60108,6 +60285,7 @@ export namespace Prisma {
     ownerId: string | null
     title: string | null
     archivedToContentNodeId: string | null
+    activeContextId: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -60118,6 +60296,7 @@ export namespace Prisma {
     ownerId: number
     title: number
     archivedToContentNodeId: number
+    activeContextId: number
     createdAt: number
     updatedAt: number
     deletedAt: number
@@ -60130,6 +60309,7 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     archivedToContentNodeId?: true
+    activeContextId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -60140,6 +60320,7 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     archivedToContentNodeId?: true
+    activeContextId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -60150,6 +60331,7 @@ export namespace Prisma {
     ownerId?: true
     title?: true
     archivedToContentNodeId?: true
+    activeContextId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -60233,6 +60415,7 @@ export namespace Prisma {
     ownerId: string
     title: string | null
     archivedToContentNodeId: string | null
+    activeContextId: string | null
     createdAt: Date
     updatedAt: Date
     deletedAt: Date | null
@@ -60260,11 +60443,13 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     archivedToContentNodeId?: boolean
+    activeContextId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
@@ -60275,11 +60460,13 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     archivedToContentNodeId?: boolean
+    activeContextId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -60287,11 +60474,13 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     archivedToContentNodeId?: boolean
+    activeContextId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectScalar = {
@@ -60299,15 +60488,17 @@ export namespace Prisma {
     ownerId?: boolean
     title?: boolean
     archivedToContentNodeId?: boolean
+    activeContextId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
   }
 
-  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "archivedToContentNodeId" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["conversation"]>
+  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "archivedToContentNodeId" | "activeContextId" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["conversation"]>
   export type ConversationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
@@ -60315,10 +60506,12 @@ export namespace Prisma {
   export type ConversationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
   }
   export type ConversationIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
+    activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
   }
 
   export type $ConversationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -60326,6 +60519,7 @@ export namespace Prisma {
     objects: {
       owner: Prisma.$UserPayload<ExtArgs>
       archivedToContentNode: Prisma.$ContentNodePayload<ExtArgs> | null
+      activeContext: Prisma.$ChatContextPayload<ExtArgs> | null
       messages: Prisma.$ConversationMessagePayload<ExtArgs>[]
       associations: Prisma.$ConversationAssociationPayload<ExtArgs>[]
     }
@@ -60334,6 +60528,7 @@ export namespace Prisma {
       ownerId: string
       title: string | null
       archivedToContentNodeId: string | null
+      activeContextId: string | null
       createdAt: Date
       updatedAt: Date
       deletedAt: Date | null
@@ -60733,6 +60928,7 @@ export namespace Prisma {
     readonly [Symbol.toStringTag]: "PrismaPromise"
     owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     archivedToContentNode<T extends Conversation$archivedToContentNodeArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$archivedToContentNodeArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    activeContext<T extends Conversation$activeContextArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$activeContextArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     messages<T extends Conversation$messagesArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     associations<T extends Conversation$associationsArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$associationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationAssociationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
@@ -60768,6 +60964,7 @@ export namespace Prisma {
     readonly ownerId: FieldRef<"Conversation", 'String'>
     readonly title: FieldRef<"Conversation", 'String'>
     readonly archivedToContentNodeId: FieldRef<"Conversation", 'String'>
+    readonly activeContextId: FieldRef<"Conversation", 'String'>
     readonly createdAt: FieldRef<"Conversation", 'DateTime'>
     readonly updatedAt: FieldRef<"Conversation", 'DateTime'>
     readonly deletedAt: FieldRef<"Conversation", 'DateTime'>
@@ -61186,6 +61383,25 @@ export namespace Prisma {
   }
 
   /**
+   * Conversation.activeContext
+   */
+  export type Conversation$activeContextArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    where?: ChatContextWhereInput
+  }
+
+  /**
    * Conversation.messages
    */
   export type Conversation$messagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -61249,6 +61465,1120 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: ConversationInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ChatContext
+   */
+
+  export type AggregateChatContext = {
+    _count: ChatContextCountAggregateOutputType | null
+    _min: ChatContextMinAggregateOutputType | null
+    _max: ChatContextMaxAggregateOutputType | null
+  }
+
+  export type ChatContextMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    name: string | null
+    body: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+    deletedAt: Date | null
+  }
+
+  export type ChatContextMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    name: string | null
+    body: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+    deletedAt: Date | null
+  }
+
+  export type ChatContextCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    name: number
+    body: number
+    createdAt: number
+    updatedAt: number
+    deletedAt: number
+    _all: number
+  }
+
+
+  export type ChatContextMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    body?: true
+    createdAt?: true
+    updatedAt?: true
+    deletedAt?: true
+  }
+
+  export type ChatContextMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    body?: true
+    createdAt?: true
+    updatedAt?: true
+    deletedAt?: true
+  }
+
+  export type ChatContextCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    name?: true
+    body?: true
+    createdAt?: true
+    updatedAt?: true
+    deletedAt?: true
+    _all?: true
+  }
+
+  export type ChatContextAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ChatContext to aggregate.
+     */
+    where?: ChatContextWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatContexts to fetch.
+     */
+    orderBy?: ChatContextOrderByWithRelationInput | ChatContextOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ChatContextWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatContexts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatContexts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ChatContexts
+    **/
+    _count?: true | ChatContextCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ChatContextMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ChatContextMaxAggregateInputType
+  }
+
+  export type GetChatContextAggregateType<T extends ChatContextAggregateArgs> = {
+        [P in keyof T & keyof AggregateChatContext]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateChatContext[P]>
+      : GetScalarType<T[P], AggregateChatContext[P]>
+  }
+
+
+
+
+  export type ChatContextGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ChatContextWhereInput
+    orderBy?: ChatContextOrderByWithAggregationInput | ChatContextOrderByWithAggregationInput[]
+    by: ChatContextScalarFieldEnum[] | ChatContextScalarFieldEnum
+    having?: ChatContextScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ChatContextCountAggregateInputType | true
+    _min?: ChatContextMinAggregateInputType
+    _max?: ChatContextMaxAggregateInputType
+  }
+
+  export type ChatContextGroupByOutputType = {
+    id: string
+    ownerId: string
+    name: string
+    body: string
+    createdAt: Date
+    updatedAt: Date
+    deletedAt: Date | null
+    _count: ChatContextCountAggregateOutputType | null
+    _min: ChatContextMinAggregateOutputType | null
+    _max: ChatContextMaxAggregateOutputType | null
+  }
+
+  type GetChatContextGroupByPayload<T extends ChatContextGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ChatContextGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ChatContextGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ChatContextGroupByOutputType[P]>
+            : GetScalarType<T[P], ChatContextGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ChatContextSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    body?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    deletedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    conversations?: boolean | ChatContext$conversationsArgs<ExtArgs>
+    _count?: boolean | ChatContextCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatContext"]>
+
+  export type ChatContextSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    body?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    deletedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatContext"]>
+
+  export type ChatContextSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    body?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    deletedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["chatContext"]>
+
+  export type ChatContextSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    name?: boolean
+    body?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    deletedAt?: boolean
+  }
+
+  export type ChatContextOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "name" | "body" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["chatContext"]>
+  export type ChatContextInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    conversations?: boolean | ChatContext$conversationsArgs<ExtArgs>
+    _count?: boolean | ChatContextCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type ChatContextIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ChatContextIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ChatContextPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ChatContext"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      conversations: Prisma.$ConversationPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      name: string
+      body: string
+      createdAt: Date
+      updatedAt: Date
+      deletedAt: Date | null
+    }, ExtArgs["result"]["chatContext"]>
+    composites: {}
+  }
+
+  type ChatContextGetPayload<S extends boolean | null | undefined | ChatContextDefaultArgs> = $Result.GetResult<Prisma.$ChatContextPayload, S>
+
+  type ChatContextCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ChatContextFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ChatContextCountAggregateInputType | true
+    }
+
+  export interface ChatContextDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ChatContext'], meta: { name: 'ChatContext' } }
+    /**
+     * Find zero or one ChatContext that matches the filter.
+     * @param {ChatContextFindUniqueArgs} args - Arguments to find a ChatContext
+     * @example
+     * // Get one ChatContext
+     * const chatContext = await prisma.chatContext.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ChatContextFindUniqueArgs>(args: SelectSubset<T, ChatContextFindUniqueArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ChatContext that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ChatContextFindUniqueOrThrowArgs} args - Arguments to find a ChatContext
+     * @example
+     * // Get one ChatContext
+     * const chatContext = await prisma.chatContext.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ChatContextFindUniqueOrThrowArgs>(args: SelectSubset<T, ChatContextFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ChatContext that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextFindFirstArgs} args - Arguments to find a ChatContext
+     * @example
+     * // Get one ChatContext
+     * const chatContext = await prisma.chatContext.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ChatContextFindFirstArgs>(args?: SelectSubset<T, ChatContextFindFirstArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ChatContext that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextFindFirstOrThrowArgs} args - Arguments to find a ChatContext
+     * @example
+     * // Get one ChatContext
+     * const chatContext = await prisma.chatContext.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ChatContextFindFirstOrThrowArgs>(args?: SelectSubset<T, ChatContextFindFirstOrThrowArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ChatContexts that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ChatContexts
+     * const chatContexts = await prisma.chatContext.findMany()
+     * 
+     * // Get first 10 ChatContexts
+     * const chatContexts = await prisma.chatContext.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const chatContextWithIdOnly = await prisma.chatContext.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ChatContextFindManyArgs>(args?: SelectSubset<T, ChatContextFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ChatContext.
+     * @param {ChatContextCreateArgs} args - Arguments to create a ChatContext.
+     * @example
+     * // Create one ChatContext
+     * const ChatContext = await prisma.chatContext.create({
+     *   data: {
+     *     // ... data to create a ChatContext
+     *   }
+     * })
+     * 
+     */
+    create<T extends ChatContextCreateArgs>(args: SelectSubset<T, ChatContextCreateArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ChatContexts.
+     * @param {ChatContextCreateManyArgs} args - Arguments to create many ChatContexts.
+     * @example
+     * // Create many ChatContexts
+     * const chatContext = await prisma.chatContext.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ChatContextCreateManyArgs>(args?: SelectSubset<T, ChatContextCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ChatContexts and returns the data saved in the database.
+     * @param {ChatContextCreateManyAndReturnArgs} args - Arguments to create many ChatContexts.
+     * @example
+     * // Create many ChatContexts
+     * const chatContext = await prisma.chatContext.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ChatContexts and only return the `id`
+     * const chatContextWithIdOnly = await prisma.chatContext.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ChatContextCreateManyAndReturnArgs>(args?: SelectSubset<T, ChatContextCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ChatContext.
+     * @param {ChatContextDeleteArgs} args - Arguments to delete one ChatContext.
+     * @example
+     * // Delete one ChatContext
+     * const ChatContext = await prisma.chatContext.delete({
+     *   where: {
+     *     // ... filter to delete one ChatContext
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ChatContextDeleteArgs>(args: SelectSubset<T, ChatContextDeleteArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ChatContext.
+     * @param {ChatContextUpdateArgs} args - Arguments to update one ChatContext.
+     * @example
+     * // Update one ChatContext
+     * const chatContext = await prisma.chatContext.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ChatContextUpdateArgs>(args: SelectSubset<T, ChatContextUpdateArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ChatContexts.
+     * @param {ChatContextDeleteManyArgs} args - Arguments to filter ChatContexts to delete.
+     * @example
+     * // Delete a few ChatContexts
+     * const { count } = await prisma.chatContext.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ChatContextDeleteManyArgs>(args?: SelectSubset<T, ChatContextDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ChatContexts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ChatContexts
+     * const chatContext = await prisma.chatContext.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ChatContextUpdateManyArgs>(args: SelectSubset<T, ChatContextUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ChatContexts and returns the data updated in the database.
+     * @param {ChatContextUpdateManyAndReturnArgs} args - Arguments to update many ChatContexts.
+     * @example
+     * // Update many ChatContexts
+     * const chatContext = await prisma.chatContext.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ChatContexts and only return the `id`
+     * const chatContextWithIdOnly = await prisma.chatContext.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ChatContextUpdateManyAndReturnArgs>(args: SelectSubset<T, ChatContextUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ChatContext.
+     * @param {ChatContextUpsertArgs} args - Arguments to update or create a ChatContext.
+     * @example
+     * // Update or create a ChatContext
+     * const chatContext = await prisma.chatContext.upsert({
+     *   create: {
+     *     // ... data to create a ChatContext
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ChatContext we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ChatContextUpsertArgs>(args: SelectSubset<T, ChatContextUpsertArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ChatContexts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextCountArgs} args - Arguments to filter ChatContexts to count.
+     * @example
+     * // Count the number of ChatContexts
+     * const count = await prisma.chatContext.count({
+     *   where: {
+     *     // ... the filter for the ChatContexts we want to count
+     *   }
+     * })
+    **/
+    count<T extends ChatContextCountArgs>(
+      args?: Subset<T, ChatContextCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ChatContextCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ChatContext.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ChatContextAggregateArgs>(args: Subset<T, ChatContextAggregateArgs>): Prisma.PrismaPromise<GetChatContextAggregateType<T>>
+
+    /**
+     * Group by ChatContext.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ChatContextGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ChatContextGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ChatContextGroupByArgs['orderBy'] }
+        : { orderBy?: ChatContextGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ChatContextGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetChatContextGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ChatContext model
+   */
+  readonly fields: ChatContextFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ChatContext.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ChatContextClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    conversations<T extends ChatContext$conversationsArgs<ExtArgs> = {}>(args?: Subset<T, ChatContext$conversationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ChatContext model
+   */
+  interface ChatContextFieldRefs {
+    readonly id: FieldRef<"ChatContext", 'String'>
+    readonly ownerId: FieldRef<"ChatContext", 'String'>
+    readonly name: FieldRef<"ChatContext", 'String'>
+    readonly body: FieldRef<"ChatContext", 'String'>
+    readonly createdAt: FieldRef<"ChatContext", 'DateTime'>
+    readonly updatedAt: FieldRef<"ChatContext", 'DateTime'>
+    readonly deletedAt: FieldRef<"ChatContext", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ChatContext findUnique
+   */
+  export type ChatContextFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatContext to fetch.
+     */
+    where: ChatContextWhereUniqueInput
+  }
+
+  /**
+   * ChatContext findUniqueOrThrow
+   */
+  export type ChatContextFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatContext to fetch.
+     */
+    where: ChatContextWhereUniqueInput
+  }
+
+  /**
+   * ChatContext findFirst
+   */
+  export type ChatContextFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatContext to fetch.
+     */
+    where?: ChatContextWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatContexts to fetch.
+     */
+    orderBy?: ChatContextOrderByWithRelationInput | ChatContextOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ChatContexts.
+     */
+    cursor?: ChatContextWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatContexts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatContexts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ChatContexts.
+     */
+    distinct?: ChatContextScalarFieldEnum | ChatContextScalarFieldEnum[]
+  }
+
+  /**
+   * ChatContext findFirstOrThrow
+   */
+  export type ChatContextFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatContext to fetch.
+     */
+    where?: ChatContextWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatContexts to fetch.
+     */
+    orderBy?: ChatContextOrderByWithRelationInput | ChatContextOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ChatContexts.
+     */
+    cursor?: ChatContextWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatContexts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatContexts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ChatContexts.
+     */
+    distinct?: ChatContextScalarFieldEnum | ChatContextScalarFieldEnum[]
+  }
+
+  /**
+   * ChatContext findMany
+   */
+  export type ChatContextFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter, which ChatContexts to fetch.
+     */
+    where?: ChatContextWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ChatContexts to fetch.
+     */
+    orderBy?: ChatContextOrderByWithRelationInput | ChatContextOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ChatContexts.
+     */
+    cursor?: ChatContextWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ChatContexts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ChatContexts.
+     */
+    skip?: number
+    distinct?: ChatContextScalarFieldEnum | ChatContextScalarFieldEnum[]
+  }
+
+  /**
+   * ChatContext create
+   */
+  export type ChatContextCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ChatContext.
+     */
+    data: XOR<ChatContextCreateInput, ChatContextUncheckedCreateInput>
+  }
+
+  /**
+   * ChatContext createMany
+   */
+  export type ChatContextCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ChatContexts.
+     */
+    data: ChatContextCreateManyInput | ChatContextCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ChatContext createManyAndReturn
+   */
+  export type ChatContextCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * The data used to create many ChatContexts.
+     */
+    data: ChatContextCreateManyInput | ChatContextCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ChatContext update
+   */
+  export type ChatContextUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ChatContext.
+     */
+    data: XOR<ChatContextUpdateInput, ChatContextUncheckedUpdateInput>
+    /**
+     * Choose, which ChatContext to update.
+     */
+    where: ChatContextWhereUniqueInput
+  }
+
+  /**
+   * ChatContext updateMany
+   */
+  export type ChatContextUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ChatContexts.
+     */
+    data: XOR<ChatContextUpdateManyMutationInput, ChatContextUncheckedUpdateManyInput>
+    /**
+     * Filter which ChatContexts to update
+     */
+    where?: ChatContextWhereInput
+    /**
+     * Limit how many ChatContexts to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ChatContext updateManyAndReturn
+   */
+  export type ChatContextUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * The data used to update ChatContexts.
+     */
+    data: XOR<ChatContextUpdateManyMutationInput, ChatContextUncheckedUpdateManyInput>
+    /**
+     * Filter which ChatContexts to update
+     */
+    where?: ChatContextWhereInput
+    /**
+     * Limit how many ChatContexts to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ChatContext upsert
+   */
+  export type ChatContextUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ChatContext to update in case it exists.
+     */
+    where: ChatContextWhereUniqueInput
+    /**
+     * In case the ChatContext found by the `where` argument doesn't exist, create a new ChatContext with this data.
+     */
+    create: XOR<ChatContextCreateInput, ChatContextUncheckedCreateInput>
+    /**
+     * In case the ChatContext was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ChatContextUpdateInput, ChatContextUncheckedUpdateInput>
+  }
+
+  /**
+   * ChatContext delete
+   */
+  export type ChatContextDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
+    /**
+     * Filter which ChatContext to delete.
+     */
+    where: ChatContextWhereUniqueInput
+  }
+
+  /**
+   * ChatContext deleteMany
+   */
+  export type ChatContextDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ChatContexts to delete
+     */
+    where?: ChatContextWhereInput
+    /**
+     * Limit how many ChatContexts to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ChatContext.conversations
+   */
+  export type ChatContext$conversationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Conversation
+     */
+    select?: ConversationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Conversation
+     */
+    omit?: ConversationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConversationInclude<ExtArgs> | null
+    where?: ConversationWhereInput
+    orderBy?: ConversationOrderByWithRelationInput | ConversationOrderByWithRelationInput[]
+    cursor?: ConversationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ConversationScalarFieldEnum | ConversationScalarFieldEnum[]
+  }
+
+  /**
+   * ChatContext without action
+   */
+  export type ChatContextDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ChatContext
+     */
+    select?: ChatContextSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ChatContext
+     */
+    omit?: ChatContextOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ChatContextInclude<ExtArgs> | null
   }
 
 
@@ -99085,6 +100415,7 @@ export namespace Prisma {
     passwordHash: 'passwordHash',
     email: 'email',
     role: 'role',
+    canClaimCustomHosts: 'canClaimCustomHosts',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     settings: 'settings',
@@ -99521,12 +100852,26 @@ export namespace Prisma {
     ownerId: 'ownerId',
     title: 'title',
     archivedToContentNodeId: 'archivedToContentNodeId',
+    activeContextId: 'activeContextId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     deletedAt: 'deletedAt'
   };
 
   export type ConversationScalarFieldEnum = (typeof ConversationScalarFieldEnum)[keyof typeof ConversationScalarFieldEnum]
+
+
+  export const ChatContextScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    name: 'name',
+    body: 'body',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt',
+    deletedAt: 'deletedAt'
+  };
+
+  export type ChatContextScalarFieldEnum = (typeof ChatContextScalarFieldEnum)[keyof typeof ChatContextScalarFieldEnum]
 
 
   export const ConversationMessageScalarFieldEnum: {
@@ -100967,7 +102312,7 @@ export namespace Prisma {
 
   export type FlashcardDeckWhereUniqueInput = Prisma.AtLeast<{
     id?: string
-    ownerId_slug?: FlashcardDeckOwnerIdSlugCompoundUniqueInput
+    ownerId_path?: FlashcardDeckOwnerIdPathCompoundUniqueInput
     ownerId_parentDeckId_name?: FlashcardDeckOwnerIdParentDeckIdNameCompoundUniqueInput
     AND?: FlashcardDeckWhereInput | FlashcardDeckWhereInput[]
     OR?: FlashcardDeckWhereInput[]
@@ -100988,7 +102333,7 @@ export namespace Prisma {
     parent?: XOR<FlashcardDeckNullableScalarRelationFilter, FlashcardDeckWhereInput> | null
     children?: FlashcardDeckListRelationFilter
     flashcards?: FlashcardListRelationFilter
-  }, "id" | "ownerId_slug" | "ownerId_parentDeckId_name">
+  }, "id" | "ownerId_path" | "ownerId_parentDeckId_name">
 
   export type FlashcardDeckOrderByWithAggregationInput = {
     id?: SortOrder
@@ -102107,6 +103452,7 @@ export namespace Prisma {
     passwordHash?: StringNullableFilter<"User"> | string | null
     email?: StringFilter<"User"> | string
     role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
+    canClaimCustomHosts?: BoolFilter<"User"> | boolean
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     settings?: JsonNullableFilter<"User">
@@ -102125,6 +103471,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
     conversations?: ConversationListRelationFilter
+    chatContexts?: ChatContextListRelationFilter
     sessions?: SessionListRelationFilter
     storageConfigs?: StorageProviderConfigListRelationFilter
     tags?: TagListRelationFilter
@@ -102171,6 +103518,7 @@ export namespace Prisma {
     passwordHash?: SortOrderInput | SortOrder
     email?: SortOrder
     role?: SortOrder
+    canClaimCustomHosts?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     settings?: SortOrderInput | SortOrder
@@ -102189,6 +103537,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryOrderByRelationAggregateInput
     contentNodes?: ContentNodeOrderByRelationAggregateInput
     conversations?: ConversationOrderByRelationAggregateInput
+    chatContexts?: ChatContextOrderByRelationAggregateInput
     sessions?: SessionOrderByRelationAggregateInput
     storageConfigs?: StorageProviderConfigOrderByRelationAggregateInput
     tags?: TagOrderByRelationAggregateInput
@@ -102238,6 +103587,7 @@ export namespace Prisma {
     NOT?: UserWhereInput | UserWhereInput[]
     passwordHash?: StringNullableFilter<"User"> | string | null
     role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
+    canClaimCustomHosts?: BoolFilter<"User"> | boolean
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     settings?: JsonNullableFilter<"User">
@@ -102256,6 +103606,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryListRelationFilter
     contentNodes?: ContentNodeListRelationFilter
     conversations?: ConversationListRelationFilter
+    chatContexts?: ChatContextListRelationFilter
     sessions?: SessionListRelationFilter
     storageConfigs?: StorageProviderConfigListRelationFilter
     tags?: TagListRelationFilter
@@ -102302,6 +103653,7 @@ export namespace Prisma {
     passwordHash?: SortOrderInput | SortOrder
     email?: SortOrder
     role?: SortOrder
+    canClaimCustomHosts?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     settings?: SortOrderInput | SortOrder
@@ -102327,6 +103679,7 @@ export namespace Prisma {
     passwordHash?: StringNullableWithAggregatesFilter<"User"> | string | null
     email?: StringWithAggregatesFilter<"User"> | string
     role?: EnumUserRoleWithAggregatesFilter<"User"> | $Enums.UserRole
+    canClaimCustomHosts?: BoolWithAggregatesFilter<"User"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"User"> | Date | string
     settings?: JsonNullableWithAggregatesFilter<"User">
@@ -104596,11 +105949,13 @@ export namespace Prisma {
     ownerId?: UuidFilter<"Conversation"> | string
     title?: StringNullableFilter<"Conversation"> | string | null
     archivedToContentNodeId?: UuidNullableFilter<"Conversation"> | string | null
+    activeContextId?: UuidNullableFilter<"Conversation"> | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     owner?: XOR<UserScalarRelationFilter, UserWhereInput>
     archivedToContentNode?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
   }
@@ -104610,11 +105965,13 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrderInput | SortOrder
     archivedToContentNodeId?: SortOrderInput | SortOrder
+    activeContextId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
     owner?: UserOrderByWithRelationInput
     archivedToContentNode?: ContentNodeOrderByWithRelationInput
+    activeContext?: ChatContextOrderByWithRelationInput
     messages?: ConversationMessageOrderByRelationAggregateInput
     associations?: ConversationAssociationOrderByRelationAggregateInput
   }
@@ -104627,11 +105984,13 @@ export namespace Prisma {
     NOT?: ConversationWhereInput | ConversationWhereInput[]
     ownerId?: UuidFilter<"Conversation"> | string
     title?: StringNullableFilter<"Conversation"> | string | null
+    activeContextId?: UuidNullableFilter<"Conversation"> | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     owner?: XOR<UserScalarRelationFilter, UserWhereInput>
     archivedToContentNode?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
+    activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
   }, "id" | "archivedToContentNodeId">
@@ -104641,6 +106000,7 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrderInput | SortOrder
     archivedToContentNodeId?: SortOrderInput | SortOrder
+    activeContextId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
@@ -104657,9 +106017,78 @@ export namespace Prisma {
     ownerId?: UuidWithAggregatesFilter<"Conversation"> | string
     title?: StringNullableWithAggregatesFilter<"Conversation"> | string | null
     archivedToContentNodeId?: UuidNullableWithAggregatesFilter<"Conversation"> | string | null
+    activeContextId?: UuidNullableWithAggregatesFilter<"Conversation"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
+  }
+
+  export type ChatContextWhereInput = {
+    AND?: ChatContextWhereInput | ChatContextWhereInput[]
+    OR?: ChatContextWhereInput[]
+    NOT?: ChatContextWhereInput | ChatContextWhereInput[]
+    id?: UuidFilter<"ChatContext"> | string
+    ownerId?: UuidFilter<"ChatContext"> | string
+    name?: StringFilter<"ChatContext"> | string
+    body?: StringFilter<"ChatContext"> | string
+    createdAt?: DateTimeFilter<"ChatContext"> | Date | string
+    updatedAt?: DateTimeFilter<"ChatContext"> | Date | string
+    deletedAt?: DateTimeNullableFilter<"ChatContext"> | Date | string | null
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    conversations?: ConversationListRelationFilter
+  }
+
+  export type ChatContextOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    body?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    deletedAt?: SortOrderInput | SortOrder
+    owner?: UserOrderByWithRelationInput
+    conversations?: ConversationOrderByRelationAggregateInput
+  }
+
+  export type ChatContextWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: ChatContextWhereInput | ChatContextWhereInput[]
+    OR?: ChatContextWhereInput[]
+    NOT?: ChatContextWhereInput | ChatContextWhereInput[]
+    ownerId?: UuidFilter<"ChatContext"> | string
+    name?: StringFilter<"ChatContext"> | string
+    body?: StringFilter<"ChatContext"> | string
+    createdAt?: DateTimeFilter<"ChatContext"> | Date | string
+    updatedAt?: DateTimeFilter<"ChatContext"> | Date | string
+    deletedAt?: DateTimeNullableFilter<"ChatContext"> | Date | string | null
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    conversations?: ConversationListRelationFilter
+  }, "id">
+
+  export type ChatContextOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    body?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    deletedAt?: SortOrderInput | SortOrder
+    _count?: ChatContextCountOrderByAggregateInput
+    _max?: ChatContextMaxOrderByAggregateInput
+    _min?: ChatContextMinOrderByAggregateInput
+  }
+
+  export type ChatContextScalarWhereWithAggregatesInput = {
+    AND?: ChatContextScalarWhereWithAggregatesInput | ChatContextScalarWhereWithAggregatesInput[]
+    OR?: ChatContextScalarWhereWithAggregatesInput[]
+    NOT?: ChatContextScalarWhereWithAggregatesInput | ChatContextScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ChatContext"> | string
+    ownerId?: UuidWithAggregatesFilter<"ChatContext"> | string
+    name?: StringWithAggregatesFilter<"ChatContext"> | string
+    body?: StringWithAggregatesFilter<"ChatContext"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"ChatContext"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ChatContext"> | Date | string
+    deletedAt?: DateTimeNullableWithAggregatesFilter<"ChatContext"> | Date | string | null
   }
 
   export type ConversationMessageWhereInput = {
@@ -109073,6 +110502,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109090,6 +110520,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -109136,6 +110567,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109154,6 +110586,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -109199,6 +110632,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109216,6 +110650,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -109262,6 +110697,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109280,6 +110716,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -109325,6 +110762,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109342,6 +110780,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -109358,6 +110797,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -111797,6 +113237,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
   }
@@ -111806,6 +113247,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -111821,6 +113263,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
   }
@@ -111830,6 +113273,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -111842,6 +113286,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -111860,6 +113305,80 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type ChatContextCreateInput = {
+    id?: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    owner: UserCreateNestedOneWithoutChatContextsInput
+    conversations?: ConversationCreateNestedManyWithoutActiveContextInput
+  }
+
+  export type ChatContextUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    conversations?: ConversationUncheckedCreateNestedManyWithoutActiveContextInput
+  }
+
+  export type ChatContextUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    owner?: UserUpdateOneRequiredWithoutChatContextsNestedInput
+    conversations?: ConversationUpdateManyWithoutActiveContextNestedInput
+  }
+
+  export type ChatContextUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    conversations?: ConversationUncheckedUpdateManyWithoutActiveContextNestedInput
+  }
+
+  export type ChatContextCreateManyInput = {
+    id?: string
+    ownerId: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
+  export type ChatContextUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type ChatContextUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -115500,9 +117019,9 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
-  export type FlashcardDeckOwnerIdSlugCompoundUniqueInput = {
+  export type FlashcardDeckOwnerIdPathCompoundUniqueInput = {
     ownerId: string
-    slug: string
+    path: string
   }
 
   export type FlashcardDeckOwnerIdParentDeckIdNameCompoundUniqueInput = {
@@ -116569,6 +118088,12 @@ export namespace Prisma {
     none?: ConversationWhereInput
   }
 
+  export type ChatContextListRelationFilter = {
+    every?: ChatContextWhereInput
+    some?: ChatContextWhereInput
+    none?: ChatContextWhereInput
+  }
+
   export type SessionListRelationFilter = {
     every?: SessionWhereInput
     some?: SessionWhereInput
@@ -116732,6 +118257,10 @@ export namespace Prisma {
     _count?: SortOrder
   }
 
+  export type ChatContextOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
   export type SessionOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -116830,6 +118359,7 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
+    canClaimCustomHosts?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     settings?: SortOrder
@@ -116853,6 +118383,7 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
+    canClaimCustomHosts?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     settingsVersion?: SortOrder
@@ -116868,6 +118399,7 @@ export namespace Prisma {
     passwordHash?: SortOrder
     email?: SortOrder
     role?: SortOrder
+    canClaimCustomHosts?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     settingsVersion?: SortOrder
@@ -118218,6 +119750,11 @@ export namespace Prisma {
     updatedAt?: SortOrder
   }
 
+  export type ChatContextNullableScalarRelationFilter = {
+    is?: ChatContextWhereInput | null
+    isNot?: ChatContextWhereInput | null
+  }
+
   export type ConversationMessageListRelationFilter = {
     every?: ConversationMessageWhereInput
     some?: ConversationMessageWhereInput
@@ -118233,6 +119770,7 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
+    activeContextId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -118243,6 +119781,7 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
+    activeContextId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -118253,6 +119792,37 @@ export namespace Prisma {
     ownerId?: SortOrder
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
+    activeContextId?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    deletedAt?: SortOrder
+  }
+
+  export type ChatContextCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    body?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    deletedAt?: SortOrder
+  }
+
+  export type ChatContextMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    body?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    deletedAt?: SortOrder
+  }
+
+  export type ChatContextMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    name?: SortOrder
+    body?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -122055,6 +123625,13 @@ export namespace Prisma {
     connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
   }
 
+  export type ChatContextCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput> | ChatContextCreateWithoutOwnerInput[] | ChatContextUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ChatContextCreateOrConnectWithoutOwnerInput | ChatContextCreateOrConnectWithoutOwnerInput[]
+    createMany?: ChatContextCreateManyOwnerInputEnvelope
+    connect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+  }
+
   export type SessionCreateNestedManyWithoutUserInput = {
     create?: XOR<SessionCreateWithoutUserInput, SessionUncheckedCreateWithoutUserInput> | SessionCreateWithoutUserInput[] | SessionUncheckedCreateWithoutUserInput[]
     connectOrCreate?: SessionCreateOrConnectWithoutUserInput | SessionCreateOrConnectWithoutUserInput[]
@@ -122381,6 +123958,13 @@ export namespace Prisma {
     connectOrCreate?: ConversationCreateOrConnectWithoutOwnerInput | ConversationCreateOrConnectWithoutOwnerInput[]
     createMany?: ConversationCreateManyOwnerInputEnvelope
     connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+  }
+
+  export type ChatContextUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput> | ChatContextCreateWithoutOwnerInput[] | ChatContextUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ChatContextCreateOrConnectWithoutOwnerInput | ChatContextCreateOrConnectWithoutOwnerInput[]
+    createMany?: ChatContextCreateManyOwnerInputEnvelope
+    connect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
   }
 
   export type SessionUncheckedCreateNestedManyWithoutUserInput = {
@@ -122770,6 +124354,20 @@ export namespace Prisma {
     update?: ConversationUpdateWithWhereUniqueWithoutOwnerInput | ConversationUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: ConversationUpdateManyWithWhereWithoutOwnerInput | ConversationUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
+  }
+
+  export type ChatContextUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput> | ChatContextCreateWithoutOwnerInput[] | ChatContextUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ChatContextCreateOrConnectWithoutOwnerInput | ChatContextCreateOrConnectWithoutOwnerInput[]
+    upsert?: ChatContextUpsertWithWhereUniqueWithoutOwnerInput | ChatContextUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: ChatContextCreateManyOwnerInputEnvelope
+    set?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    disconnect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    delete?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    connect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    update?: ChatContextUpdateWithWhereUniqueWithoutOwnerInput | ChatContextUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: ChatContextUpdateManyWithWhereWithoutOwnerInput | ChatContextUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: ChatContextScalarWhereInput | ChatContextScalarWhereInput[]
   }
 
   export type SessionUpdateManyWithoutUserNestedInput = {
@@ -123424,6 +125022,20 @@ export namespace Prisma {
     update?: ConversationUpdateWithWhereUniqueWithoutOwnerInput | ConversationUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: ConversationUpdateManyWithWhereWithoutOwnerInput | ConversationUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
+  }
+
+  export type ChatContextUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput> | ChatContextCreateWithoutOwnerInput[] | ChatContextUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: ChatContextCreateOrConnectWithoutOwnerInput | ChatContextCreateOrConnectWithoutOwnerInput[]
+    upsert?: ChatContextUpsertWithWhereUniqueWithoutOwnerInput | ChatContextUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: ChatContextCreateManyOwnerInputEnvelope
+    set?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    disconnect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    delete?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    connect?: ChatContextWhereUniqueInput | ChatContextWhereUniqueInput[]
+    update?: ChatContextUpdateWithWhereUniqueWithoutOwnerInput | ChatContextUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: ChatContextUpdateManyWithWhereWithoutOwnerInput | ChatContextUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: ChatContextScalarWhereInput | ChatContextScalarWhereInput[]
   }
 
   export type SessionUncheckedUpdateManyWithoutUserNestedInput = {
@@ -125515,6 +127127,12 @@ export namespace Prisma {
     connect?: ContentNodeWhereUniqueInput
   }
 
+  export type ChatContextCreateNestedOneWithoutConversationsInput = {
+    create?: XOR<ChatContextCreateWithoutConversationsInput, ChatContextUncheckedCreateWithoutConversationsInput>
+    connectOrCreate?: ChatContextCreateOrConnectWithoutConversationsInput
+    connect?: ChatContextWhereUniqueInput
+  }
+
   export type ConversationMessageCreateNestedManyWithoutConversationInput = {
     create?: XOR<ConversationMessageCreateWithoutConversationInput, ConversationMessageUncheckedCreateWithoutConversationInput> | ConversationMessageCreateWithoutConversationInput[] | ConversationMessageUncheckedCreateWithoutConversationInput[]
     connectOrCreate?: ConversationMessageCreateOrConnectWithoutConversationInput | ConversationMessageCreateOrConnectWithoutConversationInput[]
@@ -125559,6 +127177,16 @@ export namespace Prisma {
     delete?: ContentNodeWhereInput | boolean
     connect?: ContentNodeWhereUniqueInput
     update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutArchivedConversationInput, ContentNodeUpdateWithoutArchivedConversationInput>, ContentNodeUncheckedUpdateWithoutArchivedConversationInput>
+  }
+
+  export type ChatContextUpdateOneWithoutConversationsNestedInput = {
+    create?: XOR<ChatContextCreateWithoutConversationsInput, ChatContextUncheckedCreateWithoutConversationsInput>
+    connectOrCreate?: ChatContextCreateOrConnectWithoutConversationsInput
+    upsert?: ChatContextUpsertWithoutConversationsInput
+    disconnect?: ChatContextWhereInput | boolean
+    delete?: ChatContextWhereInput | boolean
+    connect?: ChatContextWhereUniqueInput
+    update?: XOR<XOR<ChatContextUpdateToOneWithWhereWithoutConversationsInput, ChatContextUpdateWithoutConversationsInput>, ChatContextUncheckedUpdateWithoutConversationsInput>
   }
 
   export type ConversationMessageUpdateManyWithoutConversationNestedInput = {
@@ -125615,6 +127243,62 @@ export namespace Prisma {
     update?: ConversationAssociationUpdateWithWhereUniqueWithoutConversationInput | ConversationAssociationUpdateWithWhereUniqueWithoutConversationInput[]
     updateMany?: ConversationAssociationUpdateManyWithWhereWithoutConversationInput | ConversationAssociationUpdateManyWithWhereWithoutConversationInput[]
     deleteMany?: ConversationAssociationScalarWhereInput | ConversationAssociationScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutChatContextsInput = {
+    create?: XOR<UserCreateWithoutChatContextsInput, UserUncheckedCreateWithoutChatContextsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutChatContextsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ConversationCreateNestedManyWithoutActiveContextInput = {
+    create?: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput> | ConversationCreateWithoutActiveContextInput[] | ConversationUncheckedCreateWithoutActiveContextInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutActiveContextInput | ConversationCreateOrConnectWithoutActiveContextInput[]
+    createMany?: ConversationCreateManyActiveContextInputEnvelope
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+  }
+
+  export type ConversationUncheckedCreateNestedManyWithoutActiveContextInput = {
+    create?: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput> | ConversationCreateWithoutActiveContextInput[] | ConversationUncheckedCreateWithoutActiveContextInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutActiveContextInput | ConversationCreateOrConnectWithoutActiveContextInput[]
+    createMany?: ConversationCreateManyActiveContextInputEnvelope
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutChatContextsNestedInput = {
+    create?: XOR<UserCreateWithoutChatContextsInput, UserUncheckedCreateWithoutChatContextsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutChatContextsInput
+    upsert?: UserUpsertWithoutChatContextsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutChatContextsInput, UserUpdateWithoutChatContextsInput>, UserUncheckedUpdateWithoutChatContextsInput>
+  }
+
+  export type ConversationUpdateManyWithoutActiveContextNestedInput = {
+    create?: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput> | ConversationCreateWithoutActiveContextInput[] | ConversationUncheckedCreateWithoutActiveContextInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutActiveContextInput | ConversationCreateOrConnectWithoutActiveContextInput[]
+    upsert?: ConversationUpsertWithWhereUniqueWithoutActiveContextInput | ConversationUpsertWithWhereUniqueWithoutActiveContextInput[]
+    createMany?: ConversationCreateManyActiveContextInputEnvelope
+    set?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    disconnect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    delete?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    update?: ConversationUpdateWithWhereUniqueWithoutActiveContextInput | ConversationUpdateWithWhereUniqueWithoutActiveContextInput[]
+    updateMany?: ConversationUpdateManyWithWhereWithoutActiveContextInput | ConversationUpdateManyWithWhereWithoutActiveContextInput[]
+    deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
+  }
+
+  export type ConversationUncheckedUpdateManyWithoutActiveContextNestedInput = {
+    create?: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput> | ConversationCreateWithoutActiveContextInput[] | ConversationUncheckedCreateWithoutActiveContextInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutActiveContextInput | ConversationCreateOrConnectWithoutActiveContextInput[]
+    upsert?: ConversationUpsertWithWhereUniqueWithoutActiveContextInput | ConversationUpsertWithWhereUniqueWithoutActiveContextInput[]
+    createMany?: ConversationCreateManyActiveContextInputEnvelope
+    set?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    disconnect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    delete?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    update?: ConversationUpdateWithWhereUniqueWithoutActiveContextInput | ConversationUpdateWithWhereUniqueWithoutActiveContextInput[]
+    updateMany?: ConversationUpdateManyWithWhereWithoutActiveContextInput | ConversationUpdateManyWithWhereWithoutActiveContextInput[]
+    deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
   }
 
   export type ConversationCreateNestedOneWithoutMessagesInput = {
@@ -129068,6 +130752,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -129084,6 +130769,7 @@ export namespace Prisma {
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -129130,6 +130816,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -129147,6 +130834,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -129751,6 +131439,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
   }
@@ -129759,6 +131448,7 @@ export namespace Prisma {
     id?: string
     ownerId: string
     title?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -131084,6 +132774,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -131100,6 +132791,7 @@ export namespace Prisma {
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -131146,6 +132838,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -131163,6 +132856,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -131590,6 +133284,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
   }
@@ -131598,6 +133293,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -132307,6 +134003,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132324,6 +134021,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -132369,6 +134067,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132387,6 +134086,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -132572,6 +134272,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132589,6 +134290,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -132634,6 +134336,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132652,6 +134355,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -132827,6 +134531,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132844,6 +134549,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -132889,6 +134595,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -132907,6 +134614,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -133126,6 +134834,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133143,6 +134852,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -133188,6 +134898,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133206,6 +134917,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -133346,6 +135058,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133363,6 +135076,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -133408,6 +135122,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133426,6 +135141,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -133698,6 +135414,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133715,6 +135432,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -133760,6 +135478,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -133778,6 +135497,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -134108,6 +135828,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -134125,6 +135846,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -134170,6 +135892,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -134188,6 +135911,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -134325,6 +136049,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -134342,6 +136067,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -134387,6 +136113,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -134405,6 +136132,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -135473,6 +137201,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -135489,6 +137218,7 @@ export namespace Prisma {
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -135535,6 +137265,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -135552,6 +137283,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -135738,6 +137470,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -135754,6 +137487,7 @@ export namespace Prisma {
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -135800,6 +137534,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -135817,6 +137552,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -137194,6 +138930,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137211,6 +138948,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -137256,6 +138994,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137274,6 +139013,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -137465,6 +139205,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137482,6 +139223,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -137527,6 +139269,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137545,6 +139288,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -137589,6 +139333,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137606,6 +139351,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
@@ -137651,6 +139397,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137669,6 +139416,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
@@ -137729,6 +139477,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137746,6 +139495,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
@@ -137791,6 +139541,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -137809,6 +139560,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
@@ -138218,6 +139970,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
   }
@@ -138226,6 +139979,7 @@ export namespace Prisma {
     id?: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -138240,6 +139994,36 @@ export namespace Prisma {
 
   export type ConversationCreateManyOwnerInputEnvelope = {
     data: ConversationCreateManyOwnerInput | ConversationCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ChatContextCreateWithoutOwnerInput = {
+    id?: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    conversations?: ConversationCreateNestedManyWithoutActiveContextInput
+  }
+
+  export type ChatContextUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    conversations?: ConversationUncheckedCreateNestedManyWithoutActiveContextInput
+  }
+
+  export type ChatContextCreateOrConnectWithoutOwnerInput = {
+    where: ChatContextWhereUniqueInput
+    create: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type ChatContextCreateManyOwnerInputEnvelope = {
+    data: ChatContextCreateManyOwnerInput | ChatContextCreateManyOwnerInput[]
     skipDuplicates?: boolean
   }
 
@@ -140028,9 +141812,39 @@ export namespace Prisma {
     ownerId?: UuidFilter<"Conversation"> | string
     title?: StringNullableFilter<"Conversation"> | string | null
     archivedToContentNodeId?: UuidNullableFilter<"Conversation"> | string | null
+    activeContextId?: UuidNullableFilter<"Conversation"> | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
+  }
+
+  export type ChatContextUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: ChatContextWhereUniqueInput
+    update: XOR<ChatContextUpdateWithoutOwnerInput, ChatContextUncheckedUpdateWithoutOwnerInput>
+    create: XOR<ChatContextCreateWithoutOwnerInput, ChatContextUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type ChatContextUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: ChatContextWhereUniqueInput
+    data: XOR<ChatContextUpdateWithoutOwnerInput, ChatContextUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type ChatContextUpdateManyWithWhereWithoutOwnerInput = {
+    where: ChatContextScalarWhereInput
+    data: XOR<ChatContextUpdateManyMutationInput, ChatContextUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type ChatContextScalarWhereInput = {
+    AND?: ChatContextScalarWhereInput | ChatContextScalarWhereInput[]
+    OR?: ChatContextScalarWhereInput[]
+    NOT?: ChatContextScalarWhereInput | ChatContextScalarWhereInput[]
+    id?: UuidFilter<"ChatContext"> | string
+    ownerId?: UuidFilter<"ChatContext"> | string
+    name?: StringFilter<"ChatContext"> | string
+    body?: StringFilter<"ChatContext"> | string
+    createdAt?: DateTimeFilter<"ChatContext"> | Date | string
+    updatedAt?: DateTimeFilter<"ChatContext"> | Date | string
+    deletedAt?: DateTimeNullableFilter<"ChatContext"> | Date | string | null
   }
 
   export type SessionUpsertWithWhereUniqueWithoutUserInput = {
@@ -141063,6 +142877,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -141080,6 +142895,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -141125,6 +142941,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -141143,6 +142960,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -141358,6 +143176,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -141375,6 +143194,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -141420,6 +143240,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -141438,6 +143259,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -141977,6 +143799,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -141993,6 +143816,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -142039,6 +143863,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142056,6 +143881,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -142247,6 +144073,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142263,6 +144090,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -142309,6 +144137,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142326,6 +144155,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -142411,6 +144241,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142428,6 +144259,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
@@ -142473,6 +144305,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142491,6 +144324,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
@@ -142567,6 +144401,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142584,6 +144419,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
@@ -142629,6 +144465,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142647,6 +144484,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
@@ -142816,6 +144654,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142833,6 +144672,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -142878,6 +144718,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -142896,6 +144737,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -143087,6 +144929,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143104,6 +144947,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -143149,6 +144993,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143167,6 +145012,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -143336,6 +145182,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143353,6 +145200,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -143398,6 +145246,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143416,6 +145265,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -143607,6 +145457,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143624,6 +145475,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -143669,6 +145521,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -143687,6 +145540,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -143987,6 +145841,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144004,6 +145859,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -144049,6 +145905,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144067,6 +145924,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -144116,6 +145974,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144133,6 +145992,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -144178,6 +146038,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144196,6 +146057,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -144559,6 +146421,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144576,6 +146439,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -144621,6 +146485,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144639,6 +146504,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -144694,6 +146560,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144711,6 +146578,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -144756,6 +146624,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144774,6 +146643,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -144931,6 +146801,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -144948,6 +146819,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -144993,6 +146865,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145011,6 +146884,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -145302,6 +147176,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145319,6 +147194,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -145364,6 +147240,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145382,6 +147259,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -145523,6 +147401,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145540,6 +147419,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -145585,6 +147465,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145603,6 +147484,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -145878,6 +147760,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145895,6 +147778,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -145940,6 +147824,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -145958,6 +147843,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -146235,6 +148121,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146252,6 +148139,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -146297,6 +148185,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146315,6 +148204,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -146547,6 +148437,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146564,6 +148455,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -146609,6 +148501,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146627,6 +148520,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -146855,6 +148749,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146872,6 +148767,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
@@ -146917,6 +148813,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -146935,6 +148832,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
     trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
@@ -146995,6 +148893,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147012,6 +148911,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
@@ -147057,6 +148957,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147075,6 +148976,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
@@ -147119,6 +149021,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147136,6 +149039,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -147181,6 +149085,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147199,6 +149104,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -147348,6 +149254,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147365,6 +149272,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -147410,6 +149318,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147428,6 +149337,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -147539,6 +149449,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147556,6 +149467,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -147601,6 +149513,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147619,6 +149532,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -147794,6 +149708,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147811,6 +149726,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -147856,6 +149772,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -147874,6 +149791,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -148004,6 +149922,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -148021,6 +149940,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -148066,6 +149986,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -148084,6 +150005,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -148368,6 +150290,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -148385,6 +150308,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -148430,6 +150354,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -148448,6 +150373,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -149216,6 +151142,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149233,6 +151160,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -149278,6 +151206,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149296,6 +151225,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -149494,6 +151424,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149511,6 +151442,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -149556,6 +151488,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149574,6 +151507,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -149694,6 +151628,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149711,6 +151646,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -149756,6 +151692,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -149774,6 +151711,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -149998,6 +151936,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150015,6 +151954,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -150060,6 +152000,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150078,6 +152019,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -150298,6 +152240,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150315,6 +152258,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -150360,6 +152304,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150378,6 +152323,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -150647,6 +152593,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150664,6 +152611,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -150709,6 +152657,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -150727,6 +152676,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -150998,6 +152948,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151014,6 +152965,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -151060,6 +153012,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151077,6 +153030,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -151138,6 +153092,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151154,6 +153109,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -151200,6 +153156,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151217,6 +153174,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -151387,6 +153345,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151403,6 +153362,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -151449,6 +153409,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151466,6 +153427,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -151516,6 +153478,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151532,6 +153495,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -151578,6 +153542,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151595,6 +153560,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -151787,6 +153753,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151803,6 +153770,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -151849,6 +153817,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151866,6 +153835,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -151922,6 +153892,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -151938,6 +153909,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -151984,6 +153956,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -152001,6 +153974,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -152898,6 +154872,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -152914,6 +154889,7 @@ export namespace Prisma {
     categories?: CategoryCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -152960,6 +154936,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -152977,6 +154954,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -153146,6 +155124,31 @@ export namespace Prisma {
     create: XOR<ContentNodeCreateWithoutArchivedConversationInput, ContentNodeUncheckedCreateWithoutArchivedConversationInput>
   }
 
+  export type ChatContextCreateWithoutConversationsInput = {
+    id?: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    owner: UserCreateNestedOneWithoutChatContextsInput
+  }
+
+  export type ChatContextUncheckedCreateWithoutConversationsInput = {
+    id?: string
+    ownerId: string
+    name: string
+    body: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
+  export type ChatContextCreateOrConnectWithoutConversationsInput = {
+    where: ChatContextWhereUniqueInput
+    create: XOR<ChatContextCreateWithoutConversationsInput, ChatContextUncheckedCreateWithoutConversationsInput>
+  }
+
   export type ConversationMessageCreateWithoutConversationInput = {
     id?: string
     role: $Enums.ChatMessageRole
@@ -153227,6 +155230,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -153243,6 +155247,7 @@ export namespace Prisma {
     categories?: CategoryUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -153289,6 +155294,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -153306,6 +155312,7 @@ export namespace Prisma {
     categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -153476,6 +155483,37 @@ export namespace Prisma {
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
   }
 
+  export type ChatContextUpsertWithoutConversationsInput = {
+    update: XOR<ChatContextUpdateWithoutConversationsInput, ChatContextUncheckedUpdateWithoutConversationsInput>
+    create: XOR<ChatContextCreateWithoutConversationsInput, ChatContextUncheckedCreateWithoutConversationsInput>
+    where?: ChatContextWhereInput
+  }
+
+  export type ChatContextUpdateToOneWithWhereWithoutConversationsInput = {
+    where?: ChatContextWhereInput
+    data: XOR<ChatContextUpdateWithoutConversationsInput, ChatContextUncheckedUpdateWithoutConversationsInput>
+  }
+
+  export type ChatContextUpdateWithoutConversationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    owner?: UserUpdateOneRequiredWithoutChatContextsNestedInput
+  }
+
+  export type ChatContextUncheckedUpdateWithoutConversationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
   export type ConversationMessageUpsertWithWhereUniqueWithoutConversationInput = {
     where: ConversationMessageWhereUniqueInput
     update: XOR<ConversationMessageUpdateWithoutConversationInput, ConversationMessageUncheckedUpdateWithoutConversationInput>
@@ -153525,6 +155563,328 @@ export namespace Prisma {
     data: XOR<ConversationAssociationUpdateManyMutationInput, ConversationAssociationUncheckedUpdateManyWithoutConversationInput>
   }
 
+  export type UserCreateWithoutChatContextsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+  }
+
+  export type UserUncheckedCreateWithoutChatContextsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+  }
+
+  export type UserCreateOrConnectWithoutChatContextsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutChatContextsInput, UserUncheckedCreateWithoutChatContextsInput>
+  }
+
+  export type ConversationCreateWithoutActiveContextInput = {
+    id?: string
+    title?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    owner: UserCreateNestedOneWithoutConversationsInput
+    archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    messages?: ConversationMessageCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationUncheckedCreateWithoutActiveContextInput = {
+    id?: string
+    ownerId: string
+    title?: string | null
+    archivedToContentNodeId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationCreateOrConnectWithoutActiveContextInput = {
+    where: ConversationWhereUniqueInput
+    create: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput>
+  }
+
+  export type ConversationCreateManyActiveContextInputEnvelope = {
+    data: ConversationCreateManyActiveContextInput | ConversationCreateManyActiveContextInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutChatContextsInput = {
+    update: XOR<UserUpdateWithoutChatContextsInput, UserUncheckedUpdateWithoutChatContextsInput>
+    create: XOR<UserCreateWithoutChatContextsInput, UserUncheckedCreateWithoutChatContextsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutChatContextsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutChatContextsInput, UserUncheckedUpdateWithoutChatContextsInput>
+  }
+
+  export type UserUpdateWithoutChatContextsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutChatContextsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+  }
+
+  export type ConversationUpsertWithWhereUniqueWithoutActiveContextInput = {
+    where: ConversationWhereUniqueInput
+    update: XOR<ConversationUpdateWithoutActiveContextInput, ConversationUncheckedUpdateWithoutActiveContextInput>
+    create: XOR<ConversationCreateWithoutActiveContextInput, ConversationUncheckedCreateWithoutActiveContextInput>
+  }
+
+  export type ConversationUpdateWithWhereUniqueWithoutActiveContextInput = {
+    where: ConversationWhereUniqueInput
+    data: XOR<ConversationUpdateWithoutActiveContextInput, ConversationUncheckedUpdateWithoutActiveContextInput>
+  }
+
+  export type ConversationUpdateManyWithWhereWithoutActiveContextInput = {
+    where: ConversationScalarWhereInput
+    data: XOR<ConversationUpdateManyMutationInput, ConversationUncheckedUpdateManyWithoutActiveContextInput>
+  }
+
   export type ConversationCreateWithoutMessagesInput = {
     id?: string
     title?: string | null
@@ -153533,6 +155893,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
   }
 
@@ -153541,6 +155902,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -153642,6 +156004,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
   }
 
@@ -153650,6 +156013,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -153719,6 +156083,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
   }
 
@@ -153727,6 +156092,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -153882,6 +156248,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
   }
 
@@ -153890,6 +156257,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -154033,6 +156401,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154049,6 +156418,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -154095,6 +156465,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154112,6 +156483,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -154203,6 +156575,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154219,6 +156592,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -154265,6 +156639,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154282,6 +156657,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -154343,6 +156719,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154359,6 +156736,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -154405,6 +156783,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154422,6 +156801,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -154524,6 +156904,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154540,6 +156921,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -154586,6 +156968,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -154603,6 +156986,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -155719,6 +158103,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -155736,6 +158121,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -155781,6 +158167,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -155799,6 +158186,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -156092,6 +158480,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156109,6 +158498,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -156154,6 +158544,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156172,6 +158563,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -156376,6 +158768,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156393,6 +158786,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -156438,6 +158832,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156456,6 +158851,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -156559,6 +158955,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156576,6 +158973,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -156621,6 +159019,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156639,6 +159038,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -156720,6 +159120,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156737,6 +159138,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -156782,6 +159184,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156800,6 +159203,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -156903,6 +159307,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156920,6 +159325,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -156965,6 +159371,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -156983,6 +159390,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -157064,6 +159472,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157081,6 +159490,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -157126,6 +159536,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157144,6 +159555,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -157247,6 +159659,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157264,6 +159677,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -157309,6 +159723,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157327,6 +159742,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -157408,6 +159824,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157425,6 +159842,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -157470,6 +159888,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157488,6 +159907,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -157591,6 +160011,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157608,6 +160029,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -157653,6 +160075,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157671,6 +160094,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -157715,6 +160139,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157732,6 +160157,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -157777,6 +160203,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157795,6 +160222,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -157903,6 +160331,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157920,6 +160349,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -157965,6 +160395,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -157983,6 +160414,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -158043,6 +160475,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158060,6 +160493,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -158105,6 +160539,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158123,6 +160558,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -158276,6 +160712,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158293,6 +160730,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -158338,6 +160776,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158356,6 +160795,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -158457,6 +160897,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158474,6 +160915,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -158519,6 +160961,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158537,6 +160980,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -158791,6 +161235,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158808,6 +161253,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -158853,6 +161299,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -158871,6 +161318,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -159235,6 +161683,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159252,6 +161701,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -159297,6 +161747,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159315,6 +161766,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -159546,6 +161998,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159563,6 +162016,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -159608,6 +162062,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159625,6 +162080,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -159691,6 +162147,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159708,6 +162165,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -159753,6 +162211,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -159771,6 +162230,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -159910,6 +162370,7 @@ export namespace Prisma {
     passwordHash?: StringNullableFilter<"User"> | string | null
     email?: StringFilter<"User"> | string
     role?: EnumUserRoleFilter<"User"> | $Enums.UserRole
+    canClaimCustomHosts?: BoolFilter<"User"> | boolean
     createdAt?: DateTimeFilter<"User"> | Date | string
     updatedAt?: DateTimeFilter<"User"> | Date | string
     settings?: JsonNullableFilter<"User">
@@ -160003,6 +162464,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160020,6 +162482,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -160065,6 +162528,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160083,6 +162547,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -160371,6 +162836,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160388,6 +162854,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -160433,6 +162900,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160451,6 +162919,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -160627,6 +163096,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160644,6 +163114,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -160689,6 +163160,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160707,6 +163179,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -160847,6 +163320,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160864,6 +163338,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -160909,6 +163384,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -160927,6 +163403,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -160987,6 +163464,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -161004,6 +163482,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -161049,6 +163528,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -161067,6 +163547,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -161704,6 +164185,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -161721,6 +164203,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -161766,6 +164249,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -161784,6 +164268,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -162492,6 +164977,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -162509,6 +164995,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -162554,6 +165041,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -162572,6 +165060,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -162863,6 +165352,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -162880,6 +165370,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -162925,6 +165416,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -162943,6 +165435,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -163149,6 +165642,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163166,6 +165660,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -163211,6 +165706,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163229,6 +165725,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -163436,6 +165933,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163453,6 +165951,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -163498,6 +165997,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163516,6 +166016,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -163800,6 +166301,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163817,6 +166319,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
     conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
     sessions?: SessionCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
     tags?: TagCreateNestedManyWithoutUserInput
@@ -163862,6 +166365,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -163880,6 +166384,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
     contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
     conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
     sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
     storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
     tags?: TagUncheckedCreateNestedManyWithoutUserInput
@@ -164021,6 +166526,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -164038,6 +166544,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -164083,6 +166590,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -164101,6 +166609,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -167054,6 +169563,16 @@ export namespace Prisma {
     id?: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    activeContextId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
+  export type ChatContextCreateManyOwnerInput = {
+    id?: string
+    name: string
+    body: string
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -167980,6 +170499,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
   }
@@ -167988,6 +170508,7 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -167999,6 +170520,36 @@ export namespace Prisma {
     id?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type ChatContextUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    conversations?: ConversationUpdateManyWithoutActiveContextNestedInput
+  }
+
+  export type ChatContextUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    conversations?: ConversationUncheckedUpdateManyWithoutActiveContextNestedInput
+  }
+
+  export type ChatContextUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    body?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -171095,6 +173646,50 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type ConversationCreateManyActiveContextInput = {
+    id?: string
+    ownerId: string
+    title?: string | null
+    archivedToContentNodeId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
+  export type ConversationUpdateWithoutActiveContextInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
+    archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+  }
+
+  export type ConversationUncheckedUpdateWithoutActiveContextInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+  }
+
+  export type ConversationUncheckedUpdateManyWithoutActiveContextInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
   export type ConversationMessageCreateManyParentInput = {
     id?: string
     conversationId: string
@@ -171735,6 +174330,7 @@ export namespace Prisma {
     passwordHash?: string | null
     email: string
     role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -171951,6 +174547,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -171968,6 +174565,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
     tags?: TagUpdateManyWithoutUserNestedInput
@@ -172013,6 +174611,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue
@@ -172030,6 +174629,7 @@ export namespace Prisma {
     contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
     sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
@@ -172075,6 +174675,7 @@ export namespace Prisma {
     passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
     email?: StringFieldUpdateOperationsInput | string
     role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     settings?: NullableJsonNullValueInput | InputJsonValue

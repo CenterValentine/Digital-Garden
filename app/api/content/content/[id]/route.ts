@@ -24,7 +24,10 @@ import {
 } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
-import { syncImageReferences } from "@/lib/domain/content/image-refs";
+import {
+  syncImageReferences,
+  softDeleteIfOrphaned,
+} from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import {
   resolveContentAccess,
@@ -49,16 +52,43 @@ import {
 import crypto from "node:crypto";
 
 /**
+ * Stable JSON serialization with deep-sorted object keys.
+ *
+ * `JSON.stringify` emits keys in insertion order, which is NOT stable across the
+ * round-trip a note body takes: `sanitizeTipTapJsonWithExtensions` rebuilds the
+ * node tree (reordering `type`/`attrs`/`content`), and Postgres JSONB doesn't
+ * preserve key order on store/read. So two byte-different serializations of the
+ * SAME content would hash differently — tripping a false `If-Match` conflict on
+ * every save. Sorting keys makes the hash purely content-based; array order
+ * (which is semantically meaningful in TipTap) is preserved.
+ */
+function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value);
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(",")}]`;
+  }
+  const obj = value as Record<string, unknown>;
+  const body = Object.keys(obj)
+    .sort()
+    .map((key) => `${JSON.stringify(key)}:${stableStringify(obj[key])}`)
+    .join(",");
+  return `{${body}}`;
+}
+
+/**
  * Deterministic short hash of the tiptap JSON body. Used for `If-Match`
  * preconditions on PATCH so clients can prove they're updating the version
  * of the document they last saw. Slicing to 64 hex chars (SHA-256 truncated)
  * keeps the header value compact while preserving negligible collision risk
  * for per-document version checks.
+ *
+ * Hashes a canonical (key-sorted) serialization so the hash compares CONTENT,
+ * not serialization order — see `stableStringify`.
  */
 function hashTiptap(json: unknown): string {
   return crypto
     .createHash("sha256")
-    .update(JSON.stringify(json))
+    .update(stableStringify(json))
     .digest("hex")
     .slice(0, 64);
 }
@@ -68,6 +98,7 @@ import type {
 } from "@/lib/domain/content/api-types";
 import type { StoredChatMessage } from "@/lib/domain/ai/types";
 import { softDeleteConversation } from "@/lib/features/conversations";
+import { publishConversationEvent } from "@/lib/features/conversations/events";
 
 type Params = Promise<{ id: string }>;
 
@@ -416,6 +447,9 @@ export async function GET(
           storageKey: content.filePayload.storageKey,
           storageUrl: content.filePayload.storageUrl,
           storageMetadata: content.filePayload.storageMetadata as Record<string, unknown>,
+          // Extracted document text (PDF/doc body) — powers search and the
+          // "read aloud" whole-document Listen for file content types.
+          searchText: content.filePayload.searchText,
           uploadStatus: content.filePayload.uploadStatus,
           uploadedAt: content.filePayload.uploadedAt,
           uploadError: content.filePayload.uploadError,
@@ -584,14 +618,20 @@ export async function PATCH(
         );
       }
 
-      // ── If-Match precondition (optional) ─────────────────────────────────
-      // Standard HTTP precondition. When clients pass `If-Match: <bodyHash>`,
-      // we verify the current notePayload hash matches what they last saw.
-      // Mismatch → 409 Conflict; client should re-fetch and re-apply.
-      // Missing header → proceed (backwards compatible — existing clients
-      // are unaffected). Hash is computed on the fly from the existing
-      // tiptapJson, so no schema migration is required for this guard.
-      const ifMatch = request.headers.get("if-match");
+      // ── Body-hash precondition (optional) ────────────────────────────────
+      // App-level optimistic concurrency. Clients echo the bodyHash they last
+      // saw via the CUSTOM `X-Body-Hash` header; we verify it matches the
+      // current notePayload hash. Mismatch → 409 Conflict; client re-fetches.
+      // Missing header → proceed (backwards compatible). Hash is computed on
+      // the fly, so no schema migration is required.
+      //
+      // IMPORTANT: this is NOT the standard `If-Match` header. Vercel's edge
+      // evaluates `If-Match` as an HTTP conditional precondition against the
+      // response ETag and returns 412 *before the request reaches this
+      // function* (our responses carry no matching ETag), so the check never
+      // ran on production. A non-conditional custom header passes through.
+      const ifMatch =
+        request.headers.get("x-body-hash") ?? request.headers.get("if-match");
       if (ifMatch && existing.notePayload) {
         const currentHash = hashTiptap(existing.notePayload.tiptapJson);
         if (currentHash !== ifMatch.trim()) {
@@ -1230,6 +1270,51 @@ export async function PATCH(
         }
       }
 
+      // Chat-content title cascade. A chat lives in TWO tables: ContentNode
+      // (what the file tree / tab read) and Conversation (what ChatViewer
+      // reads via useConversationBinding). Renaming from the file tree only
+      // touched ContentNode.title, leaving the conversation header showing
+      // the stale name. Mirror the title to the backing Conversation when
+      // it really changed, then publish `conversation.updated` so any open
+      // ChatViewer instance refreshes via SSE. Best-effort: a sync failure
+      // does not undo the successful content update.
+      if (
+        title !== undefined &&
+        title !== existing.title &&
+        existing.contentType === "chat"
+      ) {
+        try {
+          const backing = await prisma.conversation.findFirst({
+            where: {
+              archivedToContentNodeId: id,
+              ownerId: userId,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (backing) {
+            await prisma.conversation.update({
+              where: { id: backing.id },
+              data: { title: updated.title },
+            });
+            publishConversationEvent(userId, {
+              type: "conversation.updated",
+              conversationId: backing.id,
+              title: updated.title,
+              at: new Date().toISOString(),
+            });
+          }
+        } catch (error) {
+          logger.warn({
+            layer: "route",
+            event: "content.rename.conversation_sync_failed",
+            summary: `failed to mirror title to backing Conversation for ${id}`,
+            attrs: { content_id: id },
+            error,
+          });
+        }
+      }
+
       // Format response
       const response: ContentDetailResponse = {
         id: updated.id,
@@ -1458,6 +1543,41 @@ export async function DELETE(
             },
           );
         }
+      }
+
+      // Cascade generated/referenced media. When a source node is trashed,
+      // soft-delete the referenced media it OWNED (generated from it) or
+      // EMBEDDED — but only when that media has no other LIVE reference, so a
+      // generated image/clip reused in another note or card survives. The
+      // source was soft-deleted above, so its own edges no longer count.
+      try {
+        const [ownedEmbeds, embeddedLinks] = await Promise.all([
+          prisma.contentNode.findMany({
+            where: { ownedByNoteId: id, role: "referenced", deletedAt: null },
+            select: { id: true },
+          }),
+          prisma.contentLink.findMany({
+            where: {
+              sourceId: id,
+              linkType: { in: ["image-ref", "audio-ref"] },
+            },
+            select: { targetId: true },
+          }),
+        ]);
+        const candidateIds = new Set<string>([
+          ...ownedEmbeds.map((n) => n.id),
+          ...embeddedLinks.map((l) => l.targetId),
+        ]);
+        for (const targetId of candidateIds) {
+          await softDeleteIfOrphaned(targetId, session.user.id);
+        }
+      } catch (cascadeError) {
+        logger.warn({
+          event: "content.delete.media_cascade_failed",
+          summary:
+            "generated-media cascade failed (node soft-delete already done)",
+          error: cascadeError,
+        });
       }
 
       return NextResponse.json({

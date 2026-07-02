@@ -18,6 +18,105 @@ export function createTextTiptapDoc(text: string): JSONContent {
   };
 }
 
+/**
+ * Build a rich card front for an identification (image-recall) card: the
+ * generated image followed by a short instruction caption beneath it. Stored as
+ * frontContent with isFrontRichText=true. The `image` node matches the editor's
+ * EditorImage (extends @tiptap/extension-image) attrs.
+ */
+export function createImageFrontDoc(
+  imageUrl: string,
+  imageContentId: string | null,
+  label: string,
+): JSONContent {
+  const caption = label.trim();
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "image",
+        attrs: {
+          src: imageUrl,
+          contentId: imageContentId,
+          source: "ai-generated",
+          alt: caption || "Identification image",
+        },
+      },
+      {
+        type: "paragraph",
+        content: caption ? [{ type: "text", text: caption }] : undefined,
+      },
+    ],
+  };
+}
+
+/**
+ * Build a card front/back fragment containing an audio clip. Two uses:
+ *  - Pronunciation (Mode A): a spoken term attached to a card, autoplay on flip.
+ *  - Sound identification (Mode B/C): the clip IS the front prompt (bird call,
+ *    engine). For identification pass an EMPTY label so the answer isn't given
+ *    away in a caption.
+ *
+ * Mirrors createImageFrontDoc. The `audioEmbed` node carries `contentId` (the
+ * ContentNode id of the generated clip) alongside the playback URL so audio is
+ * usage-ref-countable (ContentLink audio-ref) and lifecycle-cleanable.
+ */
+export function createAudioFrontDoc(
+  audioUrl: string,
+  audioContentId: string | null,
+  label: string,
+  options: { autoplayOnFlip?: boolean } = {},
+): JSONContent {
+  const caption = label.trim();
+  return {
+    type: "doc",
+    content: [
+      {
+        type: "audioEmbed",
+        attrs: {
+          blockId: crypto.randomUUID(),
+          src: audioUrl,
+          contentId: audioContentId,
+          filename: caption || "Audio",
+          autoplayOnFlip: options.autoplayOnFlip ?? false,
+        },
+      },
+      {
+        type: "paragraph",
+        content: caption ? [{ type: "text", text: caption }] : undefined,
+      },
+    ],
+  };
+}
+
+/**
+ * Append an audio clip to an existing card doc (e.g. attach a pronunciation to
+ * a term that's already on the front/back). Returns a new doc — does not mutate
+ * the input. If the value isn't a doc it's normalized first.
+ */
+export function appendAudioToDoc(
+  doc: unknown,
+  audioUrl: string,
+  audioContentId: string | null,
+  options: { autoplayOnFlip?: boolean } = {},
+): JSONContent {
+  const base = normalizeTiptapDoc(doc);
+  const audioNode: JSONContent = {
+    type: "audioEmbed",
+    attrs: {
+      blockId: crypto.randomUUID(),
+      src: audioUrl,
+      contentId: audioContentId,
+      filename: "Pronunciation",
+      autoplayOnFlip: options.autoplayOnFlip ?? false,
+    },
+  };
+  return {
+    ...base,
+    content: [...(base.content ?? []), audioNode],
+  };
+}
+
 export function isTiptapDoc(value: unknown): value is JSONContent {
   return Boolean(
     value &&

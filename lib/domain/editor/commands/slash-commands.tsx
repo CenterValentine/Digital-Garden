@@ -185,6 +185,31 @@ export function getSlashCommands(): SlashCommand[] {
       aliases: ["blockquote"],
     },
     {
+      title: "Audio",
+      description: "Embed an audio file — upload via inline player",
+      icon: "🔊",
+      command: ({ editor, range }) => {
+        // Insert in empty-state (src=null); the NodeView's empty state
+        // shows a file picker + drop zone until the user uploads.
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({ type: "audioEmbed", attrs: {} })
+          .run();
+      },
+      aliases: [
+        "audio",
+        "sound",
+        "mp3",
+        "music",
+        "voice",
+        "podcast",
+        "recording",
+        "pronunciation",
+      ],
+    },
+    {
       title: "Flashcards",
       description:
         "Embed a flashcard deck — tap to flip, Play opens the FSRS review overlay",
@@ -522,6 +547,18 @@ export function getSlashCommands(): SlashCommand[] {
           .insertContent({ type: "tagCloud", attrs: {} }).run();
       },
       aliases: ["tags", "cloud", "topics", "categories", "browse"],
+      kind: "published",
+    },
+    // ── W11 ─────────────────────────────────────────────────────────────────
+    {
+      title: "Stats Table",
+      description: "Vertical key/value list for case study outcomes and mixed-unit metrics",
+      icon: "≡",
+      command: ({ editor, range }) => {
+        editor.chain().focus().deleteRange(range)
+          .insertContent({ type: "statsTable", attrs: {} }).run();
+      },
+      aliases: ["stats", "table", "outcomes", "case study", "results", "kv", "key value", "metrics", "facts", "pills", "skills", "tools"],
       kind: "published",
     },
     {

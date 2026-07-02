@@ -1,8 +1,11 @@
+import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
+
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
   ignore: "dgBrowserBookmarksIgnore",
   install: "dgBrowserBookmarksInstall",
   quickSaveDrafts: "dgBrowserBookmarksQuickSaveDrafts",
+  strategyOverrides: "dgUrlStrategyOverrides",
 };
 
 const DEFAULT_CONFIG = {
@@ -183,10 +186,11 @@ async function apiFetch(path, init = {}) {
   }
 
   if (!response.ok) {
+    // Never use rawBody as the error message — it can be a full HTML page (e.g.
+    // a Next.js 404) which leaks into UI rendering when stringified as an Error.
     const message =
       json?.error?.message ||
-      rawBody.trim() ||
-      `Request failed: ${path} (${response.status} ${response.statusText})`;
+      `Request failed: ${path} (${response.status})`;
     throw new Error(message);
   }
 
@@ -269,6 +273,17 @@ async function fetchDomainAssociations(url, excludeResourceId) {
   const params = new URLSearchParams({ url });
   if (excludeResourceId) params.set("excludeResourceId", excludeResourceId);
   return apiFetch(`/api/integrations/browser-extension/domain-associations?${params}`);
+}
+
+async function fetchFlashcardDecks() {
+  return apiFetch("/api/integrations/browser-extension/flashcard/decks");
+}
+
+async function createFlashcard(payload) {
+  return apiFetch("/api/integrations/browser-extension/flashcard", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 async function saveOverlayViewState(payload) {
@@ -592,6 +607,21 @@ async function getCurrentTabSyncState() {
     })),
     connections,
   };
+}
+
+async function startQuickCaptureInActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: "dg-quick-capture" });
+    return { started: true, tabId: tab.id };
+  } catch (error) {
+    throw new Error(
+      error instanceof Error
+        ? `Quick Capture is not available on this page: ${error.message}`
+        : "Quick Capture is not available on this page"
+    );
+  }
 }
 
 async function showTreePanelInActiveTab() {
@@ -1181,6 +1211,9 @@ async function captureCurrentSession(payload = {}) {
 }
 
 const EMBED_SESSION_CACHE_KEY = "dgEmbedSession";
+// Per-tab open-panel descriptors (chrome.storage.session), so notes persist
+// across in-tab navigation. One key per tab id; cleared on tab close.
+const TAB_PANELS_KEY_PREFIX = "dgTabPanels:";
 // Two-minute buffer: refresh before the session actually expires
 const EMBED_SESSION_REFRESH_BUFFER_MS = 2 * 60 * 1000;
 
@@ -1275,6 +1308,117 @@ async function exchangeEmbedSession() {
   }
 }
 
+// ─── Read aloud (TTS) ──────────────────────────────────────────
+// Session LRU cache of synthesized audio so repeating the same selection reuses
+// the bytes instead of re-paying the provider. Best-effort: lives only for the
+// service worker's lifetime (MV3 may evict the worker), which still covers
+// back-to-back repeats. Mirrors the in-app cache (lib/features/tts/cache.ts).
+const TTS_CACHE_MAX = 8;
+const ttsCache = new Map(); // key -> { base64, mimeType }
+
+function ttsHash(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) {
+    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  }
+  return (h >>> 0).toString(36);
+}
+
+function ttsCacheGet(key) {
+  const value = ttsCache.get(key);
+  if (value) {
+    ttsCache.delete(key);
+    ttsCache.set(key, value); // touch → MRU
+  }
+  return value;
+}
+
+function ttsCachePut(key, value) {
+  if (ttsCache.has(key)) ttsCache.delete(key);
+  ttsCache.set(key, value);
+  while (ttsCache.size > TTS_CACHE_MAX) {
+    const oldest = ttsCache.keys().next().value;
+    if (oldest === undefined) break;
+    ttsCache.delete(oldest);
+  }
+}
+
+// Binary-safe fetch to the TTS proxy. Unlike apiFetch (which parses JSON), this
+// returns raw audio bytes. The key stays server-side — we only ever get audio.
+async function fetchSpeechAudio(text) {
+  const key = ttsHash(text);
+  const cached = ttsCacheGet(key);
+  if (cached) return cached;
+
+  const config = await getConfig();
+  if (!config.appBaseUrl || !config.token) {
+    throw new Error("Extension not connected");
+  }
+  const url = getApiUrl(
+    config.appBaseUrl,
+    "/api/integrations/browser-extension/tts",
+  );
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${config.token}`,
+    },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok) {
+    throw new Error(`TTS request failed (${res.status})`);
+  }
+  const buffer = await res.arrayBuffer();
+  const mimeType = res.headers.get("content-type") || "audio/mpeg";
+  const result = { base64: arrayBufferToBase64(buffer), mimeType };
+  ttsCachePut(key, result);
+  return result;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunk = 0x8000; // avoid call-stack limits on String.fromCharCode
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function sendTtsFallback(tabId, text) {
+  await chrome.tabs
+    .sendMessage(tabId, { type: "dg-tts-fallback", text })
+    .catch(() => {});
+}
+
+// Read the highlighted selection aloud. Cloud (HD, BYOK) is preferred; offline
+// or any cloud failure degrades to the page's Web Speech engine — so the user
+// always hears something. Mirrors the in-app fallback policy.
+async function readAloudSelection(tabId, selectionText) {
+  const text = (selectionText || "").trim();
+  if (!text || tabId == null) return;
+
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    await sendTtsFallback(tabId, text);
+    return;
+  }
+  try {
+    const { base64, mimeType } = await fetchSpeechAudio(text);
+    await chrome.tabs.sendMessage(tabId, {
+      type: "dg-tts-play",
+      audioBase64: base64,
+      mimeType,
+    });
+  } catch (error) {
+    console.warn(
+      "[DG Bookmarks] Cloud TTS failed — falling back to Web Speech:",
+      error?.message,
+    );
+    await sendTtsFallback(tabId, text);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: "dg-save-page",
@@ -1285,6 +1429,11 @@ chrome.runtime.onInstalled.addListener(async () => {
     id: "dg-capture-session",
     title: "Capture Session to Digital Garden",
     contexts: ["action"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-read-aloud",
+    title: "Read aloud with Digital Garden",
+    contexts: ["selection"],
   });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
@@ -1299,6 +1448,13 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     }
     if (info.menuItemId === "dg-capture-session") {
       await captureCurrentSession({});
+    }
+    if (info.menuItemId === "dg-read-aloud") {
+      const [tab] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true,
+      });
+      await readAloudSelection(tab?.id, info.selectionText);
     }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);
@@ -1342,10 +1498,56 @@ chrome.bookmarks.onRemoved.addListener((id, removeInfo) => {
   });
 });
 
+// ── MRU tab tracking ─────────────────────────────────────────────────────────
+// Ordered most-recent-first. Ephemeral (service-worker memory only) — resets
+// on MV3 restart, self-populates as the user browses. Only tabs the user
+// explicitly activates/focuses are tracked; background/preloaded tabs are not.
+const MRU_TABS_MAX = 10;
+const mruTabs = [];
+
+function isIneligibleMruUrl(url) {
+  if (!url) return true;
+  return (
+    url.startsWith("chrome://") ||
+    url.startsWith("chrome-extension://") ||
+    url.startsWith("about:") ||
+    url.startsWith("edge://") ||
+    url.startsWith("vivaldi://")
+  );
+}
+
+function updateMruTab(tabId, tab) {
+  if (!tab?.url || isIneligibleMruUrl(tab.url)) return;
+  const idx = mruTabs.findIndex((t) => t.tabId === tabId);
+  if (idx !== -1) mruTabs.splice(idx, 1);
+  mruTabs.unshift({
+    tabId,
+    title: tab.title || "",
+    favIconUrl: tab.favIconUrl || null,
+    url: tab.url,
+    lastViewedAt: new Date().toISOString(),
+  });
+  if (mruTabs.length > MRU_TABS_MAX) mruTabs.length = MRU_TABS_MAX;
+}
+
+function pruneMruTab(tabId) {
+  const idx = mruTabs.findIndex((t) => t.tabId === tabId);
+  if (idx !== -1) mruTabs.splice(idx, 1);
+}
+
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, (tab) => {
     if (chrome.runtime.lastError || !tab?.url) return;
     void updateTabBadge(tabId, tab.url);
+    updateMruTab(tabId, tab);
+  });
+});
+
+chrome.windows.onFocusChanged.addListener((windowId) => {
+  if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+  chrome.tabs.query({ active: true, windowId }, ([tab]) => {
+    if (chrome.runtime.lastError || !tab) return;
+    updateMruTab(tab.id, tab);
   });
 });
 
@@ -1355,10 +1557,42 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   }
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Drop a tab's sticky open-panel descriptors when it closes, so a later tab
+// that reuses the id starts clean.
+chrome.tabs.onRemoved.addListener((tabId) => {
+  void chrome.storage.session.remove(`${TAB_PANELS_KEY_PREFIX}${tabId}`);
+  pruneMruTab(tabId);
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
+      return;
+    }
+    // Tab-scoped open-panel persistence: notes stay open as the user navigates
+    // within a tab. Keyed by the SENDER's tab id (derived here, not trusted from
+    // the content script) in chrome.storage.session so it survives navigation
+    // and clears on browser restart. See tabs.onRemoved cleanup below.
+    if (message.type === "save-tab-panels") {
+      const tabId = sender.tab?.id;
+      if (tabId != null) {
+        await chrome.storage.session.set({
+          [`${TAB_PANELS_KEY_PREFIX}${tabId}`]: message.payload?.panels ?? [],
+        });
+      }
+      sendResponse({ ok: true, data: true });
+      return;
+    }
+    if (message.type === "get-tab-panels") {
+      const tabId = sender.tab?.id;
+      let panels = [];
+      if (tabId != null) {
+        const key = `${TAB_PANELS_KEY_PREFIX}${tabId}`;
+        const stored = await chrome.storage.session.get(key);
+        if (Array.isArray(stored[key])) panels = stored[key];
+      }
+      sendResponse({ ok: true, data: panels });
       return;
     }
     if (message.type === "get-extension-context") {
@@ -1413,6 +1647,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
     if (message.type === "show-tree-panel") {
       sendResponse({ ok: true, data: await showTreePanelInActiveTab() });
+      return;
+    }
+    if (message.type === "start-quick-capture") {
+      sendResponse({ ok: true, data: await startQuickCaptureInActiveTab() });
       return;
     }
     if (message.type === "open-content-in-active-tab") {
@@ -1503,6 +1741,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ ok: true, data: await fetchDomainAssociations(message.url, message.excludeResourceId || null) });
       return;
     }
+    if (message.type === "fetch-flashcard-decks") {
+      sendResponse({ ok: true, data: await fetchFlashcardDecks() });
+      return;
+    }
+    if (message.type === "create-flashcard") {
+      sendResponse({ ok: true, data: await createFlashcard(message.payload || {}) });
+      return;
+    }
     if (message.type === "save-overlay-view-state") {
       sendResponse({ ok: true, data: await saveOverlayViewState(message.payload || {}) });
       return;
@@ -1536,7 +1782,71 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       sendResponse({ ok: true, data: next });
       return;
     }
+    if (message.type === "get-url-preset") {
+      const { presetMap, overrides } = await loadUrlPresets();
+      const preset = resolvePreset(message.url, presetMap, overrides);
+      sendResponse({ ok: true, data: preset });
+      return;
+    }
+    if (message.type === "get-url-strategy-overrides") {
+      sendResponse({ ok: true, data: await getStrategyOverrides() });
+      return;
+    }
+    if (message.type === "set-url-strategy-override") {
+      const result = await setStrategyOverride(message.hostname, message.config ?? null);
+      sendResponse({ ok: true, data: result });
+      return;
+    }
     sendResponse({ ok: false, error: "Unknown message type" });
+    if (message.type === "get-recent-viewed-tabs") {
+      const config = await getConfig();
+      const appOrigin = config.appBaseUrl
+        ? (() => { try { return new URL(config.appBaseUrl).origin; } catch { return null; } })()
+        : null;
+      const tabs = mruTabs.filter((t) => {
+        if (!appOrigin) return true;
+        try { return new URL(t.url).origin !== appOrigin; } catch { return true; }
+      });
+      sendResponse({ ok: true, data: tabs });
+      return;
+    }
+
+    if (message.type === "send-note-to-tabs") {
+      const { contentId, contentKind = "note", tabIds = [] } = message.payload || {};
+      const results = await Promise.all(
+        tabIds.map(async (tabId) => {
+          const entry = mruTabs.find((t) => t.tabId === tabId);
+          try {
+            await new Promise((resolve, reject) => {
+              chrome.tabs.sendMessage(
+                tabId,
+                { type: "dg-associate-and-open", payload: { contentId, contentKind } },
+                (response) => {
+                  if (chrome.runtime.lastError) {
+                    reject(new Error(chrome.runtime.lastError.message));
+                  } else if (!response?.ok) {
+                    reject(new Error(response?.error || "Overlay unavailable"));
+                  } else {
+                    resolve(response);
+                  }
+                }
+              );
+            });
+            return { tabId, success: true, title: entry?.title || "" };
+          } catch (error) {
+            return {
+              tabId,
+              success: false,
+              title: entry?.title || "",
+              error: error instanceof Error ? error.message : "Failed",
+            };
+          }
+        })
+      );
+      sendResponse({ ok: true, data: results });
+      return;
+    }
+
   })().catch((error) => {
     sendResponse({ ok: false, error: error.message || "Unknown error" });
   });

@@ -337,6 +337,38 @@ export function MultiConversationSidebar({ contentId }: Props) {
     [(activeProviderId ?? "anthropic") as AIProviderId],
   );
 
+  // Tabs not yet known for this content → show a skeleton, NOT the empty
+  // "How can I help?" chat. The empty/transient ChatPanel is a terminal state
+  // (rendered below once cachedTabs === [] — i.e. we KNOW there are no
+  // conversations). Showing it while cachedTabs is still undefined produces the
+  // blank-chat flash before history loads. (Side-panel cascade rule: render a
+  // loader, not a terminal state, while data is loading.) A force-reload keeps
+  // the prior cachedTabs, so this doesn't flash on background refresh.
+  if (contentId && cachedTabs === undefined) {
+    return (
+      <div
+        className="flex h-full flex-col"
+        style={{ background: surfaceBackground }}
+        aria-busy="true"
+        aria-label="Loading conversations"
+      >
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/10 px-3">
+          <div className="h-5 w-24 animate-pulse rounded bg-white/10" />
+          <div className="h-5 w-16 animate-pulse rounded bg-white/5" />
+        </div>
+        <div className="min-h-0 flex-1 space-y-3 p-4">
+          <div className="h-4 w-1/2 animate-pulse rounded bg-white/5" />
+          <div className="ml-auto h-16 w-3/4 animate-pulse rounded-lg bg-white/10" />
+          <div className="h-20 w-4/5 animate-pulse rounded-lg bg-white/5" />
+          <div className="ml-auto h-12 w-2/3 animate-pulse rounded-lg bg-white/10" />
+        </div>
+        <div className="h-12 shrink-0 border-t border-white/10 p-2">
+          <div className="h-8 w-full animate-pulse rounded-lg bg-white/5" />
+        </div>
+      </div>
+    );
+  }
+
   // Header: tabs + pick/new. Below: ChatPanel rendering the active
   // conversation (or transient if no active yet).
   return (
@@ -369,12 +401,27 @@ export function MultiConversationSidebar({ contentId }: Props) {
       </div>
 
       <div className="flex-1 min-h-0">
+        {/*
+          Stage 2: dropped the `key={activeId ?? "transient"}` remount on
+          purpose. With it, the panel would unmount/remount on every
+          conversation switch (and on the transient→bound promote), and
+          the in-flight first message would be lost across the remount.
+          Without it, the ChatPanel rebinds in place — useChat re-keys
+          internally on conversationKey change, but the surrounding
+          refs (pendingTransientSendRef, etc.) survive so the queued
+          first send can fire after the conversationId catches up.
+        */}
         <ChatPanel
-          key={activeId ?? "transient"}
           contentId={contentId}
           conversationId={activeId}
           onDeleteConversation={handleDeleteConversation}
           onForked={(newId) => {
+            void (async () => {
+              await reloadTabs();
+              setActiveId(newId);
+            })();
+          }}
+          onTransientPromoted={(newId) => {
             void (async () => {
               await reloadTabs();
               setActiveId(newId);

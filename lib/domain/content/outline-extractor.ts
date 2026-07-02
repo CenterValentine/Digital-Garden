@@ -14,6 +14,7 @@ export interface OutlineHeading {
   level: number; // 1-6 (H1-H6)
   text: string; // Heading text content
   position: number; // Node position in document (for scroll-to)
+  kind?: "heading" | "accordion"; // source node type
 }
 
 /**
@@ -102,7 +103,18 @@ export function extractOutline(tiptapJson: JSONContent): OutlineHeading[] {
           level,
           text: text.trim(),
           position: pos,
+          kind: "heading",
         });
+      }
+    }
+
+    // Check if this node is an accordion block (title lives in attrs, not content)
+    if (node.type === "accordion" && node.attrs?.headerText) {
+      const text = (node.attrs.headerText as string).trim();
+      const level = parseInt((node.attrs.headerLevel as string) || "2", 10);
+      if (text) {
+        const id = generateAnchorId(text, existingIds);
+        headings.push({ id, level, text, position: pos, kind: "accordion" });
       }
     }
 

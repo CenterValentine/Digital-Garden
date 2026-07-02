@@ -159,14 +159,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (!ogData) {
-        let errorMessage = "Failed to fetch Open Graph metadata. ";
-
-        // Detect a common SSL-error class of failure for friendly messaging.
-        if (url.toLowerCase().includes('papermart') || url.toLowerCase().includes('.com')) {
-          errorMessage += "The site may have SSL certificate issues. In development, you can bypass this by setting NODE_TLS_REJECT_UNAUTHORIZED=0 in your environment. ";
-        }
-
-        errorMessage += "The site may not support Open Graph tags, may be blocking requests, or may have connectivity issues.";
+        const errorMessage =
+          "Failed to fetch Open Graph metadata. The site may not support Open Graph tags, may be blocking requests, or may have SSL/connectivity issues.";
 
         return NextResponse.json(
           {

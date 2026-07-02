@@ -11,6 +11,15 @@ import type { ImageMetadata, ProcessingOptions, ProcessingResult } from './types
 import { logger } from "@/lib/core/logger";
 
 /**
+ * Convert an Apple HEIC/HEIF image buffer to JPEG so it renders in all
+ * browsers (only Safari decodes HEIC natively) and is consumable by vision
+ * models. Relies on sharp's bundled libheif decode support.
+ */
+export async function convertHeicToJpeg(buffer: Buffer): Promise<Buffer> {
+  return sharp(buffer).jpeg({ quality: 90 }).toBuffer();
+}
+
+/**
  * Image Processor
  * Handles dimension extraction and thumbnail generation
  */

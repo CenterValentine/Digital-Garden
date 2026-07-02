@@ -2,15 +2,16 @@
   "name": "web",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.25.0",
   "scripts": {
     "predev": "pnpm clean:traces",
-    "dev": "next dev --port 3015",
+    "dev": "tsx scripts/predev.ts && next dev --port 3015",
     "clean:traces": "tsx scripts/archive-traces.ts",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm lint && next build --webpack",
-    "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --webpack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm lint && next build --turbopack",
+    "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --turbopack",
     "start": "next start",
     "lint": "eslint --max-warnings 159",
     "lint:publishing": "eslint extensions/publishing/ lib/domain/blocks/ app/api/publishing/ components/public/ lib/domain/editor/commands/slash-commands-menu.tsx lib/domain/editor/commands/slash-commands.tsx lib/domain/editor/extensions/blocks/pull-quote.ts lib/domain/editor/extensions/blocks/table-of-contents.ts components/content/blocks/JsonArrayEditor.tsx components/content/editor/ImageBubbleMenu.tsx",
@@ -20,6 +21,11 @@
     "publishing:audit:defaults": "tsx scripts/audit-publishing-defaults.ts",
     "publishing:audit:themes": "tsx scripts/audit-publishing-themes.ts",
     "db:seed": "tsx prisma/seed.ts",
+    "db:target": "tsx scripts/check-db-target.ts",
+    "db:local:up": "docker compose up -d postgres",
+    "db:local:down": "docker compose down",
+    "db:local:reset": "docker compose down -v && docker compose up -d postgres",
+    "db:local:bootstrap": "tsx scripts/db-local-bootstrap.ts",
     "collab:env:check": "tsx scripts/check-hocuspocus-env.ts",
     "trace:view": "tsx scripts/render-trace.ts",
     "trace:list": "tsx scripts/render-trace.ts --list",
@@ -62,6 +68,7 @@
     "@hocuspocus/transformer": "^3.4.4",
     "@hookform/resolvers": "^5.2.2",
     "@lobehub/icons": "^5.10.0",
+    "@mozilla/readability": "^0.6.0",
     "@onlyoffice/document-editor-react": "^2.1.1",
     "@prisma/adapter-pg": "^7.2.0",
     "@prisma/client": "7.2.0",
@@ -125,10 +132,12 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "docx": "^9.5.1",
+    "dompurify": "^3.4.7",
     "file-type": "^21.3.0",
     "fluent-ffmpeg": "^2.1.3",
     "framer-motion": "^12.23.26",
     "google-auth-library": "^9.0.0",
+    "heic2any": "^0.0.4",
     "jsdom": "^26.1.0",
     "jszip": "^3.10.1",
     "katex": "^0.16.45",
@@ -162,6 +171,7 @@
     "sharp": "^0.34.5",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
+    "tesseract.js": "^7.0.0",
     "three": "^0.182.0",
     "tippy.js": "^6.3.7",
     "ts-fsrs": "^5.4.0",
@@ -201,6 +211,16 @@
         "react": "19",
         "react-dom": "19"
       }
-    }
+    },
+    "onlyBuiltDependencies": [
+      "@ffmpeg-installer/linux-x64",
+      "@prisma/engines",
+      "canvas",
+      "esbuild",
+      "prisma",
+      "sharp",
+      "tesseract.js",
+      "unrs-resolver"
+    ]
   }
 }

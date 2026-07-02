@@ -52,6 +52,7 @@ const { schema: stopwatchSchema, defaults: stopwatchDefaults } = createBlockSche
 
 registerBlock({
   type: "stopwatch",
+  ttsSkip: true, // interactive widget — not narratable prose
   label: "Stopwatch",
   description: "Persisted count-up stopwatch with laps and style variants",
   iconName: "TimerReset",

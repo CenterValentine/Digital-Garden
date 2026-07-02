@@ -471,41 +471,31 @@ export function MainPanelWorkspace({
 
     const urlParams = new URLSearchParams(window.location.search);
     const workspaceIdFromUrl = urlParams.get("workspace");
-    const contentIdFromUrl = urlParams.get("content");
+    // Defensively drop `temp-*` ids from any restore source: they're
+    // optimistic placeholders for unsaved content and can't be loaded on a
+    // fresh page (no real ContentNode → "failed to load content"). The write
+    // side no longer persists them, but old URLs/links may still carry one.
+    const isRealId = (value: string): boolean =>
+      Boolean(value) && !value.startsWith("temp-");
+    const parseTabParam = (name: string): string[] | undefined =>
+      urlParams
+        .get(name)
+        ?.split(",")
+        .map((value) => value.trim())
+        .filter(isRealId);
+    const rawContentId = urlParams.get("content");
+    const contentIdFromUrl =
+      rawContentId && isRealId(rawContentId) ? rawContentId : null;
     const layoutModeFromUrl = urlParams.get("layout");
     const activePaneIdFromUrl = urlParams.get("pane");
     const paneTabContentIds = {
-      [TOP_LEFT_PANE_ID]: urlParams
-        .get("tabs_top_left")
-        ?.split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-      [TOP_RIGHT_PANE_ID]: urlParams
-        .get("tabs_top_right")
-        ?.split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-      [BOTTOM_LEFT_PANE_ID]: urlParams
-        .get("tabs_bottom_left")
-        ?.split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
-      [BOTTOM_RIGHT_PANE_ID]: urlParams
-        .get("tabs_bottom_right")
-        ?.split(",")
-        .map((value) => value.trim())
-        .filter(Boolean),
+      [TOP_LEFT_PANE_ID]: parseTabParam("tabs_top_left"),
+      [TOP_RIGHT_PANE_ID]: parseTabParam("tabs_top_right"),
+      [BOTTOM_LEFT_PANE_ID]: parseTabParam("tabs_bottom_left"),
+      [BOTTOM_RIGHT_PANE_ID]: parseTabParam("tabs_bottom_right"),
     };
-    const tabsFromUrl = urlParams
-      .get("tabs")
-      ?.split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
-    const secondaryTabsFromUrl = urlParams
-      .get("tabs_secondary")
-      ?.split(",")
-      .map((value) => value.trim())
-      .filter(Boolean);
+    const tabsFromUrl = parseTabParam("tabs");
+    const secondaryTabsFromUrl = parseTabParam("tabs_secondary");
     const splitModeFromUrl = urlParams.get("split");
 
     const hasPaneTabs = Object.values(paneTabContentIds).some(

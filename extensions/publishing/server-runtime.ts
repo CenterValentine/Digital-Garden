@@ -33,6 +33,8 @@ import { ServerSpacer } from "./blocks/spacer";
 import { ServerSkillBadges } from "./blocks/skill-badges";
 import { ServerBookmarkCard } from "./blocks/bookmark-card";
 import { ServerTagCloud } from "./blocks/tag-cloud";
+// W11 blocks
+import { ServerStatsTable } from "./blocks/stats-table";
 
 export const publishingExtensionServerRuntime: ExtensionServerRuntime = {
   id: PUBLISHING_EXTENSION_ID,
@@ -69,5 +71,7 @@ export const publishingExtensionServerRuntime: ExtensionServerRuntime = {
     ServerSkillBadges,
     ServerBookmarkCard,
     ServerTagCloud,
+    // W11
+    ServerStatsTable,
   ],
 };

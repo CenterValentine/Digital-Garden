@@ -28,6 +28,8 @@ export interface ConversationSummary {
   id: string;
   title: string | null;
   archivedToContentNodeId: string | null;
+  /** Selected custom-instruction context for this chat, or null. */
+  activeContextId: string | null;
   createdAt: string;
   updatedAt: string;
   /** Last seen activity timestamp — currently `updatedAt`; may track per-message later. */
@@ -128,4 +130,9 @@ export interface ListConversationsOptions {
 /** Patch shape for `updateConversation`. */
 export interface UpdateConversationPatch {
   title?: string | null;
+  /**
+   * Selected custom-instruction context id, or null to clear. Ownership
+   * is validated server-side before the link is written.
+   */
+  activeContextId?: string | null;
 }

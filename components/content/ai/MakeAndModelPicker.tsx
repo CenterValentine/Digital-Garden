@@ -107,6 +107,13 @@ export interface MakeAndModelPickerProps {
   disabled?: boolean;
   /** When non-empty, the picker shows a "Mixed" chip with contributor info. */
   contributors?: AIProviderId[];
+  /**
+   * Narrow-container layout (e.g. the chat side panel). Hides the big-three
+   * provider quick-icons and the "via" badge, and folds ALL providers into the
+   * "More" (⋯) menu so the strip fits without clipping. The full-page chat
+   * leaves this false and shows the full quick-switch row.
+   */
+  compact?: boolean;
 }
 
 export function MakeAndModelPicker({
@@ -115,6 +122,7 @@ export function MakeAndModelPicker({
   onChange,
   disabled = false,
   contributors = [],
+  compact = false,
 }: MakeAndModelPickerProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -306,12 +314,16 @@ export function MakeAndModelPicker({
 
   // Overflow = everything not in the big three. Includes dynamic
   // providers so newly-added gateway namespaces show up automatically.
+  // In compact mode the big-three quick-icons are hidden, so the "More" menu
+  // becomes the full provider switcher (all providers, big-three included).
   const overflowProviders = useMemo(
     () =>
-      allProviders.filter(
-        (p) => !BIG_THREE_PROVIDER_IDS.includes(p.id as AIProviderId),
-      ),
-    [allProviders],
+      compact
+        ? allProviders
+        : allProviders.filter(
+            (p) => !BIG_THREE_PROVIDER_IDS.includes(p.id as AIProviderId),
+          ),
+    [allProviders, compact],
   );
 
   // Close popovers on outside click + escape
@@ -365,24 +377,26 @@ export function MakeAndModelPicker({
 
   return (
     <div className="flex items-center gap-1 text-[11px]">
-      {/* Big-three make chips */}
-      {bigThreeProviders.map((p) => (
-        <MakeChip
-          key={p.id}
-          name={p.name}
-          providerId={p.id as AIProviderId}
-          isActive={p.id === providerId}
-          disabled={disabled}
-          onClick={() => handleMakeClick(p.id)}
-        />
-      ))}
+      {/* Big-three make chips — hidden in compact (folded into "More"). */}
+      {!compact &&
+        bigThreeProviders.map((p) => (
+          <MakeChip
+            key={p.id}
+            name={p.name}
+            providerId={p.id as AIProviderId}
+            isActive={p.id === providerId}
+            disabled={disabled}
+            onClick={() => handleMakeClick(p.id)}
+          />
+        ))}
 
-      {/* "More" overflow for non-big-three providers */}
+      {/* "More" overflow. Compact: all providers; otherwise non-big-three. */}
       <div ref={moreRef} className="relative">
         <MoreChip
           isOpen={moreOpen}
           disabled={disabled}
           activeOverflowProviderId={
+            compact ||
             !BIG_THREE_PROVIDER_IDS.includes(providerId as AIProviderId)
               ? (providerId as AIProviderId)
               : null
@@ -472,7 +486,7 @@ export function MakeAndModelPicker({
         >
           <Sparkles className="h-3 w-3 shrink-0" />
           <span className="max-w-[120px] truncate">{activeModelName}</span>
-          {activeRouting?.via === "gateway" && (
+          {!compact && activeRouting?.via === "gateway" && (
             <span
               className="hidden sm:inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/30 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-amber-300/90"
               title={`Routed through ${activeRouting.conn.name}`}

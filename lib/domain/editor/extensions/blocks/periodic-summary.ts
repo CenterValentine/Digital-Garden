@@ -112,6 +112,7 @@ const { schema: weeklySummarySchema, defaults: weeklySummaryDefaults } =
 
 registerBlock({
   type: "dailySummary",
+  ttsSkip: true, // generated activity widget — not authored prose
   label: "Daily Summary",
   description: "Files created or edited during one workday",
   iconName: "ListChecks",
@@ -127,6 +128,7 @@ registerBlock({
 
 registerBlock({
   type: "weeklySummary",
+  ttsSkip: true, // generated activity widget — not authored prose
   label: "Weekly Summary",
   description: "Files created or edited during one ISO week",
   iconName: "ListChecks",

@@ -15,6 +15,12 @@ function asIsoString(value: Date | null | undefined) {
   return value ? value.toISOString() : null;
 }
 
+function effectiveUpdatedAt(nodeUpdatedAt: Date, payloadUpdatedAt: Date | null | undefined) {
+  const nodeMs = nodeUpdatedAt.getTime();
+  const payloadMs = payloadUpdatedAt ? payloadUpdatedAt.getTime() : 0;
+  return new Date(Math.max(nodeMs, payloadMs)).toISOString();
+}
+
 function trimNullable(value: string | null | undefined, maxLength = 2048) {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -408,6 +414,7 @@ type TreeNode = {
   slug: string;
   contentType: string;
   displayOrder: number;
+  updatedAt: string;
   customIcon: string | null;
   iconColor: string | null;
   folder: {
@@ -426,6 +433,20 @@ type TreeNode = {
   children: TreeNode[];
 };
 
+function getContentPickerTitle(node: {
+  title: string;
+  slug: string;
+  contentType: string;
+}) {
+  const title = node.title.trim();
+  if (title) return title;
+
+  const slug = node.slug.trim();
+  if (slug) return slug;
+
+  return `Untitled ${node.contentType}`;
+}
+
 export async function getExtensionContentPickerTree(
   userId: string,
   options?: { workspaceId?: string | null }
@@ -443,6 +464,12 @@ export async function getExtensionContentPickerTree(
     where: {
       ownerId: userId,
       deletedAt: null,
+      // The extension picker only ever associates against browsable documents.
+      // Match the app's default tree visibility: show `primary` only, hiding
+      // `referenced` (embedded/generated media like AI images + TTS clips) and
+      // `system` nodes. Without this the picker surfaced the hidden generated
+      // media that every other surface conceals.
+      role: "primary",
     },
     orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }, { createdAt: "asc" }],
     select: {
@@ -474,6 +501,12 @@ export async function getExtensionContentPickerTree(
           engine: true,
         },
       },
+      notePayload: {
+        select: {
+          updatedAt: true,
+        },
+      },
+      updatedAt: true,
     },
   });
 
@@ -494,10 +527,11 @@ export async function getExtensionContentPickerTree(
       })
       .map((node) => ({
         id: node.id,
-        title: node.title,
+        title: getContentPickerTitle(node),
         slug: node.slug,
         contentType: node.contentType,
         displayOrder: node.displayOrder,
+        updatedAt: effectiveUpdatedAt(node.updatedAt, node.notePayload?.updatedAt),
         customIcon: node.customIcon,
         iconColor: node.iconColor,
         folder: node.folderPayload
@@ -537,10 +571,11 @@ export async function getExtensionContentPickerTree(
     if (!item) return null;
     return {
       id: item.id,
-      title: item.title,
+      title: getContentPickerTitle(item),
       slug: item.slug,
       contentType: item.contentType,
       displayOrder: item.displayOrder,
+      updatedAt: effectiveUpdatedAt(item.updatedAt, item.notePayload?.updatedAt),
       customIcon: item.customIcon,
       iconColor: item.iconColor,
       folder: item.folderPayload ? { viewMode: item.folderPayload.viewMode } : null,

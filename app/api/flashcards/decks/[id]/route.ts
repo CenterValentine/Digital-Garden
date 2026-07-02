@@ -223,19 +223,35 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
   }
 }
 
-// DELETE /api/flashcards/decks/[id]?cascade=true
+// DELETE /api/flashcards/decks/[id]?cascade=true&moveToDeckId=<uuid>
 //
-// Soft-delete by default (sets deletedAt). Without cascade, refuses to
-// delete a deck that still has cards or children. With ?cascade=true,
-// soft-deletes all descendant decks and orphans the cards (deckId set
-// to null) so the user can reassign them. We never hard-delete cards
-// here — the user explicitly chose to delete the deck, not the cards.
+// Soft-delete by default. Behavior:
+//   - No params + deck is empty: soft-delete just this deck.
+//   - No params + deck has cards or children: refuse with NOT_EMPTY 409.
+//   - ?cascade=true: soft-delete this deck + every descendant deck + every
+//     card in the deleted subtree. Cards are soft-deleted (deletedAt),
+//     NOT orphaned — Flashcard.deckId is NOT NULL under Migration C, so
+//     leaving cards pointing at a deleted deck would mean a follow-up
+//     restore-deck flow could reattach. (Older comment in this route
+//     described an orphan-to-null behavior that the schema no longer
+//     permits.)
+//   - ?moveToDeckId=<uuid>: re-parent this deck's cards into the target
+//     deck, then soft-delete this deck. Descendant decks of the source
+//     are ALSO soft-deleted (their cards move too). The target deck must
+//     exist, belong to the user, and not be a descendant of this deck
+//     (would be self-defeating — its cards would get deleted with the
+//     cascade). When moveToDeckId is passed, cascade is implied.
 export async function DELETE(request: NextRequest, { params }: { params: Params }) {
   try {
     const session = await requireAuth();
     const { id } = await params;
     const { searchParams } = new URL(request.url);
     const cascade = searchParams.get("cascade") === "true";
+    const moveToDeckIdRaw = searchParams.get("moveToDeckId");
+    const moveToDeckId =
+      typeof moveToDeckIdRaw === "string" && moveToDeckIdRaw.trim()
+        ? moveToDeckIdRaw.trim()
+        : null;
 
     const existing = await prisma.flashcardDeck.findFirst({
       where: { id, ownerId: session.user.id, deletedAt: null },
@@ -248,7 +264,55 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       );
     }
 
-    if (!cascade) {
+    // Validate moveToDeckId: must exist, belong to user, and not be the
+    // deck being deleted or any of its descendants.
+    let moveTarget: { id: string; path: string } | null = null;
+    if (moveToDeckId) {
+      if (moveToDeckId === id) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message: "Cannot move cards to the deck being deleted.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      const target = await prisma.flashcardDeck.findFirst({
+        where: { id: moveToDeckId, ownerId: session.user.id, deletedAt: null },
+        select: { id: true, path: true },
+      });
+      if (!target) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "INVALID_INPUT", message: "Move-target deck not found." },
+          },
+          { status: 400 },
+        );
+      }
+      if (
+        target.path === existing.path ||
+        target.path.startsWith(`${existing.path}/`)
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "INVALID_INPUT",
+              message:
+                "Cannot move cards into a descendant of the deck being deleted.",
+            },
+          },
+          { status: 400 },
+        );
+      }
+      moveTarget = target;
+    }
+
+    if (!cascade && !moveTarget) {
       const [childCount, cardCount] = await Promise.all([
         prisma.flashcardDeck.count({
           where: { ownerId: session.user.id, parentDeckId: id, deletedAt: null },
@@ -263,7 +327,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
             success: false,
             error: {
               code: "NOT_EMPTY",
-              message: `Deck has ${cardCount} card(s) and ${childCount} child deck(s). Pass ?cascade=true to delete anyway.`,
+              message: `Deck has ${cardCount} card(s) and ${childCount} child deck(s). Pass ?cascade=true to delete cards too, or ?moveToDeckId=<id> to move them first.`,
             },
           },
           { status: 409 },
@@ -273,7 +337,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
 
     const now = new Date();
     const result = await prisma.$transaction(async (tx) => {
-      // Soft-delete this deck and every descendant.
+      // Collect this deck + every descendant.
       const descendants = await tx.flashcardDeck.findMany({
         where: {
           ownerId: session.user.id,
@@ -282,20 +346,45 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
         },
         select: { id: true },
       });
-      const ids = descendants.map((d) => d.id);
+      const deckIds = descendants.map((d) => d.id);
+
+      let movedCardCount = 0;
+      let deletedCardCount = 0;
+      if (moveTarget) {
+        // Move all cards out of the subtree into the target, THEN soft-
+        // delete the (now-empty) decks.
+        const moved = await tx.flashcard.updateMany({
+          where: {
+            ownerId: session.user.id,
+            deckId: { in: deckIds },
+            deletedAt: null,
+          },
+          data: { deckId: moveTarget.id },
+        });
+        movedCardCount = moved.count;
+      } else {
+        // Cascade: soft-delete the cards alongside the decks.
+        const deleted = await tx.flashcard.updateMany({
+          where: {
+            ownerId: session.user.id,
+            deckId: { in: deckIds },
+            deletedAt: null,
+          },
+          data: { deletedAt: now },
+        });
+        deletedCardCount = deleted.count;
+      }
+
       await tx.flashcardDeck.updateMany({
-        where: { id: { in: ids } },
+        where: { id: { in: deckIds } },
         data: { deletedAt: now },
       });
-      // Orphan the cards (deckId = null). Cards remain queryable in the
-      // "Inbox" view; user can reassign them later.
-      const cardUpdate = await tx.flashcard.updateMany({
-        where: { ownerId: session.user.id, deckId: { in: ids }, deletedAt: null },
-        data: { deckId: null },
-      });
+
       return {
-        deletedDeckIds: ids,
-        orphanedCardCount: cardUpdate.count,
+        deletedDeckIds: deckIds,
+        movedCardCount,
+        deletedCardCount,
+        moveTargetDeckId: moveTarget?.id ?? null,
       };
     });
 

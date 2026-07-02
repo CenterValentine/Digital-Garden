@@ -32,7 +32,10 @@ import {
   ExternalLink,
   ArrowDownLeft,
   ArrowDownRight,
+  FolderInput,
+  Captions,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -53,6 +56,7 @@ import {
 } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
+import { useSettingsStore } from "@/state/settings-store";
 
 /**
  * Context passed to file tree action provider
@@ -337,7 +341,12 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
         },
         {
           id: "toggle-referenced",
-          label: clickedNode?.includeReferencedContent ? "Hide Referenced Content" : "Show Referenced Content",
+          // Scoped to THIS folder. Distinct from the tree-wide toggle in
+          // Section 8 ("Show all referenced content"). The labels used to
+          // collide as "Show Referenced Content" in both places.
+          label: clickedNode?.includeReferencedContent
+            ? "Hide referenced content in this folder"
+            : "Show referenced content in this folder",
           icon: clickedNode?.includeReferencedContent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />,
           onClick: async () => {
             if (onToggleReferencedContent) {
@@ -518,6 +527,36 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     });
   }
 
+  // Section 5.5: Move (folder search now; AI folder assistant in Phase 2).
+  // Excludes the items themselves and their current parent as obvious
+  // non-targets; the move API is the hard guard against true cycles.
+  if (selectedIds.length > 0 && !isPeopleMount) {
+    const excludeIds = [
+      ...selectedIds,
+      ...(clickedNode?.parentId ? [clickedNode.parentId] : []),
+    ];
+    const aiSettings = useSettingsStore.getState().ai;
+    const folderAssistantOn =
+      aiSettings?.enabled !== false &&
+      aiSettings?.folderAssistant?.enabled !== false;
+    // Single "Move" entry whose flyout hosts: Folder assistant (top, when on)
+    // → search input → Recents. Consolidates the former two items.
+    const moveActions: ContextMenuAction[] = [
+      {
+        id: "move",
+        label: "Move",
+        icon: <FolderInput className="h-4 w-4" />,
+        customFlyout: {
+          kind: "folder-search",
+          selectedIds,
+          excludeIds,
+          folderAssistant: folderAssistantOn,
+        },
+      },
+    ];
+    sections.push({ title: "Move", actions: moveActions });
+  }
+
   // Section 6: Share & Export
   if (selectedIds.length > 0) {
     const itemLabel = isMultiSelection ? `${selectedIds.length} items` : "item";
@@ -538,6 +577,55 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           onClick: async () => await onDownload?.(selectedIds),
           disabled: !onDownload,
           divider: true,
+        },
+      ],
+    });
+  }
+
+  // Section 6.5: AI — transcribe an audio file into a sibling note (Phase 5).
+  // Single audio file only. Opt-in (explicit click); the speech-to-text route
+  // is auto-discovered server-side.
+  if (
+    isSingleSelection &&
+    clickedId &&
+    clickedNode?.contentType === "file" &&
+    clickedNode.file?.mimeType?.startsWith("audio/")
+  ) {
+    const audioId = clickedId;
+    sections.push({
+      title: "AI",
+      actions: [
+        {
+          id: "transcribe-audio",
+          label: "Transcribe to note",
+          icon: <Captions className="h-4 w-4" />,
+          onClick: async () => {
+            const toastId = toast.loading("Transcribing audio…");
+            try {
+              const res = await fetch("/api/ai/transcribe", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({ contentId: audioId }),
+              });
+              const json = (await res.json().catch(() => null)) as {
+                success?: boolean;
+                error?: string;
+                data?: { noteId?: string | null };
+              } | null;
+              if (!res.ok || !json?.success) {
+                throw new Error(json?.error || "Transcription failed");
+              }
+              toast.success("Transcript note created", { id: toastId });
+              await onRefresh?.();
+            } catch (error) {
+              toast.error("Couldn't transcribe audio", {
+                id: toastId,
+                description:
+                  error instanceof Error ? error.message : "Transcription failed",
+              });
+            }
+          },
         },
       ],
     });
@@ -569,9 +657,11 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       actions: [
         {
           id: "toggle-referenced-content",
+          // Tree-wide filter. Section 2 has a per-folder variant labeled
+          // "Show referenced content in this folder" — distinct scope.
           label: showReferencedContent
-            ? "Hide referenced content"
-            : "Show referenced content",
+            ? "Hide all referenced content"
+            : "Show all referenced content",
           icon: showReferencedContent ? (
             <EyeOff className="h-4 w-4" />
           ) : (

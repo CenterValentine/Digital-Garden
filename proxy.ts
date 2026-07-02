@@ -25,11 +25,12 @@
  * Always runs on the Node.js runtime — no runtime or config export needed.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/core/logger/emit";
 import { withTrace } from "@/lib/core/logger/context";
 import { normalizeHost, resolveTenantByHost } from "@/lib/domain/tenancy";
+import { validateSession } from "@/lib/infrastructure/auth/session";
 
 /** Routes that require an active session */
 const PROTECTED_PREFIXES = ["/content", "/settings", "/admin"];
@@ -52,19 +53,37 @@ function deriveTraceId(request: NextRequest): string {
 }
 
 /**
- * Resolve the request's tenant and return a new Headers object with
- * x-tenant-id / x-tenant-slug injected. Returns null when the flag is off
- * or the host doesn't resolve — callers pass through without header
- * mutation in that case (preserving today's behavior).
+ * Generate a per-request nonce. Used by server-component layouts to put
+ * `nonce={...}` on inline <script> tags so they survive a future strict
+ * CSP `script-src 'nonce-{value}'`. Until that CSP header is added (M-2
+ * follow-up), the nonce attribute is inert — browsers ignore it without
+ * a referencing CSP — so this is pure prep work.
+ *
+ * 16 bytes of crypto-random encoded base64 ≈ 22 chars. Long enough that
+ * an attacker can't guess it within the request's lifetime.
+ */
+function generateNonce(): string {
+  return randomBytes(16).toString("base64");
+}
+
+/**
+ * Build the Headers object that downstream pages will see via the
+ * `headers()` server function. Always sets `x-nonce`; layers on tenant
+ * headers (and trace continuity) when multi-tenant is enabled and the
+ * host resolves.
  *
  * Runs inside a withTrace scope so the spans emitted by resolveTenantByHost
  * have a valid trace context. The proxy is upstream of every route handler,
  * so withRouteTrace hasn't opened a trace yet — we open our own here.
  */
-async function resolveTenantHeaders(
+async function buildInjectedHeaders(
   request: NextRequest,
-): Promise<Headers | null> {
-  if (!MULTITENANT_ENABLED) return null;
+  nonce: string,
+): Promise<Headers> {
+  const headers = new Headers(request.headers);
+  headers.set("x-nonce", nonce);
+
+  if (!MULTITENANT_ENABLED) return headers;
 
   const host = request.headers.get("host");
 
@@ -77,12 +96,12 @@ async function resolveTenantHeaders(
   // Subdomains of the platform (e.g. yourname.notetrellis.com) still
   // resolve normally via resolveTenantByHost's subdomain path.
   if (PLATFORM_DOMAIN && normalizeHost(host) === PLATFORM_DOMAIN) {
-    return null;
+    return headers;
   }
 
   const traceId = deriveTraceId(request);
 
-  return withTrace(traceId, async () => {
+  await withTrace(traceId, async () => {
     const tenant = await resolveTenantByHost(host);
 
     if (!tenant) {
@@ -92,26 +111,24 @@ async function resolveTenantHeaders(
         summary: "host did not resolve to a tenant — passing through",
         attrs: { host: host ?? "(none)" },
       });
-      return null;
+      return;
     }
 
-    const headers = new Headers(request.headers);
     headers.set("x-tenant-id", tenant.tenantId);
     headers.set("x-tenant-slug", tenant.slug);
     // Forward the trace_id so the downstream withRouteTrace continues
     // the same trace instead of starting a new one.
     headers.set("x-trace-id", traceId);
-    return headers;
   });
+
+  return headers;
 }
 
 /**
- * Build a `NextResponse.next()` that carries the tenant-injected headers
- * when available. If no headers were produced (flag off or unresolved
- * host), this is a plain `NextResponse.next()` — same shape as before.
+ * Build a `NextResponse.next()` that carries the injected headers (nonce
+ * plus optional tenant ids).
  */
-function nextWithTenantHeaders(injected: Headers | null): NextResponse {
-  if (!injected) return NextResponse.next();
+function nextWithInjectedHeaders(injected: Headers): NextResponse {
   return NextResponse.next({ request: { headers: injected } });
 }
 
@@ -128,18 +145,65 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     return NextResponse.next();
   }
 
-  // Tenant resolution runs before auth/embed handling so injected headers
-  // are present on every downstream branch.
-  const injectedHeaders = await resolveTenantHeaders(request);
+  // Per-request nonce + tenant resolution. Headers are built once and
+  // shared across every downstream branch so the nonce a layout reads
+  // matches the cookie/tenant context the route handler sees.
+  const nonce = generateNonce();
+  const injectedHeaders = await buildInjectedHeaders(request, nonce);
 
   // Embed iframe: promote URL token to cookie before the page renders.
-  // We don't validate against the DB here (proxy runtime should stay light) —
-  // the page itself re-validates and redirects to /sign-in if the token is bad.
+  //
+  // Two threats this branch defends against:
+  //   1. Garbage tokens — set a junk cookie that wastes a page render before
+  //      bouncing to /sign-in. Validate the URL token before setting.
+  //   2. Cross-user session fixation — an attacker who possesses any valid
+  //      session token crafts /embed/content/...?_t=ATTACKER_TOKEN and sends
+  //      it to a logged-in victim, overriding their cookie. We block this by
+  //      validating the existing cookie too and refusing to overwrite if it
+  //      belongs to a different user.
+  //
+  // What is NOT addressed here (tracked as a follow-up): a logged-out
+  // victim has no existing cookie to compare against, so promotion of any
+  // valid attacker token still succeeds. Fully closing that gap requires a
+  // different token model — single-use, time-bounded, or content-bound —
+  // and is out of scope for this proxy-level patch.
+  //
+  // validateSession is cache-backed (hot tokens <1ms; invalid tokens are
+  // negative-cached), so the added DB cost is paid only on first-touch.
   if (pathname.startsWith("/embed/content/")) {
     const urlToken = searchParams.get("_t");
     const existingCookie = request.cookies.get("session_token")?.value;
     if (urlToken && existingCookie !== urlToken) {
-      const response = nextWithTenantHeaders(injectedHeaders);
+      const validatedUrl = await validateSession(urlToken);
+      if (!validatedUrl) {
+        logger.warn({
+          layer: "auth",
+          event: "embed_token_promote:rejected",
+          summary: "rejected invalid _t param at proxy",
+        });
+        return nextWithInjectedHeaders(injectedHeaders);
+      }
+
+      if (existingCookie) {
+        const validatedCookie = await validateSession(existingCookie);
+        if (
+          validatedCookie &&
+          validatedCookie.user.id !== validatedUrl.user.id
+        ) {
+          logger.warn({
+            layer: "auth",
+            event: "embed_token_promote:cross_user_blocked",
+            summary: "refused to override cookie belonging to a different user",
+            attrs: {
+              existing_user_id: validatedCookie.user.id,
+              incoming_user_id: validatedUrl.user.id,
+            },
+          });
+          return nextWithInjectedHeaders(injectedHeaders);
+        }
+      }
+
+      const response = nextWithInjectedHeaders(injectedHeaders);
       response.cookies.set("session_token", urlToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
@@ -153,17 +217,17 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
       });
       return response;
     }
-    return nextWithTenantHeaders(injectedHeaders);
+    return nextWithInjectedHeaders(injectedHeaders);
   }
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
     pathname.startsWith(prefix)
   );
 
-  if (!isProtected) return nextWithTenantHeaders(injectedHeaders);
+  if (!isProtected) return nextWithInjectedHeaders(injectedHeaders);
 
   const hasSession = request.cookies.has("session_token");
-  if (hasSession) return nextWithTenantHeaders(injectedHeaders);
+  if (hasSession) return nextWithInjectedHeaders(injectedHeaders);
 
   const signInUrl = new URL("/sign-in", request.url);
   signInUrl.searchParams.set("from", pathname);

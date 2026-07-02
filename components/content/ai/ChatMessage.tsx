@@ -12,13 +12,19 @@
 "use client";
 
 import { memo, useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus } from "lucide-react";
+import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
+import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
+import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useNotesPanelStore } from "@/state/notes-panel-store";
+import { useImagePreviewStore } from "@/state/image-preview-store";
 import { useTypewriter } from "@/lib/domain/ai/use-typewriter";
 import type { UIMessage } from "ai";
 import type { Components } from "react-markdown";
@@ -74,6 +80,16 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
   };
 }
 
+/** Shape of the note payload returned by createNote / updateNote tools. */
+interface NotePayload {
+  __notePayload: true;
+  kind: "created" | "updated";
+  contentId: string;
+  title: string;
+  parentId?: string | null;
+  wordCount?: number;
+}
+
 /** Shape of the image payload returned by generate_image tool */
 interface ImagePayload {
   __imagePayload: true;
@@ -86,6 +102,75 @@ interface ImagePayload {
   width: number;
   height: number;
   fileName: string;
+}
+
+/** Shape of the audio payload returned by the generate_speech tool */
+interface AudioPayload {
+  __audioPayload: true;
+  contentId: string;
+  url: string;
+  text: string;
+  mimeType: string;
+  durationSeconds?: number | null;
+  providerId: string;
+  modelId: string;
+  fileName: string;
+}
+
+/**
+ * Shape of the deck proposal payload returned by propose_deck.
+ * Session 1: renders a read-only stub with a DISABLED commit button so
+ * the affordance is visible before Session 2 wires up the POST.
+ */
+interface DeckProposalPayload {
+  __deckProposal: true;
+  name: string;
+  parentDeckPath: string | null;
+  parentDeckId: string | null;
+  parentResolved: boolean;
+  proposedPath: string;
+  rationale: string;
+  similarExistingPaths: string[];
+}
+
+/**
+ * Shape of the card proposal payload returned by propose_cards.
+ * Carries `requestedCount` and `batchLimit` so the rendered card can
+ * display the truncation honestly (e.g. "10 of 15 requested").
+ */
+/**
+ * Stage 3 — propose_deck_with_cards payload. Replaces the old
+ * __deckWithCardsProposal sentinel. The deck info is embedded so the commit
+ * step is self-sufficient: if `deck.deckExists` is false, the client
+ * creates the deck (using deck.name + deck.parentDeckId) before
+ * posting the cards. When the parent deck doesn't exist yet either
+ * (deck.parentResolved === false), the card waits for a sibling
+ * propose_deck card to fire `flashcard-deck-created` for the parent
+ * path before "Add selected" enables.
+ */
+interface DeckWithCardsProposalPayload {
+  __deckWithCardsProposal: true;
+  deck: {
+    name: string;
+    proposedPath: string;
+    parentDeckPath: string | null;
+    parentDeckId: string | null;
+    parentResolved: boolean;
+    rationale: string | null;
+    similarExistingPaths: string[];
+    deckExists: boolean;
+    deckId: string | null;
+    existingName: string | null;
+  };
+  cards: Array<{
+    front: string;
+    back: string;
+    frontLabel?: string;
+    backLabel?: string;
+  }>;
+  requestedCount: number;
+  batchLimit: number;
+  sourceContentId: string | null;
 }
 
 // Shared lowlight instance — same config as TipTap editor
@@ -125,6 +210,10 @@ interface ChatMessageProps {
   onBranch?: (messageId: string) => void;
   /** Disable edit/regenerate/branch (e.g. while a turn is streaming). */
   actionsDisabled?: boolean;
+  /** Revert a specific edit by tool call ID — called when the user clicks "Undo" on an edit chip. */
+  onRevertEdit?: (toolCallId: string) => void;
+  /** Set of tool call IDs for which a pre-edit snapshot is available (drives undo button visibility). */
+  revertableToolIds?: ReadonlySet<string>;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -136,6 +225,8 @@ export const ChatMessage = memo(function ChatMessage({
   onRegenerate,
   onBranch,
   actionsDisabled = false,
+  onRevertEdit,
+  revertableToolIds,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -220,13 +311,27 @@ export const ChatMessage = memo(function ChatMessage({
     onEdit?.(message.id, next);
   }, [draft, messageText, onEdit, message.id]);
 
-  // Pre-scan: extract image payloads from ALL tool parts at message level.
-  // This is more reliable than detecting inside the parts loop because it
-  // handles streaming state transitions and part type variations.
-  const { imagePayloads, hasRunningTools } = useMemo(() => {
-    const payloads: ImagePayload[] = [];
+  // Pre-scan: extract image + note + flashcard-proposal payloads from ALL
+  // tool parts at message level. More reliable than detecting inside the
+  // parts loop because it handles streaming state transitions and part
+  // type variations.
+  const {
+    imagePayloads,
+    audioPayloads,
+    notePayloads,
+    deckProposals,
+    deckWithCardsProposals,
+    hasRunningTools,
+  } = useMemo(() => {
+    const images: ImagePayload[] = [];
+    const audios: AudioPayload[] = [];
+    const notes: NotePayload[] = [];
+    const deckProps: DeckProposalPayload[] = [];
+    const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     let running = false;
-    const seenIds = new Set<string>();
+    const seenImageIds = new Set<string>();
+    const seenAudioIds = new Set<string>();
+    const seenNoteIds = new Set<string>();
 
     for (const part of message.parts) {
       const tp = detectToolPart(part);
@@ -237,16 +342,51 @@ export const ChatMessage = memo(function ChatMessage({
       }
 
       if (tp.state === "output-available" && tp.output !== undefined) {
-        const payload = parseImagePayload(tp.output);
-        if (payload && !seenIds.has(payload.contentId)) {
-          seenIds.add(payload.contentId);
-          payloads.push(payload);
+        const image = parseImagePayload(tp.output);
+        if (image && !seenImageIds.has(image.contentId)) {
+          seenImageIds.add(image.contentId);
+          images.push(image);
+          continue;
+        }
+        const audio = parseAudioPayload(tp.output);
+        if (audio && !seenAudioIds.has(audio.contentId)) {
+          seenAudioIds.add(audio.contentId);
+          audios.push(audio);
+          continue;
+        }
+        const note = parseNotePayload(tp.output);
+        if (note && !seenNoteIds.has(note.contentId)) {
+          seenNoteIds.add(note.contentId);
+          notes.push(note);
+          continue;
+        }
+        const deck = parseDeckProposal(tp.output);
+        if (deck) {
+          deckProps.push(deck);
+          continue;
+        }
+        const cards = parseDeckWithCardsProposal(tp.output);
+        if (cards) {
+          deckWithCardsProps.push(cards);
         }
       }
     }
 
-    return { imagePayloads: payloads, hasRunningTools: running };
+    return {
+      imagePayloads: images,
+      audioPayloads: audios,
+      notePayloads: notes,
+      deckProposals: deckProps,
+      deckWithCardsProposals: deckWithCardsProps,
+      hasRunningTools: running,
+    };
   }, [message.parts]);
+
+  // NOTE: tree-refresh + content-updated dispatch for AI note writes
+  // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
+  // once per AI completion. Putting that logic here (in the render
+  // path) re-fired every time a historical assistant message mounted,
+  // which caused a refetch loop on page open. Do NOT move it back.
 
   return (
     <div
@@ -273,15 +413,24 @@ export const ChatMessage = memo(function ChatMessage({
           <User className="h-4 w-4" />
         </div>
       ) : (
-        <AssistantAvatar providerId={providerId} modelId={modelId} />
+        <AssistantAvatar
+          providerId={providerId}
+          modelId={modelId}
+          metadata={
+            (message as { metadata?: Record<string, unknown> }).metadata
+          }
+        />
       )}
 
-      {/* Message content */}
+      {/* Message content. User bubbles are positioned right via flex-row-reverse
+          (line ~267) and the action row uses its own justify-end, so we do NOT
+          add text-right here — keeping text-left makes line-wrapped bullet
+          lists / multi-line prompts read left-to-right while the bubble still
+          sits on the right side of the column. */}
       <div
         className={cn(
           "min-w-0 space-y-2",
           theme.bubble.columnClassName,
-          isUser && "text-right",
         )}
       >
         {/* Inline editor for user messages (Session 5a) */}
@@ -368,18 +517,36 @@ export const ChatMessage = memo(function ChatMessage({
               : undefined;
             const isImg = filePart.mediaType?.startsWith("image/");
             if (isImg && filePart.url) {
+              const imgUrl = filePart.url;
               return (
                 // eslint-disable-next-line @next/next/no-img-element -- user-attached image, arbitrary host
                 <img
                   key={i}
-                  src={filePart.url}
+                  src={imgUrl}
                   alt={filePart.filename ?? "attachment"}
-                  onClick={openContent}
-                  title={openContent ? "Open attachment" : undefined}
-                  className={cn(
-                    "max-h-64 max-w-full rounded-lg border border-black/10 dark:border-white/10 inline-block",
-                    openContent && "cursor-pointer hover:opacity-90 transition-opacity",
-                  )}
+                  onClick={() =>
+                    useImagePreviewStore.getState().open([
+                      {
+                        src: imgUrl,
+                        alt: filePart.filename ?? "image",
+                        downloadUrl: imgUrl,
+                      },
+                    ])
+                  }
+                  title="Preview image"
+                  className="max-h-64 max-w-full cursor-zoom-in rounded-lg border border-black/10 dark:border-white/10 inline-block hover:opacity-90 transition-opacity"
+                />
+              );
+            }
+            // Audio attachment → inline player so the user can replay the clip.
+            if (filePart.mediaType?.startsWith("audio/") && filePart.url) {
+              return (
+                <audio
+                  key={i}
+                  controls
+                  src={filePart.url}
+                  preload="metadata"
+                  className="my-1 max-w-full rounded-lg"
                 />
               );
             }
@@ -451,21 +618,28 @@ export const ChatMessage = memo(function ChatMessage({
 
           // Tool parts: detect via detectToolPart helper (handles both static and dynamic)
           // Image generation tool results render as GeneratedImageCard at message level below.
+          // Note creation/update tool results render as NotePayloadCard at message level below.
+          // Flashcard proposals render as DeckProposalCard / CardProposalList at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
-            // Skip image tool results — they render at message level
             if (toolPart.state === "output-available") {
-              const isImageResult = parseImagePayload(toolPart.output) !== null;
-              if (isImageResult) return null;
+              if (parseImagePayload(toolPart.output) !== null) return null;
+              if (parseAudioPayload(toolPart.output) !== null) return null;
+              if (parseNotePayload(toolPart.output) !== null) return null;
+              if (parseDeckProposal(toolPart.output) !== null) return null;
+              if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
             }
 
             return (
               <ToolCallBubble
                 key={i}
                 toolName={toolPart.toolName}
+                toolCallId={toolPart.toolCallId}
                 state={toolPart.state}
                 args={toolPart.input}
                 result={toolPart.output}
+                isRevertable={revertableToolIds?.has(toolPart.toolCallId) ?? false}
+                onRevertEdit={onRevertEdit}
               />
             );
           }
@@ -476,6 +650,33 @@ export const ChatMessage = memo(function ChatMessage({
         {/* Image cards — rendered at message level for reliability */}
         {imagePayloads.map((payload) => (
           <GeneratedImageCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Audio cards — inline player for generate_speech results */}
+        {audioPayloads.map((payload) => (
+          <GeneratedAudioCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Note cards — clickable link affordance for createNote / updateNote */}
+        {notePayloads.map((payload) => (
+          <NotePayloadCard key={payload.contentId} payload={payload} />
+        ))}
+
+        {/* Deck proposals — Session 2: interactive card with POST commit */}
+        {deckProposals.map((payload, i) => (
+          <FlashcardDeckProposalCard key={`deck-${i}`} payload={payload} />
+        ))}
+
+        {/* Card proposals — Session 2: inline editing + per-row checkboxes + bulk POST.
+            `proposalId` threads through to localStorage so the "already-added"
+            row state persists across chat reloads — without it, reloading would
+            re-enable "Add selected" and let the user duplicate the batch. */}
+        {deckWithCardsProposals.map((payload, i) => (
+          <FlashcardCardProposalList
+            key={`cards-${i}`}
+            payload={payload}
+            proposalId={`${message.id}-cards-${i}`}
+          />
         ))}
 
         {/* Thinking indicator — shows during tool execution */}
@@ -954,37 +1155,89 @@ function renderHastNode(node: HastNode, key: number): React.ReactNode {
 // ─── Existing Sub-Components ─────────────────────────────────
 
 /**
- * Assistant avatar with provider/model tooltip.
+ * Assistant avatar with provider/model/usage tooltip.
  *
- * Tooltip shows after a 1-second deliberate hover — short hovers from
- * cursor passes don't trigger it. Background tints to the producing
- * provider's brand color so the avatar itself is an at-a-glance
- * provider indicator.
+ * Tooltip:
+ *   - shows after a 1-second deliberate hover (cursor-pass-through guard)
+ *   - rendered in a body-level portal anchored to the avatar's
+ *     getBoundingClientRect, so message-bubble overflow:hidden / rounded
+ *     corners can't clip or reflow it
+ *   - displays provider name + model name + this turn's input/output
+ *     tokens when present in message.metadata.usage
+ *
+ * Background tints to the producing provider's brand color so the
+ * avatar itself is an at-a-glance provider indicator.
  */
+type UsageShape = {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+} | undefined;
+
+function extractUsage(metadata: Record<string, unknown> | undefined): UsageShape {
+  if (!metadata || typeof metadata !== "object") return undefined;
+  const usage = (metadata as { usage?: unknown }).usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const u = usage as Record<string, unknown>;
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  return {
+    inputTokens: num(u.inputTokens),
+    outputTokens: num(u.outputTokens),
+    totalTokens: num(u.totalTokens),
+  };
+}
+
 function AssistantAvatar({
   providerId,
   modelId,
+  metadata,
 }: {
   providerId?: string | null;
   modelId?: string | null;
+  metadata?: Record<string, unknown>;
 }) {
-  const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipAnchor, setTooltipAnchor] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const anchorRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [portalReady, setPortalReady] = useState(false);
 
   const theme = getProviderTheme(providerId);
   const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
   const model = provider?.models.find((m) => m.id === modelId);
   const providerName = provider?.name ?? "AI assistant";
   const modelName = model?.name ?? modelId ?? null;
+  const usage = useMemo(() => extractUsage(metadata), [metadata]);
+
+  useEffect(() => {
+    // One-shot SSR/hydration boundary marker so we only render the
+    // portal once `document.body` is present. The React Compiler flags
+    // "setState in effect" defensively here; this is the same one-shot
+    // pattern used by the right-sidebar hydration hook, not a render-
+    // synchronization bug.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot post-mount marker
+    setPortalReady(typeof document !== "undefined");
+  }, []);
 
   const handleEnter = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(() => setShowTooltip(true), 1000);
+    timerRef.current = setTimeout(() => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      // Anchor to the right edge of the avatar, vertically centered.
+      setTooltipAnchor({
+        top: rect.top + rect.height / 2,
+        left: rect.right + 8, // 8px gap (matches the prior `ml-2`)
+      });
+    }, 1000);
   }, []);
 
   const handleLeave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    setShowTooltip(false);
+    setTooltipAnchor(null);
   }, []);
 
   useEffect(() => {
@@ -995,7 +1248,8 @@ function AssistantAvatar({
 
   return (
     <div
-      className="relative shrink-0"
+      ref={anchorRef}
+      className="shrink-0"
       onMouseEnter={handleEnter}
       onMouseLeave={handleLeave}
     >
@@ -1009,25 +1263,56 @@ function AssistantAvatar({
       >
         <Bot className="h-4 w-4" />
       </div>
-      {showTooltip && (
-        <div
-          role="tooltip"
-          className="absolute left-full top-1/2 ml-2 z-50 -translate-y-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-200 shadow-xl"
-        >
-          <div className="flex items-center gap-1.5">
-            <span
-              className="h-2 w-2 shrink-0 rounded-full"
-              style={{ background: theme.brandColor }}
-            />
-            <span className="font-medium">{providerName}</span>
-          </div>
-          {modelName && (
-            <div className="mt-0.5 text-gray-500 dark:text-gray-400">
-              {modelName}
+      {portalReady && tooltipAnchor &&
+        createPortal(
+          <div
+            role="tooltip"
+            // Fixed positioning relative to the viewport — no ancestor
+            // overflow / transform can clip or reflow this.
+            style={{
+              position: "fixed",
+              top: tooltipAnchor.top,
+              left: tooltipAnchor.left,
+              transform: "translateY(-50%)",
+              zIndex: 9999,
+            }}
+            className="pointer-events-none whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-200 shadow-xl"
+          >
+            <div className="flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full"
+                style={{ background: theme.brandColor }}
+              />
+              <span className="font-medium">{providerName}</span>
             </div>
-          )}
-        </div>
-      )}
+            {modelName && (
+              <div className="mt-0.5 text-gray-500 dark:text-gray-400">
+                {modelName}
+              </div>
+            )}
+            {usage && (usage.inputTokens != null || usage.outputTokens != null) && (
+              <div className="mt-1 flex items-center gap-2 border-t border-white/10 pt-1 text-gray-400 dark:text-gray-500">
+                {usage.inputTokens != null && (
+                  <span>
+                    <span className="text-gray-500">in</span>{" "}
+                    <span className="tabular-nums text-gray-300">
+                      {usage.inputTokens.toLocaleString()}
+                    </span>
+                  </span>
+                )}
+                {usage.outputTokens != null && (
+                  <span>
+                    <span className="text-gray-500">out</span>{" "}
+                    <span className="tabular-nums text-gray-300">
+                      {usage.outputTokens.toLocaleString()}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -1061,6 +1346,62 @@ function parseImagePayload(result: unknown): ImagePayload | null {
   return null;
 }
 
+/** Parse an audio payload from a generate_speech tool result string */
+function parseAudioPayload(result: unknown): AudioPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__audioPayload"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__audioPayload) return parsed as AudioPayload;
+  } catch {
+    // not valid JSON
+  }
+  return null;
+}
+
+/** Parse a note payload (createNote / updateNote) from a tool result. */
+function parseNotePayload(result: unknown): NotePayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__notePayload"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__notePayload) return parsed as NotePayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a deck proposal payload from a propose_deck tool result. */
+function parseDeckProposal(result: unknown): DeckProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__deckProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__deckProposal) return parsed as DeckProposalPayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a card proposal payload from a propose_cards tool result. */
+function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__deckWithCardsProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__deckWithCardsProposal) return parsed as DeckWithCardsProposalPayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
 /**
  * Tool call indicator bubble — collapsed-by-default disclosure.
  *
@@ -1080,19 +1421,26 @@ function parseImagePayload(result: unknown): ImagePayload | null {
  */
 function ToolCallBubble({
   toolName,
+  toolCallId,
   state,
   args: _args,
   result,
+  isRevertable = false,
+  onRevertEdit,
 }: {
   toolName: string;
+  toolCallId?: string;
   state: string;
   args: unknown;
   result?: unknown;
+  isRevertable?: boolean;
+  onRevertEdit?: (toolCallId: string) => void;
 }) {
   const isRunning = state === "input-streaming" || state === "input-available";
   const hasResult = state === "output-available";
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [reverted, setReverted] = useState(false);
 
   // Canonical string form of the result for display + clipboard.
   const resultString = useMemo(() => {
@@ -1142,6 +1490,22 @@ function ToolCallBubble({
     () => toolActionLabel(toolName, isRunning),
     [toolName, isRunning],
   );
+
+  // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).
+  const isEditPayload = useMemo(
+    () =>
+      hasResult &&
+      typeof result === "string" &&
+      result.startsWith("{") &&
+      result.includes('"__editPayload"'),
+    [hasResult, result],
+  );
+
+  const handleRevert = useCallback(() => {
+    if (!toolCallId) return;
+    onRevertEdit?.(toolCallId);
+    setReverted(true);
+  }, [toolCallId, onRevertEdit]);
 
   const handleCopy = useCallback(async () => {
     if (!resultString) return;
@@ -1219,6 +1583,32 @@ function ToolCallBubble({
           </pre>
         </div>
       )}
+      {isEditPayload && (
+        <div className="border-t border-black/[0.06] dark:border-white/[0.06] flex items-center gap-2 px-3 py-1.5">
+          {!reverted ? (
+            <button
+              type="button"
+              onClick={handleRevert}
+              disabled={!isRevertable}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-[11px] transition-colors",
+                isRevertable
+                  ? "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer"
+                  : "text-gray-400 dark:text-gray-600 cursor-default",
+              )}
+              title={isRevertable ? "Restore document to its state before this edit" : "Applying edit…"}
+            >
+              <RotateCcw className="h-3 w-3 shrink-0" />
+              Undo
+            </button>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400">
+              <Check className="h-3 w-3 shrink-0" />
+              Reverted
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1263,10 +1653,82 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * - Draggable via HTML5 drag with image URL in dataTransfer,
  *   compatible with TipTap's image drop handler.
  */
+/**
+ * Inline card rendered when createNote / updateNote tool returns. Replaces
+ * the raw "Created note (id: …)" string with a clickable affordance that
+ * opens the note in the main panel. Compact so it doesn't dominate the
+ * assistant turn — Bug C target.
+ */
+function NotePayloadCard({ payload }: { payload: NotePayload }) {
+  // Self-edit detection: the AI updated this very chat's own sidecar
+  // notes (same contentId as the open content). In that case clicking
+  // "open" doesn't make sense — you're already here — so instead we
+  // expand + scroll to the Notes editor panel below the chat. For
+  // non-self payloads (a different note got created or updated), the
+  // click navigates to that content as before.
+  const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const isSelfEdit = selectedContentId === payload.contentId;
+
+  const handleClick = useCallback(() => {
+    if (isSelfEdit) {
+      useNotesPanelStore.getState().setExpanded(true);
+      // Defer scroll until React has had a chance to render the
+      // newly-expanded panel.
+      setTimeout(() => {
+        document
+          .getElementById("notes-panel-anchor")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+      return;
+    }
+    useContentStore.getState().setSelectedContentId(payload.contentId);
+  }, [isSelfEdit, payload.contentId]);
+
+  const verb = payload.kind === "updated" ? "Updated" : "Created";
+  const wordCount =
+    typeof payload.wordCount === "number" && payload.wordCount > 0
+      ? ` · ${payload.wordCount.toLocaleString()} word${payload.wordCount === 1 ? "" : "s"}`
+      : "";
+  const subline = isSelfEdit
+    ? `${verb} this chat's notes${wordCount} · click to view`
+    : `${verb} note${wordCount} · click to open`;
+  const tooltipText = isSelfEdit
+    ? "View the updated notes for this chat"
+    : `Open "${payload.title}"`;
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 text-left text-sm transition-colors hover:border-blue-400/40 hover:bg-blue-500/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+      title={tooltipText}
+    >
+      <FileText className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+      <span className="flex min-w-0 flex-col">
+        <span className="truncate font-medium text-gray-900 group-hover:text-blue-700 dark:text-gray-100 dark:group-hover:text-blue-300">
+          {payload.title}
+        </span>
+        <span className="text-[11px] text-gray-500 dark:text-gray-400">
+          {subline}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
   const [inserted, setInserted] = useState(false);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
   const canInsert = selectedContentType === "note";
+  // "Add to…" flyout — inject this image into ANY content's note.
+  const [injectAnchor, setInjectAnchor] = useState<{ x: number; y: number } | null>(null);
+  const imageMedia: InjectMedia = {
+    kind: "image",
+    url: payload.url,
+    contentId: payload.contentId,
+    alt: payload.revisedPrompt || payload.prompt,
+    filename: payload.fileName,
+  };
 
   const handleInsertIntoDocument = useCallback(() => {
     // Dispatch CustomEvent for the editor to handle
@@ -1377,7 +1839,179 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
             </>
           )}
         </button>
+
+        {/* Add to… — inject into any content's note */}
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setInjectAnchor({ x: r.left, y: r.bottom });
+          }}
+          title="Add this image to a note, chat, or any content"
+          className="flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors bg-black/[0.03] dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-black/10 dark:border-white/10 hover:bg-black/[0.06] dark:hover:bg-white/10"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+          Add to…
+        </button>
       </div>
+      {injectAnchor && (
+        <MediaInjectFlyout
+          media={imageMedia}
+          anchor={injectAnchor}
+          onClose={() => setInjectAnchor(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Inline player for an AI-generated speech clip (generate_speech tool).
+ * Mirrors GeneratedImageCard: native playback + an "Insert into document"
+ * action that drops an `audioEmbed` block at the editor cursor.
+ */
+function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
+  const [inserted, setInserted] = useState(false);
+  const selectedContentType = useContentStore((s) => s.selectedContentType);
+  // Notes target the full-page editor; chats target their sidecar "Add notes"
+  // TipTap doc (the ExpandableEditor), so both can receive the audio block.
+  const canInsert =
+    selectedContentType === "note" || selectedContentType === "chat";
+  // "Add to…" flyout — inject this clip into ANY content's note.
+  const [injectAnchor, setInjectAnchor] = useState<{ x: number; y: number } | null>(null);
+  const [transcriptCopied, setTranscriptCopied] = useState(false);
+  const audioMedia: InjectMedia = {
+    kind: "audio",
+    url: payload.url,
+    contentId: payload.contentId,
+    mimeType: payload.mimeType,
+    filename: payload.fileName,
+    durationSeconds: payload.durationSeconds ?? null,
+  };
+
+  const handleInsertIntoDocument = useCallback(() => {
+    const dispatch = () =>
+      window.dispatchEvent(
+        new CustomEvent("insert-ai-audio", {
+          detail: {
+            src: payload.url,
+            filename: payload.fileName,
+            mimeType: payload.mimeType,
+            durationSeconds: payload.durationSeconds ?? null,
+            autoplayOnFlip: false,
+          },
+        })
+      );
+
+    // A chat's note editor (ExpandableEditor → MarkdownEditor) only mounts —
+    // and only then registers its insert-ai-audio listener — when the notes
+    // panel is expanded. Expand it first, then dispatch once the lazily-loaded
+    // editor has had time to mount and subscribe. If already expanded (or a
+    // plain note), dispatch immediately.
+    if (selectedContentType === "chat") {
+      const notesPanel = useNotesPanelStore.getState();
+      if (!notesPanel.isExpanded) {
+        notesPanel.setExpanded(true);
+        setTimeout(dispatch, 400);
+      } else {
+        dispatch();
+      }
+    } else {
+      dispatch();
+    }
+    setInserted(true);
+    setTimeout(() => setInserted(false), 3000);
+  }, [payload, selectedContentType]);
+
+  return (
+    <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/5 overflow-hidden max-w-sm">
+      <div className="px-3 py-2 space-y-2">
+        {/* Spoken text summary + subtle copy-transcript affordance */}
+        <div className="group flex items-start gap-2">
+          <Volume2 className="mt-0.5 h-4 w-4 shrink-0 text-teal-500 dark:text-teal-300" />
+          <p className="flex-1 text-xs text-gray-600 dark:text-gray-400 line-clamp-2">
+            {payload.text}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              void navigator.clipboard?.writeText(payload.text);
+              setTranscriptCopied(true);
+              setTimeout(() => setTranscriptCopied(false), 2000);
+            }}
+            title="Copy transcript"
+            aria-label="Copy transcript"
+            className="mt-0.5 shrink-0 rounded p-0.5 text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover:opacity-100 dark:hover:text-gray-200"
+          >
+            {transcriptCopied ? (
+              <Check className="h-3.5 w-3.5 text-green-500" />
+            ) : (
+              <Copy className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+
+        {/* Native audio player */}
+        <audio controls src={payload.url} className="w-full" preload="metadata">
+          <track kind="captions" />
+        </audio>
+
+        {/* Provider badge */}
+        <div className="flex items-center gap-2 text-[10px] text-gray-500 dark:text-gray-400">
+          <span className="rounded bg-black/[0.03] dark:bg-white/5 px-1.5 py-0.5">
+            {payload.providerId}/{payload.modelId}
+          </span>
+        </div>
+
+        {/* Insert action */}
+        <button
+          type="button"
+          onClick={handleInsertIntoDocument}
+          disabled={inserted || !canInsert}
+          title={canInsert ? "Insert into the document's notes" : "Open a note or chat to insert audio"}
+          className={cn(
+            "flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+            inserted
+              ? "bg-green-500/20 text-green-300 border border-green-500/20"
+              : canInsert
+                ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+                : "bg-black/[0.03] dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/5 cursor-not-allowed"
+          )}
+        >
+          {inserted ? (
+            <>
+              <Check className="h-3.5 w-3.5" />
+              Inserted
+            </>
+          ) : (
+            <>
+              <Volume2 className="h-3.5 w-3.5" />
+              Insert into document
+            </>
+          )}
+        </button>
+
+        {/* Add to… — inject into any content's note */}
+        <button
+          type="button"
+          onClick={(e) => {
+            const r = e.currentTarget.getBoundingClientRect();
+            setInjectAnchor({ x: r.left, y: r.bottom });
+          }}
+          title="Add this audio to a note, chat, or any content"
+          className="flex items-center gap-1.5 w-full justify-center rounded-lg px-3 py-1.5 text-xs font-medium transition-colors bg-black/[0.03] dark:bg-white/5 text-gray-600 dark:text-gray-300 border border-black/10 dark:border-white/10 hover:bg-black/[0.06] dark:hover:bg-white/10"
+        >
+          <FolderPlus className="h-3.5 w-3.5" />
+          Add to…
+        </button>
+      </div>
+      {injectAnchor && (
+        <MediaInjectFlyout
+          media={audioMedia}
+          anchor={injectAnchor}
+          onClose={() => setInjectAnchor(null)}
+        />
+      )}
     </div>
   );
 }

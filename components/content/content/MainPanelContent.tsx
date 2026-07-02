@@ -27,6 +27,14 @@ import {
 } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
+import {
+  useSaveConflictStore,
+  stashConflictDraft,
+  loadConflictDraft,
+  clearConflictDraft,
+} from "@/state/save-conflict-store";
+import { SaveConflictBanner } from "./SaveConflictBanner";
+import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
   useExtensionContentViewer,
@@ -112,6 +120,8 @@ interface ContentResponse {
       tiptapJson: JSONContent | null; // Persisted from Prisma Json field
       searchText: string;
       metadata: Record<string, unknown>;
+      // Optimistic-concurrency baseline echoed back as If-Match on PATCH.
+      bodyHash?: string;
     };
     folder?: {
       viewMode: string;
@@ -269,6 +279,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  // Read-only "their version" preview for the save-conflict "Open theirs"
+  // action — tabs are contentId-keyed, so we can't open a second tab for the
+  // same doc; a modal lets the user compare before choosing keep/take.
+  const [theirsPreview, setTheirsPreview] = useState<{
+    title: string;
+    content: JSONContent;
+  } | null>(null);
   const [contentCustomIcon, setContentCustomIcon] = useState<string | null>(null);
   const [contentIconColor, setContentIconColor] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string | null>(null);
@@ -333,21 +350,32 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // from being written to Doc B's API endpoint.
   const saveAbortControllerRef = useRef<AbortController | null>(null);
 
+  // Optimistic-concurrency baseline (spec: write persistence). The bodyHash
+  // the server returned the last time we loaded/saved this doc. Echoed as the
+  // `If-Match` header on PATCH so a stale tab (the doc changed elsewhere since
+  // we loaded it) gets a 409 instead of silently overwriting newer content.
+  // Only the plain/REST save path uses this — collaboration docs persist via
+  // Hocuspocus and never reach handleSave's network call.
+  const bodyHashRef = useRef<string | null>(null);
+
+  const setConflict = useSaveConflictStore((s) => s.setConflict);
+  const clearConflict = useSaveConflictStore((s) => s.clearConflict);
+  const activeConflict = useSaveConflictStore((s) =>
+    selectedContentId ? s.conflicts[selectedContentId] ?? null : null
+  );
+
   // SSR initial-content gate: when the page server-rendered with a
   // pre-fetched ContentDetailResponse matching the current selection, we
   // hydrate from it once instead of fetching. Re-selection or refresh
   // afterwards goes through the normal fetch path so writes are observed.
   const consumedInitialContentRef = useRef(false);
 
-  // Cancel in-flight saves whenever selectedContentId changes
-  useEffect(() => {
-    return () => {
-      if (saveAbortControllerRef.current) {
-        saveAbortControllerRef.current.abort();
-        saveAbortControllerRef.current = null;
-      }
-    };
-  }, [selectedContentId]);
+  // NOTE (spec §3.6 — never cancel a write): we deliberately do NOT abort
+  // in-flight saves on navigation/unmount. The write must complete; the
+  // post-await guard in handleSave skips the stale UI commit if the pane has
+  // since moved to a different document. The AbortController is retained only
+  // for debounce coalescing (a newer save of the same doc supersedes an older
+  // one), not for cancelling on navigation.
 
   // Fetch note content when selection changes
   // Also re-fetch when content is updated (e.g., renamed in file tree)
@@ -392,6 +420,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       return;
     }
 
+    // Stale-commit guard (spec §3.7): a fast tab-switch can let this run's
+    // fetch resolve after the pane has moved to a different document. The
+    // cleanup sets `cancelled`, and every post-await commit checks it, so we
+    // never paint Doc A's content (or loading/error state) into a pane now
+    // showing Doc B. Reads are safe to drop — unlike writes — so this guards
+    // the commit, not the fetch.
+    let cancelled = false;
+
     const fetchNote = async () => {
       setIsLoading(true);
       setError(null);
@@ -422,6 +458,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           if (!response.ok) {
             throw new Error(result.error || "Failed to fetch page template");
           }
+
+          if (cancelled) return;
 
           setNoteTitle(result.title);
           setContentParentId(null);
@@ -520,6 +558,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             throw new Error(errorMsg);
           }
         }
+
+        if (cancelled) return;
+
+        // Capture the optimistic-concurrency baseline for the plain/REST save
+        // path. (SSR fast-path results have no note.bodyHash; that's fine —
+        // the first real save just proceeds without an If-Match.)
+        bodyHashRef.current = result.data.note?.bodyHash ?? null;
 
         setNoteTitle(result.data.title);
         setContentParentId(result.data.parentId);
@@ -644,7 +689,25 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           const initialOutline = extractOutline(emptyDoc);
           setOutline(selectedContentId, initialOutline);
         }
+
+        // Reload mid-conflict: if a prior session stashed unsaved edits for
+        // this doc, the server copy we just loaded is "theirs". Show the
+        // user's draft (not the server copy) and re-raise the conflict so it
+        // can be resolved — this is what preserves edits across a reload.
+        if (!cancelled && !isPageTemplateTab) {
+          const draft = loadConflictDraft(selectedContentId);
+          if (draft && bodyHashRef.current) {
+            setConflict({
+              contentId: selectedContentId,
+              mine: draft,
+              theirHash: bodyHashRef.current,
+            });
+            setNoteContent(draft);
+            setOutline(selectedContentId, extractOutline(draft));
+          }
+        }
       } catch (err) {
+        if (cancelled) return;
         clientLogger.error({
           layer: "fetch",
           event: "content_fetch:caught",
@@ -654,11 +717,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         });
         setError(err instanceof Error ? err.message : "Failed to load note");
       } finally {
-        setIsLoading(false);
+        // Don't flip the loading flag for a run the pane has navigated away
+        // from — the newer run owns it now.
+        if (!cancelled) setIsLoading(false);
       }
     };
 
     fetchNote();
+
+    return () => {
+      cancelled = true;
+    };
   }, [
     selectedContentId,
     refreshTrigger,
@@ -667,6 +736,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setOutline,
     updateContentTab,
     initialContent,
+    setConflict,
   ]);
 
   useEffect(() => {
@@ -704,6 +774,52 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       window.removeEventListener('content-updated', handleContentUpdate);
     };
   }, [selectedContentId, updateContentTab]);
+
+  // Targeted notes-only refresh — fired by `use-conversation-engine`'s
+  // onFinish when the AI's updateNote tool writes new note content.
+  // Why a separate path from `content-updated`: that listener triggers
+  // `refreshTrigger++`, which re-runs `fetchNote`, which resets loading
+  // state, re-extracts the outline, syncs the tab title, and reloads
+  // ALL content. The user only sees the note panel change, but every
+  // surface flickers. This handler does the minimum work — a small GET
+  // on the content endpoint, then a single `setNoteContent` — so only
+  // the editor's content updates. Pane scoping is automatic because the
+  // listener gates on `selectedContentId === detail.contentId`; in a
+  // multi-pane layout, every pane that has this content open reacts
+  // (including non-focused panes — the user expects them to stay in
+  // sync even when they're not the active one).
+  useEffect(() => {
+    const handler = async (event: Event) => {
+      const detail = (event as CustomEvent<{ contentId: string }>).detail;
+      if (!detail?.contentId) return;
+      if (detail.contentId !== selectedContentId) return;
+      try {
+        const res = await fetch(
+          `/api/content/content/${encodeURIComponent(detail.contentId)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok) return;
+        // ContentDetailResponse exposes the NotePayload as `data.note`
+        // (not `data.notePayload`). Read site has to match the route's
+        // formatter at app/api/content/content/[id]/route.ts:397.
+        const body = (await res.json()) as {
+          data?: {
+            note?: { tiptapJson?: JSONContent };
+          };
+        };
+        const json = body?.data?.note?.tiptapJson;
+        if (json) {
+          setNoteContent(json);
+        }
+      } catch {
+        /* silent — user can always trigger a full refresh manually */
+      }
+    };
+    window.addEventListener("dg:notes-refresh", handler);
+    return () => {
+      window.removeEventListener("dg:notes-refresh", handler);
+    };
+  }, [selectedContentId]);
 
   // Stats change handler
   const handleStatsChange = useCallback(
@@ -770,6 +886,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
 
+      // Paused while a conflict awaits resolution — don't re-attempt the
+      // overwrite that was already refused. Resolution actions (Keep mine /
+      // Take theirs) clear the conflict before they re-save. Read live state
+      // (not the closure) so a conflict raised after this callback was created
+      // still pauses it.
+      if (useSaveConflictStore.getState().getConflict(selectedContentId)) {
+        setHasUnsavedChanges(true);
+        return;
+      }
+
       // Cancel any previous in-flight save
       if (saveAbortControllerRef.current) {
         saveAbortControllerRef.current.abort();
@@ -790,6 +916,19 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           credentials: "include",
           headers: {
             "Content-Type": "application/json",
+            // Optimistic concurrency for the plain/REST save path: prove we're
+            // updating the version we last loaded. Server returns 409 if the
+            // doc changed elsewhere (stale tab / concurrent edit). Templates
+            // don't carry a bodyHash, so skip there.
+            //
+            // CUSTOM header on purpose — do NOT use the standard `If-Match`.
+            // Vercel's edge treats `If-Match` as an HTTP conditional precondition
+            // and rejects it with a 412 *before the request reaches the function*
+            // (our responses have no matching ETag), so the app's check never
+            // runs. A non-conditional `X-Body-Hash` header passes through.
+            ...(!isPageTemplateTab && bodyHashRef.current
+              ? { "X-Body-Hash": bodyHashRef.current }
+              : {}),
           },
           body: JSON.stringify({
             tiptapJson: content,
@@ -810,6 +949,36 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         );
 
         const result = await response.json();
+
+        // Concurrent-change conflict (409): the doc changed elsewhere since we
+        // loaded it. Do NOT overwrite — stash the user's edits and raise a
+        // conflict for explicit resolution (Keep mine / Take theirs).
+        if (
+          !isPageTemplateTab &&
+          response.status === 409 &&
+          result?.meta?.reason === "if_match"
+        ) {
+          const postSaveId = getPaneActiveContentId(
+            useContentStore.getState(),
+            paneId
+          );
+          if (postSaveId === selectedContentId) {
+            stashConflictDraft(selectedContentId, content);
+            setConflict({
+              contentId: selectedContentId,
+              mine: content,
+              theirHash: result.meta.currentBodyHash ?? bodyHashRef.current ?? "",
+            });
+            setHasUnsavedChanges(true);
+            clientLogger.warn({
+              layer: "ui",
+              event: "save:conflict_detected",
+              summary: "save refused — document changed elsewhere (409)",
+              attrs: { content_id: selectedContentId },
+            });
+          }
+          return;
+        }
 
         if (isPageTemplateTab) {
           if (!response.ok) {
@@ -834,6 +1003,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         setLastSaved(new Date());
+        // Advance the optimistic-concurrency baseline to the version we just
+        // wrote, so the next save's If-Match matches. Clear any stashed draft —
+        // a successful write means there's nothing unresolved to recover.
+        if (!isPageTemplateTab) {
+          bodyHashRef.current = result.data?.note?.bodyHash ?? bodyHashRef.current;
+          clearConflictDraft(selectedContentId);
+        }
         // Keep parent state in sync so re-mounts (e.g., ExpandableEditor
         // collapse/reopen) receive the latest persisted content
         setNoteContent(content);
@@ -871,8 +1047,55 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setHasUnsavedChanges,
       setIsSaving,
       setLastSaved,
+      setConflict,
     ]
   );
+
+  // ── Save-conflict resolution (stale-tab overwrite mitigation) ───────────
+  // Keep mine: re-save the user's edits, deliberately overwriting the newer
+  // server copy. Advancing the baseline to the server's current hash makes the
+  // forced PATCH's If-Match match, so it wins in one round-trip.
+  const handleConflictKeepMine = useCallback(() => {
+    if (!activeConflict || !selectedContentId) return;
+    bodyHashRef.current = activeConflict.theirHash;
+    const mine = activeConflict.mine;
+    clearConflict(selectedContentId);
+    clearConflictDraft(selectedContentId);
+    void handleSave(mine, { userInitiated: true });
+  }, [activeConflict, selectedContentId, clearConflict, handleSave]);
+
+  // Take theirs: discard local edits and reload the latest server version.
+  const handleConflictTakeTheirs = useCallback(() => {
+    if (!selectedContentId) return;
+    clearConflict(selectedContentId);
+    clearConflictDraft(selectedContentId);
+    setRefreshTrigger((n) => n + 1);
+  }, [selectedContentId, clearConflict]);
+
+  // Open theirs: fetch the latest server copy into a read-only preview so the
+  // user can compare/copy before deciding.
+  const handleConflictOpenTheirs = useCallback(async () => {
+    if (!selectedContentId) return;
+    try {
+      const res = await fetch(`/api/content/content/${selectedContentId}`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      const rawJson = json?.data?.note?.tiptapJson;
+      if (json?.success && rawJson) {
+        const parsed =
+          typeof rawJson === "string" ? JSON.parse(rawJson) : rawJson;
+        setTheirsPreview({
+          title: json.data.title ?? "Their version",
+          content: parsed as JSONContent,
+        });
+      } else {
+        toast.error("Couldn't load the other version.");
+      }
+    } catch {
+      toast.error("Couldn't load the other version.");
+    }
+  }, [selectedContentId]);
 
   // Wiki-link click handler - navigate to note or folder by title
   const handleWikiLinkClick = useCallback(
@@ -924,6 +1147,20 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     },
     [paneId, setSelectedContentId]
   );
+
+  // Handle wiki-link "Open" context menu action.
+  // "Open in Pane" is handled directly in editor-actions.tsx via the pane submenu.
+  useEffect(() => {
+    const handleOpen = (e: Event) => {
+      const { targetTitle } = (e as CustomEvent<{ targetTitle: string }>).detail;
+      void handleWikiLinkClick(targetTitle);
+    };
+
+    window.addEventListener("open-wiki-link", handleOpen);
+    return () => {
+      window.removeEventListener("open-wiki-link", handleOpen);
+    };
+  }, [handleWikiLinkClick]);
 
   // Fetch notes for wiki-link autocomplete
   const fetchNotesForWikiLink = useCallback(
@@ -1639,13 +1876,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     );
   }
 
-  // Loading state
+  // Loading state — staged skeleton mirroring the editor layout (title +
+  // paragraph blocks) rather than a bare "Loading…" so the structure reads as
+  // arriving. Shares the same skeleton as the page-level Suspense fallback.
   if (isLoading) {
-    return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-sm text-muted-foreground">Loading...</div>
-      </div>
-    );
+    return <EditorSkeleton />;
   }
 
   // Render content based on type
@@ -1787,58 +2022,60 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     const editorElement = (
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
-        <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
-          {isTitleEditing ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
-              onBlur={handleTitleCommit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
-                if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
-              }}
-              className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
-            />
-          ) : (
-            <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
-              <h1
-                className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
-                  isReadOnlyPageTemplate
-                    ? "cursor-default"
-                    : "cursor-text hover:opacity-80"
-                }`}
-                title={
-                  contentType === "page-template"
-                    ? isReadOnlyPageTemplate
-                      ? "System template (read-only)"
-                      : "Click to rename template"
-                    : "Click to rename"
-                }
-                onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
-              >
-                {noteTitle}
-              </h1>
-              {contentType === "page-template" && templateWarningText ? (
-                <TooltipProvider delayDuration={150}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
-                        <AlertTriangle className="h-3.5 w-3.5" />
-                        Template
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-xs text-xs">
-                      {templateWarningText}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              ) : null}
-            </div>
-          )}
-          {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
-        </div>
+        {!isEmbedMode && (
+          <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+            {isTitleEditing ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={handleTitleCommit}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") { e.preventDefault(); handleTitleCommit(); }
+                  if (e.key === "Escape") { e.preventDefault(); setIsTitleEditing(false); }
+                }}
+                className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
+              />
+            ) : (
+              <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
+                <h1
+                  className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                    isReadOnlyPageTemplate
+                      ? "cursor-default"
+                      : "cursor-text hover:opacity-80"
+                  }`}
+                  title={
+                    contentType === "page-template"
+                      ? isReadOnlyPageTemplate
+                        ? "System template (read-only)"
+                        : "Click to rename template"
+                      : "Click to rename"
+                  }
+                  onClick={isReadOnlyPageTemplate ? undefined : handleTitleEditStart}
+                >
+                  {noteTitle}
+                </h1>
+                {contentType === "page-template" && templateWarningText ? (
+                  <TooltipProvider delayDuration={150}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800">
+                          <AlertTriangle className="h-3.5 w-3.5" />
+                          Template
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-xs text-xs">
+                        {templateWarningText}
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                ) : null}
+              </div>
+            )}
+            {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
+          </div>
+        )}
 
         {contentType === "page-template" && templateWarningText ? (
           <div className="mx-6 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
@@ -1847,6 +2084,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               : "Editing a page template. Changes here affect future notes created from this template."}
           </div>
         ) : null}
+
+        {/* Save-conflict resolution (stale-tab / concurrent-edit overwrite) */}
+        <SaveConflictBanner
+          active={Boolean(activeConflict)}
+          onKeepMine={handleConflictKeepMine}
+          onTakeTheirs={handleConflictTakeTheirs}
+          onOpenTheirs={handleConflictOpenTheirs}
+          theirsPreview={theirsPreview}
+          onCloseTheirs={() => setTheirsPreview(null)}
+        />
 
         {/* Editor */}
         <div className="flex-1 overflow-hidden">
@@ -1869,6 +2116,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
             collaborationEnabled={contentType === "note" ? collaborationEnabled : false}
             collaborationRuntime={collaborationRuntime}
             onCollaborationSyncChange={handleCollaborationSyncChange}
+            compact={isEmbedMode}
+            edgeToEdge={isEmbedMode}
           />
         </div>
       </div>
@@ -1925,7 +2174,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         {selectedContentId &&
           !selectedContentId.startsWith("person:") &&
           contentType !== "page-template" &&
-          !isEmbedMode && <ContentToolbar />}
+          !isEmbedMode && <ContentToolbar contentId={selectedContentId} />}
         {isNonNoteContent ? (
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
             {notesPanelPosition === "above" && (

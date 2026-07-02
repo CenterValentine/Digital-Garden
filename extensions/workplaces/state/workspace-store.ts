@@ -168,6 +168,26 @@ function restoreTreeSnapshotForWorkspace(workspaceId: string | null) {
   useTreeStateStore.getState().restoreSnapshot(snapshots[workspaceId]);
 }
 
+// Persist the active workspace id so it survives navigations that drop the
+// `?workspace=` URL param (e.g. visiting Settings then hitting Back). Without
+// this, those round-trips fall back to the Main Workspace even though the
+// last-selected file restores.
+const ACTIVE_WORKSPACE_ID_KEY = "workspace-active-id";
+
+function readPersistedActiveWorkspaceId(): string | null {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem(ACTIVE_WORKSPACE_ID_KEY);
+}
+
+function writePersistedActiveWorkspaceId(workspaceId: string | null) {
+  if (typeof window === "undefined") return;
+  if (workspaceId) {
+    window.localStorage.setItem(ACTIVE_WORKSPACE_ID_KEY, workspaceId);
+  } else {
+    window.localStorage.removeItem(ACTIVE_WORKSPACE_ID_KEY);
+  }
+}
+
 function isOfflineLikePersistenceError(value: unknown) {
   const message = value instanceof Error ? value.message : String(value);
   return (
@@ -259,7 +279,15 @@ function readContentIdFromUrl(): string | null {
   return value && value.length > 0 ? value : null;
 }
 
-function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
+function restoreContentWorkspace(
+  workspace: ContentWorkspaceResponse,
+  // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
+  // snapshot to keep the open-tab SET in sync across windows — but it must not
+  // yank the active tab away from what the local user is currently viewing.
+  // When set and still an open tab in the snapshot, this wins as the active
+  // selection, so a poll/visibility refresh can't revert a fresh tab click.
+  preferActiveContentId?: string | null,
+) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
       ([paneId, pane]) => [paneId, pane?.contentIds ?? []],
@@ -278,9 +306,21 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
   const urlContentBelongsToWorkspace =
     contentIdFromUrl !== null &&
     workspace.items.some((item) => item.contentId === contentIdFromUrl);
-  const activeContentId = urlContentBelongsToWorkspace
-    ? contentIdFromUrl
-    : workspace.paneState.activeContentId;
+  const openTabIds = Object.values(paneTabContentIds).flat();
+  const preferStillOpen =
+    preferActiveContentId != null &&
+    openTabIds.includes(preferActiveContentId);
+  const activeContentId = preferStillOpen
+    ? preferActiveContentId
+    : urlContentBelongsToWorkspace
+      ? contentIdFromUrl
+      : workspace.paneState.activeContentId;
+
+  // Per-content title + type from the snapshot so tabs paint named on the
+  // first frame (spec §3.8) — no "Loading…" tab label, no post-mount fetch.
+  // contentMeta covers the full open-tab set (superset of items), so tabs that
+  // aren't formal workspace assignments are still named.
+  const tabMeta = workspace.contentMeta ?? {};
 
   isBypassingWorkspaceGuard = true;
   try {
@@ -289,6 +329,7 @@ function restoreContentWorkspace(workspace: ContentWorkspaceResponse) {
       activePaneId: workspace.paneState.activePaneId,
       layoutMode: workspace.paneState.layoutMode,
       paneTabContentIds,
+      tabMeta,
     });
   } finally {
     isBypassingWorkspaceGuard = false;
@@ -474,7 +515,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           workspaces.find(
             (workspace) => workspace.id === initialWorkspaceId,
           )) ||
-        getWorkspace(workspaces, get().activeWorkspaceId);
+        getWorkspace(workspaces, get().activeWorkspaceId) ||
+        // Fall back to the last active workspace persisted across reloads —
+        // covers navigations that drop the `?workspace=` URL param.
+        getWorkspace(workspaces, readPersistedActiveWorkspaceId());
       const activeWorkspace =
         requestedWorkspace ?? getMainWorkspace(workspaces);
 
@@ -490,6 +534,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         isLoading: false,
         hasLoadedOnce: true,
       });
+      writePersistedActiveWorkspaceId(activeWorkspace?.id ?? null);
 
       warmContentSummaryCache(
         workspaces.flatMap((ws) => ws.items.map((item) => item.content)),
@@ -501,6 +546,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         if (useContentStore.getState().openContentIds.length === 0) {
           restoreContentWorkspace(activeWorkspace);
         }
+        // Order-independent title backfill (spec §3.8): the URL-restore path
+        // in MainPanelWorkspace can create tabs (from the `tabs_*` URL params)
+        // before this snapshot resolves, in which case the guard above skips
+        // restoreContentWorkspace and those tabs are stuck on "Loading…".
+        // contentMeta covers the full open-tab set, so this names every tab
+        // regardless of which restore path created it.
+        useContentStore
+          .getState()
+          .backfillTabMeta(activeWorkspace.contentMeta ?? {});
+
         restoreTreeSnapshotForWorkspace(activeWorkspace.id);
       }
     } catch (error) {
@@ -540,6 +595,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       conflict: null,
       pendingOpenIntent: null,
     });
+    writePersistedActiveWorkspaceId(workspace.id);
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     syncWorkspaceUrl(workspace.id);
     restoreContentWorkspace(workspace);
@@ -1066,6 +1122,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       state.activeWorkspaceId,
     );
 
+    // INVARIANT — cross-session isolation is scoped to the SAME workspace.
+    // This background reconcile only re-applies the local session's *active*
+    // workspace (keyed on state.activeWorkspaceId below); pane state for every
+    // other workspace is refreshed in the list but never applied to this view.
+    // Combined with per-workspace persistActiveWorkspace writes and the
+    // per-browser active-workspace pointer, two sessions on DIFFERENT
+    // workspaces never converge — only same-workspace sessions share pane
+    // state. Do not broaden this to apply non-active workspaces.
+    //
     // If the active workspace was saved by another tab (its updatedAt changed),
     // apply the remote pane state so open tabs stay in sync across windows.
     const incomingActive = ordered.find(
@@ -1075,7 +1140,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const knownUpdatedAt = lastAppliedUpdatedAt[incomingActive.id];
       if (knownUpdatedAt && incomingActive.updatedAt !== knownUpdatedAt) {
         lastAppliedUpdatedAt[incomingActive.id] = incomingActive.updatedAt;
-        restoreContentWorkspace(incomingActive);
+        // Preserve the local active tab: a background refresh syncs the open-tab
+        // set, but must not revert what the user is currently viewing (e.g. a
+        // tab they just clicked after reload).
+        const localActive = useContentStore.getState().selectedContentId;
+        restoreContentWorkspace(incomingActive, localActive);
       }
     }
 

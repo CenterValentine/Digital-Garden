@@ -508,6 +508,15 @@ document.getElementById("open-capture").addEventListener("click", () => {
   chrome.tabs.create({ url: chrome.runtime.getURL("capture.html") });
 });
 
+document.getElementById("quick-capture-btn").addEventListener("click", async () => {
+  try {
+    await sendMessage({ type: "start-quick-capture" });
+  } catch {
+    // Overlay unavailable on this page — close anyway
+  }
+  window.close();
+});
+
 connectionSelect().addEventListener("change", async (event) => {
   const value = event.target.value;
   if (!value) return;

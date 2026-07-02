@@ -33,7 +33,7 @@
 import { useState, useEffect, useRef } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { Button } from "@/components/ui/glass/button";
-import { Check, Wrench } from "lucide-react";
+import { Check, Wrench, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import AIConnectionsPage from "@/components/settings/AIConnectionsPage";
 import AIFeatureRoutingPage from "@/components/settings/AIFeatureRoutingPage";
@@ -61,9 +61,12 @@ interface AISettings {
   showAiHighlight?: boolean;
   showReasoning?: boolean;
   showFollowUps?: boolean;
+  folderAssistant?: { enabled?: boolean };
 }
 
-const DEFAULTS: Required<AISettings> = {
+const DEFAULTS: Required<Omit<AISettings, "folderAssistant">> & {
+  folderAssistantEnabled: boolean;
+} = {
   enabled: true,
   temperature: 0.7,
   maxTokens: 4096,
@@ -72,6 +75,7 @@ const DEFAULTS: Required<AISettings> = {
   showAiHighlight: true,
   showReasoning: true,
   showFollowUps: true,
+  folderAssistantEnabled: true,
 };
 
 export default function AISettingsPage() {
@@ -91,6 +95,9 @@ export default function AISettingsPage() {
   const [showAiHighlight, setShowAiHighlight] = useState(DEFAULTS.showAiHighlight);
   const [showReasoning, setShowReasoning] = useState(DEFAULTS.showReasoning);
   const [showFollowUps, setShowFollowUps] = useState(DEFAULTS.showFollowUps);
+  const [folderAssistantEnabled, setFolderAssistantEnabled] = useState(
+    DEFAULTS.folderAssistantEnabled,
+  );
 
   // UI state
   const [isLoading, setIsLoading] = useState(true);
@@ -114,6 +121,8 @@ export default function AISettingsPage() {
           if (ai.showAiHighlight !== undefined) setShowAiHighlight(ai.showAiHighlight);
           if (ai.showReasoning !== undefined) setShowReasoning(ai.showReasoning);
           if (ai.showFollowUps !== undefined) setShowFollowUps(ai.showFollowUps);
+          if (ai.folderAssistant?.enabled !== undefined)
+            setFolderAssistantEnabled(ai.folderAssistant.enabled);
         }
       } catch (err) {
         clientLogger.error({
@@ -177,6 +186,7 @@ export default function AISettingsPage() {
             showAiHighlight,
             showReasoning,
             showFollowUps,
+            folderAssistant: { enabled: folderAssistantEnabled },
           },
         }),
       });
@@ -405,6 +415,29 @@ export default function AISettingsPage() {
               <div className="font-medium text-sm">Show AI Content Highlights</div>
               <div className="text-sm text-gray-400">
                 Subtly highlight text that was inserted or edited by AI with an indigo tint.
+              </div>
+            </div>
+          </label>
+
+          {/* Folder Assistant — used from the file tree, not the chat. */}
+          <label className="flex items-center gap-3 p-2.5 rounded-lg border border-white/10 hover:bg-white/5 cursor-pointer transition-colors">
+            <input
+              type="checkbox"
+              checked={folderAssistantEnabled}
+              onChange={(e) => setFolderAssistantEnabled(e.target.checked)}
+            />
+            <div className="flex-1">
+              <div className="font-medium text-sm flex items-center gap-1.5">
+                <Sparkles className="h-3.5 w-3.5 text-indigo-400" />
+                Folder Assistant
+                <span className="ml-1 rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-normal text-gray-400">
+                  File tree
+                </span>
+              </div>
+              <div className="text-sm text-gray-400">
+                Adds a “✨ Folder assistant” option to the file-tree right-click
+                Move menu — describe where files should go and it places them
+                (with confirm-when-unsure and undo). This is not a chat tool.
               </div>
             </div>
           </label>

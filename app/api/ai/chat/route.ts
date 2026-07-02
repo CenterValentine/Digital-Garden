@@ -25,6 +25,7 @@ import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import type { UIMessage } from "ai";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
+import { getChatContextBody } from "@/lib/features/chat-contexts";
 import {
   resolveChatModel,
   resolveChatModelFromConnection,
@@ -98,9 +99,13 @@ import type {
 import {
   applyMiddleware,
   defaultSettingsMiddleware,
+  rateLimitRetryMiddleware,
 } from "@/lib/domain/ai/middleware";
+import { buildSystemPrompt } from "@/lib/domain/ai/system-prompt";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
+import { createFlashcardTools } from "@/lib/domain/ai/tools";
+import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -137,6 +142,10 @@ export async function POST(request: Request) {
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
       const aiSettings = userSettings.ai ?? {};
+      // Auto-pronounce: when on (default), the model is told to attach spoken
+      // audio to non-English vocab cards by default. The proposal gate still
+      // gates the actual TTS spend, so "default on" never auto-bills.
+      const autoPronounceDefault = userSettings.flashcards?.autoPronounce !== false;
 
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
@@ -287,6 +296,7 @@ export async function POST(request: Request) {
               });
           return applyMiddleware(model, [
             defaultSettingsMiddleware({ temperature, maxTokens }),
+            rateLimitRetryMiddleware(),
           ]);
         },
       );
@@ -310,9 +320,56 @@ export async function POST(request: Request) {
       // per-tool `enabled` in settings. Tools default to enabled; only
       // `enabled === false` entries are dropped. If the result is empty
       // we pass `undefined` so streamText knows there are no tools at all.
-      const toolCtx = { userId: session.user.id, contentId: editableContentId };
+      // Collect image/audio attachments for propose_cards_from_media to package
+      // as card fronts. Scope to the MOST RECENT user message that carries media
+      // — NOT the whole conversation. The model indexes "the media I was just
+      // given" (0..n) per turn; collecting every attachment across the chat
+      // would offset those indices and pull the wrong (earlier) clips. We walk
+      // backwards and take the first user message that has media parts.
+      const attachedMedia: Array<{
+        url: string;
+        mediaType: string;
+        contentNodeId?: string;
+        filename?: string;
+      }> = [];
+      for (let mi = messages.length - 1; mi >= 0; mi--) {
+        const m = messages[mi];
+        if (m.role !== "user" || !Array.isArray(m.parts)) continue;
+        const mediaParts = (m.parts as Array<Record<string, unknown>>).filter(
+          (part) =>
+            part?.type === "file" &&
+            typeof part.url === "string" &&
+            typeof part.mediaType === "string" &&
+            ((part.mediaType as string).startsWith("image/") ||
+              (part.mediaType as string).startsWith("audio/")),
+        );
+        if (mediaParts.length === 0) continue;
+        for (const part of mediaParts) {
+          const app = (
+            part.providerMetadata as { app?: { contentNodeId?: string } } | undefined
+          )?.app;
+          attachedMedia.push({
+            url: part.url as string,
+            mediaType: part.mediaType as string,
+            contentNodeId: app?.contentNodeId,
+            filename: typeof part.filename === "string" ? part.filename : undefined,
+          });
+        }
+        break; // only the most recent batch of attachments
+      }
+
+      const toolCtx = {
+        userId: session.user.id,
+        contentId: editableContentId,
+        // When the user is viewing this conversation in full-page mode the
+        // chat IS the open content. Pass that through so createNote can
+        // default the new note's parent folder to the chat's own parent.
+        chatContentId: isChatContent ? contentId : undefined,
+        attachedMedia,
+      };
       const allTools = {
         ...createBaseTools(toolCtx),
+        ...createFlashcardTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
@@ -331,7 +388,12 @@ export async function POST(request: Request) {
       // Anthropic/Google), and inline the server-extracted text for
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
-      const resolvedMessages = resolveAttachmentsForModel(messages, providerId);
+      const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      const resolvedMessages = resolveAttachmentsForModel(
+        messages,
+        providerId,
+        audioCapable,
+      );
 
       // Convert UIMessages to ModelMessages for streamText
       const modelMessages = await convertToModelMessages(
@@ -394,6 +456,19 @@ export async function POST(request: Request) {
         }
       }
 
+      // Resolve the selected custom-instruction context, if any. Sent by
+      // the composer's context picker. Ownership-gated; a missing/foreign/
+      // deleted id degrades to the base system prompt (returns null).
+      let userContextSection = "";
+      const contextId: string | null =
+        typeof body.contextId === "string" ? body.contextId : null;
+      if (contextId) {
+        const ctx = await getChatContextBody(session.user.id, contextId);
+        if (ctx) {
+          userContextSection = `\n\nThe user has set a custom context titled "${ctx.name}". Follow these instructions for how you respond — they take precedence over default tone, but never over safety or the editing rules above:\n\n${ctx.body}`;
+        }
+      }
+
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
       // with the captured trace_id even after ALS scope exits.
@@ -435,23 +510,21 @@ export async function POST(request: Request) {
         }),
         // Allow up to 8 model turns for multi-step tool workflows.
         // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
-        // Base chat tools typically need 2-3 steps.
-        stopWhen: stepCountIs(editableContentId ? 8 : 5),
-        system: `You are a helpful AI assistant in Digital Garden, a knowledge management application. Help the user with their notes, writing, and research. Be concise and helpful.
-
-You have a generate_image tool that creates AI images from text prompts. When asked to generate, create, or draw an image, use this tool. Available providers: DALL·E 3, GPT Image 1, Imagen 3, FLUX (fal.ai/Together/Fireworks), DeepAI, RunwayML, Artbreeder. Default to DALL·E 3 unless specified. Write detailed prompts for best results.${
-          editableContentId
-            ? `\n\nThe user is currently viewing a document (ID: ${editableContentId}). You have editor tools available to read and edit this document.
-
-IMPORTANT EDITING RULES:
-- When the document has existing content, ALWAYS use apply_diff to make targeted changes or APPEND new content. NEVER use replace_document unless the user explicitly asks you overwrite the entire document.
-- To add content (descriptions, text, images), APPEND it after the existing content using apply_diff. Do NOT overwrite what is already there.
-- When asked to edit, always: 1) Read the document first with read_first_chunk, 2) Plan your approach if the edit is complex, 3) Apply changes with apply_diff for targeted edits, 4) Call finish_with_summary when done.
-- Only use replace_document for blank/empty documents or when the user explicitly requests a full rewrite.
-
-When you generate an image, the user can insert it into the document at their cursor position.`
-            : ""
-        }${mentionedContext}`,
+        // Flashcard workflows can chain: list_decks → propose_deck (parent)
+        //   → propose_deck (child) → propose_cards → final text = 5 steps,
+        //   with headroom for an optional search_decks or get_deck call.
+        // Base chat (no flashcards, no document) typically needs 2-3 steps.
+        stopWhen: stepCountIs(editableContentId ? 8 : 7),
+        system: buildSystemPrompt({
+          hasImageTools: "generate_image" in tools,
+          hasFlashcardTools: "list_decks" in tools,
+          editableContentId,
+          isChatContent,
+          chatContentId: isChatContent ? contentId : undefined,
+          autoPronounceDefault,
+          userContextSection,
+          mentionedContext,
+        }),
         onStepFinish: (step) => {
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any
@@ -599,6 +672,7 @@ const PDF_NATIVE_PROVIDERS = new Set(["anthropic", "google"]);
 function resolveAttachmentsForModel(
   messages: unknown[],
   providerId: string,
+  audioCapable: boolean,
 ): unknown[] {
   const nativePdf = PDF_NATIVE_PROVIDERS.has(providerId);
 
@@ -637,9 +711,16 @@ function resolveAttachmentsForModel(
 
       const isImage = mediaType.startsWith("image/");
       const isPdf = mediaType === "application/pdf";
+      const isAudio = mediaType.startsWith("audio/");
 
-      if (isImage || (isPdf && nativePdf)) {
+      if (isImage || (isPdf && nativePdf) || (isAudio && audioCapable)) {
         kept.push(stripAppMeta(p));
+      } else if (isAudio) {
+        // Audio but the model can't hear it — tell the model so it can ask the
+        // user to switch to an audio-input model rather than silently ignoring.
+        inlined.push(
+          `[Attached audio: ${filename} — the selected model can't process audio. Ask the user to switch to an audio-input model.]`,
+        );
       } else {
         inlined.push(
           appText

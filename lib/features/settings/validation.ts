@@ -139,6 +139,32 @@ const aiSettingsSchema = z
     // call after each assistant reply and render 2-3 next-prompt chips.
     // The chosen model lives in Feature Routing under "follow-ups".
     showFollowUps: z.boolean().optional(),
+    // Optional free-form guidance appended to the follow-up generator's
+    // system prompt. Lets users steer suggestions toward their domain
+    // (e.g. "Focus on next experiments / pitfalls to watch for / cite
+    // sources"). Capped at 600 chars to keep the prompt manageable.
+    followUpsPrompt: z.string().max(600).optional(),
+    // Folder Assistant (file-tree right-click → Move → Folder assistant).
+    // NOT a chat tool — a standalone one-shot agent. `recent` is a small
+    // ring buffer of past requests/outcomes used as working memory and to
+    // avoid repeating recently-rejected placements.
+    folderAssistant: z
+      .object({
+        enabled: z.boolean().optional(),
+        recent: z
+          .array(
+            z.object({
+              prompt: z.string(),
+              status: z.enum(["success", "failed"]),
+              targetFolderId: z.string().optional(),
+              targetPath: z.string().optional(),
+              at: z.number(),
+            }),
+          )
+          .max(20)
+          .optional(),
+      })
+      .optional(),
   })
   .optional();
 
@@ -239,6 +265,10 @@ const flashcardsSettingsSchema = z
   .object({
     lastUsedCategory: z.string().min(1).max(120).optional(),
     lastUsedSubcategory: z.string().max(120).optional(),
+    // Sprint: path-based builder. Full skill/subskill/subskill path of the
+    // last deck a card was added to, so the path input can prefill the
+    // whole hierarchy (the 2-level category/subcategory pair can't).
+    lastUsedDeckPath: z.string().max(600).optional(),
     defaultFrontLabel: z.string().min(1).max(80).optional(),
     defaultBackLabel: z.string().min(1).max(80).optional(),
     defaultReviewMode: z
@@ -250,6 +280,15 @@ const flashcardsSettingsSchema = z
     // - quickFireEnabled: gates the Enter-at-idle shortcut.
     lastUsedSelectionDeckId: z.string().min(1).max(64).optional(),
     quickFireEnabled: z.boolean().optional(),
+    // When true (default), the AI is told to attach a spoken pronunciation to
+    // non-English vocabulary cards by default (still opt-in to generate — the
+    // proposal gate gates the actual TTS spend). Set false to only add audio on
+    // explicit request.
+    autoPronounce: z.boolean().optional(),
+    // When true (default), accepting an AI card proposal skips cards whose front
+    // already exists in the target deck (and dups within the batch) instead of
+    // creating them. Skipped rows are shown as "Duplicate".
+    dropDuplicatesOnAdd: z.boolean().optional(),
   })
   .optional();
 
@@ -443,6 +482,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     showAiHighlight: true,
     showReasoning: true,
     showFollowUps: true,
+    folderAssistant: { enabled: true, recent: [] },
   },
   exportBackup: {
     defaultFormat: "markdown",

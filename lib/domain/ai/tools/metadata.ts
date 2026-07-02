@@ -11,13 +11,20 @@ import {
   EDITOR_TOOL_METADATA as _EDITOR_TOOL_METADATA,
   type EditorToolId as _EditorToolId,
 } from "./editor-metadata";
+import {
+  FLASHCARD_TOOL_IDS as _FLASHCARD_TOOL_IDS,
+  FLASHCARD_TOOL_METADATA as _FLASHCARD_TOOL_METADATA,
+  type FlashcardToolId as _FlashcardToolId,
+} from "./flashcard-metadata";
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
   "searchNotes",
   "getCurrentNote",
   "createNote",
+  "updateNote",
   "generate_image",
+  "generate_speech",
 ] as const;
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
@@ -52,12 +59,23 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Create Note",
     description: "Create a new note with a title and optional content",
   },
+  updateNote: {
+    name: "Update Note",
+    description: "Update an existing note's content (and optionally its title)",
+  },
   generate_image: {
     name: "Generate Image",
     description:
       "Generate an AI image from a text prompt using DALL·E, Imagen, FLUX, and other providers",
     callsAi: true,
     requiredCapabilities: ["image-generation"],
+  },
+  generate_speech: {
+    name: "Generate Speech",
+    description:
+      "Convert text to spoken audio using OpenAI, ElevenLabs, or Google text-to-speech voices",
+    callsAi: true,
+    requiredCapabilities: ["speech"],
   },
 };
 
@@ -66,14 +84,24 @@ export const EDITOR_TOOL_IDS = _EDITOR_TOOL_IDS;
 export const EDITOR_TOOL_METADATA = _EDITOR_TOOL_METADATA;
 export type EditorToolId = _EditorToolId;
 
-/** All tool IDs (base + editor) for settings UI */
+// Re-export flashcard tool metadata for unified access
+export const FLASHCARD_TOOL_IDS = _FLASHCARD_TOOL_IDS;
+export const FLASHCARD_TOOL_METADATA = _FLASHCARD_TOOL_METADATA;
+export type FlashcardToolId = _FlashcardToolId;
+
+/** All tool IDs (base + editor + flashcards) for settings UI */
 export const ALL_TOOL_IDS = [
   ...BASE_TOOL_IDS,
   ..._EDITOR_TOOL_IDS,
+  ..._FLASHCARD_TOOL_IDS,
 ] as const;
 
 /** All tool metadata combined */
 export const ALL_TOOL_METADATA: Record<
   string,
   { name: string; description: string }
-> = { ...BASE_TOOL_METADATA, ..._EDITOR_TOOL_METADATA };
+> = {
+  ...BASE_TOOL_METADATA,
+  ..._EDITOR_TOOL_METADATA,
+  ..._FLASHCARD_TOOL_METADATA,
+};

@@ -64,14 +64,34 @@ export async function POST(request: NextRequest, context: RouteContext) {
           { status: 404 },
         );
       }
+      // Capture the error class + message so prod investigations don't
+      // have to grep the stack trace. Prisma errors carry .code (e.g.
+      // P2002 unique violation, P2025 record not found) — surface it.
+      const errName = error instanceof Error ? error.name : "Unknown";
+      const errMsg = error instanceof Error ? error.message : String(error);
+      const errCode =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code: unknown }).code)
+          : null;
       logger.error({
         layer: "ai",
         event: "conversation_fork:caught",
-        summary: `POST ${ROUTE_PATH} caught — 500`,
+        summary: `POST ${ROUTE_PATH} caught — 500 (${errName}${errCode ? `:${errCode}` : ""})`,
+        attrs: {
+          err_name: errName,
+          err_code: errCode ?? "none",
+        },
         error,
       });
+      // Surface a short error tag in the body so the client toast can
+      // show something more actionable than "Fork failed". Avoid leaking
+      // raw error.message verbatim — keep it scoped to known classes.
+      const safeError =
+        errCode && errCode.startsWith("P")
+          ? `Fork failed (${errCode})`
+          : `Fork failed (${errName})`;
       return NextResponse.json(
-        { success: false, error: "Fork failed" },
+        { success: false, error: safeError },
         { status: 500 },
       );
     }

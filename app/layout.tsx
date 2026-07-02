@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import React from "react";
+import { headers } from "next/headers";
 import localFont from "next/font/local";
 import {
   Source_Serif_4,
@@ -127,11 +128,18 @@ export const viewport: Viewport = {
   themeColor: "#ffffff",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Per-request nonce from the proxy. Inert until the M-2 CSP rollout
+  // adds `script-src 'nonce-{value}' 'strict-dynamic'` to the response
+  // headers — at which point this attribute is what keeps the theme
+  // script executing under strict CSP. Browsers ignore the attribute
+  // when no referencing CSP is present, so this is safe to land now.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
@@ -144,7 +152,7 @@ export default function RootLayout({
           hatch next-themes uses for this exact case.
           See lib/features/theme/script.ts.
         */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         <Head />
       </head>
       <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable} ${newsreader.variable} ${jetbrainsMono.variable} ${caveat.variable}`}>

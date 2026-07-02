@@ -27,6 +27,8 @@ export interface JsonArrayItemField {
   min?: number;
   max?: number;
   tooltip?: string;
+  /** Only render this field when another field in the same item equals a given value. */
+  showWhen?: { key: string; value: string };
 }
 
 // ─── Compact inline image field ───────────────────────────────────────────────
@@ -62,7 +64,7 @@ function ItemImageField({
   return (
     <div className="space-y-1">
       {value && (
-        <div className="relative rounded overflow-hidden h-10 border border-white/10">
+        <div className="relative rounded overflow-hidden h-10 border border-gray-200 dark:border-white/10">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={value} alt="" className="w-full h-full object-cover" />
           <button
@@ -79,7 +81,7 @@ function ItemImageField({
           type="button"
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-white/15 bg-white/5 text-gray-400 hover:text-gray-200 hover:bg-white/10 transition-colors disabled:opacity-50"
+          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
         >
           {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
           {value ? "Replace" : "Upload"}
@@ -87,7 +89,7 @@ function ItemImageField({
         <button
           type="button"
           onClick={() => setShowUrl((v) => !v)}
-          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-white/15 bg-white/5 text-gray-400 hover:text-gray-200 hover:bg-white/10 transition-colors"
+          className="flex items-center gap-1 px-2 py-0.5 text-[11px] rounded border border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/5 text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
         >
           <Link2 className="w-3 h-3" /> URL
         </button>
@@ -109,7 +111,7 @@ function ItemImageField({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="https://..."
-          className="w-full px-2 py-1 text-[11px] rounded bg-white/8 border border-white/10 text-gray-300 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none font-mono"
+          className="w-full px-2 py-1 text-[11px] rounded bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none font-mono"
         />
       )}
     </div>
@@ -128,7 +130,7 @@ function ItemFieldInput({
   onChange: (v: unknown) => void;
 }) {
   const baseClass =
-    "w-full px-2 py-1 text-xs rounded bg-white/8 border border-white/10 text-gray-200 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none";
+    "w-full px-2 py-1 text-xs rounded bg-white/8 border border-white/10 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none";
 
   if (field.type === "image") {
     return <ItemImageField value={(value as string) || ""} onChange={onChange} />;
@@ -259,9 +261,9 @@ function ItemRow({
 
   const isEven = index % 2 === 0;
   return (
-    <div className={`rounded-md border overflow-hidden ${isEven ? "border-white/10 bg-white/[0.03]" : "border-white/[0.07] bg-white/[0.06]"}`}>
+    <div className={`rounded-md border overflow-hidden ${isEven ? "border-gray-200 dark:border-white/10 bg-gray-50/60 dark:bg-white/[0.03]" : "border-gray-200 dark:border-white/[0.07] bg-white dark:bg-white/[0.06]"}`}>
       {/* Row header */}
-      <div className={`flex items-center justify-between px-2 py-1 border-b ${isEven ? "border-white/[0.07] bg-white/[0.04]" : "border-white/10 bg-white/[0.08]"}`}>
+      <div className={`flex items-center justify-between px-2 py-1 border-b ${isEven ? "border-gray-200 dark:border-white/[0.07] bg-gray-100/60 dark:bg-white/[0.04]" : "border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/[0.08]"}`}>
         <span className="text-[10px] text-gray-500 font-mono font-medium">#{index + 1}</span>
         <div className="flex gap-0.5">
           <button
@@ -301,7 +303,9 @@ function ItemRow({
           gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))`,
         }}
       >
-        {schema.map((field) => (
+        {schema.filter((field) =>
+          !field.showWhen || String(item[field.showWhen.key] ?? "") === field.showWhen.value
+        ).map((field) => (
           <div
             key={field.key}
             style={field.type === "textarea" || field.type === "image" || field.type === "icon" ? { gridColumn: "1 / -1" } : undefined}
@@ -468,10 +472,10 @@ export function JsonArrayEditor({
             onChange={(e) => handleRawChange(e.target.value)}
             rows={Math.min(Math.max(rawText.split("\n").length + 1, 5), 20)}
             spellCheck={false}
-            className={`w-full px-2 py-1.5 text-[11px] rounded-md border bg-black/30 text-gray-200 focus:outline-none font-mono resize-y leading-relaxed ${
+            className={`w-full px-2 py-1.5 text-[11px] rounded-md border bg-gray-50 dark:bg-black/30 text-gray-800 dark:text-gray-200 focus:outline-none font-mono resize-y leading-relaxed ${
               rawError
-                ? "border-rose-500/40 focus:border-rose-500/60"
-                : "border-white/12 focus:border-blue-500/50"
+                ? "border-rose-400/60 dark:border-rose-500/40 focus:border-rose-500/60"
+                : "border-gray-200 dark:border-white/12 focus:border-blue-500/50"
             }`}
           />
           {rawError && (
@@ -488,7 +492,7 @@ export function JsonArrayEditor({
         /* ── Visual editor ── */
         <div className="space-y-1.5">
           {items.length === 0 && (
-            <p className="text-xs text-gray-500/80 text-center py-3 border border-dashed border-white/10 rounded-md">
+            <p className="text-xs text-gray-500 text-center py-3 border border-dashed border-gray-300 dark:border-white/10 rounded-md">
               {emptyMessage}
             </p>
           )}
@@ -523,7 +527,7 @@ export function JsonArrayEditor({
           <button
             type="button"
             onClick={() => commit([...items, makeDefault(itemSchema)])}
-            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-dashed border-white/12 bg-white/[0.02] text-xs text-gray-500 hover:border-white/25 hover:text-gray-300 hover:bg-white/[0.04] transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-dashed border-gray-300 dark:border-white/12 bg-transparent dark:bg-white/[0.02] text-xs text-gray-500 hover:border-gray-400 dark:hover:border-white/25 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
           >
             <Plus className="w-3 h-3" />
             {addLabel}
@@ -618,10 +622,10 @@ export function StringArrayEditor({
             onChange={(e) => handleRawChange(e.target.value)}
             rows={Math.max(4, items.length + 2)}
             spellCheck={false}
-            className={`w-full px-2 py-1.5 text-[11px] rounded-md border bg-black/30 text-gray-200 focus:outline-none font-mono resize-y leading-relaxed ${
+            className={`w-full px-2 py-1.5 text-[11px] rounded-md border bg-gray-50 dark:bg-black/30 text-gray-800 dark:text-gray-200 focus:outline-none font-mono resize-y leading-relaxed ${
               rawError
-                ? "border-rose-500/40 focus:border-rose-500/60"
-                : "border-white/12 focus:border-blue-500/50"
+                ? "border-rose-400/60 dark:border-rose-500/40 focus:border-rose-500/60"
+                : "border-gray-200 dark:border-white/12 focus:border-blue-500/50"
             }`}
           />
           {rawError && <p className="text-[10px] text-rose-400">⚠ {rawError}</p>}
@@ -630,7 +634,7 @@ export function StringArrayEditor({
       ) : (
         <div className="space-y-1.5">
           {items.length === 0 && (
-            <p className="text-xs text-gray-500/80 text-center py-3 border border-dashed border-white/10 rounded-md">
+            <p className="text-xs text-gray-500 text-center py-3 border border-dashed border-gray-300 dark:border-white/10 rounded-md">
               {emptyMessage}
             </p>
           )}
@@ -643,7 +647,7 @@ export function StringArrayEditor({
                   commit(items.map((v, idx) => (idx === i ? e.target.value : v)))
                 }
                 placeholder={placeholder}
-                className="flex-1 px-2 py-1 text-xs rounded bg-white/8 border border-white/10 text-gray-200 placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none"
+                className="flex-1 px-2 py-1 text-xs rounded bg-gray-50 dark:bg-white/8 border border-gray-200 dark:border-white/10 text-gray-800 dark:text-gray-200 placeholder:text-gray-400 dark:placeholder:text-gray-600 focus:border-blue-500/50 focus:outline-none"
               />
               <div className="flex gap-0.5 shrink-0">
                 <button
@@ -686,7 +690,7 @@ export function StringArrayEditor({
           <button
             type="button"
             onClick={() => commit([...items, ""])}
-            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-dashed border-white/12 bg-white/[0.02] text-xs text-gray-500 hover:border-white/25 hover:text-gray-300 hover:bg-white/[0.04] transition-colors"
+            className="w-full flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md border border-dashed border-gray-300 dark:border-white/12 bg-transparent dark:bg-white/[0.02] text-xs text-gray-500 hover:border-gray-400 dark:hover:border-white/25 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
           >
             <Plus className="w-3 h-3" />
             {addLabel}

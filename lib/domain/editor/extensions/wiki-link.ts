@@ -12,7 +12,6 @@
 
 import { Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
-import type { Node as ProseMirrorNode } from "@tiptap/pm/model";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
 
@@ -225,42 +224,22 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         key: new PluginKey("wikiLinkInteraction"),
 
         props: {
-          handleClick(view, pos, event) {
-            const { doc } = view.state;
-            const clickPos = view.posAtCoords({
-              left: event.clientX,
-              top: event.clientY,
-            });
+          handleClick(_view, _pos, event) {
+            // Only handle left-click; right-click must reach the contextmenu handler
+            if (event.button !== 0) return false;
 
-            if (!clickPos) return false;
+            // Read directly from DOM — posAtCoords.inside is layout-sensitive and
+            // can return -1 in prod when fonts/CSS differ from dev.
+            const target = event.target as HTMLElement;
+            const wikiLinkEl = target.closest('[data-type="wiki-link"]');
+            if (!wikiLinkEl) return false;
 
-            // Find the wiki-link node at this position
-            // Use safe boundaries to avoid nodesBetween errors
-            const from = Math.max(0, clickPos.pos - 1);
-            const to = Math.min(doc.content.size, clickPos.pos + 1);
+            const targetTitle = wikiLinkEl.getAttribute("data-target-title");
+            if (!targetTitle || !options.onClickLink) return false;
 
-            let wikiLinkNode: ProseMirrorNode | null = null;
-
-            try {
-              doc.nodesBetween(from, to, (node) => {
-                if (node.type.name === "wikiLink") {
-                  wikiLinkNode = node;
-                  return false;
-                }
-              });
-            } catch (err) {
-              // Silently handle any range errors
-              return false;
-            }
-
-            // Single-click to navigate
-            if (wikiLinkNode && options.onClickLink) {
-              event.preventDefault();
-              options.onClickLink((wikiLinkNode as ProseMirrorNode).attrs.targetTitle);
-              return true;
-            }
-
-            return false;
+            event.preventDefault();
+            options.onClickLink(targetTitle);
+            return true;
           },
 
           handleKeyDown(view, event) {

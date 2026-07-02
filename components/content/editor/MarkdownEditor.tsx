@@ -41,6 +41,9 @@ import type {
   CollaborationUser,
 } from "@/lib/domain/collaboration/runtime";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { dropPoint } from "@tiptap/pm/transform";
+import type { NodeSelection } from "@tiptap/pm/state";
+import type { Slice } from "@tiptap/pm/model";
 
 interface RemoteCollaborator extends CollaborationUser {
   clientId: number;
@@ -184,6 +187,8 @@ export interface MarkdownEditorProps {
   }) => void;
   /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
   compact?: boolean;
+  /** Edge-to-edge mode for the browser-extension iframe note surface */
+  edgeToEdge?: boolean;
   /** Placeholder text when editor is empty */
   placeholder?: string;
   /** Custom class name */
@@ -212,6 +217,7 @@ export function MarkdownEditor({
   collaborationRuntime = null,
   onCollaborationSyncChange,
   compact = false,
+  edgeToEdge = false,
   className = "",
 }: MarkdownEditorProps) {
   const openMenu = useContextMenuStore((s) => s.openMenu);
@@ -284,6 +290,12 @@ export function MarkdownEditor({
     () => sanitizeTipTapJsonWithExtensions(content, viewerExtensions).json,
     [content, viewerExtensions]
   );
+  // Tracks the content reference the editor currently holds, seeded with the
+  // value the editor is created with (see useEditor `content` below). The
+  // content-sync effect compares against this to skip the redundant initial
+  // setContent — the editor already mounts with safeContent, so re-applying it
+  // on first render is a wasted doc re-parse on the critical (LCP) path.
+  const appliedContentRef = useRef<JSONContent | null>(safeContent);
   const isPlainEditorFallback =
     shouldUseCollaboration && runtimeEditPolicy?.reason === "degraded-plain-fallback";
   const collaborationState = useMemo(
@@ -427,7 +439,9 @@ export function MarkdownEditor({
     editorProps: {
       attributes: {
         class: [
-          compact
+          edgeToEdge
+            ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-2 pt-1 pb-1 dg-editor-edge-to-edge"
+            : compact
             ? "prose prose-sm max-w-none focus:outline-none min-h-[120px] px-4 pt-2 pb-2"
             : "prose prose-sm sm:prose lg:prose-lg xl:prose-xl max-w-none focus:outline-none min-h-[500px] px-6 pt-3 pb-4",
           effectiveEditable ? "block-editing-active" : "",
@@ -451,6 +465,7 @@ export function MarkdownEditor({
           }
           return false;
         },
+        drop: () => false,
       },
       // Sprint 37: Image paste handler
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
@@ -484,8 +499,8 @@ export function MarkdownEditor({
       },
       // Sprint 37: Image drop handler (ProseMirror-level)
       // Uses insertImageFromFileRef to avoid stale closure (see ref declaration)
-      handleDrop: (view, event, _slice, moved) => {
-        if (moved) return false; // Internal drag — let ProseMirror handle it
+      handleDrop: (_view, event, slice, moved) => {
+        if (moved) return false; // Internal node drags handled in React onDrop
 
         const files = Array.from(event.dataTransfer?.files || []);
         const imageFiles = files.filter((f) => f.type.startsWith("image/"));
@@ -800,14 +815,20 @@ export function MarkdownEditor({
     if (!editor || !safeContent) return;
     if (collaborationState) return;
 
+    // Already applied (including the initial mount, where the editor was
+    // created with this exact content) — skip the redundant re-parse.
+    if (safeContent === appliedContentRef.current) return;
+
     // If this content matches what we just saved, it's a save-echo — skip it
     if (safeContent === lastSavedContentRef.current) {
       lastSavedContentRef.current = null;
+      appliedContentRef.current = safeContent;
       return;
     }
 
     // Genuine external update — apply it
     editor.commands.setContent(safeContent);
+    appliedContentRef.current = safeContent;
   }, [collaborationState, editor, safeContent]);
 
   // Initial stats update when editor is created
@@ -1101,6 +1122,36 @@ export function MarkdownEditor({
     return () => window.removeEventListener("insert-ai-image", handleInsertAiImage);
   }, [editor]);
 
+  // Audio subsystem: insert an AI-generated speech clip at the cursor as an
+  // `audioEmbed` block. Mirrors the insert-ai-image flow above.
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleInsertAiAudio = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      const { src, filename, mimeType, durationSeconds, autoplayOnFlip } = detail;
+
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: "audioEmbed",
+          attrs: {
+            blockId: crypto.randomUUID(),
+            src,
+            filename: filename ?? "AI speech",
+            mimeType: mimeType ?? null,
+            durationSeconds: durationSeconds ?? null,
+            autoplayOnFlip: autoplayOnFlip ?? false,
+          },
+        })
+        .run();
+    };
+
+    window.addEventListener("insert-ai-audio", handleInsertAiAudio);
+    return () => window.removeEventListener("insert-ai-audio", handleInsertAiAudio);
+  }, [editor]);
+
   // Sprint 37: Insert image from file — shared by paste, drop, and file input.
   // Immediately shows a blob URL placeholder, uploads async, then swaps src.
   // NOTE: editorProps handlers use insertImageFromFileRef (not this directly)
@@ -1227,21 +1278,25 @@ export function MarkdownEditor({
         ref={editorScrollRef}
         className="relative flex-1 overflow-y-auto"
         onDragOver={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onDragEnter={(e) => {
-          if (
-            e.dataTransfer.types.includes("Files") ||
-            e.dataTransfer.types.includes("application/x-dg-ai-image")
-          ) {
+          const isFile = e.dataTransfer.types.includes("Files");
+          const isAiImage = e.dataTransfer.types.includes("application/x-dg-ai-image");
+          const isInternalPMDrag = editor
+            ? !!(editor.view as unknown as { dragging: unknown }).dragging
+            : false;
+          if (isFile || isAiImage || isInternalPMDrag) {
             e.preventDefault();
-            e.dataTransfer.dropEffect = "copy";
+            e.dataTransfer.dropEffect = isInternalPMDrag ? "move" : "copy";
           }
         }}
         onContextMenu={(e) => {
@@ -1322,6 +1377,53 @@ export function MarkdownEditor({
             e.stopPropagation();
             for (const file of imageFiles) {
               insertImageFromFile(file);
+            }
+            return;
+          }
+
+          // Internal ProseMirror drag (node move): React's onDrop fires before PM's
+          // native listener on view.dom, so view.dragging is still set here. We can't
+          // reliably re-dispatch through PM's event pipeline (posAtCoords may return
+          // null on a re-entrant synthetic dispatch), so we replicate PM's handleDrop
+          // logic directly: find the insert position, delete the source if it's a move,
+          // then insert the slice at the mapped position.
+          if (editor) {
+            type DraggingState = {
+              slice: Slice;
+              move: boolean;
+              node: NodeSelection | null;
+            };
+            const pmDragging = (editor.view as unknown as { dragging: DraggingState | null }).dragging;
+            if (pmDragging) {
+              e.preventDefault();
+              const { slice, move, node: draggingNode } = pmDragging;
+              const eventPos = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+              if (eventPos) {
+                const { state } = editor.view;
+                const tr = state.tr;
+                // Find the best drop target on the original doc before any deletions
+                const insertPos = dropPoint(state.doc, eventPos.pos, slice) ?? eventPos.pos;
+                // Delete the original node when this is a move (not a copy)
+                if (move && draggingNode) {
+                  tr.delete(draggingNode.from, draggingNode.to);
+                } else if (move) {
+                  tr.deleteSelection();
+                }
+                // Map the insertion point through any preceding deletions
+                const pos = tr.mapping.map(insertPos);
+                const isNodeSlice =
+                  slice.openStart === 0 &&
+                  slice.openEnd === 0 &&
+                  slice.content.childCount === 1;
+                if (isNodeSlice && slice.content.firstChild) {
+                  tr.replaceRangeWith(pos, pos, slice.content.firstChild);
+                } else {
+                  tr.replaceRange(pos, pos, slice);
+                }
+                (editor.view as unknown as { dragging: null }).dragging = null;
+                editor.view.focus();
+                editor.view.dispatch(tr);
+              }
             }
           }
         }}

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-05-31
+last_updated: 2026-06-03
 ---
 
 # Sprint Backlog
@@ -52,9 +52,33 @@ Total estimated effort: ~150 lines + 1 schema field + cron extension.
 
 ---
 
+## Speed Reader Followups (from worktree `worktree-speed-reader`, 2026-06-01)
+
+The Speed Reader extension shipped as a disabled-by-default global extension with RSVP playback over notes, PDFs, OCR'd images, and external articles. Followup work:
+
+- [ ] **Adaptive AI reading speed** — observe per-user reading behavior (pause frequency, step-backs, longest dwell positions) and use an AI model to adapt WPM dynamically based on text complexity (lexical density, sentence length, technical-term ratio). Goals: slow down on dense paragraphs without user intervention; speed up on filler. Considerations: privacy-preserving (local inference where possible vs. cloud model fan-out), opt-in only, must surface why it's adjusting (a subtle "AI: dense passage, –15%" affordance). Likely depends on a small classifier fed by the chunk's preceding paragraph; could pilot with a cached embeddings-based readability score before going model-driven. Track effect on comprehension via retention prompts at session end.
+- [ ] **Sticky session resume** — persist current `position` per `contentId` in localStorage so closing/reopening the dialog resumes where you left off.
+- [ ] **Keyboard speed-trim shortcuts** — `[` and `]` to bump WPM ±25 without mousing to the slider.
+- [ ] **Comprehension prompts at session end** — optional 1-question recall on the final chunk's paragraph, scored locally, feeds the adaptive model in the first bullet.
+
+---
+
 ## Dev Infra Followups
 
-- [ ] **Local Postgres (Docker) for development** — reserve cloud Neon for deployed/preview only, so heavy local dev/testing stops burning Neon metered compute (hit the "exceeded compute time quota" wall during AI-chat-revamp dev, 2026-05). Temporary workaround in place: upgraded Vercel (Neon billed through it). Do this **after** the AI chat revamp scope completes. Deliverable: `docker-compose.yml` for Postgres + a dev `DATABASE_URL` swap (keep the Neon URL for deploys); `npx prisma db push` to seed the local schema.
+- [x] **Local Postgres (Docker) for development** — Shipped 2026-06-03 in PR `chore/local-postgres-dev`. Deliverables: `docker-compose.yml` (Postgres 16-alpine), `.env.docker.example` template, `scripts/check-db-target.ts` safety guard, `pnpm db:local:up/down/reset` + `pnpm db:target` scripts, `docs/notes-feature/guides/database/LOCAL-POSTGRES.md`. Verified workflow: `pnpm db:local:up → migrate deploy → db push → db:seed → pnpm dev` boots in <2s. Neon connection preserved as opt-in fallback.
+
+### Migration history drift (surfaced by local-postgres setup, 2026-06-03)
+
+Verifying the local-postgres workflow exposed that several merged features applied schema changes via `prisma db push` against Neon without backfilling proper migration files. `prisma migrate deploy` alone produces a DB missing ~30 tables that the running app expects. The local-postgres workflow documents `npx prisma db push` as the interim catch-up step.
+
+**Template for each backfill**: `prisma/migrations/20260530150000_baseline_ai_chat_tables/migration.sql` (PR #48, AI Chat tables). Idempotent `CREATE TABLE IF NOT EXISTS` + `DO` blocks for enums/constraints. After each backfill migration merges, every existing Neon environment (prod, prod-mirror dev, live preview branches) must run `npx prisma migrate resolve --applied <name>` once.
+
+- [ ] **Backfill: Tenancy schema (PR #47, Phases 5-12)** — Tables: `Tenant`, `TenantHost`. New columns on `User`: `canClaimCustomHosts`, `primaryTenantId`. Plus related indexes and FKs. **Smallest of the four; freshest in team memory; recommended first.**
+- [ ] **Backfill: Publishing system schema** — Tables: `PublicItem`, `PublicItemRevision`, `PublicPath`, `PublicPathRedirect`, `PreviewToken`, `Series`, plus 14 payload tables (`BlogPostPayload`, `CaseStudyPayload`, `ChatPayload`, `DataPayload`, `ExternalPayload`, `FolderPayload`, `HopePayload`, `MediaItemPayload`, `PagePayload`, `ProfileSectionPayload`, `ProjectPayload`, `VisualizationPayload`, `WorkflowPayload`, `BookmarkPayload`). **Largest of the four; may warrant splitting into payload-tables and routing-tables sub-PRs.**
+- [ ] **Backfill: Browser extension schema** — Tables: `BrowserExtensionToken`, `BrowserExtensionInstall`, `BookmarkSyncConnection`, `BookmarkSyncConnectionInstall`, `BookmarkSyncLink`. Relatively isolated surface.
+- [ ] **Backfill: Web resources schema** — Tables: `WebResource`, `WebResourceContentLink`, `WebResourceViewState`. Smallest after tenancy.
+
+Once all four land, the `npx prisma db push` step can be deleted from the LOCAL-POSTGRES.md quick-start and the workflow becomes `migrate deploy → db:seed` only.
 
 ---
 

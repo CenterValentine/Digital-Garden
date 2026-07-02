@@ -6,12 +6,14 @@
  * `error.message` verbatim, so we parse it here and:
  *   - show a human-readable label (no raw JSON in the UI)
  *   - add a "Settings → AI" CTA when the cause is BYOK setup
+ *   - allow user to dismiss the error with a close button
  */
 
 "use client";
 
 import Link from "next/link";
-import { AlertCircle, ExternalLink } from "lucide-react";
+import { AlertCircle, ExternalLink, X } from "lucide-react";
+import { useState } from "react";
 import {
   parseChatError,
   describeChatError,
@@ -23,7 +25,9 @@ interface ChatErrorBannerProps {
 }
 
 export function ChatErrorBanner({ message }: ChatErrorBannerProps) {
-  if (!message) return null;
+  const [dismissed, setDismissed] = useState(false);
+
+  if (!message || dismissed) return null;
   const parsed = parseChatError(message);
   const showSettingsCta = shouldOfferSettingsCta(parsed);
 
@@ -42,6 +46,15 @@ export function ChatErrorBanner({ message }: ChatErrorBannerProps) {
           </Link>
         )}
       </div>
+      <button
+        type="button"
+        onClick={() => setDismissed(true)}
+        className="shrink-0 text-red-400 hover:text-red-200 transition-colors p-0.5"
+        aria-label="Dismiss error"
+        title="Dismiss"
+      >
+        <X className="h-3.5 w-3.5" />
+      </button>
     </div>
   );
 }

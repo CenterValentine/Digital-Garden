@@ -14,7 +14,7 @@
 
 "use client";
 
-import { useRef, useEffect, useMemo, useState, useCallback } from "react";
+import { useRef, useEffect, useMemo } from "react";
 import { Tree, type NodeApi, type TreeApi, type NodeRendererProps } from "react-arborist";
 import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
@@ -88,7 +88,6 @@ export function FileTree({
   } = useTreeStateStore();
   const hasRestoredRef = useRef(false);
   const isRestoringScrollRef = useRef(false);
-  const [editingDrafts, setEditingDrafts] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const targetOffset = scrollOffset;
@@ -225,26 +224,11 @@ export function FileTree({
     }
   }, [selectedIds]); // React to selectedIds changes
 
-  // Create a wrapper component that has access to callbacks
-  const handleEditingValueChange = useCallback((id: string, value: string) => {
-    setEditingDrafts((current) => {
-      if (current[id] === value) return current;
-      return { ...current, [id]: value };
-    });
-  }, []);
-
-  const handleEditingValueClear = useCallback((id: string) => {
-    setEditingDrafts((current) => {
-      if (!(id in current)) return current;
-      const next = { ...current };
-      delete next[id];
-      return next;
-    });
-  }, []);
-
+  // Node renderer. Inline-rename drafts live in `useFileTreeEditStore`
+  // (read inside FileNode), NOT in this component's state — so a keystroke
+  // re-renders only the editing node and never re-creates this renderer or
+  // remounts rows (which used to snap the rename caret to the end).
   const NodeWithCallbacks = (props: NodeRendererProps<TreeNode>) => {
-    const nodeId = String(props.node.id);
-
     return (
       <FileNode
         {...props}
@@ -261,9 +245,6 @@ export function FileTree({
         onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet}
         onCreateAiImage={onCreateAiImage}
         onAddPeopleTarget={onAddPeopleTarget}
-        editingValue={editingDrafts[nodeId]}
-        onEditingValueChange={handleEditingValueChange}
-        onEditingValueClear={handleEditingValueClear}
       />
     );
   };

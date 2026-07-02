@@ -77,6 +77,13 @@ export interface FlashcardDeckDto {
   masteredCount: number;
   reviewedCount: number;
   viewedCount: number;
+  // FK-paradigm fields surfaced through the legacy DTO so the panel can
+  // call deck-id-based endpoints (DELETE, move-cards) without an extra
+  // resolve hop. Optional for backward-compat with any consumer that
+  // doesn't need them.
+  deckId?: string;
+  /** Materialized full path (e.g. "spanish/irregular-verbs"). */
+  path?: string;
 }
 
 // FK-paradigm deck record returned by the new deck CRUD routes. Distinct

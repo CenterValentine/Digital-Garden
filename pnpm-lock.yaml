@@ -92,6 +92,9 @@ importers:
       '@lobehub/icons':
         specifier: ^5.10.0
         version: 5.10.0(@lobehub/ui@5.15.6)(@types/react@19.2.10)(antd@6.4.3(date-fns@4.1.0)(moment@2.30.1)(react-dom@19.2.1(react@19.2.1))(react@19.2.1))(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@mozilla/readability':
+        specifier: ^0.6.0
+        version: 0.6.0
       '@onlyoffice/document-editor-react':
         specifier: ^2.1.1
         version: 2.1.1(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
@@ -281,6 +284,9 @@ importers:
       docx:
         specifier: ^9.5.1
         version: 9.5.1
+      dompurify:
+        specifier: ^3.4.7
+        version: 3.4.7
       file-type:
         specifier: ^21.3.0
         version: 21.3.0
@@ -293,6 +299,9 @@ importers:
       google-auth-library:
         specifier: ^9.0.0
         version: 9.15.1
+      heic2any:
+        specifier: ^0.0.4
+        version: 0.0.4
       jsdom:
         specifier: ^26.1.0
         version: 26.1.0(canvas@3.2.1)
@@ -392,6 +401,9 @@ importers:
       tailwind-merge:
         specifier: ^3.4.0
         version: 3.4.0
+      tesseract.js:
+        specifier: ^7.0.0
+        version: 7.0.0
       three:
         specifier: ^0.182.0
         version: 0.182.0
@@ -2455,6 +2467,10 @@ packages:
     resolution: {integrity: sha512-2Z0FATFHaoYJ8b+Y4y4Hgfn3FRFwuU5zRrk+9dFWp4uGAdHGqVEdP7HP+gLA3X469KXHmfupJaUbKo1b/aDKIg==}
     peerDependencies:
       three: '>= 0.159.0'
+
+  '@mozilla/readability@0.6.0':
+    resolution: {integrity: sha512-juG5VWh4qAivzTAeMzvY9xs9HY5rAcr2E4I7tiSSCokRFi7XIZCAu92ZkSTsIj1OPceCifL3cpfteP3pDT9/QQ==}
+    engines: {node: '>=14.0.0'}
 
   '@mrleebo/prisma-ast@0.12.1':
     resolution: {integrity: sha512-JwqeCQ1U3fvccttHZq7Tk0m/TMC6WcFAQZdukypW3AzlJYKYTGNVd1ANU2GuhKnv4UQuOFj3oAl0LLG/gxFN1w==}
@@ -5532,6 +5548,9 @@ packages:
   bluebird@3.4.7:
     resolution: {integrity: sha512-iD3898SR7sWVRHbiQv+sHUtHnMvC1o3nW5rAcqnq3uOn07DSAppZYUkIGslDz6gXC7HfunPe7YVBgoEJASPcHA==}
 
+  bmp-js@0.1.0:
+    resolution: {integrity: sha512-vHdS19CnY3hwiNdkaqk93DvjVLfbEcI8mys4UjuWrlX1haDmroo8o4xCzh4wD6DGV6HxRCyauwhHRqMTfERtjw==}
+
   bowser@2.13.1:
     resolution: {integrity: sha512-OHawaAbjwx6rqICCKgSG0SAnT05bzd7ppyKLVUITZpANBaaMFBAsaNkto3LoQ31tyFP5kNujE8Cdx85G9VzOkw==}
 
@@ -6155,6 +6174,9 @@ packages:
 
   dompurify@3.3.1:
     resolution: {integrity: sha512-qkdCKzLNtrgPFP1Vo+98FRzJnBRGe4ffyCea9IwHB1fyxPOeNTHpLKYGd4Uk9xvNoH0ZoOjwZxNptyMwqrId1Q==}
+
+  dompurify@3.4.7:
+    resolution: {integrity: sha512-2jBxDJY4RR06tQNy4w5FlFH7kfxsQZlufd0sbv+chfHCxeJwrFw2baUDsSwvBISD4K4RDbd0PTfy3uNXsR6siA==}
 
   dotenv@16.6.1:
     resolution: {integrity: sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==}
@@ -6881,6 +6903,9 @@ packages:
   hastscript@9.0.1:
     resolution: {integrity: sha512-g7df9rMFX/SPi34tyGCyUBREQoKkapwdY/T04Qn9TDWfHhAYt4/I0gMVirzK5wEzeUqIjEB+LXC/ypb7Aqno5w==}
 
+  heic2any@0.0.4:
+    resolution: {integrity: sha512-3lLnZiDELfabVH87htnRolZ2iehX9zwpRyGNz22GKXIu0fznlblf0/ftppXKNqS26dqFSeqfIBhAmAj/uSp0cA==}
+
   hermes-estree@0.25.1:
     resolution: {integrity: sha512-0wUoCcLp+5Ev5pDW2OriHC2MJCbwLwuRx+gAqMTOkGKJJiBCLjtrvy4PWUGn6MIVefecRpzoOZ/UV6iGdOr+Cw==}
 
@@ -6933,6 +6958,9 @@ packages:
   iconv-lite@0.7.2:
     resolution: {integrity: sha512-im9DjEDQ55s9fL4EYzOAv0yMqmMBSZp6G0VvFyTMPKWxiSBHUj9NW/qqLmXUwXrrM7AvqSlTCfvqRb0cM8yYqw==}
     engines: {node: '>=0.10.0'}
+
+  idb-keyval@6.2.4:
+    resolution: {integrity: sha512-D/NzHWUmYJGXi++z67aMSrnisb9A3621CyRK5G89JyTlN13C8xf0g04DLxUKMufPem3e3L2JAXR6Z00OWy183Q==}
 
   idb@7.1.1:
     resolution: {integrity: sha512-gchesWBzyvGHRO9W8tzUWFDycow5gwjvFKfyV9FF32Y7F50yZMp7mP+T2mJIWFx49zicqyC4uefHM17o6xKIVQ==}
@@ -7182,6 +7210,9 @@ packages:
   is-typed-array@1.1.15:
     resolution: {integrity: sha512-p3EcsicXjit7SaskXHs1hA91QxgTw46Fv6EFKKGS5DRFLD8yKnohjF3hxoju94b/OcMZoQukzpPpBE9uLVKzgQ==}
     engines: {node: '>= 0.4'}
+
+  is-url@1.2.4:
+    resolution: {integrity: sha512-ITvGim8FhRiYe4IQ5uHSkj7pVaPDrCTkNd3yq3cV7iZAcJdHTUMPMEHcqSOy9xZ9qFenQCvi+2wjH9a1nXqHww==}
 
   is-weakmap@2.0.2:
     resolution: {integrity: sha512-K5pXYOm9wqY1RgjpL3YTkF39tni1XajUIkawTLUo9EZEVUFga5gSQJF8nNS7ZwJQ02y+1YCNYcMh+HIf1ZqE+w==}
@@ -8182,6 +8213,10 @@ packages:
   open-color@1.9.1:
     resolution: {integrity: sha512-vCseG/EQ6/RcvxhUcGJiHViOgrtz4x0XbZepXvKik66TMGkvbmjeJrKFyBEx6daG5rNyyd14zYXhz0hZVwQFOw==}
 
+  opencollective-postinstall@2.0.3:
+    resolution: {integrity: sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q==}
+    hasBin: true
+
   option@0.2.4:
     resolution: {integrity: sha512-pkEqbDyl8ou5cpq+VsnQbe/WlEy5qS7xPzMS1U55OCG9KPvwFD46zDbxQIj3egJSFc3D+XhYOPUzz49zQAVy7A==}
 
@@ -8948,6 +8983,9 @@ packages:
   regenerate@1.4.2:
     resolution: {integrity: sha512-zrceR/XhGYU/d/opr2EKO7aRHUeiBI8qjtfHqADTwZd6Szfy16la6kqD0MIUs5z5hx6AaKa+PixpPrR289+I0A==}
 
+  regenerator-runtime@0.13.11:
+    resolution: {integrity: sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==}
+
   regex-recursion@6.0.2:
     resolution: {integrity: sha512-0YCaSCq2VRIebiaUviZNs0cBz1kg5kVS2UKUfNIx8YVs1cN3AV7NTctO5FOKBA+UT2BPJIWZauYHPqJODG50cg==}
 
@@ -9603,6 +9641,12 @@ packages:
     engines: {node: '>=10'}
     hasBin: true
 
+  tesseract.js-core@7.0.0:
+    resolution: {integrity: sha512-WnNH518NzmbSq9zgTPeoF8c+xmilS8rFIl1YKbk/ptuuc7p6cLNELNuPAzcmsYw450ca6bLa8j3t0VAtq435Vw==}
+
+  tesseract.js@7.0.0:
+    resolution: {integrity: sha512-exPBkd+z+wM1BuMkx/Bjv43OeLBxhL5kKWsz/9JY+DXcXdiBjiAch0V49QR3oAJqCaL5qURE0vx9Eo+G5YE7mA==}
+
   thingies@2.5.0:
     resolution: {integrity: sha512-s+2Bwztg6PhWUD7XMfeYm5qliDdSiZm7M7n8KjTkIsm3l/2lgVRc2/Gx/v+ZX8lT4FMA+i8aQvhcWylldc+ZNw==}
     engines: {node: '>=10.18'}
@@ -10036,6 +10080,9 @@ packages:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
     engines: {node: '>=18'}
 
+  wasm-feature-detect@1.8.0:
+    resolution: {integrity: sha512-zksaLKM2fVlnB5jQQDqKXXwYHLQUVH9es+5TOOHwGOVJOCeRBCiPjwSg+3tN2AdTCzjgli4jijCH290kXb/zWQ==}
+
   watchpack@2.5.1:
     resolution: {integrity: sha512-Zn5uXdcFNIA1+1Ei5McRd+iRzfhENPCe7LeABkJtNulSxjma+l7ltNx55BWZkRlwRnpOgHqxnjyaDgJnNXnqzg==}
     engines: {node: '>=10.13.0'}
@@ -10287,6 +10334,9 @@ packages:
 
   zeptomatch@2.0.2:
     resolution: {integrity: sha512-H33jtSKf8Ijtb5BW6wua3G5DhnFjbFML36eFu+VdOoVY4HD9e7ggjqdM6639B+L87rjnR6Y+XeRzBXZdy52B/g==}
+
+  zlibjs@0.3.1:
+    resolution: {integrity: sha512-+J9RrgTKOmlxFSDHo0pI1xM6BLVUv+o0ZT9ANtCxGkjIVCCUdx9alUF8Gm+dGLKbkkkidWIHFDZHDMpfITt4+w==}
 
   zod-validation-error@4.0.2:
     resolution: {integrity: sha512-Q6/nZLe6jxuU80qb/4uJ4t5v2VEZ44lzQjPDhYJNztRQ4wyWc6VF3D3Kb/fAuPetZQnhS3hnajCf9CsWesghLQ==}
@@ -12897,6 +12947,8 @@ snapshots:
     dependencies:
       promise-worker-transferable: 1.0.4
       three: 0.182.0
+
+  '@mozilla/readability@0.6.0': {}
 
   '@mrleebo/prisma-ast@0.12.1':
     dependencies:
@@ -16403,6 +16455,8 @@ snapshots:
 
   bluebird@3.4.7: {}
 
+  bmp-js@0.1.0: {}
+
   bowser@2.13.1: {}
 
   brace-expansion@1.1.12:
@@ -17044,6 +17098,10 @@ snapshots:
   dompurify@3.1.6: {}
 
   dompurify@3.3.1:
+    optionalDependencies:
+      '@types/trusted-types': 2.0.7
+
+  dompurify@3.4.7:
     optionalDependencies:
       '@types/trusted-types': 2.0.7
 
@@ -18076,6 +18134,8 @@ snapshots:
       property-information: 7.1.0
       space-separated-tokens: 2.0.2
 
+  heic2any@0.0.4: {}
+
   hermes-estree@0.25.1: {}
 
   hermes-parser@0.25.1:
@@ -18125,6 +18185,8 @@ snapshots:
   iconv-lite@0.7.2:
     dependencies:
       safer-buffer: 2.1.2
+
+  idb-keyval@6.2.4: {}
 
   idb@7.1.1: {}
 
@@ -18347,6 +18409,8 @@ snapshots:
   is-typed-array@1.1.15:
     dependencies:
       which-typed-array: 1.1.20
+
+  is-url@1.2.4: {}
 
   is-weakmap@2.0.2: {}
 
@@ -19058,7 +19122,7 @@ snapshots:
       d3-sankey: 0.12.3
       dagre-d3-es: 7.0.13
       dayjs: 1.11.19
-      dompurify: 3.3.1
+      dompurify: 3.4.7
       katex: 0.16.45
       khroma: 2.1.0
       lodash-es: 4.17.23
@@ -19785,6 +19849,8 @@ snapshots:
       regex-recursion: 6.0.2
 
   open-color@1.9.1: {}
+
+  opencollective-postinstall@2.0.3: {}
 
   option@0.2.4: {}
 
@@ -20726,6 +20792,8 @@ snapshots:
 
   regenerate@1.4.2: {}
 
+  regenerator-runtime@0.13.11: {}
+
   regex-recursion@6.0.2:
     dependencies:
       regex-utilities: 2.3.0
@@ -21476,6 +21544,22 @@ snapshots:
       commander: 2.20.3
       source-map-support: 0.5.21
 
+  tesseract.js-core@7.0.0: {}
+
+  tesseract.js@7.0.0:
+    dependencies:
+      bmp-js: 0.1.0
+      idb-keyval: 6.2.4
+      is-url: 1.2.4
+      node-fetch: 2.7.0
+      opencollective-postinstall: 2.0.3
+      regenerator-runtime: 0.13.11
+      tesseract.js-core: 7.0.0
+      wasm-feature-detect: 1.8.0
+      zlibjs: 0.3.1
+    transitivePeerDependencies:
+      - encoding
+
   thingies@2.5.0(tslib@2.8.1):
     dependencies:
       tslib: 2.8.1
@@ -21939,6 +22023,8 @@ snapshots:
     dependencies:
       xml-name-validator: 5.0.0
 
+  wasm-feature-detect@1.8.0: {}
+
   watchpack@2.5.1:
     dependencies:
       glob-to-regexp: 0.4.1
@@ -22284,6 +22370,8 @@ snapshots:
   zeptomatch@2.0.2:
     dependencies:
       grammex: 3.1.12
+
+  zlibjs@0.3.1: {}
 
   zod-validation-error@4.0.2(zod@4.3.6):
     dependencies:
