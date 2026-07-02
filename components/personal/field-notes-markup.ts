@@ -79,7 +79,7 @@ export const FIELD_NOTES_MARKUP = `<div class="stage">
     <header class="topbar">
       <a class="logo" href="#"><span class="wd"><span class="wn">David Valentine<span class="dot">.</span></span><span class="wt">MY&nbsp;DIGITAL GARDEN</span></span></a>
       <nav class="nav" id="nav" aria-label="Garden"></nav>
-      <a class="signin" href="#signin" aria-label="My Sign In">My Sign In</a>
+      <a class="signin" href="https://notetrellis.com/sign-in" aria-label="Sign in">Sign In</a>
     </header>
 
     <!-- fixed, only spins -->
