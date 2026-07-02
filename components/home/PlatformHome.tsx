@@ -30,7 +30,7 @@ export function PlatformHome() {
               Sign in
             </Link>
             <Link
-              href="/sign-up"
+              href="/invite"
               className="px-3 py-1.5 rounded-md bg-white text-black hover:bg-white/90 transition-colors"
             >
               Create account
@@ -52,7 +52,7 @@ export function PlatformHome() {
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Link
-              href="/sign-up"
+              href="/invite"
               className="px-5 py-3 rounded-lg bg-emerald-500 text-black font-medium hover:bg-emerald-400 transition-colors"
             >
               Start your garden
