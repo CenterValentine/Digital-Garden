@@ -567,6 +567,17 @@ model User {
   webResourceContentLinks WebResourceContentLink[]
   webResourceViewStates WebResourceViewState[]
 
+  connectionInvitesSent     ConnectionInvite[]      @relation("ConnectionInvitesSent")
+  connectionInvitesReceived ConnectionInvite[]      @relation("ConnectionInvitesReceived")
+  connectionsAsA            UserConnection[]        @relation("ConnectionsAsA")
+  connectionsAsB            UserConnection[]        @relation("ConnectionsAsB")
+  blocksIssued              UserBlock[]             @relation("BlocksIssued")
+  blocksReceived            UserBlock[]             @relation("BlocksReceived")
+  activityEventsActed       ActivityEvent[]         @relation("ActivityEventsActed")
+  notificationInbox         NotificationRecipient[] @relation("NotificationInbox")
+  dmParticipations          DmParticipant[]         @relation("DmParticipations")
+  dmMessagesSent            DmMessage[]             @relation("DmMessagesSent")
+
   @@index([email])
 }
 
@@ -1960,4 +1971,184 @@ model MediaItemPayload {
   mediaContentIds String[]            @db.Uuid
 
   publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// Connections + Notifications + Direct Messages
+//
+// ActivityEvent is the canonical event log (string kinds, Zod-validated
+// payloads in lib/domain/notifications/kinds.ts). NotificationRecipient
+// is the per-user projection carrying read/archive state. DM content
+// lives outside the log (messages are content; the log is signal).
+// ============================================================
+
+enum ConnectionInviteStatus {
+  pending
+  accepted
+  declined // never exposed to the inviter; renders as "pending" until expiry
+  revoked
+  expired
+}
+
+model ConnectionInvite {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inviterId         String                 @db.Uuid
+  // Email/username exactly as typed (lowercased). Kept even when unresolved
+  // so the sender's sent-list is identical for real and non-existent targets.
+  inviteeIdentifier String                 @db.VarChar(255)
+  // Secretly resolved server-side; NEVER exposed to the inviter. Stays null
+  // when the invite is suppressed (self, blocked, already connected, dupe)
+  // so a suppressed invite can never be listed or accepted by the target.
+  inviteeUserId     String?                @db.Uuid
+  status            ConnectionInviteStatus @default(pending)
+  message           String?                @db.VarChar(280)
+  expiresAt         DateTime               @db.Timestamptz(6)
+  respondedAt       DateTime?              @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
+
+  inviter User  @relation("ConnectionInvitesSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User? @relation("ConnectionInvitesReceived", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+
+  @@index([inviterId, status])
+  @@index([inviteeUserId, status])
+  @@index([status, expiresAt])
+}
+
+model UserConnection {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Canonical pair ordering enforced in service: userAId < userBId.
+  userAId     String    @db.Uuid
+  userBId     String    @db.Uuid
+  connectedAt DateTime  @default(now()) @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+  deletedById String?   @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  userA User @relation("ConnectionsAsA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("ConnectionsAsB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userAId, deletedAt])
+  @@index([userBId, deletedAt])
+}
+
+model UserBlock {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blockerId     String   @db.Uuid
+  blockedUserId String   @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  blocker User @relation("BlocksIssued", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedUserId])
+  @@index([blockedUserId])
+}
+
+enum ActivityActorType {
+  user
+  system
+  ai
+  extension
+}
+
+model ActivityEvent {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind        String            @db.VarChar(100)
+  actorType   ActivityActorType
+  // SetNull so the canonical log survives account deletion.
+  actorUserId String?           @db.Uuid
+  actorLabel  String?           @db.VarChar(120)
+  payload     Json
+  subjectType String?           @db.VarChar(50)
+  subjectId   String?           @db.Uuid
+  createdAt   DateTime          @default(now()) @db.Timestamptz(6)
+
+  actor      User?                   @relation("ActivityEventsActed", fields: [actorUserId], references: [id], onDelete: SetNull)
+  recipients NotificationRecipient[]
+
+  @@index([kind, createdAt])
+  @@index([subjectType, subjectId])
+  @@index([createdAt])
+}
+
+model NotificationRecipient {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String    @db.Uuid
+  userId      String    @db.Uuid
+  // Unread coalescing key (e.g. "dm:<threadId>") — service-enforced, no
+  // unique constraint; a rare race producing two rows is harmless.
+  collapseKey String?   @db.VarChar(120)
+  readAt      DateTime? @db.Timestamptz(6)
+  archivedAt  DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  event ActivityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation("NotificationInbox", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId, readAt])
+  @@index([userId, archivedAt, createdAt])
+  @@index([userId, collapseKey])
+}
+
+model DmThread {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // "<minUserId>:<maxUserId>" for 1:1 threads; null reserved for future groups.
+  pairKey       String?   @unique @db.VarChar(80)
+  lastMessageAt DateTime? @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+
+  participants DmParticipant[]
+  messages     DmMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model DmParticipant {
+  threadId     String    @db.Uuid
+  userId       String    @db.Uuid
+  // Unread cursor — messages newer than this count as unread.
+  lastReadAt   DateTime? @db.Timestamptz(6)
+  // Viewing heartbeat — a fresh value suppresses dm.message notifications.
+  lastActiveAt DateTime? @db.Timestamptz(6)
+  archivedAt   DateTime? @db.Timestamptz(6)
+  // Per-user thread hide; cleared when a new message arrives.
+  deletedAt    DateTime? @db.Timestamptz(6)
+  joinedAt     DateTime  @default(now()) @db.Timestamptz(6)
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User     @relation("DmParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([userId, deletedAt])
+}
+
+model DmMessage {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId  String    @db.Uuid
+  // SetNull so history survives account deletion ("deleted user").
+  senderId  String?   @db.Uuid
+  body      String    @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  editedAt  DateTime? @db.Timestamptz(6)
+  // Soft delete → "message deleted" placeholder on both sides.
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User?    @relation("DmMessagesSent", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+}
+
+model RateLimitCounter {
+  key         String   @db.VarChar(160)
+  windowStart DateTime @db.Timestamptz(6)
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
 }
