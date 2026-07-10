@@ -181,18 +181,18 @@ export function ChatContextPicker({
   return (
     <div ref={containerRef} className="relative">
       {isOpen && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 w-72 overflow-hidden rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl">
+        <div className="absolute bottom-full left-0 z-50 mb-1 w-72 overflow-hidden rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl">
           {draft ? (
             // ── Form view (create / edit) ──
             <div className="p-2.5">
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   {draft.id ? "Edit context" : "New context"}
                 </span>
                 <button
                   type="button"
                   onClick={() => setDraft(null)}
-                  className="rounded p-0.5 text-gray-500 hover:bg-white/10 hover:text-gray-300"
+                  className="rounded p-0.5 text-gray-500 hover:bg-black/[0.06] hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-300"
                   aria-label="Cancel"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -212,7 +212,7 @@ export function ChatContextPicker({
                 placeholder="Name (e.g. Concise & technical)"
                 maxLength={CHAT_CONTEXT_NAME_MAX}
                 autoFocus
-                className="mb-2 w-full rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs text-white placeholder:text-gray-500 focus:border-white/25 focus:outline-none"
+                className="mb-2 w-full rounded-md border border-black/10 bg-black/[0.03] text-gray-900 focus:border-black/25 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-white/25 px-2.5 py-1.5 text-xs placeholder:text-gray-500 focus:outline-none"
               />
               <textarea
                 value={draft.body}
@@ -228,13 +228,13 @@ export function ChatContextPicker({
                 placeholder="How should the assistant respond? e.g. 'Be terse. Prefer code examples. Assume I'm a senior engineer.'"
                 maxLength={CHAT_CONTEXT_BODY_MAX}
                 rows={5}
-                className="scrollbar-hide w-full resize-none rounded-md border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-xs leading-relaxed text-white placeholder:text-gray-500 focus:border-white/25 focus:outline-none"
+                className="scrollbar-hide w-full resize-none rounded-md border border-black/10 bg-black/[0.03] text-gray-900 focus:border-black/25 dark:border-white/10 dark:bg-white/[0.04] dark:text-white dark:focus:border-white/25 px-2.5 py-1.5 text-xs leading-relaxed placeholder:text-gray-500 focus:outline-none"
               />
               <div className="mt-2 flex items-center justify-end gap-1.5">
                 <button
                   type="button"
                   onClick={() => setDraft(null)}
-                  className="rounded-md px-2.5 py-1 text-[11px] text-gray-400 hover:bg-white/10 hover:text-gray-200"
+                  className="rounded-md px-2.5 py-1 text-[11px] text-gray-500 hover:bg-black/[0.06] hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
                 >
                   Cancel
                 </button>
@@ -242,7 +242,7 @@ export function ChatContextPicker({
                   type="button"
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex items-center gap-1 rounded-md bg-white/10 px-2.5 py-1 text-[11px] text-white hover:bg-white/20 disabled:opacity-50"
+                  className="flex items-center gap-1 rounded-md bg-gray-900 text-white hover:bg-gray-700 dark:bg-white/10 dark:hover:bg-white/20 px-2.5 py-1 text-[11px] disabled:opacity-50"
                 >
                   <Check className="h-3 w-3" />
                   {saving ? "Saving…" : "Save"}
@@ -259,8 +259,8 @@ export function ChatContextPicker({
                 className={cn(
                   "flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors",
                   value === null
-                    ? "bg-white/10 text-white"
-                    : "text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                    ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
+                    : "text-gray-500 hover:bg-black/[0.04] hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200",
                 )}
               >
                 <span>No context</span>
@@ -287,7 +287,7 @@ export function ChatContextPicker({
                     key={ctx.id}
                     className={cn(
                       "group flex items-center gap-1 px-1.5",
-                      isSelected && "bg-white/10",
+                      isSelected && "bg-black/[0.06] dark:bg-white/10",
                     )}
                   >
                     <button
@@ -296,8 +296,8 @@ export function ChatContextPicker({
                       className={cn(
                         "flex min-w-0 flex-1 items-center justify-between rounded px-1.5 py-2 text-left text-xs transition-colors",
                         isSelected
-                          ? "text-white"
-                          : "text-gray-400 hover:text-gray-200",
+                          ? "text-gray-900 dark:text-white"
+                          : "text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200",
                       )}
                     >
                       <span className="truncate">{ctx.name}</span>
@@ -314,7 +314,7 @@ export function ChatContextPicker({
                           body: ctx.body,
                         })
                       }
-                      className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:bg-white/10 hover:text-gray-300 group-hover:opacity-100"
+                      className="rounded p-1 text-gray-500 opacity-0 transition-opacity hover:bg-black/[0.06] hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-300 group-hover:opacity-100"
                       aria-label={`Edit ${ctx.name}`}
                     >
                       <Pencil className="h-3 w-3" />
@@ -332,11 +332,11 @@ export function ChatContextPicker({
               })}
 
               {/* New context */}
-              <div className="mt-1 border-t border-white/5 pt-1">
+              <div className="mt-1 border-t border-black/5 dark:border-white/5 pt-1">
                 <button
                   type="button"
                   onClick={() => setDraft({ id: null, name: "", body: "" })}
-                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-gray-400 transition-colors hover:bg-white/5 hover:text-gray-200"
+                  className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-xs text-gray-500 hover:bg-black/[0.04] hover:text-gray-800 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-200 transition-colors"
                 >
                   <Plus className="h-3.5 w-3.5 shrink-0" />
                   New context
@@ -355,8 +355,8 @@ export function ChatContextPicker({
         className={cn(
           "flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] transition-colors",
           active
-            ? "text-emerald-300/90 hover:text-emerald-200"
-            : "text-gray-500 dark:text-gray-400 hover:text-gray-300",
+            ? "text-emerald-600 hover:text-emerald-700 dark:text-emerald-300/90 dark:hover:text-emerald-200"
+            : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300",
           "disabled:cursor-not-allowed disabled:opacity-50",
         )}
         title={

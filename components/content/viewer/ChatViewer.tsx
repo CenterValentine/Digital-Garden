@@ -30,6 +30,7 @@ import {
   buildSurfaceBackground,
   detectMixedProvider,
 } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import { extractChatOutline } from "@/lib/domain/ai/chat-outline";
 import { useOutlineStore } from "@/state/outline-store";
@@ -510,6 +511,7 @@ function ChatViewerInner({
   const [renamingTitle, setRenamingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const resolvedTheme = useResolvedTheme();
   const displayTitle = titleOverride ?? conversationTitle ?? title;
 
   const beginRenameTitle = useCallback(() => {
@@ -576,9 +578,11 @@ function ChatViewerInner({
       providerId: getMessageStamp(m.id, { providerId, modelId }).providerId,
     })),
   );
-  const surfaceBackground = buildSurfaceBackground(providerId, [
-    providerId as AIProviderId,
-  ]);
+  const surfaceBackground = buildSurfaceBackground(
+    providerId,
+    [providerId as AIProviderId],
+    resolvedTheme,
+  );
 
   return (
     <div
@@ -586,9 +590,9 @@ function ChatViewerInner({
       style={{ background: surfaceBackground }}
     >
       {/* Header */}
-      <div className="flex shrink-0 flex-col gap-2 border-b border-white/10 px-6 py-4">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-black/10 dark:border-white/10 px-6 py-4">
         <div className="flex items-center gap-3">
-          <Bot className="h-5 w-5 text-green-400" />
+          <Bot className="h-5 w-5 text-green-600 dark:text-green-400" />
           <div className="min-w-0 flex-1">
             {renamingTitle ? (
               <input
@@ -606,11 +610,11 @@ function ChatViewerInner({
                   }
                 }}
                 onBlur={() => void commitRenameTitle()}
-                className="w-full bg-transparent text-lg font-semibold text-white outline-none border-b border-white/30 focus:border-white/60"
+                className="w-full bg-transparent text-lg font-semibold text-gray-900 dark:text-white outline-none border-b border-black/30 dark:border-white/30 focus:border-black/60 dark:focus:border-white/60"
               />
             ) : (
               <h1
-                className="text-lg font-semibold text-white truncate cursor-text"
+                className="text-lg font-semibold text-gray-900 dark:text-white truncate cursor-text"
                 onDoubleClick={beginRenameTitle}
                 title="Double-click to rename"
               >
@@ -678,7 +682,7 @@ function ChatViewerInner({
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-3 py-1 text-xs text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-black/15 bg-white/90 text-gray-700 hover:bg-black/[0.06] dark:border-white/15 dark:bg-[#1a1a1a]/90 dark:text-gray-200 dark:hover:bg-white/10 px-3 py-1 text-xs shadow-lg backdrop-blur transition-colors"
         >
           <ChevronDown className="h-3.5 w-3.5" /> Jump to latest
         </button>
@@ -735,9 +739,9 @@ function ChatViewerInner({
 function ChatViewerLoading({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-6 py-4">
-        <Bot className="h-5 w-5 text-green-400" />
-        <h1 className="text-lg font-semibold text-white truncate">{title}</h1>
+      <div className="flex shrink-0 items-center gap-3 border-b border-black/10 dark:border-white/10 px-6 py-4">
+        <Bot className="h-5 w-5 text-green-600 dark:text-green-400" />
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{title}</h1>
       </div>
       <ChatLoadingBody />
     </div>
@@ -750,7 +754,7 @@ function ChatLoadingBody() {
     <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
       <div className="flex w-full max-w-[420px] flex-col gap-2 opacity-50 animate-pulse">
         <div className="ml-auto h-8 w-2/3 rounded-xl bg-blue-500/20" />
-        <div className="h-10 w-3/4 rounded-xl bg-white/10" />
+        <div className="h-10 w-3/4 rounded-xl bg-black/10 dark:bg-white/10" />
         <div className="ml-auto h-8 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
       <p className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -764,10 +768,10 @@ function ChatLoadingBody() {
 function EmptyState({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10 mb-4">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 mb-4">
         <Bot className="h-8 w-8 text-gray-500" />
       </div>
-      <h2 className="text-lg font-medium text-gray-300">{title}</h2>
+      <h2 className="text-lg font-medium text-gray-700 dark:text-gray-300">{title}</h2>
       <p className="mt-2 text-sm text-gray-500 max-w-sm">
         Start a conversation. Messages are automatically saved.
       </p>

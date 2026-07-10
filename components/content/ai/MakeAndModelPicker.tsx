@@ -29,6 +29,7 @@ import {
   BIG_THREE_PROVIDER_IDS,
   getProviderTheme,
 } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import { MixedProviderChip } from "./MixedProviderChip";
 import { ProviderIcon } from "./ProviderIcon";
@@ -126,6 +127,7 @@ export function MakeAndModelPicker({
 }: MakeAndModelPickerProps) {
   const [moreOpen, setMoreOpen] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
+  const resolvedTheme = useResolvedTheme();
   const moreRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
 
@@ -405,7 +407,7 @@ export function MakeAndModelPicker({
         />
 
         {moreOpen && (
-          <div className="absolute bottom-full left-0 mb-1 min-w-[220px] rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl z-50 overflow-hidden">
+          <div className="absolute bottom-full left-0 mb-1 min-w-[220px] rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden">
             {overflowProviders.map((p) => {
               const isActive = p.id === providerId;
               // Count this provider's models that a Connection can
@@ -431,10 +433,10 @@ export function MakeAndModelPicker({
                   className={cn(
                     "flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs transition-colors",
                     isActive
-                      ? "bg-white/10 text-white"
+                      ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
                       : noneAvailable
                         ? "text-gray-500/70 hover:bg-amber-500/[0.05]"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                        : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-gray-200",
                   )}
                 >
                   <span className="flex items-center gap-2">
@@ -447,7 +449,7 @@ export function MakeAndModelPicker({
                         "h-3.5 w-3.5 shrink-0",
                         noneAvailable && "opacity-50",
                       )}
-                      color={getProviderTheme(p.id).brandColor}
+                      color={getProviderTheme(p.id, resolvedTheme).brandColor}
                     />
                     <span>{p.name}</span>
                   </span>
@@ -464,7 +466,7 @@ export function MakeAndModelPicker({
       </div>
 
       {/* Vertical divider */}
-      <div className="h-3 w-px bg-white/10 mx-0.5" />
+      <div className="h-3 w-px bg-black/10 dark:bg-white/10 mx-0.5" />
 
       {/* Model picker for the active make */}
       <div ref={modelRef} className="relative">
@@ -480,7 +482,7 @@ export function MakeAndModelPicker({
           aria-expanded={modelOpen}
           aria-label={`Active model: ${activeModelName}. Click to change.`}
           className={cn(
-            "flex h-7 items-center gap-1 rounded-full px-2 border border-white/10 text-gray-300 hover:text-white hover:border-white/20 transition-colors",
+            "flex h-7 items-center gap-1 rounded-full px-2 border border-black/10 text-gray-600 hover:text-gray-900 hover:border-black/20 dark:border-white/10 dark:text-gray-300 dark:hover:text-white dark:hover:border-white/20 transition-colors",
             disabled && "opacity-50 cursor-not-allowed",
           )}
         >
@@ -488,7 +490,7 @@ export function MakeAndModelPicker({
           <span className="max-w-[120px] truncate">{activeModelName}</span>
           {!compact && activeRouting?.via === "gateway" && (
             <span
-              className="hidden sm:inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/30 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-amber-300/90"
+              className="hidden sm:inline-flex items-center rounded-md bg-amber-500/10 border border-amber-500/30 px-1 py-px text-[9px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300/90"
               title={`Routed through ${activeRouting.conn.name}`}
             >
               via {activeRouting.conn.name}
@@ -506,9 +508,9 @@ export function MakeAndModelPicker({
           <div
             role="listbox"
             aria-label={`${activeProvider.name} models`}
-            className="absolute bottom-full left-0 mb-1 min-w-[260px] rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl z-50 overflow-hidden"
+            className="absolute bottom-full left-0 mb-1 min-w-[260px] rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden"
           >
-            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium border-b border-white/5">
+            <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium border-b border-black/5 dark:border-white/5">
               {activeProvider.name}
             </div>
             {activeProvider.models.map((m) => {
@@ -540,9 +542,9 @@ export function MakeAndModelPicker({
                     "flex w-full items-center justify-between px-3 py-2 text-left text-xs transition-colors",
                     !available && "opacity-40 cursor-help",
                     isSelected
-                      ? "bg-white/10 text-white"
+                      ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
                       : available
-                        ? "text-gray-600 dark:text-gray-400 hover:bg-white/5 hover:text-gray-200"
+                        ? "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-gray-200"
                         : "text-gray-500 hover:bg-amber-500/[0.04]",
                   )}
                   title={
@@ -568,8 +570,8 @@ export function MakeAndModelPicker({
               );
             })}
             {notice && (
-              <div className="border-t border-white/5 bg-amber-500/[0.06] px-3 py-2.5 space-y-1.5">
-                <p className="text-[11px] text-amber-200 leading-snug">
+              <div className="border-t border-black/5 dark:border-white/5 bg-amber-500/[0.06] px-3 py-2.5 space-y-1.5">
+                <p className="text-[11px] text-amber-800 dark:text-amber-200 leading-snug">
                   <span className="font-medium">{notice.modelName}</span>{" "}
                   isn&apos;t set up. Add a {notice.providerName} Connection (or
                   a gateway Connection that routes to it) in Settings &rarr; AI.
@@ -580,7 +582,7 @@ export function MakeAndModelPicker({
                     setNotice(null);
                     setModelOpen(false);
                   }}
-                  className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors"
+                  className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-[11px] font-medium text-amber-800 dark:text-amber-200 hover:bg-amber-500/20 hover:border-amber-500/60 transition-colors"
                 >
                   <ExternalLink className="h-3 w-3" />
                   Open AI Settings
@@ -594,7 +596,7 @@ export function MakeAndModelPicker({
       {/* Mixed-provider chip — only when conversation has used 2+ providers */}
       {isMixed && (
         <>
-          <div className="h-3 w-px bg-white/10 mx-0.5" />
+          <div className="h-3 w-px bg-black/10 dark:bg-white/10 mx-0.5" />
           <MixedProviderChip contributors={contributors} />
         </>
       )}
@@ -620,9 +622,10 @@ function MoreChip({
   activeOverflowProviderId: AIProviderId | null;
   onClick: () => void;
 }) {
+  const resolvedTheme = useResolvedTheme();
   const isActive = activeOverflowProviderId !== null;
   const theme = isActive
-    ? getProviderTheme(activeOverflowProviderId)
+    ? getProviderTheme(activeOverflowProviderId, resolvedTheme)
     : null;
   const providerName = isActive
     ? PROVIDER_CATALOG.find((p) => p.id === activeOverflowProviderId)?.name
@@ -639,7 +642,7 @@ function MoreChip({
       className={cn(
         "flex h-7 items-center gap-0.5 rounded-full px-1.5 border transition-colors",
         !isActive &&
-          "border-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-300 hover:border-white/20",
+          "border-black/10 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-black/20 dark:hover:border-white/20",
         disabled && "opacity-50 cursor-not-allowed",
       )}
       style={
@@ -689,7 +692,7 @@ function MakeChip({
   disabled: boolean;
   onClick: () => void;
 }) {
-  const theme = getProviderTheme(providerId);
+  const theme = getProviderTheme(providerId, useResolvedTheme());
 
   return (
     <button
@@ -702,7 +705,7 @@ function MakeChip({
       className={cn(
         "flex h-7 w-7 items-center justify-center rounded-full border transition-colors",
         !isActive &&
-          "border-white/10 text-gray-500 dark:text-gray-400 hover:border-white/25 hover:text-gray-300",
+          "border-black/10 dark:border-white/10 text-gray-500 dark:text-gray-400 hover:border-black/25 dark:hover:border-white/25 hover:text-gray-700 dark:hover:text-gray-300",
         disabled && "opacity-50 cursor-not-allowed",
       )}
       style={

@@ -453,15 +453,15 @@ export function ChatInput({
   return (
     <form
       onSubmit={handleSubmit}
-      className="border-t border-black/10 dark:border-white/10 bg-black/20 p-2"
+      className="border-t border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-black/20 p-2"
     >
       <div
         ref={treeDropRef as unknown as React.Ref<HTMLDivElement>}
         className={cn(
-          "relative rounded-xl border bg-white/[0.04] transition-colors",
+          "relative rounded-xl border bg-white/70 dark:bg-white/[0.04] transition-colors",
           isDragging || isOverTree
             ? "border-emerald-400/60 ring-1 ring-emerald-400/30"
-            : "border-white/10 focus-within:border-white/25 focus-within:ring-1 focus-within:ring-white/10",
+            : "border-black/10 focus-within:border-black/25 focus-within:ring-1 focus-within:ring-black/10 dark:border-white/10 dark:focus-within:border-white/25 dark:focus-within:ring-white/10",
         )}
         onDragOver={
           dropEnabled
@@ -516,7 +516,7 @@ export function ChatInput({
           className={cn(
             "scrollbar-hide block w-full max-h-[160px] min-h-[36px] overflow-y-auto whitespace-pre-wrap break-words",
             "bg-transparent px-3 pt-2.5 pb-1",
-            "text-sm text-white",
+            "text-sm text-gray-900 dark:text-white",
             "focus:outline-none",
             (disabled || isActive) && "opacity-50 cursor-not-allowed",
             isEmpty &&
@@ -549,7 +549,7 @@ export function ChatInput({
                     : "Attach text files (active model can't read images)"
                 }
                 aria-label="Attach files"
-                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-300 hover:bg-white/10 transition-colors"
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.06] dark:hover:bg-white/10 transition-colors"
               >
                 <Paperclip className="h-3.5 w-3.5" />
               </button>
@@ -559,7 +559,7 @@ export function ChatInput({
             type="button"
             disabled
             title="Speech input (coming soon)"
-            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-300 transition-colors cursor-not-allowed disabled:opacity-50"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors cursor-not-allowed disabled:opacity-50"
           >
             <Mic className="h-3.5 w-3.5" />
           </button>
@@ -580,8 +580,8 @@ export function ChatInput({
               className={cn(
                 "flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors",
                 canSend
-                  ? "bg-white/15 text-white hover:bg-white/25"
-                  : "bg-white/5 text-gray-600 cursor-not-allowed",
+                  ? "bg-gray-900 text-white hover:bg-gray-700 dark:bg-white/15 dark:hover:bg-white/25"
+                  : "bg-black/5 text-gray-400 dark:bg-white/5 dark:text-gray-600 cursor-not-allowed",
               )}
             >
               <ArrowUp className="h-3.5 w-3.5" />
@@ -741,8 +741,8 @@ function AttachmentChip({
       className={cn(
         "group/att relative flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] max-w-[180px]",
         status === "error"
-          ? "border-red-500/30 bg-red-500/10 text-red-300"
-          : "border-white/10 bg-white/[0.06] text-gray-300",
+          ? "border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300"
+          : "border-black/10 bg-black/[0.04] text-gray-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-300",
       )}
       title={error || name}
     >

@@ -88,10 +88,10 @@ export function ChatSnippetMenu({ onSelect, selectedIds }: ChatSnippetMenuProps)
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center pb-20 bg-black/20">
-      <div className="w-full max-w-sm rounded-xl border border-black/10 dark:border-white/10 bg-gray-900/95 shadow-2xl backdrop-blur-sm">
+      <div className="w-full max-w-sm rounded-xl border border-black/10 dark:border-white/10 bg-white/95 dark:bg-gray-900/95 shadow-2xl backdrop-blur-sm">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-black/10 dark:border-white/10">
-          <h3 className="text-xs font-medium flex items-center gap-2 text-gray-300">
+          <h3 className="text-xs font-medium flex items-center gap-2 text-gray-700 dark:text-gray-300">
             <Scissors className="h-3.5 w-3.5" />
             Attach Snippets
             {selectedIds.length > 0 && (
@@ -118,7 +118,7 @@ export function ChatSnippetMenu({ onSelect, selectedIds }: ChatSnippetMenuProps)
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search snippets..."
-              className="w-full pl-7 pr-3 py-1.5 text-xs rounded-md bg-white/5 border border-black/10 dark:border-white/10 focus:border-white/30 focus:outline-none"
+              className="w-full pl-7 pr-3 py-1.5 text-xs rounded-md bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 focus:border-black/30 dark:focus:border-white/30 focus:outline-none"
             />
           </div>
         </div>
@@ -173,7 +173,7 @@ export function ChatSnippetMenu({ onSelect, selectedIds }: ChatSnippetMenuProps)
           <div className="px-3 py-2 border-t border-black/10 dark:border-white/10">
             <button
               onClick={handleClose}
-              className="w-full text-xs py-1.5 rounded-md bg-blue-600/30 text-blue-400 hover:bg-blue-600/40 transition-colors"
+              className="w-full text-xs py-1.5 rounded-md bg-blue-600/15 text-blue-700 hover:bg-blue-600/25 dark:bg-blue-600/30 dark:text-blue-400 dark:hover:bg-blue-600/40 transition-colors"
             >
               Done ({selectedIds.length} attached)
             </button>

@@ -240,10 +240,10 @@ export function ConversationPicker({
   return (
     <div
       ref={containerRef}
-      className="absolute top-full left-2 right-2 mt-1 rounded-xl border border-white/10 bg-[#1a1a1a] shadow-2xl z-50 overflow-hidden flex flex-col"
+      className="absolute top-full left-2 right-2 mt-1 rounded-xl border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-2xl z-50 overflow-hidden flex flex-col"
       style={{ maxHeight: "60vh", maxWidth: "calc(100% - 1rem)" }}
     >
-      <div className="flex items-center gap-2 border-b border-white/10 px-3 py-2">
+      <div className="flex items-center gap-2 border-b border-black/10 dark:border-white/10 px-3 py-2">
         <Search className="h-3.5 w-3.5 text-gray-500" />
         <input
           autoFocus
@@ -251,11 +251,11 @@ export function ConversationPicker({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search chats…"
-          className="flex-1 bg-transparent text-xs text-white placeholder-gray-500 focus:outline-none"
+          className="flex-1 bg-transparent text-xs text-gray-900 dark:text-white placeholder-gray-500 focus:outline-none"
         />
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-300"
+          className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
         >
           <X className="h-3.5 w-3.5" />
         </button>
@@ -283,13 +283,13 @@ export function ConversationPicker({
                     disabled={isBusy}
                     className={cn(
                       "flex w-full items-center gap-2 px-3 py-2 text-left transition-colors",
-                      "hover:bg-white/[0.04]",
+                      "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]",
                       alreadyPinned && "opacity-50",
                     )}
                   >
                     <MessageSquare className="h-3.5 w-3.5 shrink-0 text-gray-500" />
                     <div className="min-w-0 flex-1">
-                      <div className="text-xs text-white truncate">
+                      <div className="text-xs text-gray-900 dark:text-white truncate">
                         {item.title || "Untitled chat"}
                       </div>
                       <div className="text-[10px] text-gray-500">

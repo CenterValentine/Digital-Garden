@@ -16,11 +16,11 @@ export function ReasoningBlockGeneric({ text, streaming }: ReasoningBlockProps) 
   const open = userPref ?? Boolean(streaming);
 
   return (
-    <div className="my-2 rounded-lg border border-white/10 bg-white/[0.03]">
+    <div className="my-2 rounded-lg border border-black/10 bg-black/[0.02] dark:border-white/10 dark:bg-white/[0.03]">
       <button
         type="button"
         onClick={() => setUserPref(!open)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-400 hover:bg-white/[0.04] transition-colors rounded-lg"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -31,7 +31,7 @@ export function ReasoningBlockGeneric({ text, streaming }: ReasoningBlockProps) 
         <span>{streaming ? "Thinking…" : "Reasoning"}</span>
       </button>
       {open && (
-        <div className="px-3.5 pb-2.5 pt-1 text-xs leading-relaxed text-gray-400 whitespace-pre-wrap">
+        <div className="px-3.5 pb-2.5 pt-1 text-xs leading-relaxed text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
           {text}
           {streaming && <span className="ml-0.5 inline-block animate-pulse">▍</span>}
         </div>

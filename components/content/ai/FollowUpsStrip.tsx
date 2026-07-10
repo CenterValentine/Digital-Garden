@@ -35,14 +35,14 @@ export function FollowUpsStrip({
       aria-label="Suggested follow-up prompts"
     >
       <div className="flex items-center gap-1.5">
-        <Sparkles className="h-3 w-3 shrink-0 text-amber-300/70" aria-hidden />
+        <Sparkles className="h-3 w-3 shrink-0 text-amber-600/70 dark:text-amber-300/70" aria-hidden />
         <div className="flex flex-wrap gap-1.5 flex-1 min-w-0">
           {followUps.map((text, i) => (
             <button
               key={`${i}:${text.slice(0, 24)}`}
               type="button"
               onClick={() => onPick(text)}
-              className="text-left text-[11px] leading-snug rounded-md border border-white/10 bg-white/[0.04] hover:bg-white/10 hover:border-white/20 px-2 py-1 text-gray-300 transition-colors max-w-[280px] truncate"
+              className="text-left text-[11px] leading-snug rounded-md border border-black/10 bg-black/[0.03] hover:bg-black/[0.06] hover:border-black/20 text-gray-700 dark:border-white/10 dark:bg-white/[0.04] dark:hover:bg-white/10 dark:hover:border-white/20 dark:text-gray-300 px-2 py-1 transition-colors max-w-[280px] truncate"
               title={text}
             >
               {text}
@@ -54,7 +54,7 @@ export function FollowUpsStrip({
             type="button"
             onClick={onDismiss}
             aria-label="Dismiss follow-up suggestions"
-            className="shrink-0 text-gray-500 hover:text-gray-300 transition-colors"
+            className="shrink-0 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
           >
             <X className="h-3 w-3" />
           </button>
