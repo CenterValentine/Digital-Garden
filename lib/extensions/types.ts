@@ -2,6 +2,7 @@ import type { Extensions } from "@tiptap/core";
 import type { ComponentType } from "react";
 import type { ToolDefinition } from "@/lib/domain/tools";
 import type { SlashCommand } from "@/lib/domain/editor/commands/slash-commands";
+import type { NotificationKindRenderer } from "@/lib/features/notifications/kind-renderer-types";
 import type {
   WorkspacePaneId,
   WorkspaceTabState,
@@ -115,6 +116,13 @@ export interface ExtensionRuntime {
   settingsDialog?: ComponentType;
   getSlashCommands?: () => SlashCommand[];
   editorClientExtensions?: Extensions;
+  /**
+   * Renderers for notification kinds this extension emits (keyed by kind,
+   * e.g. "flashcards.review_due"). Merged over the core registry by
+   * useNotificationKindRenderers(); unknown kinds fall back to a safe
+   * generic renderer.
+   */
+  notificationKindRenderers?: Record<string, NotificationKindRenderer>;
 }
 
 export interface ExtensionServerRuntime {

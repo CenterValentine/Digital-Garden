@@ -32,6 +32,7 @@ interface SettingsStore extends UserSettings {
   setCalendarSettings: (calendar: Partial<NonNullable<UserSettings["calendar"]>>) => Promise<void>;
   setPeriodicNotesSettings: (periodicNotes: Partial<NonNullable<UserSettings["periodicNotes"]>>) => Promise<void>;
   setFlashcardSettings: (flashcards: Partial<NonNullable<UserSettings["flashcards"]>>) => Promise<void>;
+  setNotificationsSettings: (notifications: Partial<NonNullable<UserSettings["notifications"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -255,6 +256,21 @@ export const useSettingsStore = create<SettingsStore>()(
           flashcards: {
             ...state.flashcards,
             ...flashcards,
+          },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setNotificationsSettings: async (notifications) => {
+        set((state) => ({
+          notifications: {
+            ...state.notifications,
+            ...notifications,
+            kinds: {
+              ...state.notifications?.kinds,
+              ...notifications.kinds,
+            },
           },
           hasPendingChanges: true,
         }));
