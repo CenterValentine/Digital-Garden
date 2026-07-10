@@ -33,6 +33,7 @@ import {
   getProviderTheme,
   type ProviderTheme,
 } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 
@@ -409,7 +410,7 @@ export const ChatMessage = memo(function ChatMessage({
     >
       {/* Avatar */}
       {isUser ? (
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/20 text-blue-400">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-500/15 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400">
           <User className="h-4 w-4" />
         </div>
       ) : (
@@ -459,12 +460,12 @@ export const ChatMessage = memo(function ChatMessage({
               //     `w-full` which is still legible just wider;
               //   - `max-w-full` keeps it from overflowing the column.
               style={{ fieldSizing: "content" } as React.CSSProperties}
-              className="w-full max-w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/30 px-3.5 py-2.5 text-sm leading-relaxed text-blue-100 outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30 align-top"
+              className="w-full max-w-full resize-y rounded-xl border border-blue-500/20 bg-blue-600/10 text-blue-950 dark:bg-blue-600/30 dark:text-blue-100 px-3.5 py-2.5 text-sm leading-relaxed outline-none focus:border-blue-400/60 focus:ring-2 focus:ring-blue-400/30 align-top"
             />
             <div className="flex items-center justify-end gap-1.5">
               <button
                 onClick={() => setEditing(false)}
-                className="rounded-md px-2 py-1 text-[11px] text-gray-400 hover:text-gray-200 hover:bg-white/5 transition-colors"
+                className="rounded-md px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>
@@ -587,7 +588,7 @@ export const ChatMessage = memo(function ChatMessage({
               return (
                 <div
                   key={i}
-                  className="inline-block rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-blue-600/30 text-blue-100 border border-blue-500/20"
+                  className="inline-block rounded-xl px-3.5 py-2.5 text-sm leading-relaxed bg-blue-600/10 text-blue-950 dark:bg-blue-600/30 dark:text-blue-100 border border-blue-500/20"
                 >
                   <UserMessageText text={part.text} />
                 </div>
@@ -775,7 +776,7 @@ function MessageActionButton({
       disabled={disabled}
       title={label}
       aria-label={label}
-      className="inline-flex items-center justify-center rounded-md p-1 hover:text-gray-200 hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+      className="inline-flex items-center justify-center rounded-md p-1 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors disabled:opacity-40 disabled:cursor-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
     >
       {children}
     </button>
@@ -893,7 +894,7 @@ function buildMarkdownComponents(theme: ProviderTheme): Components {
     return (
       <code
         {...rest}
-        className="rounded bg-white/10 px-1 py-0.5 text-xs font-mono text-amber-300"
+        className="rounded bg-black/[0.06] text-amber-700 dark:bg-white/10 dark:text-amber-300 px-1 py-0.5 text-xs font-mono"
       >
         {children}
       </code>
@@ -910,32 +911,32 @@ function buildMarkdownComponents(theme: ProviderTheme): Components {
 const themeNeutralMarkdownComponents: Components = {
   // ── Headings ──
   h1: ({ children }) => (
-    <h1 className="text-xl font-bold mt-4 mb-2 text-white/90 first:mt-0">
+    <h1 className="text-xl font-bold mt-4 mb-2 text-gray-900 dark:text-white/90 first:mt-0">
       {children}
     </h1>
   ),
   h2: ({ children }) => (
-    <h2 className="text-lg font-bold mt-3.5 mb-2 text-white/90 first:mt-0">
+    <h2 className="text-lg font-bold mt-3.5 mb-2 text-gray-900 dark:text-white/90 first:mt-0">
       {children}
     </h2>
   ),
   h3: ({ children }) => (
-    <h3 className="text-base font-semibold mt-3 mb-1.5 text-white/85 first:mt-0">
+    <h3 className="text-base font-semibold mt-3 mb-1.5 text-gray-900/90 dark:text-white/85 first:mt-0">
       {children}
     </h3>
   ),
   h4: ({ children }) => (
-    <h4 className="text-sm font-semibold mt-2.5 mb-1 text-white/80 first:mt-0">
+    <h4 className="text-sm font-semibold mt-2.5 mb-1 text-gray-900/85 dark:text-white/80 first:mt-0">
       {children}
     </h4>
   ),
   h5: ({ children }) => (
-    <h5 className="text-sm font-medium mt-2 mb-1 text-white/75 first:mt-0">
+    <h5 className="text-sm font-medium mt-2 mb-1 text-gray-800/85 dark:text-white/75 first:mt-0">
       {children}
     </h5>
   ),
   h6: ({ children }) => (
-    <h6 className="text-xs font-medium mt-2 mb-1 text-white/70 uppercase tracking-wide first:mt-0">
+    <h6 className="text-xs font-medium mt-2 mb-1 text-gray-700 dark:text-white/70 uppercase tracking-wide first:mt-0">
       {children}
     </h6>
   ),
@@ -965,7 +966,7 @@ const themeNeutralMarkdownComponents: Components = {
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-400 hover:text-blue-300 underline underline-offset-2 transition-colors"
+        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline underline-offset-2 transition-colors"
       >
         {children}
       </a>
@@ -994,7 +995,7 @@ const themeNeutralMarkdownComponents: Components = {
 
   // ── Inline formatting ──
   strong: ({ children }) => (
-    <strong className="font-semibold text-[#FFD700]">{children}</strong>
+    <strong className="font-semibold text-[#8A6A00] dark:text-[#FFD700]">{children}</strong>
   ),
   em: ({ children }) => <em className="italic">{children}</em>,
   del: ({ children }) => (
@@ -1013,7 +1014,7 @@ const themeNeutralMarkdownComponents: Components = {
   ),
   tbody: ({ children }) => <tbody>{children}</tbody>,
   tr: ({ children }) => (
-    <tr className="border-b border-white/5 last:border-0">{children}</tr>
+    <tr className="border-b border-black/5 dark:border-white/5 last:border-0">{children}</tr>
   ),
   th: ({ children }) => (
     <th className="px-3 py-1.5 text-left font-medium text-gray-700 dark:text-gray-300">
@@ -1090,13 +1091,13 @@ function CodeBlock({
         {theme.codeBlock.showCopyButton && (
           <button
             onClick={handleCopy}
-            className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-gray-300 transition-colors"
+            className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
             title="Copy code"
           >
             {copied ? (
               <>
-                <Check className="h-3 w-3 text-green-400" />
-                <span className="text-green-400">Copied</span>
+                <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                <span className="text-green-600 dark:text-green-400">Copied</span>
               </>
             ) : (
               <>
@@ -1205,7 +1206,7 @@ function AssistantAvatar({
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
-  const theme = getProviderTheme(providerId);
+  const theme = getProviderTheme(providerId, useResolvedTheme());
   const provider = PROVIDER_CATALOG.find((p) => p.id === providerId);
   const model = provider?.models.find((m) => m.id === modelId);
   const providerName = provider?.name ?? "AI assistant";
@@ -1276,7 +1277,7 @@ function AssistantAvatar({
               transform: "translateY(-50%)",
               zIndex: 9999,
             }}
-            className="pointer-events-none whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-200 shadow-xl"
+            className="pointer-events-none whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl"
           >
             <div className="flex items-center gap-1.5">
               <span
@@ -1291,11 +1292,11 @@ function AssistantAvatar({
               </div>
             )}
             {usage && (usage.inputTokens != null || usage.outputTokens != null) && (
-              <div className="mt-1 flex items-center gap-2 border-t border-white/10 pt-1 text-gray-400 dark:text-gray-500">
+              <div className="mt-1 flex items-center gap-2 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
                 {usage.inputTokens != null && (
                   <span>
                     <span className="text-gray-500">in</span>{" "}
-                    <span className="tabular-nums text-gray-300">
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
                       {usage.inputTokens.toLocaleString()}
                     </span>
                   </span>
@@ -1303,7 +1304,7 @@ function AssistantAvatar({
                 {usage.outputTokens != null && (
                   <span>
                     <span className="text-gray-500">out</span>{" "}
-                    <span className="tabular-nums text-gray-300">
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
                       {usage.outputTokens.toLocaleString()}
                     </span>
                   </span>
@@ -1325,7 +1326,7 @@ function MentionPill({ title, contentId }: { title: string; contentId: string })
       onClick={() => {
         useContentStore.getState().setSelectedContentId(contentId);
       }}
-      className="inline-flex items-center gap-0.5 rounded bg-blue-500/20 text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/30 transition-colors cursor-pointer"
+      className="inline-flex items-center gap-0.5 rounded bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 px-1.5 py-0.5 text-xs font-medium hover:bg-blue-500/25 dark:hover:bg-blue-500/30 transition-colors cursor-pointer"
     >
       @{title}
     </button>
@@ -1568,7 +1569,7 @@ function ToolCallBubble({
             <button
               type="button"
               onClick={handleCopy}
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-white/5 transition-colors"
+              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 hover:bg-black/[0.04] dark:hover:bg-white/5 transition-colors"
               title="Copy result"
             >
               {copied ? (
@@ -1823,7 +1824,7 @@ function GeneratedImageCard({ payload }: { payload: ImagePayload }) {
             inserted
               ? "bg-green-500/20 text-green-300 border border-green-500/20"
               : canInsert
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+                ? "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-500/20 hover:bg-blue-500/25 dark:hover:bg-blue-500/30"
                 : "bg-black/[0.03] dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/5 cursor-not-allowed"
           )}
         >
@@ -1974,7 +1975,7 @@ function GeneratedAudioCard({ payload }: { payload: AudioPayload }) {
             inserted
               ? "bg-green-500/20 text-green-300 border border-green-500/20"
               : canInsert
-                ? "bg-blue-500/20 text-blue-300 border border-blue-500/20 hover:bg-blue-500/30"
+                ? "bg-blue-500/15 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300 border border-blue-500/20 hover:bg-blue-500/25 dark:hover:bg-blue-500/30"
                 : "bg-black/[0.03] dark:bg-white/5 text-gray-500 dark:text-gray-400 border border-white/5 cursor-not-allowed"
           )}
         >

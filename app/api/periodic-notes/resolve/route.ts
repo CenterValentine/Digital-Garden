@@ -25,7 +25,13 @@ interface ResolvePeriodicNoteRequest {
 }
 
 function isPeriodicNoteKind(value: unknown): value is PeriodicNoteKind {
-  return value === "daily" || value === "weekly";
+  return (
+    value === "daily" ||
+    value === "weekly" ||
+    value === "monthly" ||
+    value === "quarterly" ||
+    value === "yearly"
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -41,7 +47,8 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "VALIDATION_ERROR",
-            message: "Periodic note kind must be daily or weekly.",
+            message:
+              "Periodic note kind must be daily, weekly, monthly, quarterly, or yearly.",
           },
         },
         { status: 400 }
@@ -57,7 +64,7 @@ export async function POST(request: NextRequest) {
           success: false,
           error: {
             code: "DISABLED",
-            message: `${kind === "daily" ? "Daily" : "Weekly"} notes are disabled.`,
+            message: `${kind.charAt(0).toUpperCase()}${kind.slice(1)} notes are disabled.`,
           },
         },
         { status: 400 }
@@ -68,9 +75,10 @@ export async function POST(request: NextRequest) {
     const period = getPeriodicNotePeriod(
       kind,
       noteSettings.filenameFormat,
-      body.localDateTime
+      body.localDateTime,
+      noteSettings.nightOwlHour
     );
-    const currentMoment = getMomentForPeriodicNote(body.localDateTime);
+    const currentMoment = getMomentForPeriodicNote(body.localDateTime, noteSettings.nightOwlHour);
     const templateJson = await resolveTemplateJson(
       session.user.id,
       noteSettings.templateId

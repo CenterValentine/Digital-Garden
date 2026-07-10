@@ -29,7 +29,7 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
       <button
         type="button"
         onClick={() => setUserPref(!open)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#10A37F] hover:bg-[#10A37F]/[0.08] transition-colors rounded-lg"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0B7A5E] dark:text-[#10A37F] hover:bg-[#10A37F]/[0.08] transition-colors rounded-lg"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -49,18 +49,18 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
           {steps.map((step, i) => (
             <li
               key={i}
-              className="flex gap-2.5 rounded-md border border-[#10A37F]/15 bg-black/20 px-2.5 py-1.5"
+              className="flex gap-2.5 rounded-md border border-[#10A37F]/15 bg-black/[0.03] dark:bg-black/20 px-2.5 py-1.5"
             >
-              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#10A37F]/25 text-[10px] font-bold text-[#10A37F]">
+              <span className="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-[#10A37F]/25 text-[10px] font-bold text-[#0B7A5E] dark:text-[#10A37F]">
                 {i + 1}
               </span>
-              <span className="text-xs leading-relaxed text-gray-300 whitespace-pre-wrap">
+              <span className="text-xs leading-relaxed text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
                 {step}
               </span>
             </li>
           ))}
           {streaming && (
-            <li className="flex items-center gap-2 px-2.5 py-1 text-[11px] text-[#10A37F]/70">
+            <li className="flex items-center gap-2 px-2.5 py-1 text-[11px] text-[#0B7A5E]/80 dark:text-[#10A37F]/70">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#10A37F]" />
               <span>working through next step</span>
             </li>

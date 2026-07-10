@@ -17,6 +17,7 @@ import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
@@ -531,7 +532,7 @@ export function ChatPanel({
             <button
               onClick={() => void handleOpenInPage()}
               title="Open in full view"
-              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-200 transition-colors"
+              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
@@ -600,7 +601,7 @@ export function ChatPanel({
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-2.5 py-1 text-[11px] text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-black/15 bg-white/90 text-gray-700 hover:bg-black/[0.06] dark:border-white/15 dark:bg-[#1a1a1a]/90 dark:text-gray-200 dark:hover:bg-white/10 px-2.5 py-1 text-[11px] shadow-lg backdrop-blur transition-colors"
         >
           <ChevronDown className="h-3 w-3" /> Jump to latest
         </button>
@@ -669,7 +670,7 @@ function HeaderTitle({
   providerId: string;
   modelId: string;
 }) {
-  const theme = getProviderTheme(providerId);
+  const theme = getProviderTheme(providerId, useResolvedTheme());
   const provider = useMemo(
     () => PROVIDER_CATALOG.find((p) => p.id === providerId),
     [providerId],
@@ -679,7 +680,7 @@ function HeaderTitle({
     [provider, modelId],
   );
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-300 min-w-0">
+    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 min-w-0">
       <span
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
         style={{
@@ -742,7 +743,7 @@ function DeleteWithConfirm({
           ? "Confirm delete (click again, auto-cancels in 3s)"
           : "Confirm clear (click again, auto-cancels in 3s)"
       }
-      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30 hover:bg-red-500/25 dark:hover:bg-red-500/30 transition-colors"
     >
       <Trash2 className="h-3 w-3" />
       {destructive ? "Delete" : "Confirm"}
@@ -761,7 +762,7 @@ function LoadingMessages() {
     <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
       <div className="flex w-full max-w-[280px] flex-col gap-2 opacity-50 animate-pulse">
         <div className="ml-auto h-7 w-2/3 rounded-xl bg-blue-500/20" />
-        <div className="h-8 w-3/4 rounded-xl bg-white/10" />
+        <div className="h-8 w-3/4 rounded-xl bg-black/10 dark:bg-white/10" />
         <div className="ml-auto h-7 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
       <p className="text-[10px] uppercase tracking-wider text-gray-500">

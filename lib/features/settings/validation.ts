@@ -252,12 +252,16 @@ const periodicNoteKindSettingsSchema = z.object({
   filenameFormat: z.string().min(1).max(120).optional(),
   templateId: z.string().uuid().nullable().optional(),
   autoCreateOnOpen: z.boolean().optional(),
+  nightOwlHour: z.number().int().min(0).max(4).optional(),
 });
 
 const periodicNotesSettingsSchema = z
   .object({
     daily: periodicNoteKindSettingsSchema.optional(),
     weekly: periodicNoteKindSettingsSchema.optional(),
+    monthly: periodicNoteKindSettingsSchema.optional(),
+    quarterly: periodicNoteKindSettingsSchema.optional(),
+    yearly: periodicNoteKindSettingsSchema.optional(),
   })
   .optional();
 
@@ -536,6 +540,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
       filenameFormat: "YYYY-MM-DD",
       templateId: null,
       autoCreateOnOpen: false,
+      nightOwlHour: 0,
     },
     weekly: {
       enabled: false,
@@ -543,6 +548,31 @@ export const DEFAULT_SETTINGS: UserSettings = {
       filenameFormat: "GGGG-[W]WW",
       templateId: null,
       autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    monthly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY-MM",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    quarterly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY-[Q]Q",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    yearly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
     },
   },
   flashcards: {

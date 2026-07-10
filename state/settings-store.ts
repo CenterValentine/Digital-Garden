@@ -232,6 +232,18 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.periodicNotes?.weekly,
               ...periodicNotes.weekly,
             },
+            monthly: {
+              ...state.periodicNotes?.monthly,
+              ...periodicNotes.monthly,
+            },
+            quarterly: {
+              ...state.periodicNotes?.quarterly,
+              ...periodicNotes.quarterly,
+            },
+            yearly: {
+              ...state.periodicNotes?.yearly,
+              ...periodicNotes.yearly,
+            },
           },
           hasPendingChanges: true,
         }));

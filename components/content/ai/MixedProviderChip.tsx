@@ -13,6 +13,7 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 
@@ -22,6 +23,7 @@ export interface MixedProviderChipProps {
 
 export function MixedProviderChip({ contributors }: MixedProviderChipProps) {
   const [hover, setHover] = useState(false);
+  const resolvedTheme = useResolvedTheme();
 
   if (contributors.length < 2) return null;
 
@@ -31,7 +33,7 @@ export function MixedProviderChip({ contributors }: MixedProviderChipProps) {
   // border.
   const stops = contributors
     .map((id, i) => {
-      const c = getProviderTheme(id).brandColor;
+      const c = getProviderTheme(id, resolvedTheme).brandColor;
       const pct = Math.round((i / Math.max(1, contributors.length - 1)) * 100);
       return `${c}33 ${pct}%`;
     })
@@ -46,7 +48,7 @@ export function MixedProviderChip({ contributors }: MixedProviderChipProps) {
       <span
         className={cn(
           "inline-flex items-center gap-1 rounded-full px-2.5 py-1 border text-[11px]",
-          "border-white/15 text-gray-300",
+          "border-black/15 text-gray-700 dark:border-white/15 dark:text-gray-300",
         )}
         style={{
           background: `linear-gradient(135deg, ${stops})`,
@@ -57,14 +59,14 @@ export function MixedProviderChip({ contributors }: MixedProviderChipProps) {
       </span>
 
       {hover && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md border border-white/10 bg-[#1a1a1a] px-2.5 py-1.5 text-[10px] text-gray-300 shadow-xl z-50">
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-300 px-2.5 py-1.5 text-[10px] shadow-xl z-50">
           <div className="text-gray-500 dark:text-gray-400 mb-0.5">
             Providers in this conversation
           </div>
           {contributors.map((id) => {
             const name =
               PROVIDER_CATALOG.find((p) => p.id === id)?.name ?? id;
-            const color = getProviderTheme(id).brandColor;
+            const color = getProviderTheme(id, resolvedTheme).brandColor;
             return (
               <div key={id} className="flex items-center gap-1.5">
                 <span
