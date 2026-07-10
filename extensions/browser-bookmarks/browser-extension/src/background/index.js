@@ -1221,13 +1221,19 @@ async function plantEmbedCookie(appBaseUrl, { token, expiresAt, cookieName }) {
   const url = appBaseUrl.replace(/\/$/, "");
   const isSecure = url.startsWith("https://");
   const base = {
-    url,
+    url: `${url}/embed`,
     name: cookieName,
     value: token,
     httpOnly: true,
     secure: isSecure,
     expirationDate: new Date(expiresAt).getTime() / 1000,
-    path: "/",
+    // MUST stay scoped to /embed. Cookies are keyed by (name, domain, path) —
+    // at path "/" this short-lived token REPLACES the user's 7-day session
+    // cookie set by sign-in, logging them out of the app when it expires.
+    // Server-side embed cookie writers (proxy.ts, /embed/auth) enforce the
+    // same scoping; /api/* calls from the iframe use the X-Embed-Session
+    // header instead, so nothing outside /embed needs this cookie.
+    path: "/embed",
   };
 
   // Attempt 1: SameSite=None (required for cross-site iframe delivery).
@@ -1269,15 +1275,18 @@ async function plantEmbedCookie(appBaseUrl, { token, expiresAt, cookieName }) {
  * Uses chrome.storage.session to cache the session across service worker restarts
  * (MV3 workers wake frequently — this avoids a DB round-trip on each wake).
  */
-async function exchangeEmbedSession() {
+async function exchangeEmbedSession({ force = false } = {}) {
   const config = await getConfig();
   if (!config.appBaseUrl || !config.token) return null;
 
   try {
-    // Check session cache first
+    // Check session cache first. `force` skips it — the 20-min alarm must
+    // always mint a fresh session, because at that point the cached token has
+    // ~10 min left (> the 2-min buffer) and the NEXT alarm at 40 min lands
+    // after its 30-min expiry, leaving a dead-cookie window from minute 30-40.
     const cached = await chrome.storage.session.get(EMBED_SESSION_CACHE_KEY);
     const cachedSession = cached[EMBED_SESSION_CACHE_KEY];
-    if (cachedSession?.token && cachedSession?.expiresAt) {
+    if (!force && cachedSession?.token && cachedSession?.expiresAt) {
       const msRemaining = new Date(cachedSession.expiresAt).getTime() - Date.now();
       if (msRemaining > EMBED_SESSION_REFRESH_BUFFER_MS) {
         // Still valid — just re-plant the cookie (cheap: no DB, no API call)
@@ -1468,7 +1477,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     });
   }
   if (alarm.name === "dg-embed-session-refresh") {
-    await exchangeEmbedSession().catch((error) => {
+    await exchangeEmbedSession({ force: true }).catch((error) => {
       console.error("[DG Bookmarks] Embed session refresh failed", error);
     });
   }
