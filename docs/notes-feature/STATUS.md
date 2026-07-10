@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-06-11
+last_updated: 2026-07-10
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,14 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 10, 2026**: User Connections + Unified Notifications/Inbox + DMs (branch `worktree-connections-inbox`, PR pending)
+
+- First cross-user feature: mutual-consent connections (invite by exact email/username, **enumeration-safe** — suppressed invites keep `inviteeUserId` null and responses are byte-identical for real/nonexistent/blocked targets; declines render as "pending" to the sender until 14-day expiry), block list with connection/invite cascade, audit-logged, Postgres fixed-window rate limits.
+- **ActivityEvent log + NotificationRecipient projection**: string kinds with Zod payload registry (`lib/domain/notifications/kinds.ts`), `actorType user|system|ai|extension`, per-recipient read/archive state, collapse-key coalescing (N rapid DMs → 1 unread row re-pointed at the newest event), publish-time per-kind preference filtering from the new `notifications` settings section.
+- **DMs** (`DmThread`/`DmParticipant`/`DmMessage`): `lastReadAt` unread cursors, `lastActiveAt` viewing heartbeat suppresses bell notifications while the thread is open, `markThreadRead ↔ markSubjectRead` keeps badge and thread coherent; soft-delete messages, per-user thread hide.
+- **UI**: bell + unread badge in NotesNavBar, glass popover (All/Unread, Today/Earlier, inline invite Accept/Decline, mark-all-read), full `/inbox` page (Notifications / Messages / Connections tabs, `?tab=&thread=` deep links), DM view with optimistic send + 2.5s fast-poll via a swappable `NotificationTransport` abstraction (45s badge poll + focus refresh; deliberately NOT Hocuspocus), `/settings/notifications` preferences.
+- **AI**: `notify_user` tool (10/hr rate limit, polite refusal result, sparkles "Assistant" badge). Extension hook: `ExtensionRuntime.notificationKindRenderers`. Maintenance cron (invite expiry + retention). Migration artifact `20260710120000_add_connections_notifications_dms`. Gates green (typecheck/lint/build); 28-check curl smoke suite passed with two seeded users (`scripts/seed-smoke-users.ts`).
 
 **June 11, 2026**: Canonical `bodyHash` save-conflict hotfix — PR #56 (open)
 

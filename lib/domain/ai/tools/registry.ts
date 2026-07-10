@@ -28,6 +28,11 @@ import {
   type SpeechProviderId,
   type SpeechModelId,
 } from "@/lib/domain/ai/speech/types";
+import { publishEvent } from "@/lib/domain/notifications";
+import {
+  consumeRateLimit,
+  RATE_LIMITS,
+} from "@/lib/infrastructure/rate-limiting";
 import type { ToolExecuteContext } from "./types";
 
 /**
@@ -493,6 +498,49 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           // Swap the low-level "no key" error for actionable setup guidance
           // (points at Connections + Feature Routing → Text-to-Speech).
           return `Speech generation failed: ${describeSpeechError(error)}`;
+        }
+      },
+    }),
+
+    notify_user: tool({
+      description:
+        "Post a notification to the user's inbox (the bell in the top bar). " +
+        "Use for reminders, task completions, or anything they should see " +
+        "later even after closing this chat. Notifications are visibly " +
+        "badged as AI-generated.",
+      inputSchema: z.object({
+        title: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe("Short notification headline"),
+        body: z
+          .string()
+          .min(1)
+          .max(1000)
+          .describe("Notification detail text"),
+      }),
+      execute: async ({ title, body }) => {
+        const rate = await consumeRateLimit({
+          key: `ai-notify:${ctx.userId}`,
+          ...RATE_LIMITS.AI_NOTIFY_PER_HOUR,
+        });
+        if (!rate.ok) {
+          // Return an explanatory result (not a throw) so the model can
+          // relay the limit to the user gracefully.
+          return `Notification not sent: the AI notification rate limit was reached. Try again in about ${Math.ceil(rate.retryAfterSeconds / 60)} minute(s).`;
+        }
+        try {
+          await publishEvent(prisma, {
+            kind: "ai.notify",
+            actorType: "ai",
+            actorLabel: "Assistant",
+            payload: { title, body },
+            recipients: [{ userId: ctx.userId }],
+          });
+          return `Notification posted to the user's inbox: "${title}". If they have AI notifications disabled in settings, it will not appear.`;
+        } catch (error) {
+          return `Failed to post notification: ${error instanceof Error ? error.message : "unknown error"}`;
         }
       },
     }),

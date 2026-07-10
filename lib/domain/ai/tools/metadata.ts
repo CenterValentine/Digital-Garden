@@ -25,6 +25,7 @@ export const BASE_TOOL_IDS = [
   "updateNote",
   "generate_image",
   "generate_speech",
+  "notify_user",
 ] as const;
 
 export type BaseToolId = (typeof BASE_TOOL_IDS)[number];
@@ -76,6 +77,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
       "Convert text to spoken audio using OpenAI, ElevenLabs, or Google text-to-speech voices",
     callsAi: true,
     requiredCapabilities: ["speech"],
+  },
+  notify_user: {
+    name: "Notify User",
+    description:
+      "Post a reminder or task result to your inbox (rate limited, badged as AI)",
   },
 };
 

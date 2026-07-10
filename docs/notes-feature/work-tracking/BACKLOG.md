@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-06-03
+last_updated: 2026-07-10
 ---
 
 # Sprint Backlog
@@ -7,6 +7,21 @@ last_updated: 2026-06-03
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Connections / Notifications / DM Followups (2026-07-10)
+
+Deferred by design from the connections-inbox feature (branch `worktree-connections-inbox`); the architecture has explicit seams for each:
+
+- [ ] **SSE/pub-sub transport upgrade** — replace `createPollingTransport()` (`lib/features/notifications/transport.ts`) when real-time latency matters; callers depend only on the `NotificationTransport` interface. Needs a pub/sub backing (Redis/Upstash) or the Cloud Run service — serverless SSE alone still polls the DB server-side.
+- [ ] **Partial unique index on `NotificationRecipient(userId, collapseKey)`** — closes the coalescing race (two concurrent DM sends can create two unread rows). Needs raw SQL migration (`WHERE readAt IS NULL AND archivedAt IS NULL`); harmless dupes at current scale.
+- [ ] **Signup-time invite resolver** — invites to not-yet-registered emails never resolve today; on account creation, match `ConnectionInvite.inviteeIdentifier` and backfill `inviteeUserId` + publish the notification.
+- [ ] **Activate inbox Playwright stubs** (`tests/e2e/inbox/inbox.spec.ts`) — blocked on the e2e auth fixture; `scripts/seed-smoke-users.ts` mints session tokens and is the building block.
+- [ ] **Shared-folder sharing events** — the original motivation for the event-log architecture: new kinds (`share.grant`, `share.revoke`) + `ViewGrant` integration, gated on connections via `areConnected()`.
+- [ ] **Email digest channel** — daily unread-summary email via the existing cron pattern + per-kind preferences already in settings.
+- [ ] **`Person.linkedUserId`** — link People-extension contacts to connected accounts (auto-materialize a Person card on connection accept).
+- [ ] **Migration-chain repair (pre-existing)** — `prisma migrate dev` fails shadow-DB replay at `20260608120000_backfill_tenancy_drift_columns` (P3006: `TenantHost` table missing). Unrelated to this feature; `migrate deploy` unaffected. Worth a `migrate resolve`/baseline pass.
 
 ---
 
