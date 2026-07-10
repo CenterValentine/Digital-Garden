@@ -15,6 +15,12 @@ export function getPeriodicNotesSettings(
   return {
     daily: normalizeKindSettings(settings?.periodicNotes?.daily, "daily"),
     weekly: normalizeKindSettings(settings?.periodicNotes?.weekly, "weekly"),
+    monthly: normalizeKindSettings(settings?.periodicNotes?.monthly, "monthly"),
+    quarterly: normalizeKindSettings(
+      settings?.periodicNotes?.quarterly,
+      "quarterly"
+    ),
+    yearly: normalizeKindSettings(settings?.periodicNotes?.yearly, "yearly"),
   };
 }
 
@@ -37,7 +43,7 @@ function normalizeKindSettings(
     folderId: value?.folderId ?? defaults.folderId,
     filenameFormat,
     templateId: value?.templateId ?? defaults.templateId,
-    autoCreateOnOpen:
-      value?.autoCreateOnOpen ?? defaults.autoCreateOnOpen,
+    autoCreateOnOpen: value?.autoCreateOnOpen ?? defaults.autoCreateOnOpen,
+    nightOwlHour: Math.min(4, Math.max(0, Math.trunc(value?.nightOwlHour ?? defaults.nightOwlHour ?? 0))),
   };
 }

@@ -9,6 +9,8 @@ import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
+import { logger } from "@/lib/core/logger";
 import { generateJSON, type JSONContent } from "@tiptap/core";
 
 function asIsoString(value: Date | null | undefined) {
@@ -1074,6 +1076,23 @@ export async function updateExtensionNoteContent(
   await syncContentTags(contentId, json, userId);
   await syncImageReferences(contentId, json, userId);
   await syncPersonMentions(contentId, json, userId);
+
+  // Realign the collaborative Y.Doc with the payload we just wrote. This write
+  // path bypasses collaboration, so without a reseed a stale-but-non-empty
+  // CollaborationDocument would win at bootstrap and mask this edit (stale/blank
+  // note when later opened in the app). Non-fatal: the NotePayload above is the
+  // durable source of truth, so a reseed failure must not fail the note write.
+  try {
+    await reseedCollaborationDocumentFromNote(prisma, contentId);
+  } catch (error) {
+    logger.error({
+      layer: "browser_ext",
+      event: "note_content_update:reseed_failed",
+      summary: "failed to reseed collaboration doc after extension note write",
+      attrs: { content_id: contentId },
+      error,
+    });
+  }
 
   return getExtensionNoteContent(userId, contentId);
 }

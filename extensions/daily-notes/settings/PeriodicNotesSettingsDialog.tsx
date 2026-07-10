@@ -2,10 +2,22 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CalendarCheck, Folder, Search } from "lucide-react";
+import { CalendarCheck, Folder, Info, Search } from "lucide-react";
 import { Input } from "@/components/client/ui/input";
 import { Label } from "@/components/client/ui/label";
 import { Switch } from "@/components/client/ui/switch";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/client/ui/tooltip";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/client/ui/tabs";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { TreeNode } from "@/lib/domain/content/types";
 import {
@@ -147,9 +159,7 @@ export default function PeriodicNotesSettingsDialog() {
       ...settings[kind],
       ...updates,
     };
-    void setPeriodicNotesSettings(
-      kind === "daily" ? { daily: next } : { weekly: next }
-    );
+    void setPeriodicNotesSettings({ [kind]: next });
   };
 
   return (
@@ -157,37 +167,78 @@ export default function PeriodicNotesSettingsDialog() {
       <div>
         <div className="flex items-center gap-3">
           <CalendarCheck className="h-7 w-7 text-gold-primary" />
-          <h1 className="text-3xl font-bold">Daily Notes</h1>
+          <h1 className="text-3xl font-bold">Periodic Notes</h1>
         </div>
         <p className="mt-2 text-sm text-gray-400">
-          Create a note for today or this ISO week from the left-panel header.
+          Open or auto-create daily, weekly, monthly, and yearly notes from the
+          left-panel header.
         </p>
       </div>
 
-      <PeriodicNoteSection
-        title="Daily Notes"
-        description="Use today as the note period."
-        kind="daily"
-        values={settings.daily}
-        folders={folders}
-        templates={templates}
-        onChange={updateKind}
-        surfaceStyle={glass0}
-      />
-
-      <PeriodicNoteSection
-        title="Weekly Notes"
-        description="Use the current ISO week as the note period."
-        kind="weekly"
-        values={settings.weekly}
-        folders={folders}
-        templates={templates}
-        onChange={updateKind}
-        surfaceStyle={glass0}
-      />
+      <Tabs defaultValue="daily" className="w-full">
+        <TabsList className="grid w-full grid-cols-5">
+          {PERIODIC_SECTIONS.map((section) => (
+            <TabsTrigger key={section.kind} value={section.kind}>
+              {section.tab}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {PERIODIC_SECTIONS.map((section) => (
+          <TabsContent key={section.kind} value={section.kind} className="mt-6">
+            <PeriodicNoteSection
+              title={section.title}
+              description={section.description}
+              kind={section.kind}
+              values={settings[section.kind]}
+              folders={folders}
+              templates={templates}
+              onChange={updateKind}
+              surfaceStyle={glass0}
+            />
+          </TabsContent>
+        ))}
+      </Tabs>
     </div>
   );
 }
+
+const PERIODIC_SECTIONS: Array<{
+  kind: PeriodicNoteKind;
+  tab: string;
+  title: string;
+  description: string;
+}> = [
+  {
+    kind: "daily",
+    tab: "Daily",
+    title: "Daily Notes",
+    description: "Use today as the note period.",
+  },
+  {
+    kind: "weekly",
+    tab: "Weekly",
+    title: "Weekly Notes",
+    description: "Use the current ISO week as the note period.",
+  },
+  {
+    kind: "monthly",
+    tab: "Monthly",
+    title: "Monthly Notes",
+    description: "Use the current month as the note period.",
+  },
+  {
+    kind: "quarterly",
+    tab: "Quarterly",
+    title: "Quarterly Notes",
+    description: "Use the current calendar quarter as the note period.",
+  },
+  {
+    kind: "yearly",
+    tab: "Yearly",
+    title: "Yearly Notes",
+    description: "Use the current year as the note period.",
+  },
+];
 
 function PeriodicNoteSection({
   title,
@@ -322,9 +373,11 @@ function PeriodicNoteSection({
 
         <div className="flex items-center justify-between gap-4 rounded-lg border border-white/10 px-4 py-3">
           <div>
-            <p className="text-sm font-medium">Auto-create on app open</p>
+            <p className="text-sm font-medium">
+              Auto-create {kind} note on app open
+            </p>
             <p className="text-xs text-gray-500">
-              Create missing note content without opening the note.
+              Create missing {kind} note content without opening the note.
             </p>
           </div>
           <Switch
@@ -335,9 +388,41 @@ function PeriodicNoteSection({
                 enabled: autoCreateOnOpen ? true : values.enabled,
               })
             }
-            aria-label={`Auto-create ${title.toLowerCase()} on app open`}
+            aria-label={`Auto-create ${kind} note on app open`}
           />
         </div>
+
+        {kind === "daily" || kind === "weekly" ? (
+          <div className="space-y-2 md:col-span-2">
+            <div className="flex items-center gap-1.5">
+              <Label htmlFor={`${kind}-night-owl-hour`}>Night Owl Protection</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="h-3.5 w-3.5 cursor-help text-gray-500" />
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-64">
+                    If you journal late at night, this shifts when your &ldquo;day&rdquo; begins.
+                    Set to 2 AM and notes created at 1:30 AM will still open the
+                    previous {kind === "weekly" ? "week" : "day"}&apos;s entry — not a blank one for the next period.
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+            <select
+              id={`${kind}-night-owl-hour`}
+              value={String(values.nightOwlHour ?? 0)}
+              onChange={(e) => onChange(kind, { nightOwlHour: Number(e.target.value) })}
+              className="flex h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
+            >
+              <option value="0">Off — day starts at midnight</option>
+              <option value="1">1 AM — day starts at 1 AM</option>
+              <option value="2">2 AM — day starts at 2 AM</option>
+              <option value="3">3 AM — day starts at 3 AM</option>
+              <option value="4">4 AM — day starts at 4 AM</option>
+            </select>
+          </div>
+        ) : null}
       </div>
     </section>
   );

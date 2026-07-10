@@ -3,10 +3,21 @@
 import { useEffect, useMemo, useRef } from "react";
 import moment from "moment";
 import { toast } from "sonner";
-import { getNextPeriodicRolloverDelay } from "@/lib/domain/periodic-notes";
+import {
+  formatPeriodKey,
+  getNextPeriodicRolloverDelay,
+} from "@/lib/domain/periodic-notes";
 import { getPeriodicNotesSettings } from "@/lib/domain/periodic-notes/settings";
 import type { PeriodicNoteKind } from "@/lib/domain/periodic-notes/types";
 import { useSettingsStore } from "@/state/settings-store";
+
+const PERIODIC_KINDS: PeriodicNoteKind[] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+];
 
 export function PeriodicNotesShellController() {
   const periodicNotes = useSettingsStore((state) => state.periodicNotes);
@@ -28,28 +39,29 @@ export function PeriodicNotesShellController() {
     let retryTimeoutId: number | null = null;
     const runAutoCreate = async () => {
       const localDateTime = moment().format("YYYY-MM-DDTHH:mm:ss");
-      const dailyKey = moment(localDateTime).format("YYYY-MM-DD");
-      const weeklyKey = moment(localDateTime)
-        .clone()
-        .startOf("isoWeek")
-        .format("GGGG-[W]WW");
-      const runKey = [
-        settings.daily.enabled && settings.daily.autoCreateOnOpen
-          ? `daily:${dailyKey}`
-          : null,
-        settings.weekly.enabled && settings.weekly.autoCreateOnOpen
-          ? `weekly:${weeklyKey}`
-          : null,
-      ]
-        .filter(Boolean)
+
+      // Every enabled kind with auto-create on. The runKey (kind:periodKey per
+      // active kind) dedupes so we don't re-hit the API within the same period.
+      const activeKinds = PERIODIC_KINDS.filter(
+        (kind) => settings[kind].enabled && settings[kind].autoCreateOnOpen
+      );
+      const runKey = activeKinds
+        .map((kind) => {
+          const adjusted = moment(localDateTime).subtract(
+            settings[kind].nightOwlHour,
+            "hours"
+          );
+          return `${kind}:${formatPeriodKey(kind, adjusted)}`;
+        })
         .join("|");
 
       if (!runKey || lastAutoCreateKeyRef.current === runKey) return;
 
-      const results = await Promise.all([
-        maybeResolvePeriodicNote("daily", localDateTime, settings.daily.enabled && settings.daily.autoCreateOnOpen),
-        maybeResolvePeriodicNote("weekly", localDateTime, settings.weekly.enabled && settings.weekly.autoCreateOnOpen),
-      ]);
+      const results = await Promise.all(
+        activeKinds.map((kind) =>
+          maybeResolvePeriodicNote(kind, localDateTime, true)
+        )
+      );
       const requestedResults = results.filter((result) => result.requested);
       const failedResult = requestedResults.find((result) => !result.ok);
 
@@ -78,7 +90,7 @@ export function PeriodicNotesShellController() {
     const scheduleNextRun = () => {
       timeoutId = window.setTimeout(() => {
         void runAutoCreate().finally(scheduleNextRun);
-      }, getNextPeriodicRolloverDelay());
+      }, getNextPeriodicRolloverDelay(new Date(), settings.daily.nightOwlHour));
     };
 
     void runAutoCreate();

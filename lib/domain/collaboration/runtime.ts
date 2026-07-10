@@ -69,7 +69,7 @@ function schedulePostPaint(callback: () => void): { cancel: () => void } {
 export type LocalSurfaceTopology = "singleSurface" | "multiSurface";
 export type BrowserSessionTopology = "singleSession" | "multiSession";
 export type RemoteCollaborationTopology = "solo" | "remotePresent";
-export type PersistenceState = "booting" | "localReady";
+export type PersistenceState = "booting" | "localReady" | "unavailable";
 export type BootstrapState = "pending" | "ready" | "failed";
 export type CollaborationAvailabilityState = "canonical" | "localFallback" | "plainFallback";
 export type LocalFallbackReason =
@@ -328,6 +328,7 @@ const PROVIDER_RECONNECT_BASE_MS = 1000;
 const PROVIDER_RECONNECT_MAX_MS = 30_000;
 const BOOTSTRAP_SLOW_WARNING_MS = 10_000;
 const BOOTSTRAP_LOCAL_FALLBACK_MS = 25_000;
+const INDEXEDDB_INIT_TIMEOUT_MS = 4_000;
 const COOLDOWN_MS = 120_000;
 const IDLE_EVICTION_MS = 300_000;
 const LOCAL_CACHE_MANIFEST_KEY = "dg-collab-local-cache-manifest";
@@ -723,16 +724,40 @@ class CollaborationRuntimeManager {
     };
     entry.ydoc.on("update", entry.ydocUpdateHandler);
 
+    // Watchdog: if IndexedDB doesn't respond within INDEXEDDB_INIT_TIMEOUT_MS
+    // (common in mobile webviews with partitioned storage or background suspension),
+    // treat storage as unavailable and route to plainFallback so the user can edit
+    // via REST auto-save rather than being blocked in read-only "booting" state.
+    let indexedDbWatchdog: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+      indexedDbWatchdog = null;
+      if (entry.state.persistenceState !== "booting") return;
+      this.routeToPlainFallback(
+        entry,
+        "Local storage is unavailable. Editing from the last saved state — changes are saved to the server.",
+        "canonical-unavailable"
+      );
+    }, INDEXEDDB_INIT_TIMEOUT_MS);
+
     indexedDbProvider.whenSynced
       .then(() => {
+        if (indexedDbWatchdog !== null) {
+          clearTimeout(indexedDbWatchdog);
+          indexedDbWatchdog = null;
+        }
         entry.state.persistenceState = "localReady";
         void this.bootstrapInitialContent(entry);
         this.emit(entry);
       })
       .catch((error) => {
-        this.markBootstrapFailed(
+        if (indexedDbWatchdog !== null) {
+          clearTimeout(indexedDbWatchdog);
+          indexedDbWatchdog = null;
+        }
+        entry.state.persistenceState = "unavailable";
+        this.routeToPlainFallback(
           entry,
-          "Local collaborative storage could not be initialized. Editing is blocked to avoid data loss."
+          "Local collaborative storage could not be initialized. Editing from the last saved state — changes are saved to the server.",
+          "canonical-unavailable"
         );
         if (process.env.NODE_ENV === "development") {
           console.error(
@@ -938,6 +963,31 @@ class CollaborationRuntimeManager {
     entry.hasSeededInitialContent = false;
     entry.isBootstrappingInitialContent = false;
     this.emit(entry);
+  }
+
+  // Routes to plainFallback when IndexedDB is blocked or unavailable.
+  // plainFallback = editor uses REST content directly with REST auto-save,
+  // so edits are durable to the server even without local IndexedDB storage.
+  // Falls back to markBootstrapFailed if the pending content can't be used
+  // as a plain-editor fallback (e.g. not yet seeded or malformed).
+  private routeToPlainFallback(
+    entry: DocumentRuntimeEntry,
+    warning: string,
+    fallbackReason: LocalFallbackReason
+  ) {
+    const pendingContent = entry.pendingInitialContent;
+    if (pendingContent && canUsePlainEditorFallback(pendingContent)) {
+      this.clearBootstrapWatch(entry);
+      entry.state.bootstrapState = "failed";
+      entry.state.availabilityState = "plainFallback";
+      entry.state.localFallbackReason = fallbackReason;
+      entry.state.warning = warning;
+      entry.hasSeededInitialContent = false;
+      entry.isBootstrappingInitialContent = false;
+      this.emit(entry);
+    } else {
+      this.markBootstrapFailed(entry, warning);
+    }
   }
 
   private bootstrapFromSavedContent(
@@ -2048,6 +2098,16 @@ class CollaborationRuntimeManager {
 }
 
 export const collaborationRuntimeManager = new CollaborationRuntimeManager();
+
+// Request persistent IndexedDB storage on startup. Mobile browsers and some
+// desktop contexts (e.g. private browsing) apply aggressive eviction to
+// "best-effort" storage. Persistent storage is less likely to be cleared
+// mid-session — directly reduces Y.Doc buffer loss in webview/iframe contexts.
+// This is a hint to the browser; it may be denied (partitioned iframes, user
+// choice), so we fire-and-forget rather than gating any behavior on the result.
+if (typeof navigator !== "undefined" && "storage" in navigator && "persist" in navigator.storage) {
+  void navigator.storage.persist();
+}
 
 export function useCollaborationRuntime({
   contentId,

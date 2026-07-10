@@ -1,7 +1,9 @@
 # Content Page Load Cascade — Spec & Remediation Plan
 
-> Status: **DRAFT for approval** (2026-06-07). Authoritative contract for how
-> the authenticated `/content` page loads. New features and refactors that
+> Status: **DRAFT for approval** (2026-06-07; §4 data-safety invariant + §9
+> offline & non-standard contexts added 2026-07-02; §9.6 levers implemented
+> 2026-07-02). Authoritative contract for
+> how the authenticated `/content` page loads. New features and refactors that
 > touch the content surface MUST conform to the cascade and rules below.
 
 ## 1. Why this exists
@@ -137,6 +139,19 @@ the top-level order, but each must honor §3 rules).
   promotes `editorMode` `"collaboration-local"` → `"collaboration"`
   (`canonical`). It must never gate first contentful paint of the editor.
   Only for collaborative types (notes).
+- **Promotion must never regress content → blank (data-safety invariant).**
+  The plain/fallback editor paints the durable REST `NotePayload`. Promotion to
+  `"collaboration"` **recreates** the editor bound to the Y.Doc (the `useEditor`
+  deps change), which is only safe once that Y.Doc actually carries the content
+  the payload proves exists. The editor MUST NOT bind to an empty/partial Y.Doc
+  while the REST payload is non-empty; until the Y.Doc materializes that content
+  the editor keeps showing the payload — **never a blank document, and never a
+  skeleton painted over content we already hold.** "A document that exists only
+  ever loads content." Enforced in `MarkdownEditor` via `collaborationBindingSafe`
+  (`!restContentIsMeaningful || ydocContentReady`, latched sticky per instance).
+  This invariant is what makes the cascade safe in the harsher persistence
+  environments of §9. Do **not** attempt to satisfy it by re-tuning the
+  `runtime.ts` bootstrap state machine — enforce it at the binding layer.
 - **Teardown on navigation** (rule §3.6): switching a pane's active content —
   or hiding a pane via a layout change — tears down that pane's provider
   before the next content's provider mounts.
@@ -225,3 +240,138 @@ the top-level order, but each must honor §3 rules).
   tears the provider down.
 - Gates: `pnpm typecheck` → `pnpm lint` (≤175) → `pnpm build`; browser
   smoke on `:3017`. Consider a Playwright timing assertion for the cascade.
+
+## 9. Offline capabilities & non-standard browser contexts
+
+This section exists because the recurring "existing note opens blank / flashes
+then disappears" incidents all trace to the same seam: a note has **two content
+representations** that can disagree, and the cascade can bind the editor to the
+wrong one. Anything touching content load, save, or collaboration MUST hold the
+rules here.
+
+### 9.1 The two representations (know which is authoritative)
+
+| | `NotePayload.tiptapJson` (REST) | `CollaborationDocument` Y.Doc (CRDT) |
+|---|---|---|
+| Role | **Durable source of truth.** Survives every collab state. | Live-editing / real-time surface + offline local buffer. |
+| Written by | REST `PATCH /content/[id]`, extension writes, importers, AI. | Hocuspocus (`storeCollaborationYDocState`) on collab edits. |
+| Client cache | Server-inlined `initialContent` + fetch. | Per-content `IndexeddbPersistence` (`dg:content:<id>`). |
+| Emptiness meaning | Empty ⇒ note genuinely has no content. | Empty ⇒ **unknown** — may just not be bootstrapped/synced yet. |
+
+**Rule:** REST `NotePayload` is the authority on *"does content exist?"*. The
+Y.Doc is authoritative on *"what is the latest collaborative state"* only once it
+has actually synced. Never treat an empty/unbootstrapped Y.Doc as proof the note
+is empty. (This is the basis of the §4 promotion invariant.)
+
+### 9.2 Offline capability — current state & requirements
+
+**Requirement (target):** a user can edit a note (a) while starting offline,
+(b) after being disconnected mid-session, (c) across a reload or a killed tab —
+and those edits are durable locally and sync losslessly on reconnect, with the
+document **never** rendering blank at any point.
+
+**Current implementation:** offline editing is real **only when
+`NEXT_PUBLIC_COLLABORATION_ENABLED=true`.** The per-content `IndexeddbPersistence`
++ Y.Doc buffers edits locally; `runtime.ts` models this with
+`connectionState` `localOnly` / `disconnectedButDirty` and `editPolicy` reason
+`offline-local-durable` ("Changes are saved locally and will sync when
+collaboration reconnects"), reconnecting via `reconnect-after-offline`.
+- With collaboration **disabled**, notes use plain REST autosave, which has **no
+  durable offline story** beyond the in-memory `save-conflict-store` draft. Do
+  not describe the product as offline-capable in that mode.
+- The plain-mode editor stays editable during a bootstrap wait (§4 invariant),
+  so REST autosave keeps working; when collab later materializes, the Y.Doc
+  seeds from the now-current `NotePayload`.
+
+### 9.3 Non-standard browser contexts (mobile webview, extension iframe)
+
+The browser-extension embed (`app/embed/content/[id]` → `MainPanelWorkspace`) and
+the app opened in a **mobile webview** run the **identical** cascade and editor
+pipeline as desktop. They differ only in environment, and those differences are
+exactly what surface the binding bug:
+- **Aggressive IndexedDB eviction / partitioned storage** → the local Y.Doc is
+  frequently **absent, empty, or stale** at bind time.
+- **Lifecycle suspension** (backgrounded webview/iframe killed) → providers drop
+  mid-sync; local persistence may be half-written.
+- **Flakier networks** → Hocuspocus promotion races harder against first paint.
+
+**Rules:**
+1. Never assume the local Y.Doc exists, is populated, or is current in these
+   contexts. The §4 invariant + REST-as-truth (§9.1) is what keeps them safe.
+2. Any new load/persistence path must be validated in an **iframe and a
+   throttled/evicted-storage** profile, not just desktop.
+3. The "mobile app" (native) is a separate, currently-unstable track — **not**
+   this pipeline. "Mobile" in this doc means mobile **webview** of the web app.
+
+**Design decision — no REST-only mode (do not re-propose).** It is tempting to
+"fix" iframe/webview fragility by running those surfaces collaboration-disabled
+(plain REST). **We do not do this.** Running the *same* collaborative pipeline
+everywhere is a deliberate product value — the compatibility and uniform
+behavior (real-time sync + offline durability on every surface) outweigh the
+convenience of a REST-only escape hatch. Harden the Y.js path instead (§9.6),
+never bypass it. (Per-document `plainFallback` — the emergency last resort when a
+single doc genuinely cannot load into a Y.Doc — is a safety net, not a mode
+choice, and is fine.)
+
+### 9.4 Freshness contract — writes that bypass the Y.Doc
+
+Any server path that updates `NotePayload` **without** going through the
+collaborative Y.Doc MUST realign the `CollaborationDocument` afterward, or a
+stale-but-non-empty Y.Doc will win at bootstrap and mask the write (stale/blank
+note on next open). Use `reseedCollaborationDocumentFromNote(prisma, contentId)`.
+- **Known bypassing writers:** browser extension `updateExtensionNoteContent`
+  (wired 2026-07-02). **Any** future out-of-band note writer (bulk import, AI
+  edits, a REST mobile client) must do the same — this is a checklist item for
+  new note-write endpoints.
+- The reseed is **non-fatal**: `NotePayload` is the durable truth, so a reseed
+  failure logs and does not fail the write.
+- **Known residual (out of scope):** an out-of-band REST write racing a *live*
+  Hocuspocus session on the same note is the inherent two-writers conflict;
+  reseed does not resolve it (the live session re-persists its own state).
+  Proper reconciliation (revision vectors / last-writer-by-timestamp across the
+  two representations) is future work. Related: the destructive-PATCH guard
+  history in `storeCollaborationYDocState`.
+
+### 9.5 Verification (offline & context matrix)
+
+- **Extension write → app open:** edit a note via the extension, open it in the
+  app with collaboration enabled → shows the extension's content, never stale,
+  never blank.
+- **Cold webview/iframe open:** open a content-bearing note in the extension
+  iframe (and a mobile webview) with empty/evicted IndexedDB → content paints
+  and stays; only a "Connecting collaborative editor…" notice may appear — never
+  a blank editor.
+- **Offline round-trip:** go offline, edit, reload (edits persist), reconnect →
+  edits sync with no loss and no blank frame.
+
+### 9.6 Hardening levers (keep collaboration, reduce breakage)
+
+Per §9.3 we keep Y.js on every surface; these strengthen it in hostile contexts
+without abandoning it. All three are **implemented** (2026-07-02):
+
+- **`navigator.storage.persist()` on module load** ✅ — Added to
+  `lib/domain/collaboration/runtime.ts` (fires once when the module first loads,
+  client-side). Marks origin storage *persistent* so the browser stops
+  auto-evicting the Y.Doc's IndexedDB buffer under pressure/inactivity.
+  Best-effort and browser-discretionary; often **denied** in partitioned
+  third-party iframes — it mainly helps the standalone app + mobile webview (as
+  a top-level origin). Fire-and-forget; no behavior gated on the result.
+
+- **Third-party-safe collab token auth** ✅ — Already implemented. The embed
+  layout's inline `EMBED_BRIDGE_SCRIPT` patches `window.fetch` to inject
+  `X-Embed-Session` on all `/api/*` calls before any React code runs. Server-side
+  `validateSession` accepts `X-Embed-Session` as a fallback when the cookie is
+  blocked (see `lib/infrastructure/auth/session.ts:79`). The Hocuspocus WebSocket
+  uses a fetched JWT token (not cookies), so the full auth chain already works in
+  partitioned-cookie contexts.
+
+- **Faster hostile-context detection** ✅ — Added `INDEXEDDB_INIT_TIMEOUT_MS =
+  4_000` watchdog and new `routeToPlainFallback()` method in
+  `lib/domain/collaboration/runtime.ts`. If IndexedDB doesn't respond within 4s
+  (blocked or frozen by the browser), the editor routes to `plainFallback`
+  (editable via REST auto-save) instead of hanging in read-only "booting" state
+  for 25s. The `whenSynced.catch()` path now also routes to `plainFallback` via
+  the same method rather than `markBootstrapFailed` (read-only). Recovery: if
+  IndexedDB later resolves, `bootstrapInitialContent` re-runs and upgrades to
+  canonical automatically. `PersistenceState` type extended with `"unavailable"`
+  to represent blocked-storage state.

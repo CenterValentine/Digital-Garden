@@ -41,6 +41,10 @@ import type {
   CollaborationUser,
 } from "@/lib/domain/collaboration/runtime";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import {
+  hasMeaningfulTipTapContent,
+  ydocHasMeaningfulDefaultContent,
+} from "@/lib/domain/collaboration/content-safety";
 import { dropPoint } from "@tiptap/pm/transform";
 import type { NodeSelection } from "@tiptap/pm/state";
 import type { Slice } from "@tiptap/pm/model";
@@ -290,6 +294,57 @@ export function MarkdownEditor({
     () => sanitizeTipTapJsonWithExtensions(content, viewerExtensions).json,
     [content, viewerExtensions]
   );
+  // Does the durable REST payload prove this note has real content? This is the
+  // authoritative "content exists" signal — the NotePayload is persisted and
+  // survives regardless of collaboration state. When it is true we must NEVER
+  // show a blank document: the collaboration Y.Doc has to actually carry that
+  // content before the editor is allowed to bind to it.
+  const restContentIsMeaningful = useMemo(
+    () => hasMeaningfulTipTapContent(safeContent),
+    [safeContent]
+  );
+  // Reactively track whether the collaboration Y.Doc's "default" field carries
+  // meaningful content yet. The Y.Doc mutates in place (bootstrap seeding,
+  // canonical apply, provider sync), so we observe it rather than reading once.
+  // We stop observing as soon as it reports ready — subsequent user typing does
+  // not need this (potentially heavy) fromYdoc transform on every keystroke.
+  const [ydocContentReady, setYdocContentReady] = useState(false);
+  useEffect(() => {
+    if (!runtimeYdoc) {
+      setYdocContentReady(false);
+      return;
+    }
+    // Reset for this (possibly new) document, then read the current state.
+    if (ydocHasMeaningfulDefaultContent(runtimeYdoc)) {
+      setYdocContentReady(true);
+      return;
+    }
+    setYdocContentReady(false);
+    const fragment = runtimeYdoc.getXmlFragment("default");
+    const evaluate = () => {
+      if (ydocHasMeaningfulDefaultContent(runtimeYdoc)) {
+        setYdocContentReady(true);
+        // Once content is present it stays present for binding purposes; stop
+        // paying for the transform on every structural mutation.
+        fragment.unobserveDeep(evaluate);
+      }
+    };
+    fragment.observeDeep(evaluate);
+    return () => {
+      fragment.unobserveDeep(evaluate);
+    };
+  }, [runtimeYdoc]);
+  // Anti-blank-document guard (the whole point of this component's care around
+  // collaboration): the editor may bind to the collaborative Y.Doc only when
+  // either the note is genuinely empty (nothing to protect) or the Y.Doc has
+  // actually materialized the content the REST payload promises. Otherwise the
+  // "plain" branch keeps the REST content on screen — a document that exists
+  // never renders blank. The gate is sticky: once we have entered collaboration
+  // for this instance we never fall back out of it (a later transient empty
+  // read must not unbind a live collaborative session).
+  const hasEnteredCollaborationRef = useRef(false);
+  const collaborationBindingSafe =
+    hasEnteredCollaborationRef.current || !restContentIsMeaningful || ydocContentReady;
   // Tracks the content reference the editor currently holds, seeded with the
   // value the editor is created with (see useEditor `content` below). The
   // content-sync effect compares against this to skip the redundant initial
@@ -304,7 +359,8 @@ export function MarkdownEditor({
       !isPlainEditorFallback &&
       runtimeYdoc &&
       runtimePersistenceState === "localReady" &&
-      runtimeBootstrapState === "ready"
+      runtimeBootstrapState === "ready" &&
+      collaborationBindingSafe
         ? {
             document: runtimeYdoc,
             provider: runtimeProvider,
@@ -325,8 +381,21 @@ export function MarkdownEditor({
       runtimeReadOnly,
       runtimeUser,
       runtimeYdoc,
+      collaborationBindingSafe,
     ]
   );
+  // Latch the sticky guard the moment we successfully enter collaboration, so a
+  // later transient "Y.Doc looks empty" read can never tear down a live session.
+  useEffect(() => {
+    if (collaborationState) hasEnteredCollaborationRef.current = true;
+  }, [collaborationState]);
+  // This editor instance is reused across documents (see contentIdRef), so the
+  // sticky collaboration latch must be released on navigation — otherwise a new
+  // note would inherit the previous note's "already bound" state and skip the
+  // anti-blank guard.
+  useEffect(() => {
+    hasEnteredCollaborationRef.current = false;
+  }, [contentId]);
   const collaborationWarning = collaborationRuntime?.state.warning ?? null;
   const collaborationNotice = runtimeEditPolicy?.warning ?? collaborationWarning;
   const isCollaborationEditBlocked =

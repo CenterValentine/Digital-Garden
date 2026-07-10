@@ -2,11 +2,34 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronDown, Shield, LogOut, MessageSquare, Bug, Settings } from "lucide-react";
+import {
+  ChevronDown,
+  Shield,
+  LogOut,
+  MessageSquare,
+  Bug,
+  Settings,
+  Sun,
+  Moon,
+  Monitor,
+  SunMoon,
+} from "lucide-react";
 import type { SessionData } from "@/lib/infrastructure/auth/types";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { publishSignedOut } from "@/lib/infrastructure/auth/client-session-events";
 import { clientLogger } from "@/lib/core/logger/client";
+import { useThemePreference, type ThemePreference } from "@/lib/features/theme";
+import { useSettingsStore } from "@/state/settings-store";
+
+const THEME_OPTIONS: Array<{
+  value: ThemePreference;
+  label: string;
+  Icon: typeof Sun;
+}> = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "Auto", Icon: Monitor },
+];
 
 export default function ProfileMenu() {
   const router = useRouter();
@@ -14,6 +37,9 @@ export default function ProfileMenu() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  const themePreference = useThemePreference();
+  const setUISettings = useSettingsStore((s) => s.setUISettings);
 
   const glass1 = getSurfaceStyles("glass-1");
 
@@ -155,6 +181,35 @@ export default function ProfileMenu() {
               <span className="text-sm">
                 Role: <span className="text-foreground font-medium">{session.user.role}</span>
               </span>
+            </div>
+
+            {/* Theme Mode */}
+            <div className="px-4 py-2 flex items-center gap-3 text-sm text-foreground">
+              <SunMoon className="h-4 w-4 text-gold-primary" />
+              <span className="flex-1">Theme</span>
+              <div
+                className="flex items-center gap-0.5 rounded-md border border-white/10 bg-white/5 p-0.5"
+                role="radiogroup"
+                aria-label="Theme mode"
+              >
+                {THEME_OPTIONS.map(({ value, label, Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={themePreference === value}
+                    title={`${label} mode`}
+                    onClick={() => void setUISettings({ theme: value })}
+                    className={`p-1.5 rounded transition-colors cursor-pointer ${
+                      themePreference === value
+                        ? "bg-gold-primary/20 text-gold-primary"
+                        : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Divider */}

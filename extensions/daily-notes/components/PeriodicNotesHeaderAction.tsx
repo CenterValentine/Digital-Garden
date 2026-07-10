@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import moment from "moment";
 import { toast } from "sonner";
 import { renderExtensionIcon } from "@/lib/extensions/icons";
@@ -19,6 +20,57 @@ import { useSettingsStore } from "@/state/settings-store";
 import { DAILY_NOTES_EXTENSION_ID } from "../manifest";
 
 const HOLD_TO_OPEN_MS = 550;
+
+// One "period" ahead resolves per kind: +1 day / week / month / year. Months
+// and years are variable-length, so we advance by the calendar unit rather than
+// a fixed day count.
+const PERIOD_UNIT: Record<PeriodicNoteKind, moment.unitOfTime.DurationConstructor> = {
+  daily: "days",
+  weekly: "weeks",
+  monthly: "months",
+  quarterly: "quarters",
+  yearly: "years",
+};
+
+const NEXT_PERIOD_NOUN: Record<PeriodicNoteKind, string> = {
+  daily: "tomorrow's note",
+  weekly: "next week's note",
+  monthly: "next month's note",
+  quarterly: "next quarter's note",
+  yearly: "next year's note",
+};
+
+const CURRENT_PERIOD_NOUN: Record<PeriodicNoteKind, string> = {
+  daily: "daily note",
+  weekly: "weekly note",
+  monthly: "monthly note",
+  quarterly: "quarterly note",
+  yearly: "yearly note",
+};
+
+const PREV_PERIOD_NOUN: Record<PeriodicNoteKind, string> = {
+  daily: "yesterday's note",
+  weekly: "last week's note",
+  monthly: "last month's note",
+  quarterly: "last quarter's note",
+  yearly: "last year's note",
+};
+
+// Per-interval affordance: previous / current / next, only rendered for
+// enabled kinds. Each label maps to an offsetPeriods (-1 / 0 / +1).
+const PERIOD_NAV: Array<{
+  kind: PeriodicNoteKind;
+  label: string;
+  prev: string;
+  current: string;
+  next: string;
+}> = [
+  { kind: "daily", label: "Daily", prev: "Yesterday", current: "Today", next: "Tomorrow" },
+  { kind: "weekly", label: "Weekly", prev: "Last Week", current: "To Week", next: "Next Week" },
+  { kind: "monthly", label: "Monthly", prev: "Last Month", current: "To Month", next: "Next Month" },
+  { kind: "quarterly", label: "Quarterly", prev: "Last Quarter", current: "To Quarter", next: "Next Quarter" },
+  { kind: "yearly", label: "Yearly", prev: "Last Year", current: "To Year", next: "Next Year" },
+];
 
 interface MenuPosition {
   top: number;
@@ -45,18 +97,16 @@ export function PeriodicNotesHeaderAction({
     (state) => state.openExtensionDialog
   );
   const settings = getPeriodicNotesSettings({ periodicNotes });
-  const dailyEnabled = settings.daily.enabled;
-  const weeklyEnabled = settings.weekly.enabled;
 
   const openMenu = useCallback(() => {
     const rect = buttonRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const menuWidth = 176;
+    const menuWidth = 248;
     const left = collapsed
       ? rect.right + 8
       : rect.left + rect.width / 2 - menuWidth / 2;
     setMenuPosition({
-      top: rect.bottom + 6,
+      top: rect.bottom + 2,
       left: Math.max(8, Math.min(left, window.innerWidth - menuWidth - 8)),
     });
     setMenuOpen(true);
@@ -87,13 +137,22 @@ export function PeriodicNotesHeaderAction({
   }, [menuOpen]);
 
   const openPeriodicNote = useCallback(
-    async (kind: PeriodicNoteKind) => {
+    async (kind: PeriodicNoteKind, offsetPeriods = 0) => {
       closeMenu();
 
       if (!settings[kind].enabled) {
-        toast.error(`${kind === "daily" ? "Daily" : "Weekly"} notes are disabled`);
+        const label = kind.charAt(0).toUpperCase() + kind.slice(1);
+        toast.error(`${label} notes are disabled`);
         return;
       }
+
+      // Advance by whole periods. The server subtracts nightOwlHour from this
+      // timestamp, so a whole-period offset always lands cleanly in the next
+      // period — the shared periodKey + unique DB index dedupes against any
+      // auto-generated note.
+      const localDateTime = moment()
+        .add(offsetPeriods, PERIOD_UNIT[kind])
+        .format("YYYY-MM-DDTHH:mm:ss");
 
       try {
         const response = await fetch("/api/periodic-notes/resolve", {
@@ -102,10 +161,7 @@ export function PeriodicNotesHeaderAction({
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            kind,
-            localDateTime: moment().format("YYYY-MM-DDTHH:mm:ss"),
-          }),
+          body: JSON.stringify({ kind, localDateTime }),
         });
         const result = await response.json();
 
@@ -122,10 +178,14 @@ export function PeriodicNotesHeaderAction({
           contentType: "note",
         });
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        const noteNoun =
+          offsetPeriods > 0
+            ? NEXT_PERIOD_NOUN[kind]
+            : offsetPeriods < 0
+              ? PREV_PERIOD_NOUN[kind]
+              : CURRENT_PERIOD_NOUN[kind];
         toast.success(
-          result.data.created
-            ? `Created ${kind === "daily" ? "daily" : "weekly"} note`
-            : `Opened ${kind === "daily" ? "daily" : "weekly"} note`
+          result.data.created ? `Created ${noteNoun}` : `Opened ${noteNoun}`
         );
       } catch (error) {
         toast.error(
@@ -146,16 +206,16 @@ export function PeriodicNotesHeaderAction({
   );
 
   const openPrimaryNote = useCallback(() => {
-    if (dailyEnabled) {
-      void openPeriodicNote("daily");
+    // Single click opens the highest-cadence enabled note (daily first).
+    const primary = (["daily", "weekly", "monthly", "yearly"] as const).find(
+      (kind) => settings[kind].enabled
+    );
+    if (primary) {
+      void openPeriodicNote(primary);
       return;
     }
-    if (weeklyEnabled) {
-      void openPeriodicNote("weekly");
-      return;
-    }
-    toast.error("Enable daily or weekly notes in extension settings first");
-  }, [dailyEnabled, openPeriodicNote, weeklyEnabled]);
+    toast.error("Enable a periodic note kind in extension settings first");
+  }, [openPeriodicNote, settings]);
 
   const openSettings = useCallback(() => {
     closeMenu();
@@ -217,43 +277,59 @@ export function PeriodicNotesHeaderAction({
         {renderExtensionIcon(item.iconName, iconClassName)}
       </button>
 
-      {menuOpen && menuPosition ? (
-        <div
-          ref={menuRef}
-          role="menu"
-          className="fixed z-50 min-w-40 rounded-md border border-white/10 bg-[#111318] p-1 text-sm text-gray-200 shadow-xl"
-          style={{ top: menuPosition.top, left: menuPosition.left }}
-        >
-          {dailyEnabled ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
-              onClick={() => void openPeriodicNote("daily")}
+      {menuOpen && menuPosition
+        ? createPortal(
+            <div
+              ref={menuRef}
+              role="menu"
+              className="fixed z-50 w-[248px] rounded-md border border-black/10 bg-white/95 p-1 text-sm text-gray-900 shadow-lg backdrop-blur-sm dark:border-white/10 dark:bg-gray-900/95 dark:text-gray-200"
+              style={{ top: menuPosition.top, left: menuPosition.left }}
             >
-              Today
-            </button>
-          ) : null}
-          {weeklyEnabled ? (
-            <button
-              type="button"
-              role="menuitem"
-              className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
-              onClick={() => void openPeriodicNote("weekly")}
-            >
-              This Week
-            </button>
-          ) : null}
-          <button
-            type="button"
-            role="menuitem"
-            className="flex w-full items-center rounded px-3 py-2 text-left transition-colors hover:bg-white/10"
-            onClick={openSettings}
-          >
-            Settings
-          </button>
-        </div>
-      ) : null}
+              {PERIOD_NAV.filter((nav) => settings[nav.kind].enabled).map(
+                (nav) => (
+                  <div key={nav.kind} className="px-0.5 pb-0.5">
+                    <div className="px-1 pb-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-100">
+                      {nav.label}
+                    </div>
+                    <div className="grid grid-cols-3 gap-0.5">
+                      {[
+                        { rel: nav.prev, offset: -1 },
+                        { rel: nav.current, offset: 0 },
+                        { rel: nav.next, offset: 1 },
+                      ].map((seg) => (
+                        <button
+                          key={seg.offset}
+                          type="button"
+                          role="menuitem"
+                          className={`rounded px-1 py-1 text-center text-[11px] leading-tight transition-colors hover:bg-primary/10 hover:text-primary dark:hover:bg-white/10 dark:hover:text-gray-100 ${
+                            seg.offset === 0
+                              ? "bg-primary/5 font-semibold dark:bg-white/[0.06]"
+                              : "text-gray-600 dark:text-gray-400"
+                          }`}
+                          onClick={() => void openPeriodicNote(nav.kind, seg.offset)}
+                        >
+                          {seg.rel}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+              {PERIOD_NAV.some((nav) => settings[nav.kind].enabled) ? (
+                <div className="my-0.5 border-t border-black/10 dark:border-white/10" />
+              ) : null}
+              <button
+                type="button"
+                role="menuitem"
+                className="flex w-full items-center rounded px-2 py-1.5 text-left transition-colors hover:bg-primary/10 hover:text-primary dark:hover:bg-white/10 dark:hover:text-gray-100"
+                onClick={openSettings}
+              >
+                Settings
+              </button>
+            </div>,
+            document.body
+          )
+        : null}
     </>
   );
 }
