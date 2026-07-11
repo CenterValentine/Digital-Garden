@@ -553,7 +553,7 @@ export function ExcalidrawViewer({
       {/* Read-only banner: shown when this drawing is owned by a note */}
       {isReadOnly && ownerNoteInfo && (
         <div className="flex items-center justify-between gap-3 border-b border-yellow-500/20 bg-yellow-500/10 px-6 py-2 text-xs">
-          <span className="text-yellow-300">
+          <span className="text-yellow-700 dark:text-yellow-300">
             View-only — this drawing lives inside
             {ownerNoteInfo.noteTitle ? ` “${ownerNoteInfo.noteTitle}”` : " a note"}. Edit it there to keep changes in sync.
           </span>
