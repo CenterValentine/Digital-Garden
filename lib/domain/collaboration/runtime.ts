@@ -327,7 +327,7 @@ const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
 const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
 const PRESENCE_IDLE_AFTER_MS = 60_000;
 const PROVIDER_RECONNECT_BASE_MS = 1000;
-const PROVIDER_RECONNECT_MAX_MS = 30_000;
+const PROVIDER_RECONNECT_MAX_MS = 5 * 60 * 1000; // 5 min — activity triggers immediate reconnect instead
 const BOOTSTRAP_SLOW_WARNING_MS = 10_000;
 const BOOTSTRAP_LOCAL_FALLBACK_MS = 25_000;
 const COOLDOWN_MS = 120_000;
@@ -750,6 +750,10 @@ class CollaborationRuntimeManager {
       ) {
         void this.promote(entry, "reconnect-after-offline");
       }
+
+      // If Hocuspocus dropped unexpectedly (reconnectIntent=true, passive timer
+      // ticking toward 5 min cap), jump straight to reconnect on user edit.
+      this.activityTriggeredReconnect(entry);
 
       if (
         entry.state.networkState === "offline" ||
@@ -1853,6 +1857,20 @@ class CollaborationRuntimeManager {
     entry.reconnectAttempts = 0;
   }
 
+  // Called when the user is demonstrably active (typing or tab focus). If a
+  // passive reconnect timer is pending, cancel it and promote immediately so
+  // the 5-minute cap doesn't delay a reconnect the user clearly wants now.
+  private activityTriggeredReconnect(entry: DocumentRuntimeEntry) {
+    if (
+      entry.state.reconnectIntent &&
+      !entry.hocuspocusProvider &&
+      !entry.promotionPromise
+    ) {
+      this.clearProviderReconnect(entry);
+      void this.promote(entry, "reconnect-after-offline");
+    }
+  }
+
   private shouldReconnectProvider(entry: DocumentRuntimeEntry) {
     return (
       entry.consumers.size > 0 &&
@@ -1972,6 +1990,10 @@ class CollaborationRuntimeManager {
       ) {
         void this.promote(entry, "reconnect-after-offline");
       }
+
+      // If Hocuspocus dropped unexpectedly (passive backoff timer running),
+      // jump straight to reconnect now that the user is back on the tab.
+      this.activityTriggeredReconnect(entry);
     }
   }
 
