@@ -1,8 +1,10 @@
 /**
  * Settings Sidebar Navigation
  *
- * Sticky sidebar with navigation links
- * Matches Notes left sidebar design
+ * Grouped navigation: Workspace / AI & Connections / Data / Publishing /
+ * Extensions. Extension entries derive from registered manifests — never
+ * from free-form manifest path strings — so dead links are structurally
+ * impossible.
  */
 
 "use client";
@@ -10,285 +12,123 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback } from "react";
-import { getSurfaceStyles } from "@/lib/design/system";
-import { LAST_CONTENT_ROUTE_KEY } from "@/components/content/NotesLayoutMarker";
 import {
-  renderExtensionIcon,
-} from "@/lib/extensions";
+  ArrowLeft,
+  Brain,
+  Database,
+  Download,
+  FileText,
+  Globe,
+  SlidersHorizontal,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+
+import { LAST_CONTENT_ROUTE_KEY } from "@/components/content/NotesLayoutMarker";
+import { cn } from "@/lib/core/utils";
+import { getSurfaceStyles } from "@/lib/design/system";
+import { renderExtensionIcon } from "@/lib/extensions";
 import { useExtensionSettingsEntries } from "@/lib/extensions/client-registry";
-
-// Inline SVG icons (server-compatible)
-const SettingsIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-const DatabaseIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <ellipse cx="12" cy="5" rx="9" ry="3" />
-    <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-    <path d="M3 12A9 3 0 0 0 21 12" />
-  </svg>
-);
-
-const KeyIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="7.5" cy="15.5" r="5.5" />
-    <path d="m21 2-9.6 9.6" />
-    <path d="m15.5 7.5 3 3L22 7l-3-3" />
-  </svg>
-);
-
-const SparklesIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-    <path d="M5 3v4" />
-    <path d="M19 17v4" />
-    <path d="M3 5h4" />
-    <path d="M17 19h4" />
-  </svg>
-);
-
-const SlidersIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <line x1="4" x2="4" y1="21" y2="14" />
-    <line x1="4" x2="4" y1="10" y2="3" />
-    <line x1="12" x2="12" y1="21" y2="12" />
-    <line x1="12" x2="12" y1="8" y2="3" />
-    <line x1="20" x2="20" y1="21" y2="16" />
-    <line x1="20" x2="20" y1="12" y2="3" />
-    <line x1="2" x2="6" y1="14" y2="14" />
-    <line x1="10" x2="14" y1="8" y2="8" />
-    <line x1="18" x2="22" y1="16" y2="16" />
-  </svg>
-);
-
-const BrainIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z" />
-    <path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z" />
-    <path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4" />
-    <path d="M17.599 6.5a3 3 0 0 0 .399-1.375" />
-    <path d="M6.003 5.125A3 3 0 0 0 6.401 6.5" />
-    <path d="M3.477 10.896a4 4 0 0 1 .585-.396" />
-    <path d="M19.938 10.5a4 4 0 0 1 .585.396" />
-    <path d="M6 18a4 4 0 0 1-1.967-.516" />
-    <path d="M19.967 17.484A4 4 0 0 1 18 18" />
-  </svg>
-);
-
-const UserIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-    <circle cx="12" cy="7" r="4" />
-  </svg>
-);
-
-const FileTextIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
-    <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-    <path d="M10 9H8" />
-    <path d="M16 13H8" />
-    <path d="M16 17H8" />
-  </svg>
-);
-
-const SitesIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 2a14.5 14.5 0 0 0 0 20a14.5 14.5 0 0 0 0-20" />
-    <path d="M2 12h20" />
-  </svg>
-);
-
-const TrashIcon = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="16"
-    height="16"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-  >
-    <path d="M3 6h18" />
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
-    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-    <path d="M10 11v6" />
-    <path d="M14 11v6" />
-  </svg>
-);
 
 interface NavItem {
   href: string;
   label: string;
   icon: React.ReactNode;
   badge?: string;
+  /** Rendered dimmed (e.g. a disabled extension). Still navigable. */
+  dimmed?: boolean;
 }
 
-const navItems: NavItem[] = [
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const CORE_GROUPS: NavGroup[] = [
   {
-    href: "/settings/general",
-    label: "General",
-    icon: <SettingsIcon />,
+    label: "Workspace",
+    items: [
+      {
+        href: "/settings/preferences",
+        label: "Preferences",
+        icon: <SlidersHorizontal size={16} />,
+      },
+      {
+        href: "/settings/templates",
+        label: "Templates & Snippets",
+        icon: <FileText size={16} />,
+      },
+    ],
   },
   {
-    href: "/settings/storage",
-    label: "Storage",
-    icon: <DatabaseIcon />,
+    label: "AI & Connections",
+    items: [
+      { href: "/settings/ai", label: "AI", icon: <Brain size={16} />, badge: "New" },
+      {
+        href: "/settings/mcp",
+        label: "MCP",
+        icon: <Sparkles size={16} />,
+        badge: "Soon",
+      },
+    ],
   },
   {
-    href: "/settings/api",
-    label: "API Keys",
-    icon: <KeyIcon />,
-    badge: "Soon",
+    label: "Data",
+    items: [
+      {
+        href: "/settings/storage",
+        label: "Storage",
+        icon: <Database size={16} />,
+      },
+      {
+        href: "/settings/export",
+        label: "Export & Backup",
+        icon: <Download size={16} />,
+      },
+      { href: "/settings/trash", label: "Trash", icon: <Trash2 size={16} /> },
+    ],
   },
   {
-    href: "/settings/mcp",
-    label: "MCP",
-    icon: <SparklesIcon />,
-    badge: "Soon",
-  },
-  {
-    href: "/settings/ai",
-    label: "AI",
-    icon: <BrainIcon />,
-    badge: "New",
-  },
-  {
-    href: "/settings/preferences",
-    label: "Preferences",
-    icon: <SlidersIcon />,
-  },
-  {
-    href: "/settings/templates",
-    label: "Templates",
-    icon: <FileTextIcon />,
-  },
-  {
-    href: "/settings/sites",
-    label: "Sites",
-    icon: <SitesIcon />,
-  },
-  {
-    href: "/settings/account",
-    label: "Account",
-    icon: <UserIcon />,
-  },
-  {
-    href: "/settings/trash",
-    label: "Trash & Data",
-    icon: <TrashIcon />,
+    label: "Publishing",
+    items: [
+      {
+        href: "/settings/sites",
+        label: "Sites & Domains",
+        icon: <Globe size={16} />,
+      },
+    ],
   },
 ];
+
+function isItemActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  // Prefix-match nested routes, but never let a group index page (e.g.
+  // /settings/extensions) claim its children.
+  if (href === "/settings/extensions") return false;
+  return pathname.startsWith(`${href}/`);
+}
 
 export function SettingsSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const glass1 = getSurfaceStyles("glass-1");
-  const extensionSettingsItems: NavItem[] = useExtensionSettingsEntries().map(
-    (entry) => ({
+
+  // Extension entries with absolute settings routes. Relative or missing
+  // paths are excluded rather than rendered as dead links.
+  const extensionItems: NavItem[] = useExtensionSettingsEntries()
+    .filter((entry) => entry.path.startsWith("/"))
+    .map((entry) => ({
       href: entry.path,
       label: entry.label,
       icon: renderExtensionIcon(entry.iconName, "h-4 w-4"),
-    })
-  );
-  const allItems = [...navItems, ...extensionSettingsItems];
+    }));
+
+  const groups: NavGroup[] = [
+    ...CORE_GROUPS,
+    ...(extensionItems.length > 0
+      ? [{ label: "Extensions", items: extensionItems }]
+      : []),
+  ];
 
   // Back to the last content route the user visited, not the previous
   // settings sub-page. NotesLayoutMarker writes the user's pathname to
@@ -311,70 +151,72 @@ export function SettingsSidebar() {
   }, [router]);
 
   return (
-    <div className="p-4 space-y-2">
+    <nav aria-label="Settings" className="p-4">
       <button
         type="button"
         onClick={handleBack}
         title="Back to where you were"
         aria-label="Back"
-        className="flex w-full items-center gap-2 px-3 py-2 mb-2 rounded-lg text-sm text-gray-400 hover:text-gray-100 hover:bg-white/10 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+        className="mb-2 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/10"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="16"
-          height="16"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="19" y1="12" x2="5" y2="12" />
-          <polyline points="12 19 5 12 12 5" />
-        </svg>
+        <ArrowLeft size={16} />
         <span>Back</span>
       </button>
-      <div className="px-3 py-2 mb-4">
-        <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">
+
+      <div className="mb-2 px-3 py-2">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Settings
         </h2>
       </div>
 
-      {allItems.map((item) => {
-        const isActive = pathname === item.href;
+      <div className="space-y-5">
+        {groups.map((group) => (
+          <div key={group.label}>
+            <div className="px-3 pb-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground/70">
+              {group.label}
+            </div>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const isActive = isItemActive(pathname, item.href);
 
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            className={`
-              flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all
-              ${
-                isActive
-                  ? "text-primary font-medium"
-                  : "text-gray-300 hover:text-gray-100 hover:bg-white/10"
-              }
-            `}
-            style={
-              isActive
-                ? {
-                    background: glass1.background,
-                    backdropFilter: glass1.backdropFilter,
-                  }
-                : {}
-            }
-          >
-            <span className="flex-shrink-0">{item.icon}</span>
-            <span className="flex-1">{item.label}</span>
-            {item.badge && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-primary/20 text-primary">
-                {item.badge}
-              </span>
-            )}
-          </Link>
-        );
-      })}
-    </div>
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    aria-current={isActive ? "page" : undefined}
+                    className={cn(
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                      isActive
+                        ? "font-medium text-primary"
+                        : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10",
+                      item.dimmed && !isActive && "opacity-60"
+                    )}
+                    style={
+                      isActive
+                        ? {
+                            background: glass1.background,
+                            backdropFilter: glass1.backdropFilter,
+                          }
+                        : {}
+                    }
+                  >
+                    <span className="flex-shrink-0">{item.icon}</span>
+                    <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                    {item.badge && (
+                      <span className="rounded-full bg-primary/20 px-2 py-0.5 text-xs text-primary">
+                        {item.badge}
+                      </span>
+                    )}
+                    {item.dimmed && (
+                      <span className="text-xs text-muted-foreground">Off</span>
+                    )}
+                  </Link>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </nav>
   );
 }
