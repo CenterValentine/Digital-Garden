@@ -1,7 +1,8 @@
 import type { ExtensionManifest } from "@/lib/extensions/types";
 
 export const BROWSER_BOOKMARKS_EXTENSION_ID = "browser-bookmarks";
-export const BROWSER_BOOKMARKS_SETTINGS_PATH = "/settings/browser-bookmarks";
+export const BROWSER_BOOKMARKS_SETTINGS_PATH =
+  "/settings/extensions/browser-bookmarks";
 
 export const browserBookmarksExtensionManifest: ExtensionManifest = {
   id: BROWSER_BOOKMARKS_EXTENSION_ID,

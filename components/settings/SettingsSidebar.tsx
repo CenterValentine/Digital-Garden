@@ -19,6 +19,7 @@ import {
   Download,
   FileText,
   Globe,
+  Puzzle,
   SlidersHorizontal,
   Sparkles,
   Trash2,
@@ -28,7 +29,8 @@ import { LAST_CONTENT_ROUTE_KEY } from "@/components/content/NotesLayoutMarker";
 import { cn } from "@/lib/core/utils";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { renderExtensionIcon } from "@/lib/extensions";
-import { useExtensionSettingsEntries } from "@/lib/extensions/client-registry";
+import { useAllExtensionManifests } from "@/lib/extensions/client-registry";
+import { useExtensionActivationStore } from "@/state/extension-activation-store";
 
 interface NavItem {
   href: string;
@@ -113,21 +115,33 @@ export function SettingsSidebar() {
   const router = useRouter();
   const glass1 = getSurfaceStyles("glass-1");
 
-  // Extension entries with absolute settings routes. Relative or missing
-  // paths are excluded rather than rendered as dead links.
-  const extensionItems: NavItem[] = useExtensionSettingsEntries()
-    .filter((entry) => entry.path.startsWith("/"))
-    .map((entry) => ({
-      href: entry.path,
-      label: entry.label,
-      icon: renderExtensionIcon(entry.iconName, "h-4 w-4"),
-    }));
+  // Every installed extension gets a nav entry derived from its id —
+  // disabled ones stay visible (dimmed) so their settings remain findable.
+  const manifests = useAllExtensionManifests();
+  const activationOverrides = useExtensionActivationStore(
+    (state) => state.overrides
+  );
+  const extensionItems: NavItem[] = [
+    {
+      href: "/settings/extensions",
+      label: "Overview",
+      icon: <Puzzle size={16} />,
+    },
+    ...[...manifests]
+      .sort((a, b) => a.label.localeCompare(b.label))
+      .map((manifest) => ({
+        href: `/settings/extensions/${manifest.id}`,
+        label: manifest.label,
+        icon: renderExtensionIcon(manifest.iconName, "h-4 w-4"),
+        dimmed: !(
+          activationOverrides[manifest.id] ?? manifest.enabledByDefault
+        ),
+      })),
+  ];
 
   const groups: NavGroup[] = [
     ...CORE_GROUPS,
-    ...(extensionItems.length > 0
-      ? [{ label: "Extensions", items: extensionItems }]
-      : []),
+    { label: "Extensions", items: extensionItems },
   ];
 
   // Back to the last content route the user visited, not the previous
