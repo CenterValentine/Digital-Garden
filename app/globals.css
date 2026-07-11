@@ -399,6 +399,14 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
+  /* Mobile / touch base — inert on desktop:
+   * - text-size-adjust: stop iOS Safari from auto-inflating font sizes in
+   *   landscape (a common cause of "text looks huge on my phone").
+   * - tap-highlight-color: remove the grey flash box on tap; the app's rich
+   *   :hover / :active states already provide press feedback. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -473,6 +481,12 @@ nav[class*="fixed"] {
   color: #1a1a1a;
   /* Extra bottom padding ensures block "+" buttons and margins don't create dead grey space near overflow edge */
   padding-bottom: 4rem;
+  /* touch-action: manipulation removes the ~300ms double-tap-to-zoom delay on
+   * touch devices that otherwise interrupts tap-to-place-cursor and text
+   * selection inside the editor. Pinch-zoom and panning are still allowed;
+   * native double-tap-to-select-word is unaffected (it's a text gesture, not
+   * a zoom gesture). */
+  touch-action: manipulation;
 }
 
 /* Tight flashcard editor: strip the 4rem bottom padding the main editor

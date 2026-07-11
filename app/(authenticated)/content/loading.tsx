@@ -23,7 +23,7 @@ export default function NotesLoading() {
   const leftWidth = 200;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden">
       {/* Main panel area */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar */}

@@ -61,7 +61,7 @@ export default async function Home() {
 
 function UnconfiguredLanding() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-6 px-8 text-center">
+    <main className="flex min-h-dvh flex-col items-center justify-center gap-6 px-8 text-center">
       <h1 className="text-4xl font-bold tracking-tight text-foreground">
         Digital Garden
       </h1>
