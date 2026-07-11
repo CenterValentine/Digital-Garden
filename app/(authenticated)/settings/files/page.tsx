@@ -388,7 +388,7 @@ export default function FilesSettingsPage() {
                     No hosts allowed. Previews will not work.
                   </p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="max-h-64 space-y-2 overflow-y-auto pr-1">
                     {external.allowlistedHosts.map((host) => (
                       <li
                         key={host}
