@@ -72,7 +72,14 @@ function ExtensionCard({ manifest }: { manifest: ExtensionManifest }) {
  */
 export function ExtensionsOverview() {
   const manifests = useAllExtensionManifests();
-  const sorted = [...manifests].sort((a, b) => a.label.localeCompare(b.label));
+  // "Always on" extensions (no disable toggle) first, then toggleable ones;
+  // alphabetical within each group.
+  const sorted = [...manifests].sort((a, b) => {
+    const aToggle = a.canDisable ? 1 : 0;
+    const bToggle = b.canDisable ? 1 : 0;
+    if (aToggle !== bToggle) return aToggle - bToggle;
+    return a.label.localeCompare(b.label);
+  });
 
   return (
     <SettingsPage
