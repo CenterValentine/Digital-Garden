@@ -11,6 +11,7 @@ import {
   FileText,
   Folder,
   MessageCircle,
+  MessagesSquare,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -85,6 +86,8 @@ function getTabIcon(contentType: string | null) {
       return ExternalLink;
     case "chat":
       return MessageCircle;
+    case "dm-thread":
+      return MessagesSquare;
     default:
       return File;
   }
