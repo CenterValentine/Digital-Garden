@@ -1,11 +1,11 @@
 /**
  * Settings Page (Default)
  *
- * Redirects to storage settings as the primary entry point
+ * Redirects to Appearance as the primary entry point.
  */
 
 import { redirect } from "next/navigation";
 
 export default function SettingsPage() {
-  redirect("/settings/storage");
+  redirect("/settings/appearance");
 }

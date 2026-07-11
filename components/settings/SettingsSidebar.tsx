@@ -18,9 +18,10 @@ import {
   Database,
   Download,
   FileText,
+  FolderCog,
   Globe,
+  Palette,
   Puzzle,
-  SlidersHorizontal,
   Sparkles,
   Trash2,
 } from "lucide-react";
@@ -51,9 +52,14 @@ const CORE_GROUPS: NavGroup[] = [
     label: "Workspace",
     items: [
       {
-        href: "/settings/preferences",
-        label: "Preferences",
-        icon: <SlidersHorizontal size={16} />,
+        href: "/settings/appearance",
+        label: "Appearance",
+        icon: <Palette size={16} />,
+      },
+      {
+        href: "/settings/files",
+        label: "Editor & Files",
+        icon: <FolderCog size={16} />,
       },
       {
         href: "/settings/templates",
