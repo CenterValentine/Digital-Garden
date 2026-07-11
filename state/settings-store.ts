@@ -100,6 +100,7 @@ export const useSettingsStore = create<SettingsStore>()(
           calendar: current.calendar,
           periodicNotes: current.periodicNotes,
           flashcards: current.flashcards,
+          notifications: current.notifications,
         };
 
         set({ isSyncing: true, error: null });
