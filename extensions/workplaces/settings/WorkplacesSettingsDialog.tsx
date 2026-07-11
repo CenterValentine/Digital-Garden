@@ -162,18 +162,13 @@ export default function WorkplacesSettingsDialog() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-4xl font-semibold tracking-tight text-white">
-          Workplaces
-        </h2>
-        <p className="mt-3 max-w-3xl text-base text-gray-400">
-          Workplaces manages your saved layouts, content claims, and overlap
-          reminders. Re-enable Workplaces to restore your prior workplaces.
-        </p>
-      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        Workplaces manages your saved layouts, content claims, and overlap
+        reminders.
+      </p>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
           <div className="flex items-center gap-3 text-gold-primary">
             <div className="flex h-7 w-7 items-center justify-center rounded-full border border-gold-primary bg-gold-primary/20">
               <span className="text-sm font-semibold text-gold-primary">
@@ -184,25 +179,25 @@ export default function WorkplacesSettingsDialog() {
               Active
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {activeWorkspace?.name ?? "Main Workspace"}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             This is the workspace you are currently active in.
           </p>
         </div>
 
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
           <div className="flex items-center gap-3 text-gold-primary">
             <Layers3 className="h-5 w-5" />
             <span className="text-xs font-semibold uppercase tracking-[0.16em]">
               Saved Workplaces
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {renderStatValue(workspaces.length)}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Use the selector in the top workspace bar to switch, rename, or
             create workplaces.
           </p>
@@ -214,7 +209,7 @@ export default function WorkplacesSettingsDialog() {
           className={`rounded-2xl border p-5 text-left transition-colors ${
             claimsOpen
               ? "border-gold-primary/40 bg-gold-primary/10"
-              : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+              : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
           }`}
         >
           <div className="flex items-center gap-3 text-gold-primary">
@@ -223,10 +218,10 @@ export default function WorkplacesSettingsDialog() {
               Claimed Content
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {renderStatValue(claimedItemCount)}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {lockedCount} locked workplace{lockedCount === 1 ? "" : "s"} currently
             protect assigned files or folders.
           </p>
@@ -234,22 +229,22 @@ export default function WorkplacesSettingsDialog() {
       </div>
 
       {claimsOpen ? (
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <h3 className="text-lg font-semibold text-white">Claimed Content</h3>
-              <p className="mt-1 text-sm text-gray-400">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Claimed Content</h3>
+              <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                 Release claims or move them into a different workplace.
               </p>
             </div>
-            <div className="text-sm text-gray-400">
+            <div className="text-sm text-gray-600 dark:text-gray-400">
               {claimedItemCount} claim{claimedItemCount === 1 ? "" : "s"}
             </div>
           </div>
 
           <div className="mt-4 space-y-3">
             {claimedItems.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-400">
+              <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                 No content is currently claimed.
               </div>
             ) : (
@@ -266,14 +261,14 @@ export default function WorkplacesSettingsDialog() {
                 return (
                   <div
                     key={claimKey}
-                    className="rounded-xl border border-white/10 bg-black/20 px-4 py-4"
+                    className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-4"
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-white">
+                        <div className="text-sm font-semibold text-gray-900 dark:text-white">
                           {claim.contentTitle}
                         </div>
-                        <div className="mt-1 text-xs text-gray-400">
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                           {claim.workspaceName} · {claim.assignmentType} · {claim.scope}
                           {claim.expiresAt
                             ? ` · expires ${new Date(claim.expiresAt).toLocaleString()}`
@@ -290,7 +285,7 @@ export default function WorkplacesSettingsDialog() {
                         type="button"
                         onClick={() => void handleReleaseClaim(claim)}
                         disabled={inFlight}
-                        className="rounded-md border border-white/10 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                        className="rounded-md border border-black/10 dark:border-white/10 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {claimActionKey === `release:${claimKey}` ? "Releasing..." : "Release"}
                       </button>
@@ -304,7 +299,7 @@ export default function WorkplacesSettingsDialog() {
                           }))
                         }
                         disabled={inFlight || availableTargets.length === 0}
-                        className="min-w-[14rem] rounded-md border border-white/10 bg-black/30 px-3 py-2 text-sm text-white outline-none"
+                        className="min-w-[14rem] rounded-md border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/30 px-3 py-2 text-sm text-gray-900 dark:text-white outline-none"
                       >
                         {availableTargets.length === 0 ? (
                           <option value="">No other workplace available</option>
@@ -336,12 +331,12 @@ export default function WorkplacesSettingsDialog() {
 
       <div className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-5">
         <div className="flex items-start gap-3">
-          <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-200" />
+          <ShieldAlert className="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-200" />
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-100">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-amber-800 dark:text-amber-100">
               Disabling Workplaces
             </h3>
-            <p className="mt-2 text-sm text-amber-50/90">
+            <p className="mt-2 text-sm text-amber-900/85 dark:text-amber-50/90">
               Turning Workplaces off hides the selector, claim dialogs, and
               workplace controls. Re-enable Workplaces to restore your prior
               workplaces.
@@ -352,14 +347,14 @@ export default function WorkplacesSettingsDialog() {
 
       <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-5">
         <div className="flex items-start gap-3">
-          <RotateCcw className="mt-0.5 h-5 w-5 text-red-200" />
+          <RotateCcw className="mt-0.5 h-5 w-5 text-red-600 dark:text-red-200" />
           <div className="min-w-0 flex-1">
-            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-red-100">
-              Nuke Workspaces
+            <h3 className="text-sm font-semibold uppercase tracking-[0.12em] text-red-700 dark:text-red-100">
+              Delete All Workplaces
             </h3>
-            <p className="mt-2 text-sm text-red-50/85">
-              This removes every saved workplace, content, and claims, then
-              returns you to a single Main Workspace.
+            <p className="mt-2 text-sm text-red-900/80 dark:text-red-50/85">
+              This removes every saved workplace, its content assignments, and
+              claims, then returns you to a single main workplace.
             </p>
 
             <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -368,7 +363,7 @@ export default function WorkplacesSettingsDialog() {
                   type="button"
                   onClick={handleStartReset}
                   disabled={resetInFlight}
-                  className="rounded-md border border-red-400/30 px-3 py-2 text-sm font-medium text-red-100 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-md border border-red-400/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-100 transition-colors hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Reset
                 </button>
@@ -377,14 +372,14 @@ export default function WorkplacesSettingsDialog() {
                   <button
                     type="button"
                     disabled
-                    className="rounded-md border border-red-400/30 px-3 py-2 text-sm font-medium text-red-100 opacity-80"
+                    className="rounded-md border border-red-400/30 px-3 py-2 text-sm font-medium text-red-700 dark:text-red-100 opacity-80"
                   >
                     Wait {resetCountdown}s before confirming
                   </button>
                   <button
                     type="button"
                     onClick={() => setResetCountdown(null)}
-                    className="rounded-md border border-white/10 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10"
+                    className="rounded-md border border-black/10 dark:border-white/10 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-black/5 dark:hover:bg-white/10"
                   >
                     Cancel
                   </button>
@@ -395,7 +390,7 @@ export default function WorkplacesSettingsDialog() {
                     type="button"
                     onClick={() => void handleResetAllWorkplaces()}
                     disabled={resetInFlight}
-                    className="inline-flex items-center gap-2 rounded-md border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-50 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex items-center gap-2 rounded-md border border-red-400/40 bg-red-500/15 px-3 py-2 text-sm font-medium text-red-900 dark:text-red-50 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {resetInFlight ? (
                       <>
@@ -410,7 +405,7 @@ export default function WorkplacesSettingsDialog() {
                     type="button"
                     onClick={() => setResetCountdown(null)}
                     disabled={resetInFlight}
-                    className="rounded-md border border-white/10 px-3 py-2 text-sm text-gray-200 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-md border border-black/10 dark:border-white/10 px-3 py-2 text-sm text-gray-700 dark:text-gray-200 transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Cancel
                   </button>
