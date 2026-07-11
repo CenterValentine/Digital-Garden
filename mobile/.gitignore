@@ -1,0 +1,20 @@
+# Expo / React Native
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Native build artifacts (only present if you run `expo prebuild`)
+ios/
+android/
+
+# Metro / Babel caches
+.metro-health-check*
+*.tsbuildinfo
+
+# Env
+.env*.local
+.env
+
+# macOS
+.DS_Store

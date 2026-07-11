@@ -128,6 +128,20 @@ body:has(.public-route) main {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
+ * Native mobile shell — when the React Native WebView marks the document with
+ * `data-native-shell` (see mobile/src/MobileWebView.tsx), hide the global
+ * desktop nav + top padding on EVERY route. The attribute is never set on
+ * desktop, so these rules are inert there — no desktop layout change.
+ * ──────────────────────────────────────────────────────────────────────── */
+html[data-native-shell] .notes-route-hides-default-nav {
+  display: none !important;
+}
+html[data-native-shell] .notes-route-no-padding,
+html[data-native-shell] main {
+  padding-top: 0 !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────
  * Embed iframe — hide root chrome and let .embed-layout-page own the viewport.
  * Used when the browser-extension iframe loads /embed/* pages. The embed
  * layout fixed-positions itself over the whole viewport, but we also kill the

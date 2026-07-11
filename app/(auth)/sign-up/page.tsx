@@ -8,6 +8,7 @@ import type {
   ApiResponse,
   SessionData,
 } from '@/lib/infrastructure/auth/types'
+import { navigateAfterAuth } from '../navigate-after-auth'
 
 function safeRedirectPath(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) return '/content'
@@ -64,8 +65,7 @@ export default function SignUpPage() {
         return
       }
 
-      router.push(getRedirectPathFromLocation())
-      router.refresh()
+      navigateAfterAuth(getRedirectPathFromLocation(), router)
     } catch {
       setError('An unexpected error occurred')
       setIsLoading(false)

@@ -112,6 +112,10 @@ const eslintConfig = defineConfig([
     // Playwright artifacts.
     "test-results/**",
     "playwright-report/**",
+    // Standalone Expo React Native shell — isolated app with its own
+    // package.json, tsconfig, and toolchain. Not part of the Next.js build
+    // or its lint/typecheck gates. See mobile/README.md.
+    "mobile/**",
   ]),
 ]);
 
