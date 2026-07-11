@@ -33,27 +33,36 @@ export function InboxLeftPanel() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="grid shrink-0 grid-cols-3 gap-1 border-b border-black/10 p-2 dark:border-white/10">
-        {TABS.map(({ id, label, icon: Icon }) => {
-          const isActive = tab === id;
-          return (
-            <button
-              key={id}
-              type="button"
-              onClick={() => setTab(id)}
-              aria-current={isActive ? "page" : undefined}
-              className={cn(
-                "flex flex-col items-center gap-1 rounded-lg px-2 py-2 text-[11px] font-medium transition-colors",
-                isActive
-                  ? "bg-black/[0.06] text-foreground dark:bg-white/10"
-                  : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              <span className="truncate">{label}</span>
-            </button>
-          );
-        })}
+      <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+          Inbox
+        </p>
+        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
+          {TABS.find((entry) => entry.id === tab)?.label ?? "Inbox"}
+        </h3>
+        <div className="flex items-center gap-1">
+          {TABS.map(({ id, label, icon: Icon }) => {
+            const isActive = tab === id;
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setTab(id)}
+                aria-label={label}
+                aria-current={isActive ? "page" : undefined}
+                title={label}
+                className={cn(
+                  "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                  isActive
+                    ? "bg-black/[0.06] text-foreground dark:bg-white/10"
+                    : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
