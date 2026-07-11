@@ -13,11 +13,14 @@ import { usePathname } from "next/navigation";
 import { ResizablePanels } from "./ResizablePanels";
 import { LeftSidebar } from "./LeftSidebar";
 import { CollapsibleRightPanel } from "./CollapsibleRightPanel";
+import { RightSidebar } from "./RightSidebar";
 import { StatusBar } from "./StatusBar";
 import { DndWrapper } from "./DndWrapper";
+import { MobileNotesLayout } from "./mobile/MobileNotesLayout";
 import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 import { AuthSessionSync } from "./AuthSessionSync";
+import { useIsMobile } from "@/components/common/useIsMobile";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -32,6 +35,7 @@ export function ConditionalNotesLayout({
   glass0,
 }: ConditionalNotesLayoutProps) {
   const pathname = usePathname();
+  const isMobile = useIsMobile();
   const isFullscreen = pathname?.includes("/fullscreen");
   const isFocusMode = pathname?.includes("/content/focus/");
 
@@ -82,39 +86,52 @@ export function ConditionalNotesLayout({
         className="fixed top-[56px] left-0 right-0 h-[calc(100dvh-56px)] flex flex-col overflow-hidden"
       >
         <DndWrapper>
-          <div className="flex-1 overflow-hidden">
-            <ResizablePanels>
-              {/* Left Panel */}
+          {isMobile ? (
+            /* Phone width: single editor pane + bottom nav + slide-over drawers.
+               The three-pane Allotment layout below is desktop-only. */
+            <MobileNotesLayout
+              leftSidebar={<LeftSidebar />}
+              rightPanel={<RightSidebar />}
+            >
+              {children}
+            </MobileNotesLayout>
+          ) : (
+            <>
+              <div className="flex-1 overflow-hidden">
+                <ResizablePanels>
+                  {/* Left Panel */}
+                  <div
+                    className="relative z-20 flex h-full flex-col overflow-hidden border-r border-white/10"
+                    style={{
+                      background: glass0.background,
+                      backdropFilter: glass0.backdropFilter,
+                    }}
+                  >
+                    <LeftSidebar />
+                  </div>
+
+                  {/* Main Panel */}
+                  <div className="relative z-0 flex h-full min-h-0 flex-col overflow-hidden">
+                    {children}
+                  </div>
+
+                  {/* Right Panel - Collapsible with smooth transitions */}
+                  <CollapsibleRightPanel />
+                </ResizablePanels>
+              </div>
+
+              {/* Status bar */}
               <div
-                className="relative z-20 flex h-full flex-col overflow-hidden border-r border-white/10"
+                className="h-6 border-t border-white/10 px-4 py-1 text-xs"
                 style={{
                   background: glass0.background,
                   backdropFilter: glass0.backdropFilter,
                 }}
               >
-                <LeftSidebar />
+                <StatusBar />
               </div>
-
-              {/* Main Panel */}
-              <div className="relative z-0 flex h-full min-h-0 flex-col overflow-hidden">
-                {children}
-              </div>
-
-              {/* Right Panel - Collapsible with smooth transitions */}
-              <CollapsibleRightPanel />
-            </ResizablePanels>
-          </div>
-
-          {/* Status bar */}
-          <div
-            className="h-6 border-t border-white/10 px-4 py-1 text-xs"
-            style={{
-              background: glass0.background,
-              backdropFilter: glass0.backdropFilter,
-            }}
-          >
-            <StatusBar />
-          </div>
+            </>
+          )}
         </DndWrapper>
       </div>
       <ExtensionGlobalDialogs />
