@@ -185,17 +185,17 @@ export default function SitesSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Sites</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Sites & Domains</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Sites are publishing destinations for your content. Each note, page, or
           project you publish belongs to one site. New items default to your
           primary site.
         </p>
         {platformDomain && (
-          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100/80">
-            <div className="text-sky-200">
+          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-900/80 dark:text-sky-100/80">
+            <div className="text-sky-800 dark:text-sky-200">
               Every site is reachable at{" "}
               <code className="font-mono">your-slug.{platformDomain}</code>{" "}
               automatically. Want to use a domain you already own (e.g.{" "}
@@ -207,7 +207,7 @@ export default function SitesSettingsPage() {
       </div>
 
       <section
-        className="rounded-lg border border-white/10 p-6 space-y-4"
+        className="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-4"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -254,7 +254,7 @@ export default function SitesSettingsPage() {
       </section>
 
       <section
-        className="rounded-lg border border-white/10 p-6 space-y-3"
+        className="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-3"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
