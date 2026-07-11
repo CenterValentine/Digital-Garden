@@ -14,7 +14,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback } from "react";
 import {
   ArrowLeft,
-  Bell,
   Brain,
   Database,
   Download,
@@ -61,11 +60,6 @@ const CORE_GROUPS: NavGroup[] = [
         href: "/settings/files",
         label: "Editor & Files",
         icon: <FolderCog size={16} />,
-      },
-      {
-        href: "/settings/notifications",
-        label: "Notifications",
-        icon: <Bell size={16} />,
       },
       {
         href: "/settings/templates",
