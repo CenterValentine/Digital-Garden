@@ -53,7 +53,7 @@ export function StorageBackupsTab() {
     <div className="space-y-6">
       {/* Global Backup Toggle */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -87,7 +87,7 @@ export function StorageBackupsTab() {
       {backupsEnabled && (
         <>
           <div
-            className="border border-white/10 rounded-lg p-6"
+            className="border border-black/10 dark:border-white/10 rounded-lg p-6"
             style={{
               background: glass0.background,
               backdropFilter: glass0.backdropFilter,
@@ -102,7 +102,7 @@ export function StorageBackupsTab() {
               {folders.map((folder) => (
                 <div
                   key={folder.id}
-                  className="flex items-center justify-between p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors"
+                  className="flex items-center justify-between p-3 rounded-lg border border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg
@@ -142,7 +142,7 @@ export function StorageBackupsTab() {
 
           {/* Backup Schedule */}
           <div
-            className="border border-white/10 rounded-lg p-6"
+            className="border border-black/10 dark:border-white/10 rounded-lg p-6"
             style={{
               background: glass0.background,
               backdropFilter: glass0.backdropFilter,
@@ -157,7 +157,7 @@ export function StorageBackupsTab() {
               {["manual", "daily", "weekly"].map((schedule) => (
                 <label
                   key={schedule}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   <input
                     type="radio"
@@ -182,7 +182,7 @@ export function StorageBackupsTab() {
 
           {/* Retention Policy */}
           <div
-            className="border border-white/10 rounded-lg p-6"
+            className="border border-black/10 dark:border-white/10 rounded-lg p-6"
             style={{
               background: glass0.background,
               backdropFilter: glass0.backdropFilter,
@@ -197,7 +197,7 @@ export function StorageBackupsTab() {
               {[30, 90, 365].map((days) => (
                 <label
                   key={days}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-white/5 hover:bg-white/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-3 p-3 rounded-lg border border-black/5 dark:border-white/5 hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
                 >
                   <input
                     type="radio"

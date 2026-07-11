@@ -206,7 +206,7 @@ export function StorageProvidersTab() {
 
             <button
               onClick={() => handleEditProvider(defaultProvider.id)}
-              className="px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+              className="px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
             >
               Edit Configuration
             </button>
@@ -221,7 +221,7 @@ export function StorageProvidersTab() {
           {otherProviders.map((provider) => (
             <div
               key={provider.id}
-              className="border border-white/10 rounded-lg p-4"
+              className="border border-black/10 dark:border-white/10 rounded-lg p-4"
               style={{
                 background: glass0.background,
                 backdropFilter: glass0.backdropFilter,
@@ -244,7 +244,7 @@ export function StorageProvidersTab() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleSetDefault(provider.id)}
-                    className="px-3 py-1 text-xs rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                    className="px-3 py-1 text-xs rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     Set Default
                   </button>
@@ -264,7 +264,7 @@ export function StorageProvidersTab() {
       {/* Add Provider */}
       {!showAddProvider ? (
         <div
-          className="border border-white/10 rounded-lg p-6"
+          className="border border-black/10 dark:border-white/10 rounded-lg p-6"
           style={{
             background: glass0.background,
             backdropFilter: glass0.backdropFilter,
@@ -297,7 +297,7 @@ export function StorageProvidersTab() {
         />
       ) : (
         <div
-          className="border border-white/10 rounded-lg p-6"
+          className="border border-black/10 dark:border-white/10 rounded-lg p-6"
           style={{
             background: glass0.background,
             backdropFilter: glass0.backdropFilter,
@@ -312,7 +312,7 @@ export function StorageProvidersTab() {
                 onClick={() => {
                   setSelectedProvider(provider as "r2" | "s3" | "vercel");
                 }}
-                className="w-full p-4 text-left border border-white/10 rounded-lg hover:bg-white/5 transition-colors"
+                className="w-full p-4 text-left border border-black/10 dark:border-white/10 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <div>
@@ -394,7 +394,7 @@ export function StorageProvidersTab() {
       {showWarning && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div
-            className="w-full max-w-md p-6 border border-white/10 rounded-lg"
+            className="w-full max-w-md p-6 border border-black/10 dark:border-white/10 rounded-lg"
             style={{
               background: glass1.background,
               backdropFilter: glass1.backdropFilter,
@@ -441,7 +441,7 @@ export function StorageProvidersTab() {
                 <div className="mt-6 flex gap-3">
                   <button
                     onClick={() => setShowWarning(false)}
-                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                    className="flex-1 px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     Cancel
                   </button>

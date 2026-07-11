@@ -17,7 +17,7 @@ export default function AccountSettingsPage() {
       </div>
 
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
