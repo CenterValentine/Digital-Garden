@@ -7,18 +7,20 @@
 
 "use client";
 
-import { Folder, Search, Puzzle } from "lucide-react";
+import { Folder, Inbox, Search, Puzzle } from "lucide-react";
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { renderExtensionIcon } from "@/lib/extensions";
 import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
+import { useNotificationsStore } from "@/state/notifications-store";
 
 export function LeftSidebarCollapsed() {
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { setMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const extensionNavItems = useExtensionHeaderNavItems();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   const handleSearchClick = () => {
     // Expand panel and open search
@@ -42,6 +44,14 @@ export function LeftSidebarCollapsed() {
     // Expand panel and show extensions
     setMode("full");
     setActiveView("extensions");
+    if (isSearchOpen) {
+      toggleSearch();
+    }
+  };
+
+  const handleInboxClick = () => {
+    setMode("full");
+    setActiveView("inbox");
     if (isSearchOpen) {
       toggleSearch();
     }
@@ -89,6 +99,23 @@ export function LeftSidebarCollapsed() {
         type="button"
       >
         <Puzzle className="h-5 w-5" />
+      </button>
+
+      {/* Inbox icon — core view */}
+      <button
+        onClick={handleInboxClick}
+        className={`relative rounded p-2 transition-colors ${
+          activeView === "inbox"
+            ? "text-gold-primary bg-white/10"
+            : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gold-primary"
+        }`}
+        title="Inbox"
+        type="button"
+      >
+        <Inbox className="h-5 w-5" />
+        {unreadCount > 0 && (
+          <span className="absolute right-0.5 top-0.5 h-2 w-2 rounded-full bg-sky-500" />
+        )}
       </button>
 
       {extensionNavItems.map(({ item, ActionComponent }) => {

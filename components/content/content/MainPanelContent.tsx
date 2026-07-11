@@ -12,6 +12,7 @@ import { createElement, useState, useEffect, useCallback, useMemo, useRef } from
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
 import { ContentToolbar } from "../toolbar";
@@ -1856,6 +1857,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     selectedContentId,
     contentType,
   });
+
+  // Inbox core view — full-panel takeover in the primary pane
+  if (activeView === "inbox" && paneId === "top-left") {
+    return (
+      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
+        <InboxMainWorkspace />
+      </ToolSurfaceProvider>
+    );
+  }
+
   if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
