@@ -52,7 +52,7 @@ export function ConditionalNotesLayout({
       <>
         <div
           data-notes-layout
-          className="fixed inset-0 flex overflow-hidden"
+          className="fixed inset-x-0 top-0 h-dvh flex overflow-hidden"
         >
           <DndWrapper>
             <div className="flex h-full w-full overflow-hidden">
@@ -79,7 +79,7 @@ export function ConditionalNotesLayout({
       {/* Main content area */}
       <div
         data-notes-layout
-        className="fixed top-[56px] left-0 right-0 bottom-0 flex flex-col overflow-hidden"
+        className="fixed top-[56px] left-0 right-0 h-[calc(100dvh-56px)] flex flex-col overflow-hidden"
       >
         <DndWrapper>
           <div className="flex-1 overflow-hidden">

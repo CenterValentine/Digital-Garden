@@ -101,6 +101,11 @@ export const viewport: Viewport = {
   // 1.4.4 accessibility requirement, and disabling it is a common a11y bug.
   width: "device-width",
   initialScale: 1,
+  // resizes-content: when the on-screen keyboard opens, shrink the layout
+  // viewport (and thus dvh units) instead of letting the keyboard overlay
+  // fixed content. This is what keeps the editor above the keyboard — it
+  // pairs with the shell's h-[calc(100dvh-56px)] container. Inert on desktop.
+  interactiveWidget: "resizes-content",
 };
 
 export default async function RootLayout({
