@@ -660,11 +660,13 @@ function PageTemplateManager() {
 
 export default function TemplatesSettingsPage() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Templates & Snippets</h1>
-        <p className="text-muted-foreground mt-2">
-          Manage categories and templates for content creation
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Templates & Snippets
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Manage categories and templates for content creation.
         </p>
       </div>
 

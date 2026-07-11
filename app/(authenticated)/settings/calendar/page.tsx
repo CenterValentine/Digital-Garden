@@ -1,5 +1,6 @@
-import CalendarSettingsPage from "@/extensions/calendar/settings/CalendarSettingsPage";
+import { redirect } from "next/navigation";
 
-export default function CalendarSettingsRoute() {
-  return <CalendarSettingsPage />;
+/** Legacy route — calendar settings moved to the Extensions group. */
+export default function LegacyCalendarSettingsRoute() {
+  redirect("/settings/extensions/calendar");
 }

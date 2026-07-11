@@ -131,17 +131,9 @@ export default function SpeedReaderSettingsDialog() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <div className="flex items-center gap-3 text-gold-primary">
-          <Zap className="h-6 w-6" />
-          <span className="text-xs font-semibold uppercase tracking-[0.16em]">
-            Built-in extension
-          </span>
-        </div>
-        <h2 className="mt-3 text-4xl font-semibold tracking-tight text-gray-900 dark:text-white">
-          Speed Reader
-        </h2>
-        <p className="mt-3 max-w-3xl text-base text-gray-600 dark:text-gray-400">
+      <div className="flex items-start gap-3">
+        <Zap className="mt-0.5 h-5 w-5 shrink-0 text-gold-primary" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           RSVP-style one-word-at-a-time reader. Configure default speed, font,
           theme, and which research-backed polish features to apply.
         </p>

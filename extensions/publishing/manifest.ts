@@ -21,4 +21,11 @@ export const publishingExtensionManifest: ExtensionManifest = {
     },
   ],
   surfaces: ["left-sidebar", "right-sidebar", "shell"],
+  settings: {
+    path: "/settings/extensions/publishing",
+    label: "Publishing",
+    title: "Publishing",
+    description: "Publishing destinations are managed in Sites & Domains.",
+    order: 50,
+  },
 };

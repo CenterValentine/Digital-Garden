@@ -14,7 +14,7 @@ export const speedReaderExtensionManifest: ExtensionManifest = {
   navItems: [],
   surfaces: ["global-dialog"],
   settings: {
-    path: "speed-reader",
+    path: "/settings/extensions/speed-reader",
     label: "Speed Reader",
     title: "Speed Reader",
     description:

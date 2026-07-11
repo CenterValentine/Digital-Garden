@@ -255,16 +255,13 @@ export default function CalendarSettingsPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-3xl font-bold">Calendar</h1>
-        <p className="mt-2 text-muted-foreground">
-          Connect Google Calendar, subscribe to iCal feeds, and set defaults for
-          the in-app calendar workspace.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        Connect Google Calendar, subscribe to iCal feeds, and set defaults for
+        the in-app calendar workspace.
+      </p>
 
       <section
-        className="rounded-2xl border border-white/10 p-6"
+        className="rounded-2xl border border-black/10 dark:border-white/10 p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -284,7 +281,7 @@ export default function CalendarSettingsPage() {
                   >["defaultView"]
                 )
               }
-              className="flex h-10 w-full rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm"
+              className="flex h-10 w-full rounded-md border border-black/10 dark:border-white/10 bg-black/20 px-3 py-2 text-sm"
             >
               <option value="dayGridMonth">Month</option>
               <option value="timeGridWeek">Week</option>
@@ -311,7 +308,7 @@ export default function CalendarSettingsPage() {
         </div>
 
         <div className="mt-4 space-y-3">
-          <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-black/10 dark:border-white/10 px-4 py-3">
             <div>
               <p className="text-sm font-medium">Show Weekends</p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -326,11 +323,11 @@ export default function CalendarSettingsPage() {
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-xl border border-white/10 px-4 py-3">
+          <div className="flex items-center justify-between rounded-xl border border-black/10 dark:border-white/10 px-4 py-3">
             <div>
-              <p className="text-sm font-medium">Show Declined Events</p>
+              <p className="text-sm font-medium">Show declined events</p>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                Hide declined Google events if you want a cleaner calendar.
+                Include events you&apos;ve declined on your calendar.
               </p>
             </div>
             <Switch
@@ -344,7 +341,7 @@ export default function CalendarSettingsPage() {
       </section>
 
       <section
-        className="rounded-2xl border border-white/10 p-6"
+        className="rounded-2xl border border-black/10 dark:border-white/10 p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -372,7 +369,7 @@ export default function CalendarSettingsPage() {
           {remoteConnections.map((connection) => (
             <div
               key={connection.id}
-              className="flex flex-col gap-3 rounded-xl border border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between"
             >
               <div>
                 <p className="font-medium">{connection.displayName}</p>
@@ -423,7 +420,7 @@ export default function CalendarSettingsPage() {
       </section>
 
       <section
-        className="rounded-2xl border border-white/10 p-6"
+        className="rounded-2xl border border-black/10 dark:border-white/10 p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -454,7 +451,7 @@ export default function CalendarSettingsPage() {
           {localSources.map((source) => (
             <div
               key={source.id}
-              className="flex flex-col gap-3 rounded-xl border border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between"
+              className="flex flex-col gap-3 rounded-xl border border-black/10 dark:border-white/10 px-4 py-3 md:flex-row md:items-center md:justify-between"
             >
               <div>
                 <p className="font-medium">{source.title}</p>

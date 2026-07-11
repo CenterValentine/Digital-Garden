@@ -109,7 +109,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
 
   return (
     <div
-      className="border border-white/10 rounded-lg p-6"
+      className="border border-black/10 dark:border-white/10 rounded-lg p-6"
       style={{
         background: glass0.background,
         backdropFilter: glass0.backdropFilter,
@@ -127,7 +127,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
             type="text"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
             placeholder="My Storage Provider"
             required
           />
@@ -142,7 +142,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="text"
                 value={r2AccountId}
                 onChange={(e) => setR2AccountId(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="a1b2c3d4e5f6..."
                 required
               />
@@ -153,7 +153,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="text"
                 value={r2AccessKeyId}
                 onChange={(e) => setR2AccessKeyId(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="AKIA..."
                 required
               />
@@ -164,7 +164,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="password"
                 value={r2SecretAccessKey}
                 onChange={(e) => setR2SecretAccessKey(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="Secret key"
                 required
               />
@@ -175,7 +175,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="text"
                 value={r2BucketName}
                 onChange={(e) => setR2BucketName(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="my-bucket"
                 required
               />
@@ -186,7 +186,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="url"
                 value={r2Endpoint}
                 onChange={(e) => setR2Endpoint(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="https://[account-id].r2.cloudflarestorage.com"
                 required
               />
@@ -203,7 +203,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="text"
                 value={s3AccessKeyId}
                 onChange={(e) => setS3AccessKeyId(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="AKIA..."
                 required
               />
@@ -214,7 +214,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="password"
                 value={s3SecretAccessKey}
                 onChange={(e) => setS3SecretAccessKey(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
                 placeholder="Secret key"
                 required
               />
@@ -225,7 +225,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
                 type="text"
                 value={s3BucketName}
                 onChange={(e) => setS3BucketName(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 placeholder="my-bucket"
                 required
               />
@@ -235,7 +235,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
               <select
                 value={s3Region}
                 onChange={(e) => setS3Region(e.target.value)}
-                className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                 required
               >
                 <option value="us-east-1">US East (N. Virginia)</option>
@@ -259,7 +259,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
               type="password"
               value={vercelToken}
               onChange={(e) => setVercelToken(e.target.value)}
-              className="w-full px-3 py-2 bg-black/20 border border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
+              className="w-full px-3 py-2 bg-black/20 border border-black/10 dark:border-white/10 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary font-mono text-sm"
               placeholder="vercel_blob_rw_..."
               required
             />
@@ -306,7 +306,7 @@ export function ProviderConfigForm({ provider, onSuccess, onCancel }: ProviderCo
             type="button"
             onClick={onCancel}
             disabled={loading}
-            className="flex-1 px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors disabled:opacity-50"
+            className="flex-1 px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors disabled:opacity-50"
           >
             Cancel
           </button>

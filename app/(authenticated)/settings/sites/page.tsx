@@ -11,7 +11,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { getSurfaceStyles } from "@/lib/design/system";
-import { Button } from "@/components/ui/glass/button";
+import { Button } from "@/components/client/ui/button";
 import { Check, ChevronDown, ChevronRight, Pencil, Star, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { HostManagement } from "@/components/settings/sites/HostManagement";
@@ -185,17 +185,17 @@ export default function SitesSettingsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Sites</h1>
-        <p className="text-muted-foreground mt-2">
+        <h1 className="text-2xl font-semibold tracking-tight">Sites & Domains</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
           Sites are publishing destinations for your content. Each note, page, or
           project you publish belongs to one site. New items default to your
           primary site.
         </p>
         {platformDomain && (
-          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-100/80">
-            <div className="text-sky-200">
+          <div className="mt-4 rounded-md border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-900/80 dark:text-sky-100/80">
+            <div className="text-sky-800 dark:text-sky-200">
               Every site is reachable at{" "}
               <code className="font-mono">your-slug.{platformDomain}</code>{" "}
               automatically. Want to use a domain you already own (e.g.{" "}
@@ -207,7 +207,7 @@ export default function SitesSettingsPage() {
       </div>
 
       <section
-        className="rounded-lg border border-white/10 p-6 space-y-4"
+        className="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-4"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -222,7 +222,7 @@ export default function SitesSettingsPage() {
             <input
               id="site-name"
               type="text"
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
+              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2 text-sm"
               placeholder="My second garden"
               value={newName}
               onChange={(e) => setNewName(e.target.value)}
@@ -236,7 +236,7 @@ export default function SitesSettingsPage() {
             <input
               id="site-slug"
               type="text"
-              className="w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm font-mono"
+              className="w-full rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-2 text-sm font-mono"
               placeholder="my-second-garden"
               value={newSlug}
               onChange={(e) => setNewSlug(e.target.value)}
@@ -254,7 +254,7 @@ export default function SitesSettingsPage() {
       </section>
 
       <section
-        className="rounded-lg border border-white/10 p-6 space-y-3"
+        className="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-3"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -268,7 +268,7 @@ export default function SitesSettingsPage() {
             You don&apos;t have any sites yet. Create one above to start publishing.
           </p>
         ) : (
-          <ul className="divide-y divide-white/10">
+          <ul className="divide-y divide-black/10 dark:divide-white/10">
             {sites.map((site) => {
               const isPrimary = site.id === primaryId;
               const isEditing = editingId === site.id;
@@ -279,7 +279,7 @@ export default function SitesSettingsPage() {
                       <div className="flex items-center gap-2">
                         <input
                           type="text"
-                          className="flex-1 rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm"
+                          className="flex-1 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-2 py-1 text-sm"
                           value={editingName}
                           onChange={(e) => setEditingName(e.target.value)}
                           autoFocus
@@ -305,7 +305,7 @@ export default function SitesSettingsPage() {
                             setEditingId(null);
                             setEditingName("");
                           }}
-                          className="text-white/40 hover:text-white/60"
+                          className="text-black/40 dark:text-white/40 hover:text-black/60 dark:hover:text-white/60"
                           aria-label="Cancel"
                         >
                           <X className="h-4 w-4" />
@@ -321,7 +321,7 @@ export default function SitesSettingsPage() {
                             </span>
                           )}
                           {site.isPersonal && !isPrimary && (
-                            <span className="inline-flex items-center rounded-full bg-white/5 text-white/40 text-xs px-2 py-0.5">
+                            <span className="inline-flex items-center rounded-full bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40 text-xs px-2 py-0.5">
                               Personal
                             </span>
                           )}
@@ -330,7 +330,7 @@ export default function SitesSettingsPage() {
                           {site.slug}
                         </div>
                         {platformDomain && (
-                          <div className="text-[11px] text-white/30 font-mono mt-1">
+                          <div className="text-[11px] text-black/30 dark:text-white/30 font-mono mt-1">
                             {site.slug}.{platformDomain}
                           </div>
                         )}
@@ -346,7 +346,7 @@ export default function SitesSettingsPage() {
                             hostsExpandedId === site.id ? null : site.id,
                           )
                         }
-                        className="text-xs text-white/60 hover:text-white/90 px-2 py-1 rounded hover:bg-white/5 flex items-center gap-1"
+                        className="text-xs text-black/60 dark:text-white/60 hover:text-black/90 dark:hover:text-white/90 px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5 flex items-center gap-1"
                       >
                         {hostsExpandedId === site.id ? (
                           <ChevronDown className="h-3 w-3" />
@@ -359,7 +359,7 @@ export default function SitesSettingsPage() {
                         <button
                           type="button"
                           onClick={() => void handleSetPrimary(site.id)}
-                          className="text-xs text-white/60 hover:text-white/90 px-2 py-1 rounded hover:bg-white/5"
+                          className="text-xs text-black/60 dark:text-white/60 hover:text-black/90 dark:hover:text-white/90 px-2 py-1 rounded hover:bg-black/5 dark:hover:bg-white/5"
                         >
                           Set as primary
                         </button>
@@ -370,7 +370,7 @@ export default function SitesSettingsPage() {
                           setEditingId(site.id);
                           setEditingName(site.displayName);
                         }}
-                        className="text-white/40 hover:text-white/70"
+                        className="text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70"
                         aria-label="Rename"
                       >
                         <Pencil className="h-4 w-4" />
@@ -379,7 +379,7 @@ export default function SitesSettingsPage() {
                         <button
                           type="button"
                           onClick={() => void handleDelete(site)}
-                          className="text-white/40 hover:text-rose-400"
+                          className="text-black/40 dark:text-white/40 hover:text-rose-400"
                           aria-label="Delete"
                           title="Delete site (must have no items, paths, or hosts)"
                         >
