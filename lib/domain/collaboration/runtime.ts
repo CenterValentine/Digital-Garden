@@ -272,6 +272,10 @@ interface DocumentRuntimeEntry {
   presenceHeartbeatTimer: ReturnType<typeof setTimeout> | null;
   presenceHeartbeatInFlight: boolean;
   presenceEventSource: EventSource | null;
+  // True once the tab has been hidden past VISIBILITY_SLEEP_DELAY_MS. Blocks
+  // the SSE presence stream from (re)opening and selects the deep-dormant
+  // heartbeat cadence. Cleared when the tab becomes visible again.
+  presenceStreamSuspended: boolean;
   broadcastChannel: BroadcastChannel | null;
   knownBrowserSessions: Map<string, BrowserSessionPresence>;
   pendingInitialContent: JSONContent | null;
@@ -325,6 +329,18 @@ const SESSION_ANNOUNCE_INTERVAL_MS = 2000;
 const PRESENCE_HEARTBEAT_INTERVAL_MS = 10_000;
 const PRESENCE_HEARTBEAT_IDLE_INTERVAL_MS = 30_000;
 const PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS = 30_000;
+// Deep-dormant cadence: transport is deliberately asleep (sleep mode) and the
+// tab is hidden past the suspension threshold or idle past the sleep window.
+// Server-side staleness gives dormant transportStates an 8-minute window
+// (presence-server.ts DORMANT_STALE_AFTER_MS), so 5 min keeps the record alive.
+const PRESENCE_HEARTBEAT_SLEEP_INTERVAL_MS = 5 * 60 * 1000;
+// Transport states that mean "no live WebSocket". Used to route presence
+// leadership away from hibernating tabs and to pick the deep-dormant cadence.
+const DORMANT_TRANSPORT_STATES: ReadonlySet<ConnectionState> = new Set([
+  "localOnly",
+  "coolingDown",
+  "disconnectedButDirty",
+]);
 const PRESENCE_IDLE_AFTER_MS = 60_000;
 const PROVIDER_RECONNECT_BASE_MS = 1000;
 const PROVIDER_RECONNECT_MAX_MS = 5 * 60 * 1000; // 5 min — activity triggers immediate reconnect instead
@@ -661,6 +677,7 @@ class CollaborationRuntimeManager {
       presenceHeartbeatTimer: null,
       presenceHeartbeatInFlight: false,
       presenceEventSource: null,
+      presenceStreamSuspended: false,
       broadcastChannel: null,
       knownBrowserSessions: new Map(),
       pendingInitialContent: null,
@@ -737,6 +754,9 @@ class CollaborationRuntimeManager {
         entry.state.connectionState = "synced";
         this.scheduleInactivitySleep(entry);
         this.emit(entry);
+        // Announce the return to "synced" right away — the cooldown entry
+        // heartbeat may have just marked this record as dormant.
+        this.schedulePresenceHeartbeat(entry, 0);
         return;
       }
 
@@ -795,6 +815,16 @@ class CollaborationRuntimeManager {
     window.addEventListener("offline", entry.networkOfflineHandler);
     document.addEventListener("visibilitychange", entry.visibilityChangeHandler);
     window.addEventListener("pagehide", entry.pageHideHandler);
+    // Tabs restored/opened in the background never fire visibilitychange, so
+    // kick off the same hidden-sleep countdown the event handler would start.
+    if (typeof document !== "undefined" && document.visibilityState === "hidden") {
+      entry.visibilitySleepTimer = setTimeout(() => {
+        entry.visibilitySleepTimer = null;
+        entry.presenceStreamSuspended = true;
+        this.closePresenceStream(entry);
+        this.maybeEnterSleepMode(entry);
+      }, VISIBILITY_SLEEP_DELAY_MS);
+    }
     this.entries.set(contentId, entry);
     updateLocalCacheManifest(entry);
     return entry;
@@ -1178,6 +1208,10 @@ class CollaborationRuntimeManager {
 
   private openPresenceStream(entry: DocumentRuntimeEntry) {
     if (entry.presenceEventSource || entry.consumers.size === 0) return;
+    // Deep-hidden tabs don't need live badge updates; the stream reopens on
+    // tab-visible. This kills the server-side 10s Postgres poll for the
+    // lifetime of the suspension.
+    if (entry.presenceStreamSuspended) return;
     const streamUrl = `/api/collaboration/presence/stream?contentId=${encodeURIComponent(
       entry.contentId
     )}&sessionId=${encodeURIComponent(this.sessionId)}`;
@@ -1205,6 +1239,24 @@ class CollaborationRuntimeManager {
 
   private getPresenceHeartbeatDelay(entry: DocumentRuntimeEntry) {
     if (entry.state.networkState === "offline") return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
+    // Deep-dormant tier: the transport is deliberately asleep (sleep mode
+    // completed — no provider, no reconnect intent) AND the tab is either
+    // suspended-hidden or idle past the sleep window. The record survives on
+    // the server's dormant staleness window, so 5 min is safe. Requiring
+    // !hocuspocusProvider keeps sessions that stayed connected (e.g. dirty
+    // edits blocked the sleep) on the fast cadence so their "synced" record
+    // isn't pruned under the 45s active-tier window.
+    const transportDormant =
+      !entry.hocuspocusProvider &&
+      entry.state.connectionState === "localOnly" &&
+      !entry.state.reconnectIntent;
+    if (
+      transportDormant &&
+      (entry.presenceStreamSuspended ||
+        Date.now() - entry.lastActivityAt >= INACTIVITY_SLEEP_DELAY_MS)
+    ) {
+      return PRESENCE_HEARTBEAT_SLEEP_INTERVAL_MS;
+    }
     if (typeof document !== "undefined" && document.visibilityState === "hidden") {
       return PRESENCE_HEARTBEAT_HIDDEN_INTERVAL_MS;
     }
@@ -1231,13 +1283,27 @@ class CollaborationRuntimeManager {
 
   private isPresenceLeader(entry: DocumentRuntimeEntry) {
     if (entry.consumers.size === 0) return false;
-    const activeSessionIds = [
-      this.sessionId,
+    // Prefer sessions with a live transport as leader: the leader's heartbeat
+    // cadence refreshes EVERY same-browser record, so a hibernating leader on
+    // the 5-min cadence would starve active-transport records (45s staleness).
+    // Fall back to all sessions when every tab is dormant (e.g. all asleep or
+    // all pre-promote) so exactly one still heartbeats.
+    const candidates: Array<{ sessionId: string; dormant: boolean }> = [
+      {
+        sessionId: this.sessionId,
+        dormant: DORMANT_TRANSPORT_STATES.has(entry.state.connectionState),
+      },
       ...Array.from(entry.knownBrowserSessions.values())
         .filter((session) => session.surfaceCount > 0)
-        .map((session) => session.sessionId),
-    ].sort();
-    return activeSessionIds[0] === this.sessionId;
+        .map((session) => ({
+          sessionId: session.sessionId,
+          dormant: DORMANT_TRANSPORT_STATES.has(session.transportState),
+        })),
+    ];
+    const live = candidates.filter((candidate) => !candidate.dormant);
+    const pool = live.length > 0 ? live : candidates;
+    const sortedIds = pool.map((candidate) => candidate.sessionId).sort();
+    return sortedIds[0] === this.sessionId;
   }
 
   private buildPresenceHeartbeatSessions(
@@ -1643,6 +1709,9 @@ class CollaborationRuntimeManager {
         this.emit(entry);
         // Start inactivity countdown after every successful sync.
         this.scheduleInactivitySleep(entry);
+        // Announce "synced" immediately so other sessions' badges flip from
+        // grey to live without waiting out a dormant heartbeat interval.
+        this.schedulePresenceHeartbeat(entry, 0);
       },
       onUnsyncedChanges: ({ number }) => {
         entry.state.unsyncedUpdateCount = number;
@@ -1970,6 +2039,10 @@ class CollaborationRuntimeManager {
       if (!entry.visibilitySleepTimer) {
         entry.visibilitySleepTimer = setTimeout(() => {
           entry.visibilitySleepTimer = null;
+          // Deep-hidden: stop the SSE presence stream (kills the server-side
+          // 10s Postgres poll) and drop to the dormant heartbeat cadence.
+          entry.presenceStreamSuspended = true;
+          this.closePresenceStream(entry);
           this.maybeEnterSleepMode(entry);
         }, VISIBILITY_SLEEP_DELAY_MS);
       }
@@ -1981,6 +2054,14 @@ class CollaborationRuntimeManager {
       }
       // Reset activity clock so inactivity timer gets a fresh window.
       entry.lastActivityAt = Date.now();
+      // Lift deep-hidden suspension: reopen the presence stream (if leader)
+      // and heartbeat immediately so our record refreshes and we re-learn who
+      // else is here without waiting out a dormant-cadence interval.
+      if (entry.presenceStreamSuspended) {
+        entry.presenceStreamSuspended = false;
+        this.syncPresenceTransport(entry);
+        this.schedulePresenceHeartbeat(entry, 0);
+      }
       // If we slept and came back to an active session, re-promote.
       if (
         entry.state.connectionState === "localOnly" &&
@@ -2042,6 +2123,11 @@ class CollaborationRuntimeManager {
     if (entry.cooldownTimer) clearTimeout(entry.cooldownTimer);
     entry.state.connectionState = "coolingDown";
     this.emit(entry);
+    // Push the dormant transportState to the server BEFORE the heartbeat
+    // cadence slows: the server's staleness tier is keyed off the stored
+    // transportState, so a record still marked "synced" would be pruned
+    // under the 45s active window once we drop to the 5-min cadence.
+    this.schedulePresenceHeartbeat(entry, 0);
 
     entry.cooldownTimer = setTimeout(() => {
       entry.cooldownTimer = null;
@@ -2062,6 +2148,9 @@ class CollaborationRuntimeManager {
       // → promote) or user typing (ydocUpdateHandler → maybePromoteFromCurrentTopology).
       entry.state.reconnectIntent = false;
       this.emit(entry);
+      // Announce localOnly at the fast cadence one last time; the next
+      // reschedule computes the dormant 5-min interval from this state.
+      this.schedulePresenceHeartbeat(entry, 0);
     }, COOLDOWN_MS);
   }
 
