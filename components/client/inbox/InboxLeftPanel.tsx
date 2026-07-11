@@ -37,10 +37,7 @@ export function InboxLeftPanel() {
         <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
           Inbox
         </p>
-        <h3 className="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
-          {TABS.find((entry) => entry.id === tab)?.label ?? "Inbox"}
-        </h3>
-        <div className="flex items-center gap-1">
+        <div className="mt-2 flex items-center gap-1">
           {TABS.map(({ id, label, icon: Icon }) => {
             const isActive = tab === id;
             return (
@@ -63,6 +60,9 @@ export function InboxLeftPanel() {
             );
           })}
         </div>
+        <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
+          {TABS.find((entry) => entry.id === tab)?.label ?? "Inbox"}
+        </h3>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
