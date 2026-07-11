@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
+import { DmThreadTab } from "@/components/client/inbox/DmThreadTab";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
 import { ContentToolbar } from "../toolbar";
@@ -403,6 +404,21 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setOwnedByNote(null);
+      return;
+    }
+
+    // DM conversation opened as a content tab (dm:<threadId>). Synthetic id,
+    // no ContentNode fetch — DmThreadTab drives its own data from dm-store.
+    if (selectedContentId.startsWith("dm:")) {
+      setIsLoading(false);
+      setError(null);
+      setNoteContent(null);
+      setContentParentId(null);
+      setContentData(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
+      setContentType("dm-thread");
       setOwnedByNote(null);
       return;
     }
@@ -1914,6 +1930,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         </div>
       </div>
     );
+  } else if (contentType === "dm-thread" && selectedContentId) {
+    contentElement = <DmThreadTab threadId={selectedContentId.slice(3)} />;
   } else if (ExtensionContentViewer && selectedContentId) {
     contentElement = (
       <ExtensionContentViewer

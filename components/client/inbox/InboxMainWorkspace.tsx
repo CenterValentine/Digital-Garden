@@ -10,32 +10,22 @@
  * drives the inbox-view store this reads.
  */
 
-import { useEffect, useState } from "react";
-import { ArrowLeft, MessageCircle, Settings2, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  MessageCircle,
+  Settings2,
+  SquareArrowOutUpRight,
+  Users,
+} from "lucide-react";
 
+import { useContentStore } from "@/state/content-store";
+import { useDmStore } from "@/state/dm-store";
 import { useInboxViewStore } from "@/state/inbox-view-store";
+import { DmThreadHeader } from "./DmThreadHeader";
 import { DmThreadView } from "./DmThreadView";
 import { NotificationPreferences } from "./NotificationPreferences";
 import { NotificationsPane } from "./NotificationsPane";
-
-function useCurrentUserId(): string | null {
-  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/auth/session", { credentials: "include" })
-      .then((response) => response.json())
-      .then((json: { success: boolean; data?: { user?: { id?: string } } }) => {
-        if (!cancelled && json.success && json.data?.user?.id) {
-          setCurrentUserId(json.data.user.id);
-        }
-      })
-      .catch(() => undefined);
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-  return currentUserId;
-}
+import { useCurrentUserId } from "./use-current-user-id";
 
 function EmptyState({
   icon,
@@ -60,7 +50,20 @@ export function InboxMainWorkspace() {
   const showPreferences = useInboxViewStore((state) => state.showPreferences);
   const closePreferences = useInboxViewStore((state) => state.closePreferences);
   const openPreferences = useInboxViewStore((state) => state.openPreferences);
+  const setSelectedContentId = useContentStore(
+    (state) => state.setSelectedContentId,
+  );
   const currentUserId = useCurrentUserId();
+
+  const openThreadInTab = (id: string) => {
+    const thread = useDmStore
+      .getState()
+      .threads.find((entry) => entry.id === id);
+    setSelectedContentId(`dm:${id}`, {
+      title: thread ? `@${thread.otherUser.username}` : "Conversation",
+      contentType: "dm-thread",
+    });
+  };
 
   if (showPreferences) {
     return (
@@ -87,11 +90,30 @@ export function InboxMainWorkspace() {
 
   if (threadId) {
     return (
-      <DmThreadView
-        key={threadId}
-        threadId={threadId}
-        currentUserId={currentUserId}
-      />
+      <div className="flex h-full flex-col">
+        <DmThreadHeader
+          threadId={threadId}
+          action={
+            <button
+              type="button"
+              onClick={() => openThreadInTab(threadId)}
+              aria-label="Open conversation as a tab"
+              title="Open as tab"
+              className="inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+            >
+              <SquareArrowOutUpRight className="h-4 w-4" />
+              Open as tab
+            </button>
+          }
+        />
+        <div className="min-h-0 flex-1">
+          <DmThreadView
+            key={threadId}
+            threadId={threadId}
+            currentUserId={currentUserId}
+          />
+        </div>
+      </div>
     );
   }
 
