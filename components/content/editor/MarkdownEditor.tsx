@@ -1312,8 +1312,8 @@ export function MarkdownEditor({
         <div
           className={
             isCollaborationEditBlocked
-              ? "border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700"
-              : "border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-800"
+              ? "border-b border-red-500/20 bg-red-500/10 px-4 py-2 text-sm text-red-700 dark:text-red-400"
+              : "border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-sm text-amber-700 dark:text-amber-300"
           }
         >
           {isCollaborationEditBlocked ? "Editing blocked" : "Collaboration notice"}:{" "}
