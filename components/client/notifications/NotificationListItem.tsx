@@ -18,6 +18,7 @@ import {
   useNotificationKindRenderers,
 } from "@/lib/features/notifications/kind-registry";
 import { useNotificationsStore } from "@/state/notifications-store";
+import { useInboxViewStore } from "@/state/inbox-view-store";
 
 export function NotificationListItem({
   notification,
@@ -30,18 +31,25 @@ export function NotificationListItem({
   const renderers = useNotificationKindRenderers();
   const setRead = useNotificationsStore((state) => state.setRead);
   const archive = useNotificationsStore((state) => state.archive);
+  const openInbox = useInboxViewStore((state) => state.openInbox);
 
   const renderer = renderers[notification.kind] ?? FALLBACK_RENDERER;
   const Icon = renderer.icon;
   const Body = renderer.Body;
   const Actions = renderer.Actions;
+  const inboxTarget = renderer.getInboxTarget?.(notification) ?? null;
   const href = renderer.getHref?.(notification) ?? null;
+  const isClickable = Boolean(inboxTarget || href);
   const isUnread = notification.readAt === null;
   const isAiActor = notification.actor.type === "ai";
 
   const handleClick = () => {
     if (isUnread) void setRead(notification.id, true);
-    if (href) {
+    if (inboxTarget) {
+      onNavigate?.();
+      openInbox(inboxTarget.tab, inboxTarget.threadId ?? null);
+      router.push("/content");
+    } else if (href) {
       onNavigate?.();
       router.push(href);
     }
@@ -59,7 +67,7 @@ export function NotificationListItem({
         }
       }}
       className={`group relative flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5 ${
-        href ? "cursor-pointer" : "cursor-default"
+        isClickable ? "cursor-pointer" : "cursor-default"
       }`}
     >
       <span

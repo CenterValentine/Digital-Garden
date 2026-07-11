@@ -8,12 +8,13 @@
  * Positioned absolutely under the bell (house pattern: ProfileMenu).
  */
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CheckCheck, Inbox } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { NotificationDTO } from "@/lib/domain/notifications/types";
 import { useNotificationsStore } from "@/state/notifications-store";
+import { useInboxViewStore } from "@/state/inbox-view-store";
 import { NotificationListItem } from "./NotificationListItem";
 
 function groupByRecency(items: NotificationDTO[]): {
@@ -30,6 +31,8 @@ function groupByRecency(items: NotificationDTO[]): {
 }
 
 export function NotificationPopover({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const openInbox = useInboxViewStore((state) => state.openInbox);
   const glass1 = getSurfaceStyles("glass-1");
   const items = useNotificationsStore((state) => state.items);
   const filter = useNotificationsStore((state) => state.filter);
@@ -135,13 +138,17 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
       </div>
 
       <div className="border-t border-white/10 p-1.5">
-        <Link
-          href="/inbox"
-          onClick={onClose}
-          className="block rounded-md px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+        <button
+          type="button"
+          onClick={() => {
+            openInbox("notifications");
+            router.push("/content");
+            onClose();
+          }}
+          className="block w-full rounded-md px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
         >
           View all in Inbox
-        </Link>
+        </button>
       </div>
     </div>
   );

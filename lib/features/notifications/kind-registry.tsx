@@ -225,19 +225,19 @@ export const CORE_NOTIFICATION_RENDERERS: Record<
     icon: UserPlus,
     Body: ConnectionInviteBody,
     Actions: ConnectionInviteActions,
-    getHref: () => "/inbox?tab=connections",
+    getInboxTarget: () => ({ tab: "connections" }),
   },
   "connection.accepted": {
     icon: Users,
     Body: ConnectionAcceptedBody,
-    getHref: () => "/inbox?tab=connections",
+    getInboxTarget: () => ({ tab: "connections" }),
   },
   "dm.message": {
     icon: MessageCircle,
     Body: DmMessageBody,
-    getHref: (notification) => {
+    getInboxTarget: (notification) => {
       const threadId = payloadString(notification, "threadId");
-      return threadId ? `/inbox?tab=messages&thread=${threadId}` : "/inbox";
+      return threadId ? { tab: "messages", threadId } : { tab: "messages" };
     },
   },
   "ai.notify": {
