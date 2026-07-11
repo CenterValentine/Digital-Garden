@@ -47,14 +47,14 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
     <div
       role="dialog"
       aria-label="Notifications"
-      className="absolute right-0 top-full z-[110] mt-2 w-96 overflow-hidden rounded-xl border border-white/10"
+      className="absolute right-0 top-full z-[110] mt-2 w-96 overflow-hidden rounded-xl border border-black/10 dark:border-white/10"
       style={{
         background: glass1.background,
         backdropFilter: glass1.backdropFilter,
         boxShadow: glass1.boxShadow,
       }}
     >
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-2">
+      <div className="flex items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
         <div className="flex items-center gap-1">
           {(["all", "unread"] as const).map((tab) => (
             <button
@@ -63,7 +63,7 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
               onClick={() => void loadList(tab)}
               className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize transition-colors ${
                 filter === tab
-                  ? "bg-white/10 text-foreground"
+                  ? "bg-black/10 dark:bg-white/10 text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -92,7 +92,7 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
             {[0, 1, 2].map((index) => (
               <div
                 key={index}
-                className="h-12 animate-pulse rounded-lg bg-white/5"
+                className="h-12 animate-pulse rounded-lg bg-black/5 dark:bg-white/5"
               />
             ))}
           </div>
@@ -137,7 +137,7 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
         )}
       </div>
 
-      <div className="border-t border-white/10 p-1.5">
+      <div className="border-t border-black/10 dark:border-white/10 p-1.5">
         <button
           type="button"
           onClick={() => {
@@ -145,7 +145,7 @@ export function NotificationPopover({ onClose }: { onClose: () => void }) {
             router.push("/content");
             onClose();
           }}
-          className="block w-full rounded-md px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-white/5 hover:text-foreground"
+          className="block w-full rounded-md px-3 py-1.5 text-center text-xs font-medium text-muted-foreground transition-colors hover:bg-black/5 dark:hover:bg-white/5 hover:text-foreground"
         >
           View all in Inbox
         </button>

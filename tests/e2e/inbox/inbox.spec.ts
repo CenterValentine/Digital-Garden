@@ -5,10 +5,12 @@
  *   - Bell icon renders in NotesNavBar with unread badge count
  *   - Bell popover: All/Unread tabs, Today/Earlier grouping, mark-all-read
  *   - Inline Accept/Decline on connection.invite notifications
- *   - /inbox page: Notifications / Messages / Connections tabs, ?tab= deep links
+ *   - Inbox workspace view (left rail Inbox icon): Notifications / Messages /
+ *     Connections tabs in the left panel; conversation + full notifications
+ *     load in the main panel; legacy /inbox?tab=&thread= redirects to /content
  *   - DM thread view: send message, optimistic render, live delta poll
  *   - Connections panel: invite form (enumeration-safe toast), revoke, block
- *   - Settings /settings/notifications: per-kind toggles persist
+ *   - Notification preferences (Inbox → Notifications → gear): per-kind toggles persist
  *
  * Blocked on:
  *   - Auth fixture (tests/e2e/_fixtures/auth.ts) — all inbox surfaces

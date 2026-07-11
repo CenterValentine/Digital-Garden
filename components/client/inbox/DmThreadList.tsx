@@ -29,7 +29,7 @@ export function DmThreadList({
     return (
       <div className="space-y-2 p-3">
         {[0, 1, 2].map((index) => (
-          <div key={index} className="h-16 animate-pulse rounded-lg bg-white/5" />
+          <div key={index} className="h-16 animate-pulse rounded-lg bg-black/5 dark:bg-white/5" />
         ))}
       </div>
     );
@@ -56,11 +56,11 @@ export function DmThreadList({
           onClick={() => onSelect(thread.id)}
           className={`flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors ${
             activeThreadId === thread.id
-              ? "bg-white/10"
-              : "hover:bg-white/5"
+              ? "bg-black/10 dark:bg-white/10"
+              : "hover:bg-black/5 dark:hover:bg-white/5"
           }`}
         >
-          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-medium">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-sm font-medium">
             {thread.otherUser.username.charAt(0).toUpperCase()}
           </span>
           <span className="min-w-0 flex-1">

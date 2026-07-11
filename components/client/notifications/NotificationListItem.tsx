@@ -66,7 +66,7 @@ export function NotificationListItem({
           handleClick();
         }
       }}
-      className={`group relative flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-white/5 ${
+      className={`group relative flex w-full items-start gap-3 rounded-lg px-3 py-2.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5 ${
         isClickable ? "cursor-pointer" : "cursor-default"
       }`}
     >
@@ -74,7 +74,7 @@ export function NotificationListItem({
         className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
           isAiActor
             ? "bg-violet-500/15 text-violet-400"
-            : "bg-white/10 text-muted-foreground"
+            : "bg-black/10 dark:bg-white/10 text-muted-foreground"
         }`}
       >
         <Icon className="h-3.5 w-3.5" />
@@ -117,7 +117,7 @@ export function NotificationListItem({
               const ok = await archive(notification.id);
               if (!ok) toast.error("Couldn't archive notification");
             }}
-            className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-white/10 group-hover:opacity-100"
+            className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-black/10 dark:hover:bg-white/10 group-hover:opacity-100"
           >
             <Archive className="h-3.5 w-3.5" />
           </button>
@@ -137,7 +137,7 @@ export function NotificationListItem({
             className={`block h-2 w-2 rounded-full transition-colors ${
               isUnread
                 ? "bg-sky-400"
-                : "border border-white/25 bg-transparent opacity-0 group-hover:opacity-100"
+                : "border border-black/25 dark:border-white/25 bg-transparent opacity-0 group-hover:opacity-100"
             }`}
           />
         </button>

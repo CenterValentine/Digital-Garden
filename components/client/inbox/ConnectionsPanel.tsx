@@ -91,7 +91,7 @@ function SectionCard({
   const glass0 = getSurfaceStyles("glass-0");
   return (
     <div
-      className="rounded-xl border border-white/10 p-4"
+      className="rounded-xl border border-black/10 dark:border-white/10 p-4"
       style={{
         background: glass0.background,
         backdropFilter: glass0.backdropFilter,
@@ -231,7 +231,7 @@ export function ConnectionsPanel({
                 if (event.key === "Enter") void submitInvite();
               }}
               placeholder="Exact email or username"
-              className="h-9 flex-1 rounded-lg border border-white/10 bg-white/5 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-white/25"
+              className="h-9 flex-1 rounded-lg border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-black/25 dark:border-white/25"
             />
             <button
               type="button"
@@ -248,7 +248,7 @@ export function ConnectionsPanel({
             onChange={(event) => setMessage(event.target.value)}
             maxLength={280}
             placeholder="Optional message"
-            className="h-9 w-full rounded-lg border border-white/10 bg-white/5 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-white/25"
+            className="h-9 w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-black/25 dark:border-white/25"
           />
           <p className="text-xs text-muted-foreground">
             Invites require the exact email or username — there is no user
@@ -259,7 +259,7 @@ export function ConnectionsPanel({
 
       {data.received.length > 0 ? (
         <SectionCard title={`Invites received (${data.received.length})`}>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-black/5 dark:divide-white/5">
             {data.received.map((invite) => (
               <div
                 key={invite.id}
@@ -290,7 +290,7 @@ export function ConnectionsPanel({
                   <button
                     type="button"
                     onClick={() => void respond(invite.id, "decline")}
-                    className="inline-flex items-center gap-1 rounded-md border border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-white/5"
+                    className="inline-flex items-center gap-1 rounded-md border border-black/15 dark:border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
                   >
                     <X className="h-3 w-3" />
                     Decline
@@ -306,14 +306,14 @@ export function ConnectionsPanel({
         {data.connections.length === 0 ? (
           <EmptyRow text="No connections yet — send an invite above." />
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-black/5 dark:divide-white/5">
             {data.connections.map((connection) => (
               <div
                 key={connection.id}
                 className="flex items-center justify-between gap-3 py-2.5"
               >
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 text-sm font-medium">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/10 dark:bg-white/10 text-sm font-medium">
                     {connection.username.charAt(0).toUpperCase()}
                   </span>
                   <div className="min-w-0">
@@ -333,7 +333,7 @@ export function ConnectionsPanel({
                     type="button"
                     title="Message"
                     onClick={() => void messageUser(connection.userId)}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10 hover:text-foreground"
                   >
                     <MessageCircle className="h-4 w-4" />
                   </button>
@@ -341,7 +341,7 @@ export function ConnectionsPanel({
                     type="button"
                     title="Remove connection"
                     onClick={() => void remove(connection.id)}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10 hover:text-foreground"
                   >
                     <UserMinus className="h-4 w-4" />
                   </button>
@@ -349,7 +349,7 @@ export function ConnectionsPanel({
                     type="button"
                     title="Block user"
                     onClick={() => void block(connection.userId)}
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-white/10 hover:text-red-400"
+                    className="rounded-md p-1.5 text-muted-foreground hover:bg-black/10 dark:hover:bg-white/10 hover:text-red-400"
                   >
                     <Ban className="h-4 w-4" />
                   </button>
@@ -364,7 +364,7 @@ export function ConnectionsPanel({
         {data.sent.length === 0 ? (
           <EmptyRow text="No pending invites." />
         ) : (
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-black/5 dark:divide-white/5">
             {data.sent.map((invite) => (
               <div
                 key={invite.id}
@@ -382,7 +382,7 @@ export function ConnectionsPanel({
                 <button
                   type="button"
                   onClick={() => void revoke(invite.id)}
-                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-white/5"
+                  className="inline-flex shrink-0 items-center gap-1 rounded-md border border-black/15 dark:border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   <Undo2 className="h-3 w-3" />
                   Revoke
@@ -395,7 +395,7 @@ export function ConnectionsPanel({
 
       {data.blocks.length > 0 ? (
         <SectionCard title={`Blocked (${data.blocks.length})`}>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-black/5 dark:divide-white/5">
             {data.blocks.map((blockRow) => (
               <div
                 key={blockRow.id}
@@ -405,7 +405,7 @@ export function ConnectionsPanel({
                 <button
                   type="button"
                   onClick={() => void unblock(blockRow.id)}
-                  className="rounded-md border border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-white/5"
+                  className="rounded-md border border-black/15 dark:border-white/15 px-2.5 py-1 text-xs text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 >
                   Unblock
                 </button>

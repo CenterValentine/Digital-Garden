@@ -43,7 +43,7 @@ export function NotificationsPane() {
               onClick={() => void loadList(id)}
               className={`rounded-md px-3 py-1.5 text-sm transition-colors ${
                 filter === id
-                  ? "bg-white/10 font-medium text-foreground"
+                  ? "bg-black/10 dark:bg-white/10 font-medium text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
             >
@@ -71,12 +71,12 @@ export function NotificationsPane() {
           {[0, 1, 2, 3].map((index) => (
             <div
               key={index}
-              className="h-14 animate-pulse rounded-lg bg-white/5"
+              className="h-14 animate-pulse rounded-lg bg-black/5 dark:bg-white/5"
             />
           ))}
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-white/10 px-6 py-16 text-center">
+        <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-black/10 dark:border-white/10 px-6 py-16 text-center">
           <Inbox className="h-10 w-10 text-muted-foreground/40" />
           <div>
             <p className="text-sm font-medium">
@@ -104,7 +104,7 @@ export function NotificationsPane() {
               type="button"
               disabled={isLoading}
               onClick={() => void loadMore()}
-              className="mt-2 w-full rounded-lg border border-white/10 py-2 text-sm text-muted-foreground hover:bg-white/5 disabled:opacity-50"
+              className="mt-2 w-full rounded-lg border border-black/10 dark:border-white/10 py-2 text-sm text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 disabled:opacity-50"
             >
               {isLoading ? "Loading…" : "Load more"}
             </button>

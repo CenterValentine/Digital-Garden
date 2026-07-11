@@ -76,7 +76,7 @@ export function DmThreadView({
           <button
             type="button"
             onClick={() => void loadOlderMessages(threadId)}
-            className="mx-auto mb-4 block rounded-md border border-white/10 px-3 py-1 text-xs text-muted-foreground hover:bg-white/5"
+            className="mx-auto mb-4 block rounded-md border border-black/10 dark:border-white/10 px-3 py-1 text-xs text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5"
           >
             Load earlier messages
           </button>
@@ -87,7 +87,7 @@ export function DmThreadView({
             {[0, 1, 2].map((index) => (
               <div
                 key={index}
-                className={`h-10 w-1/2 animate-pulse rounded-2xl bg-white/5 ${
+                className={`h-10 w-1/2 animate-pulse rounded-2xl bg-black/5 dark:bg-white/5 ${
                   index % 2 ? "ml-auto" : ""
                 }`}
               />
@@ -120,10 +120,10 @@ export function DmThreadView({
                   <div
                     className={`max-w-[70%] rounded-2xl px-3.5 py-2 text-sm ${
                       message.deletedAt
-                        ? "border border-dashed border-white/10 italic text-muted-foreground"
+                        ? "border border-dashed border-black/10 dark:border-white/10 italic text-muted-foreground"
                         : own
                           ? `bg-sky-600/80 text-white ${pending ? "opacity-60" : ""}`
-                          : "bg-white/10"
+                          : "bg-black/10 dark:bg-white/10"
                     }`}
                   >
                     {message.deletedAt ? (
@@ -151,7 +151,7 @@ export function DmThreadView({
         )}
       </div>
 
-      <div className="shrink-0 border-t border-white/10 p-3">
+      <div className="shrink-0 border-t border-black/10 dark:border-white/10 p-3">
         <div className="flex items-end gap-2">
           <textarea
             value={draft}
@@ -164,7 +164,7 @@ export function DmThreadView({
             }}
             placeholder="Write a message…"
             rows={Math.min(4, Math.max(1, draft.split("\n").length))}
-            className="min-h-9 flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-white/25"
+            className="min-h-9 flex-1 resize-none rounded-xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3.5 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-black/25 dark:border-white/25"
           />
           <button
             type="button"
