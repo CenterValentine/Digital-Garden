@@ -164,14 +164,12 @@ export default function PeriodicNotesSettingsDialog() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <div className="flex items-center gap-3">
-          <CalendarCheck className="h-7 w-7 text-gold-primary" />
-          <h1 className="text-3xl font-bold">Periodic Notes</h1>
-        </div>
-        <p className="mt-2 text-sm text-gray-400">
-          Open or auto-create daily, weekly, monthly, and yearly notes from the
-          left-panel header.
+      <div className="flex items-start gap-3">
+        <CalendarCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold-primary" />
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Open or auto-create daily, weekly, monthly, quarterly, and yearly
+          notes from the left-panel header. Each cadence is configured on its
+          own tab below.
         </p>
       </div>
 

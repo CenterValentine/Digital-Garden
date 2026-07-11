@@ -11,9 +11,10 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
-import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { Inbox, PanelLeftClose, PanelLeft } from "lucide-react";
 import { renderExtensionIcon } from "@/lib/extensions";
 import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
+import { useNotificationsStore } from "@/state/notifications-store";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -61,6 +62,7 @@ export function LeftSidebarHeader({
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const extensionNavItems = useExtensionHeaderNavItems();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   // Daily Notes is type "action" with id "open-periodic-note", Publishing is type "view" with view "publishing-view"
   const subAffordanceIds = new Set(["open-periodic-note", "publishing-view"]);
@@ -142,6 +144,26 @@ export function LeftSidebarHeader({
                 d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
               />
             </svg>
+          </button>
+
+          {/* Inbox tab — core view (notifications / messages / connections) */}
+          <button
+            onClick={() => {
+              setActiveView("inbox");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`relative rounded-md p-1.5 transition-colors ${
+              activeView === "inbox" ? tabActive : tabInactive
+            }`}
+            title="Inbox"
+            type="button"
+          >
+            <Inbox className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Extension-registered top-level tabs (people, calendar, etc.) */}

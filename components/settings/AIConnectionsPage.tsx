@@ -174,7 +174,7 @@ function ConnectionList({
   if (connections.length === 0) {
     return (
       <div
-        className="rounded-xl border border-white/10 p-8 text-center"
+        className="rounded-xl border border-black/10 dark:border-white/10 p-8 text-center"
         style={{ background: glass0.background }}
       >
         <KeyRound className="h-8 w-8 mx-auto text-gray-500 mb-3" />
@@ -190,7 +190,7 @@ function ConnectionList({
       {connections.map((c) => (
         <li
           key={c.id}
-          className="rounded-xl border border-white/10 px-4 py-3"
+          className="rounded-xl border border-black/10 dark:border-white/10 px-4 py-3"
           style={{ background: glass0.background }}
         >
           <div className="flex items-center gap-3">
@@ -285,10 +285,10 @@ function TemplatePicker({
         <button
           type="button"
           onClick={onCustom}
-          className="flex w-full items-center gap-3 rounded-xl border border-dashed border-white/15 p-4 hover:border-white/30 transition-colors"
+          className="flex w-full items-center gap-3 rounded-xl border border-dashed border-black/15 dark:border-white/15 p-4 hover:border-black/30 dark:hover:border-white/30 transition-colors"
           style={{ background: glass0.background }}
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 dark:border-white/15">
             <Plus className="h-4 w-4 text-gray-400" />
           </div>
           <div className="text-left">
@@ -329,7 +329,7 @@ function TemplateCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-3 rounded-xl border border-white/10 p-3 hover:border-white/25 transition-colors text-left"
+      className="flex items-center gap-3 rounded-xl border border-black/10 dark:border-white/10 p-3 hover:border-black/25 dark:hover:border-white/25 transition-colors text-left"
       style={{ background: glass0.background }}
     >
       <div
@@ -434,7 +434,7 @@ function ConnectionForm({
 
   return (
     <div
-      className="rounded-xl border border-white/10 p-6 space-y-4"
+      className="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-4"
       style={{ background: glass0.background }}
     >
       <div className="flex items-center gap-3">
@@ -473,7 +473,7 @@ function ConnectionForm({
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
         />
       </Field>
 
@@ -484,7 +484,7 @@ function ConnectionForm({
           value={apiKey}
           onChange={(e) => setApiKey(e.target.value)}
           placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
-          className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-white/30"
+          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
         />
       </Field>
 
@@ -495,7 +495,7 @@ function ConnectionForm({
             value={baseURL}
             onChange={(e) => setBaseURL(e.target.value)}
             placeholder="https://api.example.com/v1"
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-white/30"
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
           />
         </Field>
       )}
@@ -505,7 +505,7 @@ function ConnectionForm({
           <select
             value={adapterKind}
             onChange={(e) => setAdapterKind(e.target.value as AdapterKind)}
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-white/30"
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
           >
             <option value="openai-compat">OpenAI-compatible (most third-party endpoints)</option>
             <option value="anthropic">Anthropic</option>
@@ -829,7 +829,7 @@ function ModelEditor({
       <div className="space-y-1.5">
         {/* ─── Fetch-from-API affordance ─── */}
         {supportsFetch && (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-1.5">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
             <div className="min-w-0 flex-1">
               <div className="text-xs font-medium text-white flex items-center gap-1.5">
                 <Sparkles className="h-3 w-3 text-amber-300/80" />
@@ -1008,7 +1008,7 @@ function ModelEditor({
                               className={`rounded px-1 py-px text-[9px] uppercase tracking-wide ${
                                 cap === "image"
                                   ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
-                                  : "bg-white/5 text-gray-400"
+                                  : "bg-black/5 dark:bg-white/5 text-gray-400"
                               }`}
                             >
                               {prettyCap(cap)}
@@ -1055,7 +1055,7 @@ function ModelEditor({
           </div>
         )}
         {models.map((m) => (
-          <div key={m.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-3 py-1.5">
+          <div key={m.id} className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
             <div className="min-w-0 flex-1">
               <div className="text-xs font-medium text-white truncate">{m.name}</div>
               <div className="text-[10px] text-gray-500 font-mono truncate">{m.id}</div>
@@ -1076,7 +1076,7 @@ function ModelEditor({
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
               placeholder="Model ID (e.g. claude-sonnet-4)"
-              className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 pr-7 text-xs text-white font-mono focus:outline-none focus:border-white/30"
+              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-2 py-1.5 pr-7 text-xs text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
             />
             {suggestions.length > 0 && (
               <button
@@ -1087,7 +1087,7 @@ function ModelEditor({
                 className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded transition-colors ${
                   pickerOpen
                     ? "text-amber-300 bg-amber-500/10"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-white/5"
+                    : "text-gray-500 hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 <HelpCircle className="h-3.5 w-3.5" />
@@ -1099,7 +1099,7 @@ function ModelEditor({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Display name"
-            className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
+            className="flex-1 rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-black/30 dark:border-white/30"
           />
           <Button variant="ghost" size="sm" onClick={addModel}>
             <Plus className="h-3.5 w-3.5" />
@@ -1158,9 +1158,9 @@ function ModelSuggestionPicker({
       ref={ref}
       role="dialog"
       aria-label="Popular model IDs"
-      className="absolute bottom-full left-0 right-0 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-white/10 bg-[#1a1a1a] shadow-2xl z-50"
+      className="absolute bottom-full left-0 right-0 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-black/10 dark:border-white/10 bg-[#1a1a1a] shadow-2xl z-50"
     >
-      <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-white/5 bg-[#1a1a1a]/95 backdrop-blur-sm px-3 py-2">
+      <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 bg-[#1a1a1a]/95 backdrop-blur-sm px-3 py-2">
         <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-gray-400">
           <Sparkles className="h-3 w-3 text-amber-300/70" />
           <span>Popular IDs · {ADAPTER_SCOPE_LABEL[adapterKind]}</span>
@@ -1180,7 +1180,7 @@ function ModelSuggestionPicker({
             key={s.id}
             type="button"
             onClick={() => onPick(s)}
-            className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-white/5 transition-colors"
+            className="flex w-full items-start gap-2 px-3 py-1.5 text-left hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">

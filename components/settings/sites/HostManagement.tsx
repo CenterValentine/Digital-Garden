@@ -182,38 +182,38 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
   };
 
   return (
-    <div className="mt-4 pl-6 border-l border-white/5 space-y-3">
+    <div className="mt-4 pl-6 border-l border-black/5 dark:border-white/5 space-y-3">
       {/* Always-shown info card: where this site is reachable for free. */}
       {platformDomain && (
-        <div className="rounded-md border border-white/8 bg-white/3 p-3 space-y-1.5">
-          <div className="text-[11px] uppercase tracking-wider text-white/40">
+        <div className="rounded-md border border-black/8 dark:border-white/8 bg-black/3 dark:bg-white/3 p-3 space-y-1.5">
+          <div className="text-[11px] uppercase tracking-wider text-black/40 dark:text-white/40">
             Your site is reachable at
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <Globe className="h-3 w-3 text-white/30 shrink-0" />
-            <code className="font-mono text-white/80">
+            <Globe className="h-3 w-3 text-black/30 dark:text-white/30 shrink-0" />
+            <code className="font-mono text-black/80 dark:text-white/80">
               {tenantSlug}.{platformDomain}
             </code>
-            <span className="text-white/30">— free, no setup required</span>
+            <span className="text-black/30 dark:text-white/30">— free, no setup required</span>
           </div>
         </div>
       )}
 
       {/* Existing hosts list */}
       {isLoading ? (
-        <p className="text-xs text-white/30">Loading hosts…</p>
+        <p className="text-xs text-black/30 dark:text-white/30">Loading hosts…</p>
       ) : hosts.length === 0 ? (
-        <p className="text-xs text-white/30">No custom hostnames yet.</p>
+        <p className="text-xs text-black/30 dark:text-white/30">No custom hostnames yet.</p>
       ) : (
         <ul className="space-y-2">
           {hosts.map((h) => (
             <li
               key={h.host}
-              className="rounded-md border border-white/8 bg-white/3 p-3 space-y-2"
+              className="rounded-md border border-black/8 dark:border-white/8 bg-black/3 dark:bg-white/3 p-3 space-y-2"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 min-w-0">
-                  <Globe className="h-3 w-3 text-white/30 shrink-0" />
+                  <Globe className="h-3 w-3 text-black/30 dark:text-white/30 shrink-0" />
                   <span className="font-mono text-sm truncate">{h.host}</span>
                   {h.verifiedAt ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs px-2 py-0.5 shrink-0">
@@ -225,7 +225,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                     </span>
                   )}
                   {h.isPrimary && (
-                    <span className="inline-flex items-center rounded-full bg-white/5 text-white/40 text-xs px-2 py-0.5 shrink-0">
+                    <span className="inline-flex items-center rounded-full bg-black/5 dark:bg-white/5 text-black/40 dark:text-white/40 text-xs px-2 py-0.5 shrink-0">
                       Primary host
                     </span>
                   )}
@@ -249,7 +249,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                   <button
                     type="button"
                     onClick={() => void handleRemove(h.host)}
-                    className="text-white/40 hover:text-rose-400 p-1 rounded"
+                    className="text-black/40 dark:text-white/40 hover:text-rose-400 p-1 rounded"
                     aria-label="Remove hostname"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -258,23 +258,23 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
               </div>
 
               {!h.verifiedAt && h.vercelConfigData?.dnsInstructions && (
-                <div className="text-xs space-y-2 pt-2 border-t border-white/5">
-                  <div className="text-white/50">
+                <div className="text-xs space-y-2 pt-2 border-t border-black/5 dark:border-white/5">
+                  <div className="text-black/50 dark:text-white/50">
                     Add these DNS records at your registrar:
                   </div>
                   {h.vercelConfigData.dnsInstructions.map((dns, i) => (
                     <div key={i} className="space-y-1">
                       <div className="grid grid-cols-[max-content_1fr_max-content] gap-2 items-center">
-                        <span className="font-mono bg-white/5 px-1.5 py-0.5 rounded text-white/70">
+                        <span className="font-mono bg-black/5 dark:bg-white/5 px-1.5 py-0.5 rounded text-black/70 dark:text-white/70">
                           {dns.recordType}
                         </span>
-                        <span className="font-mono text-white/60">
+                        <span className="font-mono text-black/60 dark:text-white/60">
                           name: {dns.recordName}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-white/40 text-[11px]">value:</span>
-                        <code className="flex-1 font-mono bg-white/5 px-2 py-1 rounded text-[11px] text-white/80">
+                        <span className="text-black/40 dark:text-white/40 text-[11px]">value:</span>
+                        <code className="flex-1 font-mono bg-black/5 dark:bg-white/5 px-2 py-1 rounded text-[11px] text-black/80 dark:text-white/80">
                           {dns.recordValue}
                         </code>
                         <button
@@ -282,13 +282,13 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                           onClick={() =>
                             copyToClipboard(dns.recordValue, dns.recordType)
                           }
-                          className="text-white/40 hover:text-white/70 p-1"
+                          className="text-black/40 dark:text-white/40 hover:text-black/70 dark:hover:text-white/70 p-1"
                           aria-label="Copy value"
                         >
                           <Copy className="h-3 w-3" />
                         </button>
                       </div>
-                      <p className="text-[11px] text-white/40">{dns.rationale}</p>
+                      <p className="text-[11px] text-black/40 dark:text-white/40">{dns.rationale}</p>
                     </div>
                   ))}
                 </div>
@@ -300,7 +300,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
 
       {/* Custom domain section — gated by canClaimCustomHosts. */}
       <div className="pt-2 space-y-2">
-        <div className="text-[11px] uppercase tracking-wider text-white/40">
+        <div className="text-[11px] uppercase tracking-wider text-black/40 dark:text-white/40">
           Custom domain
         </div>
         {canClaim ? (
@@ -310,7 +310,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
               placeholder="mysite.com"
               value={newHost}
               onChange={(e) => setNewHost(e.target.value)}
-              className="flex-1 rounded-md border border-white/10 bg-white/5 px-3 py-1.5 text-sm font-mono placeholder:text-white/20"
+              className="flex-1 rounded-md border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-3 py-1.5 text-sm font-mono placeholder:text-black/20 dark:text-white/20"
             />
             <button
               type="submit"
@@ -321,7 +321,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
             </button>
           </form>
         ) : (
-          <p className="text-xs text-white/40 leading-relaxed">
+          <p className="text-xs text-black/40 dark:text-white/40 leading-relaxed">
             Custom domains aren&apos;t enabled for your account. Your site
             works fine at the subdomain and subpath URLs above — those are
             permanent and don&apos;t require any DNS setup. Ask the platform

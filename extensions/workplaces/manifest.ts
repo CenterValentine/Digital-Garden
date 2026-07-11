@@ -12,4 +12,11 @@ export const workplacesExtensionManifest: ExtensionManifest = {
   canDisable: true,
   navItems: [],
   surfaces: ["shell", "global-dialog"],
+  settings: {
+    path: "/settings/extensions/workplaces",
+    label: "Workplaces",
+    title: "Workplaces",
+    description: "Manage saved workplaces and claimed content.",
+    order: 40,
+  },
 };

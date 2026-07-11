@@ -173,15 +173,10 @@ export default function PeopleSettingsDialog() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-4xl font-semibold tracking-tight text-white">
-          People
-        </h2>
-        <p className="mt-3 max-w-3xl text-base text-gray-400">
-          People organizes contact records, groups, and the content linked to
-          each person.
-        </p>
-      </div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">
+        People organizes contact records, groups, and the content linked to
+        each person.
+      </p>
 
       <div className="grid gap-4 md:grid-cols-3">
         <button
@@ -190,7 +185,7 @@ export default function PeopleSettingsDialog() {
           className={`rounded-2xl border p-5 text-left transition-colors ${
             activeSection === "groups"
               ? "border-gold-primary/40 bg-gold-primary/10"
-              : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+              : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
           }`}
         >
           <div className="flex items-center gap-3 text-gold-primary">
@@ -199,10 +194,10 @@ export default function PeopleSettingsDialog() {
               Groups
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {renderStatValue(tree?.stats.groups ?? 0)}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Group records structure the People tree and organize related content.
           </p>
         </button>
@@ -213,7 +208,7 @@ export default function PeopleSettingsDialog() {
           className={`rounded-2xl border p-5 text-left transition-colors ${
             activeSection === "people"
               ? "border-gold-primary/40 bg-gold-primary/10"
-              : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+              : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
           }`}
         >
           <div className="flex items-center gap-3 text-gold-primary">
@@ -222,10 +217,10 @@ export default function PeopleSettingsDialog() {
               People
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {renderStatValue(tree?.stats.people ?? 0)}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Open the People panel to search contacts or jump into person workspaces.
           </p>
         </button>
@@ -236,7 +231,7 @@ export default function PeopleSettingsDialog() {
           className={`rounded-2xl border p-5 text-left transition-colors ${
             activeSection === "mounted"
               ? "border-gold-primary/40 bg-gold-primary/10"
-              : "border-white/10 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.05]"
+              : "border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] hover:border-black/20 dark:hover:border-white/20 hover:bg-black/[0.04] dark:hover:bg-white/[0.05]"
           }`}
         >
           <div className="flex items-center gap-3 text-gold-primary">
@@ -245,22 +240,22 @@ export default function PeopleSettingsDialog() {
               Mounted
             </span>
           </div>
-          <div className="mt-4 text-xl font-semibold text-white">
+          <div className="mt-4 text-xl font-semibold text-gray-900 dark:text-white">
             {renderStatValue(
               (tree?.stats.mountedGroups ?? 0) + (tree?.stats.mountedPeople ?? 0)
             )}
           </div>
-          <p className="mt-2 text-sm text-gray-400">
+          <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             Mounted groups and people are contacts and subgroups visible in the file tree.
           </p>
         </button>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+      <div className="rounded-2xl border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h3 className="text-lg font-semibold text-white">{sectionLabel}</h3>
-            <p className="mt-1 text-sm text-gray-400">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{sectionLabel}</h3>
+            <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
               {activeSection === "groups"
                 ? "All group records in the People tree."
                 : activeSection === "people"
@@ -268,7 +263,7 @@ export default function PeopleSettingsDialog() {
                   : "Contacts and groups currently mounted into the file tree."}
             </p>
           </div>
-          <div className="text-sm text-gray-400">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
             {activeSection === "groups"
               ? flattened.groups.length
               : activeSection === "people"
@@ -279,26 +274,26 @@ export default function PeopleSettingsDialog() {
 
         <div className="mt-4 space-y-3">
           {isLoading ? (
-            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-400">
+            <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
               Loading {sectionLabel.toLowerCase()}...
             </div>
           ) : activeSection === "groups" ? (
             flattened.groups.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-400">
+              <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                 No groups found.
               </div>
             ) : (
               flattened.groups.map((group) => (
                 <div
                   key={group.id}
-                  className="rounded-xl border border-white/10 bg-black/20 px-4 py-4"
+                  className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-4"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
                         {group.name}
                       </div>
-                      <div className="mt-1 text-xs text-gray-400">
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {group.slug} · {group.personCount} people · {group.subgroupCount} subgroups
                       </div>
                     </div>
@@ -311,21 +306,21 @@ export default function PeopleSettingsDialog() {
             )
           ) : activeSection === "people" ? (
             flattened.people.length === 0 ? (
-              <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-400">
+              <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
                 No people found.
               </div>
             ) : (
               flattened.people.map((person) => (
                 <div
                   key={person.id}
-                  className="rounded-xl border border-white/10 bg-black/20 px-4 py-4"
+                  className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-4"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-white">
+                      <div className="text-sm font-semibold text-gray-900 dark:text-white">
                         {person.displayName}
                       </div>
-                      <div className="mt-1 text-xs text-gray-400">
+                      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                         {person.primaryGroupName}
                         {person.email ? ` · ${person.email}` : ""}
                         {person.phone ? ` · ${person.phone}` : ""}
@@ -339,21 +334,21 @@ export default function PeopleSettingsDialog() {
               ))
             )
           ) : flattened.mounted.length === 0 ? (
-            <div className="rounded-xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-gray-400">
+            <div className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
               No mounted groups or people found.
             </div>
           ) : (
             flattened.mounted.map((item) => (
               <div
                 key={item.id}
-                className="rounded-xl border border-white/10 bg-black/20 px-4 py-4"
+                className="rounded-xl border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-black/20 px-4 py-4"
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white">
+                    <div className="text-sm font-semibold text-gray-900 dark:text-white">
                       {item.label}
                     </div>
-                    <div className="mt-1 text-xs text-gray-400">
+                    <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                       {item.parentLabel}
                     </div>
                   </div>

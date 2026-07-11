@@ -296,6 +296,17 @@ const flashcardsSettingsSchema = z
   })
   .optional();
 
+// Notification preferences. `kinds` maps notification kind (e.g.
+// "dm.message") -> enabled; absent keys mean enabled. Read server-side by
+// publishEvent() when projecting recipients, so a disabled kind stops new
+// notifications at the source rather than hiding them client-side.
+const notificationsSettingsSchema = z
+  .object({
+    kinds: z.record(z.string(), z.boolean()).optional(),
+    aiNotificationsEnabled: z.boolean().optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -310,6 +321,7 @@ export const userSettingsSchema = z.object({
   calendar: calendarSettingsSchema,
   periodicNotes: periodicNotesSettingsSchema,
   flashcards: flashcardsSettingsSchema,
+  notifications: notificationsSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -582,5 +594,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     defaultBackLabel: "Answer",
     defaultReviewMode: "front_to_back",
     quickFireEnabled: false,
+  },
+  notifications: {
+    kinds: {},
+    aiNotificationsEnabled: true,
   },
 };

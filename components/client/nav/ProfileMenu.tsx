@@ -28,7 +28,7 @@ const THEME_OPTIONS: Array<{
 }> = [
   { value: "light", label: "Light", Icon: Sun },
   { value: "dark", label: "Dark", Icon: Moon },
-  { value: "system", label: "Auto", Icon: Monitor },
+  { value: "system", label: "System", Icon: Monitor },
 ];
 
 export default function ProfileMenu() {

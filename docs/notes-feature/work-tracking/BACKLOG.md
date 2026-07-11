@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-06-03
+last_updated: 2026-07-11
 ---
 
 # Sprint Backlog
@@ -7,6 +7,33 @@ last_updated: 2026-06-03
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Connections / Notifications / DM Followups (2026-07-10)
+
+Deferred by design from the connections-inbox feature (branch `worktree-connections-inbox`); the architecture has explicit seams for each:
+
+- [ ] **SSE/pub-sub transport upgrade** — replace `createPollingTransport()` (`lib/features/notifications/transport.ts`) when real-time latency matters; callers depend only on the `NotificationTransport` interface. Needs a pub/sub backing (Redis/Upstash) or the Cloud Run service — serverless SSE alone still polls the DB server-side.
+- [ ] **Partial unique index on `NotificationRecipient(userId, collapseKey)`** — closes the coalescing race (two concurrent DM sends can create two unread rows). Needs raw SQL migration (`WHERE readAt IS NULL AND archivedAt IS NULL`); harmless dupes at current scale.
+- [ ] **Signup-time invite resolver** — invites to not-yet-registered emails never resolve today; on account creation, match `ConnectionInvite.inviteeIdentifier` and backfill `inviteeUserId` + publish the notification.
+- [ ] **Activate inbox Playwright stubs** (`tests/e2e/inbox/inbox.spec.ts`) — blocked on the e2e auth fixture; `scripts/seed-smoke-users.ts` mints session tokens and is the building block.
+- [ ] **Shared-folder sharing events** — the original motivation for the event-log architecture: new kinds (`share.grant`, `share.revoke`) + `ViewGrant` integration, gated on connections via `areConnected()`.
+- [ ] **Email digest channel** — daily unread-summary email via the existing cron pattern + per-kind preferences already in settings.
+- [ ] **`Person.linkedUserId`** — link People-extension contacts to connected accounts (auto-materialize a Person card on connection accept).
+- [ ] **Migration-chain repair (pre-existing)** — `prisma migrate dev` fails shadow-DB replay at `20260608120000_backfill_tenancy_drift_columns` (P3006: `TenantHost` table missing). Unrelated to this feature; `migrate deploy` unaffected. Worth a `migrate resolve`/baseline pass.
+
+---
+
+## Settings Reorg Followups (2026-07-10, branch `feat/settings-reorg`)
+
+The settings surface was reorganized (grouped sidebar IA, extension settings consolidated under `/settings/extensions/[id]`, Preferences dissolved into Appearance + Editor & Files, hybrid instant/explicit save via `components/settings/ui/` primitives). Deferred items:
+
+- [ ] **Orphaned settings schema cleanup** — `settings.files`, `settings.search`, `settings.editor`, and `settings.ui.panelLayout` exist in the backend blob but the wired sources of truth are `upload-settings-store`, `search-store`, nothing, and `panel-store` respectively. Either migrate those stores into the blob (cross-device sync) or prune the dead schema sections. The reorg deliberately kept reads/writes on the wired paths.
+- [ ] **Auth fixture for settings visual coverage** — `tests/e2e/dark-mode/settings-routes.spec.ts` has skipped light+dark screenshot specs for all 19 settings routes; they activate once `tests/e2e/_fixtures/auth.ts` lands.
+- [ ] **Glass-button retirement in AI sub-pages** — `AIConnectionsPage`, `AIFeatureRoutingPage`, and `ConnectionUsageCard` still import `@/components/ui/glass/button` (~20 buttons; deliberately not blind-swapped). Migrate to `@/components/client/ui/button` with per-button variant review.
+- [ ] **Settings search** — a `Command`-based filter box in the settings sidebar (stretch goal from the reorg plan, skipped).
+- [ ] **Pre-existing Playwright failures (not from the reorg)** — signed-out home spec has a strict-mode violation (3 "Sign in" links match one locator); habit-tracker and daily-summary block snapshots are date-dependent and drift with the current month. Both fail on `main` too.
 
 ---
 

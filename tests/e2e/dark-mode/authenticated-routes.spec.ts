@@ -16,7 +16,7 @@
  *   - /content (note tree + empty editor canvas)
  *   - /content with a selected note (editor with content)
  *   - /content with a daily note open
- *   - /settings/preferences (theme toggle UI itself)
+ *   - /settings/appearance (theme toggle UI itself)
  *   - /content with embedded Excalidraw + Mermaid blocks
  *   - /content with an open dialog (page template editor)
  *   - /content right-sidebar tabs (backlinks, outline, tags, AI chat)
@@ -31,10 +31,10 @@ test.describe("authenticated dark-mode routes", () => {
     await expect(page).toHaveScreenshot("content-home.png");
   });
 
-  test("settings preferences renders correctly", async ({ page, themedGoto }) => {
+  test("settings appearance renders correctly", async ({ page, themedGoto }) => {
     test.skip(true, "TODO(sprint-c-followup): wire auth fixture");
-    await themedGoto("/settings/preferences");
-    await expect(page).toHaveScreenshot("settings-preferences.png");
+    await themedGoto("/settings/appearance");
+    await expect(page).toHaveScreenshot("settings-appearance.png");
   });
 
   test("note editor with content renders correctly", async ({ themedGoto }) => {

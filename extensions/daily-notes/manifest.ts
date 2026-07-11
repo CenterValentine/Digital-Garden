@@ -22,4 +22,12 @@ export const dailyNotesExtensionManifest: ExtensionManifest = {
     },
   ],
   surfaces: ["shell"],
+  settings: {
+    path: "/settings/extensions/daily-notes",
+    label: "Daily Notes",
+    title: "Daily Notes",
+    description:
+      "Configure daily, weekly, monthly, quarterly, and yearly notes.",
+    order: 10,
+  },
 };

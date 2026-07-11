@@ -40,7 +40,7 @@ export default function SettingsLayout({
         >
           {/* Left Sidebar - Settings Navigation */}
           <div
-            className="w-64 flex-shrink-0 border-r border-white/10 overflow-y-auto"
+            className="w-64 flex-shrink-0 border-r border-black/10 dark:border-white/10 overflow-y-auto"
             style={{
               background: glass0.background,
               backdropFilter: glass0.backdropFilter,

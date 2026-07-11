@@ -2,6 +2,7 @@
 
 import NotesLogo from "../logo/NotesLogo";
 import ProfileMenu from "./ProfileMenu";
+import NotificationBell from "../notifications/NotificationBell";
 import { getSurfaceStyles } from "@/lib/design/system";
 
 /**
@@ -29,8 +30,11 @@ export default function NotesNavBar() {
         {/* Left: Logo */}
         <NotesLogo />
 
-        {/* Right: Profile Menu */}
-        <ProfileMenu />
+        {/* Right: Notifications + Profile Menu */}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          <ProfileMenu />
+        </div>
       </div>
     </nav>
   );

@@ -37,10 +37,6 @@ export function StorageUsageTab() {
 
   const percentUsed = (usage.used / usage.quota) * 100;
 
-  const handleExportData = () => {
-    toast.success("Preparing data export... (wired to console)");
-  };
-
   const handleUpgrade = () => {
     toast.info("Upgrade to Pro (wired to console)");
   };
@@ -49,7 +45,7 @@ export function StorageUsageTab() {
     <div className="space-y-6">
       {/* Storage Quota */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -115,7 +111,7 @@ export function StorageUsageTab() {
 
       {/* Storage by Provider */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -145,7 +141,7 @@ export function StorageUsageTab() {
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-white/10 flex justify-between text-sm font-semibold">
+        <div className="mt-4 pt-4 border-t border-black/10 dark:border-white/10 flex justify-between text-sm font-semibold">
           <span>Total</span>
           <span className="font-mono">{formatBytes(usage.used)}</span>
         </div>
@@ -153,7 +149,7 @@ export function StorageUsageTab() {
 
       {/* File Count */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -175,7 +171,7 @@ export function StorageUsageTab() {
 
       {/* Export Data (GDPR Compliance) */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -183,12 +179,13 @@ export function StorageUsageTab() {
       >
         <h3 className="text-lg font-semibold mb-2">Export Your Data</h3>
         <p className="text-sm text-muted-foreground mb-4">
-          Download all your files and notes for offline backup or migration
+          Bulk export lives in Settings › Export &amp; Backup, where you can
+          pick a format and download your whole vault.
         </p>
 
-        <button
-          onClick={handleExportData}
-          className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+        <Link
+          href="/settings/export"
+          className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -205,8 +202,8 @@ export function StorageUsageTab() {
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" x2="12" y1="15" y2="3" />
           </svg>
-          Export All Data (.zip)
-        </button>
+          Open Export &amp; Backup
+        </Link>
 
         <div
           className="mt-4 p-4 rounded-lg border border-blue-500/30 bg-blue-500/10"
@@ -253,7 +250,7 @@ export function StorageUsageTab() {
 
       {/* Tier Comparison */}
       <div
-        className="border border-white/10 rounded-lg p-6"
+        className="border border-black/10 dark:border-white/10 rounded-lg p-6"
         style={{
           background: glass0.background,
           backdropFilter: glass0.backdropFilter,
@@ -275,7 +272,7 @@ export function StorageUsageTab() {
                 ${
                   tier.current
                     ? "border-primary bg-primary/10"
-                    : "border-white/10 hover:bg-white/5"
+                    : "border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5"
                 }
               `}
             >
@@ -298,7 +295,7 @@ export function StorageUsageTab() {
                     onClick={() => {
                       toast.info(`Upgrade to ${tier.name} (wired to console)`);
                     }}
-                    className="px-4 py-2 text-sm rounded-lg border border-white/10 hover:bg-white/5 transition-colors"
+                    className="px-4 py-2 text-sm rounded-lg border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
                   >
                     {tier.name === "Free" ? "Downgrade" : "Upgrade"}
                   </button>
