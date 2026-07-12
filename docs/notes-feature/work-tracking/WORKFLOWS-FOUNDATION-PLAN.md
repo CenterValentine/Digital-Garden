@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅) · Plan 2 SKETCH · Plan 3 STUB
+**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅ S4 ✅) · Plan 2 SKETCH · Plan 3 STUB
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -182,13 +182,20 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - **kinds.ts is shared with the connections-inbox worktree** — additive entries; expect a trivial merge when that branch lands.
 - **zsh footgun in manual testing**: `$RUN:review-match` in a curl body triggers zsh's `:r` history modifier and corrupts the token → spurious GATE_MISMATCH. Build JSON with python/jq, not shell interpolation.
 
-## Session 4 — Extension UI ⚪
+## Session 4 — Extension UI ✅ (2026-07-12)
 
-- [ ] `client.tsx` + `components/`: **RunList** (status-filtered), **RunDetail** with timeline rendered from `WorkflowRunEvent` (seq-ordered), **GateCard** (summary + actions), **ArtifactPanel** (links to ContentNodes).
-- [ ] `state/workflow-runs-store.ts` (Zustand, repo pattern). Polling only while a run detail is open (cheap indexed query, few-second interval); no realtime infra in v1.
-- [ ] Nav/surface registration through the extension manifest; flip `enabledByDefault` as appropriate. Disabled extension = no shell contributions (registry filters, no conditionals in shared UI).
-- [ ] Liquid Glass tokens, dark-mode verified; consider Playwright dark-mode spec (stub if auth fixture still pending).
-- **Gate:** the Session 3 journey is fully drivable from real UI — no debug pages, no JSON reading.
+- [x] `client.tsx` + `components/WorkflowsPanel.tsx`: RunList (status filter dropdown), RunDetail with seq-ordered timeline, GateCard (title/body from gate.opened payload + Approve/Decline), artifact list section, Cancel button, dispatch Run menu (URL prompt for job-application).
+- [x] `state/workflow-runs-store.ts` (Zustand). Detail polls every 3s only while open AND run non-terminal; list is manual-refresh + refetch after actions.
+- [x] Manifest: nav view item (`WORKFLOWS_VIEW_KEY`), `surfaces: ["left-sidebar"]`, `enabledByDefault: true`. Notification kind renderers (`workflow.gate` with inline Approve action, `workflow.finished`) registered via `ExtensionRuntime.notificationKindRenderers`.
+- [x] Dark-variant classes throughout; Playwright dark-mode spec deferred to the authenticated-routes stub (auth fixture still pending repo-wide).
+- **Gate:** ✅ full journey driven by scripted real-browser clicks (Playwright ad-hoc, chromium): nav → panel → Run menu dispatch with URL prompt → run detail → amber GateCard "Job match ready — 82% fit" → Approve → succeeded pill + 7-event timeline. Screenshots verified visually.
+
+### Session 4 log — amendments discovered in execution
+
+- **Client-safe types** live in `extensions/workflows/shared.ts` (no Prisma imports); list/detail endpoints now include `definition {slug,name}` for display.
+- **Dispatch menu width**: `w-56` overflowed the ~200px sidebar (clipped left) — `w-44` fits. If the menu grows, portal it to document.body per the fixed-menus lesson.
+- **"Open in chat" gate action deferred**: conversation seeding from run output needs deliberate chat-engine integration (conversation create + seeded context per AI-chat conventions); the server side (resume payload `conversationId` → run link) already works. Follow-up recorded for the backlog — the inbox card and GateCard ship with Approve/Decline only for now.
+- **Inbox UI already on main** (NotificationBell/NotificationListItem) — workflow notifications render there today; bell badge verified showing workflow notifications in the browser smoke.
 
 ## Session 5 — Real AI research + DOCX exporter ⚪
 

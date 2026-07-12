@@ -291,10 +291,16 @@ export async function getRunForOwner(
 export async function getRunDetailForOwner(
   runId: string,
   ownerId: string
-): Promise<WorkflowRunWithRelations | null> {
+): Promise<
+  | (WorkflowRunWithRelations & {
+      definition: { slug: string; name: string };
+    })
+  | null
+> {
   return prisma.workflowRun.findFirst({
     where: { id: runId, ownerId },
     include: {
+      definition: { select: { slug: true, name: true } },
       events: { orderBy: { seq: "asc" } },
       artifacts: { orderBy: { createdAt: "asc" } },
     },
@@ -309,10 +315,13 @@ export interface ListRunsOptions {
 export async function listRunsForOwner(
   ownerId: string,
   options: ListRunsOptions = {}
-): Promise<WorkflowRun[]> {
+): Promise<
+  Array<WorkflowRun & { definition: { slug: string; name: string } }>
+> {
   const limit = Math.min(Math.max(options.limit ?? 50, 1), 100);
   return prisma.workflowRun.findMany({
     where: { ownerId, ...(options.status ? { status: options.status } : {}) },
+    include: { definition: { select: { slug: true, name: true } } },
     orderBy: { createdAt: "desc" },
     take: limit,
   });
