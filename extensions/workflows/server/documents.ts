@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { DOCXConverter } from "@/lib/domain/export/converters/docx";
 import { DEFAULT_EXPORT_BACKUP_SETTINGS } from "@/lib/domain/export";
@@ -108,4 +109,64 @@ export async function storeRunDocxArtifact(
 
   await attachArtifact(input.runId, content.id, "document", fileName);
   return { contentNodeId: content.id, fileName };
+}
+
+const CAPTURE_TEXT_CAP = 100_000;
+
+/**
+ * Store a captured web page as a note ContentNode (design rule: big content
+ * becomes content immediately; workflow inputs and steps pass IDs). The
+ * capture doubles as a source document the user keeps in their garden.
+ */
+export async function storeCapturedPage(
+  ownerId: string,
+  capture: { pageUrl?: string; pageTitle?: string; pageText: string }
+): Promise<string> {
+  const parentId = await ensureWorkflowsFolder(ownerId);
+  const text = capture.pageText.slice(0, CAPTURE_TEXT_CAP);
+  const title = `Capture — ${capture.pageTitle || capture.pageUrl || "page"}`.slice(
+    0,
+    180
+  );
+  const slug = await generateUniqueSlug(title, ownerId);
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .slice(0, 400)
+    .map((chunk) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: chunk }],
+    }));
+  const tiptapJson = {
+    type: "doc",
+    content: [
+      ...(capture.pageUrl
+        ? [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: `Source: ${capture.pageUrl}` }],
+            },
+          ]
+        : []),
+      ...paragraphs,
+    ],
+  };
+  const content = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug,
+      contentType: "note",
+      parentId,
+      displayOrder: 0,
+      notePayload: {
+        create: {
+          tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
+          searchText: text,
+        },
+      },
+    },
+  });
+  return content.id;
 }

@@ -43,6 +43,18 @@ export async function getRunOwnerId(runId: string): Promise<string> {
   return run.ownerId;
 }
 
+/** Owner-scoped note text lookup (captures, resume notes). */
+export async function getNoteText(
+  ownerId: string,
+  contentNodeId: string
+): Promise<string | null> {
+  const note = await prisma.contentNode.findFirst({
+    where: { id: contentNodeId, ownerId, deletedAt: null },
+    select: { notePayload: { select: { searchText: true } } },
+  });
+  return note?.notePayload?.searchText ?? null;
+}
+
 /** Bounded server-side page fetch for URL-only dispatches (no extension capture yet). */
 export async function fetchPageText(pageUrl: string): Promise<string | null> {
   let url: URL;
@@ -158,14 +170,10 @@ export async function runJobMatch(
   listing: { pageText?: string },
   resumeNoteId?: string
 ): Promise<JobMatchReport> {
-  let resumeText: string | null = null;
-  if (resumeNoteId) {
-    const note = await prisma.contentNode.findFirst({
-      where: { id: resumeNoteId, ownerId, deletedAt: null },
-      select: { notePayload: { select: { searchText: true } } },
-    });
-    resumeText = note?.notePayload?.searchText?.slice(0, RESUME_TEXT_CAP) ?? null;
-  }
+  const resumeText = resumeNoteId
+    ? (await getNoteText(ownerId, resumeNoteId))?.slice(0, RESUME_TEXT_CAP) ??
+      null
+    : null;
   const text = await generateViaChatRoute(
     ownerId,
     'You are a candidate-fit analyst. Compare the job listing/research against the candidate resume (if provided; otherwise assess the role\'s general demands). Respond with ONLY a JSON object: {"score": number (0-100 fit), "strengths": string[] (2-4), "concerns": string[] (2-4)}.',

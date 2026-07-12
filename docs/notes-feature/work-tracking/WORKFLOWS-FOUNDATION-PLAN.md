@@ -2,8 +2,8 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅ S4 ✅ S5 ✅*) · Plan 2 SKETCH · Plan 3 STUB
-*S5 asterisk: real-AI execution and storage upload verified in code + graceful paths; live verification needs an env with BYOK connections + working storage (see S5 log).
+**Status:** Plan 1 ✅ COMPLETE (S1–S6, 2026-07-12; SOAK PENDING — see backlog) · Plan 2 SKETCH · Plan 3 STUB
+Soak items (user's primary env): approved run with real BYOK AI + working storage → dossier artifact verification. See "Workflows Foundation Followups" in BACKLOG.md.
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -214,13 +214,13 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - **Step payload discipline**: only a 6k listing excerpt crosses step boundaries.
 - Stuck run from the pre-fix failure canceled via API; lint improved to 151 warnings (implementing DOCX removed 2 stub warnings).
 
-## Session 6 — Browser-extension capture, soak, polish, docs ⚪
+## Session 6 — Browser-extension capture, polish, docs ✅ (2026-07-12)
 
-- [ ] Extension action "Run workflow → Job application research": readable-text extraction client-side (trimmed — keep dispatch payloads small), POST via existing session bridge. `pnpm extension:build` + chrome://extensions reload.
-- [ ] Captured page stored as content at dispatch; workflow receives the reference (design rule 1).
-- [ ] Error UX: FAILED runs surface in inbox + run detail with error payload; `RetryableError` for provider 429s.
-- [ ] Tracking docs: STATUS.md (frontmatter + Recent Completions), BACKLOG.md (deferred items), this doc (⚪→✅ per session).
-- **Gate:** the complete journey from a real job page in the browser, end to end. Then **SOAK**: run it on real listings for several days before promoting Plan 2 — the inbox-gate UX lessons are Plan 2's input.
+- [x] Extension context menu "Research job posting in Digital Garden" (page + action contexts): `chrome.scripting.executeScript` extracts `document.body.innerText` (60k cap; new `scripting` permission — **reload in chrome://extensions**), POSTs to the new Bearer-authed `/api/integrations/browser-extension/workflow-dispatch` route (trusted-browser token, proxy-not-share), badge feedback. `pnpm extension:build` run.
+- [x] Capture stored as content at dispatch via new `WorkflowDefinitionSpec.prepareInput` hook: pageText → "Capture — {title}" note in the Job Applications folder; stored run input carries `captureNodeId` only (verified live: pageText dropped, note created). Research step reads the capture note.
+- [x] Error UX: failed runs emit `workflow.finished` (status failed) inbox notifications + run detail error panel (S4/S5 work); restricted pages (chrome://, PDFs) fall back to URL-only dispatch with server-side fetch.
+- [x] Tracking docs: STATUS.md Recent Completions entry, BACKLOG.md "Workflows Foundation Followups" section, this doc.
+- **Gate:** capture-shaped dispatch verified live end-to-end (capture note + reference-only input + gate). **SOAK deferred to the user** — real listings, real keys, real storage in the primary env; harvest into the Plan 2 sketch before promotion.
 
 ### Plan 1 completion checklist
 

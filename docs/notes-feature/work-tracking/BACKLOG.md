@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-11
+last_updated: 2026-07-12
 ---
 
 # Sprint Backlog
@@ -7,6 +7,21 @@ last_updated: 2026-07-11
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Workflows Foundation Followups (2026-07-12, branch `feature/workflows-foundation`)
+
+Deferred by design from Plan 1 (see `WORKFLOWS-FOUNDATION-PLAN.md` session logs):
+
+- [ ] **Soak (user)**: run the job-application flow on real listings in the primary dev env — verifies real BYOK AI research (local Docker DB has no AIConnection rows; steps degraded to flagged stubs) and the approve-path DOCX artifact (local env's R2 config fails SSL handshake; storage code path mirrors TTS and is untested live).
+- [ ] **"Open in chat" gate action** — conversation seeded from run output per AI-chat conventions; server side already accepts `conversationId` in the resume payload and links it. This is the doctor-the-resume loop's missing UI half.
+- [ ] **Inbox → run detail deep link** — notification renderers have no click-through; needs a navigate-to-extension-view affordance (open Workflows panel + select run).
+- [ ] **Dedicated `workflow-research` feature id** — AI steps currently reuse the "chat" feature's routing; add a registry entry if workflow AI should have its own model choice/fallbacks.
+- [ ] **Plan 2 promotion** (external-engine machinery + n8n): PAT auth, HTTP callback transport over the same writers, `n8n-nodes-digital-garden`, engines settings panel. Promote the sketch only after soak lessons are harvested.
+- [ ] **Run-state reconciliation sweeper** — engine-vs-table status drift safety net (cron comparing engineRunId state for stale `running` runs); the step-section try/catch pattern covers the known path, a sweeper covers unknown ones.
+- [ ] **Workflows Playwright specs** — stub per repo convention; blocked on the shared e2e auth fixture.
+- [ ] **`WorkflowRunEvent` retention/pruning** — not needed at current scale; revisit with usage.
 
 ---
 

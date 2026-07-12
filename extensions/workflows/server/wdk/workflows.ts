@@ -1,5 +1,6 @@
 import {
   fetchPageText,
+  getNoteText,
   getRunOwnerId,
   runJobMatch,
   runJobResearch,
@@ -89,6 +90,10 @@ async function researchCompanyStep(
   const pageUrl = typeof input.pageUrl === "string" ? input.pageUrl : undefined;
   let pageText =
     typeof input.pageText === "string" ? input.pageText : undefined;
+  // Extension captures arrive as content references (pass-IDs rule).
+  if (!pageText && typeof input.captureNodeId === "string") {
+    pageText = (await getNoteText(ownerId, input.captureNodeId)) ?? undefined;
+  }
   if (!pageText && pageUrl) {
     pageText = (await fetchPageText(pageUrl)) ?? undefined;
   }

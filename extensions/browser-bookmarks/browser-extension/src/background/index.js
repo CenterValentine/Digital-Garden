@@ -1428,6 +1428,59 @@ async function readAloudSelection(tabId, selectionText) {
   }
 }
 
+const JOB_CAPTURE_TEXT_CAP = 60000;
+
+// "Research job posting" — captures the page's readable text and dispatches
+// the job-application workflow through the app (the extension never talks to
+// the workflow engine; the app is the hub).
+async function researchJobPosting() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab.url) {
+    throw new Error("No active tab to research");
+  }
+  let pageText = "";
+  try {
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (cap) => (document.body?.innerText || "").slice(0, cap),
+      args: [JOB_CAPTURE_TEXT_CAP],
+    });
+    pageText = injection?.result || "";
+  } catch (error) {
+    // Restricted pages (chrome://, PDFs) — fall back to URL-only dispatch;
+    // the server fetches the page text itself.
+    console.warn("[DG Bookmarks] Page text capture failed:", error?.message);
+  }
+  const response = await apiFetch(
+    "/api/integrations/browser-extension/workflow-dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        slug: "job-application",
+        input: {
+          pageUrl: tab.url,
+          pageTitle: tab.title || "",
+          ...(pageText ? { pageText } : {}),
+        },
+      }),
+    },
+  );
+  console.info(
+    "[DG Bookmarks] Job research dispatched:",
+    response?.data?.runId,
+  );
+  if (tab.id) {
+    await chrome.action.setBadgeText({ text: "▶", tabId: tab.id });
+    await chrome.action.setBadgeBackgroundColor({
+      color: "#c9a86c",
+      tabId: tab.id,
+    });
+    setTimeout(() => {
+      chrome.action.setBadgeText({ text: "", tabId: tab.id }).catch(() => {});
+    }, 4000);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: "dg-save-page",
@@ -1443,6 +1496,11 @@ chrome.runtime.onInstalled.addListener(async () => {
     id: "dg-read-aloud",
     title: "Read aloud with Digital Garden",
     contexts: ["selection"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-research-job",
+    title: "Research job posting in Digital Garden",
+    contexts: ["page", "action"],
   });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
@@ -1464,6 +1522,9 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
         currentWindow: true,
       });
       await readAloudSelection(tab?.id, info.selectionText);
+    }
+    if (info.menuItemId === "dg-research-job") {
+      await researchJobPosting();
     }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);

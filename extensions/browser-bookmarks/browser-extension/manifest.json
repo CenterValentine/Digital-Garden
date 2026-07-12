@@ -10,7 +10,8 @@
     "tabs",
     "activeTab",
     "contextMenus",
-    "alarms"
+    "alarms",
+    "scripting"
   ],
   "host_permissions": ["http://*/*", "https://*/*"],
   "icons": {

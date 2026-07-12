@@ -15,6 +15,15 @@ export interface WorkflowDefinitionSpec {
   engineRef: string;
   /** Returns an error message, or null when the input is acceptable. */
   validateInput?: (input: Record<string, unknown>) => string | null;
+  /**
+   * Pre-dispatch transform, run after validation. Used to enforce the
+   * pass-IDs-not-blobs rule: big captures become ContentNodes here and the
+   * stored input carries references.
+   */
+  prepareInput?: (
+    ownerId: string,
+    input: Record<string, unknown>
+  ) => Promise<Record<string, unknown>>;
 }
 
 export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
@@ -37,6 +46,20 @@ export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
         return "Input requires a pageUrl or pageText string.";
       }
       return null;
+    },
+    prepareInput: async (ownerId, input) => {
+      const pageText =
+        typeof input.pageText === "string" ? input.pageText.trim() : "";
+      if (!pageText) return input;
+      const { storeCapturedPage } = await import("./documents");
+      const captureNodeId = await storeCapturedPage(ownerId, {
+        pageUrl: typeof input.pageUrl === "string" ? input.pageUrl : undefined,
+        pageTitle:
+          typeof input.pageTitle === "string" ? input.pageTitle : undefined,
+        pageText,
+      });
+      const { pageText: _dropped, ...rest } = input;
+      return { ...rest, captureNodeId };
     },
   },
 ];

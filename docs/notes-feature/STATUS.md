@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-10
+last_updated: 2026-07-12
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,14 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 12, 2026**: Workflows Foundation — Plan 1 complete (branch `feature/workflows-foundation`, PR pending; soak pending)
+
+- **Hub-and-spoke workflow subsystem**: app-owned run tables (`WorkflowDefinition`/`WorkflowRun`/`WorkflowRunEvent`/`WorkflowRunArtifact`) + idempotent writer module are the system of record; durable engines are swappable adapters behind a four-verb contract (`start`/effects/`resumeGate`/finish). Product UI reads ONLY app tables.
+- **WDK engine live** (workflow@4.6.0, `withWorkflow` + Turbopack): `superviseGate` suspends at `createHook` with deterministic `gate:{runId}:{name}` tokens; dispatch → steps → waiting → resume → succeeded proven end-to-end, plus mid-gate cancel. proxy.ts bypasses `/.well-known/workflow/` (WDK queue transport).
+- **Job-application journey**: extension context menu ("Research job posting") captures page text → Bearer-authed dispatch → capture stored as a note ContentNode (pass-IDs rule enforced by a `prepareInput` hook) → AI research/match through `resolveFeatureRoute` BYOK fallback chains (flagged stubs when keyless) → inbox gate notification (`workflow.gate`/`workflow.finished` kinds, actorType `extension`) → approve/decline from GateCard or inline inbox action → DOCX dossier (real `DOCXConverter`, replacing the export stub) into a "Job Applications" folder as a run artifact.
+- **Workflows panel** (left-sidebar extension view): status-filtered run list, run detail with event timeline, gate cards, cancel, dispatch menu; polls only while a non-terminal detail is open. Verified by scripted real-browser Playwright run.
+- **Error semantics hardened**: step sections try/catch → run marked failed + rethrow (gates never wrapped — suspension is control flow); found via a live stuck-at-running failure. Gates green ×6 sessions; per-session commits babeac9…S6. Soak items: approved run with real BYOK keys + working storage in the primary dev env.
 
 **July 10, 2026**: User Connections + Unified Notifications/Inbox + DMs (branch `worktree-connections-inbox`, PR pending)
 

@@ -10,6 +10,14 @@ export type DispatchErrorCode =
   | "VALIDATION_ERROR"
   | "ENGINE_ERROR";
 
+/** HTTP status per dispatch failure code — shared by every dispatch route. */
+export const DISPATCH_ERROR_STATUS: Record<DispatchErrorCode, number> = {
+  UNKNOWN_WORKFLOW: 404,
+  WORKFLOW_DISABLED: 409,
+  VALIDATION_ERROR: 400,
+  ENGINE_ERROR: 502,
+};
+
 export interface DispatchSuccess {
   ok: true;
   run: WorkflowRun;
@@ -65,11 +73,28 @@ export async function dispatchWorkflow(
     return { ok: false, code: "VALIDATION_ERROR", message: validationError };
   }
 
+  let preparedInput = input;
+  if (spec?.prepareInput) {
+    try {
+      preparedInput = await spec.prepareInput(ownerId, input);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Input preparation failed.";
+      logger.error({
+        layer: "route",
+        event: "workflows_dispatch:prepare_input_failed",
+        summary: message,
+        attrs: { slug },
+      });
+      return { ok: false, code: "ENGINE_ERROR", message };
+    }
+  }
+
   const run = await createRun({
     definitionId: definition.id,
     ownerId,
     engine: definition.engine,
-    input,
+    input: preparedInput,
   });
 
   const adapter = getEngineAdapter(definition.engine);

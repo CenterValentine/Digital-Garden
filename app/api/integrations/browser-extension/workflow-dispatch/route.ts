@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withRouteTrace } from "@/lib/core/logger";
-import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
 import {
   DISPATCH_ERROR_STATUS,
   dispatchWorkflow,
@@ -11,12 +11,17 @@ import {
   handleRouteError,
 } from "@/extensions/workflows/server/http";
 
-const ROUTE_PATH = "/api/workflows/dispatch";
+const ROUTE_PATH = "/api/integrations/browser-extension/workflow-dispatch";
 
+/**
+ * Extension → workflow trigger, proxy-not-share style: the browser
+ * extension authenticates with its trusted-browser Bearer token and the
+ * app performs the dispatch — the extension never learns engine details.
+ */
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
-      const session = await requireAuth();
+      const record = await requireBrowserExtensionBearerAuth(request);
       const body = (await request.json().catch(() => ({}))) as {
         slug?: unknown;
         input?: unknown;
@@ -37,7 +42,7 @@ export async function POST(request: NextRequest) {
         );
       }
       const result = await dispatchWorkflow(
-        session.user.id,
+        record.user.id,
         body.slug,
         input as Record<string, unknown>
       );
@@ -50,11 +55,7 @@ export async function POST(request: NextRequest) {
       }
       return NextResponse.json({
         success: true,
-        data: {
-          runId: result.run.id,
-          status: result.run.status,
-          engine: result.run.engine,
-        },
+        data: { runId: result.run.id, status: result.run.status },
       });
     } catch (error) {
       return handleRouteError(error, "Failed to dispatch workflow");
