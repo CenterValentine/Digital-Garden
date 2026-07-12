@@ -1,4 +1,8 @@
-import { gateProbeWorkflow, type WdkWorkflowInput } from "./workflows";
+import {
+  gateProbeWorkflow,
+  jobApplicationWorkflow,
+  type WdkWorkflowInput,
+} from "./workflows";
 
 type WdkWorkflowFunction = (input: WdkWorkflowInput) => Promise<unknown>;
 
@@ -10,4 +14,5 @@ type WdkWorkflowFunction = (input: WdkWorkflowInput) => Promise<unknown>;
  */
 export const WDK_WORKFLOWS: Record<string, WdkWorkflowFunction> = {
   "gate-probe": gateProbeWorkflow,
+  "job-application": jobApplicationWorkflow,
 };

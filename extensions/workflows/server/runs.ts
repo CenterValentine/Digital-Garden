@@ -5,12 +5,44 @@ import {
   type WorkflowRunEvent,
   type WorkflowRunStatus,
 } from "@/lib/database/generated/prisma";
+import { logger } from "@/lib/core/logger";
+import { publishEvent } from "@/lib/domain/notifications/service";
 import type {
   WorkflowArtifactKind,
   WorkflowGateSummary,
   WorkflowRunEventType,
   WorkflowRunWithRelations,
 } from "./types";
+
+/**
+ * Inbox emission — actorType "extension" (no actorUserId) so publishEvent's
+ * "never notify the actor" filter can't swallow the owner's notification.
+ * Best-effort: a notification failure must never fail the run transition.
+ */
+async function notifyOwner(
+  run: { id: string; ownerId: string },
+  kind: string,
+  payload: Record<string, unknown>
+): Promise<void> {
+  try {
+    await publishEvent(prisma, {
+      kind,
+      actorType: "extension",
+      actorLabel: "Workflows",
+      payload,
+      subjectType: "workflowRun",
+      subjectId: run.id,
+      recipients: [{ userId: run.ownerId }],
+    });
+  } catch (error) {
+    logger.warn({
+      layer: "route",
+      event: "workflows_notify:publish_failed",
+      summary: error instanceof Error ? error.message : String(error),
+      attrs: { runId: run.id, kind },
+    });
+  }
+}
 
 /**
  * Writer module — the ONLY place run state mutates. WDK steps call these
@@ -132,13 +164,14 @@ export async function openGate(
   summary: WorkflowGateSummary,
   engineGateRef?: string
 ): Promise<void> {
-  await prisma.workflowRun.update({
+  const run = await prisma.workflowRun.update({
     where: { id: runId },
     data: {
       status: "waiting",
       gateToken: token,
       engineGateRef: engineGateRef ?? null,
     },
+    include: { definition: { select: { name: true } } },
   });
   await recordEvent({
     runId,
@@ -146,7 +179,13 @@ export async function openGate(
     key: `${token}:opened`,
     payload: summary as unknown as Record<string, unknown>,
   });
-  // Session 3: emit the inbox notification here (ActivityEvent + recipient).
+  await notifyOwner(run, "workflow.gate", {
+    runId,
+    gateToken: token,
+    workflowName: run.definition.name,
+    title: summary.title,
+    body: summary.body,
+  });
 }
 
 export async function closeGate(
@@ -154,9 +193,20 @@ export async function closeGate(
   token: string,
   resumePayload: Record<string, unknown>
 ): Promise<void> {
+  // "Open in chat" flows resume with the conversation used to doctor the
+  // result — persist the link so the run detail can point at it.
+  const conversationId =
+    typeof resumePayload.conversationId === "string"
+      ? resumePayload.conversationId
+      : undefined;
   await prisma.workflowRun.update({
     where: { id: runId },
-    data: { status: "running", gateToken: null, engineGateRef: null },
+    data: {
+      status: "running",
+      gateToken: null,
+      engineGateRef: null,
+      ...(conversationId ? { conversationId } : {}),
+    },
   });
   await recordEvent({
     runId,
@@ -198,7 +248,7 @@ export async function finishRun(
   runId: string,
   result: FinishRunInput
 ): Promise<void> {
-  await prisma.workflowRun.update({
+  const run = await prisma.workflowRun.update({
     where: { id: runId },
     data: {
       status: result.status,
@@ -212,12 +262,22 @@ export async function finishRun(
       engineGateRef: null,
       finishedAt: new Date(),
     },
+    include: { definition: { select: { name: true } } },
   });
   await recordEvent({
     runId,
     type: "run.finished",
     key: "run:finished",
     payload: { status: result.status },
+  });
+  await notifyOwner(run, "workflow.finished", {
+    runId,
+    status: result.status,
+    workflowName: run.definition.name,
+    title:
+      result.status === "succeeded"
+        ? `${run.definition.name} finished`
+        : `${run.definition.name} ${result.status}`,
   });
 }
 

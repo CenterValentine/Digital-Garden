@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅) · Plan 2 SKETCH · Plan 3 STUB
+**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅) · Plan 2 SKETCH · Plan 3 STUB
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -165,15 +165,22 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - **Dev-loop notes**: this worktree's server runs on **port 3021** (3015/3020 = main checkout, 3017 = multi-tenancy worktree). Authed curl testing via a locally-minted session row (`scripts/dev-mint-session.ts`, deliberately uncommitted). WDK engine run ids look like `wrun_01KX…`.
 - Generated Prisma client (tracked in repo) committed alongside — it reflects the S1 schema.
 
-## Session 3 — Job-application workflow (stubbed AI), inbox wiring, end-to-end proof ⚪
+## Session 3 — Job-application workflow (stubbed AI), inbox wiring, end-to-end proof ✅ (2026-07-12)
 
-**Blocked on: inbox merge.**
+**Blocker dissolved:** the notifications event-log core (publishEvent, NOTIFICATION_KINDS, ActivityEvent/NotificationRecipient, /api/notifications) is already on main — no wait on the connections-inbox merge was needed for emission.
 
-- [ ] `server/workflows/job-application.ts` — full journey shape with STUBBED research/match steps (canned output): capture ref in → research → match → `superviseGate("review-match")` → export (stub) → notify → finish.
-- [ ] Inbox integration: `gate.opened` event → inbox notification carrying runId + token; notification actions **Approve** / **Open in chat** / (post-doctoring) **Use this version** → `POST /runs/[id]/resume`.
-- [ ] Conversation linkage: "Open in chat" creates a conversation seeded from run output; store `conversationId` on the run (reuse ConversationAssociation patterns).
-- [ ] Manual dispatch affordance for testing (debug page or simple form posting to dispatch) — extension capture comes in Session 6.
-- **Gate:** full loop in the browser with stub AI — dispatch → gate lands in inbox → approve → run completes. This is the moment the seam is proven.
+- [x] `server/wdk/workflows.ts` — jobApplicationWorkflow: research (STUB) → match (STUB) → `superviseGate("review-match")` → export (STUB) → finish. Real AI + DOCX land in Session 5.
+- [x] Inbox integration: `openGate`/`finishRun` in the WRITER emit `workflow.gate` / `workflow.finished` via `publishEvent` — every engine gets notifications for free. Two new kinds registered in `lib/domain/notifications/kinds.ts` with Zod payload schemas.
+- [x] Conversation linkage: `closeGate` persists `resumePayload.conversationId` onto the run (FK to Conversation, SetNull).
+- [x] Manual dispatch affordance: curl + smoke script (S4's UI supersedes; notification ACTION buttons — Approve / Open in chat — are S4 client work).
+- **Gate:** ✅ live end-to-end: dispatch → gate notification "Job match ready — 82% fit" in /api/notifications inbox → resume with `{approved, conversationId}` → conversation linked → succeeded → "Job Application Research finished" notification. Full event trail (7 events).
+
+### Session 3 log — amendments discovered in execution
+
+- **publishEvent contract**: throws on unknown kinds (closed registry — kinds MUST be added to `NOTIFICATION_KINDS`); filters recipients equal to `actorUserId`. Workflow emissions use `actorType: "extension"`, label "Workflows", NO actorUserId — otherwise the owner would never be notified of their own workflow's gates.
+- **Notification emission is best-effort** in the writer (try/catch + warn) — a publish failure must never fail a run transition.
+- **kinds.ts is shared with the connections-inbox worktree** — additive entries; expect a trivial merge when that branch lands.
+- **zsh footgun in manual testing**: `$RUN:review-match` in a curl body triggers zsh's `:r` history modifier and corrupts the token → spurious GATE_MISMATCH. Build JSON with python/jq, not shell interpolation.
 
 ## Session 4 — Extension UI ⚪
 
