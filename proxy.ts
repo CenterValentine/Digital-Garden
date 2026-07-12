@@ -136,9 +136,12 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, searchParams } = request.nextUrl;
 
   // Skip static assets and API routes — no tenant resolution, no auth check.
+  // .well-known/workflow is the Workflow DevKit's internal queue transport;
+  // intercepting or buffering it breaks workflow execution (see WDK docs).
   if (
     pathname.startsWith("/_next/") ||
     pathname.startsWith("/api/") ||
+    pathname.startsWith("/.well-known/workflow/") ||
     pathname.startsWith("/favicon") ||
     /\.(?:ico|png|svg|jpg|jpeg|gif|webp|woff2?|ttf|otf)$/.test(pathname)
   ) {

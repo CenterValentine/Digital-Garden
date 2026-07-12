@@ -437,6 +437,26 @@ export type DmMessage = $Result.DefaultSelection<Prisma.$DmMessagePayload>
  * 
  */
 export type RateLimitCounter = $Result.DefaultSelection<Prisma.$RateLimitCounterPayload>
+/**
+ * Model WorkflowDefinition
+ * 
+ */
+export type WorkflowDefinition = $Result.DefaultSelection<Prisma.$WorkflowDefinitionPayload>
+/**
+ * Model WorkflowRun
+ * 
+ */
+export type WorkflowRun = $Result.DefaultSelection<Prisma.$WorkflowRunPayload>
+/**
+ * Model WorkflowRunEvent
+ * 
+ */
+export type WorkflowRunEvent = $Result.DefaultSelection<Prisma.$WorkflowRunEventPayload>
+/**
+ * Model WorkflowRunArtifact
+ * 
+ */
+export type WorkflowRunArtifact = $Result.DefaultSelection<Prisma.$WorkflowRunArtifactPayload>
 
 /**
  * Enums
@@ -744,6 +764,18 @@ export const ActivityActorType: {
 
 export type ActivityActorType = (typeof ActivityActorType)[keyof typeof ActivityActorType]
 
+
+export const WorkflowRunStatus: {
+  queued: 'queued',
+  running: 'running',
+  waiting: 'waiting',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  canceled: 'canceled'
+};
+
+export type WorkflowRunStatus = (typeof WorkflowRunStatus)[keyof typeof WorkflowRunStatus]
+
 }
 
 export type ContentType = $Enums.ContentType
@@ -865,6 +897,10 @@ export const ConnectionInviteStatus: typeof $Enums.ConnectionInviteStatus
 export type ActivityActorType = $Enums.ActivityActorType
 
 export const ActivityActorType: typeof $Enums.ActivityActorType
+
+export type WorkflowRunStatus = $Enums.WorkflowRunStatus
+
+export const WorkflowRunStatus: typeof $Enums.WorkflowRunStatus
 
 /**
  * ##  Prisma Client ʲˢ
@@ -1822,6 +1858,46 @@ export class PrismaClient<
     * ```
     */
   get rateLimitCounter(): Prisma.RateLimitCounterDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.workflowDefinition`: Exposes CRUD operations for the **WorkflowDefinition** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WorkflowDefinitions
+    * const workflowDefinitions = await prisma.workflowDefinition.findMany()
+    * ```
+    */
+  get workflowDefinition(): Prisma.WorkflowDefinitionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.workflowRun`: Exposes CRUD operations for the **WorkflowRun** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WorkflowRuns
+    * const workflowRuns = await prisma.workflowRun.findMany()
+    * ```
+    */
+  get workflowRun(): Prisma.WorkflowRunDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.workflowRunEvent`: Exposes CRUD operations for the **WorkflowRunEvent** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WorkflowRunEvents
+    * const workflowRunEvents = await prisma.workflowRunEvent.findMany()
+    * ```
+    */
+  get workflowRunEvent(): Prisma.WorkflowRunEventDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.workflowRunArtifact`: Exposes CRUD operations for the **WorkflowRunArtifact** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more WorkflowRunArtifacts
+    * const workflowRunArtifacts = await prisma.workflowRunArtifact.findMany()
+    * ```
+    */
+  get workflowRunArtifact(): Prisma.WorkflowRunArtifactDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2339,7 +2415,11 @@ export namespace Prisma {
     DmThread: 'DmThread',
     DmParticipant: 'DmParticipant',
     DmMessage: 'DmMessage',
-    RateLimitCounter: 'RateLimitCounter'
+    RateLimitCounter: 'RateLimitCounter',
+    WorkflowDefinition: 'WorkflowDefinition',
+    WorkflowRun: 'WorkflowRun',
+    WorkflowRunEvent: 'WorkflowRunEvent',
+    WorkflowRunArtifact: 'WorkflowRunArtifact'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2355,7 +2435,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8575,6 +8655,302 @@ export namespace Prisma {
           }
         }
       }
+      WorkflowDefinition: {
+        payload: Prisma.$WorkflowDefinitionPayload<ExtArgs>
+        fields: Prisma.WorkflowDefinitionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkflowDefinitionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkflowDefinitionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          findFirst: {
+            args: Prisma.WorkflowDefinitionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkflowDefinitionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          findMany: {
+            args: Prisma.WorkflowDefinitionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>[]
+          }
+          create: {
+            args: Prisma.WorkflowDefinitionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          createMany: {
+            args: Prisma.WorkflowDefinitionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkflowDefinitionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>[]
+          }
+          delete: {
+            args: Prisma.WorkflowDefinitionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          update: {
+            args: Prisma.WorkflowDefinitionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkflowDefinitionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkflowDefinitionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.WorkflowDefinitionUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>[]
+          }
+          upsert: {
+            args: Prisma.WorkflowDefinitionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowDefinitionPayload>
+          }
+          aggregate: {
+            args: Prisma.WorkflowDefinitionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkflowDefinition>
+          }
+          groupBy: {
+            args: Prisma.WorkflowDefinitionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowDefinitionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkflowDefinitionCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowDefinitionCountAggregateOutputType> | number
+          }
+        }
+      }
+      WorkflowRun: {
+        payload: Prisma.$WorkflowRunPayload<ExtArgs>
+        fields: Prisma.WorkflowRunFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkflowRunFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkflowRunFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          findFirst: {
+            args: Prisma.WorkflowRunFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkflowRunFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          findMany: {
+            args: Prisma.WorkflowRunFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+          }
+          create: {
+            args: Prisma.WorkflowRunCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          createMany: {
+            args: Prisma.WorkflowRunCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkflowRunCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+          }
+          delete: {
+            args: Prisma.WorkflowRunDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          update: {
+            args: Prisma.WorkflowRunUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkflowRunDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkflowRunUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.WorkflowRunUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>[]
+          }
+          upsert: {
+            args: Prisma.WorkflowRunUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunPayload>
+          }
+          aggregate: {
+            args: Prisma.WorkflowRunAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkflowRun>
+          }
+          groupBy: {
+            args: Prisma.WorkflowRunGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkflowRunCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunCountAggregateOutputType> | number
+          }
+        }
+      }
+      WorkflowRunEvent: {
+        payload: Prisma.$WorkflowRunEventPayload<ExtArgs>
+        fields: Prisma.WorkflowRunEventFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkflowRunEventFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkflowRunEventFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          findFirst: {
+            args: Prisma.WorkflowRunEventFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkflowRunEventFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          findMany: {
+            args: Prisma.WorkflowRunEventFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>[]
+          }
+          create: {
+            args: Prisma.WorkflowRunEventCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          createMany: {
+            args: Prisma.WorkflowRunEventCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkflowRunEventCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>[]
+          }
+          delete: {
+            args: Prisma.WorkflowRunEventDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          update: {
+            args: Prisma.WorkflowRunEventUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkflowRunEventDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkflowRunEventUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.WorkflowRunEventUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>[]
+          }
+          upsert: {
+            args: Prisma.WorkflowRunEventUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunEventPayload>
+          }
+          aggregate: {
+            args: Prisma.WorkflowRunEventAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkflowRunEvent>
+          }
+          groupBy: {
+            args: Prisma.WorkflowRunEventGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunEventGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkflowRunEventCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunEventCountAggregateOutputType> | number
+          }
+        }
+      }
+      WorkflowRunArtifact: {
+        payload: Prisma.$WorkflowRunArtifactPayload<ExtArgs>
+        fields: Prisma.WorkflowRunArtifactFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.WorkflowRunArtifactFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.WorkflowRunArtifactFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          findFirst: {
+            args: Prisma.WorkflowRunArtifactFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.WorkflowRunArtifactFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          findMany: {
+            args: Prisma.WorkflowRunArtifactFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>[]
+          }
+          create: {
+            args: Prisma.WorkflowRunArtifactCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          createMany: {
+            args: Prisma.WorkflowRunArtifactCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.WorkflowRunArtifactCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>[]
+          }
+          delete: {
+            args: Prisma.WorkflowRunArtifactDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          update: {
+            args: Prisma.WorkflowRunArtifactUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          deleteMany: {
+            args: Prisma.WorkflowRunArtifactDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.WorkflowRunArtifactUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.WorkflowRunArtifactUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>[]
+          }
+          upsert: {
+            args: Prisma.WorkflowRunArtifactUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$WorkflowRunArtifactPayload>
+          }
+          aggregate: {
+            args: Prisma.WorkflowRunArtifactAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateWorkflowRunArtifact>
+          }
+          groupBy: {
+            args: Prisma.WorkflowRunArtifactGroupByArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunArtifactGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.WorkflowRunArtifactCountArgs<ExtArgs>
+            result: $Utils.Optional<WorkflowRunArtifactCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -8767,6 +9143,10 @@ export namespace Prisma {
     dmParticipant?: DmParticipantOmit
     dmMessage?: DmMessageOmit
     rateLimitCounter?: RateLimitCounterOmit
+    workflowDefinition?: WorkflowDefinitionOmit
+    workflowRun?: WorkflowRunOmit
+    workflowRunEvent?: WorkflowRunEventOmit
+    workflowRunArtifact?: WorkflowRunArtifactOmit
   }
 
   /* Types for Logging */
@@ -8869,6 +9249,7 @@ export namespace Prisma {
     bookmarkSyncRoots: number
     webResourceLinks: number
     webResourceViewStates: number
+    workflowRunArtifacts: number
   }
 
   export type ContentNodeCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -8894,6 +9275,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: boolean | ContentNodeCountOutputTypeCountBookmarkSyncRootsArgs
     webResourceLinks?: boolean | ContentNodeCountOutputTypeCountWebResourceLinksArgs
     webResourceViewStates?: boolean | ContentNodeCountOutputTypeCountWebResourceViewStatesArgs
+    workflowRunArtifacts?: boolean | ContentNodeCountOutputTypeCountWorkflowRunArtifactsArgs
   }
 
   // Custom InputTypes
@@ -9061,6 +9443,13 @@ export namespace Prisma {
     where?: WebResourceViewStateWhereInput
   }
 
+  /**
+   * ContentNodeCountOutputType without action
+   */
+  export type ContentNodeCountOutputTypeCountWorkflowRunArtifactsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunArtifactWhereInput
+  }
+
 
   /**
    * Count Type FlashcardDeckCountOutputType
@@ -9195,6 +9584,8 @@ export namespace Prisma {
     notificationInbox: number
     dmParticipations: number
     dmMessagesSent: number
+    workflowDefinitions: number
+    workflowRuns: number
   }
 
   export type UserCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -9255,6 +9646,8 @@ export namespace Prisma {
     notificationInbox?: boolean | UserCountOutputTypeCountNotificationInboxArgs
     dmParticipations?: boolean | UserCountOutputTypeCountDmParticipationsArgs
     dmMessagesSent?: boolean | UserCountOutputTypeCountDmMessagesSentArgs
+    workflowDefinitions?: boolean | UserCountOutputTypeCountWorkflowDefinitionsArgs
+    workflowRuns?: boolean | UserCountOutputTypeCountWorkflowRunsArgs
   }
 
   // Custom InputTypes
@@ -9667,6 +10060,20 @@ export namespace Prisma {
     where?: DmMessageWhereInput
   }
 
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountWorkflowDefinitionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowDefinitionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountWorkflowRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunWhereInput
+  }
+
 
   /**
    * Count Type ContentWorkspaceCountOutputType
@@ -10035,11 +10442,13 @@ export namespace Prisma {
   export type ConversationCountOutputType = {
     messages: number
     associations: number
+    workflowRuns: number
   }
 
   export type ConversationCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     messages?: boolean | ConversationCountOutputTypeCountMessagesArgs
     associations?: boolean | ConversationCountOutputTypeCountAssociationsArgs
+    workflowRuns?: boolean | ConversationCountOutputTypeCountWorkflowRunsArgs
   }
 
   // Custom InputTypes
@@ -10065,6 +10474,13 @@ export namespace Prisma {
    */
   export type ConversationCountOutputTypeCountAssociationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ConversationAssociationWhereInput
+  }
+
+  /**
+   * ConversationCountOutputType without action
+   */
+  export type ConversationCountOutputTypeCountWorkflowRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunWhereInput
   }
 
 
@@ -10589,6 +11005,77 @@ export namespace Prisma {
 
 
   /**
+   * Count Type WorkflowDefinitionCountOutputType
+   */
+
+  export type WorkflowDefinitionCountOutputType = {
+    runs: number
+  }
+
+  export type WorkflowDefinitionCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    runs?: boolean | WorkflowDefinitionCountOutputTypeCountRunsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * WorkflowDefinitionCountOutputType without action
+   */
+  export type WorkflowDefinitionCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinitionCountOutputType
+     */
+    select?: WorkflowDefinitionCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowDefinitionCountOutputType without action
+   */
+  export type WorkflowDefinitionCountOutputTypeCountRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunWhereInput
+  }
+
+
+  /**
+   * Count Type WorkflowRunCountOutputType
+   */
+
+  export type WorkflowRunCountOutputType = {
+    events: number
+    artifacts: number
+  }
+
+  export type WorkflowRunCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    events?: boolean | WorkflowRunCountOutputTypeCountEventsArgs
+    artifacts?: boolean | WorkflowRunCountOutputTypeCountArtifactsArgs
+  }
+
+  // Custom InputTypes
+  /**
+   * WorkflowRunCountOutputType without action
+   */
+  export type WorkflowRunCountOutputTypeDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunCountOutputType
+     */
+    select?: WorkflowRunCountOutputTypeSelect<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRunCountOutputType without action
+   */
+  export type WorkflowRunCountOutputTypeCountEventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunEventWhereInput
+  }
+
+  /**
+   * WorkflowRunCountOutputType without action
+   */
+  export type WorkflowRunCountOutputTypeCountArtifactsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunArtifactWhereInput
+  }
+
+
+  /**
    * Models
    */
 
@@ -10961,6 +11448,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: boolean | ContentNode$bookmarkSyncRootsArgs<ExtArgs>
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
+    workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["contentNode"]>
 
@@ -11093,6 +11581,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: boolean | ContentNode$bookmarkSyncRootsArgs<ExtArgs>
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
+    workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ContentNodeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -11158,6 +11647,7 @@ export namespace Prisma {
       bookmarkSyncRoots: Prisma.$BookmarkSyncConnectionPayload<ExtArgs>[]
       webResourceLinks: Prisma.$WebResourceContentLinkPayload<ExtArgs>[]
       webResourceViewStates: Prisma.$WebResourceViewStatePayload<ExtArgs>[]
+      workflowRunArtifacts: Prisma.$WorkflowRunArtifactPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -11618,6 +12108,7 @@ export namespace Prisma {
     bookmarkSyncRoots<T extends ContentNode$bookmarkSyncRootsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$bookmarkSyncRootsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookmarkSyncConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceLinks<T extends ContentNode$webResourceLinksArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceViewStates<T extends ContentNode$webResourceViewStatesArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceViewStatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceViewStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    workflowRunArtifacts<T extends ContentNode$workflowRunArtifactsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$workflowRunArtifactsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -12969,6 +13460,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: WebResourceViewStateScalarFieldEnum | WebResourceViewStateScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.workflowRunArtifacts
+   */
+  export type ContentNode$workflowRunArtifactsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    where?: WorkflowRunArtifactWhereInput
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
   }
 
   /**
@@ -29636,6 +30151,8 @@ export namespace Prisma {
     notificationInbox?: boolean | User$notificationInboxArgs<ExtArgs>
     dmParticipations?: boolean | User$dmParticipationsArgs<ExtArgs>
     dmMessagesSent?: boolean | User$dmMessagesSentArgs<ExtArgs>
+    workflowDefinitions?: boolean | User$workflowDefinitionsArgs<ExtArgs>
+    workflowRuns?: boolean | User$workflowRunsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["user"]>
 
@@ -29755,6 +30272,8 @@ export namespace Prisma {
     notificationInbox?: boolean | User$notificationInboxArgs<ExtArgs>
     dmParticipations?: boolean | User$dmParticipationsArgs<ExtArgs>
     dmMessagesSent?: boolean | User$dmMessagesSentArgs<ExtArgs>
+    workflowDefinitions?: boolean | User$workflowDefinitionsArgs<ExtArgs>
+    workflowRuns?: boolean | User$workflowRunsArgs<ExtArgs>
     _count?: boolean | UserCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type UserIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -29825,6 +30344,8 @@ export namespace Prisma {
       notificationInbox: Prisma.$NotificationRecipientPayload<ExtArgs>[]
       dmParticipations: Prisma.$DmParticipantPayload<ExtArgs>[]
       dmMessagesSent: Prisma.$DmMessagePayload<ExtArgs>[]
+      workflowDefinitions: Prisma.$WorkflowDefinitionPayload<ExtArgs>[]
+      workflowRuns: Prisma.$WorkflowRunPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -30294,6 +30815,8 @@ export namespace Prisma {
     notificationInbox<T extends User$notificationInboxArgs<ExtArgs> = {}>(args?: Subset<T, User$notificationInboxArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$NotificationRecipientPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     dmParticipations<T extends User$dmParticipationsArgs<ExtArgs> = {}>(args?: Subset<T, User$dmParticipationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DmParticipantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     dmMessagesSent<T extends User$dmMessagesSentArgs<ExtArgs> = {}>(args?: Subset<T, User$dmMessagesSentArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$DmMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    workflowDefinitions<T extends User$workflowDefinitionsArgs<ExtArgs> = {}>(args?: Subset<T, User$workflowDefinitionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    workflowRuns<T extends User$workflowRunsArgs<ExtArgs> = {}>(args?: Subset<T, User$workflowRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -32118,6 +32641,54 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: DmMessageScalarFieldEnum | DmMessageScalarFieldEnum[]
+  }
+
+  /**
+   * User.workflowDefinitions
+   */
+  export type User$workflowDefinitionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    where?: WorkflowDefinitionWhereInput
+    orderBy?: WorkflowDefinitionOrderByWithRelationInput | WorkflowDefinitionOrderByWithRelationInput[]
+    cursor?: WorkflowDefinitionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowDefinitionScalarFieldEnum | WorkflowDefinitionScalarFieldEnum[]
+  }
+
+  /**
+   * User.workflowRuns
+   */
+  export type User$workflowRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    where?: WorkflowRunWhereInput
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    cursor?: WorkflowRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
   }
 
   /**
@@ -61741,6 +62312,7 @@ export namespace Prisma {
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
+    workflowRuns?: boolean | Conversation$workflowRunsArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
@@ -61790,6 +62362,7 @@ export namespace Prisma {
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
+    workflowRuns?: boolean | Conversation$workflowRunsArgs<ExtArgs>
     _count?: boolean | ConversationCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ConversationIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -61811,6 +62384,7 @@ export namespace Prisma {
       activeContext: Prisma.$ChatContextPayload<ExtArgs> | null
       messages: Prisma.$ConversationMessagePayload<ExtArgs>[]
       associations: Prisma.$ConversationAssociationPayload<ExtArgs>[]
+      workflowRuns: Prisma.$WorkflowRunPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -62220,6 +62794,7 @@ export namespace Prisma {
     activeContext<T extends Conversation$activeContextArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$activeContextArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     messages<T extends Conversation$messagesArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     associations<T extends Conversation$associationsArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$associationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationAssociationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    workflowRuns<T extends Conversation$workflowRunsArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$workflowRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -62736,6 +63311,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ConversationAssociationScalarFieldEnum | ConversationAssociationScalarFieldEnum[]
+  }
+
+  /**
+   * Conversation.workflowRuns
+   */
+  export type Conversation$workflowRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    where?: WorkflowRunWhereInput
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    cursor?: WorkflowRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
   }
 
   /**
@@ -111292,6 +111891,4643 @@ export namespace Prisma {
 
 
   /**
+   * Model WorkflowDefinition
+   */
+
+  export type AggregateWorkflowDefinition = {
+    _count: WorkflowDefinitionCountAggregateOutputType | null
+    _min: WorkflowDefinitionMinAggregateOutputType | null
+    _max: WorkflowDefinitionMaxAggregateOutputType | null
+  }
+
+  export type WorkflowDefinitionMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    slug: string | null
+    name: string | null
+    engine: string | null
+    engineRef: string | null
+    enabled: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowDefinitionMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    slug: string | null
+    name: string | null
+    engine: string | null
+    engineRef: string | null
+    enabled: boolean | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowDefinitionCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    slug: number
+    name: number
+    engine: number
+    engineRef: number
+    inputSchema: number
+    enabled: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type WorkflowDefinitionMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    slug?: true
+    name?: true
+    engine?: true
+    engineRef?: true
+    enabled?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowDefinitionMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    slug?: true
+    name?: true
+    engine?: true
+    engineRef?: true
+    enabled?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowDefinitionCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    slug?: true
+    name?: true
+    engine?: true
+    engineRef?: true
+    inputSchema?: true
+    enabled?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type WorkflowDefinitionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowDefinition to aggregate.
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowDefinitions to fetch.
+     */
+    orderBy?: WorkflowDefinitionOrderByWithRelationInput | WorkflowDefinitionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkflowDefinitionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowDefinitions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowDefinitions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WorkflowDefinitions
+    **/
+    _count?: true | WorkflowDefinitionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkflowDefinitionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkflowDefinitionMaxAggregateInputType
+  }
+
+  export type GetWorkflowDefinitionAggregateType<T extends WorkflowDefinitionAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkflowDefinition]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkflowDefinition[P]>
+      : GetScalarType<T[P], AggregateWorkflowDefinition[P]>
+  }
+
+
+
+
+  export type WorkflowDefinitionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowDefinitionWhereInput
+    orderBy?: WorkflowDefinitionOrderByWithAggregationInput | WorkflowDefinitionOrderByWithAggregationInput[]
+    by: WorkflowDefinitionScalarFieldEnum[] | WorkflowDefinitionScalarFieldEnum
+    having?: WorkflowDefinitionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkflowDefinitionCountAggregateInputType | true
+    _min?: WorkflowDefinitionMinAggregateInputType
+    _max?: WorkflowDefinitionMaxAggregateInputType
+  }
+
+  export type WorkflowDefinitionGroupByOutputType = {
+    id: string
+    ownerId: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema: JsonValue | null
+    enabled: boolean
+    createdAt: Date
+    updatedAt: Date
+    _count: WorkflowDefinitionCountAggregateOutputType | null
+    _min: WorkflowDefinitionMinAggregateOutputType | null
+    _max: WorkflowDefinitionMaxAggregateOutputType | null
+  }
+
+  type GetWorkflowDefinitionGroupByPayload<T extends WorkflowDefinitionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkflowDefinitionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkflowDefinitionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkflowDefinitionGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkflowDefinitionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkflowDefinitionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    slug?: boolean
+    name?: boolean
+    engine?: boolean
+    engineRef?: boolean
+    inputSchema?: boolean
+    enabled?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    runs?: boolean | WorkflowDefinition$runsArgs<ExtArgs>
+    _count?: boolean | WorkflowDefinitionCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowDefinition"]>
+
+  export type WorkflowDefinitionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    slug?: boolean
+    name?: boolean
+    engine?: boolean
+    engineRef?: boolean
+    inputSchema?: boolean
+    enabled?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowDefinition"]>
+
+  export type WorkflowDefinitionSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    slug?: boolean
+    name?: boolean
+    engine?: boolean
+    engineRef?: boolean
+    inputSchema?: boolean
+    enabled?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowDefinition"]>
+
+  export type WorkflowDefinitionSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    slug?: boolean
+    name?: boolean
+    engine?: boolean
+    engineRef?: boolean
+    inputSchema?: boolean
+    enabled?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type WorkflowDefinitionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "slug" | "name" | "engine" | "engineRef" | "inputSchema" | "enabled" | "createdAt" | "updatedAt", ExtArgs["result"]["workflowDefinition"]>
+  export type WorkflowDefinitionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    runs?: boolean | WorkflowDefinition$runsArgs<ExtArgs>
+    _count?: boolean | WorkflowDefinitionCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowDefinitionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type WorkflowDefinitionIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $WorkflowDefinitionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WorkflowDefinition"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      runs: Prisma.$WorkflowRunPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      slug: string
+      name: string
+      engine: string
+      engineRef: string
+      inputSchema: Prisma.JsonValue | null
+      enabled: boolean
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["workflowDefinition"]>
+    composites: {}
+  }
+
+  type WorkflowDefinitionGetPayload<S extends boolean | null | undefined | WorkflowDefinitionDefaultArgs> = $Result.GetResult<Prisma.$WorkflowDefinitionPayload, S>
+
+  type WorkflowDefinitionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WorkflowDefinitionFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WorkflowDefinitionCountAggregateInputType | true
+    }
+
+  export interface WorkflowDefinitionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WorkflowDefinition'], meta: { name: 'WorkflowDefinition' } }
+    /**
+     * Find zero or one WorkflowDefinition that matches the filter.
+     * @param {WorkflowDefinitionFindUniqueArgs} args - Arguments to find a WorkflowDefinition
+     * @example
+     * // Get one WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkflowDefinitionFindUniqueArgs>(args: SelectSubset<T, WorkflowDefinitionFindUniqueArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WorkflowDefinition that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WorkflowDefinitionFindUniqueOrThrowArgs} args - Arguments to find a WorkflowDefinition
+     * @example
+     * // Get one WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkflowDefinitionFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkflowDefinitionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowDefinition that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionFindFirstArgs} args - Arguments to find a WorkflowDefinition
+     * @example
+     * // Get one WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkflowDefinitionFindFirstArgs>(args?: SelectSubset<T, WorkflowDefinitionFindFirstArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowDefinition that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionFindFirstOrThrowArgs} args - Arguments to find a WorkflowDefinition
+     * @example
+     * // Get one WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkflowDefinitionFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkflowDefinitionFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WorkflowDefinitions that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WorkflowDefinitions
+     * const workflowDefinitions = await prisma.workflowDefinition.findMany()
+     * 
+     * // Get first 10 WorkflowDefinitions
+     * const workflowDefinitions = await prisma.workflowDefinition.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const workflowDefinitionWithIdOnly = await prisma.workflowDefinition.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WorkflowDefinitionFindManyArgs>(args?: SelectSubset<T, WorkflowDefinitionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WorkflowDefinition.
+     * @param {WorkflowDefinitionCreateArgs} args - Arguments to create a WorkflowDefinition.
+     * @example
+     * // Create one WorkflowDefinition
+     * const WorkflowDefinition = await prisma.workflowDefinition.create({
+     *   data: {
+     *     // ... data to create a WorkflowDefinition
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkflowDefinitionCreateArgs>(args: SelectSubset<T, WorkflowDefinitionCreateArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WorkflowDefinitions.
+     * @param {WorkflowDefinitionCreateManyArgs} args - Arguments to create many WorkflowDefinitions.
+     * @example
+     * // Create many WorkflowDefinitions
+     * const workflowDefinition = await prisma.workflowDefinition.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkflowDefinitionCreateManyArgs>(args?: SelectSubset<T, WorkflowDefinitionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WorkflowDefinitions and returns the data saved in the database.
+     * @param {WorkflowDefinitionCreateManyAndReturnArgs} args - Arguments to create many WorkflowDefinitions.
+     * @example
+     * // Create many WorkflowDefinitions
+     * const workflowDefinition = await prisma.workflowDefinition.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WorkflowDefinitions and only return the `id`
+     * const workflowDefinitionWithIdOnly = await prisma.workflowDefinition.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkflowDefinitionCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkflowDefinitionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WorkflowDefinition.
+     * @param {WorkflowDefinitionDeleteArgs} args - Arguments to delete one WorkflowDefinition.
+     * @example
+     * // Delete one WorkflowDefinition
+     * const WorkflowDefinition = await prisma.workflowDefinition.delete({
+     *   where: {
+     *     // ... filter to delete one WorkflowDefinition
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkflowDefinitionDeleteArgs>(args: SelectSubset<T, WorkflowDefinitionDeleteArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WorkflowDefinition.
+     * @param {WorkflowDefinitionUpdateArgs} args - Arguments to update one WorkflowDefinition.
+     * @example
+     * // Update one WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkflowDefinitionUpdateArgs>(args: SelectSubset<T, WorkflowDefinitionUpdateArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WorkflowDefinitions.
+     * @param {WorkflowDefinitionDeleteManyArgs} args - Arguments to filter WorkflowDefinitions to delete.
+     * @example
+     * // Delete a few WorkflowDefinitions
+     * const { count } = await prisma.workflowDefinition.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkflowDefinitionDeleteManyArgs>(args?: SelectSubset<T, WorkflowDefinitionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowDefinitions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WorkflowDefinitions
+     * const workflowDefinition = await prisma.workflowDefinition.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkflowDefinitionUpdateManyArgs>(args: SelectSubset<T, WorkflowDefinitionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowDefinitions and returns the data updated in the database.
+     * @param {WorkflowDefinitionUpdateManyAndReturnArgs} args - Arguments to update many WorkflowDefinitions.
+     * @example
+     * // Update many WorkflowDefinitions
+     * const workflowDefinition = await prisma.workflowDefinition.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more WorkflowDefinitions and only return the `id`
+     * const workflowDefinitionWithIdOnly = await prisma.workflowDefinition.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends WorkflowDefinitionUpdateManyAndReturnArgs>(args: SelectSubset<T, WorkflowDefinitionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one WorkflowDefinition.
+     * @param {WorkflowDefinitionUpsertArgs} args - Arguments to update or create a WorkflowDefinition.
+     * @example
+     * // Update or create a WorkflowDefinition
+     * const workflowDefinition = await prisma.workflowDefinition.upsert({
+     *   create: {
+     *     // ... data to create a WorkflowDefinition
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WorkflowDefinition we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkflowDefinitionUpsertArgs>(args: SelectSubset<T, WorkflowDefinitionUpsertArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WorkflowDefinitions.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionCountArgs} args - Arguments to filter WorkflowDefinitions to count.
+     * @example
+     * // Count the number of WorkflowDefinitions
+     * const count = await prisma.workflowDefinition.count({
+     *   where: {
+     *     // ... the filter for the WorkflowDefinitions we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkflowDefinitionCountArgs>(
+      args?: Subset<T, WorkflowDefinitionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkflowDefinitionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WorkflowDefinition.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkflowDefinitionAggregateArgs>(args: Subset<T, WorkflowDefinitionAggregateArgs>): Prisma.PrismaPromise<GetWorkflowDefinitionAggregateType<T>>
+
+    /**
+     * Group by WorkflowDefinition.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowDefinitionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkflowDefinitionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkflowDefinitionGroupByArgs['orderBy'] }
+        : { orderBy?: WorkflowDefinitionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkflowDefinitionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkflowDefinitionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WorkflowDefinition model
+   */
+  readonly fields: WorkflowDefinitionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WorkflowDefinition.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkflowDefinitionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    runs<T extends WorkflowDefinition$runsArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowDefinition$runsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WorkflowDefinition model
+   */
+  interface WorkflowDefinitionFieldRefs {
+    readonly id: FieldRef<"WorkflowDefinition", 'String'>
+    readonly ownerId: FieldRef<"WorkflowDefinition", 'String'>
+    readonly slug: FieldRef<"WorkflowDefinition", 'String'>
+    readonly name: FieldRef<"WorkflowDefinition", 'String'>
+    readonly engine: FieldRef<"WorkflowDefinition", 'String'>
+    readonly engineRef: FieldRef<"WorkflowDefinition", 'String'>
+    readonly inputSchema: FieldRef<"WorkflowDefinition", 'Json'>
+    readonly enabled: FieldRef<"WorkflowDefinition", 'Boolean'>
+    readonly createdAt: FieldRef<"WorkflowDefinition", 'DateTime'>
+    readonly updatedAt: FieldRef<"WorkflowDefinition", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WorkflowDefinition findUnique
+   */
+  export type WorkflowDefinitionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowDefinition to fetch.
+     */
+    where: WorkflowDefinitionWhereUniqueInput
+  }
+
+  /**
+   * WorkflowDefinition findUniqueOrThrow
+   */
+  export type WorkflowDefinitionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowDefinition to fetch.
+     */
+    where: WorkflowDefinitionWhereUniqueInput
+  }
+
+  /**
+   * WorkflowDefinition findFirst
+   */
+  export type WorkflowDefinitionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowDefinition to fetch.
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowDefinitions to fetch.
+     */
+    orderBy?: WorkflowDefinitionOrderByWithRelationInput | WorkflowDefinitionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowDefinitions.
+     */
+    cursor?: WorkflowDefinitionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowDefinitions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowDefinitions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowDefinitions.
+     */
+    distinct?: WorkflowDefinitionScalarFieldEnum | WorkflowDefinitionScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowDefinition findFirstOrThrow
+   */
+  export type WorkflowDefinitionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowDefinition to fetch.
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowDefinitions to fetch.
+     */
+    orderBy?: WorkflowDefinitionOrderByWithRelationInput | WorkflowDefinitionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowDefinitions.
+     */
+    cursor?: WorkflowDefinitionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowDefinitions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowDefinitions.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowDefinitions.
+     */
+    distinct?: WorkflowDefinitionScalarFieldEnum | WorkflowDefinitionScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowDefinition findMany
+   */
+  export type WorkflowDefinitionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowDefinitions to fetch.
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowDefinitions to fetch.
+     */
+    orderBy?: WorkflowDefinitionOrderByWithRelationInput | WorkflowDefinitionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WorkflowDefinitions.
+     */
+    cursor?: WorkflowDefinitionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowDefinitions from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowDefinitions.
+     */
+    skip?: number
+    distinct?: WorkflowDefinitionScalarFieldEnum | WorkflowDefinitionScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowDefinition create
+   */
+  export type WorkflowDefinitionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WorkflowDefinition.
+     */
+    data: XOR<WorkflowDefinitionCreateInput, WorkflowDefinitionUncheckedCreateInput>
+  }
+
+  /**
+   * WorkflowDefinition createMany
+   */
+  export type WorkflowDefinitionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WorkflowDefinitions.
+     */
+    data: WorkflowDefinitionCreateManyInput | WorkflowDefinitionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WorkflowDefinition createManyAndReturn
+   */
+  export type WorkflowDefinitionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * The data used to create many WorkflowDefinitions.
+     */
+    data: WorkflowDefinitionCreateManyInput | WorkflowDefinitionCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowDefinition update
+   */
+  export type WorkflowDefinitionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WorkflowDefinition.
+     */
+    data: XOR<WorkflowDefinitionUpdateInput, WorkflowDefinitionUncheckedUpdateInput>
+    /**
+     * Choose, which WorkflowDefinition to update.
+     */
+    where: WorkflowDefinitionWhereUniqueInput
+  }
+
+  /**
+   * WorkflowDefinition updateMany
+   */
+  export type WorkflowDefinitionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WorkflowDefinitions.
+     */
+    data: XOR<WorkflowDefinitionUpdateManyMutationInput, WorkflowDefinitionUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowDefinitions to update
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * Limit how many WorkflowDefinitions to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowDefinition updateManyAndReturn
+   */
+  export type WorkflowDefinitionUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * The data used to update WorkflowDefinitions.
+     */
+    data: XOR<WorkflowDefinitionUpdateManyMutationInput, WorkflowDefinitionUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowDefinitions to update
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * Limit how many WorkflowDefinitions to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowDefinition upsert
+   */
+  export type WorkflowDefinitionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WorkflowDefinition to update in case it exists.
+     */
+    where: WorkflowDefinitionWhereUniqueInput
+    /**
+     * In case the WorkflowDefinition found by the `where` argument doesn't exist, create a new WorkflowDefinition with this data.
+     */
+    create: XOR<WorkflowDefinitionCreateInput, WorkflowDefinitionUncheckedCreateInput>
+    /**
+     * In case the WorkflowDefinition was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkflowDefinitionUpdateInput, WorkflowDefinitionUncheckedUpdateInput>
+  }
+
+  /**
+   * WorkflowDefinition delete
+   */
+  export type WorkflowDefinitionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+    /**
+     * Filter which WorkflowDefinition to delete.
+     */
+    where: WorkflowDefinitionWhereUniqueInput
+  }
+
+  /**
+   * WorkflowDefinition deleteMany
+   */
+  export type WorkflowDefinitionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowDefinitions to delete
+     */
+    where?: WorkflowDefinitionWhereInput
+    /**
+     * Limit how many WorkflowDefinitions to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowDefinition.runs
+   */
+  export type WorkflowDefinition$runsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    where?: WorkflowRunWhereInput
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    cursor?: WorkflowRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowDefinition without action
+   */
+  export type WorkflowDefinitionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowDefinition
+     */
+    select?: WorkflowDefinitionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowDefinition
+     */
+    omit?: WorkflowDefinitionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowDefinitionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model WorkflowRun
+   */
+
+  export type AggregateWorkflowRun = {
+    _count: WorkflowRunCountAggregateOutputType | null
+    _min: WorkflowRunMinAggregateOutputType | null
+    _max: WorkflowRunMaxAggregateOutputType | null
+  }
+
+  export type WorkflowRunMinAggregateOutputType = {
+    id: string | null
+    definitionId: string | null
+    ownerId: string | null
+    status: $Enums.WorkflowRunStatus | null
+    engine: string | null
+    engineRunId: string | null
+    engineGateRef: string | null
+    gateToken: string | null
+    conversationId: string | null
+    startedAt: Date | null
+    finishedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowRunMaxAggregateOutputType = {
+    id: string | null
+    definitionId: string | null
+    ownerId: string | null
+    status: $Enums.WorkflowRunStatus | null
+    engine: string | null
+    engineRunId: string | null
+    engineGateRef: string | null
+    gateToken: string | null
+    conversationId: string | null
+    startedAt: Date | null
+    finishedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type WorkflowRunCountAggregateOutputType = {
+    id: number
+    definitionId: number
+    ownerId: number
+    status: number
+    engine: number
+    engineRunId: number
+    engineGateRef: number
+    input: number
+    output: number
+    error: number
+    gateToken: number
+    conversationId: number
+    startedAt: number
+    finishedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type WorkflowRunMinAggregateInputType = {
+    id?: true
+    definitionId?: true
+    ownerId?: true
+    status?: true
+    engine?: true
+    engineRunId?: true
+    engineGateRef?: true
+    gateToken?: true
+    conversationId?: true
+    startedAt?: true
+    finishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowRunMaxAggregateInputType = {
+    id?: true
+    definitionId?: true
+    ownerId?: true
+    status?: true
+    engine?: true
+    engineRunId?: true
+    engineGateRef?: true
+    gateToken?: true
+    conversationId?: true
+    startedAt?: true
+    finishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type WorkflowRunCountAggregateInputType = {
+    id?: true
+    definitionId?: true
+    ownerId?: true
+    status?: true
+    engine?: true
+    engineRunId?: true
+    engineGateRef?: true
+    input?: true
+    output?: true
+    error?: true
+    gateToken?: true
+    conversationId?: true
+    startedAt?: true
+    finishedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type WorkflowRunAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRun to aggregate.
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRuns to fetch.
+     */
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkflowRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WorkflowRuns
+    **/
+    _count?: true | WorkflowRunCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkflowRunMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkflowRunMaxAggregateInputType
+  }
+
+  export type GetWorkflowRunAggregateType<T extends WorkflowRunAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkflowRun]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkflowRun[P]>
+      : GetScalarType<T[P], AggregateWorkflowRun[P]>
+  }
+
+
+
+
+  export type WorkflowRunGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunWhereInput
+    orderBy?: WorkflowRunOrderByWithAggregationInput | WorkflowRunOrderByWithAggregationInput[]
+    by: WorkflowRunScalarFieldEnum[] | WorkflowRunScalarFieldEnum
+    having?: WorkflowRunScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkflowRunCountAggregateInputType | true
+    _min?: WorkflowRunMinAggregateInputType
+    _max?: WorkflowRunMaxAggregateInputType
+  }
+
+  export type WorkflowRunGroupByOutputType = {
+    id: string
+    definitionId: string
+    ownerId: string
+    status: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId: string | null
+    engineGateRef: string | null
+    input: JsonValue
+    output: JsonValue | null
+    error: JsonValue | null
+    gateToken: string | null
+    conversationId: string | null
+    startedAt: Date | null
+    finishedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: WorkflowRunCountAggregateOutputType | null
+    _min: WorkflowRunMinAggregateOutputType | null
+    _max: WorkflowRunMaxAggregateOutputType | null
+  }
+
+  type GetWorkflowRunGroupByPayload<T extends WorkflowRunGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkflowRunGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkflowRunGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkflowRunGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkflowRunGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkflowRunSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    definitionId?: boolean
+    ownerId?: boolean
+    status?: boolean
+    engine?: boolean
+    engineRunId?: boolean
+    engineGateRef?: boolean
+    input?: boolean
+    output?: boolean
+    error?: boolean
+    gateToken?: boolean
+    conversationId?: boolean
+    startedAt?: boolean
+    finishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+    events?: boolean | WorkflowRun$eventsArgs<ExtArgs>
+    artifacts?: boolean | WorkflowRun$artifactsArgs<ExtArgs>
+    _count?: boolean | WorkflowRunCountOutputTypeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRun"]>
+
+  export type WorkflowRunSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    definitionId?: boolean
+    ownerId?: boolean
+    status?: boolean
+    engine?: boolean
+    engineRunId?: boolean
+    engineGateRef?: boolean
+    input?: boolean
+    output?: boolean
+    error?: boolean
+    gateToken?: boolean
+    conversationId?: boolean
+    startedAt?: boolean
+    finishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRun"]>
+
+  export type WorkflowRunSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    definitionId?: boolean
+    ownerId?: boolean
+    status?: boolean
+    engine?: boolean
+    engineRunId?: boolean
+    engineGateRef?: boolean
+    input?: boolean
+    output?: boolean
+    error?: boolean
+    gateToken?: boolean
+    conversationId?: boolean
+    startedAt?: boolean
+    finishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRun"]>
+
+  export type WorkflowRunSelectScalar = {
+    id?: boolean
+    definitionId?: boolean
+    ownerId?: boolean
+    status?: boolean
+    engine?: boolean
+    engineRunId?: boolean
+    engineGateRef?: boolean
+    input?: boolean
+    output?: boolean
+    error?: boolean
+    gateToken?: boolean
+    conversationId?: boolean
+    startedAt?: boolean
+    finishedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type WorkflowRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "definitionId" | "ownerId" | "status" | "engine" | "engineRunId" | "engineGateRef" | "input" | "output" | "error" | "gateToken" | "conversationId" | "startedAt" | "finishedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["workflowRun"]>
+  export type WorkflowRunInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+    events?: boolean | WorkflowRun$eventsArgs<ExtArgs>
+    artifacts?: boolean | WorkflowRun$artifactsArgs<ExtArgs>
+    _count?: boolean | WorkflowRunCountOutputTypeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowRunIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+  }
+  export type WorkflowRunIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    definition?: boolean | WorkflowDefinitionDefaultArgs<ExtArgs>
+    conversation?: boolean | WorkflowRun$conversationArgs<ExtArgs>
+  }
+
+  export type $WorkflowRunPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WorkflowRun"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      definition: Prisma.$WorkflowDefinitionPayload<ExtArgs>
+      conversation: Prisma.$ConversationPayload<ExtArgs> | null
+      events: Prisma.$WorkflowRunEventPayload<ExtArgs>[]
+      artifacts: Prisma.$WorkflowRunArtifactPayload<ExtArgs>[]
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      definitionId: string
+      ownerId: string
+      status: $Enums.WorkflowRunStatus
+      engine: string
+      engineRunId: string | null
+      engineGateRef: string | null
+      input: Prisma.JsonValue
+      output: Prisma.JsonValue | null
+      error: Prisma.JsonValue | null
+      gateToken: string | null
+      conversationId: string | null
+      startedAt: Date | null
+      finishedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["workflowRun"]>
+    composites: {}
+  }
+
+  type WorkflowRunGetPayload<S extends boolean | null | undefined | WorkflowRunDefaultArgs> = $Result.GetResult<Prisma.$WorkflowRunPayload, S>
+
+  type WorkflowRunCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WorkflowRunFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WorkflowRunCountAggregateInputType | true
+    }
+
+  export interface WorkflowRunDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WorkflowRun'], meta: { name: 'WorkflowRun' } }
+    /**
+     * Find zero or one WorkflowRun that matches the filter.
+     * @param {WorkflowRunFindUniqueArgs} args - Arguments to find a WorkflowRun
+     * @example
+     * // Get one WorkflowRun
+     * const workflowRun = await prisma.workflowRun.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkflowRunFindUniqueArgs>(args: SelectSubset<T, WorkflowRunFindUniqueArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WorkflowRun that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WorkflowRunFindUniqueOrThrowArgs} args - Arguments to find a WorkflowRun
+     * @example
+     * // Get one WorkflowRun
+     * const workflowRun = await prisma.workflowRun.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkflowRunFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkflowRunFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRun that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunFindFirstArgs} args - Arguments to find a WorkflowRun
+     * @example
+     * // Get one WorkflowRun
+     * const workflowRun = await prisma.workflowRun.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkflowRunFindFirstArgs>(args?: SelectSubset<T, WorkflowRunFindFirstArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRun that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunFindFirstOrThrowArgs} args - Arguments to find a WorkflowRun
+     * @example
+     * // Get one WorkflowRun
+     * const workflowRun = await prisma.workflowRun.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkflowRunFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkflowRunFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WorkflowRuns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WorkflowRuns
+     * const workflowRuns = await prisma.workflowRun.findMany()
+     * 
+     * // Get first 10 WorkflowRuns
+     * const workflowRuns = await prisma.workflowRun.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const workflowRunWithIdOnly = await prisma.workflowRun.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WorkflowRunFindManyArgs>(args?: SelectSubset<T, WorkflowRunFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WorkflowRun.
+     * @param {WorkflowRunCreateArgs} args - Arguments to create a WorkflowRun.
+     * @example
+     * // Create one WorkflowRun
+     * const WorkflowRun = await prisma.workflowRun.create({
+     *   data: {
+     *     // ... data to create a WorkflowRun
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkflowRunCreateArgs>(args: SelectSubset<T, WorkflowRunCreateArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WorkflowRuns.
+     * @param {WorkflowRunCreateManyArgs} args - Arguments to create many WorkflowRuns.
+     * @example
+     * // Create many WorkflowRuns
+     * const workflowRun = await prisma.workflowRun.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkflowRunCreateManyArgs>(args?: SelectSubset<T, WorkflowRunCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WorkflowRuns and returns the data saved in the database.
+     * @param {WorkflowRunCreateManyAndReturnArgs} args - Arguments to create many WorkflowRuns.
+     * @example
+     * // Create many WorkflowRuns
+     * const workflowRun = await prisma.workflowRun.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WorkflowRuns and only return the `id`
+     * const workflowRunWithIdOnly = await prisma.workflowRun.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkflowRunCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkflowRunCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WorkflowRun.
+     * @param {WorkflowRunDeleteArgs} args - Arguments to delete one WorkflowRun.
+     * @example
+     * // Delete one WorkflowRun
+     * const WorkflowRun = await prisma.workflowRun.delete({
+     *   where: {
+     *     // ... filter to delete one WorkflowRun
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkflowRunDeleteArgs>(args: SelectSubset<T, WorkflowRunDeleteArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WorkflowRun.
+     * @param {WorkflowRunUpdateArgs} args - Arguments to update one WorkflowRun.
+     * @example
+     * // Update one WorkflowRun
+     * const workflowRun = await prisma.workflowRun.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkflowRunUpdateArgs>(args: SelectSubset<T, WorkflowRunUpdateArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WorkflowRuns.
+     * @param {WorkflowRunDeleteManyArgs} args - Arguments to filter WorkflowRuns to delete.
+     * @example
+     * // Delete a few WorkflowRuns
+     * const { count } = await prisma.workflowRun.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkflowRunDeleteManyArgs>(args?: SelectSubset<T, WorkflowRunDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WorkflowRuns
+     * const workflowRun = await prisma.workflowRun.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkflowRunUpdateManyArgs>(args: SelectSubset<T, WorkflowRunUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRuns and returns the data updated in the database.
+     * @param {WorkflowRunUpdateManyAndReturnArgs} args - Arguments to update many WorkflowRuns.
+     * @example
+     * // Update many WorkflowRuns
+     * const workflowRun = await prisma.workflowRun.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more WorkflowRuns and only return the `id`
+     * const workflowRunWithIdOnly = await prisma.workflowRun.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends WorkflowRunUpdateManyAndReturnArgs>(args: SelectSubset<T, WorkflowRunUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one WorkflowRun.
+     * @param {WorkflowRunUpsertArgs} args - Arguments to update or create a WorkflowRun.
+     * @example
+     * // Update or create a WorkflowRun
+     * const workflowRun = await prisma.workflowRun.upsert({
+     *   create: {
+     *     // ... data to create a WorkflowRun
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WorkflowRun we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkflowRunUpsertArgs>(args: SelectSubset<T, WorkflowRunUpsertArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WorkflowRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunCountArgs} args - Arguments to filter WorkflowRuns to count.
+     * @example
+     * // Count the number of WorkflowRuns
+     * const count = await prisma.workflowRun.count({
+     *   where: {
+     *     // ... the filter for the WorkflowRuns we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkflowRunCountArgs>(
+      args?: Subset<T, WorkflowRunCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkflowRunCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WorkflowRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkflowRunAggregateArgs>(args: Subset<T, WorkflowRunAggregateArgs>): Prisma.PrismaPromise<GetWorkflowRunAggregateType<T>>
+
+    /**
+     * Group by WorkflowRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkflowRunGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkflowRunGroupByArgs['orderBy'] }
+        : { orderBy?: WorkflowRunGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkflowRunGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkflowRunGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WorkflowRun model
+   */
+  readonly fields: WorkflowRunFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WorkflowRun.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkflowRunClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    definition<T extends WorkflowDefinitionDefaultArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowDefinitionDefaultArgs<ExtArgs>>): Prisma__WorkflowDefinitionClient<$Result.GetResult<Prisma.$WorkflowDefinitionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    conversation<T extends WorkflowRun$conversationArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowRun$conversationArgs<ExtArgs>>): Prisma__ConversationClient<$Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    events<T extends WorkflowRun$eventsArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowRun$eventsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    artifacts<T extends WorkflowRun$artifactsArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowRun$artifactsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WorkflowRun model
+   */
+  interface WorkflowRunFieldRefs {
+    readonly id: FieldRef<"WorkflowRun", 'String'>
+    readonly definitionId: FieldRef<"WorkflowRun", 'String'>
+    readonly ownerId: FieldRef<"WorkflowRun", 'String'>
+    readonly status: FieldRef<"WorkflowRun", 'WorkflowRunStatus'>
+    readonly engine: FieldRef<"WorkflowRun", 'String'>
+    readonly engineRunId: FieldRef<"WorkflowRun", 'String'>
+    readonly engineGateRef: FieldRef<"WorkflowRun", 'String'>
+    readonly input: FieldRef<"WorkflowRun", 'Json'>
+    readonly output: FieldRef<"WorkflowRun", 'Json'>
+    readonly error: FieldRef<"WorkflowRun", 'Json'>
+    readonly gateToken: FieldRef<"WorkflowRun", 'String'>
+    readonly conversationId: FieldRef<"WorkflowRun", 'String'>
+    readonly startedAt: FieldRef<"WorkflowRun", 'DateTime'>
+    readonly finishedAt: FieldRef<"WorkflowRun", 'DateTime'>
+    readonly createdAt: FieldRef<"WorkflowRun", 'DateTime'>
+    readonly updatedAt: FieldRef<"WorkflowRun", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WorkflowRun findUnique
+   */
+  export type WorkflowRunFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRun to fetch.
+     */
+    where: WorkflowRunWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRun findUniqueOrThrow
+   */
+  export type WorkflowRunFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRun to fetch.
+     */
+    where: WorkflowRunWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRun findFirst
+   */
+  export type WorkflowRunFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRun to fetch.
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRuns to fetch.
+     */
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRuns.
+     */
+    cursor?: WorkflowRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRuns.
+     */
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRun findFirstOrThrow
+   */
+  export type WorkflowRunFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRun to fetch.
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRuns to fetch.
+     */
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRuns.
+     */
+    cursor?: WorkflowRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRuns.
+     */
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRun findMany
+   */
+  export type WorkflowRunFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRuns to fetch.
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRuns to fetch.
+     */
+    orderBy?: WorkflowRunOrderByWithRelationInput | WorkflowRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WorkflowRuns.
+     */
+    cursor?: WorkflowRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRuns.
+     */
+    skip?: number
+    distinct?: WorkflowRunScalarFieldEnum | WorkflowRunScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRun create
+   */
+  export type WorkflowRunCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WorkflowRun.
+     */
+    data: XOR<WorkflowRunCreateInput, WorkflowRunUncheckedCreateInput>
+  }
+
+  /**
+   * WorkflowRun createMany
+   */
+  export type WorkflowRunCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WorkflowRuns.
+     */
+    data: WorkflowRunCreateManyInput | WorkflowRunCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WorkflowRun createManyAndReturn
+   */
+  export type WorkflowRunCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * The data used to create many WorkflowRuns.
+     */
+    data: WorkflowRunCreateManyInput | WorkflowRunCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRun update
+   */
+  export type WorkflowRunUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WorkflowRun.
+     */
+    data: XOR<WorkflowRunUpdateInput, WorkflowRunUncheckedUpdateInput>
+    /**
+     * Choose, which WorkflowRun to update.
+     */
+    where: WorkflowRunWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRun updateMany
+   */
+  export type WorkflowRunUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WorkflowRuns.
+     */
+    data: XOR<WorkflowRunUpdateManyMutationInput, WorkflowRunUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRuns to update
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * Limit how many WorkflowRuns to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRun updateManyAndReturn
+   */
+  export type WorkflowRunUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * The data used to update WorkflowRuns.
+     */
+    data: XOR<WorkflowRunUpdateManyMutationInput, WorkflowRunUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRuns to update
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * Limit how many WorkflowRuns to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRun upsert
+   */
+  export type WorkflowRunUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WorkflowRun to update in case it exists.
+     */
+    where: WorkflowRunWhereUniqueInput
+    /**
+     * In case the WorkflowRun found by the `where` argument doesn't exist, create a new WorkflowRun with this data.
+     */
+    create: XOR<WorkflowRunCreateInput, WorkflowRunUncheckedCreateInput>
+    /**
+     * In case the WorkflowRun was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkflowRunUpdateInput, WorkflowRunUncheckedUpdateInput>
+  }
+
+  /**
+   * WorkflowRun delete
+   */
+  export type WorkflowRunDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+    /**
+     * Filter which WorkflowRun to delete.
+     */
+    where: WorkflowRunWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRun deleteMany
+   */
+  export type WorkflowRunDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRuns to delete
+     */
+    where?: WorkflowRunWhereInput
+    /**
+     * Limit how many WorkflowRuns to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRun.conversation
+   */
+  export type WorkflowRun$conversationArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Conversation
+     */
+    select?: ConversationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Conversation
+     */
+    omit?: ConversationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConversationInclude<ExtArgs> | null
+    where?: ConversationWhereInput
+  }
+
+  /**
+   * WorkflowRun.events
+   */
+  export type WorkflowRun$eventsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    where?: WorkflowRunEventWhereInput
+    orderBy?: WorkflowRunEventOrderByWithRelationInput | WorkflowRunEventOrderByWithRelationInput[]
+    cursor?: WorkflowRunEventWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunEventScalarFieldEnum | WorkflowRunEventScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRun.artifacts
+   */
+  export type WorkflowRun$artifactsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    where?: WorkflowRunArtifactWhereInput
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRun without action
+   */
+  export type WorkflowRunDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRun
+     */
+    select?: WorkflowRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRun
+     */
+    omit?: WorkflowRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model WorkflowRunEvent
+   */
+
+  export type AggregateWorkflowRunEvent = {
+    _count: WorkflowRunEventCountAggregateOutputType | null
+    _avg: WorkflowRunEventAvgAggregateOutputType | null
+    _sum: WorkflowRunEventSumAggregateOutputType | null
+    _min: WorkflowRunEventMinAggregateOutputType | null
+    _max: WorkflowRunEventMaxAggregateOutputType | null
+  }
+
+  export type WorkflowRunEventAvgAggregateOutputType = {
+    seq: number | null
+  }
+
+  export type WorkflowRunEventSumAggregateOutputType = {
+    seq: number | null
+  }
+
+  export type WorkflowRunEventMinAggregateOutputType = {
+    id: string | null
+    runId: string | null
+    seq: number | null
+    key: string | null
+    type: string | null
+    stepName: string | null
+    createdAt: Date | null
+  }
+
+  export type WorkflowRunEventMaxAggregateOutputType = {
+    id: string | null
+    runId: string | null
+    seq: number | null
+    key: string | null
+    type: string | null
+    stepName: string | null
+    createdAt: Date | null
+  }
+
+  export type WorkflowRunEventCountAggregateOutputType = {
+    id: number
+    runId: number
+    seq: number
+    key: number
+    type: number
+    stepName: number
+    payload: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type WorkflowRunEventAvgAggregateInputType = {
+    seq?: true
+  }
+
+  export type WorkflowRunEventSumAggregateInputType = {
+    seq?: true
+  }
+
+  export type WorkflowRunEventMinAggregateInputType = {
+    id?: true
+    runId?: true
+    seq?: true
+    key?: true
+    type?: true
+    stepName?: true
+    createdAt?: true
+  }
+
+  export type WorkflowRunEventMaxAggregateInputType = {
+    id?: true
+    runId?: true
+    seq?: true
+    key?: true
+    type?: true
+    stepName?: true
+    createdAt?: true
+  }
+
+  export type WorkflowRunEventCountAggregateInputType = {
+    id?: true
+    runId?: true
+    seq?: true
+    key?: true
+    type?: true
+    stepName?: true
+    payload?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type WorkflowRunEventAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRunEvent to aggregate.
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunEvents to fetch.
+     */
+    orderBy?: WorkflowRunEventOrderByWithRelationInput | WorkflowRunEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkflowRunEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WorkflowRunEvents
+    **/
+    _count?: true | WorkflowRunEventCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: WorkflowRunEventAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: WorkflowRunEventSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkflowRunEventMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkflowRunEventMaxAggregateInputType
+  }
+
+  export type GetWorkflowRunEventAggregateType<T extends WorkflowRunEventAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkflowRunEvent]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkflowRunEvent[P]>
+      : GetScalarType<T[P], AggregateWorkflowRunEvent[P]>
+  }
+
+
+
+
+  export type WorkflowRunEventGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunEventWhereInput
+    orderBy?: WorkflowRunEventOrderByWithAggregationInput | WorkflowRunEventOrderByWithAggregationInput[]
+    by: WorkflowRunEventScalarFieldEnum[] | WorkflowRunEventScalarFieldEnum
+    having?: WorkflowRunEventScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkflowRunEventCountAggregateInputType | true
+    _avg?: WorkflowRunEventAvgAggregateInputType
+    _sum?: WorkflowRunEventSumAggregateInputType
+    _min?: WorkflowRunEventMinAggregateInputType
+    _max?: WorkflowRunEventMaxAggregateInputType
+  }
+
+  export type WorkflowRunEventGroupByOutputType = {
+    id: string
+    runId: string
+    seq: number
+    key: string | null
+    type: string
+    stepName: string | null
+    payload: JsonValue | null
+    createdAt: Date
+    _count: WorkflowRunEventCountAggregateOutputType | null
+    _avg: WorkflowRunEventAvgAggregateOutputType | null
+    _sum: WorkflowRunEventSumAggregateOutputType | null
+    _min: WorkflowRunEventMinAggregateOutputType | null
+    _max: WorkflowRunEventMaxAggregateOutputType | null
+  }
+
+  type GetWorkflowRunEventGroupByPayload<T extends WorkflowRunEventGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkflowRunEventGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkflowRunEventGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkflowRunEventGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkflowRunEventGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkflowRunEventSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    seq?: boolean
+    key?: boolean
+    type?: boolean
+    stepName?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunEvent"]>
+
+  export type WorkflowRunEventSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    seq?: boolean
+    key?: boolean
+    type?: boolean
+    stepName?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunEvent"]>
+
+  export type WorkflowRunEventSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    seq?: boolean
+    key?: boolean
+    type?: boolean
+    stepName?: boolean
+    payload?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunEvent"]>
+
+  export type WorkflowRunEventSelectScalar = {
+    id?: boolean
+    runId?: boolean
+    seq?: boolean
+    key?: boolean
+    type?: boolean
+    stepName?: boolean
+    payload?: boolean
+    createdAt?: boolean
+  }
+
+  export type WorkflowRunEventOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "seq" | "key" | "type" | "stepName" | "payload" | "createdAt", ExtArgs["result"]["workflowRunEvent"]>
+  export type WorkflowRunEventInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }
+  export type WorkflowRunEventIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }
+  export type WorkflowRunEventIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+  }
+
+  export type $WorkflowRunEventPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WorkflowRunEvent"
+    objects: {
+      run: Prisma.$WorkflowRunPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      runId: string
+      seq: number
+      key: string | null
+      type: string
+      stepName: string | null
+      payload: Prisma.JsonValue | null
+      createdAt: Date
+    }, ExtArgs["result"]["workflowRunEvent"]>
+    composites: {}
+  }
+
+  type WorkflowRunEventGetPayload<S extends boolean | null | undefined | WorkflowRunEventDefaultArgs> = $Result.GetResult<Prisma.$WorkflowRunEventPayload, S>
+
+  type WorkflowRunEventCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WorkflowRunEventFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WorkflowRunEventCountAggregateInputType | true
+    }
+
+  export interface WorkflowRunEventDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WorkflowRunEvent'], meta: { name: 'WorkflowRunEvent' } }
+    /**
+     * Find zero or one WorkflowRunEvent that matches the filter.
+     * @param {WorkflowRunEventFindUniqueArgs} args - Arguments to find a WorkflowRunEvent
+     * @example
+     * // Get one WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkflowRunEventFindUniqueArgs>(args: SelectSubset<T, WorkflowRunEventFindUniqueArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WorkflowRunEvent that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WorkflowRunEventFindUniqueOrThrowArgs} args - Arguments to find a WorkflowRunEvent
+     * @example
+     * // Get one WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkflowRunEventFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkflowRunEventFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRunEvent that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventFindFirstArgs} args - Arguments to find a WorkflowRunEvent
+     * @example
+     * // Get one WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkflowRunEventFindFirstArgs>(args?: SelectSubset<T, WorkflowRunEventFindFirstArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRunEvent that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventFindFirstOrThrowArgs} args - Arguments to find a WorkflowRunEvent
+     * @example
+     * // Get one WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkflowRunEventFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkflowRunEventFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WorkflowRunEvents that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WorkflowRunEvents
+     * const workflowRunEvents = await prisma.workflowRunEvent.findMany()
+     * 
+     * // Get first 10 WorkflowRunEvents
+     * const workflowRunEvents = await prisma.workflowRunEvent.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const workflowRunEventWithIdOnly = await prisma.workflowRunEvent.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WorkflowRunEventFindManyArgs>(args?: SelectSubset<T, WorkflowRunEventFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WorkflowRunEvent.
+     * @param {WorkflowRunEventCreateArgs} args - Arguments to create a WorkflowRunEvent.
+     * @example
+     * // Create one WorkflowRunEvent
+     * const WorkflowRunEvent = await prisma.workflowRunEvent.create({
+     *   data: {
+     *     // ... data to create a WorkflowRunEvent
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkflowRunEventCreateArgs>(args: SelectSubset<T, WorkflowRunEventCreateArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WorkflowRunEvents.
+     * @param {WorkflowRunEventCreateManyArgs} args - Arguments to create many WorkflowRunEvents.
+     * @example
+     * // Create many WorkflowRunEvents
+     * const workflowRunEvent = await prisma.workflowRunEvent.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkflowRunEventCreateManyArgs>(args?: SelectSubset<T, WorkflowRunEventCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WorkflowRunEvents and returns the data saved in the database.
+     * @param {WorkflowRunEventCreateManyAndReturnArgs} args - Arguments to create many WorkflowRunEvents.
+     * @example
+     * // Create many WorkflowRunEvents
+     * const workflowRunEvent = await prisma.workflowRunEvent.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WorkflowRunEvents and only return the `id`
+     * const workflowRunEventWithIdOnly = await prisma.workflowRunEvent.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkflowRunEventCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkflowRunEventCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WorkflowRunEvent.
+     * @param {WorkflowRunEventDeleteArgs} args - Arguments to delete one WorkflowRunEvent.
+     * @example
+     * // Delete one WorkflowRunEvent
+     * const WorkflowRunEvent = await prisma.workflowRunEvent.delete({
+     *   where: {
+     *     // ... filter to delete one WorkflowRunEvent
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkflowRunEventDeleteArgs>(args: SelectSubset<T, WorkflowRunEventDeleteArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WorkflowRunEvent.
+     * @param {WorkflowRunEventUpdateArgs} args - Arguments to update one WorkflowRunEvent.
+     * @example
+     * // Update one WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkflowRunEventUpdateArgs>(args: SelectSubset<T, WorkflowRunEventUpdateArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WorkflowRunEvents.
+     * @param {WorkflowRunEventDeleteManyArgs} args - Arguments to filter WorkflowRunEvents to delete.
+     * @example
+     * // Delete a few WorkflowRunEvents
+     * const { count } = await prisma.workflowRunEvent.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkflowRunEventDeleteManyArgs>(args?: SelectSubset<T, WorkflowRunEventDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRunEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WorkflowRunEvents
+     * const workflowRunEvent = await prisma.workflowRunEvent.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkflowRunEventUpdateManyArgs>(args: SelectSubset<T, WorkflowRunEventUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRunEvents and returns the data updated in the database.
+     * @param {WorkflowRunEventUpdateManyAndReturnArgs} args - Arguments to update many WorkflowRunEvents.
+     * @example
+     * // Update many WorkflowRunEvents
+     * const workflowRunEvent = await prisma.workflowRunEvent.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more WorkflowRunEvents and only return the `id`
+     * const workflowRunEventWithIdOnly = await prisma.workflowRunEvent.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends WorkflowRunEventUpdateManyAndReturnArgs>(args: SelectSubset<T, WorkflowRunEventUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one WorkflowRunEvent.
+     * @param {WorkflowRunEventUpsertArgs} args - Arguments to update or create a WorkflowRunEvent.
+     * @example
+     * // Update or create a WorkflowRunEvent
+     * const workflowRunEvent = await prisma.workflowRunEvent.upsert({
+     *   create: {
+     *     // ... data to create a WorkflowRunEvent
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WorkflowRunEvent we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkflowRunEventUpsertArgs>(args: SelectSubset<T, WorkflowRunEventUpsertArgs<ExtArgs>>): Prisma__WorkflowRunEventClient<$Result.GetResult<Prisma.$WorkflowRunEventPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WorkflowRunEvents.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventCountArgs} args - Arguments to filter WorkflowRunEvents to count.
+     * @example
+     * // Count the number of WorkflowRunEvents
+     * const count = await prisma.workflowRunEvent.count({
+     *   where: {
+     *     // ... the filter for the WorkflowRunEvents we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkflowRunEventCountArgs>(
+      args?: Subset<T, WorkflowRunEventCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkflowRunEventCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WorkflowRunEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkflowRunEventAggregateArgs>(args: Subset<T, WorkflowRunEventAggregateArgs>): Prisma.PrismaPromise<GetWorkflowRunEventAggregateType<T>>
+
+    /**
+     * Group by WorkflowRunEvent.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunEventGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkflowRunEventGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkflowRunEventGroupByArgs['orderBy'] }
+        : { orderBy?: WorkflowRunEventGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkflowRunEventGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkflowRunEventGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WorkflowRunEvent model
+   */
+  readonly fields: WorkflowRunEventFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WorkflowRunEvent.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkflowRunEventClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    run<T extends WorkflowRunDefaultArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowRunDefaultArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WorkflowRunEvent model
+   */
+  interface WorkflowRunEventFieldRefs {
+    readonly id: FieldRef<"WorkflowRunEvent", 'String'>
+    readonly runId: FieldRef<"WorkflowRunEvent", 'String'>
+    readonly seq: FieldRef<"WorkflowRunEvent", 'Int'>
+    readonly key: FieldRef<"WorkflowRunEvent", 'String'>
+    readonly type: FieldRef<"WorkflowRunEvent", 'String'>
+    readonly stepName: FieldRef<"WorkflowRunEvent", 'String'>
+    readonly payload: FieldRef<"WorkflowRunEvent", 'Json'>
+    readonly createdAt: FieldRef<"WorkflowRunEvent", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WorkflowRunEvent findUnique
+   */
+  export type WorkflowRunEventFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunEvent to fetch.
+     */
+    where: WorkflowRunEventWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunEvent findUniqueOrThrow
+   */
+  export type WorkflowRunEventFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunEvent to fetch.
+     */
+    where: WorkflowRunEventWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunEvent findFirst
+   */
+  export type WorkflowRunEventFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunEvent to fetch.
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunEvents to fetch.
+     */
+    orderBy?: WorkflowRunEventOrderByWithRelationInput | WorkflowRunEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRunEvents.
+     */
+    cursor?: WorkflowRunEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRunEvents.
+     */
+    distinct?: WorkflowRunEventScalarFieldEnum | WorkflowRunEventScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunEvent findFirstOrThrow
+   */
+  export type WorkflowRunEventFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunEvent to fetch.
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunEvents to fetch.
+     */
+    orderBy?: WorkflowRunEventOrderByWithRelationInput | WorkflowRunEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRunEvents.
+     */
+    cursor?: WorkflowRunEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunEvents.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRunEvents.
+     */
+    distinct?: WorkflowRunEventScalarFieldEnum | WorkflowRunEventScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunEvent findMany
+   */
+  export type WorkflowRunEventFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunEvents to fetch.
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunEvents to fetch.
+     */
+    orderBy?: WorkflowRunEventOrderByWithRelationInput | WorkflowRunEventOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WorkflowRunEvents.
+     */
+    cursor?: WorkflowRunEventWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunEvents from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunEvents.
+     */
+    skip?: number
+    distinct?: WorkflowRunEventScalarFieldEnum | WorkflowRunEventScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunEvent create
+   */
+  export type WorkflowRunEventCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WorkflowRunEvent.
+     */
+    data: XOR<WorkflowRunEventCreateInput, WorkflowRunEventUncheckedCreateInput>
+  }
+
+  /**
+   * WorkflowRunEvent createMany
+   */
+  export type WorkflowRunEventCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WorkflowRunEvents.
+     */
+    data: WorkflowRunEventCreateManyInput | WorkflowRunEventCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WorkflowRunEvent createManyAndReturn
+   */
+  export type WorkflowRunEventCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * The data used to create many WorkflowRunEvents.
+     */
+    data: WorkflowRunEventCreateManyInput | WorkflowRunEventCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRunEvent update
+   */
+  export type WorkflowRunEventUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WorkflowRunEvent.
+     */
+    data: XOR<WorkflowRunEventUpdateInput, WorkflowRunEventUncheckedUpdateInput>
+    /**
+     * Choose, which WorkflowRunEvent to update.
+     */
+    where: WorkflowRunEventWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunEvent updateMany
+   */
+  export type WorkflowRunEventUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WorkflowRunEvents.
+     */
+    data: XOR<WorkflowRunEventUpdateManyMutationInput, WorkflowRunEventUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRunEvents to update
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * Limit how many WorkflowRunEvents to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRunEvent updateManyAndReturn
+   */
+  export type WorkflowRunEventUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * The data used to update WorkflowRunEvents.
+     */
+    data: XOR<WorkflowRunEventUpdateManyMutationInput, WorkflowRunEventUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRunEvents to update
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * Limit how many WorkflowRunEvents to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRunEvent upsert
+   */
+  export type WorkflowRunEventUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WorkflowRunEvent to update in case it exists.
+     */
+    where: WorkflowRunEventWhereUniqueInput
+    /**
+     * In case the WorkflowRunEvent found by the `where` argument doesn't exist, create a new WorkflowRunEvent with this data.
+     */
+    create: XOR<WorkflowRunEventCreateInput, WorkflowRunEventUncheckedCreateInput>
+    /**
+     * In case the WorkflowRunEvent was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkflowRunEventUpdateInput, WorkflowRunEventUncheckedUpdateInput>
+  }
+
+  /**
+   * WorkflowRunEvent delete
+   */
+  export type WorkflowRunEventDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+    /**
+     * Filter which WorkflowRunEvent to delete.
+     */
+    where: WorkflowRunEventWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunEvent deleteMany
+   */
+  export type WorkflowRunEventDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRunEvents to delete
+     */
+    where?: WorkflowRunEventWhereInput
+    /**
+     * Limit how many WorkflowRunEvents to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRunEvent without action
+   */
+  export type WorkflowRunEventDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunEvent
+     */
+    select?: WorkflowRunEventSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunEvent
+     */
+    omit?: WorkflowRunEventOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunEventInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model WorkflowRunArtifact
+   */
+
+  export type AggregateWorkflowRunArtifact = {
+    _count: WorkflowRunArtifactCountAggregateOutputType | null
+    _min: WorkflowRunArtifactMinAggregateOutputType | null
+    _max: WorkflowRunArtifactMaxAggregateOutputType | null
+  }
+
+  export type WorkflowRunArtifactMinAggregateOutputType = {
+    id: string | null
+    runId: string | null
+    contentNodeId: string | null
+    kind: string | null
+    label: string | null
+    createdAt: Date | null
+  }
+
+  export type WorkflowRunArtifactMaxAggregateOutputType = {
+    id: string | null
+    runId: string | null
+    contentNodeId: string | null
+    kind: string | null
+    label: string | null
+    createdAt: Date | null
+  }
+
+  export type WorkflowRunArtifactCountAggregateOutputType = {
+    id: number
+    runId: number
+    contentNodeId: number
+    kind: number
+    label: number
+    createdAt: number
+    _all: number
+  }
+
+
+  export type WorkflowRunArtifactMinAggregateInputType = {
+    id?: true
+    runId?: true
+    contentNodeId?: true
+    kind?: true
+    label?: true
+    createdAt?: true
+  }
+
+  export type WorkflowRunArtifactMaxAggregateInputType = {
+    id?: true
+    runId?: true
+    contentNodeId?: true
+    kind?: true
+    label?: true
+    createdAt?: true
+  }
+
+  export type WorkflowRunArtifactCountAggregateInputType = {
+    id?: true
+    runId?: true
+    contentNodeId?: true
+    kind?: true
+    label?: true
+    createdAt?: true
+    _all?: true
+  }
+
+  export type WorkflowRunArtifactAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRunArtifact to aggregate.
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunArtifacts to fetch.
+     */
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunArtifacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunArtifacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned WorkflowRunArtifacts
+    **/
+    _count?: true | WorkflowRunArtifactCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: WorkflowRunArtifactMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: WorkflowRunArtifactMaxAggregateInputType
+  }
+
+  export type GetWorkflowRunArtifactAggregateType<T extends WorkflowRunArtifactAggregateArgs> = {
+        [P in keyof T & keyof AggregateWorkflowRunArtifact]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateWorkflowRunArtifact[P]>
+      : GetScalarType<T[P], AggregateWorkflowRunArtifact[P]>
+  }
+
+
+
+
+  export type WorkflowRunArtifactGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: WorkflowRunArtifactWhereInput
+    orderBy?: WorkflowRunArtifactOrderByWithAggregationInput | WorkflowRunArtifactOrderByWithAggregationInput[]
+    by: WorkflowRunArtifactScalarFieldEnum[] | WorkflowRunArtifactScalarFieldEnum
+    having?: WorkflowRunArtifactScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: WorkflowRunArtifactCountAggregateInputType | true
+    _min?: WorkflowRunArtifactMinAggregateInputType
+    _max?: WorkflowRunArtifactMaxAggregateInputType
+  }
+
+  export type WorkflowRunArtifactGroupByOutputType = {
+    id: string
+    runId: string
+    contentNodeId: string
+    kind: string
+    label: string
+    createdAt: Date
+    _count: WorkflowRunArtifactCountAggregateOutputType | null
+    _min: WorkflowRunArtifactMinAggregateOutputType | null
+    _max: WorkflowRunArtifactMaxAggregateOutputType | null
+  }
+
+  type GetWorkflowRunArtifactGroupByPayload<T extends WorkflowRunArtifactGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<WorkflowRunArtifactGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof WorkflowRunArtifactGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], WorkflowRunArtifactGroupByOutputType[P]>
+            : GetScalarType<T[P], WorkflowRunArtifactGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type WorkflowRunArtifactSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    contentNodeId?: boolean
+    kind?: boolean
+    label?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunArtifact"]>
+
+  export type WorkflowRunArtifactSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    contentNodeId?: boolean
+    kind?: boolean
+    label?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunArtifact"]>
+
+  export type WorkflowRunArtifactSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    runId?: boolean
+    contentNodeId?: boolean
+    kind?: boolean
+    label?: boolean
+    createdAt?: boolean
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["workflowRunArtifact"]>
+
+  export type WorkflowRunArtifactSelectScalar = {
+    id?: boolean
+    runId?: boolean
+    contentNodeId?: boolean
+    kind?: boolean
+    label?: boolean
+    createdAt?: boolean
+  }
+
+  export type WorkflowRunArtifactOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "runId" | "contentNodeId" | "kind" | "label" | "createdAt", ExtArgs["result"]["workflowRunArtifact"]>
+  export type WorkflowRunArtifactInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowRunArtifactIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type WorkflowRunArtifactIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    run?: boolean | WorkflowRunDefaultArgs<ExtArgs>
+    content?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $WorkflowRunArtifactPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "WorkflowRunArtifact"
+    objects: {
+      run: Prisma.$WorkflowRunPayload<ExtArgs>
+      content: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      runId: string
+      contentNodeId: string
+      kind: string
+      label: string
+      createdAt: Date
+    }, ExtArgs["result"]["workflowRunArtifact"]>
+    composites: {}
+  }
+
+  type WorkflowRunArtifactGetPayload<S extends boolean | null | undefined | WorkflowRunArtifactDefaultArgs> = $Result.GetResult<Prisma.$WorkflowRunArtifactPayload, S>
+
+  type WorkflowRunArtifactCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<WorkflowRunArtifactFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: WorkflowRunArtifactCountAggregateInputType | true
+    }
+
+  export interface WorkflowRunArtifactDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['WorkflowRunArtifact'], meta: { name: 'WorkflowRunArtifact' } }
+    /**
+     * Find zero or one WorkflowRunArtifact that matches the filter.
+     * @param {WorkflowRunArtifactFindUniqueArgs} args - Arguments to find a WorkflowRunArtifact
+     * @example
+     * // Get one WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends WorkflowRunArtifactFindUniqueArgs>(args: SelectSubset<T, WorkflowRunArtifactFindUniqueArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one WorkflowRunArtifact that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {WorkflowRunArtifactFindUniqueOrThrowArgs} args - Arguments to find a WorkflowRunArtifact
+     * @example
+     * // Get one WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends WorkflowRunArtifactFindUniqueOrThrowArgs>(args: SelectSubset<T, WorkflowRunArtifactFindUniqueOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRunArtifact that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactFindFirstArgs} args - Arguments to find a WorkflowRunArtifact
+     * @example
+     * // Get one WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends WorkflowRunArtifactFindFirstArgs>(args?: SelectSubset<T, WorkflowRunArtifactFindFirstArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first WorkflowRunArtifact that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactFindFirstOrThrowArgs} args - Arguments to find a WorkflowRunArtifact
+     * @example
+     * // Get one WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends WorkflowRunArtifactFindFirstOrThrowArgs>(args?: SelectSubset<T, WorkflowRunArtifactFindFirstOrThrowArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more WorkflowRunArtifacts that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all WorkflowRunArtifacts
+     * const workflowRunArtifacts = await prisma.workflowRunArtifact.findMany()
+     * 
+     * // Get first 10 WorkflowRunArtifacts
+     * const workflowRunArtifacts = await prisma.workflowRunArtifact.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const workflowRunArtifactWithIdOnly = await prisma.workflowRunArtifact.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends WorkflowRunArtifactFindManyArgs>(args?: SelectSubset<T, WorkflowRunArtifactFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a WorkflowRunArtifact.
+     * @param {WorkflowRunArtifactCreateArgs} args - Arguments to create a WorkflowRunArtifact.
+     * @example
+     * // Create one WorkflowRunArtifact
+     * const WorkflowRunArtifact = await prisma.workflowRunArtifact.create({
+     *   data: {
+     *     // ... data to create a WorkflowRunArtifact
+     *   }
+     * })
+     * 
+     */
+    create<T extends WorkflowRunArtifactCreateArgs>(args: SelectSubset<T, WorkflowRunArtifactCreateArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many WorkflowRunArtifacts.
+     * @param {WorkflowRunArtifactCreateManyArgs} args - Arguments to create many WorkflowRunArtifacts.
+     * @example
+     * // Create many WorkflowRunArtifacts
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends WorkflowRunArtifactCreateManyArgs>(args?: SelectSubset<T, WorkflowRunArtifactCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many WorkflowRunArtifacts and returns the data saved in the database.
+     * @param {WorkflowRunArtifactCreateManyAndReturnArgs} args - Arguments to create many WorkflowRunArtifacts.
+     * @example
+     * // Create many WorkflowRunArtifacts
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many WorkflowRunArtifacts and only return the `id`
+     * const workflowRunArtifactWithIdOnly = await prisma.workflowRunArtifact.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends WorkflowRunArtifactCreateManyAndReturnArgs>(args?: SelectSubset<T, WorkflowRunArtifactCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a WorkflowRunArtifact.
+     * @param {WorkflowRunArtifactDeleteArgs} args - Arguments to delete one WorkflowRunArtifact.
+     * @example
+     * // Delete one WorkflowRunArtifact
+     * const WorkflowRunArtifact = await prisma.workflowRunArtifact.delete({
+     *   where: {
+     *     // ... filter to delete one WorkflowRunArtifact
+     *   }
+     * })
+     * 
+     */
+    delete<T extends WorkflowRunArtifactDeleteArgs>(args: SelectSubset<T, WorkflowRunArtifactDeleteArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one WorkflowRunArtifact.
+     * @param {WorkflowRunArtifactUpdateArgs} args - Arguments to update one WorkflowRunArtifact.
+     * @example
+     * // Update one WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends WorkflowRunArtifactUpdateArgs>(args: SelectSubset<T, WorkflowRunArtifactUpdateArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more WorkflowRunArtifacts.
+     * @param {WorkflowRunArtifactDeleteManyArgs} args - Arguments to filter WorkflowRunArtifacts to delete.
+     * @example
+     * // Delete a few WorkflowRunArtifacts
+     * const { count } = await prisma.workflowRunArtifact.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends WorkflowRunArtifactDeleteManyArgs>(args?: SelectSubset<T, WorkflowRunArtifactDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRunArtifacts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many WorkflowRunArtifacts
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends WorkflowRunArtifactUpdateManyArgs>(args: SelectSubset<T, WorkflowRunArtifactUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more WorkflowRunArtifacts and returns the data updated in the database.
+     * @param {WorkflowRunArtifactUpdateManyAndReturnArgs} args - Arguments to update many WorkflowRunArtifacts.
+     * @example
+     * // Update many WorkflowRunArtifacts
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more WorkflowRunArtifacts and only return the `id`
+     * const workflowRunArtifactWithIdOnly = await prisma.workflowRunArtifact.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends WorkflowRunArtifactUpdateManyAndReturnArgs>(args: SelectSubset<T, WorkflowRunArtifactUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one WorkflowRunArtifact.
+     * @param {WorkflowRunArtifactUpsertArgs} args - Arguments to update or create a WorkflowRunArtifact.
+     * @example
+     * // Update or create a WorkflowRunArtifact
+     * const workflowRunArtifact = await prisma.workflowRunArtifact.upsert({
+     *   create: {
+     *     // ... data to create a WorkflowRunArtifact
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the WorkflowRunArtifact we want to update
+     *   }
+     * })
+     */
+    upsert<T extends WorkflowRunArtifactUpsertArgs>(args: SelectSubset<T, WorkflowRunArtifactUpsertArgs<ExtArgs>>): Prisma__WorkflowRunArtifactClient<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of WorkflowRunArtifacts.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactCountArgs} args - Arguments to filter WorkflowRunArtifacts to count.
+     * @example
+     * // Count the number of WorkflowRunArtifacts
+     * const count = await prisma.workflowRunArtifact.count({
+     *   where: {
+     *     // ... the filter for the WorkflowRunArtifacts we want to count
+     *   }
+     * })
+    **/
+    count<T extends WorkflowRunArtifactCountArgs>(
+      args?: Subset<T, WorkflowRunArtifactCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], WorkflowRunArtifactCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a WorkflowRunArtifact.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends WorkflowRunArtifactAggregateArgs>(args: Subset<T, WorkflowRunArtifactAggregateArgs>): Prisma.PrismaPromise<GetWorkflowRunArtifactAggregateType<T>>
+
+    /**
+     * Group by WorkflowRunArtifact.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {WorkflowRunArtifactGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends WorkflowRunArtifactGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: WorkflowRunArtifactGroupByArgs['orderBy'] }
+        : { orderBy?: WorkflowRunArtifactGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, WorkflowRunArtifactGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetWorkflowRunArtifactGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the WorkflowRunArtifact model
+   */
+  readonly fields: WorkflowRunArtifactFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for WorkflowRunArtifact.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__WorkflowRunArtifactClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    run<T extends WorkflowRunDefaultArgs<ExtArgs> = {}>(args?: Subset<T, WorkflowRunDefaultArgs<ExtArgs>>): Prisma__WorkflowRunClient<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    content<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the WorkflowRunArtifact model
+   */
+  interface WorkflowRunArtifactFieldRefs {
+    readonly id: FieldRef<"WorkflowRunArtifact", 'String'>
+    readonly runId: FieldRef<"WorkflowRunArtifact", 'String'>
+    readonly contentNodeId: FieldRef<"WorkflowRunArtifact", 'String'>
+    readonly kind: FieldRef<"WorkflowRunArtifact", 'String'>
+    readonly label: FieldRef<"WorkflowRunArtifact", 'String'>
+    readonly createdAt: FieldRef<"WorkflowRunArtifact", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * WorkflowRunArtifact findUnique
+   */
+  export type WorkflowRunArtifactFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunArtifact to fetch.
+     */
+    where: WorkflowRunArtifactWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunArtifact findUniqueOrThrow
+   */
+  export type WorkflowRunArtifactFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunArtifact to fetch.
+     */
+    where: WorkflowRunArtifactWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunArtifact findFirst
+   */
+  export type WorkflowRunArtifactFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunArtifact to fetch.
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunArtifacts to fetch.
+     */
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRunArtifacts.
+     */
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunArtifacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunArtifacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRunArtifacts.
+     */
+    distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunArtifact findFirstOrThrow
+   */
+  export type WorkflowRunArtifactFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunArtifact to fetch.
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunArtifacts to fetch.
+     */
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for WorkflowRunArtifacts.
+     */
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunArtifacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunArtifacts.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of WorkflowRunArtifacts.
+     */
+    distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunArtifact findMany
+   */
+  export type WorkflowRunArtifactFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter, which WorkflowRunArtifacts to fetch.
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of WorkflowRunArtifacts to fetch.
+     */
+    orderBy?: WorkflowRunArtifactOrderByWithRelationInput | WorkflowRunArtifactOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing WorkflowRunArtifacts.
+     */
+    cursor?: WorkflowRunArtifactWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` WorkflowRunArtifacts from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` WorkflowRunArtifacts.
+     */
+    skip?: number
+    distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * WorkflowRunArtifact create
+   */
+  export type WorkflowRunArtifactCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * The data needed to create a WorkflowRunArtifact.
+     */
+    data: XOR<WorkflowRunArtifactCreateInput, WorkflowRunArtifactUncheckedCreateInput>
+  }
+
+  /**
+   * WorkflowRunArtifact createMany
+   */
+  export type WorkflowRunArtifactCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many WorkflowRunArtifacts.
+     */
+    data: WorkflowRunArtifactCreateManyInput | WorkflowRunArtifactCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * WorkflowRunArtifact createManyAndReturn
+   */
+  export type WorkflowRunArtifactCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * The data used to create many WorkflowRunArtifacts.
+     */
+    data: WorkflowRunArtifactCreateManyInput | WorkflowRunArtifactCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRunArtifact update
+   */
+  export type WorkflowRunArtifactUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * The data needed to update a WorkflowRunArtifact.
+     */
+    data: XOR<WorkflowRunArtifactUpdateInput, WorkflowRunArtifactUncheckedUpdateInput>
+    /**
+     * Choose, which WorkflowRunArtifact to update.
+     */
+    where: WorkflowRunArtifactWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunArtifact updateMany
+   */
+  export type WorkflowRunArtifactUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update WorkflowRunArtifacts.
+     */
+    data: XOR<WorkflowRunArtifactUpdateManyMutationInput, WorkflowRunArtifactUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRunArtifacts to update
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * Limit how many WorkflowRunArtifacts to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRunArtifact updateManyAndReturn
+   */
+  export type WorkflowRunArtifactUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * The data used to update WorkflowRunArtifacts.
+     */
+    data: XOR<WorkflowRunArtifactUpdateManyMutationInput, WorkflowRunArtifactUncheckedUpdateManyInput>
+    /**
+     * Filter which WorkflowRunArtifacts to update
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * Limit how many WorkflowRunArtifacts to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * WorkflowRunArtifact upsert
+   */
+  export type WorkflowRunArtifactUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * The filter to search for the WorkflowRunArtifact to update in case it exists.
+     */
+    where: WorkflowRunArtifactWhereUniqueInput
+    /**
+     * In case the WorkflowRunArtifact found by the `where` argument doesn't exist, create a new WorkflowRunArtifact with this data.
+     */
+    create: XOR<WorkflowRunArtifactCreateInput, WorkflowRunArtifactUncheckedCreateInput>
+    /**
+     * In case the WorkflowRunArtifact was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<WorkflowRunArtifactUpdateInput, WorkflowRunArtifactUncheckedUpdateInput>
+  }
+
+  /**
+   * WorkflowRunArtifact delete
+   */
+  export type WorkflowRunArtifactDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+    /**
+     * Filter which WorkflowRunArtifact to delete.
+     */
+    where: WorkflowRunArtifactWhereUniqueInput
+  }
+
+  /**
+   * WorkflowRunArtifact deleteMany
+   */
+  export type WorkflowRunArtifactDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which WorkflowRunArtifacts to delete
+     */
+    where?: WorkflowRunArtifactWhereInput
+    /**
+     * Limit how many WorkflowRunArtifacts to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * WorkflowRunArtifact without action
+   */
+  export type WorkflowRunArtifactDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the WorkflowRunArtifact
+     */
+    select?: WorkflowRunArtifactSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the WorkflowRunArtifact
+     */
+    omit?: WorkflowRunArtifactOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: WorkflowRunArtifactInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -112657,6 +117893,70 @@ export namespace Prisma {
   export type RateLimitCounterScalarFieldEnum = (typeof RateLimitCounterScalarFieldEnum)[keyof typeof RateLimitCounterScalarFieldEnum]
 
 
+  export const WorkflowDefinitionScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    slug: 'slug',
+    name: 'name',
+    engine: 'engine',
+    engineRef: 'engineRef',
+    inputSchema: 'inputSchema',
+    enabled: 'enabled',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type WorkflowDefinitionScalarFieldEnum = (typeof WorkflowDefinitionScalarFieldEnum)[keyof typeof WorkflowDefinitionScalarFieldEnum]
+
+
+  export const WorkflowRunScalarFieldEnum: {
+    id: 'id',
+    definitionId: 'definitionId',
+    ownerId: 'ownerId',
+    status: 'status',
+    engine: 'engine',
+    engineRunId: 'engineRunId',
+    engineGateRef: 'engineGateRef',
+    input: 'input',
+    output: 'output',
+    error: 'error',
+    gateToken: 'gateToken',
+    conversationId: 'conversationId',
+    startedAt: 'startedAt',
+    finishedAt: 'finishedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type WorkflowRunScalarFieldEnum = (typeof WorkflowRunScalarFieldEnum)[keyof typeof WorkflowRunScalarFieldEnum]
+
+
+  export const WorkflowRunEventScalarFieldEnum: {
+    id: 'id',
+    runId: 'runId',
+    seq: 'seq',
+    key: 'key',
+    type: 'type',
+    stepName: 'stepName',
+    payload: 'payload',
+    createdAt: 'createdAt'
+  };
+
+  export type WorkflowRunEventScalarFieldEnum = (typeof WorkflowRunEventScalarFieldEnum)[keyof typeof WorkflowRunEventScalarFieldEnum]
+
+
+  export const WorkflowRunArtifactScalarFieldEnum: {
+    id: 'id',
+    runId: 'runId',
+    contentNodeId: 'contentNodeId',
+    kind: 'kind',
+    label: 'label',
+    createdAt: 'createdAt'
+  };
+
+  export type WorkflowRunArtifactScalarFieldEnum = (typeof WorkflowRunArtifactScalarFieldEnum)[keyof typeof WorkflowRunArtifactScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -113233,6 +118533,20 @@ export namespace Prisma {
    */
   export type ListEnumActivityActorTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'ActivityActorType[]'>
     
+
+
+  /**
+   * Reference to a field of type 'WorkflowRunStatus'
+   */
+  export type EnumWorkflowRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkflowRunStatus'>
+    
+
+
+  /**
+   * Reference to a field of type 'WorkflowRunStatus[]'
+   */
+  export type ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WorkflowRunStatus[]'>
+    
   /**
    * Deep Input Types
    */
@@ -113306,6 +118620,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionListRelationFilter
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
+    workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
   }
 
   export type ContentNodeOrderByWithRelationInput = {
@@ -113373,6 +118688,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionOrderByRelationAggregateInput
     webResourceLinks?: WebResourceContentLinkOrderByRelationAggregateInput
     webResourceViewStates?: WebResourceViewStateOrderByRelationAggregateInput
+    workflowRunArtifacts?: WorkflowRunArtifactOrderByRelationAggregateInput
   }
 
   export type ContentNodeWhereUniqueInput = Prisma.AtLeast<{
@@ -113444,6 +118760,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionListRelationFilter
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
+    workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
   }, "id" | "ownerId_slug">
 
   export type ContentNodeOrderByWithAggregationInput = {
@@ -114824,6 +120141,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientListRelationFilter
     dmParticipations?: DmParticipantListRelationFilter
     dmMessagesSent?: DmMessageListRelationFilter
+    workflowDefinitions?: WorkflowDefinitionListRelationFilter
+    workflowRuns?: WorkflowRunListRelationFilter
   }
 
   export type UserOrderByWithRelationInput = {
@@ -114900,6 +120219,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientOrderByRelationAggregateInput
     dmParticipations?: DmParticipantOrderByRelationAggregateInput
     dmMessagesSent?: DmMessageOrderByRelationAggregateInput
+    workflowDefinitions?: WorkflowDefinitionOrderByRelationAggregateInput
+    workflowRuns?: WorkflowRunOrderByRelationAggregateInput
   }
 
   export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -114979,6 +120300,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientListRelationFilter
     dmParticipations?: DmParticipantListRelationFilter
     dmMessagesSent?: DmMessageListRelationFilter
+    workflowDefinitions?: WorkflowDefinitionListRelationFilter
+    workflowRuns?: WorkflowRunListRelationFilter
   }, "id" | "username" | "email">
 
   export type UserOrderByWithAggregationInput = {
@@ -117292,6 +122615,7 @@ export namespace Prisma {
     activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
+    workflowRuns?: WorkflowRunListRelationFilter
   }
 
   export type ConversationOrderByWithRelationInput = {
@@ -117308,6 +122632,7 @@ export namespace Prisma {
     activeContext?: ChatContextOrderByWithRelationInput
     messages?: ConversationMessageOrderByRelationAggregateInput
     associations?: ConversationAssociationOrderByRelationAggregateInput
+    workflowRuns?: WorkflowRunOrderByRelationAggregateInput
   }
 
   export type ConversationWhereUniqueInput = Prisma.AtLeast<{
@@ -117327,6 +122652,7 @@ export namespace Prisma {
     activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
+    workflowRuns?: WorkflowRunListRelationFilter
   }, "id" | "archivedToContentNodeId">
 
   export type ConversationOrderByWithAggregationInput = {
@@ -120762,6 +126088,349 @@ export namespace Prisma {
     count?: IntWithAggregatesFilter<"RateLimitCounter"> | number
   }
 
+  export type WorkflowDefinitionWhereInput = {
+    AND?: WorkflowDefinitionWhereInput | WorkflowDefinitionWhereInput[]
+    OR?: WorkflowDefinitionWhereInput[]
+    NOT?: WorkflowDefinitionWhereInput | WorkflowDefinitionWhereInput[]
+    id?: UuidFilter<"WorkflowDefinition"> | string
+    ownerId?: UuidFilter<"WorkflowDefinition"> | string
+    slug?: StringFilter<"WorkflowDefinition"> | string
+    name?: StringFilter<"WorkflowDefinition"> | string
+    engine?: StringFilter<"WorkflowDefinition"> | string
+    engineRef?: StringFilter<"WorkflowDefinition"> | string
+    inputSchema?: JsonNullableFilter<"WorkflowDefinition">
+    enabled?: BoolFilter<"WorkflowDefinition"> | boolean
+    createdAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    runs?: WorkflowRunListRelationFilter
+  }
+
+  export type WorkflowDefinitionOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    slug?: SortOrder
+    name?: SortOrder
+    engine?: SortOrder
+    engineRef?: SortOrder
+    inputSchema?: SortOrderInput | SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+    runs?: WorkflowRunOrderByRelationAggregateInput
+  }
+
+  export type WorkflowDefinitionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerId_slug?: WorkflowDefinitionOwnerIdSlugCompoundUniqueInput
+    AND?: WorkflowDefinitionWhereInput | WorkflowDefinitionWhereInput[]
+    OR?: WorkflowDefinitionWhereInput[]
+    NOT?: WorkflowDefinitionWhereInput | WorkflowDefinitionWhereInput[]
+    ownerId?: UuidFilter<"WorkflowDefinition"> | string
+    slug?: StringFilter<"WorkflowDefinition"> | string
+    name?: StringFilter<"WorkflowDefinition"> | string
+    engine?: StringFilter<"WorkflowDefinition"> | string
+    engineRef?: StringFilter<"WorkflowDefinition"> | string
+    inputSchema?: JsonNullableFilter<"WorkflowDefinition">
+    enabled?: BoolFilter<"WorkflowDefinition"> | boolean
+    createdAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    runs?: WorkflowRunListRelationFilter
+  }, "id" | "ownerId_slug">
+
+  export type WorkflowDefinitionOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    slug?: SortOrder
+    name?: SortOrder
+    engine?: SortOrder
+    engineRef?: SortOrder
+    inputSchema?: SortOrderInput | SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: WorkflowDefinitionCountOrderByAggregateInput
+    _max?: WorkflowDefinitionMaxOrderByAggregateInput
+    _min?: WorkflowDefinitionMinOrderByAggregateInput
+  }
+
+  export type WorkflowDefinitionScalarWhereWithAggregatesInput = {
+    AND?: WorkflowDefinitionScalarWhereWithAggregatesInput | WorkflowDefinitionScalarWhereWithAggregatesInput[]
+    OR?: WorkflowDefinitionScalarWhereWithAggregatesInput[]
+    NOT?: WorkflowDefinitionScalarWhereWithAggregatesInput | WorkflowDefinitionScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"WorkflowDefinition"> | string
+    ownerId?: UuidWithAggregatesFilter<"WorkflowDefinition"> | string
+    slug?: StringWithAggregatesFilter<"WorkflowDefinition"> | string
+    name?: StringWithAggregatesFilter<"WorkflowDefinition"> | string
+    engine?: StringWithAggregatesFilter<"WorkflowDefinition"> | string
+    engineRef?: StringWithAggregatesFilter<"WorkflowDefinition"> | string
+    inputSchema?: JsonNullableWithAggregatesFilter<"WorkflowDefinition">
+    enabled?: BoolWithAggregatesFilter<"WorkflowDefinition"> | boolean
+    createdAt?: DateTimeWithAggregatesFilter<"WorkflowDefinition"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"WorkflowDefinition"> | Date | string
+  }
+
+  export type WorkflowRunWhereInput = {
+    AND?: WorkflowRunWhereInput | WorkflowRunWhereInput[]
+    OR?: WorkflowRunWhereInput[]
+    NOT?: WorkflowRunWhereInput | WorkflowRunWhereInput[]
+    id?: UuidFilter<"WorkflowRun"> | string
+    definitionId?: UuidFilter<"WorkflowRun"> | string
+    ownerId?: UuidFilter<"WorkflowRun"> | string
+    status?: EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
+    engine?: StringFilter<"WorkflowRun"> | string
+    engineRunId?: StringNullableFilter<"WorkflowRun"> | string | null
+    engineGateRef?: StringNullableFilter<"WorkflowRun"> | string | null
+    input?: JsonFilter<"WorkflowRun">
+    output?: JsonNullableFilter<"WorkflowRun">
+    error?: JsonNullableFilter<"WorkflowRun">
+    gateToken?: StringNullableFilter<"WorkflowRun"> | string | null
+    conversationId?: UuidNullableFilter<"WorkflowRun"> | string | null
+    startedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    finishedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    createdAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    definition?: XOR<WorkflowDefinitionScalarRelationFilter, WorkflowDefinitionWhereInput>
+    conversation?: XOR<ConversationNullableScalarRelationFilter, ConversationWhereInput> | null
+    events?: WorkflowRunEventListRelationFilter
+    artifacts?: WorkflowRunArtifactListRelationFilter
+  }
+
+  export type WorkflowRunOrderByWithRelationInput = {
+    id?: SortOrder
+    definitionId?: SortOrder
+    ownerId?: SortOrder
+    status?: SortOrder
+    engine?: SortOrder
+    engineRunId?: SortOrderInput | SortOrder
+    engineGateRef?: SortOrderInput | SortOrder
+    input?: SortOrder
+    output?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    gateToken?: SortOrderInput | SortOrder
+    conversationId?: SortOrderInput | SortOrder
+    startedAt?: SortOrderInput | SortOrder
+    finishedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+    definition?: WorkflowDefinitionOrderByWithRelationInput
+    conversation?: ConversationOrderByWithRelationInput
+    events?: WorkflowRunEventOrderByRelationAggregateInput
+    artifacts?: WorkflowRunArtifactOrderByRelationAggregateInput
+  }
+
+  export type WorkflowRunWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: WorkflowRunWhereInput | WorkflowRunWhereInput[]
+    OR?: WorkflowRunWhereInput[]
+    NOT?: WorkflowRunWhereInput | WorkflowRunWhereInput[]
+    definitionId?: UuidFilter<"WorkflowRun"> | string
+    ownerId?: UuidFilter<"WorkflowRun"> | string
+    status?: EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
+    engine?: StringFilter<"WorkflowRun"> | string
+    engineRunId?: StringNullableFilter<"WorkflowRun"> | string | null
+    engineGateRef?: StringNullableFilter<"WorkflowRun"> | string | null
+    input?: JsonFilter<"WorkflowRun">
+    output?: JsonNullableFilter<"WorkflowRun">
+    error?: JsonNullableFilter<"WorkflowRun">
+    gateToken?: StringNullableFilter<"WorkflowRun"> | string | null
+    conversationId?: UuidNullableFilter<"WorkflowRun"> | string | null
+    startedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    finishedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    createdAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    definition?: XOR<WorkflowDefinitionScalarRelationFilter, WorkflowDefinitionWhereInput>
+    conversation?: XOR<ConversationNullableScalarRelationFilter, ConversationWhereInput> | null
+    events?: WorkflowRunEventListRelationFilter
+    artifacts?: WorkflowRunArtifactListRelationFilter
+  }, "id">
+
+  export type WorkflowRunOrderByWithAggregationInput = {
+    id?: SortOrder
+    definitionId?: SortOrder
+    ownerId?: SortOrder
+    status?: SortOrder
+    engine?: SortOrder
+    engineRunId?: SortOrderInput | SortOrder
+    engineGateRef?: SortOrderInput | SortOrder
+    input?: SortOrder
+    output?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    gateToken?: SortOrderInput | SortOrder
+    conversationId?: SortOrderInput | SortOrder
+    startedAt?: SortOrderInput | SortOrder
+    finishedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: WorkflowRunCountOrderByAggregateInput
+    _max?: WorkflowRunMaxOrderByAggregateInput
+    _min?: WorkflowRunMinOrderByAggregateInput
+  }
+
+  export type WorkflowRunScalarWhereWithAggregatesInput = {
+    AND?: WorkflowRunScalarWhereWithAggregatesInput | WorkflowRunScalarWhereWithAggregatesInput[]
+    OR?: WorkflowRunScalarWhereWithAggregatesInput[]
+    NOT?: WorkflowRunScalarWhereWithAggregatesInput | WorkflowRunScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"WorkflowRun"> | string
+    definitionId?: UuidWithAggregatesFilter<"WorkflowRun"> | string
+    ownerId?: UuidWithAggregatesFilter<"WorkflowRun"> | string
+    status?: EnumWorkflowRunStatusWithAggregatesFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
+    engine?: StringWithAggregatesFilter<"WorkflowRun"> | string
+    engineRunId?: StringNullableWithAggregatesFilter<"WorkflowRun"> | string | null
+    engineGateRef?: StringNullableWithAggregatesFilter<"WorkflowRun"> | string | null
+    input?: JsonWithAggregatesFilter<"WorkflowRun">
+    output?: JsonNullableWithAggregatesFilter<"WorkflowRun">
+    error?: JsonNullableWithAggregatesFilter<"WorkflowRun">
+    gateToken?: StringNullableWithAggregatesFilter<"WorkflowRun"> | string | null
+    conversationId?: UuidNullableWithAggregatesFilter<"WorkflowRun"> | string | null
+    startedAt?: DateTimeNullableWithAggregatesFilter<"WorkflowRun"> | Date | string | null
+    finishedAt?: DateTimeNullableWithAggregatesFilter<"WorkflowRun"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"WorkflowRun"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"WorkflowRun"> | Date | string
+  }
+
+  export type WorkflowRunEventWhereInput = {
+    AND?: WorkflowRunEventWhereInput | WorkflowRunEventWhereInput[]
+    OR?: WorkflowRunEventWhereInput[]
+    NOT?: WorkflowRunEventWhereInput | WorkflowRunEventWhereInput[]
+    id?: UuidFilter<"WorkflowRunEvent"> | string
+    runId?: UuidFilter<"WorkflowRunEvent"> | string
+    seq?: IntFilter<"WorkflowRunEvent"> | number
+    key?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    type?: StringFilter<"WorkflowRunEvent"> | string
+    stepName?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    payload?: JsonNullableFilter<"WorkflowRunEvent">
+    createdAt?: DateTimeFilter<"WorkflowRunEvent"> | Date | string
+    run?: XOR<WorkflowRunScalarRelationFilter, WorkflowRunWhereInput>
+  }
+
+  export type WorkflowRunEventOrderByWithRelationInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    seq?: SortOrder
+    key?: SortOrderInput | SortOrder
+    type?: SortOrder
+    stepName?: SortOrderInput | SortOrder
+    payload?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    run?: WorkflowRunOrderByWithRelationInput
+  }
+
+  export type WorkflowRunEventWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    runId_seq?: WorkflowRunEventRunIdSeqCompoundUniqueInput
+    runId_key?: WorkflowRunEventRunIdKeyCompoundUniqueInput
+    AND?: WorkflowRunEventWhereInput | WorkflowRunEventWhereInput[]
+    OR?: WorkflowRunEventWhereInput[]
+    NOT?: WorkflowRunEventWhereInput | WorkflowRunEventWhereInput[]
+    runId?: UuidFilter<"WorkflowRunEvent"> | string
+    seq?: IntFilter<"WorkflowRunEvent"> | number
+    key?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    type?: StringFilter<"WorkflowRunEvent"> | string
+    stepName?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    payload?: JsonNullableFilter<"WorkflowRunEvent">
+    createdAt?: DateTimeFilter<"WorkflowRunEvent"> | Date | string
+    run?: XOR<WorkflowRunScalarRelationFilter, WorkflowRunWhereInput>
+  }, "id" | "runId_seq" | "runId_key">
+
+  export type WorkflowRunEventOrderByWithAggregationInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    seq?: SortOrder
+    key?: SortOrderInput | SortOrder
+    type?: SortOrder
+    stepName?: SortOrderInput | SortOrder
+    payload?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    _count?: WorkflowRunEventCountOrderByAggregateInput
+    _avg?: WorkflowRunEventAvgOrderByAggregateInput
+    _max?: WorkflowRunEventMaxOrderByAggregateInput
+    _min?: WorkflowRunEventMinOrderByAggregateInput
+    _sum?: WorkflowRunEventSumOrderByAggregateInput
+  }
+
+  export type WorkflowRunEventScalarWhereWithAggregatesInput = {
+    AND?: WorkflowRunEventScalarWhereWithAggregatesInput | WorkflowRunEventScalarWhereWithAggregatesInput[]
+    OR?: WorkflowRunEventScalarWhereWithAggregatesInput[]
+    NOT?: WorkflowRunEventScalarWhereWithAggregatesInput | WorkflowRunEventScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"WorkflowRunEvent"> | string
+    runId?: UuidWithAggregatesFilter<"WorkflowRunEvent"> | string
+    seq?: IntWithAggregatesFilter<"WorkflowRunEvent"> | number
+    key?: StringNullableWithAggregatesFilter<"WorkflowRunEvent"> | string | null
+    type?: StringWithAggregatesFilter<"WorkflowRunEvent"> | string
+    stepName?: StringNullableWithAggregatesFilter<"WorkflowRunEvent"> | string | null
+    payload?: JsonNullableWithAggregatesFilter<"WorkflowRunEvent">
+    createdAt?: DateTimeWithAggregatesFilter<"WorkflowRunEvent"> | Date | string
+  }
+
+  export type WorkflowRunArtifactWhereInput = {
+    AND?: WorkflowRunArtifactWhereInput | WorkflowRunArtifactWhereInput[]
+    OR?: WorkflowRunArtifactWhereInput[]
+    NOT?: WorkflowRunArtifactWhereInput | WorkflowRunArtifactWhereInput[]
+    id?: UuidFilter<"WorkflowRunArtifact"> | string
+    runId?: UuidFilter<"WorkflowRunArtifact"> | string
+    contentNodeId?: UuidFilter<"WorkflowRunArtifact"> | string
+    kind?: StringFilter<"WorkflowRunArtifact"> | string
+    label?: StringFilter<"WorkflowRunArtifact"> | string
+    createdAt?: DateTimeFilter<"WorkflowRunArtifact"> | Date | string
+    run?: XOR<WorkflowRunScalarRelationFilter, WorkflowRunWhereInput>
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type WorkflowRunArtifactOrderByWithRelationInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    contentNodeId?: SortOrder
+    kind?: SortOrder
+    label?: SortOrder
+    createdAt?: SortOrder
+    run?: WorkflowRunOrderByWithRelationInput
+    content?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type WorkflowRunArtifactWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: WorkflowRunArtifactWhereInput | WorkflowRunArtifactWhereInput[]
+    OR?: WorkflowRunArtifactWhereInput[]
+    NOT?: WorkflowRunArtifactWhereInput | WorkflowRunArtifactWhereInput[]
+    runId?: UuidFilter<"WorkflowRunArtifact"> | string
+    contentNodeId?: UuidFilter<"WorkflowRunArtifact"> | string
+    kind?: StringFilter<"WorkflowRunArtifact"> | string
+    label?: StringFilter<"WorkflowRunArtifact"> | string
+    createdAt?: DateTimeFilter<"WorkflowRunArtifact"> | Date | string
+    run?: XOR<WorkflowRunScalarRelationFilter, WorkflowRunWhereInput>
+    content?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id">
+
+  export type WorkflowRunArtifactOrderByWithAggregationInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    contentNodeId?: SortOrder
+    kind?: SortOrder
+    label?: SortOrder
+    createdAt?: SortOrder
+    _count?: WorkflowRunArtifactCountOrderByAggregateInput
+    _max?: WorkflowRunArtifactMaxOrderByAggregateInput
+    _min?: WorkflowRunArtifactMinOrderByAggregateInput
+  }
+
+  export type WorkflowRunArtifactScalarWhereWithAggregatesInput = {
+    AND?: WorkflowRunArtifactScalarWhereWithAggregatesInput | WorkflowRunArtifactScalarWhereWithAggregatesInput[]
+    OR?: WorkflowRunArtifactScalarWhereWithAggregatesInput[]
+    NOT?: WorkflowRunArtifactScalarWhereWithAggregatesInput | WorkflowRunArtifactScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"WorkflowRunArtifact"> | string
+    runId?: UuidWithAggregatesFilter<"WorkflowRunArtifact"> | string
+    contentNodeId?: UuidWithAggregatesFilter<"WorkflowRunArtifact"> | string
+    kind?: StringWithAggregatesFilter<"WorkflowRunArtifact"> | string
+    label?: StringWithAggregatesFilter<"WorkflowRunArtifact"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"WorkflowRunArtifact"> | Date | string
+  }
+
   export type ContentNodeCreateInput = {
     id?: string
     title: string
@@ -120821,6 +126490,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateInput = {
@@ -120882,6 +126552,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUpdateInput = {
@@ -120943,6 +126614,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateInput = {
@@ -121004,6 +126676,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateManyInput = {
@@ -122506,6 +128179,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateInput = {
@@ -122581,6 +128256,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUpdateInput = {
@@ -122656,6 +128333,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateInput = {
@@ -122731,6 +128410,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateManyInput = {
@@ -125217,6 +130898,7 @@ export namespace Prisma {
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateInput = {
@@ -125230,6 +130912,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUpdateInput = {
@@ -125243,6 +130926,7 @@ export namespace Prisma {
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateInput = {
@@ -125256,6 +130940,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationCreateManyInput = {
@@ -128921,6 +134606,375 @@ export namespace Prisma {
     count?: IntFieldUpdateOperationsInput | number
   }
 
+  export type WorkflowDefinitionCreateInput = {
+    id?: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowDefinitionsInput
+    runs?: WorkflowRunCreateNestedManyWithoutDefinitionInput
+  }
+
+  export type WorkflowDefinitionUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    runs?: WorkflowRunUncheckedCreateNestedManyWithoutDefinitionInput
+  }
+
+  export type WorkflowDefinitionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowDefinitionsNestedInput
+    runs?: WorkflowRunUpdateManyWithoutDefinitionNestedInput
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runs?: WorkflowRunUncheckedUpdateManyWithoutDefinitionNestedInput
+  }
+
+  export type WorkflowDefinitionCreateManyInput = {
+    id?: string
+    ownerId: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowDefinitionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunCreateInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowRunsInput
+    definition: WorkflowDefinitionCreateNestedOneWithoutRunsInput
+    conversation?: ConversationCreateNestedOneWithoutWorkflowRunsInput
+    events?: WorkflowRunEventCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+    definition?: WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput
+    conversation?: ConversationUpdateOneWithoutWorkflowRunsNestedInput
+    events?: WorkflowRunEventUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunCreateManyInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowRunUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventCreateInput = {
+    id?: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    run: WorkflowRunCreateNestedOneWithoutEventsInput
+  }
+
+  export type WorkflowRunEventUncheckedCreateInput = {
+    id?: string
+    runId: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunEventUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    run?: WorkflowRunUpdateOneRequiredWithoutEventsNestedInput
+  }
+
+  export type WorkflowRunEventUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventCreateManyInput = {
+    id?: string
+    runId: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunEventUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactCreateInput = {
+    id?: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+    run: WorkflowRunCreateNestedOneWithoutArtifactsInput
+    content: ContentNodeCreateNestedOneWithoutWorkflowRunArtifactsInput
+  }
+
+  export type WorkflowRunArtifactUncheckedCreateInput = {
+    id?: string
+    runId: string
+    contentNodeId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunArtifactUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    run?: WorkflowRunUpdateOneRequiredWithoutArtifactsNestedInput
+    content?: ContentNodeUpdateOneRequiredWithoutWorkflowRunArtifactsNestedInput
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    contentNodeId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactCreateManyInput = {
+    id?: string
+    runId: string
+    contentNodeId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunArtifactUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    contentNodeId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -129247,6 +135301,12 @@ export namespace Prisma {
     none?: WebResourceViewStateWhereInput
   }
 
+  export type WorkflowRunArtifactListRelationFilter = {
+    every?: WorkflowRunArtifactWhereInput
+    some?: WorkflowRunArtifactWhereInput
+    none?: WorkflowRunArtifactWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -129329,6 +135389,10 @@ export namespace Prisma {
   }
 
   export type WebResourceViewStateOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WorkflowRunArtifactOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -130871,6 +136935,18 @@ export namespace Prisma {
     none?: DmMessageWhereInput
   }
 
+  export type WorkflowDefinitionListRelationFilter = {
+    every?: WorkflowDefinitionWhereInput
+    some?: WorkflowDefinitionWhereInput
+    none?: WorkflowDefinitionWhereInput
+  }
+
+  export type WorkflowRunListRelationFilter = {
+    every?: WorkflowRunWhereInput
+    some?: WorkflowRunWhereInput
+    none?: WorkflowRunWhereInput
+  }
+
   export type AccountOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
@@ -131012,6 +137088,14 @@ export namespace Prisma {
   }
 
   export type DmMessageOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WorkflowDefinitionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WorkflowRunOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -134500,6 +140584,212 @@ export namespace Prisma {
     count?: SortOrder
   }
 
+  export type WorkflowDefinitionOwnerIdSlugCompoundUniqueInput = {
+    ownerId: string
+    slug: string
+  }
+
+  export type WorkflowDefinitionCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    slug?: SortOrder
+    name?: SortOrder
+    engine?: SortOrder
+    engineRef?: SortOrder
+    inputSchema?: SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowDefinitionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    slug?: SortOrder
+    name?: SortOrder
+    engine?: SortOrder
+    engineRef?: SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowDefinitionMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    slug?: SortOrder
+    name?: SortOrder
+    engine?: SortOrder
+    engineRef?: SortOrder
+    enabled?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumWorkflowRunStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.WorkflowRunStatus | EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumWorkflowRunStatusFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+  }
+
+  export type WorkflowDefinitionScalarRelationFilter = {
+    is?: WorkflowDefinitionWhereInput
+    isNot?: WorkflowDefinitionWhereInput
+  }
+
+  export type WorkflowRunEventListRelationFilter = {
+    every?: WorkflowRunEventWhereInput
+    some?: WorkflowRunEventWhereInput
+    none?: WorkflowRunEventWhereInput
+  }
+
+  export type WorkflowRunEventOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type WorkflowRunCountOrderByAggregateInput = {
+    id?: SortOrder
+    definitionId?: SortOrder
+    ownerId?: SortOrder
+    status?: SortOrder
+    engine?: SortOrder
+    engineRunId?: SortOrder
+    engineGateRef?: SortOrder
+    input?: SortOrder
+    output?: SortOrder
+    error?: SortOrder
+    gateToken?: SortOrder
+    conversationId?: SortOrder
+    startedAt?: SortOrder
+    finishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowRunMaxOrderByAggregateInput = {
+    id?: SortOrder
+    definitionId?: SortOrder
+    ownerId?: SortOrder
+    status?: SortOrder
+    engine?: SortOrder
+    engineRunId?: SortOrder
+    engineGateRef?: SortOrder
+    gateToken?: SortOrder
+    conversationId?: SortOrder
+    startedAt?: SortOrder
+    finishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type WorkflowRunMinOrderByAggregateInput = {
+    id?: SortOrder
+    definitionId?: SortOrder
+    ownerId?: SortOrder
+    status?: SortOrder
+    engine?: SortOrder
+    engineRunId?: SortOrder
+    engineGateRef?: SortOrder
+    gateToken?: SortOrder
+    conversationId?: SortOrder
+    startedAt?: SortOrder
+    finishedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type EnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.WorkflowRunStatus | EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+    _max?: NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+  }
+
+  export type WorkflowRunScalarRelationFilter = {
+    is?: WorkflowRunWhereInput
+    isNot?: WorkflowRunWhereInput
+  }
+
+  export type WorkflowRunEventRunIdSeqCompoundUniqueInput = {
+    runId: string
+    seq: number
+  }
+
+  export type WorkflowRunEventRunIdKeyCompoundUniqueInput = {
+    runId: string
+    key: string
+  }
+
+  export type WorkflowRunEventCountOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    seq?: SortOrder
+    key?: SortOrder
+    type?: SortOrder
+    stepName?: SortOrder
+    payload?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type WorkflowRunEventAvgOrderByAggregateInput = {
+    seq?: SortOrder
+  }
+
+  export type WorkflowRunEventMaxOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    seq?: SortOrder
+    key?: SortOrder
+    type?: SortOrder
+    stepName?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type WorkflowRunEventMinOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    seq?: SortOrder
+    key?: SortOrder
+    type?: SortOrder
+    stepName?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type WorkflowRunEventSumOrderByAggregateInput = {
+    seq?: SortOrder
+  }
+
+  export type WorkflowRunArtifactCountOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    contentNodeId?: SortOrder
+    kind?: SortOrder
+    label?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type WorkflowRunArtifactMaxOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    contentNodeId?: SortOrder
+    kind?: SortOrder
+    label?: SortOrder
+    createdAt?: SortOrder
+  }
+
+  export type WorkflowRunArtifactMinOrderByAggregateInput = {
+    id?: SortOrder
+    runId?: SortOrder
+    contentNodeId?: SortOrder
+    kind?: SortOrder
+    label?: SortOrder
+    createdAt?: SortOrder
+  }
+
   export type AuditLogCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -134780,6 +141070,13 @@ export namespace Prisma {
     connect?: WebResourceViewStateWhereUniqueInput | WebResourceViewStateWhereUniqueInput[]
   }
 
+  export type WorkflowRunArtifactCreateNestedManyWithoutContentInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput> | WorkflowRunArtifactCreateWithoutContentInput[] | WorkflowRunArtifactUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
+    createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+  }
+
   export type AuditLogUncheckedCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -135022,6 +141319,13 @@ export namespace Prisma {
     connectOrCreate?: WebResourceViewStateCreateOrConnectWithoutContentInput | WebResourceViewStateCreateOrConnectWithoutContentInput[]
     createMany?: WebResourceViewStateCreateManyContentInputEnvelope
     connect?: WebResourceViewStateWhereUniqueInput | WebResourceViewStateWhereUniqueInput[]
+  }
+
+  export type WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput> | WorkflowRunArtifactCreateWithoutContentInput[] | WorkflowRunArtifactUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
+    createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -135576,6 +141880,20 @@ export namespace Prisma {
     deleteMany?: WebResourceViewStateScalarWhereInput | WebResourceViewStateScalarWhereInput[]
   }
 
+  export type WorkflowRunArtifactUpdateManyWithoutContentNestedInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput> | WorkflowRunArtifactCreateWithoutContentInput[] | WorkflowRunArtifactUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
+    upsert?: WorkflowRunArtifactUpsertWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpsertWithWhereUniqueWithoutContentInput[]
+    createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
+    set?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    disconnect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    delete?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput[]
+    updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput | WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput[]
+    deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+  }
+
   export type AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -136032,6 +142350,20 @@ export namespace Prisma {
     update?: WebResourceViewStateUpdateWithWhereUniqueWithoutContentInput | WebResourceViewStateUpdateWithWhereUniqueWithoutContentInput[]
     updateMany?: WebResourceViewStateUpdateManyWithWhereWithoutContentInput | WebResourceViewStateUpdateManyWithWhereWithoutContentInput[]
     deleteMany?: WebResourceViewStateScalarWhereInput | WebResourceViewStateScalarWhereInput[]
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput> | WorkflowRunArtifactCreateWithoutContentInput[] | WorkflowRunArtifactUncheckedCreateWithoutContentInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
+    upsert?: WorkflowRunArtifactUpsertWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpsertWithWhereUniqueWithoutContentInput[]
+    createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
+    set?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    disconnect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    delete?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput[]
+    updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput | WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput[]
+    deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutPeriodicNoteIndexesInput = {
@@ -136968,6 +143300,20 @@ export namespace Prisma {
     connect?: DmMessageWhereUniqueInput | DmMessageWhereUniqueInput[]
   }
 
+  export type WorkflowDefinitionCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput> | WorkflowDefinitionCreateWithoutOwnerInput[] | WorkflowDefinitionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutOwnerInput | WorkflowDefinitionCreateOrConnectWithoutOwnerInput[]
+    createMany?: WorkflowDefinitionCreateManyOwnerInputEnvelope
+    connect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+  }
+
+  export type WorkflowRunCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput> | WorkflowRunCreateWithoutOwnerInput[] | WorkflowRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutOwnerInput | WorkflowRunCreateOrConnectWithoutOwnerInput[]
+    createMany?: WorkflowRunCreateManyOwnerInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+  }
+
   export type AccountUncheckedCreateNestedManyWithoutUserInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -137365,6 +143711,20 @@ export namespace Prisma {
     connectOrCreate?: DmMessageCreateOrConnectWithoutSenderInput | DmMessageCreateOrConnectWithoutSenderInput[]
     createMany?: DmMessageCreateManySenderInputEnvelope
     connect?: DmMessageWhereUniqueInput | DmMessageWhereUniqueInput[]
+  }
+
+  export type WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput> | WorkflowDefinitionCreateWithoutOwnerInput[] | WorkflowDefinitionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutOwnerInput | WorkflowDefinitionCreateOrConnectWithoutOwnerInput[]
+    createMany?: WorkflowDefinitionCreateManyOwnerInputEnvelope
+    connect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+  }
+
+  export type WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput> | WorkflowRunCreateWithoutOwnerInput[] | WorkflowRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutOwnerInput | WorkflowRunCreateOrConnectWithoutOwnerInput[]
+    createMany?: WorkflowRunCreateManyOwnerInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
   }
 
   export type EnumUserRoleFieldUpdateOperationsInput = {
@@ -138179,6 +144539,34 @@ export namespace Prisma {
     deleteMany?: DmMessageScalarWhereInput | DmMessageScalarWhereInput[]
   }
 
+  export type WorkflowDefinitionUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput> | WorkflowDefinitionCreateWithoutOwnerInput[] | WorkflowDefinitionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutOwnerInput | WorkflowDefinitionCreateOrConnectWithoutOwnerInput[]
+    upsert?: WorkflowDefinitionUpsertWithWhereUniqueWithoutOwnerInput | WorkflowDefinitionUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: WorkflowDefinitionCreateManyOwnerInputEnvelope
+    set?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    disconnect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    delete?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    connect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    update?: WorkflowDefinitionUpdateWithWhereUniqueWithoutOwnerInput | WorkflowDefinitionUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: WorkflowDefinitionUpdateManyWithWhereWithoutOwnerInput | WorkflowDefinitionUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: WorkflowDefinitionScalarWhereInput | WorkflowDefinitionScalarWhereInput[]
+  }
+
+  export type WorkflowRunUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput> | WorkflowRunCreateWithoutOwnerInput[] | WorkflowRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutOwnerInput | WorkflowRunCreateOrConnectWithoutOwnerInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutOwnerInput | WorkflowRunUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: WorkflowRunCreateManyOwnerInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutOwnerInput | WorkflowRunUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutOwnerInput | WorkflowRunUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+  }
+
   export type AccountUncheckedUpdateManyWithoutUserNestedInput = {
     create?: XOR<AccountCreateWithoutUserInput, AccountUncheckedCreateWithoutUserInput> | AccountCreateWithoutUserInput[] | AccountUncheckedCreateWithoutUserInput[]
     connectOrCreate?: AccountCreateOrConnectWithoutUserInput | AccountCreateOrConnectWithoutUserInput[]
@@ -138975,6 +145363,34 @@ export namespace Prisma {
     update?: DmMessageUpdateWithWhereUniqueWithoutSenderInput | DmMessageUpdateWithWhereUniqueWithoutSenderInput[]
     updateMany?: DmMessageUpdateManyWithWhereWithoutSenderInput | DmMessageUpdateManyWithWhereWithoutSenderInput[]
     deleteMany?: DmMessageScalarWhereInput | DmMessageScalarWhereInput[]
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput> | WorkflowDefinitionCreateWithoutOwnerInput[] | WorkflowDefinitionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutOwnerInput | WorkflowDefinitionCreateOrConnectWithoutOwnerInput[]
+    upsert?: WorkflowDefinitionUpsertWithWhereUniqueWithoutOwnerInput | WorkflowDefinitionUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: WorkflowDefinitionCreateManyOwnerInputEnvelope
+    set?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    disconnect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    delete?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    connect?: WorkflowDefinitionWhereUniqueInput | WorkflowDefinitionWhereUniqueInput[]
+    update?: WorkflowDefinitionUpdateWithWhereUniqueWithoutOwnerInput | WorkflowDefinitionUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: WorkflowDefinitionUpdateManyWithWhereWithoutOwnerInput | WorkflowDefinitionUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: WorkflowDefinitionScalarWhereInput | WorkflowDefinitionScalarWhereInput[]
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput> | WorkflowRunCreateWithoutOwnerInput[] | WorkflowRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutOwnerInput | WorkflowRunCreateOrConnectWithoutOwnerInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutOwnerInput | WorkflowRunUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: WorkflowRunCreateManyOwnerInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutOwnerInput | WorkflowRunUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutOwnerInput | WorkflowRunUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutContentWorkspacesInput = {
@@ -140568,6 +146984,13 @@ export namespace Prisma {
     connect?: ConversationAssociationWhereUniqueInput | ConversationAssociationWhereUniqueInput[]
   }
 
+  export type WorkflowRunCreateNestedManyWithoutConversationInput = {
+    create?: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput> | WorkflowRunCreateWithoutConversationInput[] | WorkflowRunUncheckedCreateWithoutConversationInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutConversationInput | WorkflowRunCreateOrConnectWithoutConversationInput[]
+    createMany?: WorkflowRunCreateManyConversationInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+  }
+
   export type ConversationMessageUncheckedCreateNestedManyWithoutConversationInput = {
     create?: XOR<ConversationMessageCreateWithoutConversationInput, ConversationMessageUncheckedCreateWithoutConversationInput> | ConversationMessageCreateWithoutConversationInput[] | ConversationMessageUncheckedCreateWithoutConversationInput[]
     connectOrCreate?: ConversationMessageCreateOrConnectWithoutConversationInput | ConversationMessageCreateOrConnectWithoutConversationInput[]
@@ -140580,6 +147003,13 @@ export namespace Prisma {
     connectOrCreate?: ConversationAssociationCreateOrConnectWithoutConversationInput | ConversationAssociationCreateOrConnectWithoutConversationInput[]
     createMany?: ConversationAssociationCreateManyConversationInputEnvelope
     connect?: ConversationAssociationWhereUniqueInput | ConversationAssociationWhereUniqueInput[]
+  }
+
+  export type WorkflowRunUncheckedCreateNestedManyWithoutConversationInput = {
+    create?: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput> | WorkflowRunCreateWithoutConversationInput[] | WorkflowRunUncheckedCreateWithoutConversationInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutConversationInput | WorkflowRunCreateOrConnectWithoutConversationInput[]
+    createMany?: WorkflowRunCreateManyConversationInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
   }
 
   export type UserUpdateOneRequiredWithoutConversationsNestedInput = {
@@ -140638,6 +147068,20 @@ export namespace Prisma {
     deleteMany?: ConversationAssociationScalarWhereInput | ConversationAssociationScalarWhereInput[]
   }
 
+  export type WorkflowRunUpdateManyWithoutConversationNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput> | WorkflowRunCreateWithoutConversationInput[] | WorkflowRunUncheckedCreateWithoutConversationInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutConversationInput | WorkflowRunCreateOrConnectWithoutConversationInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutConversationInput | WorkflowRunUpsertWithWhereUniqueWithoutConversationInput[]
+    createMany?: WorkflowRunCreateManyConversationInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutConversationInput | WorkflowRunUpdateWithWhereUniqueWithoutConversationInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutConversationInput | WorkflowRunUpdateManyWithWhereWithoutConversationInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+  }
+
   export type ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput = {
     create?: XOR<ConversationMessageCreateWithoutConversationInput, ConversationMessageUncheckedCreateWithoutConversationInput> | ConversationMessageCreateWithoutConversationInput[] | ConversationMessageUncheckedCreateWithoutConversationInput[]
     connectOrCreate?: ConversationMessageCreateOrConnectWithoutConversationInput | ConversationMessageCreateOrConnectWithoutConversationInput[]
@@ -140664,6 +147108,20 @@ export namespace Prisma {
     update?: ConversationAssociationUpdateWithWhereUniqueWithoutConversationInput | ConversationAssociationUpdateWithWhereUniqueWithoutConversationInput[]
     updateMany?: ConversationAssociationUpdateManyWithWhereWithoutConversationInput | ConversationAssociationUpdateManyWithWhereWithoutConversationInput[]
     deleteMany?: ConversationAssociationScalarWhereInput | ConversationAssociationScalarWhereInput[]
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput> | WorkflowRunCreateWithoutConversationInput[] | WorkflowRunUncheckedCreateWithoutConversationInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutConversationInput | WorkflowRunCreateOrConnectWithoutConversationInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutConversationInput | WorkflowRunUpsertWithWhereUniqueWithoutConversationInput[]
+    createMany?: WorkflowRunCreateManyConversationInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutConversationInput | WorkflowRunUpdateWithWhereUniqueWithoutConversationInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutConversationInput | WorkflowRunUpdateManyWithWhereWithoutConversationInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutChatContextsInput = {
@@ -143165,6 +149623,236 @@ export namespace Prisma {
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutDmMessagesSentInput, UserUpdateWithoutDmMessagesSentInput>, UserUncheckedUpdateWithoutDmMessagesSentInput>
   }
 
+  export type UserCreateNestedOneWithoutWorkflowDefinitionsInput = {
+    create?: XOR<UserCreateWithoutWorkflowDefinitionsInput, UserUncheckedCreateWithoutWorkflowDefinitionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWorkflowDefinitionsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type WorkflowRunCreateNestedManyWithoutDefinitionInput = {
+    create?: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput> | WorkflowRunCreateWithoutDefinitionInput[] | WorkflowRunUncheckedCreateWithoutDefinitionInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutDefinitionInput | WorkflowRunCreateOrConnectWithoutDefinitionInput[]
+    createMany?: WorkflowRunCreateManyDefinitionInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+  }
+
+  export type WorkflowRunUncheckedCreateNestedManyWithoutDefinitionInput = {
+    create?: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput> | WorkflowRunCreateWithoutDefinitionInput[] | WorkflowRunUncheckedCreateWithoutDefinitionInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutDefinitionInput | WorkflowRunCreateOrConnectWithoutDefinitionInput[]
+    createMany?: WorkflowRunCreateManyDefinitionInputEnvelope
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+  }
+
+  export type UserUpdateOneRequiredWithoutWorkflowDefinitionsNestedInput = {
+    create?: XOR<UserCreateWithoutWorkflowDefinitionsInput, UserUncheckedCreateWithoutWorkflowDefinitionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWorkflowDefinitionsInput
+    upsert?: UserUpsertWithoutWorkflowDefinitionsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutWorkflowDefinitionsInput, UserUpdateWithoutWorkflowDefinitionsInput>, UserUncheckedUpdateWithoutWorkflowDefinitionsInput>
+  }
+
+  export type WorkflowRunUpdateManyWithoutDefinitionNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput> | WorkflowRunCreateWithoutDefinitionInput[] | WorkflowRunUncheckedCreateWithoutDefinitionInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutDefinitionInput | WorkflowRunCreateOrConnectWithoutDefinitionInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutDefinitionInput | WorkflowRunUpsertWithWhereUniqueWithoutDefinitionInput[]
+    createMany?: WorkflowRunCreateManyDefinitionInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutDefinitionInput | WorkflowRunUpdateWithWhereUniqueWithoutDefinitionInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutDefinitionInput | WorkflowRunUpdateManyWithWhereWithoutDefinitionInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutDefinitionNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput> | WorkflowRunCreateWithoutDefinitionInput[] | WorkflowRunUncheckedCreateWithoutDefinitionInput[]
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutDefinitionInput | WorkflowRunCreateOrConnectWithoutDefinitionInput[]
+    upsert?: WorkflowRunUpsertWithWhereUniqueWithoutDefinitionInput | WorkflowRunUpsertWithWhereUniqueWithoutDefinitionInput[]
+    createMany?: WorkflowRunCreateManyDefinitionInputEnvelope
+    set?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    disconnect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    delete?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    connect?: WorkflowRunWhereUniqueInput | WorkflowRunWhereUniqueInput[]
+    update?: WorkflowRunUpdateWithWhereUniqueWithoutDefinitionInput | WorkflowRunUpdateWithWhereUniqueWithoutDefinitionInput[]
+    updateMany?: WorkflowRunUpdateManyWithWhereWithoutDefinitionInput | WorkflowRunUpdateManyWithWhereWithoutDefinitionInput[]
+    deleteMany?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+  }
+
+  export type UserCreateNestedOneWithoutWorkflowRunsInput = {
+    create?: XOR<UserCreateWithoutWorkflowRunsInput, UserUncheckedCreateWithoutWorkflowRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWorkflowRunsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type WorkflowDefinitionCreateNestedOneWithoutRunsInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutRunsInput, WorkflowDefinitionUncheckedCreateWithoutRunsInput>
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutRunsInput
+    connect?: WorkflowDefinitionWhereUniqueInput
+  }
+
+  export type ConversationCreateNestedOneWithoutWorkflowRunsInput = {
+    create?: XOR<ConversationCreateWithoutWorkflowRunsInput, ConversationUncheckedCreateWithoutWorkflowRunsInput>
+    connectOrCreate?: ConversationCreateOrConnectWithoutWorkflowRunsInput
+    connect?: ConversationWhereUniqueInput
+  }
+
+  export type WorkflowRunEventCreateNestedManyWithoutRunInput = {
+    create?: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput> | WorkflowRunEventCreateWithoutRunInput[] | WorkflowRunEventUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunEventCreateOrConnectWithoutRunInput | WorkflowRunEventCreateOrConnectWithoutRunInput[]
+    createMany?: WorkflowRunEventCreateManyRunInputEnvelope
+    connect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+  }
+
+  export type WorkflowRunArtifactCreateNestedManyWithoutRunInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput> | WorkflowRunArtifactCreateWithoutRunInput[] | WorkflowRunArtifactUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutRunInput | WorkflowRunArtifactCreateOrConnectWithoutRunInput[]
+    createMany?: WorkflowRunArtifactCreateManyRunInputEnvelope
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+  }
+
+  export type WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput = {
+    create?: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput> | WorkflowRunEventCreateWithoutRunInput[] | WorkflowRunEventUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunEventCreateOrConnectWithoutRunInput | WorkflowRunEventCreateOrConnectWithoutRunInput[]
+    createMany?: WorkflowRunEventCreateManyRunInputEnvelope
+    connect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+  }
+
+  export type WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput> | WorkflowRunArtifactCreateWithoutRunInput[] | WorkflowRunArtifactUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutRunInput | WorkflowRunArtifactCreateOrConnectWithoutRunInput[]
+    createMany?: WorkflowRunArtifactCreateManyRunInputEnvelope
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+  }
+
+  export type EnumWorkflowRunStatusFieldUpdateOperationsInput = {
+    set?: $Enums.WorkflowRunStatus
+  }
+
+  export type UserUpdateOneRequiredWithoutWorkflowRunsNestedInput = {
+    create?: XOR<UserCreateWithoutWorkflowRunsInput, UserUncheckedCreateWithoutWorkflowRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutWorkflowRunsInput
+    upsert?: UserUpsertWithoutWorkflowRunsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutWorkflowRunsInput, UserUpdateWithoutWorkflowRunsInput>, UserUncheckedUpdateWithoutWorkflowRunsInput>
+  }
+
+  export type WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput = {
+    create?: XOR<WorkflowDefinitionCreateWithoutRunsInput, WorkflowDefinitionUncheckedCreateWithoutRunsInput>
+    connectOrCreate?: WorkflowDefinitionCreateOrConnectWithoutRunsInput
+    upsert?: WorkflowDefinitionUpsertWithoutRunsInput
+    connect?: WorkflowDefinitionWhereUniqueInput
+    update?: XOR<XOR<WorkflowDefinitionUpdateToOneWithWhereWithoutRunsInput, WorkflowDefinitionUpdateWithoutRunsInput>, WorkflowDefinitionUncheckedUpdateWithoutRunsInput>
+  }
+
+  export type ConversationUpdateOneWithoutWorkflowRunsNestedInput = {
+    create?: XOR<ConversationCreateWithoutWorkflowRunsInput, ConversationUncheckedCreateWithoutWorkflowRunsInput>
+    connectOrCreate?: ConversationCreateOrConnectWithoutWorkflowRunsInput
+    upsert?: ConversationUpsertWithoutWorkflowRunsInput
+    disconnect?: ConversationWhereInput | boolean
+    delete?: ConversationWhereInput | boolean
+    connect?: ConversationWhereUniqueInput
+    update?: XOR<XOR<ConversationUpdateToOneWithWhereWithoutWorkflowRunsInput, ConversationUpdateWithoutWorkflowRunsInput>, ConversationUncheckedUpdateWithoutWorkflowRunsInput>
+  }
+
+  export type WorkflowRunEventUpdateManyWithoutRunNestedInput = {
+    create?: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput> | WorkflowRunEventCreateWithoutRunInput[] | WorkflowRunEventUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunEventCreateOrConnectWithoutRunInput | WorkflowRunEventCreateOrConnectWithoutRunInput[]
+    upsert?: WorkflowRunEventUpsertWithWhereUniqueWithoutRunInput | WorkflowRunEventUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: WorkflowRunEventCreateManyRunInputEnvelope
+    set?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    disconnect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    delete?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    connect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    update?: WorkflowRunEventUpdateWithWhereUniqueWithoutRunInput | WorkflowRunEventUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: WorkflowRunEventUpdateManyWithWhereWithoutRunInput | WorkflowRunEventUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: WorkflowRunEventScalarWhereInput | WorkflowRunEventScalarWhereInput[]
+  }
+
+  export type WorkflowRunArtifactUpdateManyWithoutRunNestedInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput> | WorkflowRunArtifactCreateWithoutRunInput[] | WorkflowRunArtifactUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutRunInput | WorkflowRunArtifactCreateOrConnectWithoutRunInput[]
+    upsert?: WorkflowRunArtifactUpsertWithWhereUniqueWithoutRunInput | WorkflowRunArtifactUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: WorkflowRunArtifactCreateManyRunInputEnvelope
+    set?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    disconnect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    delete?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutRunInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutRunInput | WorkflowRunArtifactUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+  }
+
+  export type WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput = {
+    create?: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput> | WorkflowRunEventCreateWithoutRunInput[] | WorkflowRunEventUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunEventCreateOrConnectWithoutRunInput | WorkflowRunEventCreateOrConnectWithoutRunInput[]
+    upsert?: WorkflowRunEventUpsertWithWhereUniqueWithoutRunInput | WorkflowRunEventUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: WorkflowRunEventCreateManyRunInputEnvelope
+    set?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    disconnect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    delete?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    connect?: WorkflowRunEventWhereUniqueInput | WorkflowRunEventWhereUniqueInput[]
+    update?: WorkflowRunEventUpdateWithWhereUniqueWithoutRunInput | WorkflowRunEventUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: WorkflowRunEventUpdateManyWithWhereWithoutRunInput | WorkflowRunEventUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: WorkflowRunEventScalarWhereInput | WorkflowRunEventScalarWhereInput[]
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput = {
+    create?: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput> | WorkflowRunArtifactCreateWithoutRunInput[] | WorkflowRunArtifactUncheckedCreateWithoutRunInput[]
+    connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutRunInput | WorkflowRunArtifactCreateOrConnectWithoutRunInput[]
+    upsert?: WorkflowRunArtifactUpsertWithWhereUniqueWithoutRunInput | WorkflowRunArtifactUpsertWithWhereUniqueWithoutRunInput[]
+    createMany?: WorkflowRunArtifactCreateManyRunInputEnvelope
+    set?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    disconnect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    delete?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+    update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutRunInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutRunInput[]
+    updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutRunInput | WorkflowRunArtifactUpdateManyWithWhereWithoutRunInput[]
+    deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+  }
+
+  export type WorkflowRunCreateNestedOneWithoutEventsInput = {
+    create?: XOR<WorkflowRunCreateWithoutEventsInput, WorkflowRunUncheckedCreateWithoutEventsInput>
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutEventsInput
+    connect?: WorkflowRunWhereUniqueInput
+  }
+
+  export type WorkflowRunUpdateOneRequiredWithoutEventsNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutEventsInput, WorkflowRunUncheckedCreateWithoutEventsInput>
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutEventsInput
+    upsert?: WorkflowRunUpsertWithoutEventsInput
+    connect?: WorkflowRunWhereUniqueInput
+    update?: XOR<XOR<WorkflowRunUpdateToOneWithWhereWithoutEventsInput, WorkflowRunUpdateWithoutEventsInput>, WorkflowRunUncheckedUpdateWithoutEventsInput>
+  }
+
+  export type WorkflowRunCreateNestedOneWithoutArtifactsInput = {
+    create?: XOR<WorkflowRunCreateWithoutArtifactsInput, WorkflowRunUncheckedCreateWithoutArtifactsInput>
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutArtifactsInput
+    connect?: WorkflowRunWhereUniqueInput
+  }
+
+  export type ContentNodeCreateNestedOneWithoutWorkflowRunArtifactsInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkflowRunArtifactsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type WorkflowRunUpdateOneRequiredWithoutArtifactsNestedInput = {
+    create?: XOR<WorkflowRunCreateWithoutArtifactsInput, WorkflowRunUncheckedCreateWithoutArtifactsInput>
+    connectOrCreate?: WorkflowRunCreateOrConnectWithoutArtifactsInput
+    upsert?: WorkflowRunUpsertWithoutArtifactsInput
+    connect?: WorkflowRunWhereUniqueInput
+    update?: XOR<XOR<WorkflowRunUpdateToOneWithWhereWithoutArtifactsInput, WorkflowRunUpdateWithoutArtifactsInput>, WorkflowRunUncheckedUpdateWithoutArtifactsInput>
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutWorkflowRunArtifactsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutWorkflowRunArtifactsInput
+    upsert?: ContentNodeUpsertWithoutWorkflowRunArtifactsInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutWorkflowRunArtifactsInput, ContentNodeUpdateWithoutWorkflowRunArtifactsInput>, ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput>
+  }
+
   export type NestedUuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -144065,6 +150753,23 @@ export namespace Prisma {
     _max?: NestedEnumActivityActorTypeFilter<$PrismaModel>
   }
 
+  export type NestedEnumWorkflowRunStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.WorkflowRunStatus | EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumWorkflowRunStatusFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+  }
+
+  export type NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: $Enums.WorkflowRunStatus | EnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.WorkflowRunStatus[] | ListEnumWorkflowRunStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumWorkflowRunStatusWithAggregatesFilter<$PrismaModel> | $Enums.WorkflowRunStatus
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+    _max?: NestedEnumWorkflowRunStatusFilter<$PrismaModel>
+  }
+
   export type AuditLogCreateWithoutTargetContentInput = {
     id?: string
     action: string
@@ -144595,6 +151300,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentNodesInput = {
@@ -144669,6 +151376,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentNodesInput = {
@@ -144734,6 +151443,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChildrenInput = {
@@ -144794,6 +151504,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChildrenInput = {
@@ -144859,6 +151570,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutParentInput = {
@@ -144919,6 +151631,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutParentInput = {
@@ -144989,6 +151702,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedEmbedsInput = {
@@ -145049,6 +151763,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedEmbedsInput = {
@@ -145114,6 +151829,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedByNoteInput = {
@@ -145174,6 +151890,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedByNoteInput = {
@@ -145239,6 +151956,7 @@ export namespace Prisma {
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateWithoutArchivedToContentNodeInput = {
@@ -145251,6 +151969,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationCreateOrConnectWithoutArchivedToContentNodeInput = {
@@ -146034,6 +152753,32 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkflowRunArtifactCreateWithoutContentInput = {
+    id?: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+    run: WorkflowRunCreateNestedOneWithoutArtifactsInput
+  }
+
+  export type WorkflowRunArtifactUncheckedCreateWithoutContentInput = {
+    id?: string
+    runId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunArtifactCreateOrConnectWithoutContentInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    create: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput>
+  }
+
+  export type WorkflowRunArtifactCreateManyContentInputEnvelope = {
+    data: WorkflowRunArtifactCreateManyContentInput | WorkflowRunArtifactCreateManyContentInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AuditLogUpsertWithWhereUniqueWithoutTargetContentInput = {
     where: AuditLogWhereUniqueInput
     update: XOR<AuditLogUpdateWithoutTargetContentInput, AuditLogUncheckedUpdateWithoutTargetContentInput>
@@ -146637,6 +153382,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentNodesInput = {
@@ -146711,6 +153458,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutChildrenInput = {
@@ -146782,6 +153531,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChildrenInput = {
@@ -146842,6 +153592,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutParentInput = {
@@ -146956,6 +153707,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedEmbedsInput = {
@@ -147016,6 +153768,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutOwnedByNoteInput = {
@@ -147104,6 +153857,7 @@ export namespace Prisma {
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateWithoutArchivedToContentNodeInput = {
@@ -147116,6 +153870,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationAssociationUpsertWithWhereUniqueWithoutContentNodeInput = {
@@ -147814,6 +154569,34 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"WebResourceViewState"> | Date | string
   }
 
+  export type WorkflowRunArtifactUpsertWithWhereUniqueWithoutContentInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    update: XOR<WorkflowRunArtifactUpdateWithoutContentInput, WorkflowRunArtifactUncheckedUpdateWithoutContentInput>
+    create: XOR<WorkflowRunArtifactCreateWithoutContentInput, WorkflowRunArtifactUncheckedCreateWithoutContentInput>
+  }
+
+  export type WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    data: XOR<WorkflowRunArtifactUpdateWithoutContentInput, WorkflowRunArtifactUncheckedUpdateWithoutContentInput>
+  }
+
+  export type WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput = {
+    where: WorkflowRunArtifactScalarWhereInput
+    data: XOR<WorkflowRunArtifactUpdateManyMutationInput, WorkflowRunArtifactUncheckedUpdateManyWithoutContentInput>
+  }
+
+  export type WorkflowRunArtifactScalarWhereInput = {
+    AND?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+    OR?: WorkflowRunArtifactScalarWhereInput[]
+    NOT?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+    id?: UuidFilter<"WorkflowRunArtifact"> | string
+    runId?: UuidFilter<"WorkflowRunArtifact"> | string
+    contentNodeId?: UuidFilter<"WorkflowRunArtifact"> | string
+    kind?: StringFilter<"WorkflowRunArtifact"> | string
+    label?: StringFilter<"WorkflowRunArtifact"> | string
+    createdAt?: DateTimeFilter<"WorkflowRunArtifact"> | Date | string
+  }
+
   export type UserCreateWithoutPeriodicNoteIndexesInput = {
     id?: string
     username: string
@@ -147886,6 +154669,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeriodicNoteIndexesInput = {
@@ -147960,6 +154745,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeriodicNoteIndexesInput = {
@@ -148025,6 +154812,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeriodicNoteIndexesInput = {
@@ -148085,6 +154873,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeriodicNoteIndexesInput = {
@@ -148175,6 +154964,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeriodicNoteIndexesInput = {
@@ -148249,6 +155040,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPeriodicNoteIndexesInput = {
@@ -148320,6 +155113,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeriodicNoteIndexesInput = {
@@ -148380,6 +155174,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutFlashcardDecksInput = {
@@ -148454,6 +155249,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutFlashcardDecksInput = {
@@ -148528,6 +155325,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutFlashcardDecksInput = {
@@ -148777,6 +155576,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFlashcardDecksInput = {
@@ -148851,6 +155652,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type FlashcardDeckUpsertWithoutChildrenInput = {
@@ -149021,6 +155824,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutFlashcardsInput = {
@@ -149095,6 +155900,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutFlashcardsInput = {
@@ -149199,6 +156006,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceFlashcardsInput = {
@@ -149259,6 +156067,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceFlashcardsInput = {
@@ -149397,6 +156206,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFlashcardsInput = {
@@ -149471,6 +156282,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type FlashcardDeckUpsertWithoutFlashcardsInput = {
@@ -149587,6 +156400,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceFlashcardsInput = {
@@ -149647,6 +156461,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type FlashcardReviewAttemptUpsertWithWhereUniqueWithoutFlashcardInput = {
@@ -149831,6 +156646,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutFlashcardReviewAttemptsInput = {
@@ -149905,6 +156722,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutFlashcardReviewAttemptsInput = {
@@ -150072,6 +156891,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutFlashcardReviewAttemptsInput = {
@@ -150146,6 +156967,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutNotePayloadInput = {
@@ -150206,6 +157029,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutNotePayloadInput = {
@@ -150266,6 +157090,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutNotePayloadInput = {
@@ -150342,6 +157167,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutNotePayloadInput = {
@@ -150402,6 +157228,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutFilePayloadInput = {
@@ -150462,6 +157289,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFilePayloadInput = {
@@ -150522,6 +157350,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFilePayloadInput = {
@@ -150598,6 +157427,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFilePayloadInput = {
@@ -150658,6 +157488,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutHtmlPayloadInput = {
@@ -150718,6 +157549,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHtmlPayloadInput = {
@@ -150778,6 +157610,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHtmlPayloadInput = {
@@ -150854,6 +157687,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHtmlPayloadInput = {
@@ -150914,6 +157748,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutCodePayloadInput = {
@@ -150974,6 +157809,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCodePayloadInput = {
@@ -151034,6 +157870,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCodePayloadInput = {
@@ -151110,6 +157947,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCodePayloadInput = {
@@ -151170,6 +158008,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutContentHistoryInput = {
@@ -151244,6 +158083,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentHistoryInput = {
@@ -151318,6 +158159,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentHistoryInput = {
@@ -151383,6 +158226,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHistoryInput = {
@@ -151443,6 +158287,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHistoryInput = {
@@ -151533,6 +158378,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentHistoryInput = {
@@ -151607,6 +158454,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutHistoryInput = {
@@ -151678,6 +158527,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHistoryInput = {
@@ -151738,6 +158588,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutContentPathInput = {
@@ -151798,6 +158649,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentPathInput = {
@@ -151858,6 +158710,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentPathInput = {
@@ -151934,6 +158787,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentPathInput = {
@@ -151994,6 +158848,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutSourceLinksInput = {
@@ -152054,6 +158909,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceLinksInput = {
@@ -152114,6 +158970,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceLinksInput = {
@@ -152179,6 +159036,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTargetLinksInput = {
@@ -152239,6 +159097,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTargetLinksInput = {
@@ -152315,6 +159174,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceLinksInput = {
@@ -152375,6 +159235,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUpsertWithoutTargetLinksInput = {
@@ -152446,6 +159307,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTargetLinksInput = {
@@ -152506,6 +159368,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutContentTagsInput = {
@@ -152566,6 +159429,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentTagsInput = {
@@ -152626,6 +159490,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentTagsInput = {
@@ -152725,6 +159590,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentTagsInput = {
@@ -152785,6 +159651,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type TagUpsertWithoutContentTagsInput = {
@@ -152874,6 +159741,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTrashBinEntryInput = {
@@ -152934,6 +159802,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTrashBinEntryInput = {
@@ -153013,6 +159882,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTrashedContentInput = {
@@ -153087,6 +159958,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTrashedContentInput = {
@@ -153163,6 +160036,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTrashBinEntryInput = {
@@ -153223,6 +160097,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutTrashedContentInput = {
@@ -153308,6 +160183,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTrashedContentInput = {
@@ -153382,6 +160259,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutStorageConfigsInput = {
@@ -153456,6 +160335,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutStorageConfigsInput = {
@@ -153530,6 +160411,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutStorageConfigsInput = {
@@ -153620,6 +160503,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutStorageConfigsInput = {
@@ -153694,6 +160579,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AccountCreateWithoutUserInput = {
@@ -153988,6 +160875,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnerInput = {
@@ -154048,6 +160936,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnerInput = {
@@ -154070,6 +160959,7 @@ export namespace Prisma {
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateWithoutOwnerInput = {
@@ -154082,6 +160972,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationCreateOrConnectWithoutOwnerInput = {
@@ -155983,6 +162874,92 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkflowDefinitionCreateWithoutOwnerInput = {
+    id?: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    runs?: WorkflowRunCreateNestedManyWithoutDefinitionInput
+  }
+
+  export type WorkflowDefinitionUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    runs?: WorkflowRunUncheckedCreateNestedManyWithoutDefinitionInput
+  }
+
+  export type WorkflowDefinitionCreateOrConnectWithoutOwnerInput = {
+    where: WorkflowDefinitionWhereUniqueInput
+    create: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type WorkflowDefinitionCreateManyOwnerInputEnvelope = {
+    data: WorkflowDefinitionCreateManyOwnerInput | WorkflowDefinitionCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type WorkflowRunCreateWithoutOwnerInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    definition: WorkflowDefinitionCreateNestedOneWithoutRunsInput
+    conversation?: ConversationCreateNestedOneWithoutWorkflowRunsInput
+    events?: WorkflowRunEventCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    definitionId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunCreateOrConnectWithoutOwnerInput = {
+    where: WorkflowRunWhereUniqueInput
+    create: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type WorkflowRunCreateManyOwnerInputEnvelope = {
+    data: WorkflowRunCreateManyOwnerInput | WorkflowRunCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AccountUpsertWithWhereUniqueWithoutUserInput = {
     where: AccountWhereUniqueInput
     update: XOR<AccountUpdateWithoutUserInput, AccountUncheckedUpdateWithoutUserInput>
@@ -157515,6 +164492,76 @@ export namespace Prisma {
     deletedAt?: DateTimeNullableFilter<"DmMessage"> | Date | string | null
   }
 
+  export type WorkflowDefinitionUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: WorkflowDefinitionWhereUniqueInput
+    update: XOR<WorkflowDefinitionUpdateWithoutOwnerInput, WorkflowDefinitionUncheckedUpdateWithoutOwnerInput>
+    create: XOR<WorkflowDefinitionCreateWithoutOwnerInput, WorkflowDefinitionUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type WorkflowDefinitionUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: WorkflowDefinitionWhereUniqueInput
+    data: XOR<WorkflowDefinitionUpdateWithoutOwnerInput, WorkflowDefinitionUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type WorkflowDefinitionUpdateManyWithWhereWithoutOwnerInput = {
+    where: WorkflowDefinitionScalarWhereInput
+    data: XOR<WorkflowDefinitionUpdateManyMutationInput, WorkflowDefinitionUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type WorkflowDefinitionScalarWhereInput = {
+    AND?: WorkflowDefinitionScalarWhereInput | WorkflowDefinitionScalarWhereInput[]
+    OR?: WorkflowDefinitionScalarWhereInput[]
+    NOT?: WorkflowDefinitionScalarWhereInput | WorkflowDefinitionScalarWhereInput[]
+    id?: UuidFilter<"WorkflowDefinition"> | string
+    ownerId?: UuidFilter<"WorkflowDefinition"> | string
+    slug?: StringFilter<"WorkflowDefinition"> | string
+    name?: StringFilter<"WorkflowDefinition"> | string
+    engine?: StringFilter<"WorkflowDefinition"> | string
+    engineRef?: StringFilter<"WorkflowDefinition"> | string
+    inputSchema?: JsonNullableFilter<"WorkflowDefinition">
+    enabled?: BoolFilter<"WorkflowDefinition"> | boolean
+    createdAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowDefinition"> | Date | string
+  }
+
+  export type WorkflowRunUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: WorkflowRunWhereUniqueInput
+    update: XOR<WorkflowRunUpdateWithoutOwnerInput, WorkflowRunUncheckedUpdateWithoutOwnerInput>
+    create: XOR<WorkflowRunCreateWithoutOwnerInput, WorkflowRunUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type WorkflowRunUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: WorkflowRunWhereUniqueInput
+    data: XOR<WorkflowRunUpdateWithoutOwnerInput, WorkflowRunUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type WorkflowRunUpdateManyWithWhereWithoutOwnerInput = {
+    where: WorkflowRunScalarWhereInput
+    data: XOR<WorkflowRunUpdateManyMutationInput, WorkflowRunUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type WorkflowRunScalarWhereInput = {
+    AND?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+    OR?: WorkflowRunScalarWhereInput[]
+    NOT?: WorkflowRunScalarWhereInput | WorkflowRunScalarWhereInput[]
+    id?: UuidFilter<"WorkflowRun"> | string
+    definitionId?: UuidFilter<"WorkflowRun"> | string
+    ownerId?: UuidFilter<"WorkflowRun"> | string
+    status?: EnumWorkflowRunStatusFilter<"WorkflowRun"> | $Enums.WorkflowRunStatus
+    engine?: StringFilter<"WorkflowRun"> | string
+    engineRunId?: StringNullableFilter<"WorkflowRun"> | string | null
+    engineGateRef?: StringNullableFilter<"WorkflowRun"> | string | null
+    input?: JsonFilter<"WorkflowRun">
+    output?: JsonNullableFilter<"WorkflowRun">
+    error?: JsonNullableFilter<"WorkflowRun">
+    gateToken?: StringNullableFilter<"WorkflowRun"> | string | null
+    conversationId?: UuidNullableFilter<"WorkflowRun"> | string | null
+    startedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    finishedAt?: DateTimeNullableFilter<"WorkflowRun"> | Date | string | null
+    createdAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+    updatedAt?: DateTimeFilter<"WorkflowRun"> | Date | string
+  }
+
   export type UserCreateWithoutContentWorkspacesInput = {
     id?: string
     username: string
@@ -157587,6 +164634,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentWorkspacesInput = {
@@ -157661,6 +164710,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentWorkspacesInput = {
@@ -157726,6 +164777,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewWorkspacesInput = {
@@ -157786,6 +164838,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewWorkspacesInput = {
@@ -157906,6 +164959,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentWorkspacesInput = {
@@ -157980,6 +165035,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutViewWorkspacesInput = {
@@ -158051,6 +165108,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewWorkspacesInput = {
@@ -158111,6 +165169,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
@@ -158230,6 +165289,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkspaceItemsInput = {
@@ -158290,6 +165350,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkspaceItemsInput = {
@@ -158415,6 +165476,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput = {
@@ -158475,6 +165537,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutCategoriesInput = {
@@ -158549,6 +165612,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCategoriesInput = {
@@ -158623,6 +165688,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCategoriesInput = {
@@ -158688,6 +165755,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCategoryInput = {
@@ -158748,6 +165816,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCategoryInput = {
@@ -158843,6 +165912,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCategoriesInput = {
@@ -158917,6 +165988,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutCategoryInput = {
@@ -159031,6 +166104,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutTagsInput = {
@@ -159105,6 +166180,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutTagsInput = {
@@ -159211,6 +166288,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutTagsInput = {
@@ -159285,6 +166364,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutViewGrantsInput = {
@@ -159345,6 +166426,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewGrantsInput = {
@@ -159405,6 +166487,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewGrantsInput = {
@@ -159484,6 +166567,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutViewGrantsInput = {
@@ -159558,6 +166643,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutViewGrantsInput = {
@@ -159634,6 +166721,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewGrantsInput = {
@@ -159694,6 +166782,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutViewGrantsInput = {
@@ -159779,6 +166868,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutViewGrantsInput = {
@@ -159853,6 +166944,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutCollaborationDocumentInput = {
@@ -159913,6 +167006,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationDocumentInput = {
@@ -159973,6 +167067,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationDocumentInput = {
@@ -160052,6 +167147,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCollaborationDocumentsInput = {
@@ -160126,6 +167223,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCollaborationDocumentsInput = {
@@ -160202,6 +167301,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput = {
@@ -160262,6 +167362,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutCollaborationDocumentsInput = {
@@ -160347,6 +167448,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCollaborationDocumentsInput = {
@@ -160421,6 +167524,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutCollaborationPresenceRecordsInput = {
@@ -160481,6 +167586,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationPresenceRecordsInput = {
@@ -160541,6 +167647,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationPresenceRecordsInput = {
@@ -160617,6 +167724,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationPresenceRecordsInput = {
@@ -160677,6 +167785,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutPeopleGroupsInput = {
@@ -160751,6 +167860,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleGroupsInput = {
@@ -160825,6 +167936,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleGroupsInput = {
@@ -160904,6 +168017,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleDefaultGroupsInput = {
@@ -160978,6 +168093,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleDefaultGroupsInput = {
@@ -161186,6 +168303,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleGroupInput = {
@@ -161246,6 +168364,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleGroupInput = {
@@ -161371,6 +168490,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleGroupsInput = {
@@ -161445,6 +168566,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutPeopleDefaultGroupsInput = {
@@ -161530,6 +168653,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleDefaultGroupsInput = {
@@ -161604,6 +168729,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutChildGroupsInput = {
@@ -161791,6 +168918,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleInput = {
@@ -161865,6 +168994,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleInput = {
@@ -161973,6 +169104,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonInput = {
@@ -162033,6 +169165,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonInput = {
@@ -162186,6 +169319,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleInput = {
@@ -162260,6 +169395,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PeopleGroupUpsertWithoutPeopleInput = {
@@ -162431,6 +169568,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -162505,6 +169644,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -162570,6 +169711,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -162630,6 +169772,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -162810,6 +169953,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -162884,6 +170029,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPeopleFileTreeMountsInput = {
@@ -162955,6 +170102,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -163015,6 +170163,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type PeopleGroupUpsertWithoutFileTreeMountsInput = {
@@ -163191,6 +170340,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPersonMentionsInput = {
@@ -163265,6 +170416,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPersonMentionsInput = {
@@ -163330,6 +170483,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonMentionsInput = {
@@ -163390,6 +170544,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonMentionsInput = {
@@ -163527,6 +170682,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPersonMentionsInput = {
@@ -163601,6 +170758,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutPersonMentionsInput = {
@@ -163672,6 +170831,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonMentionsInput = {
@@ -163732,6 +170892,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type PersonUpsertWithoutMentionsInput = {
@@ -163859,6 +171020,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSessionsInput = {
@@ -163933,6 +171096,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSessionsInput = {
@@ -164023,6 +171188,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSessionsInput = {
@@ -164097,6 +171264,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutBrowserExtensionTokensInput = {
@@ -164171,6 +171340,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutBrowserExtensionTokensInput = {
@@ -164245,6 +171416,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutBrowserExtensionTokensInput = {
@@ -164424,6 +171597,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBrowserExtensionTokensInput = {
@@ -164498,6 +171673,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type BookmarkSyncConnectionUpsertWithWhereUniqueWithoutTokenInput = {
@@ -164639,6 +171816,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutBrowserExtensionInstallsInput = {
@@ -164713,6 +171892,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutBrowserExtensionInstallsInput = {
@@ -164918,6 +172099,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBrowserExtensionInstallsInput = {
@@ -164992,6 +172175,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type BrowserExtensionTokenUpsertWithoutInstallInput = {
@@ -165152,6 +172337,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutBookmarkSyncConnectionsInput = {
@@ -165226,6 +172413,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutBookmarkSyncConnectionsInput = {
@@ -165326,6 +172515,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncRootsInput = {
@@ -165386,6 +172576,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncRootsInput = {
@@ -165540,6 +172731,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBookmarkSyncConnectionsInput = {
@@ -165614,6 +172807,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type BrowserExtensionTokenUpsertWithoutConnectionsInput = {
@@ -165726,6 +172921,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncRootsInput = {
@@ -165786,6 +172982,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type BookmarkSyncLinkUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -166097,6 +173294,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncLinksInput = {
@@ -166157,6 +173355,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncLinksInput = {
@@ -166278,6 +173477,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncLinksInput = {
@@ -166338,6 +173538,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutWebResourcesInput = {
@@ -166412,6 +173613,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutWebResourcesInput = {
@@ -166486,6 +173689,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutWebResourcesInput = {
@@ -166714,6 +173919,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWebResourcesInput = {
@@ -166788,6 +173995,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type WebResourceContentLinkUpsertWithWhereUniqueWithoutWebResourceInput = {
@@ -166938,6 +174147,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutWebResourceContentLinksInput = {
@@ -167012,6 +174223,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutWebResourceContentLinksInput = {
@@ -167116,6 +174329,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceLinksInput = {
@@ -167176,6 +174390,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceLinksInput = {
@@ -167266,6 +174481,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWebResourceContentLinksInput = {
@@ -167340,6 +174557,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type WebResourceUpsertWithoutContentLinksInput = {
@@ -167456,6 +174675,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceLinksInput = {
@@ -167516,6 +174736,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutWebResourceViewStatesInput = {
@@ -167590,6 +174811,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutWebResourceViewStatesInput = {
@@ -167664,6 +174887,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutWebResourceViewStatesInput = {
@@ -167813,6 +175038,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceViewStatesInput = {
@@ -167873,6 +175099,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceViewStatesInput = {
@@ -167963,6 +175190,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutWebResourceViewStatesInput = {
@@ -168037,6 +175266,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type BrowserExtensionInstallUpsertWithoutWebResourceViewStatesInput = {
@@ -168204,6 +175435,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceViewStatesInput = {
@@ -168264,6 +175496,7 @@ export namespace Prisma {
     bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutAccountsInput = {
@@ -168338,6 +175571,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAccountsInput = {
@@ -168412,6 +175647,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAccountsInput = {
@@ -168502,6 +175739,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAccountsInput = {
@@ -168576,6 +175815,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutAuditLogsInput = {
@@ -168636,6 +175877,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
@@ -168696,6 +175938,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
@@ -168775,6 +176018,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAuditTargetsInput = {
@@ -168849,6 +176094,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAuditTargetsInput = {
@@ -168928,6 +176175,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAdminActionsInput = {
@@ -169002,6 +176251,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAdminActionsInput = {
@@ -169078,6 +176329,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
@@ -169138,6 +176390,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserUpsertWithoutAuditTargetsInput = {
@@ -169223,6 +176476,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAuditTargetsInput = {
@@ -169297,6 +176552,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutAdminActionsInput = {
@@ -169382,6 +176639,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAdminActionsInput = {
@@ -169456,6 +176715,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeCreateWithoutFolderPayloadInput = {
@@ -169516,6 +176777,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFolderPayloadInput = {
@@ -169576,6 +176838,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFolderPayloadInput = {
@@ -169652,6 +176915,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFolderPayloadInput = {
@@ -169712,6 +176976,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutExternalPayloadInput = {
@@ -169772,6 +177037,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutExternalPayloadInput = {
@@ -169832,6 +177098,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutExternalPayloadInput = {
@@ -169947,6 +177214,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutExternalPayloadInput = {
@@ -170007,6 +177275,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type WebResourceUpsertWithoutExternalPayloadsInput = {
@@ -170112,6 +177381,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChatPayloadInput = {
@@ -170172,6 +177442,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChatPayloadInput = {
@@ -170248,6 +177519,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChatPayloadInput = {
@@ -170308,6 +177580,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutConversationsInput = {
@@ -170382,6 +177655,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutConversationsInput = {
@@ -170456,6 +177731,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutConversationsInput = {
@@ -170521,6 +177798,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutArchivedConversationInput = {
@@ -170581,6 +177859,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutArchivedConversationInput = {
@@ -170677,6 +177956,56 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type WorkflowRunCreateWithoutConversationInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowRunsInput
+    definition: WorkflowDefinitionCreateNestedOneWithoutRunsInput
+    events?: WorkflowRunEventCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateWithoutConversationInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunCreateOrConnectWithoutConversationInput = {
+    where: WorkflowRunWhereUniqueInput
+    create: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput>
+  }
+
+  export type WorkflowRunCreateManyConversationInputEnvelope = {
+    data: WorkflowRunCreateManyConversationInput | WorkflowRunCreateManyConversationInput[]
+    skipDuplicates?: boolean
+  }
+
   export type UserUpsertWithoutConversationsInput = {
     update: XOR<UserUpdateWithoutConversationsInput, UserUncheckedUpdateWithoutConversationsInput>
     create: XOR<UserCreateWithoutConversationsInput, UserUncheckedCreateWithoutConversationsInput>
@@ -170760,6 +178089,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConversationsInput = {
@@ -170834,6 +178165,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ContentNodeUpsertWithoutArchivedConversationInput = {
@@ -170905,6 +178238,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutArchivedConversationInput = {
@@ -170965,6 +178299,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ChatContextUpsertWithoutConversationsInput = {
@@ -171047,6 +178382,22 @@ export namespace Prisma {
     data: XOR<ConversationAssociationUpdateManyMutationInput, ConversationAssociationUncheckedUpdateManyWithoutConversationInput>
   }
 
+  export type WorkflowRunUpsertWithWhereUniqueWithoutConversationInput = {
+    where: WorkflowRunWhereUniqueInput
+    update: XOR<WorkflowRunUpdateWithoutConversationInput, WorkflowRunUncheckedUpdateWithoutConversationInput>
+    create: XOR<WorkflowRunCreateWithoutConversationInput, WorkflowRunUncheckedCreateWithoutConversationInput>
+  }
+
+  export type WorkflowRunUpdateWithWhereUniqueWithoutConversationInput = {
+    where: WorkflowRunWhereUniqueInput
+    data: XOR<WorkflowRunUpdateWithoutConversationInput, WorkflowRunUncheckedUpdateWithoutConversationInput>
+  }
+
+  export type WorkflowRunUpdateManyWithWhereWithoutConversationInput = {
+    where: WorkflowRunScalarWhereInput
+    data: XOR<WorkflowRunUpdateManyMutationInput, WorkflowRunUncheckedUpdateManyWithoutConversationInput>
+  }
+
   export type UserCreateWithoutChatContextsInput = {
     id?: string
     username: string
@@ -171119,6 +178470,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutChatContextsInput = {
@@ -171193,6 +178546,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutChatContextsInput = {
@@ -171210,6 +178565,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateWithoutActiveContextInput = {
@@ -171222,6 +178578,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationCreateOrConnectWithoutActiveContextInput = {
@@ -171317,6 +178674,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutChatContextsInput = {
@@ -171391,6 +178750,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ConversationUpsertWithWhereUniqueWithoutActiveContextInput = {
@@ -171419,6 +178780,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateWithoutMessagesInput = {
@@ -171431,6 +178793,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationCreateOrConnectWithoutMessagesInput = {
@@ -171530,6 +178893,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateWithoutMessagesInput = {
@@ -171542,6 +178906,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationMessageUpsertWithoutBranchesInput = {
@@ -171609,6 +178974,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationUncheckedCreateWithoutAssociationsInput = {
@@ -171621,6 +178987,7 @@ export namespace Prisma {
     updatedAt?: Date | string
     deletedAt?: Date | string | null
     messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
   }
 
   export type ConversationCreateOrConnectWithoutAssociationsInput = {
@@ -171686,6 +179053,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutConversationAssociationsInput = {
@@ -171746,6 +179114,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutConversationAssociationsInput = {
@@ -171774,6 +179143,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateWithoutAssociationsInput = {
@@ -171786,6 +179156,7 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ContentNodeUpsertWithoutConversationAssociationsInput = {
@@ -171857,6 +179228,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutConversationAssociationsInput = {
@@ -171917,6 +179289,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutAiConnectionsInput = {
@@ -171991,6 +179364,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAiConnectionsInput = {
@@ -172065,6 +179440,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAiConnectionsInput = {
@@ -172185,6 +179562,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAiConnectionsInput = {
@@ -172259,6 +179638,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AIFeatureRouteUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -172349,6 +179730,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutAiFeatureRoutesInput = {
@@ -172423,6 +179806,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutAiFeatureRoutesInput = {
@@ -172554,6 +179939,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutAiFeatureRoutesInput = {
@@ -172628,6 +180015,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AIConnectionUpsertWithoutFeatureRoutesInput = {
@@ -172735,6 +180124,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutVisualizationPayloadInput = {
@@ -172795,6 +180185,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutVisualizationPayloadInput = {
@@ -172871,6 +180262,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput = {
@@ -172931,6 +180323,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutDataPayloadInput = {
@@ -172991,6 +180384,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutDataPayloadInput = {
@@ -173051,6 +180445,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutDataPayloadInput = {
@@ -173127,6 +180522,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutDataPayloadInput = {
@@ -173187,6 +180583,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutHopePayloadInput = {
@@ -173247,6 +180644,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHopePayloadInput = {
@@ -173307,6 +180705,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHopePayloadInput = {
@@ -173383,6 +180782,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHopePayloadInput = {
@@ -173443,6 +180843,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeCreateWithoutWorkflowPayloadInput = {
@@ -173503,6 +180904,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowPayloadInput = {
@@ -173563,6 +180965,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowPayloadInput = {
@@ -173639,6 +181042,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput = {
@@ -173699,6 +181103,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type UserCreateWithoutReusableCategoriesInput = {
@@ -173773,6 +181178,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutReusableCategoriesInput = {
@@ -173847,6 +181254,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutReusableCategoriesInput = {
@@ -174170,6 +181579,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutReusableCategoriesInput = {
@@ -174244,6 +181655,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryUpsertWithoutChildrenInput = {
@@ -174478,6 +181891,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSavedBlocksInput = {
@@ -174552,6 +181967,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSavedBlocksInput = {
@@ -174685,6 +182102,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSavedBlocksInput = {
@@ -174759,6 +182178,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutContentTemplatesInput = {
@@ -174870,6 +182291,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutContentTemplatesInput = {
@@ -174944,6 +182367,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutContentTemplatesInput = {
@@ -175077,6 +182502,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutContentTemplatesInput = {
@@ -175151,6 +182578,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutSnippetsInput = {
@@ -175262,6 +182691,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSnippetsInput = {
@@ -175336,6 +182767,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSnippetsInput = {
@@ -175469,6 +182902,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSnippetsInput = {
@@ -175543,6 +182978,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type ReusableCategoryCreateWithoutPageTemplatesInput = {
@@ -175654,6 +183091,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPageTemplatesInput = {
@@ -175728,6 +183167,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPageTemplatesInput = {
@@ -175861,6 +183302,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPageTemplatesInput = {
@@ -175935,6 +183378,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutCalendarConnectionsInput = {
@@ -176009,6 +183454,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarConnectionsInput = {
@@ -176083,6 +183530,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarConnectionsInput = {
@@ -176221,6 +183670,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarConnectionsInput = {
@@ -176295,6 +183746,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -176385,6 +183838,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarSourcesInput = {
@@ -176459,6 +183914,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarSourcesInput = {
@@ -176642,6 +184099,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarSourcesInput = {
@@ -176716,6 +184175,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarConnectionUpsertWithoutSourcesInput = {
@@ -176847,6 +184308,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutCalendarEventsInput = {
@@ -176921,6 +184384,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutCalendarEventsInput = {
@@ -177029,6 +184494,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCalendarEventsInput = {
@@ -177089,6 +184555,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCalendarEventsInput = {
@@ -177205,6 +184672,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutCalendarEventsInput = {
@@ -177279,6 +184748,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type CalendarSourceUpsertWithoutEventsInput = {
@@ -177399,6 +184870,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCalendarEventsInput = {
@@ -177459,6 +184931,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput = {
@@ -177673,6 +185146,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutOwnedTenantsInput = {
@@ -177747,6 +185222,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutOwnedTenantsInput = {
@@ -178008,6 +185485,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPrimaryTenantInput = {
@@ -178082,6 +185561,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPrimaryTenantInput = {
@@ -178177,6 +185658,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutOwnedTenantsInput = {
@@ -178251,6 +185734,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type TenantHostUpsertWithWhereUniqueWithoutTenantInput = {
@@ -178514,6 +185999,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPublicPathsInput = {
@@ -178588,6 +186075,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPublicPathsInput = {
@@ -178906,6 +186395,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPublicPathsInput = {
@@ -178980,6 +186471,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type TenantUpsertWithoutPublicPathsInput = {
@@ -179186,6 +186679,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutSeriesInput = {
@@ -179260,6 +186755,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutSeriesInput = {
@@ -179430,6 +186927,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutSeriesInput = {
@@ -179504,6 +187003,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PublicItemUpsertWithWhereUniqueWithoutSeriesInput = {
@@ -179594,6 +187095,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPublicItemsInput = {
@@ -179668,6 +187171,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPublicItemsInput = {
@@ -179768,6 +187273,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPublicItemsInput = {
@@ -179828,6 +187334,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPublicItemsInput = {
@@ -180335,6 +187842,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPublicItemsInput = {
@@ -180409,6 +187918,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type TenantUpsertWithoutPublicItemsInput = {
@@ -180521,6 +188032,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPublicItemsInput = {
@@ -180581,6 +188093,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type PublicPathUpsertWithoutItemsInput = {
@@ -181147,6 +188660,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPublicItemRevisionsInput = {
@@ -181221,6 +188736,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPublicItemRevisionsInput = {
@@ -181542,6 +189059,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPublicItemRevisionsInput = {
@@ -181616,6 +189135,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PublicItemUpsertWithoutWorkingRevisionInput = {
@@ -181852,6 +189373,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPublicPathRedirectsInput = {
@@ -181926,6 +189449,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPublicPathRedirectsInput = {
@@ -182163,6 +189688,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPublicPathRedirectsInput = {
@@ -182237,6 +189764,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type TenantUpsertWithoutPublicPathRedirectsInput = {
@@ -182551,6 +190080,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutPreviewTokensInput = {
@@ -182625,6 +190156,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutPreviewTokensInput = {
@@ -182796,6 +190329,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPreviewTokensInput = {
@@ -182870,6 +190405,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type PublicItemCreateWithoutBlogPostPayloadInput = {
@@ -184036,6 +191573,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutConnectionInvitesSentInput = {
@@ -184110,6 +191649,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutConnectionInvitesSentInput = {
@@ -184189,6 +191730,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutConnectionInvitesReceivedInput = {
@@ -184263,6 +191806,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutConnectionInvitesReceivedInput = {
@@ -184353,6 +191898,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConnectionInvitesSentInput = {
@@ -184427,6 +191974,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutConnectionInvitesReceivedInput = {
@@ -184512,6 +192061,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConnectionInvitesReceivedInput = {
@@ -184586,6 +192137,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutConnectionsAsAInput = {
@@ -184660,6 +192213,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutConnectionsAsAInput = {
@@ -184734,6 +192289,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutConnectionsAsAInput = {
@@ -184813,6 +192370,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutConnectionsAsBInput = {
@@ -184887,6 +192446,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutConnectionsAsBInput = {
@@ -184977,6 +192538,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConnectionsAsAInput = {
@@ -185051,6 +192614,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutConnectionsAsBInput = {
@@ -185136,6 +192701,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutConnectionsAsBInput = {
@@ -185210,6 +192777,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutBlocksIssuedInput = {
@@ -185284,6 +192853,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutBlocksIssuedInput = {
@@ -185358,6 +192929,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutBlocksIssuedInput = {
@@ -185437,6 +193010,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutBlocksReceivedInput = {
@@ -185511,6 +193086,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutBlocksReceivedInput = {
@@ -185601,6 +193178,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBlocksIssuedInput = {
@@ -185675,6 +193254,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUpsertWithoutBlocksReceivedInput = {
@@ -185760,6 +193341,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutBlocksReceivedInput = {
@@ -185834,6 +193417,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserCreateWithoutActivityEventsActedInput = {
@@ -185908,6 +193493,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutActivityEventsActedInput = {
@@ -185982,6 +193569,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutActivityEventsActedInput = {
@@ -186102,6 +193691,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutActivityEventsActedInput = {
@@ -186176,6 +193767,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type NotificationRecipientUpsertWithWhereUniqueWithoutEventInput = {
@@ -186295,6 +193888,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutNotificationInboxInput = {
@@ -186369,6 +193964,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutNotificationInboxInput = {
@@ -186494,6 +194091,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutNotificationInboxInput = {
@@ -186568,6 +194167,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type DmParticipantCreateWithoutThreadInput = {
@@ -186753,6 +194354,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutDmParticipationsInput = {
@@ -186827,6 +194430,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutDmParticipationsInput = {
@@ -186946,6 +194551,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutDmParticipationsInput = {
@@ -187020,6 +194627,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type DmThreadCreateWithoutMessagesInput = {
@@ -187117,6 +194726,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
     notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
   }
 
   export type UserUncheckedCreateWithoutDmMessagesSentInput = {
@@ -187191,6 +194802,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
     notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
     dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
   }
 
   export type UserCreateOrConnectWithoutDmMessagesSentInput = {
@@ -187310,6 +194923,8 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutDmMessagesSentInput = {
@@ -187384,6 +194999,1404 @@ export namespace Prisma {
     activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserCreateWithoutWorkflowDefinitionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutWorkflowDefinitionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutWorkflowDefinitionsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutWorkflowDefinitionsInput, UserUncheckedCreateWithoutWorkflowDefinitionsInput>
+  }
+
+  export type WorkflowRunCreateWithoutDefinitionInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowRunsInput
+    conversation?: ConversationCreateNestedOneWithoutWorkflowRunsInput
+    events?: WorkflowRunEventCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateWithoutDefinitionInput = {
+    id?: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput
+    artifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunCreateOrConnectWithoutDefinitionInput = {
+    where: WorkflowRunWhereUniqueInput
+    create: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput>
+  }
+
+  export type WorkflowRunCreateManyDefinitionInputEnvelope = {
+    data: WorkflowRunCreateManyDefinitionInput | WorkflowRunCreateManyDefinitionInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutWorkflowDefinitionsInput = {
+    update: XOR<UserUpdateWithoutWorkflowDefinitionsInput, UserUncheckedUpdateWithoutWorkflowDefinitionsInput>
+    create: XOR<UserCreateWithoutWorkflowDefinitionsInput, UserUncheckedCreateWithoutWorkflowDefinitionsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutWorkflowDefinitionsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutWorkflowDefinitionsInput, UserUncheckedUpdateWithoutWorkflowDefinitionsInput>
+  }
+
+  export type UserUpdateWithoutWorkflowDefinitionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutWorkflowDefinitionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type WorkflowRunUpsertWithWhereUniqueWithoutDefinitionInput = {
+    where: WorkflowRunWhereUniqueInput
+    update: XOR<WorkflowRunUpdateWithoutDefinitionInput, WorkflowRunUncheckedUpdateWithoutDefinitionInput>
+    create: XOR<WorkflowRunCreateWithoutDefinitionInput, WorkflowRunUncheckedCreateWithoutDefinitionInput>
+  }
+
+  export type WorkflowRunUpdateWithWhereUniqueWithoutDefinitionInput = {
+    where: WorkflowRunWhereUniqueInput
+    data: XOR<WorkflowRunUpdateWithoutDefinitionInput, WorkflowRunUncheckedUpdateWithoutDefinitionInput>
+  }
+
+  export type WorkflowRunUpdateManyWithWhereWithoutDefinitionInput = {
+    where: WorkflowRunScalarWhereInput
+    data: XOR<WorkflowRunUpdateManyMutationInput, WorkflowRunUncheckedUpdateManyWithoutDefinitionInput>
+  }
+
+  export type UserCreateWithoutWorkflowRunsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutWorkflowRunsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutWorkflowRunsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutWorkflowRunsInput, UserUncheckedCreateWithoutWorkflowRunsInput>
+  }
+
+  export type WorkflowDefinitionCreateWithoutRunsInput = {
+    id?: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowDefinitionsInput
+  }
+
+  export type WorkflowDefinitionUncheckedCreateWithoutRunsInput = {
+    id?: string
+    ownerId: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowDefinitionCreateOrConnectWithoutRunsInput = {
+    where: WorkflowDefinitionWhereUniqueInput
+    create: XOR<WorkflowDefinitionCreateWithoutRunsInput, WorkflowDefinitionUncheckedCreateWithoutRunsInput>
+  }
+
+  export type ConversationCreateWithoutWorkflowRunsInput = {
+    id?: string
+    title?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    owner: UserCreateNestedOneWithoutConversationsInput
+    archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    messages?: ConversationMessageCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationUncheckedCreateWithoutWorkflowRunsInput = {
+    id?: string
+    ownerId: string
+    title?: string | null
+    archivedToContentNodeId?: string | null
+    activeContextId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationCreateOrConnectWithoutWorkflowRunsInput = {
+    where: ConversationWhereUniqueInput
+    create: XOR<ConversationCreateWithoutWorkflowRunsInput, ConversationUncheckedCreateWithoutWorkflowRunsInput>
+  }
+
+  export type WorkflowRunEventCreateWithoutRunInput = {
+    id?: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunEventUncheckedCreateWithoutRunInput = {
+    id?: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunEventCreateOrConnectWithoutRunInput = {
+    where: WorkflowRunEventWhereUniqueInput
+    create: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput>
+  }
+
+  export type WorkflowRunEventCreateManyRunInputEnvelope = {
+    data: WorkflowRunEventCreateManyRunInput | WorkflowRunEventCreateManyRunInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type WorkflowRunArtifactCreateWithoutRunInput = {
+    id?: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+    content: ContentNodeCreateNestedOneWithoutWorkflowRunArtifactsInput
+  }
+
+  export type WorkflowRunArtifactUncheckedCreateWithoutRunInput = {
+    id?: string
+    contentNodeId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunArtifactCreateOrConnectWithoutRunInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    create: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput>
+  }
+
+  export type WorkflowRunArtifactCreateManyRunInputEnvelope = {
+    data: WorkflowRunArtifactCreateManyRunInput | WorkflowRunArtifactCreateManyRunInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type UserUpsertWithoutWorkflowRunsInput = {
+    update: XOR<UserUpdateWithoutWorkflowRunsInput, UserUncheckedUpdateWithoutWorkflowRunsInput>
+    create: XOR<UserCreateWithoutWorkflowRunsInput, UserUncheckedCreateWithoutWorkflowRunsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutWorkflowRunsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutWorkflowRunsInput, UserUncheckedUpdateWithoutWorkflowRunsInput>
+  }
+
+  export type UserUpdateWithoutWorkflowRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutWorkflowRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type WorkflowDefinitionUpsertWithoutRunsInput = {
+    update: XOR<WorkflowDefinitionUpdateWithoutRunsInput, WorkflowDefinitionUncheckedUpdateWithoutRunsInput>
+    create: XOR<WorkflowDefinitionCreateWithoutRunsInput, WorkflowDefinitionUncheckedCreateWithoutRunsInput>
+    where?: WorkflowDefinitionWhereInput
+  }
+
+  export type WorkflowDefinitionUpdateToOneWithWhereWithoutRunsInput = {
+    where?: WorkflowDefinitionWhereInput
+    data: XOR<WorkflowDefinitionUpdateWithoutRunsInput, WorkflowDefinitionUncheckedUpdateWithoutRunsInput>
+  }
+
+  export type WorkflowDefinitionUpdateWithoutRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowDefinitionsNestedInput
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateWithoutRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConversationUpsertWithoutWorkflowRunsInput = {
+    update: XOR<ConversationUpdateWithoutWorkflowRunsInput, ConversationUncheckedUpdateWithoutWorkflowRunsInput>
+    create: XOR<ConversationCreateWithoutWorkflowRunsInput, ConversationUncheckedCreateWithoutWorkflowRunsInput>
+    where?: ConversationWhereInput
+  }
+
+  export type ConversationUpdateToOneWithWhereWithoutWorkflowRunsInput = {
+    where?: ConversationWhereInput
+    data: XOR<ConversationUpdateWithoutWorkflowRunsInput, ConversationUncheckedUpdateWithoutWorkflowRunsInput>
+  }
+
+  export type ConversationUpdateWithoutWorkflowRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
+    archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+  }
+
+  export type ConversationUncheckedUpdateWithoutWorkflowRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+  }
+
+  export type WorkflowRunEventUpsertWithWhereUniqueWithoutRunInput = {
+    where: WorkflowRunEventWhereUniqueInput
+    update: XOR<WorkflowRunEventUpdateWithoutRunInput, WorkflowRunEventUncheckedUpdateWithoutRunInput>
+    create: XOR<WorkflowRunEventCreateWithoutRunInput, WorkflowRunEventUncheckedCreateWithoutRunInput>
+  }
+
+  export type WorkflowRunEventUpdateWithWhereUniqueWithoutRunInput = {
+    where: WorkflowRunEventWhereUniqueInput
+    data: XOR<WorkflowRunEventUpdateWithoutRunInput, WorkflowRunEventUncheckedUpdateWithoutRunInput>
+  }
+
+  export type WorkflowRunEventUpdateManyWithWhereWithoutRunInput = {
+    where: WorkflowRunEventScalarWhereInput
+    data: XOR<WorkflowRunEventUpdateManyMutationInput, WorkflowRunEventUncheckedUpdateManyWithoutRunInput>
+  }
+
+  export type WorkflowRunEventScalarWhereInput = {
+    AND?: WorkflowRunEventScalarWhereInput | WorkflowRunEventScalarWhereInput[]
+    OR?: WorkflowRunEventScalarWhereInput[]
+    NOT?: WorkflowRunEventScalarWhereInput | WorkflowRunEventScalarWhereInput[]
+    id?: UuidFilter<"WorkflowRunEvent"> | string
+    runId?: UuidFilter<"WorkflowRunEvent"> | string
+    seq?: IntFilter<"WorkflowRunEvent"> | number
+    key?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    type?: StringFilter<"WorkflowRunEvent"> | string
+    stepName?: StringNullableFilter<"WorkflowRunEvent"> | string | null
+    payload?: JsonNullableFilter<"WorkflowRunEvent">
+    createdAt?: DateTimeFilter<"WorkflowRunEvent"> | Date | string
+  }
+
+  export type WorkflowRunArtifactUpsertWithWhereUniqueWithoutRunInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    update: XOR<WorkflowRunArtifactUpdateWithoutRunInput, WorkflowRunArtifactUncheckedUpdateWithoutRunInput>
+    create: XOR<WorkflowRunArtifactCreateWithoutRunInput, WorkflowRunArtifactUncheckedCreateWithoutRunInput>
+  }
+
+  export type WorkflowRunArtifactUpdateWithWhereUniqueWithoutRunInput = {
+    where: WorkflowRunArtifactWhereUniqueInput
+    data: XOR<WorkflowRunArtifactUpdateWithoutRunInput, WorkflowRunArtifactUncheckedUpdateWithoutRunInput>
+  }
+
+  export type WorkflowRunArtifactUpdateManyWithWhereWithoutRunInput = {
+    where: WorkflowRunArtifactScalarWhereInput
+    data: XOR<WorkflowRunArtifactUpdateManyMutationInput, WorkflowRunArtifactUncheckedUpdateManyWithoutRunInput>
+  }
+
+  export type WorkflowRunCreateWithoutEventsInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowRunsInput
+    definition: WorkflowDefinitionCreateNestedOneWithoutRunsInput
+    conversation?: ConversationCreateNestedOneWithoutWorkflowRunsInput
+    artifacts?: WorkflowRunArtifactCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateWithoutEventsInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    artifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunCreateOrConnectWithoutEventsInput = {
+    where: WorkflowRunWhereUniqueInput
+    create: XOR<WorkflowRunCreateWithoutEventsInput, WorkflowRunUncheckedCreateWithoutEventsInput>
+  }
+
+  export type WorkflowRunUpsertWithoutEventsInput = {
+    update: XOR<WorkflowRunUpdateWithoutEventsInput, WorkflowRunUncheckedUpdateWithoutEventsInput>
+    create: XOR<WorkflowRunCreateWithoutEventsInput, WorkflowRunUncheckedCreateWithoutEventsInput>
+    where?: WorkflowRunWhereInput
+  }
+
+  export type WorkflowRunUpdateToOneWithWhereWithoutEventsInput = {
+    where?: WorkflowRunWhereInput
+    data: XOR<WorkflowRunUpdateWithoutEventsInput, WorkflowRunUncheckedUpdateWithoutEventsInput>
+  }
+
+  export type WorkflowRunUpdateWithoutEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+    definition?: WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput
+    conversation?: ConversationUpdateOneWithoutWorkflowRunsNestedInput
+    artifacts?: WorkflowRunArtifactUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateWithoutEventsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    artifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunCreateWithoutArtifactsInput = {
+    id?: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutWorkflowRunsInput
+    definition: WorkflowDefinitionCreateNestedOneWithoutRunsInput
+    conversation?: ConversationCreateNestedOneWithoutWorkflowRunsInput
+    events?: WorkflowRunEventCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunUncheckedCreateWithoutArtifactsInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    events?: WorkflowRunEventUncheckedCreateNestedManyWithoutRunInput
+  }
+
+  export type WorkflowRunCreateOrConnectWithoutArtifactsInput = {
+    where: WorkflowRunWhereUniqueInput
+    create: XOR<WorkflowRunCreateWithoutArtifactsInput, WorkflowRunUncheckedCreateWithoutArtifactsInput>
+  }
+
+  export type ContentNodeCreateWithoutWorkflowRunArtifactsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutWorkflowRunArtifactsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput>
+  }
+
+  export type WorkflowRunUpsertWithoutArtifactsInput = {
+    update: XOR<WorkflowRunUpdateWithoutArtifactsInput, WorkflowRunUncheckedUpdateWithoutArtifactsInput>
+    create: XOR<WorkflowRunCreateWithoutArtifactsInput, WorkflowRunUncheckedCreateWithoutArtifactsInput>
+    where?: WorkflowRunWhereInput
+  }
+
+  export type WorkflowRunUpdateToOneWithWhereWithoutArtifactsInput = {
+    where?: WorkflowRunWhereInput
+    data: XOR<WorkflowRunUpdateWithoutArtifactsInput, WorkflowRunUncheckedUpdateWithoutArtifactsInput>
+  }
+
+  export type WorkflowRunUpdateWithoutArtifactsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+    definition?: WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput
+    conversation?: ConversationUpdateOneWithoutWorkflowRunsNestedInput
+    events?: WorkflowRunEventUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateWithoutArtifactsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type ContentNodeUpsertWithoutWorkflowRunArtifactsInput = {
+    update: XOR<ContentNodeUpdateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput>
+    create: XOR<ContentNodeCreateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutWorkflowRunArtifactsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutWorkflowRunArtifactsInput, ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput>
+  }
+
+  export type ContentNodeUpdateWithoutWorkflowRunArtifactsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type AuditLogCreateManyTargetContentInput = {
@@ -187703,6 +196716,14 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type WorkflowRunArtifactCreateManyContentInput = {
+    id?: string
+    runId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
   export type AuditLogUpdateWithoutTargetContentInput = {
     id?: StringFieldUpdateOperationsInput | string
     action?: StringFieldUpdateOperationsInput | string
@@ -187872,6 +196893,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutParentInput = {
@@ -187932,6 +196954,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutParentInput = {
@@ -188015,6 +197038,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedByNoteInput = {
@@ -188075,6 +197099,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnedByNoteInput = {
@@ -188830,6 +197855,30 @@ export namespace Prisma {
     lastActiveAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    run?: WorkflowRunUpdateOneRequiredWithoutArtifactsNestedInput
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateManyWithoutContentInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    runId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type FlashcardDeckCreateManyParentInput = {
@@ -189846,6 +198895,36 @@ export namespace Prisma {
     deletedAt?: Date | string | null
   }
 
+  export type WorkflowDefinitionCreateManyOwnerInput = {
+    id?: string
+    slug: string
+    name: string
+    engine: string
+    engineRef: string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowRunCreateManyOwnerInput = {
+    id?: string
+    definitionId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AccountUpdateWithoutUserInput = {
     id?: StringFieldUpdateOperationsInput | string
     provider?: StringFieldUpdateOperationsInput | string
@@ -190148,6 +199227,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnerInput = {
@@ -190208,6 +199288,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnerInput = {
@@ -190243,6 +199324,7 @@ export namespace Prisma {
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateWithoutOwnerInput = {
@@ -190255,6 +199337,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateManyWithoutOwnerInput = {
@@ -192272,6 +201355,102 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
+  export type WorkflowDefinitionUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runs?: WorkflowRunUpdateManyWithoutDefinitionNestedInput
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    runs?: WorkflowRunUncheckedUpdateManyWithoutDefinitionNestedInput
+  }
+
+  export type WorkflowDefinitionUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRef?: StringFieldUpdateOperationsInput | string
+    inputSchema?: NullableJsonNullValueInput | InputJsonValue
+    enabled?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    definition?: WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput
+    conversation?: ConversationUpdateOneWithoutWorkflowRunsNestedInput
+    events?: WorkflowRunEventUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ContentWorkspaceItemCreateManyWorkspaceInput = {
     id?: string
     contentId: string
@@ -192393,6 +201572,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCategoryInput = {
@@ -192453,6 +201633,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutCategoryInput = {
@@ -192743,6 +201924,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleGroupInput = {
@@ -192803,6 +201985,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPeopleGroupInput = {
@@ -192958,6 +202141,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonInput = {
@@ -193018,6 +202202,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPersonInput = {
@@ -193609,6 +202794,24 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
+  export type WorkflowRunCreateManyConversationInput = {
+    id?: string
+    definitionId: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type ConversationMessageUpdateWithoutConversationInput = {
     id?: StringFieldUpdateOperationsInput | string
     role?: EnumChatMessageRoleFieldUpdateOperationsInput | $Enums.ChatMessageRole
@@ -193674,6 +202877,64 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type WorkflowRunUpdateWithoutConversationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+    definition?: WorkflowDefinitionUpdateOneRequiredWithoutRunsNestedInput
+    events?: WorkflowRunEventUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateWithoutConversationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutConversationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    definitionId?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ConversationCreateManyActiveContextInput = {
     id?: string
     ownerId: string
@@ -193694,6 +202955,7 @@ export namespace Prisma {
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateWithoutActiveContextInput = {
@@ -193706,6 +202968,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
   }
 
   export type ConversationUncheckedUpdateManyWithoutActiveContextInput = {
@@ -194641,6 +203904,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateWithoutPrimaryTenantInput = {
@@ -194715,6 +203980,8 @@ export namespace Prisma {
     notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
     dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
     dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type UserUncheckedUpdateManyWithoutPrimaryTenantInput = {
@@ -195354,6 +204621,154 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     editedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type WorkflowRunCreateManyDefinitionInput = {
+    id?: string
+    ownerId: string
+    status?: $Enums.WorkflowRunStatus
+    engine: string
+    engineRunId?: string | null
+    engineGateRef?: string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: string | null
+    conversationId?: string | null
+    startedAt?: Date | string | null
+    finishedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type WorkflowRunUpdateWithoutDefinitionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutWorkflowRunsNestedInput
+    conversation?: ConversationUpdateOneWithoutWorkflowRunsNestedInput
+    events?: WorkflowRunEventUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateWithoutDefinitionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    events?: WorkflowRunEventUncheckedUpdateManyWithoutRunNestedInput
+    artifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutRunNestedInput
+  }
+
+  export type WorkflowRunUncheckedUpdateManyWithoutDefinitionInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    status?: EnumWorkflowRunStatusFieldUpdateOperationsInput | $Enums.WorkflowRunStatus
+    engine?: StringFieldUpdateOperationsInput | string
+    engineRunId?: NullableStringFieldUpdateOperationsInput | string | null
+    engineGateRef?: NullableStringFieldUpdateOperationsInput | string | null
+    input?: JsonNullValueInput | InputJsonValue
+    output?: NullableJsonNullValueInput | InputJsonValue
+    error?: NullableJsonNullValueInput | InputJsonValue
+    gateToken?: NullableStringFieldUpdateOperationsInput | string | null
+    conversationId?: NullableStringFieldUpdateOperationsInput | string | null
+    startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    finishedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventCreateManyRunInput = {
+    id?: string
+    seq: number
+    key?: string | null
+    type: string
+    stepName?: string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunArtifactCreateManyRunInput = {
+    id?: string
+    contentNodeId: string
+    kind: string
+    label: string
+    createdAt?: Date | string
+  }
+
+  export type WorkflowRunEventUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventUncheckedUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunEventUncheckedUpdateManyWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    seq?: IntFieldUpdateOperationsInput | number
+    key?: NullableStringFieldUpdateOperationsInput | string | null
+    type?: StringFieldUpdateOperationsInput | string
+    stepName?: NullableStringFieldUpdateOperationsInput | string | null
+    payload?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    content?: ContentNodeUpdateOneRequiredWithoutWorkflowRunArtifactsNestedInput
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentNodeId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type WorkflowRunArtifactUncheckedUpdateManyWithoutRunInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    contentNodeId?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    label?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
 

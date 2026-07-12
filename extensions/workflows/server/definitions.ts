@@ -19,6 +19,12 @@ export interface WorkflowDefinitionSpec {
 
 export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
   {
+    slug: "gate-probe",
+    name: "Gate Probe (WDK plumbing test)",
+    engine: "wdk",
+    engineRef: "gate-probe",
+  },
+  {
     slug: "job-application",
     name: "Job Application Research",
     engine: "wdk",

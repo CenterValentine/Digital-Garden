@@ -180,6 +180,7 @@ model ContentNode {
   bookmarkSyncRoots            BookmarkSyncConnection[]  @relation("BookmarkSyncRoot")
   webResourceLinks             WebResourceContentLink[]
   webResourceViewStates        WebResourceViewState[]
+  workflowRunArtifacts         WorkflowRunArtifact[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -574,6 +575,9 @@ model User {
   notificationInbox         NotificationRecipient[] @relation("NotificationInbox")
   dmParticipations          DmParticipant[]         @relation("DmParticipations")
   dmMessagesSent            DmMessage[]             @relation("DmMessagesSent")
+
+  workflowDefinitions WorkflowDefinition[]
+  workflowRuns        WorkflowRun[]
 
   @@index([email])
 }
@@ -1159,6 +1163,7 @@ model Conversation {
   activeContext         ChatContext?              @relation("ConversationActiveContext", fields: [activeContextId], references: [id], onDelete: SetNull)
   messages              ConversationMessage[]
   associations          ConversationAssociation[]
+  workflowRuns          WorkflowRun[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, deletedAt])
@@ -2142,4 +2147,99 @@ model RateLimitCounter {
   count       Int      @default(0)
 
   @@id([key, windowStart])
+}
+
+// ============================================================
+// Workflows subsystem — engine-agnostic run tables (hub-and-spoke)
+// The app is the system of record; durable execution engines (WDK,
+// later n8n/Hatchet) are swappable adapters. Product UI reads ONLY
+// these tables, never an engine's API.
+// See docs/notes-feature/work-tracking/WORKFLOWS-FOUNDATION-PLAN.md
+// NOTE: distinct from WorkflowPayload (a ContentNode payload stub from
+// an earlier epoch) — these tables model executions, not content.
+// ============================================================
+
+enum WorkflowRunStatus {
+  queued
+  running
+  waiting
+  succeeded
+  failed
+  canceled
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId     String   @db.Uuid
+  slug        String   @db.VarChar(120) // append-only versioning: behavior changes ship as a new slug (e.g. "job-application@2")
+  name        String   @db.VarChar(200)
+  engine      String   @db.VarChar(50) // adapter key in the engine registry: "wdk" | later "n8n" | ...
+  engineRef   String   @db.VarChar(200) // engine-side identity — WDK: code-manifest key; n8n: webhook id
+  inputSchema Json? // JSON Schema for dispatch payload validation
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  owner User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  runs  WorkflowRun[]
+
+  @@unique([ownerId, slug])
+}
+
+model WorkflowRun {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  definitionId   String            @db.Uuid
+  ownerId        String            @db.Uuid
+  status         WorkflowRunStatus @default(queued)
+  engine         String            @db.VarChar(50) // denormalized at dispatch — stays truthful if the definition later migrates engines
+  engineRunId    String?           @db.VarChar(200) // engine-side handle, debugging only — UI never reads through it
+  engineGateRef  String? // engine-native resume handle (e.g. n8n Wait resume URL); unused by WDK (deterministic tokens)
+  input          Json              @default("{}")
+  output         Json?
+  error          Json?
+  gateToken      String?           @db.VarChar(200) // non-null ⟺ status waiting; what inbox actions resume
+  conversationId String?           @db.Uuid
+  startedAt      DateTime?         @db.Timestamptz(6)
+  finishedAt     DateTime?         @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+
+  owner        User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  definition   WorkflowDefinition    @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  conversation Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  events       WorkflowRunEvent[]
+  artifacts    WorkflowRunArtifact[]
+
+  @@index([ownerId, status])
+  @@index([definitionId, createdAt])
+}
+
+model WorkflowRunEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId     String   @db.Uuid
+  seq       Int // monotonic per run — timeline order without clock trust
+  key       String?  @db.VarChar(200) // deterministic idempotency key — engines retry steps; double-fire must upsert, not duplicate
+  type      String   @db.VarChar(50) // "step.started" | "step.completed" | "gate.opened" | "gate.resumed" | "log" | "artifact.created"
+  stepName  String?  @db.VarChar(120)
+  payload   Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, seq])
+  @@unique([runId, key])
+}
+
+model WorkflowRunArtifact {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId         String   @db.Uuid
+  contentNodeId String   @db.Uuid
+  kind          String   @db.VarChar(50) // "document" | "note" | "file"
+  label         String   @db.VarChar(200)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  run     WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  content ContentNode @relation(fields: [contentNodeId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
 }

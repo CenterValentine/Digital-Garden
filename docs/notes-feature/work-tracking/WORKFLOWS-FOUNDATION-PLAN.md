@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 🟡 In progress (S1 ✅) · Plan 2 SKETCH · Plan 3 STUB
+**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅) · Plan 2 SKETCH · Plan 3 STUB
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -148,13 +148,22 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - **Pre-existing `WorkflowPayload` model** (ContentNode payload stub from an earlier epoch, execution deliberately blocked) — different concept, left untouched; noted in the schema section comment.
 - WDK adapter is a **queued-run placeholder** this session (Session 2 wires the real engine); `superviseGate` not yet written.
 
-## Session 2 — WDK install, adapter, gate helper ⚪
+## Session 2 — WDK install, adapter, gate helper ✅ (2026-07-12)
 
-- [ ] `pnpm add workflow` + `withWorkflow` in `next.config` — **verify Turbopack compat and build heap early** (builds already need `NODE_OPTIONS='--max-old-space-size=8192'` locally; watch for regression). `npx workflow health` + `npx workflow web` for local dev loop.
-- [ ] `server/engines/wdk.ts` — adapter: `start` via `start(fn, [input])` from `workflow/api` resolved through a code manifest (`WDK_WORKFLOWS: Record<slug, WorkflowFn>`); `resumeGate` via `resumeHook(token, payload)`; `cancel` via engine run handle.
-- [ ] `superviseGate(runId, gateName, summary)` helper — workflow-level (NOT `"use step"`): `createHook({ token })` → `openGate` step (WAITING + gateToken + inbox notify) → `await hook` → `closeGate` step. Deterministic token `gate:{runId}:{gateName}`.
-- [ ] WDK constraints honored: orchestration bodies thin + deterministic; all Prisma/Node access inside `"use step"` functions; serializable payloads only (IDs, not objects).
-- **Gate:** a trivial two-step workflow with one gate dispatches, suspends, resumes via the API route, and completes — verified with `npx workflow web` + run detail JSON.
+- [x] `pnpm add workflow` (v4.6.0) + `withWorkflow` in `next.config` — Turbopack compat verified in dev AND production build; heap unchanged.
+- [x] `server/engines/wdk.ts` — adapter: `start` via `start(fn, [input])` from `workflow/api` resolved through `server/wdk/manifest.ts` (`WDK_WORKFLOWS`); `resumeGate` via `resumeHook(token, payload)`; `cancel` via `getRun(engineRunId).cancel()`.
+- [x] `superviseGate(runId, gateName, summary)` in `server/wdk/gate.ts` — workflow-level `createHook({ token })` with openGate/closeGate steps around the suspension point.
+- [x] WDK constraints honored: orchestration bodies thin; Prisma access only in `"use step"` functions; serializable payloads.
+- **Gate:** ✅ `gate-probe` workflow: dispatch → steps execute → suspends `waiting` with deterministic `gate:{runId}:probe` token → resume via API → `succeeded` with output `{approved: true}`. Event trail: run.dispatched → step.completed → gate.opened → gate.resumed → run.finished. Cancel verb also verified (mid-gate cancel → `canceled`, engine-side cancel best-effort).
+
+### Session 2 log — amendments discovered in execution
+
+- **`withWorkflow` must wrap the export, not just be imported** — a missed wrapper produces `'start' received an invalid workflow function` at dispatch time (the directive never compiles). The failure surfaced as a visible failed run — the dispatch-owns-run-creation design working as intended.
+- **proxy.ts bypass added**: `/.well-known/workflow/` joins the early-return skip list. WDK docs warn Next 16 proxies that intercept its internal queue transport break execution with detached-ArrayBuffer errors; worked without the bypass here, but now it's explicit and future-proof.
+- **WDK generates `app/.well-known/workflow/v1/*` route files** at dev/build time — added to `.gitignore` and eslint `globalIgnores` (one generated file had a bare `console` that broke the lint gate). WDK itself appended `/.swc` to .gitignore.
+- **No workflow-level try/catch around gates** — suspension may be control-flow; failure marking lives in steps and dispatch. Revisit error semantics deliberately in S3 for the job workflow.
+- **Dev-loop notes**: this worktree's server runs on **port 3021** (3015/3020 = main checkout, 3017 = multi-tenancy worktree). Authed curl testing via a locally-minted session row (`scripts/dev-mint-session.ts`, deliberately uncommitted). WDK engine run ids look like `wrun_01KX…`.
+- Generated Prisma client (tracked in repo) committed alongside — it reflects the S1 schema.
 
 ## Session 3 — Job-application workflow (stubbed AI), inbox wiring, end-to-end proof ⚪
 
