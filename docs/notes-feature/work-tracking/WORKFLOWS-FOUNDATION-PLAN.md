@@ -2,7 +2,8 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅ S4 ✅) · Plan 2 SKETCH · Plan 3 STUB
+**Status:** Plan 1 🟡 In progress (S1 ✅ S2 ✅ S3 ✅ S4 ✅ S5 ✅*) · Plan 2 SKETCH · Plan 3 STUB
+*S5 asterisk: real-AI execution and storage upload verified in code + graceful paths; live verification needs an env with BYOK connections + working storage (see S5 log).
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -197,13 +198,21 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - **"Open in chat" gate action deferred**: conversation seeding from run output needs deliberate chat-engine integration (conversation create + seeded context per AI-chat conventions); the server side (resume payload `conversationId` → run link) already works. Follow-up recorded for the backlog — the inbox card and GateCard ship with Approve/Decline only for now.
 - **Inbox UI already on main** (NotificationBell/NotificationListItem) — workflow notifications render there today; bell badge verified showing workflow notifications in the browser smoke.
 
-## Session 5 — Real AI research + DOCX exporter ⚪
+## Session 5 — Real AI research + DOCX exporter ✅* (2026-07-12)
 
-- [ ] Research step: `DurableAgent` (`@workflow/ai`) wired through `resolveFeatureRoute()` — BYOK, fallback chains, existing AI rate limits. Bound turns (`maxSteps`). Verbose output → namespaced streams; curated summary events → Postgres.
-- [ ] Match step: fetch resume note by ContentNode ID; produce structured match report (score, strengths, concerns) persisted as run output.
-- [ ] **DOCX exporter as a domain function** (`lib/domain/export/`) using the `docx` package, exposed BOTH as an export-system converter (replacing the stub) and callable from the workflow step. Any future engine gets it via route for free.
-- [ ] Export step: approved draft from linked conversation → DOCX → two-phase storage upload → FilePayload ContentNode in the designated folder → `attachArtifact`.
-- **Gate:** real job listing (pasted) produces a real research dossier, real match report, and a real .docx in the target folder.
+- [x] Research + match steps via `resolveFeatureRoute(ownerId, "chat")` + `executeWithFallback` + `resolveChatModelFromConnection` + `generateText` — BYOK and fallback chains preserved. **Amendment: plain feature-routed steps instead of DurableAgent** — model instances aren't serializable into the workflow sandbox, and step-level generateText keeps BYOK routing without gateway keys. DurableAgent revisit-worthy when streaming agent thoughts matters.
+- [x] Match step reads the resume note's `NotePayload.searchText` by ContentNode id (`resumeNoteId` input, optional).
+- [x] **DOCXConverter implemented** (`lib/domain/export/converters/docx.ts`, `docx` pkg): paragraphs, headings 1–6, lists (as bullets), blockquotes, code blocks, bold/italic/underline/strike/code; unknown nodes degrade to text. Valid Word file proven (PK container, opens as zip).
+- [x] Export step: dossier TipTap (research + match + source) → DOCX → user storage upload → FilePayload ContentNode in root "Job Applications" folder → `attachArtifact`. Mirrors the TTS generate-and-store pattern.
+- **Gate (env-limited):** declined path proven live end-to-end; research/match execute the real code path and degrade to `stubbed: true`-flagged results when no AI route exists (this local Docker dev DB has no AIConnection rows). Approve-path artifact creation blocked HERE by an environmental R2 SSL handshake failure (local `StorageProviderConfig` r2 row + copied env creds don't work from this worktree env). **Soak item for the user's normal env: one approved run with real keys + storage → verify dossier lands in the folder.**
+
+### Session 5 log — amendments discovered in execution
+
+- **Error-semantics gap found and fixed (the big one):** a step that exhausts WDK retries bubbles a FatalError; without workflow-level handling, the workflow dies but `finishRun` never fires — the run row sticks at `running` forever while the engine knows it failed. Fix: try/catch around STEP SECTIONS (research/match, export+succeed) that `failRunStep` + re-throw; the GATE stays outside any try (suspension-as-control-flow hazard). Pattern is now documented in the workflow body comment; any future WDK workflow must follow it.
+- **No AI route → flagged stubs, not failures** (`stubbed: true` in event payloads + results) — keyless dev environments stay usable and honest.
+- **URL-only dispatches fetch the page server-side** (bounded: http/https, 15s timeout, tag-strip, 16k cap) until S6's extension capture provides pageText.
+- **Step payload discipline**: only a 6k listing excerpt crosses step boundaries.
+- Stuck run from the pre-fix failure canceled via API; lint improved to 151 warnings (implementing DOCX removed 2 stub warnings).
 
 ## Session 6 — Browser-extension capture, soak, polish, docs ⚪
 
