@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ⚪ Not started · Plan 2 SKETCH · Plan 3 STUB
+**Status:** Plan 1 🟡 In progress (S1 ✅) · Plan 2 SKETCH · Plan 3 STUB
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -124,18 +124,29 @@ model WorkflowRunArtifact {
 
 Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint` (warning ratchet) → `pnpm build` → browser smoke.
 
-## Session 1 — Schema, writer module, API surface ⚪
+## Session 1 — Schema, writer module, API surface ✅ (2026-07-12)
 
-- [ ] Prisma schema: 4 tables + enum (above). `npx prisma db push` + `generate`. Follow `docs/notes-feature/guides/database/DATABASE-CHANGE-CHECKLIST.md`.
-- [ ] `extensions/workflows/server/runs.ts` — writer module: `createRun`, `recordEvent` (idempotent, deterministic keys), `openGate`, `closeGate`, `attachArtifact`, `finishRun`, `markRunning`.
-- [ ] `extensions/workflows/server/engines/types.ts` — `WorkflowEngineAdapter` (`start`, `cancel`, `resumeGate`) + `registry.ts` (server-only, mirrors AI tools registry split).
-- [ ] API routes:
+- [x] Prisma schema: 4 tables + enum (above). `npx prisma db push` + `generate`. Follow `docs/notes-feature/guides/database/DATABASE-CHANGE-CHECKLIST.md`.
+- [x] `extensions/workflows/server/runs.ts` — writer module: `createRun`, `recordEvent` (idempotent, deterministic keys), `openGate`, `closeGate`, `attachArtifact`, `finishRun`, `markRunning`.
+- [x] `extensions/workflows/server/engines/types.ts` — `WorkflowEngineAdapter` (`start`, `cancel`, `resumeGate`) + `registry.ts` (server-only, mirrors AI tools registry split).
+- [x] API routes:
   - `POST /api/workflows/dispatch` — `{ slug, input }` → validate against `inputSchema` → create QUEUED run → adapter `start()` → `{ runId }`
   - `GET  /api/workflows/runs` (filter by status) · `GET /api/workflows/runs/[id]` (run + events + artifacts)
   - `POST /api/workflows/runs/[id]/resume` — `{ token, payload }` → adapter `resumeGate`
   - `POST /api/workflows/runs/[id]/cancel`
-- [ ] Extension scaffolding: `extensions/workflows/manifest.ts`, register in `lib/extensions/installed.ts` (`enabledByDefault: false` until Session 4 ships UI).
-- **Gate:** typecheck + lint + build green; dispatch returns a QUEUED run against a no-op adapter; run detail route returns run + events.
+- [x] Extension scaffolding: `extensions/workflows/manifest.ts`, register in `lib/extensions/installed.ts` (`enabledByDefault: false` until Session 4 ships UI).
+- **Gate:** ✅ typecheck + lint (0 new warnings) + build green; smoke script (`scripts/workflows-smoke.ts`) proves dispatch → queued run + `run.dispatched` event, input validation rejection, unknown-slug rejection, list/detail reads.
+
+### Session 1 log — amendments discovered in execution
+
+- **Repo ID convention is `gen_random_uuid()` + `@db.Uuid`, not cuid**; enum values lowercase (`queued`…). The schema sketch above is illustrative — `prisma/schema.prisma` is authoritative.
+- **`WorkflowRunEvent` gained a `key` column** (`@@unique([runId, key])`) — the deterministic idempotency handle; `seq` is assigned transactionally with P2002 retry.
+- **Event vocabulary extended**: `run.dispatched` and `run.finished` bracket every run.
+- **tsconfig has `strict: false`** — discriminated-union narrowing via `.ok` does NOT work; use type predicates (`isDispatchFailure`). This will recur in UI code.
+- **Logger emits are closed-shape** (`LeafInput`): `layer` must be from the closed `Layer` union (used `"route"`), custom fields go in `attrs`.
+- **Notifications infra partially on main already** (`lib/features/notifications/` transport + kind registry, `ActivityEvent`/`NotificationRecipient` models, `ExtensionRuntime.notificationKindRenderers`) — Session 3's inbox blocker is likely smaller than planned; assess emission API before waiting on the connections-inbox merge.
+- **Pre-existing `WorkflowPayload` model** (ContentNode payload stub from an earlier epoch, execution deliberately blocked) — different concept, left untouched; noted in the schema section comment.
+- WDK adapter is a **queued-run placeholder** this session (Session 2 wires the real engine); `superviseGate` not yet written.
 
 ## Session 2 — WDK install, adapter, gate helper ⚪
 
