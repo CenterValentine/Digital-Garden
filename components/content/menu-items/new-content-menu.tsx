@@ -18,7 +18,7 @@ import {
   Code,
   Braces,
   ExternalLink,
-  MessageSquare,
+  MessagesSquare,
   BarChart3,
   Users,
   Table,
@@ -100,6 +100,18 @@ export function getNewContentMenuItems(
   const items: NewContentMenuItem[] = [];
   // Normalize parentId: undefined becomes null
   const normalizedParentId = parentId ?? null;
+
+  // Folder first — the organizing container.
+  if (callbacks.onCreateFolder) {
+    items.push({
+      id: "new-folder",
+      label: "Folder",
+      icon: <Folder className="h-4 w-4" />,
+      shortcut: "⇧A",
+      onClick: () => callbacks.onCreateFolder?.(normalizedParentId),
+      disabled: !callbacks.onCreateFolder,
+    });
+  }
 
   // Phase 1: Core content types
   if (callbacks.onCreateNote) {
@@ -199,24 +211,13 @@ export function getNewContentMenuItems(
     }
   }
 
-  if (callbacks.onCreateFolder) {
-    items.push({
-      id: "new-folder",
-      label: "Folder",
-      icon: <Folder className="h-4 w-4" />,
-      shortcut: "⇧A",
-      onClick: () => callbacks.onCreateFolder?.(normalizedParentId),
-      disabled: !callbacks.onCreateFolder,
-    });
-  }
-
   // ── Most-used surfaces first ──
 
-  // Chat Conversation
+  // Chat
   items.push({
     id: "new-chat",
-    label: "Chat Conversation",
-    icon: <MessageSquare className="h-4 w-4" />,
+    label: "Chat",
+    icon: <MessagesSquare className="h-4 w-4" />,
     onClick: () => callbacks.onCreateChat?.(normalizedParentId),
     disabled: !callbacks.onCreateChat,
   });

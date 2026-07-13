@@ -33,7 +33,11 @@ import { Plus, Sparkles, X } from "lucide-react";
 import { deriveChain } from "../graph/chain";
 import type { WorkflowGraph, WorkflowGraphNode } from "../graph/schema";
 import { NODE_TYPE_METADATA } from "../nodes/metadata";
-import { getAnyNodeMetadata } from "../nodes/triggers";
+import {
+  TRIGGER_TYPE_METADATA,
+  getAnyNodeMetadata,
+  isTriggerType,
+} from "../nodes/triggers";
 import { ConfigField, NODE_ICONS } from "./WorkflowBuilder";
 
 type CanvasNodeData = {
@@ -279,6 +283,31 @@ export function WorkflowCanvas({
             </button>
           </div>
           <div className="space-y-2">
+            {isTriggerType(selectedNode.type) ? (
+              <label className="block">
+                <span className="mb-1 block text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                  Trigger type
+                </span>
+                <select
+                  className="w-full rounded-md border border-black/15 bg-white px-2 py-1.5 text-xs text-gray-900 dark:border-white/20 dark:bg-gray-900 dark:text-gray-100"
+                  value={selectedNode.type}
+                  onChange={(e) =>
+                    onNodeConfigChange(selectedNode.id, {
+                      type: e.target.value,
+                      config: {},
+                      label: getAnyNodeMetadata(e.target.value)?.label,
+                    })
+                  }
+                >
+                  {TRIGGER_TYPE_METADATA.map((trigger) => (
+                    <option key={trigger.id} value={trigger.id}>
+                      {trigger.label}
+                      {trigger.firing === "stubbed" ? " — preview" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
             <ConfigField
               field={{ key: "__label", label: "Step name", kind: "text" }}
               value={selectedNode.label ?? ""}
