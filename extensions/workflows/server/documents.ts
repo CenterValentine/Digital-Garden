@@ -114,6 +114,85 @@ export async function storeRunDocxArtifact(
 const CAPTURE_TEXT_CAP = 100_000;
 
 /**
+ * Plain text → TipTap doc: `#`/`##`/`###` lines become headings, `- ` lines
+ * become bullet items, blank lines split paragraphs. The lingua franca for
+ * user-authored node configs (store-content, export-docx bodies).
+ */
+export function textToTiptap(text: string): JSONContent {
+  const blocks: JSONContent[] = [];
+  let bulletBuffer: string[] = [];
+  const flushBullets = () => {
+    if (bulletBuffer.length === 0) return;
+    blocks.push({
+      type: "bulletList",
+      content: bulletBuffer.map((item) => ({
+        type: "listItem",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: item }] },
+        ],
+      })),
+    });
+    bulletBuffer = [];
+  };
+  for (const rawLine of text.split(/\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushBullets();
+      continue;
+    }
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      flushBullets();
+      blocks.push({
+        type: "heading",
+        attrs: { level: headingMatch[1].length },
+        content: [{ type: "text", text: headingMatch[2] }],
+      });
+      continue;
+    }
+    if (line.startsWith("- ")) {
+      bulletBuffer.push(line.slice(2));
+      continue;
+    }
+    flushBullets();
+    blocks.push({
+      type: "paragraph",
+      content: [{ type: "text", text: line }],
+    });
+  }
+  flushBullets();
+  return { type: "doc", content: blocks };
+}
+
+/** Create a note in the Workflows folder from plain text (node executor path). */
+export async function storeTextNote(
+  ownerId: string,
+  note: { title: string; text: string }
+): Promise<string> {
+  const parentId = await ensureWorkflowsFolder(ownerId);
+  const title = note.title.slice(0, 180) || "Workflow note";
+  const text = note.text.slice(0, CAPTURE_TEXT_CAP);
+  const slug = await generateUniqueSlug(title, ownerId);
+  const content = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug,
+      contentType: "note",
+      parentId,
+      displayOrder: 0,
+      notePayload: {
+        create: {
+          tiptapJson: textToTiptap(text) as unknown as Prisma.InputJsonValue,
+          searchText: text,
+        },
+      },
+    },
+  });
+  return content.id;
+}
+
+/**
  * Store a captured web page as a note ContentNode (design rule: big content
  * becomes content immediately; workflow inputs and steps pass IDs). The
  * capture doubles as a source document the user keeps in their garden.

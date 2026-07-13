@@ -85,7 +85,7 @@ export async function fetchPageText(pageUrl: string): Promise<string | null> {
   }
 }
 
-function extractJson(text: string): Record<string, unknown> | null {
+export function extractJson(text: string): Record<string, unknown> | null {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start === -1 || end <= start) return null;
@@ -105,7 +105,7 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-async function generateViaChatRoute(
+export async function generateViaChatRoute(
   ownerId: string,
   system: string,
   user: string,

@@ -61,6 +61,14 @@ export const workflowFinishedPayloadSchema = z.object({
   title: z.string().min(1).max(200),
 });
 
+// Workflows extension — a user-authored notify node fired mid-run.
+export const workflowNotifyPayloadSchema = z.object({
+  runId: z.string().min(1),
+  title: z.string().min(1).max(200),
+  body: z.string().max(1000).optional(),
+  workflowName: z.string().max(200).optional(),
+});
+
 export interface NotificationKindDefinition {
   payloadSchema: z.ZodTypeAny;
   collapsible: boolean;
@@ -93,6 +101,10 @@ export const NOTIFICATION_KINDS = {
   },
   "workflow.finished": {
     payloadSchema: workflowFinishedPayloadSchema,
+    collapsible: false,
+  },
+  "workflow.notify": {
+    payloadSchema: workflowNotifyPayloadSchema,
     collapsible: false,
   },
 } as const satisfies Record<string, NotificationKindDefinition>;

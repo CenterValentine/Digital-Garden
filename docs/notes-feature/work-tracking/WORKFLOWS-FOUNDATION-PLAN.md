@@ -266,13 +266,21 @@ interface WorkflowGraph {
 }
 ```
 
-## Session 1 — Graph schema + node-type registry ⚪
+## Session 1 — Graph schema + node-type registry ✅ (2026-07-13)
 
-- [ ] Zod `WorkflowGraph` schema + structural validation (single entry, edge integrity, cycle rejection for v1)
-- [ ] `NodeTypeDefinition`: `{ id, label, description, configSchema (Zod), execute(runId, config, ctx) }` — server registry + **client-safe metadata split** (id/label/description/config field specs; mirror the AI tools metadata/registry split)
-- [ ] Launch palette wrapping Plan 1 capabilities: `ai-complete`, `gate`, `export-docx`, `store-content`, `get-content`, `fetch-url`, `http-request`, `notify`, `delay`, `branch`
-- [ ] `http-request` node: same trust posture as the OG fetcher (http/https only, timeout, size cap); revisit allowlists if the app ever goes multi-user public
-- **Gate:** job-application expressed as a graph fixture round-trips the schema; typecheck/lint/build green.
+- [x] Zod `WorkflowGraph` schema (`graph/schema.ts`) + structural validation (`graph/validate.ts`: entry/edge integrity, branch true/false edge rules, cycle rejection, reachability) — both CLIENT-SAFE so the builder validates with the exact server rules
+- [x] Client/server split per AI-tools convention: `nodes/metadata.ts` (palette + config FIELD SPECS + output hints) / `nodes/registry.ts` (server executors). `buildConfigSchema(fields)` derives Zod from the field specs — forms and enforcement cannot drift
+- [x] All ten launch nodes: step executors for `ai-complete` (via `generateViaChatRoute`, throws on no-route — user-authored nodes fail honestly, no silent stubs), `fetch-url`, `http-request` (http/https, 15s, 1MB cap, status returned for branching), `get-content`, `store-content`, `export-docx` (text→TipTap: #headings/- bullets/paragraphs), `notify` (new `workflow.notify` kind); `gate`/`delay`/`branch` are `execution: "control"` — interpreter-level (S2)
+- [x] `graph/interpolate.ts` — `{{input.path}}` / `{{nodeId.path}}` template resolution (pure, missing-path warnings), needed for the fixture's dynamic gate title parity
+- **Gate:** ✅ `scripts/workflows-graph-check.ts` — job-application-as-graph fixture: schema parse + JSON round-trip, structural validation, palette coverage, all templates resolve, cycle detection rejects a looped variant (11/11). typecheck/lint (151w/0e baseline)/build green.
+
+### P2 Session 1 log — amendments
+
+- **Interpolation pulled forward from S2**: the fixture's parity gate title ("Job match ready — {{match.json.score}}% fit") needs it; it's pure and client-safe, so the builder gets live template preview for free.
+- **Edge `condition` replaced by branch-node + labeled edges** (`branch: "true" | "false"`, false edge optional = run ends) — one routing mechanism, not two; fits the list UI's if/else block.
+- **`ai-complete` throws on missing AI route** (unlike Plan 1's flagged stubs) — a user-authored node silently stubbing a generic prompt would be a lie; the run fails visibly instead.
+- **Gate script can't import the server registry** (`server-only` marker in the AI features barrel breaks standalone tsx) — script checks the client-safe layers; executor coverage will be asserted at interpreter module boot (S2).
+- Numbers are deliberately non-interpolatable (strict Zod validation); `position` field reserved for the React Flow canvas is in the schema from day one.
 
 ## Session 2 — Interpreter workflow ⚪
 
