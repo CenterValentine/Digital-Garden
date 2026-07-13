@@ -15,6 +15,22 @@ import type { NodeConfigField } from "../nodes/metadata";
 export const WORKFLOW_GRAPH_VERSION = 1;
 export const WDK_INTERPRETER_ENGINE = "wdk-interpreter@1";
 
+/** User-facing names per engine — "Trellis" is the native graph type. */
+export const ENGINE_DISPLAY_NAMES: Record<string, string> = {
+  [WDK_INTERPRETER_ENGINE]: "Trellis",
+};
+
+/** New workflows start empty — the builder's empty state invites the first step. */
+export function blankWorkflowGraph(): WorkflowGraph {
+  return {
+    version: WORKFLOW_GRAPH_VERSION,
+    engine: WDK_INTERPRETER_ENGINE,
+    entryNodeId: "",
+    nodes: [],
+    edges: [],
+  };
+}
+
 export const workflowGraphNodeSchema = z.object({
   id: z
     .string()
@@ -39,8 +55,9 @@ export const workflowGraphEdgeSchema = z.object({
 export const workflowGraphSchema = z.object({
   version: z.literal(WORKFLOW_GRAPH_VERSION),
   engine: z.literal(WDK_INTERPRETER_ENGINE),
-  entryNodeId: z.string().min(1),
-  nodes: z.array(workflowGraphNodeSchema).min(1).max(100),
+  // Empty string while the workflow has no steps yet.
+  entryNodeId: z.string(),
+  nodes: z.array(workflowGraphNodeSchema).max(100),
   edges: z.array(workflowGraphEdgeSchema).max(200),
 });
 

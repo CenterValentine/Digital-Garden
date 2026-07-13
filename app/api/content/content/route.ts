@@ -797,18 +797,14 @@ export async function POST(request: NextRequest) {
       // User-authored workflow — seeded with the job-application starter
       // graph; edited in the builder (workflows extension content viewer).
       contentType = "workflow";
-      const { jobApplicationStarterGraph } = await import(
-        "@/extensions/workflows/graph/fixtures/job-application"
-      );
-      const { WDK_INTERPRETER_ENGINE } = await import(
+      const { blankWorkflowGraph, WDK_INTERPRETER_ENGINE } = await import(
         "@/extensions/workflows/graph/schema"
       );
       payloadData = {
         workflowPayload: {
           create: {
             engine: WDK_INTERPRETER_ENGINE,
-            definition:
-              jobApplicationStarterGraph as unknown as Prisma.InputJsonValue,
+            definition: blankWorkflowGraph() as unknown as Prisma.InputJsonValue,
             enabled: true,
           },
         },

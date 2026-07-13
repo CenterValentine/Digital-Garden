@@ -46,6 +46,7 @@ import type {
   WorkflowGraphNode,
 } from "../graph/schema";
 import { deriveChain, edgesFromChain } from "../graph/chain";
+import { ENGINE_DISPLAY_NAMES } from "../graph/schema";
 import { validateGraph, type GraphValidationIssue } from "../graph/validate";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 
@@ -288,7 +289,7 @@ export function WorkflowBuilder({
         return {
           ...draft,
           nodes: result.nodes,
-          entryNodeId: result.order[0] ?? draft.entryNodeId,
+          entryNodeId: result.order[0] ?? "",
           edges: edgesFromChain(result.order, result.nodes),
         };
       });
@@ -423,7 +424,8 @@ export function WorkflowBuilder({
             {title || "Workflow"}
           </p>
           <p className="text-[11px] text-gray-400 dark:text-gray-500">
-            {graph.nodes.length} steps · {graph.engine}
+            {graph.nodes.length} steps ·{" "}
+            {ENGINE_DISPLAY_NAMES[graph.engine] ?? graph.engine}
             {dirty ? " · unsaved changes" : ""}
           </p>
         </div>
@@ -477,10 +479,15 @@ export function WorkflowBuilder({
         <div className="min-h-0 flex-1">
           <WorkflowCanvas
             graph={graph}
+            structureEditable={chain.simple}
             onPositionChange={(nodeId, position) =>
               updateNode(nodeId, { position })
             }
             onNodeConfigChange={updateNode}
+            onInsertAfter={(afterId, type) => {
+              const index = afterId ? chain.order.indexOf(afterId) : -1;
+              addNode(type, index);
+            }}
           />
         </div>
       ) : (
@@ -493,7 +500,20 @@ export function WorkflowBuilder({
           </div>
         ) : null}
 
-        {issues.length > 0 ? (
+        {graph.nodes.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-16 text-center">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
+              A blank trellis
+            </p>
+            <p className="max-w-xs text-xs text-gray-400 dark:text-gray-500">
+              Add your first step — fetch a page, run AI, pause for your
+              approval, export a document.
+            </p>
+            <AddNodeMenu onAdd={(type) => addNode(type, -1)} />
+          </div>
+        ) : null}
+
+        {issues.length > 0 && graph.nodes.length > 0 ? (
           <div className="mb-3 rounded-md border border-red-300/60 bg-red-50/70 p-2 text-xs text-red-800 dark:border-red-500/30 dark:bg-red-900/20 dark:text-red-200">
             <p className="mb-1 font-medium">Fix before running:</p>
             <ul className="list-inside list-disc space-y-0.5">

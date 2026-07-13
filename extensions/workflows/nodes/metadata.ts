@@ -76,7 +76,7 @@ export const NODE_TYPE_METADATA: NodeTypeMetadata[] = [
   },
   {
     id: "gate",
-    label: "Approval Gate",
+    label: "Supervision Gate",
     description:
       "Pause until you approve or decline from the inbox or run detail. Free while waiting.",
     execution: "control",

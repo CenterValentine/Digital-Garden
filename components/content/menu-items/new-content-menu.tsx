@@ -352,6 +352,23 @@ export function getNewContentMenuItems(
     });
   }
 
+  // Workflow (submenu — one entry per workflow engine; Trellis is the
+  // native graph-interpreter type, future engines slot in beneath it).
+  items.push({
+    id: "new-workflow",
+    label: "Workflow (Automation)",
+    icon: <GitBranch className="h-4 w-4" />,
+    submenu: [
+      {
+        id: "new-workflow-trellis",
+        label: "Trellis Flow",
+        icon: <GitBranch className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
+        disabled: !callbacks.onCreateWorkflow,
+      },
+    ],
+  });
+
   // Stubs — defined but not implemented yet.
 
   items.push({
@@ -368,14 +385,6 @@ export function getNewContentMenuItems(
     icon: <Target className="h-4 w-4" />,
     onClick: () => callbacks.onCreateHope?.(normalizedParentId),
     disabled: true,
-  });
-
-  items.push({
-    id: "new-workflow",
-    label: "Workflow (Automation)",
-    icon: <GitBranch className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
-    disabled: !callbacks.onCreateWorkflow,
   });
 
   return items;

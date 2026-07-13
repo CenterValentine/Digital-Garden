@@ -27,6 +27,12 @@ export interface GraphValidationResult {
 
 export function validateGraph(graph: WorkflowGraph): GraphValidationResult {
   const issues: GraphValidationIssue[] = [];
+  if (graph.nodes.length === 0) {
+    return {
+      valid: false,
+      issues: [{ message: "Add your first step to run this workflow." }],
+    };
+  }
   const nodeIds = new Set<string>();
 
   for (const node of graph.nodes) {
