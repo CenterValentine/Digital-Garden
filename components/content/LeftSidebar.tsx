@@ -151,6 +151,11 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "chat", timestamp: Date.now() });
   }, []);
 
+  // Workflow creation — active (workflows Builder + Interpreter)
+  const handleCreateWorkflow = useCallback(() => {
+    setCreateTrigger({ type: "workflow", timestamp: Date.now() });
+  }, []);
+
   // AI image generation — opens the modal dialog. parentId stays
   // `null` (root) when triggered from the header; the file-tree
   // context-menu wiring passes a folder id explicitly.
@@ -254,6 +259,7 @@ export function LeftSidebar() {
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}
           onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
           isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}

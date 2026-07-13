@@ -31,12 +31,12 @@ interface LeftSidebarHeaderProps {
   onCreateVisualizationExcalidraw?: () => void;
   onCreateVisualizationDiagramsNet?: () => void;
   onCreateChat?: () => void;
+  onCreateWorkflow?: () => void;
   onCreateAiImage?: () => void;
   onAddPeopleTarget?: () => void;
   // Stub types disabled until implemented:
   // onCreateData?: () => void;
   // onCreateHope?: () => void;
-  // onCreateWorkflow?: () => void;
   isCreateDisabled?: boolean;
 }
 
@@ -54,6 +54,7 @@ export function LeftSidebarHeader({
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
   onCreateChat,
+  onCreateWorkflow,
   onCreateAiImage,
   onAddPeopleTarget,
   isCreateDisabled = false,
@@ -294,6 +295,7 @@ export function LeftSidebarHeader({
             onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
             onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
             onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
+            onCreateWorkflow={onCreateWorkflow ? () => onCreateWorkflow() : undefined}
             onCreateAiImage={onCreateAiImage ? () => onCreateAiImage() : undefined}
             onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
             disabled={isCreateDisabled}
