@@ -32,7 +32,8 @@ import "@xyflow/react/dist/style.css";
 import { Plus, Sparkles, X } from "lucide-react";
 import { deriveChain } from "../graph/chain";
 import type { WorkflowGraph, WorkflowGraphNode } from "../graph/schema";
-import { getNodeTypeMetadata, NODE_TYPE_METADATA } from "../nodes/metadata";
+import { NODE_TYPE_METADATA } from "../nodes/metadata";
+import { getAnyNodeMetadata } from "../nodes/triggers";
 import { ConfigField, NODE_ICONS } from "./WorkflowBuilder";
 
 type CanvasNodeData = {
@@ -159,8 +160,8 @@ export function WorkflowCanvas({
           y: 40 + (indexOf.get(node.id) ?? 0) * 100,
         },
       data: {
-        label: node.label ?? getNodeTypeMetadata(node.type)?.label ?? node.type,
-        typeLabel: getNodeTypeMetadata(node.type)?.label ?? node.type,
+        label: node.label ?? getAnyNodeMetadata(node.type)?.label ?? node.type,
+        typeLabel: getAnyNodeMetadata(node.type)?.label ?? node.type,
         nodeType: node.type,
       } satisfies CanvasNodeData,
     }));
@@ -184,7 +185,7 @@ export function WorkflowCanvas({
 
   const selectedNode = graph.nodes.find((node) => node.id === selectedId);
   const selectedMetadata = selectedNode
-    ? getNodeTypeMetadata(selectedNode.type)
+    ? getAnyNodeMetadata(selectedNode.type)
     : null;
 
   const handleDragStop = useCallback(

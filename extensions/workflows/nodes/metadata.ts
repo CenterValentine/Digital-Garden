@@ -33,7 +33,7 @@ export interface NodeTypeMetadata {
   id: string;
   label: string;
   description: string;
-  execution: "step" | "control";
+  execution: "step" | "control" | "trigger";
   fields: NodeConfigField[];
   /** Output keys the node contributes to ctx (builder hints + docs). */
   outputs: Array<{ key: string; description: string }>;
@@ -302,6 +302,30 @@ export const NODE_TYPE_METADATA: NodeTypeMetadata[] = [
       { key: "body", label: "Body", kind: "textarea", interpolated: true },
     ],
     outputs: [],
+  },
+  {
+    id: "call-workflow",
+    label: "Call Workflow",
+    description:
+      "Run another Trellis workflow (fire-and-forget). It must have a 'Called by another workflow' trigger.",
+    execution: "step",
+    fields: [
+      {
+        key: "workflowNodeId",
+        label: "Workflow id",
+        kind: "text",
+        required: true,
+        interpolated: true,
+        help: "The ContentNode id of the workflow to call.",
+      },
+      {
+        key: "input",
+        label: "Input to pass",
+        kind: "json",
+        help: "Object handed to the called workflow's {{input.*}}.",
+      },
+    ],
+    outputs: [{ key: "childRunId", description: "The started child run id" }],
   },
 ];
 

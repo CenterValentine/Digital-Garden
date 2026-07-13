@@ -12,7 +12,7 @@
  */
 
 import { buildConfigSchema, type WorkflowGraph } from "./schema";
-import { getNodeTypeMetadata } from "../nodes/metadata";
+import { getAnyNodeMetadata, isTriggerType } from "../nodes/triggers";
 
 export interface GraphValidationIssue {
   nodeId?: string;
@@ -34,14 +34,16 @@ export function validateGraph(graph: WorkflowGraph): GraphValidationResult {
     };
   }
   const nodeIds = new Set<string>();
+  const triggerIds: string[] = [];
 
   for (const node of graph.nodes) {
     if (nodeIds.has(node.id)) {
       issues.push({ nodeId: node.id, message: `Duplicate node id "${node.id}".` });
     }
     nodeIds.add(node.id);
+    if (isTriggerType(node.type)) triggerIds.push(node.id);
 
-    const metadata = getNodeTypeMetadata(node.type);
+    const metadata = getAnyNodeMetadata(node.type);
     if (!metadata) {
       issues.push({
         nodeId: node.id,
@@ -62,6 +64,29 @@ export function validateGraph(graph: WorkflowGraph): GraphValidationResult {
 
   if (!nodeIds.has(graph.entryNodeId)) {
     issues.push({ message: `Entry node "${graph.entryNodeId}" does not exist.` });
+  }
+
+  // Exactly one trigger, and it must be the entry.
+  if (triggerIds.length === 0) {
+    issues.push({ message: "Add a trigger — every workflow starts with one." });
+  } else if (triggerIds.length > 1) {
+    issues.push({
+      nodeId: triggerIds[1],
+      message: "A workflow can have only one trigger.",
+    });
+  } else if (triggerIds[0] !== graph.entryNodeId) {
+    issues.push({
+      nodeId: triggerIds[0],
+      message: "The trigger must be the first node.",
+    });
+  }
+  for (const node of graph.nodes) {
+    if (!isTriggerType(node.type) && node.id === graph.entryNodeId) {
+      issues.push({
+        nodeId: node.id,
+        message: "The first node must be a trigger.",
+      });
+    }
   }
 
   const edgeIds = new Set<string>();

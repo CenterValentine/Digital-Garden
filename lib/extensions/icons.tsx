@@ -7,6 +7,8 @@ import {
   Layers,
   Puzzle,
   Users,
+  Waypoints,
+  Workflow,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactElement } from "react";
@@ -20,6 +22,8 @@ const EXTENSION_ICONS: Record<string, LucideIcon> = {
   Layers,
   Puzzle,
   Users,
+  Waypoints,
+  Workflow,
 };
 
 export function getExtensionIcon(iconName: string): LucideIcon {

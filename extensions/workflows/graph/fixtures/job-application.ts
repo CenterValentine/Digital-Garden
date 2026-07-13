@@ -10,8 +10,14 @@ import type { WorkflowGraph } from "../schema";
 export const jobApplicationGraph: WorkflowGraph = {
   version: 1,
   engine: "wdk-interpreter@1",
-  entryNodeId: "listing",
+  entryNodeId: "capture",
   nodes: [
+    {
+      id: "capture",
+      type: "trigger-page-capture",
+      label: "On job page capture",
+      config: { urlPattern: "" },
+    },
     {
       id: "listing",
       type: "get-content",
@@ -79,6 +85,7 @@ export const jobApplicationGraph: WorkflowGraph = {
     },
   ],
   edges: [
+    { id: "e0", from: "capture", to: "listing" },
     { id: "e1", from: "listing", to: "research" },
     { id: "e2", from: "research", to: "match" },
     { id: "e3", from: "match", to: "review" },
@@ -89,21 +96,34 @@ export const jobApplicationGraph: WorkflowGraph = {
 };
 
 /**
- * Starter variant seeded into NEW workflow content nodes: entry is a
- * fetch-url node ({{input.pageUrl}}) so it runs standalone from the
- * builder's Run button; everything downstream is identical. The capture
- * variant above remains the extension-capture template.
+ * Starter variant (manual entry): swaps the page-capture trigger for a
+ * Manual trigger and the get-content step for fetch-url ({{input.pageUrl}}),
+ * so it runs standalone from the builder's Run form. The capture variant
+ * above remains the extension-capture template.
  */
 export const jobApplicationStarterGraph: WorkflowGraph = {
   ...jobApplicationGraph,
-  nodes: jobApplicationGraph.nodes.map((node) =>
-    node.id === "listing"
-      ? {
-          ...node,
-          type: "fetch-url",
-          label: "Fetch the listing",
-          config: { url: "{{input.pageUrl}}" },
-        }
-      : node
+  entryNodeId: "trigger",
+  nodes: jobApplicationGraph.nodes.map((node) => {
+    if (node.id === "capture") {
+      return {
+        id: "trigger",
+        type: "trigger-manual",
+        label: "Run manually",
+        config: { inputs: "pageUrl" },
+      };
+    }
+    if (node.id === "listing") {
+      return {
+        ...node,
+        type: "fetch-url",
+        label: "Fetch the listing",
+        config: { url: "{{input.pageUrl}}" },
+      };
+    }
+    return node;
+  }),
+  edges: jobApplicationGraph.edges.map((edge) =>
+    edge.from === "capture" ? { ...edge, from: "trigger" } : edge
   ),
 };

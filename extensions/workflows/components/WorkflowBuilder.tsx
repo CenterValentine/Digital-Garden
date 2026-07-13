@@ -33,14 +33,21 @@ import {
   ShieldCheck,
   Sparkles,
   Trash2,
+  Waypoints,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ExtensionContentViewerProps } from "@/lib/extensions/types";
 import {
   NODE_TYPE_METADATA,
-  getNodeTypeMetadata,
   type NodeConfigField,
 } from "../nodes/metadata";
+import {
+  TRIGGER_TYPE_METADATA,
+  getAnyNodeMetadata,
+  isTriggerType,
+  parseManualInputFields,
+} from "../nodes/triggers";
 import type {
   WorkflowGraph,
   WorkflowGraphNode,
@@ -61,6 +68,15 @@ export const NODE_ICONS: Record<string, typeof Sparkles> = {
   "store-content": FilePlus,
   "export-docx": FileOutput,
   notify: Bell,
+  "call-workflow": Waypoints,
+  "trigger-manual": Play,
+  "trigger-page-capture": Globe,
+  "trigger-called": Waypoints,
+  "trigger-content-event": FileText,
+  "trigger-schedule": Clock,
+  "trigger-periodic-note": Clock,
+  "trigger-calendar-event": Clock,
+  "trigger-activity-event": Bell,
 };
 
 function uniqueNodeId(type: string, nodes: WorkflowGraphNode[]): string {
@@ -226,6 +242,7 @@ export function WorkflowBuilder({
   const [expanded, setExpanded] = useState<string | null>(null);
   const [serverIssues, setServerIssues] = useState<GraphValidationIssue[]>([]);
   const [view, setView] = useState<"list" | "canvas">("list");
+  const [runForm, setRunForm] = useState<Record<string, string> | null>(null);
 
   const load = useCallback(async () => {
     if (!selectedContentId) return;
@@ -301,7 +318,7 @@ export function WorkflowBuilder({
     (type: string, afterIndex: number) => {
       structuralEdit((order, nodes) => {
         const id = uniqueNodeId(type, nodes);
-        const metadata = getNodeTypeMetadata(type);
+        const metadata = getAnyNodeMetadata(type);
         nodes.push({
           id,
           type,
@@ -309,6 +326,20 @@ export function WorkflowBuilder({
           config: {},
         });
         order.splice(afterIndex + 1, 0, id);
+        setExpanded(id);
+        return { order, nodes };
+      });
+    },
+    [structuralEdit]
+  );
+
+  // Prepend a trigger as the entry (recovers pre-trigger graphs).
+  const addTrigger = useCallback(
+    (type: string) => {
+      structuralEdit((order, nodes) => {
+        const id = uniqueNodeId(type, nodes);
+        nodes.push({ id, type, label: getAnyNodeMetadata(type)?.label, config: {} });
+        order.unshift(id);
         setExpanded(id);
         return { order, nodes };
       });
@@ -371,40 +402,55 @@ export function WorkflowBuilder({
     }
   }, [graph, selectedContentId]);
 
+  const dispatchRun = useCallback(
+    async (input: Record<string, unknown>) => {
+      if (!selectedContentId) return;
+      setRunning(true);
+      try {
+        const response = await fetch(
+          `/api/workflows/content/${selectedContentId}/dispatch`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input }),
+          }
+        );
+        const body = (await response.json()) as {
+          success: boolean;
+          error?: { message?: string };
+        };
+        if (!response.ok || !body.success) {
+          toast.error(body.error?.message ?? "Failed to run workflow.");
+          return;
+        }
+        toast.success("Workflow dispatched — follow it in the Workflows panel");
+      } catch {
+        toast.error("Failed to run workflow.");
+      } finally {
+        setRunning(false);
+      }
+    },
+    [selectedContentId]
+  );
+
   const run = useCallback(async () => {
-    if (!selectedContentId) return;
+    if (!selectedContentId || !graph) return;
     if (dirty) {
       toast.info("Save the workflow before running it.");
       return;
     }
-    const pageUrl = window.prompt("Input URL for this run (optional):") ?? "";
-    setRunning(true);
-    try {
-      const response = await fetch(
-        `/api/workflows/content/${selectedContentId}/dispatch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            input: pageUrl ? { pageUrl } : {},
-          }),
-        }
-      );
-      const body = (await response.json()) as {
-        success: boolean;
-        error?: { message?: string };
-      };
-      if (!response.ok || !body.success) {
-        toast.error(body.error?.message ?? "Failed to run workflow.");
+    // A Manual trigger with declared fields opens a Run form; otherwise
+    // dispatch immediately (the trigger provides input via its own source).
+    const trigger = graph.nodes.find((node) => isTriggerType(node.type));
+    if (trigger?.type === "trigger-manual") {
+      const fields = parseManualInputFields(trigger.config);
+      if (fields.length > 0) {
+        setRunForm(Object.fromEntries(fields.map((field) => [field, ""])));
         return;
       }
-      toast.success("Workflow dispatched — follow it in the Workflows panel");
-    } catch {
-      toast.error("Failed to run workflow.");
-    } finally {
-      setRunning(false);
     }
-  }, [selectedContentId, dirty]);
+    void dispatchRun({});
+  }, [selectedContentId, graph, dirty, dispatchRun]);
 
   if (!graph || !chain) {
     return (
@@ -500,16 +546,22 @@ export function WorkflowBuilder({
           </div>
         ) : null}
 
-        {graph.nodes.length === 0 ? (
+        {!graph.nodes.some((node) => isTriggerType(node.type)) ? (
           <div className="flex flex-col items-center gap-2 py-16 text-center">
             <p className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              A blank trellis
+              Every Trellis begins with a trigger
             </p>
             <p className="max-w-xs text-xs text-gray-400 dark:text-gray-500">
-              Add your first step — fetch a page, run AI, pause for your
-              approval, export a document.
+              A trigger is what starts the workflow — run it by hand, capture a
+              web page, react to an event.
             </p>
-            <AddNodeMenu onAdd={(type) => addNode(type, -1)} />
+            <button
+              type="button"
+              onClick={() => addTrigger("trigger-manual")}
+              className="inline-flex items-center gap-1 rounded-md bg-gold-primary/90 px-2.5 py-1 text-xs font-medium text-white hover:bg-gold-primary"
+            >
+              <Zap className="h-3 w-3" /> Add a trigger
+            </button>
           </div>
         ) : null}
 
@@ -530,12 +582,14 @@ export function WorkflowBuilder({
         {chain.order.map((nodeId, index) => {
           const node = nodeById.get(nodeId);
           if (!node) return null;
-          const metadata = getNodeTypeMetadata(node.type);
+          const metadata = getAnyNodeMetadata(node.type);
           const Icon = NODE_ICONS[node.type] ?? Sparkles;
           const isExpanded = expanded === node.id;
+          const isTrigger = isTriggerType(node.type);
           return (
             <div key={node.id}>
-              {index === 0 && chain.simple ? (
+              {/* No inserting before the trigger — it is always the entry. */}
+              {index === 0 && chain.simple && !isTrigger ? (
                 <AddNodeMenu onAdd={(type) => addNode(type, -1)} />
               ) : null}
               <div className="rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-gray-900/60">
@@ -560,13 +614,13 @@ export function WorkflowBuilder({
                       </span>
                     </span>
                   </button>
-                  {chain.simple ? (
+                  {chain.simple && !isTrigger ? (
                     <span className="flex shrink-0 items-center gap-0.5">
                       <button
                         type="button"
                         title="Move up"
                         onClick={() => moveNode(node.id, -1)}
-                        disabled={index === 0}
+                        disabled={index <= 1}
                         className="rounded p-1 text-gray-400 hover:bg-black/5 hover:text-gray-700 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-gray-200"
                       >
                         <ArrowUp className="h-3 w-3" />
@@ -593,6 +647,31 @@ export function WorkflowBuilder({
                 </div>
                 {isExpanded ? (
                   <div className="space-y-2 border-t border-black/5 px-3 py-2 dark:border-white/5">
+                    {isTrigger ? (
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-medium text-gray-600 dark:text-gray-300">
+                          Trigger type
+                        </span>
+                        <select
+                          className="w-full rounded-md border border-black/15 bg-white px-2 py-1.5 text-xs text-gray-900 dark:border-white/20 dark:bg-gray-900 dark:text-gray-100"
+                          value={node.type}
+                          onChange={(e) =>
+                            updateNode(node.id, {
+                              type: e.target.value,
+                              config: {},
+                              label: getAnyNodeMetadata(e.target.value)?.label,
+                            })
+                          }
+                        >
+                          {TRIGGER_TYPE_METADATA.map((trigger) => (
+                            <option key={trigger.id} value={trigger.id}>
+                              {trigger.label}
+                              {trigger.firing === "stubbed" ? " — preview" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
                     <ConfigField
                       field={{ key: "__label", label: "Step name", kind: "text" }}
                       value={node.label ?? ""}
@@ -639,6 +718,53 @@ export function WorkflowBuilder({
         })}
       </div>
       )}
+
+      {runForm ? (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-lg border border-black/10 bg-white p-4 shadow-xl dark:border-white/15 dark:bg-gray-950">
+            <p className="mb-3 text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Run {title || "workflow"}
+            </p>
+            <div className="space-y-2">
+              {Object.keys(runForm).map((field) => (
+                <ConfigField
+                  key={field}
+                  field={{ key: field, label: field, kind: "text" }}
+                  value={runForm[field]}
+                  onChange={(value) =>
+                    setRunForm((current) =>
+                      current
+                        ? { ...current, [field]: String(value ?? "") }
+                        : current
+                    )
+                  }
+                />
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setRunForm(null)}
+                className="rounded-md border border-black/15 px-2.5 py-1 text-xs text-gray-700 hover:bg-black/5 dark:border-white/20 dark:text-gray-200 dark:hover:bg-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={running}
+                onClick={() => {
+                  const values = runForm;
+                  setRunForm(null);
+                  void dispatchRun(values);
+                }}
+                className="inline-flex items-center gap-1 rounded-md bg-gold-primary/90 px-2.5 py-1 text-xs font-medium text-white hover:bg-gold-primary disabled:opacity-50"
+              >
+                <Play className="h-3 w-3" /> Run
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

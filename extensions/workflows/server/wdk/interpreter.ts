@@ -24,8 +24,8 @@ import {
 } from "../../graph/interpolate";
 import { workflowGraphSchema, type WorkflowGraph, type WorkflowGraphNode } from "../../graph/schema";
 import { validateGraph } from "../../graph/validate";
-import { getNodeTypeMetadata } from "../../nodes/metadata";
 import { getNodeExecutor } from "../../nodes/registry";
+import { getAnyNodeMetadata, isTriggerType } from "../../nodes/triggers";
 import { finishRun, markRunning, recordEvent } from "../runs";
 import { superviseGate } from "./gate";
 import type { WdkWorkflowInput } from "./workflows";
@@ -220,7 +220,7 @@ export async function interpreterWorkflow(wf: WdkWorkflowInput) {
 
     const node = nodeById.get(currentId);
     if (!node) break;
-    const metadata = getNodeTypeMetadata(node.type);
+    const metadata = getAnyNodeMetadata(node.type);
     if (!metadata) {
       await failRunStep(wf.runId, `Unknown node type "${node.type}" at "${node.id}".`);
       throw new Error("Unknown node type");
@@ -228,7 +228,15 @@ export async function interpreterWorkflow(wf: WdkWorkflowInput) {
 
     let branchResult: boolean | null = null;
 
-    if (node.type === "gate") {
+    if (isTriggerType(node.type)) {
+      // The trigger is a design-time declaration; at runtime it passes the
+      // dispatch input through. Expose it under the trigger's id too.
+      scope.nodes[node.id] = data;
+      await recordControlStep(wf.runId, node.id, {
+        nodeType: node.type,
+        trigger: true,
+      });
+    } else if (node.type === "gate") {
       // Suspension point — deliberately OUTSIDE any try/catch.
       const missing: string[] = [];
       const title =

@@ -19,9 +19,10 @@ import {
   type WorkflowRunDto,
   type WorkflowRunStatusValue,
 } from "../shared";
+import { useContentStore } from "@/state/content-store";
 import { deriveChain } from "../graph/chain";
 import { workflowGraphSchema } from "../graph/schema";
-import { getNodeTypeMetadata } from "../nodes/metadata";
+import { getAnyNodeMetadata } from "../nodes/triggers";
 import { useWorkflowRunsStore } from "../state/workflow-runs-store";
 
 const STATUS_STYLES: Record<WorkflowRunStatusValue, string> = {
@@ -129,7 +130,7 @@ function RunGraphSteps({ run }: { run: WorkflowRunDto }) {
                 className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[status]}`}
               />
               <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
-                {node.label ?? getNodeTypeMetadata(node.type)?.label ?? node.type}
+                {node.label ?? getAnyNodeMetadata(node.type)?.label ?? node.type}
               </span>
               <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
                 {status}
@@ -409,25 +410,52 @@ function RunDetail({
   );
 }
 
-function DispatchMenu({ onDispatched }: { onDispatched: () => void }) {
-  const [open, setOpen] = useState(false);
-  const [busySlug, setBusySlug] = useState<string | null>(null);
+interface WorkflowListItem {
+  id: string;
+  title: string;
+  enabled: boolean;
+}
 
-  const dispatch = useCallback(
-    async (slug: string, needsUrl: boolean) => {
-      let input: Record<string, unknown> = {};
-      if (needsUrl) {
-        const pageUrl = window.prompt("Job listing URL:");
-        if (!pageUrl) return;
-        input = { pageUrl };
-      }
-      setBusySlug(slug);
+function DispatchMenu({
+  onDispatched,
+  onOpenWorkflow,
+}: {
+  onDispatched: () => void;
+  onOpenWorkflow: (contentNodeId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [workflows, setWorkflows] = useState<WorkflowListItem[] | null>(null);
+
+  const loadWorkflows = useCallback(async () => {
+    try {
+      const response = await fetch("/api/workflows/content");
+      if (!response.ok) return;
+      const body = (await response.json()) as {
+        data: { workflows: WorkflowListItem[] };
+      };
+      setWorkflows(body.data.workflows);
+    } catch {
+      setWorkflows([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (open && workflows === null) void loadWorkflows();
+  }, [open, workflows, loadWorkflows]);
+
+  const dispatchContent = useCallback(
+    async (item: WorkflowListItem) => {
+      setBusyId(item.id);
       try {
-        const response = await fetch("/api/workflows/dispatch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ slug, input }),
-        });
+        const response = await fetch(
+          `/api/workflows/content/${item.id}/dispatch`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ input: {} }),
+          }
+        );
         if (!response.ok) {
           toast.error(await readError(response));
           return;
@@ -438,7 +466,7 @@ function DispatchMenu({ onDispatched }: { onDispatched: () => void }) {
       } catch {
         toast.error("Failed to dispatch workflow.");
       } finally {
-        setBusySlug(null);
+        setBusyId(null);
       }
     },
     [onDispatched]
@@ -455,21 +483,89 @@ function DispatchMenu({ onDispatched }: { onDispatched: () => void }) {
         Run
       </button>
       {open ? (
-        <div className="absolute right-0 z-20 mt-1 w-44 rounded-md border border-black/10 bg-white p-1 shadow-lg dark:border-white/15 dark:bg-gray-900">
-          {DISPATCHABLE_WORKFLOWS.map((workflow) => (
-            <button
-              key={workflow.slug}
-              type="button"
-              disabled={busySlug !== null}
-              onClick={() => void dispatch(workflow.slug, workflow.needsUrl)}
-              className="flex w-full items-center justify-between gap-1 rounded px-2 py-1.5 text-left text-xs text-gray-800 hover:bg-black/5 dark:text-gray-100 dark:hover:bg-white/10 disabled:opacity-50"
-            >
-              {workflow.name}
-              {busySlug === workflow.slug ? (
-                <Loader2 className="h-3 w-3 animate-spin" />
-              ) : null}
-            </button>
-          ))}
+        <div className="absolute right-0 z-20 mt-1 w-60 rounded-md border border-black/10 bg-white p-1 shadow-lg dark:border-white/15 dark:bg-gray-900">
+          <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+            Your workflows
+          </p>
+          {workflows === null ? (
+            <div className="flex justify-center py-3">
+              <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
+            </div>
+          ) : workflows.length === 0 ? (
+            <p className="px-2 py-2 text-[11px] text-gray-500 dark:text-gray-400">
+              No workflows yet. Create one with + → Workflow → Trellis Flow.
+            </p>
+          ) : (
+            workflows.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center gap-1 rounded px-2 py-1.5 text-xs text-gray-800 hover:bg-black/5 dark:text-gray-100 dark:hover:bg-white/10"
+              >
+                <button
+                  type="button"
+                  disabled={busyId !== null || !item.enabled}
+                  onClick={() => void dispatchContent(item)}
+                  className="flex min-w-0 flex-1 items-center gap-1 text-left disabled:opacity-40"
+                  title={item.enabled ? "Run now" : "Disabled"}
+                >
+                  <Play className="h-3 w-3 shrink-0 text-gold-primary" />
+                  <span className="truncate">{item.title}</span>
+                </button>
+                {busyId === item.id ? (
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                ) : (
+                  <button
+                    type="button"
+                    title="Open in builder"
+                    onClick={() => {
+                      setOpen(false);
+                      onOpenWorkflow(item.id);
+                    }}
+                    className="rounded p-0.5 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+                  >
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))
+          )}
+          {DISPATCHABLE_WORKFLOWS.length > 0 ? (
+            <>
+              <div className="my-1 border-t border-black/5 dark:border-white/10" />
+              <p className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">
+                Diagnostics
+              </p>
+              {DISPATCHABLE_WORKFLOWS.map((workflow) => (
+                <button
+                  key={workflow.slug}
+                  type="button"
+                  disabled={busyId !== null}
+                  onClick={async () => {
+                    setBusyId(workflow.slug);
+                    try {
+                      const response = await fetch("/api/workflows/dispatch", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ slug: workflow.slug, input: {} }),
+                      });
+                      if (!response.ok) {
+                        toast.error(await readError(response));
+                        return;
+                      }
+                      toast.success("Dispatched");
+                      setOpen(false);
+                      onDispatched();
+                    } finally {
+                      setBusyId(null);
+                    }
+                  }}
+                  className="flex w-full items-center gap-1 rounded px-2 py-1.5 text-left text-xs text-gray-500 hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50"
+                >
+                  {workflow.name}
+                </button>
+              ))}
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -479,6 +575,9 @@ function DispatchMenu({ onDispatched }: { onDispatched: () => void }) {
 export function WorkflowsPanel() {
   const { selectedRunId, statusFilter, selectRun, setStatusFilter } =
     useWorkflowRunsStore();
+  const setSelectedContentId = useContentStore(
+    (state) => state.setSelectedContentId
+  );
   const [runs, setRuns] = useState<WorkflowRunDto[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -528,7 +627,15 @@ export function WorkflowsPanel() {
           >
             <RefreshCw className="h-3.5 w-3.5" />
           </button>
-          <DispatchMenu onDispatched={() => void loadRuns()} />
+          <DispatchMenu
+            onDispatched={() => void loadRuns()}
+            onOpenWorkflow={(contentNodeId) =>
+              setSelectedContentId(contentNodeId, {
+                contentType: "workflow",
+                pin: true,
+              })
+            }
+          />
         </div>
       </div>
 

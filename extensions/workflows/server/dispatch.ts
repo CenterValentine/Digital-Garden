@@ -165,7 +165,9 @@ export async function dispatchCaptureToUserWorkflow(
     });
   }
 
-  let target = await prisma.contentNode.findFirst({
+  // Prefer a workflow whose page-capture trigger's URL pattern matches; fall
+  // back to the most recently updated enabled workflow.
+  const candidates = await prisma.contentNode.findMany({
     where: {
       ownerId,
       contentType: "workflow",
@@ -173,8 +175,9 @@ export async function dispatchCaptureToUserWorkflow(
       workflowPayload: { enabled: true },
     },
     orderBy: { updatedAt: "desc" },
-    select: { id: true },
+    select: { id: true, workflowPayload: { select: { definition: true } } },
   });
+  let target = pickCaptureTarget(candidates, capture.pageUrl);
   if (!target) {
     const { jobApplicationGraph } = await import(
       "../graph/fixtures/job-application"
@@ -203,6 +206,50 @@ export async function dispatchCaptureToUserWorkflow(
     });
   }
   return dispatchWorkflowFromContent(ownerId, target.id, data);
+}
+
+function globToRegExp(glob: string): RegExp {
+  const escaped = glob
+    .trim()
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*/g, ".*");
+  return new RegExp(`^${escaped}$`, "i");
+}
+
+/**
+ * Choose the capture target: among workflows whose entry is a page-capture
+ * trigger, prefer one whose URL pattern matches (a specific pattern beats a
+ * blank catch-all); else the first candidate (most-recently-updated). Returns
+ * null when no page-capture-triggered workflow exists.
+ */
+function pickCaptureTarget(
+  candidates: Array<{ id: string; workflowPayload: { definition: unknown } | null }>,
+  pageUrl?: string
+): { id: string } | null {
+  let catchAll: { id: string } | null = null;
+  for (const candidate of candidates) {
+    const parsed = workflowGraphSchema.safeParse(
+      candidate.workflowPayload?.definition
+    );
+    if (!parsed.success) continue;
+    const graph = parsed.data;
+    const entry = graph.nodes.find((n) => n.id === graph.entryNodeId);
+    if (entry?.type !== "trigger-page-capture") continue;
+    const patternRaw =
+      typeof entry.config.urlPattern === "string" ? entry.config.urlPattern : "";
+    const patterns = patternRaw
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (patterns.length === 0) {
+      catchAll ??= { id: candidate.id };
+      continue;
+    }
+    if (pageUrl && patterns.some((p) => globToRegExp(p).test(pageUrl))) {
+      return { id: candidate.id }; // specific match wins immediately
+    }
+  }
+  return catchAll;
 }
 
 export async function dispatchWorkflowFromContent(

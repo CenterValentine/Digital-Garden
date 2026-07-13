@@ -8,7 +8,7 @@ export const workflowsExtensionManifest: ExtensionManifest = {
   label: "Workflows",
   description:
     "Dispatch, supervise, and review durable workflow runs with inbox-gated human approval.",
-  iconName: "Workflow",
+  iconName: "Waypoints",
   enabledByDefault: true,
   canDisable: true,
   navItems: [

@@ -15,7 +15,7 @@ import {
 } from "@/extensions/workflows/graph/interpolate";
 import { workflowGraphSchema } from "@/extensions/workflows/graph/schema";
 import { validateGraph } from "@/extensions/workflows/graph/validate";
-import { getNodeTypeMetadata } from "@/extensions/workflows/nodes/metadata";
+import { getAnyNodeMetadata } from "@/extensions/workflows/nodes/triggers";
 
 let failures = 0;
 function check(label: string, ok: boolean, detail?: string) {
@@ -44,7 +44,7 @@ if (parsed.success) {
 
   // 3. Every fixture node type exists in the palette with an execution kind.
   for (const node of parsed.data.nodes) {
-    const metadata = getNodeTypeMetadata(node.type);
+    const metadata = getAnyNodeMetadata(node.type);
     check(
       `node "${node.id}" type "${node.type}" is in the palette (${metadata?.execution ?? "?"})`,
       metadata !== null

@@ -20,13 +20,24 @@ export const ENGINE_DISPLAY_NAMES: Record<string, string> = {
   [WDK_INTERPRETER_ENGINE]: "Trellis",
 };
 
-/** New workflows start empty — the builder's empty state invites the first step. */
+/**
+ * New workflows start with a single Manual trigger — every Trellis begins
+ * with its initiating connector — and nothing else. The builder invites the
+ * first step after it.
+ */
 export function blankWorkflowGraph(): WorkflowGraph {
   return {
     version: WORKFLOW_GRAPH_VERSION,
     engine: WDK_INTERPRETER_ENGINE,
-    entryNodeId: "",
-    nodes: [],
+    entryNodeId: "trigger",
+    nodes: [
+      {
+        id: "trigger",
+        type: "trigger-manual",
+        label: "Manual trigger",
+        config: {},
+      },
+    ],
     edges: [],
   };
 }

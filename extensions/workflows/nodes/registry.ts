@@ -165,6 +165,29 @@ const NODE_EXECUTORS: Record<string, NodeExecutor> = {
     });
     return {};
   },
+
+  "call-workflow": async (ctx, config) => {
+    const workflowNodeId = asString(config.workflowNodeId);
+    if (!workflowNodeId) {
+      throw new Error("Call Workflow needs a workflow id.");
+    }
+    const childInput =
+      typeof config.input === "object" && config.input !== null
+        ? (config.input as Record<string, unknown>)
+        : {};
+    // Dynamic import breaks the interpreter↔dispatch module cycle.
+    const { dispatchWorkflowFromContent } = await import("../server/dispatch");
+    const { isDispatchFailure } = await import("../server/dispatch");
+    const result = await dispatchWorkflowFromContent(
+      ctx.ownerId,
+      workflowNodeId,
+      childInput
+    );
+    if (isDispatchFailure(result)) {
+      throw new Error(`Called workflow failed to start: ${result.message}`);
+    }
+    return { childRunId: result.run.id };
+  },
 };
 
 export function getNodeExecutor(nodeType: string): NodeExecutor | null {
