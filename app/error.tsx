@@ -16,7 +16,7 @@ export default function Error({
   }, [error])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-gray-50 dark:bg-gray-950 px-4">
       <div className="text-center">
         <h1 className="text-6xl font-bold text-gray-900 dark:text-gray-100">500</h1>
         <h2 className="mt-4 text-2xl font-semibold text-gray-700 dark:text-gray-200">
