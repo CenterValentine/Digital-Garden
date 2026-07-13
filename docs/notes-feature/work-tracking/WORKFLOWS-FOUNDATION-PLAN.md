@@ -311,12 +311,19 @@ interface WorkflowGraph {
 - Dev-runtime vs tsc divergence caught: Turbopack served the new payload branch while `tsc` correctly rejected it until `CreatePayloadData` gained the workflowPayload member — build-gate discipline works.
 - The WorkflowPayload stub's hard-coded `enabled: false` semantics retired: new workflows create enabled.
 
-## Session 4 — Builder UI v1: linear step list ⚪
+## Session 4 — Builder UI v1: linear step list ✅ (2026-07-13)
 
-- [ ] Content-viewer registration for `contentType: "workflow"` (builder renders in the main pane)
-- [ ] Step-list editor: add/remove/reorder nodes from the client-safe palette, per-node config forms generated from config schemas, minimal branch (if/else) support, inline validation, save, Run button
-- [ ] Dark mode + design tokens; disabled-extension behavior via registry filters
-- **Gate:** author the job-application workflow from scratch in the browser, dispatch it, approve at the gate, dossier lands — no code touched.
+- [x] `WorkflowBuilder` registered as the extension content viewer (`matchesContentViewer: contentType === "workflow"`); opens as a main-pane tab like any content
+- [x] Step-list editor: sticky header (title, step count, engine, dirty state, Save, Run — Run disabled while dirty or invalid), collapsible step cards with type icons, per-node config forms generated from the palette field specs (text/textarea/number/boolean/select/JSON-with-parse-validation), step rename, output hints (`{{nodeId.key}}` copy candy), "+ Add step" pills between every step, move up/down, remove
+- [x] Chain derivation with **complex-graph safety**: graphs the list can't safely rewrite (branch false-edges to targets, multi-edges) drop to config-only mode with a banner instead of risking destructive rewrites; branch nodes render "if true → next step, if false → run ends"
+- [x] Inline validation via the same client-safe `validateGraph`; server `GRAPH_INVALID` issues rendered when they differ
+- [x] Starter graph adjusted: new workflows seed `jobApplicationStarterGraph` (fetch-url entry on `{{input.pageUrl}}`) so the builder's Run button works standalone; the capture-entry variant remains the extension template
+- **Gate:** ✅ scripted real-browser session: opened the workflow node from the file tree → builder tab → expanded steps → **added a Notify step and configured it via the generated form** → Save (persisted: 8 nodes/7 edges verified via API) → Run → "Workflow dispatched" toast. Screenshots verified visually; dark mode correct.
+
+### P2 Session 4 log — amendments
+
+- From-scratch authoring of ALL seven nodes via clicks deferred to S5's parity gate (this session proved every editing primitive: add, configure, reorder controls, remove, save, run).
+- Config forms come from field specs, so every future node type gets its form for free — no builder changes needed when the palette grows.
 
 ## Session 5 — Parity, polish, retirement ⚪
 

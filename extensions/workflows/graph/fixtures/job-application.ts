@@ -87,3 +87,23 @@ export const jobApplicationGraph: WorkflowGraph = {
     { id: "e6", from: "dossier", to: "done" },
   ],
 };
+
+/**
+ * Starter variant seeded into NEW workflow content nodes: entry is a
+ * fetch-url node ({{input.pageUrl}}) so it runs standalone from the
+ * builder's Run button; everything downstream is identical. The capture
+ * variant above remains the extension-capture template.
+ */
+export const jobApplicationStarterGraph: WorkflowGraph = {
+  ...jobApplicationGraph,
+  nodes: jobApplicationGraph.nodes.map((node) =>
+    node.id === "listing"
+      ? {
+          ...node,
+          type: "fetch-url",
+          label: "Fetch the listing",
+          config: { url: "{{input.pageUrl}}" },
+        }
+      : node
+  ),
+};
