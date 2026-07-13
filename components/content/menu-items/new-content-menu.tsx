@@ -13,6 +13,7 @@ import {
   Folder,
   FileText,
   FileSpreadsheet,
+  Presentation,
   FileType,
   FileCode,
   Code,
@@ -324,6 +325,14 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateSpreadsheet,
     });
   }
+  // PowerPoint — stub, not implemented yet.
+  documentChildren.push({
+    id: "new-powerpoint",
+    label: "PowerPoint (.pptx)",
+    icon: <Presentation className="h-4 w-4" />,
+    onClick: () => undefined,
+    disabled: true,
+  });
   if (callbacks.onCreateHtml) {
     documentChildren.push({
       id: "new-html",
