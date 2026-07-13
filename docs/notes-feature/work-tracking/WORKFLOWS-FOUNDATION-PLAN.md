@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ COMPLETE (S1–S6, 2026-07-12) · Plan 2 (Builder + Interpreter) FULL, not started · Plan 3 (n8n spoke) SKETCH, demoted · Plan 4 (MIT engine) STUB
+**Status:** Plan 1 ✅ COMPLETE (2026-07-12) · Plan 2 ✅ COMPLETE (S1–S6 incl. canvas stretch, 2026-07-13) · Plan 3 (n8n spoke) SKETCH, demoted · Plan 4 (MIT engine) STUB
 Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
 
 ## Direction pivot (2026-07-12, post-soak)
@@ -334,11 +334,17 @@ interface WorkflowGraph {
 - [x] Tracking docs updated.
 - **Gate:** ✅ full loop with zero recipe code: Bearer capture → user's builder-edited workflow → get-content(capture) → real AI "90% fit" gate → approve → dossier artifact → **"Builder-added step fired"** inbox notification from the step authored via browser clicks in S4. Steps executed: listing, research, match, approved, dossier, done, notify-1.
 
-## Session 6 — React Flow canvas (STRETCH) ⚪
+## Session 6 — React Flow canvas (STRETCH) ✅ scoped (2026-07-13)
 
-- [ ] `@xyflow/react` (MIT; keep the default attribution) rendering the same nodes/edges; custom node components on design tokens; the list stays as the fallback editor
-- [ ] Honest scope line: canvas *mechanics* (pan/zoom/drag/minimap) come free from the library; the cost is editor chrome (undo/redo, copy/paste, keyboard) — ship at feature parity with the list, no more
-- **Gate:** the same graph edits round-trip between list and canvas.
+- [x] `@xyflow/react` 12.11.2 (MIT verified; default attribution kept per licensing policy). List | Canvas toggle in the builder header; both views render the same graph state, so edits round-trip by construction
+- [x] Canvas: custom node components (palette icon + label + type), branch-labeled animated edges, pan/zoom/minimap/fitView, drag-to-position persisted into `node.position` (marks dirty → Save), node click → side config panel reusing the same generated ConfigField forms
+- [x] **Scope cut, on purpose**: structural edits (add/remove/rewire via edge dragging) remain list-mode (`nodesConnectable={false}`) — canvas connection semantics + undo/redo are the real editor-chrome cost and ship separately if wanted
+- **Gate:** ✅ browser-verified: canvas renders all 8 nodes of the user-edited workflow; config panel opens on node click with the full generated form (system prompt, {{ }} prompt, Expect JSON, max tokens)
+
+### P2 Session 6 log — amendments
+
+- `position` being in the schema from S1 meant the canvas needed zero data migration — drag persists straight into the payload.
+- Auto-layout for position-less graphs: vertical chain-order stagger; good enough until dragged once.
 
 ---
 

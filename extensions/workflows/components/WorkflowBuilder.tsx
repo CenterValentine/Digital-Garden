@@ -47,8 +47,9 @@ import type {
 } from "../graph/schema";
 import { deriveChain, edgesFromChain } from "../graph/chain";
 import { validateGraph, type GraphValidationIssue } from "../graph/validate";
+import { WorkflowCanvas } from "./WorkflowCanvas";
 
-const NODE_ICONS: Record<string, typeof Sparkles> = {
+export const NODE_ICONS: Record<string, typeof Sparkles> = {
   "ai-complete": Sparkles,
   gate: ShieldCheck,
   branch: GitBranch,
@@ -68,7 +69,7 @@ function uniqueNodeId(type: string, nodes: WorkflowGraphNode[]): string {
   return `${type}-${counter}`;
 }
 
-function ConfigField({
+export function ConfigField({
   field,
   value,
   onChange,
@@ -223,6 +224,7 @@ export function WorkflowBuilder({
   const [running, setRunning] = useState(false);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [serverIssues, setServerIssues] = useState<GraphValidationIssue[]>([]);
+  const [view, setView] = useState<"list" | "canvas">("list");
 
   const load = useCallback(async () => {
     if (!selectedContentId) return;
@@ -426,6 +428,22 @@ export function WorkflowBuilder({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="flex overflow-hidden rounded-md border border-black/15 text-[11px] dark:border-white/20">
+            {(["list", "canvas"] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setView(mode)}
+                className={`px-2 py-1 capitalize ${
+                  view === mode
+                    ? "bg-gold-primary/90 text-white"
+                    : "text-gray-600 hover:bg-black/5 dark:text-gray-300 dark:hover:bg-white/10"
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
           <button
             type="button"
             disabled={saving || !dirty}
@@ -455,6 +473,17 @@ export function WorkflowBuilder({
         </div>
       </div>
 
+      {view === "canvas" ? (
+        <div className="min-h-0 flex-1">
+          <WorkflowCanvas
+            graph={graph}
+            onPositionChange={(nodeId, position) =>
+              updateNode(nodeId, { position })
+            }
+            onNodeConfigChange={updateNode}
+          />
+        </div>
+      ) : (
       <div className="mx-auto w-full max-w-2xl flex-1 px-4 py-4">
         {!chain.simple ? (
           <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50/70 p-2 text-xs text-amber-800 dark:border-amber-500/30 dark:bg-amber-900/20 dark:text-amber-200">
@@ -589,6 +618,7 @@ export function WorkflowBuilder({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

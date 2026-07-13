@@ -53,6 +53,14 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 13, 2026**: Workflows Builder + Interpreter — Plan 2 complete incl. canvas stretch (branch `feature/workflows-foundation`, PR pending)
+
+- **User-authored automations replace hardened recipes** (post-soak pivot): canvas-ready `WorkflowGraph` Zod schema with client-safe validation/interpolation (`{{nodeId.path}}` templates), 10-node palette (`ai-complete`, `gate`, `branch`, `delay`, `fetch-url`, `http-request`, `get/store-content`, `export-docx`, `notify`) split metadata/executors per the AI-tools convention — `buildConfigSchema` derives Zod from field specs so builder forms and server enforcement can't drift.
+- **The interpreter**: one generic WDK workflow executes graph snapshots (snapshot-at-dispatch = replay-safe + in-flight runs immune to edits); gates→superviseGate with ⚠ framing on unresolved templates, delay→sleep, branch→8-operator labeled-edge routing; per-node timeline events; step-section failure semantics; executor coverage asserted at boot.
+- **Workflows are content**: + menu "Workflow (Automation)" creates ContentNode+WorkflowPayload (the old stub, activated) seeded with a starter graph; owner-scoped graph GET/PUT (structured issues) + dispatch-from-content (definition slug `content:{nodeId}`).
+- **The builder** is the workflow content viewer: step-list editor (add/reorder/remove, generated config forms, inline validation, Save/Run) + **React Flow canvas** (`@xyflow/react`, MIT, attribution kept): drag-to-position persisted, node-click config panel; structural edits stay in list mode by design.
+- **Extension capture now dispatches the user's own graph** (auto-creates one from the template on first capture). Hardened `jobApplicationWorkflow` deleted. Proven live end-to-end with real BYOK AI + storage: capture → builder-edited graph → "90% fit" gate → approve → dossier artifact → the browser-click-authored notify step fired ("Builder-added step fired" in the inbox). Per-session commits `3c706c9…`; gates green throughout.
+
 **July 12, 2026**: Workflows Foundation — Plan 1 complete (branch `feature/workflows-foundation`, PR pending; soak pending)
 
 - **Hub-and-spoke workflow subsystem**: app-owned run tables (`WorkflowDefinition`/`WorkflowRun`/`WorkflowRunEvent`/`WorkflowRunArtifact`) + idempotent writer module are the system of record; durable engines are swappable adapters behind a four-verb contract (`start`/effects/`resumeGate`/finish). Product UI reads ONLY app tables.
