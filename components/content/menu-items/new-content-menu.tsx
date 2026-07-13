@@ -375,7 +375,7 @@ export function getNewContentMenuItems(
     label: "Workflow (Automation)",
     icon: <GitBranch className="h-4 w-4" />,
     onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
-    disabled: true,
+    disabled: !callbacks.onCreateWorkflow,
   });
 
   return items;

@@ -298,12 +298,18 @@ interface WorkflowGraph {
 - **Standalone tsx can't import `documents.ts`** (the `lib/domain/content` barrel drags TipTap server extensions in; ESM interop failure) — test scripts create content via direct Prisma; app-runtime paths are unaffected.
 - **AI connections are per-user** (admin has none; centervalentine has 2) — interpreter test scripts must run as a user with routes. `ai-complete` throwing on no-route retries 3× before failing; classifying config errors as fatal-no-retry is a followup (engine-agnostic registry vs WDK FatalError coupling).
 
-## Session 3 — Workflow as content ⚪
+## Session 3 — Workflow as content ✅ (2026-07-13)
 
-- [ ] Wire the + menu "Workflow (Automation)" item: creates node + payload (`engine: "wdk-interpreter@1"`, starter graph, `enabled: true` — retire the hard-coded false)
-- [ ] Owner-scoped payload CRUD (graph read/save with schema validation) + dispatch-from-content endpoint (content → snapshot → run)
-- [ ] Reconcile `WorkflowDefinition` ↔ content node (definition row per workflow node; decide engineRef encoding vs. new column — log the decision)
-- **Gate:** create → edit graph via API → dispatch → run appears in the panel with per-node timeline.
+- [x] + menu "Workflow (Automation)" un-grayed: the existing `onCreateWorkflow → onCreate(parentId, "workflow")` plumbing was already wired end-to-end — only the client requestBody branch, the server `workflowPayload` create branch (seeded with the job-application starter graph, `enabled: true`), and the `CreatePayloadData` union entry were missing
+- [x] `GET/PUT /api/workflows/content/[id]/graph` — owner-scoped read/save; PUT enforces schema + structural validation and returns per-node issues (`GRAPH_INVALID` + issues array — the builder consumes this)
+- [x] `POST /api/workflows/content/[id]/dispatch` → `dispatchWorkflowFromContent`: payload load (enabled + engine checks) → validate → **snapshot into run input** → per-workflow `WorkflowDefinition` upsert → shared `startEngineForRun` tail (factored out of dispatchWorkflow)
+- [x] **Definition ↔ content reconciliation decision**: definition slug = `content:{contentNodeId}` (stable across renames; `name` refreshed from the node title at each dispatch). No schema change needed.
+- **Gate:** ✅ live: created "My Job Research Automation" via the content API (starter graph auto-seeded, 7 nodes) → graph read via API → dispatch → real AI gate "Job match ready — 85% fit" → approve → succeeded with the dossier artifact.
+
+### P2 Session 3 log — amendments
+
+- Dev-runtime vs tsc divergence caught: Turbopack served the new payload branch while `tsc` correctly rejected it until `CreatePayloadData` gained the workflowPayload member — build-gate discipline works.
+- The WorkflowPayload stub's hard-coded `enabled: false` semantics retired: new workflows create enabled.
 
 ## Session 4 — Builder UI v1: linear step list ⚪
 

@@ -1254,6 +1254,8 @@ export function LeftSidebarContent({
         requestBody.contentType = "chat";
         requestBody.chatMessages = config.payload?.messages || [];
         requestBody.chatMetadata = {};
+      } else if (type === "workflow") {
+        requestBody.contentType = "workflow";
       } else if (type === "visualization") {
         requestBody.engine = config.payload?.engine;
         requestBody.chartConfig = config.payload?.config || {};

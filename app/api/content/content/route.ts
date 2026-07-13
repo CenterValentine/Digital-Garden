@@ -793,6 +793,25 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (requestedContentType === "workflow") {
+      // User-authored workflow — seeded with the job-application starter
+      // graph; edited in the builder (workflows extension content viewer).
+      contentType = "workflow";
+      const { jobApplicationGraph } = await import(
+        "@/extensions/workflows/graph/fixtures/job-application"
+      );
+      const { WDK_INTERPRETER_ENGINE } = await import(
+        "@/extensions/workflows/graph/schema"
+      );
+      payloadData = {
+        workflowPayload: {
+          create: {
+            engine: WDK_INTERPRETER_ENGINE,
+            definition: jobApplicationGraph as unknown as Prisma.InputJsonValue,
+            enabled: true,
+          },
+        },
+      };
     } else {
       return NextResponse.json(
         {

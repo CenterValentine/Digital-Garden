@@ -1,5 +1,11 @@
 import { logger } from "@/lib/core/logger";
-import type { WorkflowRun } from "@/lib/database/generated/prisma";
+import { prisma } from "@/lib/database/client";
+import type {
+  WorkflowDefinition,
+  WorkflowRun,
+} from "@/lib/database/generated/prisma";
+import { WDK_INTERPRETER_ENGINE, workflowGraphSchema } from "../graph/schema";
+import { validateGraph } from "../graph/validate";
 import { ensureDefinition, getDefinitionSpec } from "./definitions";
 import { getEngineAdapter } from "./engines/registry";
 import { createRun, finishRun, setEngineRunId } from "./runs";
@@ -96,14 +102,20 @@ export async function dispatchWorkflow(
     engine: definition.engine,
     input: preparedInput,
   });
+  return startEngineForRun(definition, run);
+}
 
+/** Shared engine-start tail: adapter lookup + start with visible failure. */
+async function startEngineForRun(
+  definition: WorkflowDefinition,
+  run: WorkflowRun
+): Promise<DispatchResult> {
   const adapter = getEngineAdapter(definition.engine);
   if (!adapter) {
     const message = `No engine adapter registered for "${definition.engine}".`;
     await finishRun(run.id, { status: "failed", error: { message } });
     return { ok: false, code: "ENGINE_ERROR", message, runId: run.id };
   }
-
   try {
     const { engineRunId } = await adapter.start(definition, run);
     if (engineRunId) {
@@ -121,6 +133,83 @@ export async function dispatchWorkflow(
     await finishRun(run.id, { status: "failed", error: { message } });
     return { ok: false, code: "ENGINE_ERROR", message, runId: run.id };
   }
-
   return { ok: true, run };
+}
+
+/**
+ * Dispatch a user-authored workflow CONTENT NODE: load its payload, validate
+ * the graph, snapshot it into the run input (in-flight runs stay immune to
+ * later edits), and hand to the interpreter. The per-workflow definition row
+ * is keyed by the stable content id (renames just update the display name).
+ */
+export async function dispatchWorkflowFromContent(
+  ownerId: string,
+  contentNodeId: string,
+  data: Record<string, unknown>
+): Promise<DispatchResult> {
+  const node = await prisma.contentNode.findFirst({
+    where: {
+      id: contentNodeId,
+      ownerId,
+      contentType: "workflow",
+      deletedAt: null,
+    },
+    include: { workflowPayload: true },
+  });
+  if (!node?.workflowPayload) {
+    return {
+      ok: false,
+      code: "UNKNOWN_WORKFLOW",
+      message: "Workflow not found.",
+    };
+  }
+  if (!node.workflowPayload.enabled) {
+    return {
+      ok: false,
+      code: "WORKFLOW_DISABLED",
+      message: "This workflow is disabled.",
+    };
+  }
+  if (node.workflowPayload.engine !== WDK_INTERPRETER_ENGINE) {
+    return {
+      ok: false,
+      code: "ENGINE_ERROR",
+      message: `Unsupported workflow engine "${node.workflowPayload.engine}".`,
+    };
+  }
+  const parsed = workflowGraphSchema.safeParse(node.workflowPayload.definition);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: `Workflow graph is invalid: ${parsed.error.issues[0]?.message ?? "schema error"}`,
+    };
+  }
+  const structural = validateGraph(parsed.data);
+  if (!structural.valid) {
+    return {
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: `Workflow graph failed validation: ${structural.issues[0]?.message ?? ""}`,
+    };
+  }
+
+  const definition = await prisma.workflowDefinition.upsert({
+    where: { ownerId_slug: { ownerId, slug: `content:${contentNodeId}` } },
+    create: {
+      ownerId,
+      slug: `content:${contentNodeId}`,
+      name: node.title,
+      engine: "wdk",
+      engineRef: "interpreter",
+    },
+    update: { name: node.title },
+  });
+  const run = await createRun({
+    definitionId: definition.id,
+    ownerId,
+    engine: definition.engine,
+    input: { graph: parsed.data, data, workflowNodeId: contentNodeId },
+  });
+  return startEngineForRun(definition, run);
 }
