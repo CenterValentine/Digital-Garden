@@ -170,3 +170,22 @@ const NODE_EXECUTORS: Record<string, NodeExecutor> = {
 export function getNodeExecutor(nodeType: string): NodeExecutor | null {
   return NODE_EXECUTORS[nodeType] ?? null;
 }
+
+// Boot-time coverage assertion (server module scope — fails fast on deploy,
+// not mid-run): every "step" palette entry has an executor, every "control"
+// entry does not. The standalone graph-check script can't import this module
+// (server-only marker upstream), so the guarantee lives here.
+import { NODE_TYPE_METADATA } from "./metadata";
+for (const metadata of NODE_TYPE_METADATA) {
+  const hasExecutor = NODE_EXECUTORS[metadata.id] !== undefined;
+  if (metadata.execution === "step" && !hasExecutor) {
+    throw new Error(
+      `Workflow node type "${metadata.id}" is declared as a step but has no executor.`
+    );
+  }
+  if (metadata.execution === "control" && hasExecutor) {
+    throw new Error(
+      `Workflow node type "${metadata.id}" is a control node and must not have an executor.`
+    );
+  }
+}

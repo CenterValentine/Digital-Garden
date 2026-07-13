@@ -282,13 +282,21 @@ interface WorkflowGraph {
 - **Gate script can't import the server registry** (`server-only` marker in the AI features barrel breaks standalone tsx) — script checks the client-safe layers; executor coverage will be asserted at interpreter module boot (S2).
 - Numbers are deliberately non-interpolatable (strict Zod validation); `position` field reserved for the React Flow canvas is in the schema from day one.
 
-## Session 2 — Interpreter workflow ⚪
+## Session 2 — Interpreter workflow ✅ (2026-07-13)
 
-- [ ] `interpreterWorkflow` ("use workflow"): walk the snapshot, execute each node as a retryable step; node outputs into a serializable ctx keyed by node id (IDs-not-blobs budget: cap ctx entries, big things become content references)
-- [ ] `gate` nodes → `superviseGate(runId, node.id, …)` (deterministic tokens per node); `delay` → `sleep()`; `branch` = pure edge selection on ctx
-- [ ] Plan 1 error semantics: step sections try/catch → failRunStep + rethrow; gates never wrapped
-- [ ] Per-node timeline events (`step.completed` key `node:{id}`); register `interpreter` in `WDK_WORKFLOWS`; definition spec whose `prepareInput` snapshots the graph from a workflow content node
-- **Gate:** the job-application graph fixture dispatches through the interpreter end-to-end — gate suspends, resume completes, dossier artifact attaches (parity with Plan 1 S5).
+- [x] `interpreterWorkflow` (`server/wdk/interpreter.ts`): validates the snapshot at workflow level (pure Zod + structural — deterministic), walks nodes, executes steps via the executor registry; node outputs into workflow-level ctx keyed by node id; free-text outputs capped at 16k with `textTruncated` flag (pass-IDs budget); 200-node execution cap
+- [x] `gate` → `superviseGate(runId, node.id, …)` with interpolated title/body — unresolved templates prefix the title with ⚠ and record the missing paths (soak-lesson framing); `delay` → validated ms-converted `sleep()`; `branch` → pure `evaluateBranch` with 8 operators, true/false-labeled edge routing (false absent = run ends)
+- [x] Plan 1 error semantics per node: step/branch sections try/catch → failRunStep + rethrow; gate and sleep suspension points never wrapped. `errorMessage` handles WDK's serialized (non-Error) step failures
+- [x] Per-node timeline events (key `node:{id}`, stepName = node id); `interpreter` registered in `WDK_WORKFLOWS` + `interpreter` definition spec (inline-graph dispatch for API callers; content-node dispatch is S3); executor-coverage boot assertion at registry module scope
+- **Gate:** ✅ LIVE with real AI + real storage (centervalentine's BYOK connections): fixture graph dispatch → get-content → ai-complete research (json parsed) → ai-complete match → gate "Job match ready — **92% fit**" (interpolated from the live model response) → approve → branch true → **real artifact "Acme Rockets Inc application dossier.docx"** (title interpolated) → notify → succeeded, 7 nodes, 11 events.
+
+### P2 Session 2 log — amendments
+
+- **`sleep()` takes ms-lib `StringValue` types** — plain runtime-validated strings don't typecheck; the interpreter converts durations to milliseconds itself.
+- **Step errors cross the WDK boundary serialized**, not as Error instances — `errorMessage` narrows `{message}` shapes; without this, failures masked as "Workflow step failed."
+- **Owner-scoping verified by accident**: dispatching a graph that referenced another user's capture note failed with "not found" — `getNoteText`'s ownerId filter working as intended.
+- **Standalone tsx can't import `documents.ts`** (the `lib/domain/content` barrel drags TipTap server extensions in; ESM interop failure) — test scripts create content via direct Prisma; app-runtime paths are unaffected.
+- **AI connections are per-user** (admin has none; centervalentine has 2) — interpreter test scripts must run as a user with routes. `ai-complete` throwing on no-route retries 3× before failing; classifying config errors as fatal-no-retry is a followup (engine-agnostic registry vs WDK FatalError coupling).
 
 ## Session 3 — Workflow as content ⚪
 

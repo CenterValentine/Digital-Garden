@@ -34,6 +34,38 @@ export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
     engineRef: "gate-probe",
   },
   {
+    // Direct graph execution (testing / API callers). Content-node-backed
+    // workflows get their own per-workflow definition rows (Session 3).
+    slug: "interpreter",
+    name: "Graph Interpreter",
+    engine: "wdk",
+    engineRef: "interpreter",
+    validateInput: (input) => {
+      if (typeof input.graph !== "object" || input.graph === null) {
+        return "Input requires a graph object.";
+      }
+      return null;
+    },
+    prepareInput: async (_ownerId, input) => {
+      const { workflowGraphSchema } = await import("../graph/schema");
+      const { validateGraph } = await import("../graph/validate");
+      const parsed = workflowGraphSchema.safeParse(input.graph);
+      if (!parsed.success) {
+        throw new Error(
+          `Graph is invalid: ${parsed.error.issues[0]?.message ?? "schema error"}`
+        );
+      }
+      const structural = validateGraph(parsed.data);
+      if (!structural.valid) {
+        throw new Error(
+          `Graph failed validation: ${structural.issues[0]?.message ?? "structural error"}`
+        );
+      }
+      const { graph: _graph, ...data } = input;
+      return { graph: parsed.data, data };
+    },
+  },
+  {
     slug: "job-application",
     name: "Job Application Research",
     engine: "wdk",
