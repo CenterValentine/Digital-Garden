@@ -2,8 +2,16 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ COMPLETE (S1–S6, 2026-07-12; SOAK PENDING — see backlog) · Plan 2 SKETCH · Plan 3 STUB
-Soak items (user's primary env): approved run with real BYOK AI + working storage → dossier artifact verification. See "Workflows Foundation Followups" in BACKLOG.md.
+**Status:** Plan 1 ✅ COMPLETE (S1–S6, 2026-07-12) · Plan 2 (Builder + Interpreter) FULL, not started · Plan 3 (n8n spoke) SKETCH, demoted · Plan 4 (MIT engine) STUB
+Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
+
+## Direction pivot (2026-07-12, post-soak)
+
+User decision after testing Plan 1: **no hardened code recipes — in-app authoring is the product.** Users build their own automations in a builder; the `WorkflowPayload` ContentNode stub (previously thought legacy) was stubbed for exactly this. Consequences:
+- **Plan 2 is now Builder + Interpreter** (below): one generic WDK workflow executes user-authored graphs as data; workflows become garden content.
+- **n8n machinery demoted to Plan 3** (optional external-integration spoke); Activepieces contingency is moot — we build our own composition surface.
+- **Per-engine workflow types**: `WorkflowPayload.engine` tags each workflow; the builder renders that engine's node palette. Launch engine: `wdk-interpreter@1`.
+- Builder UI: **linear step-list first** (user-approved), graph model canvas-ready from day one; **React Flow** (`@xyflow/react`, MIT — the Flowise/Langflow/Dify canvas; n8n's is sibling Vue Flow) is the named canvas library for the stretch/followup.
 **Planning model:** Rolling wave — Plan 1 at full detail, Plan 2 as a sketch to be promoted after Plan 1's soak, Plan 3 as a trigger-conditioned stub.
 
 ---
@@ -231,7 +239,80 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 
 ---
 
-# Plan 2 — External-engine machinery + n8n (SKETCH — promote after Plan 1 soak)
+# Plan 2 — Builder + Interpreter (FULL)
+
+**Goal:** user-authored workflows as garden content, executed durably on WDK. No hardened recipes.
+
+## Architecture
+
+- **Workflow = content**: `ContentNode(contentType: "workflow")` + `WorkflowPayload { engine, definition: WorkflowGraph, enabled }`. Created from the + menu (un-gray the existing "Workflow (Automation)" item). Slugs, tree placement, trash — garden semantics free.
+- **Builder = the content viewer** for the workflow type, owned by the workflows extension (`client.tsx` matcher per extension conventions).
+- **Interpreter = one generic WDK workflow** that walks a graph snapshot. To the Plan 1 hub it's just another engineRef — run tables, gates, inbox, panel UI all unchanged.
+- **Graph snapshotted into run input at dispatch** — satisfies WDK replay determinism AND makes in-flight runs immune to live edits (append-only versioning becomes automatic, not a convention).
+
+```ts
+interface WorkflowGraph {
+  version: 1;
+  engine: "wdk-interpreter@1";     // per-engine workflow types: palette + executor keyed by this
+  entryNodeId: string;
+  nodes: Array<{
+    id: string;
+    type: string;                   // node-type registry key
+    label?: string;
+    config: Record<string, unknown>; // validated by the node type's Zod schema
+    position?: { x: number; y: number }; // unused by the list renderer; reserved for the canvas
+  }>;
+  edges: Array<{ id: string; from: string; to: string; condition?: { path: string; equals: unknown } }>;
+}
+```
+
+## Session 1 — Graph schema + node-type registry ⚪
+
+- [ ] Zod `WorkflowGraph` schema + structural validation (single entry, edge integrity, cycle rejection for v1)
+- [ ] `NodeTypeDefinition`: `{ id, label, description, configSchema (Zod), execute(runId, config, ctx) }` — server registry + **client-safe metadata split** (id/label/description/config field specs; mirror the AI tools metadata/registry split)
+- [ ] Launch palette wrapping Plan 1 capabilities: `ai-complete`, `gate`, `export-docx`, `store-content`, `get-content`, `fetch-url`, `http-request`, `notify`, `delay`, `branch`
+- [ ] `http-request` node: same trust posture as the OG fetcher (http/https only, timeout, size cap); revisit allowlists if the app ever goes multi-user public
+- **Gate:** job-application expressed as a graph fixture round-trips the schema; typecheck/lint/build green.
+
+## Session 2 — Interpreter workflow ⚪
+
+- [ ] `interpreterWorkflow` ("use workflow"): walk the snapshot, execute each node as a retryable step; node outputs into a serializable ctx keyed by node id (IDs-not-blobs budget: cap ctx entries, big things become content references)
+- [ ] `gate` nodes → `superviseGate(runId, node.id, …)` (deterministic tokens per node); `delay` → `sleep()`; `branch` = pure edge selection on ctx
+- [ ] Plan 1 error semantics: step sections try/catch → failRunStep + rethrow; gates never wrapped
+- [ ] Per-node timeline events (`step.completed` key `node:{id}`); register `interpreter` in `WDK_WORKFLOWS`; definition spec whose `prepareInput` snapshots the graph from a workflow content node
+- **Gate:** the job-application graph fixture dispatches through the interpreter end-to-end — gate suspends, resume completes, dossier artifact attaches (parity with Plan 1 S5).
+
+## Session 3 — Workflow as content ⚪
+
+- [ ] Wire the + menu "Workflow (Automation)" item: creates node + payload (`engine: "wdk-interpreter@1"`, starter graph, `enabled: true` — retire the hard-coded false)
+- [ ] Owner-scoped payload CRUD (graph read/save with schema validation) + dispatch-from-content endpoint (content → snapshot → run)
+- [ ] Reconcile `WorkflowDefinition` ↔ content node (definition row per workflow node; decide engineRef encoding vs. new column — log the decision)
+- **Gate:** create → edit graph via API → dispatch → run appears in the panel with per-node timeline.
+
+## Session 4 — Builder UI v1: linear step list ⚪
+
+- [ ] Content-viewer registration for `contentType: "workflow"` (builder renders in the main pane)
+- [ ] Step-list editor: add/remove/reorder nodes from the client-safe palette, per-node config forms generated from config schemas, minimal branch (if/else) support, inline validation, save, Run button
+- [ ] Dark mode + design tokens; disabled-extension behavior via registry filters
+- **Gate:** author the job-application workflow from scratch in the browser, dispatch it, approve at the gate, dossier lands — no code touched.
+
+## Session 5 — Parity, polish, retirement ⚪
+
+- [ ] Gate-framing fix (soak lesson): empty/failed research must not render as a scored match — gate summary adapts to data quality
+- [ ] Run detail renders the executed graph snapshot with per-node status (list form)
+- [ ] Job-application ships as a **starter template graph**; retire the hardened `jobApplicationWorkflow` code path (keep `gate-probe` as engine plumbing test); extension capture dispatches the user's graph
+- [ ] Tracking docs (STATUS/BACKLOG/this doc) + soak handoff
+- **Gate:** full authored-workflow journey in the browser; zero first-party recipe code remains in the dispatch menu.
+
+## Session 6 — React Flow canvas (STRETCH) ⚪
+
+- [ ] `@xyflow/react` (MIT; keep the default attribution) rendering the same nodes/edges; custom node components on design tokens; the list stays as the fallback editor
+- [ ] Honest scope line: canvas *mechanics* (pan/zoom/drag/minimap) come free from the library; the cost is editor chrome (undo/redo, copy/paste, keyboard) — ship at feature parity with the list, no more
+- **Gate:** the same graph edits round-trip between list and canvas.
+
+---
+
+# Plan 3 — External-engine machinery + n8n (SKETCH — demoted 2026-07-12, optional)
 
 **Goal:** everything any external engine will ever need, proven via n8n as the visual canvas spoke.
 
@@ -250,10 +331,35 @@ Six sessions. Quality gate per repo convention: `pnpm typecheck` → `pnpm lint`
 - Gate-summary payload shape the inbox UX actually wants (soak finding)
 - PAT scope model (per-definition? per-engine? global machine token?)
 
-# Plan 3 — MIT engine spoke: Hatchet first, Temporal with cause (STUB)
+# Plan 4 — MIT engine spoke: Hatchet first, Temporal with cause (STUB)
 
 **Activate only if:** WDK's youth bites in practice (API churn, ops gaps) · OR engine-level queue control over AI concurrency is wanted · OR execution must move off Vercel entirely.
 
 **Shape when activated:** one adapter (four verbs) + one worker. Worker = long-lived Node process, same repo (`workers/` entry importing `lib/domain` + Prisma), own Cloud Run service or VPS container — Hocuspocus deployment pattern, including migration-sync discipline (deploy worker after schema migrations; stale worker = old code executing steps). Engines share the VPS as containers; Hatchet shares the Postgres server (own database). Temporal only if in-flight versioning or its scale properties become genuinely necessary; its cluster is the heaviest ops bill in the lineup. Gate resume: Hatchet wait-for-event (verify maturity) with **flow-splitting as the universal fallback** (pre-gate + post-gate workflows; gate becomes pure app state).
 
-**Inherits from Plans 1–2:** writer surface + idempotency, gate vocabulary, PAT + callback routes, the box, the settings panel. Remaining work is genuinely just the adapter + worker.
+**Inherits from Plans 1–3:** writer surface + idempotency, gate vocabulary, PAT + callback routes, the box, the settings panel. Remaining work is genuinely just the adapter + worker.
+
+---
+
+# Licensing appendix (verified 2026-07-12)
+
+Current posture: private test instance, personal use — **nothing in the stack requires any action today.** Trigger points are all at "offer to the public / charge money."
+
+| Component | License (source) | Personal/test | If public + paid |
+|---|---|---|---|
+| Workflow DevKit (`workflow`, `@workflow/*`) | **Apache-2.0** (verified in node_modules LICENSE.md) | ✅ nothing | ✅ SaaS use has no obligations; keep LICENSE/NOTICE only if *distributing* code. Patent grant included. |
+| `docx` | **MIT** (verified) | ✅ | ✅ notice preservation in distributed source only |
+| React Flow `@xyflow/react` (Plan 2 S6) | **MIT** — verify at install | ✅ | ✅ legally. Nuance: default canvas shows a small "React Flow" attribution; maintainers ask you keep it or subscribe to Pro (paid examples/support, not a license). **Policy: keep the attribution.** |
+| n8n (Plan 3, optional) | **Sustainable Use License** (fair-code, NOT open source) | ✅ self-host for personal/internal use | ⚠️ **Tripwire:** offering n8n functionality *to your users* (embed, white-label, hosted access) requires a paid n8n embed license. Personal companion use stays fine even if the app is commercial. Community nodes we publish must be MIT for n8n's verified registry. |
+| Hatchet / Temporal (Plan 4) | **MIT** — verify at adoption | ✅ | ✅ |
+| Activepieces | moot (own builder) — MIT core, paid EE embed SDK, Angular frontend (iframe-only embedding) | — | — |
+| AI providers | BYOK: each key's owner bound by their own provider ToS | ✅ | ⚠️ house keys for other users → commercial API terms + usage-policy pass at pricing time |
+| Chrome extension | unpacked personal install | ✅ | ⚠️ Web Store publishing → developer account, permission justifications (incl. new `scripting`), privacy policy |
+
+**Homework checklist (all deferred until "go public" is real):**
+- [ ] Add a license inventory to CI (`pnpm licenses list` is built in) and snapshot THIRD-PARTY-NOTICES.md before launch
+- [ ] Re-verify licenses on major version bumps — relicensing happens (Terraform→BSL, Redis precedents)
+- [ ] React Flow attribution/Pro decision if the canvas becomes core to a paid product
+- [ ] n8n embed license ONLY if n8n features become user-facing (Plan 3 gate)
+- [ ] Provider ToS + data-processing pass if house-key multi-user
+- [ ] Chrome Web Store compliance pass if the extension ships publicly
