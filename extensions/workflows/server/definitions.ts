@@ -1,0 +1,96 @@
+import { prisma } from "@/lib/database/client";
+import type { WorkflowDefinition } from "@/lib/database/generated/prisma";
+
+/**
+ * Code manifest of first-party workflow definitions — the source of truth
+ * for what exists. DB rows are seeded from these specs at dispatch time and
+ * carry user-facing config (enabled, engine choice). Append-only versioning:
+ * ship behavior changes as a new slug (e.g. "job-application@2") — never
+ * repoint a slug with live runs sleeping at gates.
+ */
+export interface WorkflowDefinitionSpec {
+  slug: string;
+  name: string;
+  engine: string;
+  engineRef: string;
+  /** Returns an error message, or null when the input is acceptable. */
+  validateInput?: (input: Record<string, unknown>) => string | null;
+  /**
+   * Pre-dispatch transform, run after validation. Used to enforce the
+   * pass-IDs-not-blobs rule: big captures become ContentNodes here and the
+   * stored input carries references.
+   */
+  prepareInput?: (
+    ownerId: string,
+    input: Record<string, unknown>
+  ) => Promise<Record<string, unknown>>;
+}
+
+export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
+  {
+    slug: "gate-probe",
+    name: "Gate Probe (WDK plumbing test)",
+    engine: "wdk",
+    engineRef: "gate-probe",
+  },
+  {
+    // Direct graph execution (testing / API callers). Content-node-backed
+    // workflows get their own per-workflow definition rows (Session 3).
+    slug: "interpreter",
+    name: "Graph Interpreter",
+    engine: "wdk",
+    engineRef: "interpreter",
+    validateInput: (input) => {
+      if (typeof input.graph !== "object" || input.graph === null) {
+        return "Input requires a graph object.";
+      }
+      return null;
+    },
+    prepareInput: async (_ownerId, input) => {
+      const { workflowGraphSchema } = await import("../graph/schema");
+      const { validateGraph } = await import("../graph/validate");
+      const parsed = workflowGraphSchema.safeParse(input.graph);
+      if (!parsed.success) {
+        throw new Error(
+          `Graph is invalid: ${parsed.error.issues[0]?.message ?? "schema error"}`
+        );
+      }
+      const structural = validateGraph(parsed.data);
+      if (!structural.valid) {
+        throw new Error(
+          `Graph failed validation: ${structural.issues[0]?.message ?? "structural error"}`
+        );
+      }
+      const { graph: _graph, ...data } = input;
+      return { graph: parsed.data, data };
+    },
+  },
+];
+
+export function getDefinitionSpec(
+  slug: string
+): WorkflowDefinitionSpec | null {
+  return WORKFLOW_DEFINITION_SPECS.find((spec) => spec.slug === slug) ?? null;
+}
+
+/** Upsert the per-owner DB row for a code-manifest spec. */
+export async function ensureDefinition(
+  ownerId: string,
+  slug: string
+): Promise<WorkflowDefinition | null> {
+  const spec = getDefinitionSpec(slug);
+  if (!spec) return null;
+  return prisma.workflowDefinition.upsert({
+    where: { ownerId_slug: { ownerId, slug } },
+    create: {
+      ownerId,
+      slug: spec.slug,
+      name: spec.name,
+      engine: spec.engine,
+      engineRef: spec.engineRef,
+    },
+    // Keep name/engineRef synced to code; never touch user-facing config
+    // (enabled, future engine choice) on re-dispatch.
+    update: { name: spec.name, engineRef: spec.engineRef },
+  });
+}

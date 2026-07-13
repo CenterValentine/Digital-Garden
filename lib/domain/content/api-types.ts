@@ -400,4 +400,5 @@ export type CreatePayloadData =
   | { externalPayload: { create: Prisma.ExternalPayloadCreateWithoutContentInput } }
   | { visualizationPayload: { create: Prisma.VisualizationPayloadCreateWithoutContentInput } }
   | { chatPayload: { create: Prisma.ChatPayloadCreateWithoutContentInput } }
+  | { workflowPayload: { create: Prisma.WorkflowPayloadCreateWithoutContentInput } }
   | Record<string, never>; // Empty object for backward compatibility only

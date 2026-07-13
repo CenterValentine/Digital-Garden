@@ -43,6 +43,32 @@ export const systemAnnouncementPayloadSchema = z.object({
   href: z.string().max(500).optional(),
 });
 
+// Workflows extension — a run suspended at a human-in-the-loop gate. The
+// gateToken is what POST /api/workflows/runs/[runId]/resume expects.
+export const workflowGatePayloadSchema = z.object({
+  runId: z.string().min(1),
+  gateToken: z.string().min(1),
+  workflowName: z.string().min(1).max(200),
+  title: z.string().min(1).max(200),
+  body: z.string().max(1000).optional(),
+});
+
+// Workflows extension — a run reached a terminal status.
+export const workflowFinishedPayloadSchema = z.object({
+  runId: z.string().min(1),
+  status: z.enum(["succeeded", "failed", "canceled"]),
+  workflowName: z.string().min(1).max(200),
+  title: z.string().min(1).max(200),
+});
+
+// Workflows extension — a user-authored notify node fired mid-run.
+export const workflowNotifyPayloadSchema = z.object({
+  runId: z.string().min(1),
+  title: z.string().min(1).max(200),
+  body: z.string().max(1000).optional(),
+  workflowName: z.string().max(200).optional(),
+});
+
 export interface NotificationKindDefinition {
   payloadSchema: z.ZodTypeAny;
   collapsible: boolean;
@@ -67,6 +93,18 @@ export const NOTIFICATION_KINDS = {
   },
   "system.announcement": {
     payloadSchema: systemAnnouncementPayloadSchema,
+    collapsible: false,
+  },
+  "workflow.gate": {
+    payloadSchema: workflowGatePayloadSchema,
+    collapsible: false,
+  },
+  "workflow.finished": {
+    payloadSchema: workflowFinishedPayloadSchema,
+    collapsible: false,
+  },
+  "workflow.notify": {
+    payloadSchema: workflowNotifyPayloadSchema,
     collapsible: false,
   },
 } as const satisfies Record<string, NotificationKindDefinition>;

@@ -1,0 +1,251 @@
+import { createHash, randomBytes } from "node:crypto";
+import type { JSONContent } from "@tiptap/core";
+import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
+import { generateUniqueSlug } from "@/lib/domain/content";
+import { DOCXConverter } from "@/lib/domain/export/converters/docx";
+import { DEFAULT_EXPORT_BACKUP_SETTINGS } from "@/lib/domain/export";
+import { attachArtifact } from "./runs";
+
+const WORKFLOWS_FOLDER_TITLE = "Job Applications";
+const DOCX_MIME =
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+
+/** Root-level destination folder for workflow-produced documents. */
+async function ensureWorkflowsFolder(ownerId: string): Promise<string> {
+  const existing = await prisma.contentNode.findFirst({
+    where: {
+      ownerId,
+      contentType: "folder",
+      title: WORKFLOWS_FOLDER_TITLE,
+      parentId: null,
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+  const slug = await generateUniqueSlug(WORKFLOWS_FOLDER_TITLE, ownerId);
+  const folder = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title: WORKFLOWS_FOLDER_TITLE,
+      slug,
+      contentType: "folder",
+      displayOrder: 0,
+    },
+  });
+  return folder.id;
+}
+
+export interface StoreRunDocxInput {
+  runId: string;
+  ownerId: string;
+  title: string;
+  tiptap: JSONContent;
+  searchText?: string;
+}
+
+/**
+ * Convert TipTap JSON to DOCX, upload to the user's storage, create a
+ * ContentNode + FilePayload in the designated folder, and attach it to the
+ * run as an artifact. Mirrors the TTS generate-and-store pattern.
+ */
+export async function storeRunDocxArtifact(
+  input: StoreRunDocxInput
+): Promise<{ contentNodeId: string; fileName: string }> {
+  const converter = new DOCXConverter();
+  const result = await converter.convert(input.tiptap, {
+    format: "docx",
+    settings: DEFAULT_EXPORT_BACKUP_SETTINGS,
+  });
+  const file = result.files[0];
+  if (!result.success || !file) {
+    throw new Error("DOCX conversion produced no file.");
+  }
+  const buffer = Buffer.isBuffer(file.content)
+    ? file.content
+    : Buffer.from(file.content);
+
+  const { getUserStorageProvider } = await import(
+    "@/lib/infrastructure/storage"
+  );
+  const storageProvider = await getUserStorageProvider(input.ownerId);
+  const checksum = createHash("sha256").update(buffer).digest("hex");
+  const storageKey = `uploads/${input.ownerId}/workflow-${input.runId}-${Date.now()}-${randomBytes(6).toString("hex")}.docx`;
+  await storageProvider.uploadFile(storageKey, buffer, DOCX_MIME);
+
+  const safeTitle =
+    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Workflow document";
+  const fileName = `${safeTitle}.docx`;
+  const parentId = await ensureWorkflowsFolder(input.ownerId);
+  const slug = await generateUniqueSlug(fileName, input.ownerId);
+
+  const content = await prisma.contentNode.create({
+    data: {
+      ownerId: input.ownerId,
+      title: fileName,
+      slug,
+      contentType: "file",
+      parentId,
+      displayOrder: 0,
+      filePayload: {
+        create: {
+          fileName,
+          fileExtension: "docx",
+          mimeType: DOCX_MIME,
+          fileSize: BigInt(buffer.length),
+          checksum,
+          storageProvider: "r2",
+          storageKey,
+          searchText: input.searchText,
+          uploadStatus: "ready",
+          uploadedAt: new Date(),
+          isProcessed: true,
+          processingStatus: "complete",
+        },
+      },
+    },
+  });
+
+  await attachArtifact(input.runId, content.id, "document", fileName);
+  return { contentNodeId: content.id, fileName };
+}
+
+const CAPTURE_TEXT_CAP = 100_000;
+
+/**
+ * Plain text → TipTap doc: `#`/`##`/`###` lines become headings, `- ` lines
+ * become bullet items, blank lines split paragraphs. The lingua franca for
+ * user-authored node configs (store-content, export-docx bodies).
+ */
+export function textToTiptap(text: string): JSONContent {
+  const blocks: JSONContent[] = [];
+  let bulletBuffer: string[] = [];
+  const flushBullets = () => {
+    if (bulletBuffer.length === 0) return;
+    blocks.push({
+      type: "bulletList",
+      content: bulletBuffer.map((item) => ({
+        type: "listItem",
+        content: [
+          { type: "paragraph", content: [{ type: "text", text: item }] },
+        ],
+      })),
+    });
+    bulletBuffer = [];
+  };
+  for (const rawLine of text.split(/\n/)) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushBullets();
+      continue;
+    }
+    const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
+    if (headingMatch) {
+      flushBullets();
+      blocks.push({
+        type: "heading",
+        attrs: { level: headingMatch[1].length },
+        content: [{ type: "text", text: headingMatch[2] }],
+      });
+      continue;
+    }
+    if (line.startsWith("- ")) {
+      bulletBuffer.push(line.slice(2));
+      continue;
+    }
+    flushBullets();
+    blocks.push({
+      type: "paragraph",
+      content: [{ type: "text", text: line }],
+    });
+  }
+  flushBullets();
+  return { type: "doc", content: blocks };
+}
+
+/** Create a note in the Workflows folder from plain text (node executor path). */
+export async function storeTextNote(
+  ownerId: string,
+  note: { title: string; text: string }
+): Promise<string> {
+  const parentId = await ensureWorkflowsFolder(ownerId);
+  const title = note.title.slice(0, 180) || "Workflow note";
+  const text = note.text.slice(0, CAPTURE_TEXT_CAP);
+  const slug = await generateUniqueSlug(title, ownerId);
+  const content = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug,
+      contentType: "note",
+      parentId,
+      displayOrder: 0,
+      notePayload: {
+        create: {
+          tiptapJson: textToTiptap(text) as unknown as Prisma.InputJsonValue,
+          searchText: text,
+        },
+      },
+    },
+  });
+  return content.id;
+}
+
+/**
+ * Store a captured web page as a note ContentNode (design rule: big content
+ * becomes content immediately; workflow inputs and steps pass IDs). The
+ * capture doubles as a source document the user keeps in their garden.
+ */
+export async function storeCapturedPage(
+  ownerId: string,
+  capture: { pageUrl?: string; pageTitle?: string; pageText: string }
+): Promise<string> {
+  const parentId = await ensureWorkflowsFolder(ownerId);
+  const text = capture.pageText.slice(0, CAPTURE_TEXT_CAP);
+  const title = `Capture — ${capture.pageTitle || capture.pageUrl || "page"}`.slice(
+    0,
+    180
+  );
+  const slug = await generateUniqueSlug(title, ownerId);
+  const paragraphs = text
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.trim())
+    .filter(Boolean)
+    .slice(0, 400)
+    .map((chunk) => ({
+      type: "paragraph",
+      content: [{ type: "text", text: chunk }],
+    }));
+  const tiptapJson = {
+    type: "doc",
+    content: [
+      ...(capture.pageUrl
+        ? [
+            {
+              type: "paragraph",
+              content: [{ type: "text", text: `Source: ${capture.pageUrl}` }],
+            },
+          ]
+        : []),
+      ...paragraphs,
+    ],
+  };
+  const content = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug,
+      contentType: "note",
+      parentId,
+      displayOrder: 0,
+      notePayload: {
+        create: {
+          tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
+          searchText: text,
+        },
+      },
+    },
+  });
+  return content.id;
+}
