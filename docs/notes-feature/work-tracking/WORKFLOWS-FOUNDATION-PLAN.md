@@ -2,7 +2,8 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ COMPLETE (2026-07-12) · Plan 2 ✅ COMPLETE (S1–S6 incl. canvas stretch, 2026-07-13) · Plan 3 (n8n spoke) SKETCH, demoted · Plan 4 (MIT engine) STUB
+**Status:** Plan 1 ✅ · Plan 2 ✅ (+ triggers, sub-workflows, polish) · **PR #103 OPEN 2026-07-13** (feature/workflows-foundation → main, 22 commits, sprint format) · Plan 3 (n8n spoke) SKETCH — NEXT · Plan 4 (MIT engine) STUB
+Post-PR: Plan 3 scheming begins (external-engine machinery + n8n as the visual-canvas spoke; PAT auth + HTTP callback transport over the same writers + `n8n-nodes-digital-garden` + engines settings panel). The four-verb contract + writer surface are the seam it plugs into.
 Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
 
 ## Direction pivot (2026-07-12, post-soak)
