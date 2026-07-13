@@ -142,6 +142,69 @@ async function startEngineForRun(
  * later edits), and hand to the interpreter. The per-workflow definition row
  * is keyed by the stable content id (renames just update the display name).
  */
+/**
+ * Browser-extension capture entry: store the captured page as a note, then
+ * dispatch the user's most recently updated enabled workflow. First capture
+ * with no workflows auto-creates one from the capture-entry template — the
+ * user's own editable graph from day one, no hardened recipes.
+ */
+export async function dispatchCaptureToUserWorkflow(
+  ownerId: string,
+  capture: { pageUrl?: string; pageTitle?: string; pageText?: string }
+): Promise<DispatchResult> {
+  const data: Record<string, unknown> = {
+    ...(capture.pageUrl ? { pageUrl: capture.pageUrl } : {}),
+    ...(capture.pageTitle ? { pageTitle: capture.pageTitle } : {}),
+  };
+  if (capture.pageText && capture.pageText.trim()) {
+    const { storeCapturedPage } = await import("./documents");
+    data.captureNodeId = await storeCapturedPage(ownerId, {
+      pageUrl: capture.pageUrl,
+      pageTitle: capture.pageTitle,
+      pageText: capture.pageText,
+    });
+  }
+
+  let target = await prisma.contentNode.findFirst({
+    where: {
+      ownerId,
+      contentType: "workflow",
+      deletedAt: null,
+      workflowPayload: { enabled: true },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { id: true },
+  });
+  if (!target) {
+    const { jobApplicationGraph } = await import(
+      "../graph/fixtures/job-application"
+    );
+    const { generateUniqueSlug } = await import("@/lib/domain/content");
+    const slug = await generateUniqueSlug("Job Application Research", ownerId);
+    target = await prisma.contentNode.create({
+      data: {
+        ownerId,
+        title: "Job Application Research",
+        slug,
+        contentType: "workflow",
+        displayOrder: 0,
+        workflowPayload: {
+          create: {
+            engine: WDK_INTERPRETER_ENGINE,
+            definition:
+              jobApplicationGraph as unknown as Parameters<
+                typeof prisma.workflowPayload.create
+              >[0]["data"]["definition"],
+            enabled: true,
+          },
+        },
+      },
+      select: { id: true },
+    });
+  }
+  return dispatchWorkflowFromContent(ownerId, target.id, data);
+}
+
 export async function dispatchWorkflowFromContent(
   ownerId: string,
   contentNodeId: string,

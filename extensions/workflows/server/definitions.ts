@@ -65,35 +65,6 @@ export const WORKFLOW_DEFINITION_SPECS: WorkflowDefinitionSpec[] = [
       return { graph: parsed.data, data };
     },
   },
-  {
-    slug: "job-application",
-    name: "Job Application Research",
-    engine: "wdk",
-    engineRef: "job-application",
-    validateInput: (input) => {
-      if (
-        typeof input.pageUrl !== "string" &&
-        typeof input.pageText !== "string"
-      ) {
-        return "Input requires a pageUrl or pageText string.";
-      }
-      return null;
-    },
-    prepareInput: async (ownerId, input) => {
-      const pageText =
-        typeof input.pageText === "string" ? input.pageText.trim() : "";
-      if (!pageText) return input;
-      const { storeCapturedPage } = await import("./documents");
-      const captureNodeId = await storeCapturedPage(ownerId, {
-        pageUrl: typeof input.pageUrl === "string" ? input.pageUrl : undefined,
-        pageTitle:
-          typeof input.pageTitle === "string" ? input.pageTitle : undefined,
-        pageText,
-      });
-      const { pageText: _dropped, ...rest } = input;
-      return { ...rest, captureNodeId };
-    },
-  },
 ];
 
 export function getDefinitionSpec(

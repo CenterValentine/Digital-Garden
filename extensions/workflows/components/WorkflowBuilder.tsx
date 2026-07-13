@@ -45,6 +45,7 @@ import type {
   WorkflowGraph,
   WorkflowGraphNode,
 } from "../graph/schema";
+import { deriveChain, edgesFromChain } from "../graph/chain";
 import { validateGraph, type GraphValidationIssue } from "../graph/validate";
 
 const NODE_ICONS: Record<string, typeof Sparkles> = {
@@ -59,56 +60,6 @@ const NODE_ICONS: Record<string, typeof Sparkles> = {
   "export-docx": FileOutput,
   notify: Bell,
 };
-
-interface ChainResult {
-  order: string[];
-  /** True when the graph is exactly a supported chain (structural edits allowed). */
-  simple: boolean;
-}
-
-/** Derive the display order; detect shapes the list editor can't safely rewrite. */
-function deriveChain(graph: WorkflowGraph): ChainResult {
-  const order: string[] = [];
-  const seen = new Set<string>();
-  let simple = true;
-  let currentId: string | null = graph.entryNodeId;
-  while (currentId && !seen.has(currentId)) {
-    seen.add(currentId);
-    order.push(currentId);
-    const node = graph.nodes.find((n) => n.id === currentId);
-    const outgoing = graph.edges.filter((e) => e.from === currentId);
-    if (!node) break;
-    if (node.type === "branch") {
-      if (outgoing.some((e) => e.branch === "false")) simple = false;
-      currentId = outgoing.find((e) => e.branch === "true")?.to ?? null;
-    } else {
-      if (outgoing.length > 1) simple = false;
-      currentId = outgoing[0]?.to ?? null;
-    }
-  }
-  if (seen.size !== graph.nodes.length) simple = false;
-  return { order, simple };
-}
-
-/** Rebuild edges from a chain order (branch nodes get a labeled true edge). */
-function edgesFromChain(
-  order: string[],
-  nodes: WorkflowGraphNode[]
-): WorkflowGraph["edges"] {
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const edges: WorkflowGraph["edges"] = [];
-  for (let i = 0; i < order.length - 1; i++) {
-    const from = order[i];
-    const isBranch = byId.get(from)?.type === "branch";
-    edges.push({
-      id: `e-${from}-${order[i + 1]}`,
-      from,
-      to: order[i + 1],
-      ...(isBranch ? { branch: "true" as const } : {}),
-    });
-  }
-  return edges;
-}
 
 function uniqueNodeId(type: string, nodes: WorkflowGraphNode[]): string {
   const existing = new Set(nodes.map((n) => n.id));

@@ -58,12 +58,13 @@ export interface WorkflowRunDto {
   artifacts?: WorkflowRunArtifactDto[];
 }
 
-/** Dispatchable definitions surfaced in the panel's Run menu. */
+/**
+ * Code-defined dispatchables in the panel's Run menu. No hardened recipes —
+ * user automations are workflow content nodes run from the builder; only
+ * the engine plumbing test remains here.
+ */
 export const DISPATCHABLE_WORKFLOWS: Array<{
   slug: string;
   name: string;
   needsUrl: boolean;
-}> = [
-  { slug: "job-application", name: "Job Application Research", needsUrl: true },
-  { slug: "gate-probe", name: "Gate Probe (plumbing test)", needsUrl: false },
-];
+}> = [{ slug: "gate-probe", name: "Gate Probe (plumbing test)", needsUrl: false }];

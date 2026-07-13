@@ -3,7 +3,7 @@ import { withRouteTrace } from "@/lib/core/logger";
 import { requireBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
 import {
   DISPATCH_ERROR_STATUS,
-  dispatchWorkflow,
+  dispatchCaptureToUserWorkflow,
   isDispatchFailure,
 } from "@/extensions/workflows/server/dispatch";
 import {
@@ -14,25 +14,18 @@ import {
 const ROUTE_PATH = "/api/integrations/browser-extension/workflow-dispatch";
 
 /**
- * Extension → workflow trigger, proxy-not-share style: the browser
- * extension authenticates with its trusted-browser Bearer token and the
- * app performs the dispatch — the extension never learns engine details.
+ * Extension capture → the USER'S OWN workflow graph (most recently updated
+ * enabled one; first capture auto-creates one from the template). The
+ * legacy `slug` field is accepted and ignored — no hardened recipes remain.
+ * Proxy-not-share: the extension never learns engine details.
  */
 export async function POST(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
       const record = await requireBrowserExtensionBearerAuth(request);
       const body = (await request.json().catch(() => ({}))) as {
-        slug?: unknown;
         input?: unknown;
       };
-      if (typeof body.slug !== "string" || body.slug.length === 0) {
-        return errorResponse(
-          400,
-          "VALIDATION_ERROR",
-          "Body requires a workflow slug."
-        );
-      }
       const input = body.input === undefined ? {} : body.input;
       if (typeof input !== "object" || input === null || Array.isArray(input)) {
         return errorResponse(
@@ -41,11 +34,15 @@ export async function POST(request: NextRequest) {
           "Workflow input must be an object."
         );
       }
-      const result = await dispatchWorkflow(
-        record.user.id,
-        body.slug,
-        input as Record<string, unknown>
-      );
+      const capture = input as Record<string, unknown>;
+      const result = await dispatchCaptureToUserWorkflow(record.user.id, {
+        pageUrl:
+          typeof capture.pageUrl === "string" ? capture.pageUrl : undefined,
+        pageTitle:
+          typeof capture.pageTitle === "string" ? capture.pageTitle : undefined,
+        pageText:
+          typeof capture.pageText === "string" ? capture.pageText : undefined,
+      });
       if (isDispatchFailure(result)) {
         return errorResponse(
           DISPATCH_ERROR_STATUS[result.code],

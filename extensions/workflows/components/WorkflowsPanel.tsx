@@ -19,6 +19,9 @@ import {
   type WorkflowRunDto,
   type WorkflowRunStatusValue,
 } from "../shared";
+import { deriveChain } from "../graph/chain";
+import { workflowGraphSchema } from "../graph/schema";
+import { getNodeTypeMetadata } from "../nodes/metadata";
 import { useWorkflowRunsStore } from "../state/workflow-runs-store";
 
 const STATUS_STYLES: Record<WorkflowRunStatusValue, string> = {
@@ -51,6 +54,92 @@ async function readError(response: Response): Promise<string> {
   } catch {
     return `Request failed (${response.status})`;
   }
+}
+
+type NodeRunStatus = "done" | "waiting" | "failed" | "pending";
+
+/**
+ * Snapshot view: the graph THIS run executed (from its input snapshot),
+ * with per-node status derived from the event trail. Renders only for
+ * interpreter runs whose input carries a graph.
+ */
+function RunGraphSteps({ run }: { run: WorkflowRunDto }) {
+  const parsed = workflowGraphSchema.safeParse(
+    (run.input as Record<string, unknown>).graph
+  );
+  if (!parsed.success) return null;
+  const graph = parsed.data;
+  const { order } = deriveChain(graph);
+  const events = run.events ?? [];
+  const completed = new Set(
+    events
+      .filter((event) => event.type === "step.completed" && event.stepName)
+      .map((event) => event.stepName as string)
+  );
+  const failedMessage =
+    typeof run.error?.message === "string" ? run.error.message : "";
+
+  const statuses = new Map<string, NodeRunStatus>();
+  let lastActive = -1;
+  order.forEach((id, index) => {
+    if (completed.has(id)) {
+      statuses.set(id, "done");
+      lastActive = Math.max(lastActive, index);
+    } else if (run.status === "waiting" && run.gateToken?.endsWith(`:${id}`)) {
+      statuses.set(id, "waiting");
+      lastActive = Math.max(lastActive, index);
+    }
+  });
+  order.forEach((id, index) => {
+    if (statuses.has(id)) return;
+    const node = graph.nodes.find((n) => n.id === id);
+    const label = node?.label ?? id;
+    if (
+      run.status === "failed" &&
+      (failedMessage.includes(`"${label}"`) || failedMessage.includes(`"${id}"`))
+    ) {
+      statuses.set(id, "failed");
+    } else if (index < lastActive) {
+      statuses.set(id, "done"); // e.g. resumed gates leave no step.completed
+    } else {
+      statuses.set(id, "pending");
+    }
+  });
+
+  const STATUS_DOT: Record<NodeRunStatus, string> = {
+    done: "bg-emerald-500",
+    waiting: "bg-amber-400 animate-pulse",
+    failed: "bg-red-500",
+    pending: "bg-gray-300 dark:bg-gray-600",
+  };
+
+  return (
+    <div>
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        Steps
+      </p>
+      <ol className="space-y-1">
+        {order.map((id) => {
+          const node = graph.nodes.find((n) => n.id === id);
+          if (!node) return null;
+          const status = statuses.get(id) ?? "pending";
+          return (
+            <li key={id} className="flex items-center gap-2 text-xs">
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${STATUS_DOT[status]}`}
+              />
+              <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-200">
+                {node.label ?? getNodeTypeMetadata(node.type)?.label ?? node.type}
+              </span>
+              <span className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500">
+                {status}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
 }
 
 function RunTimeline({ run }: { run: WorkflowRunDto }) {
@@ -288,6 +377,8 @@ function RunDetail({
                 </ul>
               </div>
             ) : null}
+
+            <RunGraphSteps run={run} />
 
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">

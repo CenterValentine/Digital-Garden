@@ -325,13 +325,14 @@ interface WorkflowGraph {
 - From-scratch authoring of ALL seven nodes via clicks deferred to S5's parity gate (this session proved every editing primitive: add, configure, reorder controls, remove, save, run).
 - Config forms come from field specs, so every future node type gets its form for free — no builder changes needed when the palette grows.
 
-## Session 5 — Parity, polish, retirement ⚪
+## Session 5 — Parity, polish, retirement ✅ (2026-07-13)
 
-- [ ] Gate-framing fix (soak lesson): empty/failed research must not render as a scored match — gate summary adapts to data quality
-- [ ] Run detail renders the executed graph snapshot with per-node status (list form)
-- [ ] Job-application ships as a **starter template graph**; retire the hardened `jobApplicationWorkflow` code path (keep `gate-probe` as engine plumbing test); extension capture dispatches the user's graph
-- [ ] Tracking docs (STATUS/BACKLOG/this doc) + soak handoff
-- **Gate:** full authored-workflow journey in the browser; zero first-party recipe code remains in the dispatch menu.
+- [x] Gate framing fix: landed in S2 (interpolation misses → ⚠-prefixed title + unresolvedTemplates recorded)
+- [x] Run detail shows the executed graph snapshot: `RunGraphSteps` (shared `graph/chain.ts` derivation) with per-node done/waiting/failed/pending dots above the timeline
+- [x] **Hardened recipe retired**: `jobApplicationWorkflow` + its steps deleted; `job-application` removed from `WDK_WORKFLOWS`, definition specs, and the panel Run menu (legacy slug returns UNKNOWN_WORKFLOW; gate-probe remains as plumbing test). Templates are graphs now: the starter (fetch-url entry) seeds new workflows; the capture-entry variant seeds the auto-created one below.
+- [x] **Extension capture dispatches the user's own graph**: the Bearer route (extension payload unchanged; legacy slug ignored) stores the capture as a note, targets the most recently updated enabled workflow node, and auto-creates one from the capture template on first use — onboarding is self-serve.
+- [x] Tracking docs updated.
+- **Gate:** ✅ full loop with zero recipe code: Bearer capture → user's builder-edited workflow → get-content(capture) → real AI "90% fit" gate → approve → dossier artifact → **"Builder-added step fired"** inbox notification from the step authored via browser clicks in S4. Steps executed: listing, research, match, approved, dossier, done, notify-1.
 
 ## Session 6 — React Flow canvas (STRETCH) ⚪
 
