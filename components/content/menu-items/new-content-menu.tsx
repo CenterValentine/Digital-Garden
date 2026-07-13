@@ -244,15 +244,6 @@ export function getNewContentMenuItems(
     });
   }
 
-  // Person / Group
-  items.push({
-    id: "add-people-target",
-    label: "Person / Group",
-    icon: <Users className="h-4 w-4" />,
-    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
-    disabled: !callbacks.onAddPeopleTarget,
-  });
-
   // Visualization (submenu — engines)
   items.push({
     id: "new-visualization",
@@ -313,18 +304,10 @@ export function getNewContentMenuItems(
     });
   }
 
-  if (callbacks.onCreateHtml) {
-    items.push({
-      id: "new-html",
-      label: "HTML Document",
-      icon: <FileCode className="h-4 w-4" />,
-      onClick: () => callbacks.onCreateHtml?.(normalizedParentId),
-      disabled: !callbacks.onCreateHtml,
-    });
-  }
-
+  // Documents — structured file formats grouped in one submenu.
+  const documentChildren: NewContentMenuItem[] = [];
   if (callbacks.onCreateDocument) {
-    items.push({
+    documentChildren.push({
       id: "new-document",
       label: "Word Document (.docx)",
       icon: <FileType className="h-4 w-4" />,
@@ -332,9 +315,8 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateDocument,
     });
   }
-
   if (callbacks.onCreateSpreadsheet) {
-    items.push({
+    documentChildren.push({
       id: "new-spreadsheet",
       label: "Excel Spreadsheet (.xlsx)",
       icon: <FileSpreadsheet className="h-4 w-4" />,
@@ -342,14 +324,30 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateSpreadsheet,
     });
   }
-
+  if (callbacks.onCreateHtml) {
+    documentChildren.push({
+      id: "new-html",
+      label: "HTML Document",
+      icon: <FileCode className="h-4 w-4" />,
+      onClick: () => callbacks.onCreateHtml?.(normalizedParentId),
+      disabled: !callbacks.onCreateHtml,
+    });
+  }
   if (callbacks.onCreateJson) {
-    items.push({
+    documentChildren.push({
       id: "new-json",
       label: "JSON File (.json)",
       icon: <Braces className="h-4 w-4" />,
       onClick: () => callbacks.onCreateJson?.(normalizedParentId),
       disabled: !callbacks.onCreateJson,
+    });
+  }
+  if (documentChildren.length > 0) {
+    items.push({
+      id: "new-documents",
+      label: "Documents",
+      icon: <FileText className="h-4 w-4" />,
+      submenu: documentChildren,
     });
   }
 
@@ -368,6 +366,15 @@ export function getNewContentMenuItems(
         disabled: !callbacks.onCreateWorkflow,
       },
     ],
+  });
+
+  // Person / Group — last of the active content types.
+  items.push({
+    id: "add-people-target",
+    label: "Person / Group",
+    icon: <Users className="h-4 w-4" />,
+    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
+    disabled: !callbacks.onAddPeopleTarget,
   });
 
   // Stubs — defined but not implemented yet.
