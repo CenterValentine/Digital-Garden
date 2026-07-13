@@ -195,14 +195,14 @@ export function getNewContentMenuItems(
 
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         submenu,
       });
     } else {
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         shortcut: "A",
         onClick: () => callbacks.onCreateNote?.(normalizedParentId),
@@ -222,22 +222,22 @@ export function getNewContentMenuItems(
     disabled: !callbacks.onCreateChat,
   });
 
-  // External Link (Bookmark)
+  // External Link
   if (callbacks.onCreateExternal) {
     items.push({
       id: "new-external",
-      label: "External Link (Bookmark)",
+      label: "External Link",
       icon: <ExternalLink className="h-4 w-4" />,
       onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
       disabled: !callbacks.onCreateExternal,
     });
   }
 
-  // File (Upload)
+  // File Upload
   if (callbacks.onCreateFile) {
     items.push({
       id: "new-file",
-      label: "File (Upload)",
+      label: "File Upload",
       icon: <FileText className="h-4 w-4" />,
       onClick: () => callbacks.onCreateFile?.(normalizedParentId),
       disabled: !callbacks.onCreateFile,
@@ -355,7 +355,7 @@ export function getNewContentMenuItems(
   // native graph-interpreter type, future engines slot in beneath it).
   items.push({
     id: "new-workflow",
-    label: "Workflow (Automation)",
+    label: "Workflow",
     icon: <GitBranch className="h-4 w-4" />,
     submenu: [
       {
