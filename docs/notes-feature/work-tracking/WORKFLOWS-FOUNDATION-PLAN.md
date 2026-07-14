@@ -2,8 +2,8 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ · Plan 2 ✅ (+ triggers, sub-workflows, polish) · **PR #103 OPEN 2026-07-13** (feature/workflows-foundation → main, 22 commits, sprint format) · Plan 3 (n8n spoke) SKETCH — NEXT · Plan 4 (MIT engine) STUB
-Post-PR: Plan 3 scheming begins (external-engine machinery + n8n as the visual-canvas spoke; PAT auth + HTTP callback transport over the same writers + `n8n-nodes-digital-garden` + engines settings panel). The four-verb contract + writer surface are the seam it plugs into.
+**Status:** Plan 1 ✅ · Plan 2 ✅ · **PR #103 OPEN** (feature/workflows-foundation → main) · **Plan 3 (n8n spoke) FULL — decisions locked 2026-07-14, ready to build** · Plan 4 (MIT engine) STUB
+Plan 3 key decisions: hub-consistent (n8n workflows are ContentNodes compiled→pushed to n8n, nothing lives in n8n; builder gains an "n8n Node" step); small Dokploy/Coolify VPS hosts n8n (Hocuspocus migration = later 2nd-tenant experiment); one wide PAT per user (guard scoped to callback surface); SUL fine for personal/invite-only use (red line = charging money while n8n runs user workflows).
 Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
 
 ## Direction pivot (2026-07-12, post-soak)
@@ -349,24 +349,27 @@ interface WorkflowGraph {
 
 ---
 
-# Plan 3 — External-engine machinery + n8n (SKETCH — demoted 2026-07-12, optional)
+# Plan 3 — n8n execution spoke (FULL — decisions locked 2026-07-14)
 
-**Goal:** everything any external engine will ever need, proven via n8n as the visual canvas spoke.
+**Goal:** the outside-integration long tail (n8n's ~1000 nodes) available inside Trellis, WITHOUT anything living in n8n. n8n is a compile target + execution substrate, never a second UI or a document store.
 
-**Scope sketch:**
-- PAT/service-token auth — hashed at rest, scoped, revocable; first machine-to-machine auth story in the app
-- PAT-authed callback routes — HTTP transport over the SAME `runs.ts` writers (events, artifacts, gates) + AI proxy endpoint (proxy-not-share now does real work: n8n never holds provider keys)
-- `n8n-nodes-digital-garden` community node package: credentials (base URL + PAT); nodes — Get Content, AI Complete, Record Event, Drop File, Notify Inbox, Open Gate, Run Succeeded/Failed
-- n8n adapter: `start` → webhook POST; `resumeGate` → POST to stored `engineGateRef` (Wait-node resume URL captured at gate-open)
-- n8n deployment: first tenant of the Coolify/Dokploy VPS (with its own Postgres DB on a shared server) — or Cloud Run beside Hocuspocus; decide at promotion
-- Engines settings panel: registered adapters, health ping, admin-gated console deep links (`engine` + `engineRunId` + console base URL), default engine
-- Security: n8n console NEVER bare on the internet (its credential store holds the DG PAT + third-party keys)
+## Decisions locked (calibration 2026-07-14)
 
-**Open questions to harvest from Plan 1:**
-- Exact callback route shapes (mirror whatever `runs.ts` settled into)
-- Event granularity expectations for engines that can't batch like in-process code
-- Gate-summary payload shape the inbox UX actually wants (soak finding)
-- PAT scope model (per-definition? per-engine? global machine token?)
+1. **Hub-consistent — n8n workflows are compile targets, not documents.** An n8n workflow is still a ContentNode + `WorkflowPayload` tagged `engine: "n8n@1"`, authored in the SAME Trellis builder/canvas. On Save, the graph is **compiled to n8n workflow JSON and pushed via n8n's REST API** (like source→binary). n8n executes; events/gates/artifacts flow back through callback routes into the same run tables; runs surface in the same panel/inbox. n8n's own UI is admin-debug only. Builder gains an **"n8n Node" step type** exposing installed n8n integrations (Slack/Gmail/Sheets/…).
+2. **Deployment: small VPS (Dokploy/Coolify, ~$6–12/mo)** hosts n8n + its Postgres. Cloud Run stays for Hocuspocus FOR NOW. VPS wins once ≥2 always-on services exist (Plan 3 is that moment); it also pre-homes the deferred trigger-firing workers. **Hocuspocus migration is a documented SECOND-TENANT experiment** (after n8n soaks a few weeks on the box) — NOT part of Plan 3. Measured, not a leap.
+3. **Auth: one wide PAT per user** (GitHub-style Personal Access Token; copy `BrowserExtensionToken` — hashed, revocable, shown once). No scope-picker UI. Blast radius contained structurally: the token guard mounts ONLY on the workflow callback surface — it physically cannot read notes or hit content APIs even though it's "wide."
+4. **Licensing: confirmed clear.** Self-hosted, zero revenue, invite-only, a family member co-testing = personal use under n8n's SUL. **RED LINE (documented tripwire):** if the site ever charges money while n8n executes users' workflows → crosses into n8n's paid embed license. Exit is bounded (swap substrate via the four-verb adapter), not a rewrite. Community node package must be MIT for n8n's registry.
+
+## Sessions (full detail pending promotion; sketch-level here)
+
+- **S1 — PAT auth**: `ServiceToken` model (mirror BrowserExtensionToken), issue/revoke UI in settings, `requireServiceTokenAuth` middleware scoped to the callback surface.
+- **S2 — Callback route surface**: HTTP twins of `runs.ts` writers (`recordEvent`/`openGate`/`closeGate`/`attachArtifact`/`finishRun`) under `/api/workflows/callback/*`, PAT-authed; AI-proxy endpoint (`resolveFeatureRoute` behind the token — proxy-not-share does real work now: n8n never holds provider keys).
+- **S3 — Graph→n8n compiler + adapter**: compile `WorkflowGraph` → n8n workflow JSON (DG nodes → HTTP Request nodes hitting the callbacks; gate → DG Open Gate + n8n Wait; branch → n8n IF). Adapter `start` = trigger webhook; `resumeGate` = POST stored `engineGateRef` (Wait resume URL); push/update the compiled flow via n8n REST on Save.
+- **S4 — n8n Node step type in the builder**: palette entry listing installed n8n integrations; config maps to the target n8n node. Engine selector on the workflow (Trellis vs n8n) — `WorkflowPayload.engine`.
+- **S5 — VPS deploy + engines settings panel**: Dokploy/Coolify box, n8n + Postgres, reverse proxy + auth (n8n console NEVER bare — holds the DG PAT + third-party keys); settings panel with adapter registry, health ping, admin-gated console deep-link.
+- **S6 — parity + soak**: rebuild the job-application graph as an n8n-engine workflow; prove the same run/gate/artifact loop through n8n. Document the Hocuspocus-migration experiment as a followup.
+
+**Inherited from Plans 1–2 (the cheap part):** writer surface + idempotency, gate vocabulary + `engineGateRef` column, run panel, inbox notifications, the builder/canvas, the four-verb adapter contract. New work is auth + HTTP transport + compiler + one node type + the box.
 
 # Plan 4 — MIT engine spoke: Hatchet first, Temporal with cause (STUB)
 
