@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-13
 **Branch:** `feature/workflows-extension` (worktree, stacked on `feature/workflows-foundation` @ `fda5868`)
-**Status:** Planning — UI design aligned 2026-07-13; phases below, not yet built
+**Status:** Phase 0 ✅ COMPLETE (2026-07-13, gates green) · Phases 1–4 pending. UI design aligned 2026-07-13.
 **Depends on:** `feature/workflows-foundation` (WDK interpreter, the one dispatch door, runs API, `WorkflowsPanel`/`RunDetail`, `/embed/content/[id]` route). This plan **completes the "extension capture" edge** the foundation plan sketched as "Session 6" — the server auto-route path exists; the extension chrome and the chooser/supervise surfaces do not.
 
 ---
@@ -82,18 +82,18 @@ interface ExtensionDispatchResult { runId: string; status: WorkflowRunStatusValu
 
 ## Phases (rolling wave — each independently shippable behind extension presence)
 
-### Phase 0 — Seam + contracts (server, this branch)
+### Phase 0 — Seam + contracts (server, this branch) ✅ COMPLETE 2026-07-13
 The foundation the extension consumes. Build and freeze first.
-- [ ] Extract the URL-glob matcher (`globToRegExp` + pattern parsing) out of `dispatch.ts` into a shared server util so the list endpoint and `pickCaptureTarget` share one implementation.
-- [ ] `GET /integrations/browser-extension/workflows` (bearer) — enabled workflow content nodes → `ExtensionWorkflowListItem[]`; accepts `?pageUrl=` to compute `matchesPage`. Model on the session-authed `app/api/workflows/content/route.ts`.
-- [ ] Extend `POST /integrations/browser-extension/workflow-dispatch` — accept optional `workflowId`. Present → `storeCapturedPage` then `dispatchWorkflowFromContent(userId, workflowId, {pageUrl,pageTitle,captureNodeId})`; absent → existing `dispatchCaptureToUserWorkflow` auto-route. Extract page-storing so **both** paths persist the capture note.
-- [ ] `GET /integrations/browser-extension/workflows/runs?status=&limit=` (bearer) → `ExtensionRunListItem[]`.
-- [ ] `GET /integrations/browser-extension/workflows/runs/[id]` (bearer) → full `WorkflowRunDto` (for popup expand; optional consumer).
-- [ ] Extract `RunDetail` (+ `GateCard`, `RunTimeline`, `RunGraphSteps`, `StatusPill`) from `WorkflowsPanel.tsx` into an exported `RunDetail.tsx` — they are currently **private** functions, and mounting the whole panel drags in `DispatchMenu` + a `useContentStore.setSelectedContentId` coupling that is meaningless in embed context. `WorkflowsPanel` re-imports them; behavior unchanged.
-- [ ] **Workflow embed viewer**: add `if (contentType === "workflow")` to `app/embed/content/[id]/page.tsx` → new `EmbedWorkflowClient` inside `EmbedViewerShell` with two tabs — **Runs** (extracted `RunDetail`, opens `?run=`) and **Edit** (`<WorkflowBuilder selectedContentId={id} />` — it already takes `ExtensionContentViewerProps` and is the registered content viewer, so this tab is plug-and-play). Must be **width-fluid** from the first render (mobile-compat alignment).
-- [ ] ~~Verify embed API auth~~ **verified 2026-07-13**: `app/embed/layout.tsx` wraps `window.fetch` to inject the `x-embed-session` header and `validateSession` accepts it — client fetches to `/api/workflows/*` from inside the iframe authenticate despite the `/embed`-scoped cookie. No work needed; recorded so nobody re-litigates it.
+- [x] Extract the URL-glob matcher out of `dispatch.ts` → `extensions/workflows/graph/url-match.ts` (`parseUrlPatterns`, `globToRegExp`, `urlMatchesPatterns`, `readEntryTrigger`). Shared by the list endpoint and `pickCaptureTarget`.
+- [x] `GET /integrations/browser-extension/workflows` (bearer) — enabled workflow content nodes → `ExtensionWorkflowListItem[]`; `?pageUrl=` computes `matchesPage` (specific pattern only, not catch-all), matches sort first.
+- [x] Extend `POST /integrations/browser-extension/workflow-dispatch` — optional `workflowId`. Present → `dispatchCaptureToWorkflowContent` (new; stores page + `dispatchWorkflowFromContent`); absent → `dispatchCaptureToUserWorkflow` auto-route. Shared `buildCaptureRunData` makes **both** persist the capture note.
+- [x] `GET /integrations/browser-extension/workflows/runs?status=&limit=` (bearer) → `ExtensionRunListItem[]` (compact; `needsReview` pre-computed).
+- [x] `GET /integrations/browser-extension/workflows/runs/[id]` (bearer) → full `WorkflowRunDto`.
+- [x] Extract `RunDetail` (+ `GateCard`, `RunTimeline`, `RunGraphSteps`, `StatusPill`, `readError`) from `WorkflowsPanel.tsx` → exported `RunDetail.tsx`; `WorkflowsPanel` re-imports, behavior unchanged.
+- [x] **Workflow embed viewer**: `if (contentType === "workflow")` in `app/embed/content/[id]/page.tsx` → `EmbedWorkflowClient` in `EmbedViewerShell`, two tabs — **Runs** (`RunDetail`, `?run=` deep-link) and **Edit** (`WorkflowBuilder`). Width-fluid.
+- [x] ~~Verify embed API auth~~ **verified 2026-07-13**: `app/embed/layout.tsx` wraps `window.fetch` to inject `x-embed-session`; iframe fetches to `/api/workflows/*` authenticate despite the `/embed`-scoped cookie.
 
-**Gate:** `pnpm typecheck && pnpm lint && NODE_OPTIONS='--max-old-space-size=8192' pnpm build` green. Each bearer route curl'd with a trusted-install token returns the frozen shape. In-app browser check: opening a `workflow` content id at `/embed/content/{id}` renders the builder + runs, not the fallback.
+**Gate:** ✅ typecheck clean · lint 0 errors (151/175 warnings) · build compiled all 3 bearer routes + embed route. **Still owed** (needs a running dev server + trusted-install token — do at Phase 1 smoke): curl each bearer route; open a `workflow` id at `/embed/content/{id}` in a browser and confirm builder + runs render, not the fallback.
 
 ### Phase 1 — Initiate + immediate acknowledgement (extension)
 - [ ] Background: `list-workflows` handler (bearer GET `/workflows?pageUrl=`); `dispatch-workflow` handler — extract rendered **pageText** via content script, bearer POST, return `{runId}`.
