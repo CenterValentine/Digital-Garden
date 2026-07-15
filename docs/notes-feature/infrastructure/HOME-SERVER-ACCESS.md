@@ -4,6 +4,8 @@
 
 > **Scope of automated access:** Claude Code runs only when invoked and its shell is on the Mac. Once SSH-over-tunnel is configured on the Mac, it can run `ssh homeserver '<cmd>'` during a session. This is **on-demand diagnostics during our work, not continuous monitoring.** For continuous monitoring use Coolify's built-in health + Cloudflare's tunnel health alerts.
 
+**STATUS: LIVE 2026-07-15.** `ssh homeserver` connects (root, via `cloudflared access ssh`). Mac has cloudflared + key `~/.ssh/id_ed25519_homeserver`; box IP 96.60.13.195; hostname reports `chrome-x-debian`.
+
 ## One-time setup
 
 ### On the box (Debian)

@@ -13,7 +13,7 @@
 | Hardware | Repurposed i7 Chromebook |
 | OS | Debian 13 |
 | Disk | 400 GB |
-| RAM | **TBD** — fill in (`free -h`); constrains how many always-on services fit |
+| RAM | **16 GB** (`15Gi` total, ~13Gi available idle) — roomy; fits n8n + Postgres + Coolify with headroom for Hocuspocus + trigger workers |
 | Public IP | `96.60.13.195` (home connection) |
 | Inbound ports | **None open.** No port forwarding. All ingress is via the Cloudflare Tunnel only. |
 
@@ -52,7 +52,6 @@
 - [ ] **Literal hostname env** — set in n8n's Environment Variables tab (overrides the compose magic var): `N8N_HOST=n8n.davidvalentine.org`, `WEBHOOK_URL=https://n8n.davidvalentine.org/`, `N8N_EDITOR_BASE_URL=https://n8n.davidvalentine.org/`. Needed so n8n emits correct webhook URLs.
 - [ ] **Cloudflare Access** over `n8n.davidvalentine.org` (Zero Trust → Access → Applications → Self-hosted → allow owner + family-member emails) — gates the UI, whose credential store will hold the Digital Garden PAT + third-party keys. Plus an **Access service token** for app→n8n API calls (interactive Access can't answer programmatic requests).
 - [ ] **n8n API key** — Settings → n8n API → create. The Trellis compiler/adapter uses it to push workflows.
-- [ ] Record the box's **RAM** here.
 
 ## Planned moves
 
