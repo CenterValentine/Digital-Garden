@@ -13,6 +13,8 @@ export interface N8nPushMetadata {
   webhookPath?: string;
   credentialId?: string;
   credentialName?: string;
+  /** "native" = authored in n8n's editor; "compiled" = compiled from a Trellis graph. */
+  mode?: "native" | "compiled";
 }
 
 /** Extract the `.n8n` push metadata from a WorkflowPayload.metadata JSON value. */
