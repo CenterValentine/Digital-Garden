@@ -2,7 +2,7 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ · Plan 2 ✅ · **PR #103 OPEN** (feature/workflows-foundation → main) · **Plan 3 (n8n spoke) FULL — decisions locked 2026-07-14, ready to build** · Plan 4 (MIT engine) STUB
+**Status:** Plan 1 ✅ · Plan 2 ✅ · **PR #103 MERGED** to main (Plans 1+2) · **Plan 3 (n8n spoke) BUILDING on `feature/workflows-n8n` — S1 ✅ 2026-07-14** · Plan 4 (MIT engine) STUB
 Plan 3 key decisions: hub-consistent (n8n workflows are ContentNodes compiled→pushed to n8n, nothing lives in n8n; builder gains an "n8n Node" step); small Dokploy/Coolify VPS hosts n8n (Hocuspocus migration = later 2nd-tenant experiment); one wide PAT per user (guard scoped to callback surface); SUL fine for personal/invite-only use (red line = charging money while n8n runs user workflows).
 Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
 
@@ -362,7 +362,7 @@ interface WorkflowGraph {
 
 ## Sessions (full detail pending promotion; sketch-level here)
 
-- **S1 — PAT auth**: `ServiceToken` model (mirror BrowserExtensionToken), issue/revoke UI in settings, `requireServiceTokenAuth` middleware scoped to the callback surface.
+- **S1 — PAT auth** ✅ **built 2026-07-14** (typecheck/lint 151·0/build all green): `ServiceToken` model (mirror BrowserExtensionToken — sha256-hashed, `dgwf_` prefix, `scopes` default `["workflows:callback"]`, revocable) + additive migration `20260714120000_add_service_token`. Domain: `extensions/workflows/server/service-token.ts` (create/hash/validate/list/revoke) + guard `service-token-http.ts` (`requireServiceTokenAuth` — the SOLE intended importer of `validateServiceToken` from a request; mounting it only on `/api/workflows/callback/*` in S2 is what contains the wide token's blast radius). Management API (session-authed): `GET/POST /api/workflows/tokens`, `DELETE /api/workflows/tokens/[id]`. UI: `WorkflowsSettingsPage` registered as the workflows extension `settingsDialog` → shows at `/settings/extensions/workflows` (issue with show-once secret + copy, list with prefix/last-used, revoke). Client-safe DTOs + scope constant in `shared.ts`. **Not yet:** browser smoke; not committed. Modeled as an issue/revoke *list* (standard PAT rotation) — "one wide PAT" is about scope breadth, not count.
 - **S2 — Callback route surface**: HTTP twins of `runs.ts` writers (`recordEvent`/`openGate`/`closeGate`/`attachArtifact`/`finishRun`) under `/api/workflows/callback/*`, PAT-authed; AI-proxy endpoint (`resolveFeatureRoute` behind the token — proxy-not-share does real work now: n8n never holds provider keys).
 - **S3 — Graph→n8n compiler + adapter**: compile `WorkflowGraph` → n8n workflow JSON (DG nodes → HTTP Request nodes hitting the callbacks; gate → DG Open Gate + n8n Wait; branch → n8n IF). Adapter `start` = trigger webhook; `resumeGate` = POST stored `engineGateRef` (Wait resume URL); push/update the compiled flow via n8n REST on Save.
 - **S4 — n8n Node step type in the builder**: palette entry listing installed n8n integrations; config maps to the target n8n node. Engine selector on the workflow (Trellis vs n8n) — `WorkflowPayload.engine`.
