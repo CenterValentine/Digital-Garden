@@ -30,11 +30,15 @@ export interface N8nClientConfig {
 const REQUEST_TIMEOUT_MS = 20_000;
 
 export function readN8nConfig(): N8nClientConfig | null {
-  const baseUrl = process.env.N8N_BASE_URL?.trim();
+  const rawBaseUrl = process.env.N8N_BASE_URL?.trim();
   const apiKey = process.env.N8N_API_KEY?.trim();
-  if (!baseUrl || !apiKey) return null;
+  if (!rawBaseUrl || !apiKey) return null;
+  // Tolerate a scheme-less host (e.g. "n8n.notetrellis.com") — default https.
+  const withScheme = /^https?:\/\//i.test(rawBaseUrl)
+    ? rawBaseUrl
+    : `https://${rawBaseUrl}`;
   return {
-    baseUrl: baseUrl.replace(/\/+$/, ""),
+    baseUrl: withScheme.replace(/\/+$/, ""),
     apiKey,
     cfAccessClientId: process.env.CF_ACCESS_CLIENT_ID?.trim() || undefined,
     cfAccessClientSecret: process.env.CF_ACCESS_CLIENT_SECRET?.trim() || undefined,
