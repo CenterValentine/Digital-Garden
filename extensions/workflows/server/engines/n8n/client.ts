@@ -194,3 +194,71 @@ export async function getN8nExecution(
     throw error;
   }
 }
+
+export interface N8nCredentialSummary {
+  id: string;
+  name: string;
+}
+
+/**
+ * Create an httpHeaderAuth credential holding the DG callback bearer token.
+ * n8n stores credential `data` encrypted; the compiled HTTP Request nodes
+ * reference this credential by id so the token never sits in plain workflow
+ * parameters.
+ */
+export async function createN8nHeaderAuthCredential(
+  name: string,
+  bearerToken: string
+): Promise<N8nCredentialSummary> {
+  const result = await n8nFetch<
+    N8nCredentialSummary | { data: N8nCredentialSummary }
+  >("/credentials", {
+    method: "POST",
+    body: {
+      name,
+      type: "httpHeaderAuth",
+      data: { name: "Authorization", value: `Bearer ${bearerToken}` },
+    },
+  });
+  return unwrap(result);
+}
+
+export async function deleteN8nCredential(credentialId: string): Promise<void> {
+  try {
+    await n8nFetch(`/credentials/${encodeURIComponent(credentialId)}`, {
+      method: "DELETE",
+    });
+  } catch (error) {
+    if (error instanceof N8nRequestError && error.status === 404) return;
+    throw error;
+  }
+}
+
+/** The n8n instance origin (for building webhook URLs), or null if unconfigured. */
+export function n8nBaseUrl(): string | null {
+  return readN8nConfig()?.baseUrl ?? null;
+}
+
+/**
+ * POST to an arbitrary n8n URL (a webhook trigger or a Wait-node resume URL,
+ * not an /api/v1 path). These sit behind Cloudflare Access, so they carry the
+ * CF service-token headers — but NOT the n8n API key (webhooks don't use it).
+ */
+export async function postToN8nUrl(
+  url: string,
+  body: unknown
+): Promise<{ status: number; text: string }> {
+  const config = readN8nConfig();
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (config?.cfAccessClientId && config?.cfAccessClientSecret) {
+    headers["CF-Access-Client-Id"] = config.cfAccessClientId;
+    headers["CF-Access-Client-Secret"] = config.cfAccessClientSecret;
+  }
+  const response = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body ?? {}),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+  return { status: response.status, text: await response.text() };
+}
