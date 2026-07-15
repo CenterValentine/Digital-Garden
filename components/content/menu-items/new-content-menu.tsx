@@ -81,6 +81,7 @@ export interface NewContentCallbacks {
   onCreateData?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
+  onCreateN8nWorkflow?: (parentId: string | null) => void | Promise<void>;
   // AI category — initial entry is image generation; future entries
   // (audio, video, structured data) will share the same submenu.
   onCreateAiImage?: (parentId: string | null) => void | Promise<void>;
@@ -374,6 +375,19 @@ export function getNewContentMenuItems(
         onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
         disabled: !callbacks.onCreateWorkflow,
       },
+      // n8n Flow only where the (heavier) create callback is wired — the header
+      // + menu. The file-tree context menu routes through the content-POST path
+      // and gets it once that path learns "n8n-workflow".
+      ...(callbacks.onCreateN8nWorkflow
+        ? [
+            {
+              id: "new-workflow-n8n",
+              label: "n8n Flow",
+              icon: <GitBranch className="h-4 w-4" />,
+              onClick: () => callbacks.onCreateN8nWorkflow?.(normalizedParentId),
+            },
+          ]
+        : []),
     ],
   });
 

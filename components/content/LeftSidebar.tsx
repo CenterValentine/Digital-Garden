@@ -47,7 +47,7 @@ export function LeftSidebar() {
   const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
-    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null>(null);
@@ -156,6 +156,10 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "workflow", timestamp: Date.now() });
   }, []);
 
+  const handleCreateN8nWorkflow = useCallback(() => {
+    setCreateTrigger({ type: "n8n-workflow", timestamp: Date.now() });
+  }, []);
+
   // AI image generation — opens the modal dialog. parentId stays
   // `null` (root) when triggered from the header; the file-tree
   // context-menu wiring passes a folder id explicitly.
@@ -260,6 +264,7 @@ export function LeftSidebar() {
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
           onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
+          onCreateN8nWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateN8nWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}
           onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
           isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}
