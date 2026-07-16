@@ -15,6 +15,8 @@ export type RightSidebarTab =
   | "chat"
   | "properties"
   | "publish"
+  | "studio"
+  | "context"
   | "extension";
 
 export const DEFAULT_RIGHT_SIDEBAR_TAB: RightSidebarTab = "backlinks";

@@ -19,6 +19,12 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition, ContentType } from "@/lib/domain/tools";
 import { getExtensionManifestForView } from "@/lib/extensions";
+import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  STUDIO_EXTENSION_ID,
+  STUDIO_TAB_KEY,
+  STUDIO_CONTEXT_TAB_KEY,
+} from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
@@ -33,6 +39,10 @@ const TAB_SVG_PATHS: Record<string, string> = {
     "M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z",
   publish:
     "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9",
+  studio:
+    "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
+  context:
+    "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
 };
 
 /** Tab titles keyed by tabKey */
@@ -44,6 +54,8 @@ const TAB_TITLES: Record<string, string> = {
   properties: "Block Properties",
   extension: "Extension",
   publish: "Publish",
+  studio: "Studio",
+  context: "Context",
 };
 
 interface RightSidebarHeaderProps {
@@ -71,11 +83,19 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
       } as ToolDefinition)
     : null;
 
-  // Get visible tabs from registry, filtered by current content type
+  const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+
+  // Get visible tabs from registry, filtered by current content type.
+  // Studio-owned tabs disappear when the extension is disabled (registry-
+  // filter rule — same mechanism ContentToolbar uses for speed-reader).
   const registryTabs = queryTools({
     surface: "sidebar-tab",
     contentType: (selectedContentType as ContentType) ?? undefined,
-  });
+  }).filter(
+    (tool) =>
+      studioEnabled ||
+      (tool.tabKey !== STUDIO_TAB_KEY && tool.tabKey !== STUDIO_CONTEXT_TAB_KEY)
+  );
 
   const tabs = [...registryTabs];
   if (extensionTool) {

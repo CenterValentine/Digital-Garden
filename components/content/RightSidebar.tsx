@@ -17,6 +17,12 @@ import { queryTools } from "@/lib/domain/tools";
 import type { ContentType } from "@/lib/domain/tools";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { getExtensionManifestForView } from "@/lib/extensions";
+import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  STUDIO_EXTENSION_ID,
+  STUDIO_TAB_KEY,
+  STUDIO_CONTEXT_TAB_KEY,
+} from "@/extensions/studio/manifest";
 import {
   resolveRightSidebarTab,
   useRightSidebarStateStore,
@@ -44,13 +50,20 @@ export function RightSidebar() {
   );
   const setActiveTab = useRightSidebarStateStore((state) => state.setActiveTab);
 
+  const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+
   const availableTabs = useMemo(() => {
     const tabs = queryTools({
       surface: "sidebar-tab",
       contentType: (selectedContentType as ContentType) ?? undefined,
     })
       .map((tool) => tool.tabKey)
-      .filter(Boolean) as RightSidebarTab[];
+      .filter(Boolean)
+      .filter(
+        (tabKey) =>
+          studioEnabled ||
+          (tabKey !== STUDIO_TAB_KEY && tabKey !== STUDIO_CONTEXT_TAB_KEY)
+      ) as RightSidebarTab[];
 
     // Properties tab is available when a block is selected (injected by RightSidebarHeader)
     if (selectedBlockId && !tabs.includes("properties")) {
@@ -58,7 +71,7 @@ export function RightSidebar() {
     }
 
     return tabs;
-  }, [selectedContentType, selectedBlockId]);
+  }, [selectedContentType, selectedBlockId, studioEnabled]);
 
   // The saved tab is sacred: it ONLY changes via an explicit user action
   // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,

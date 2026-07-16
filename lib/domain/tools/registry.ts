@@ -202,6 +202,27 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 50,
     tabKey: "publish",
   },
+  // Studio extension tabs — filtered out in the sidebar when the extension is
+  // disabled (see RightSidebar/RightSidebarHeader), matching the registry-
+  // filter rule for extension-owned surfaces.
+  {
+    id: "studio-tab",
+    label: "Studio",
+    iconName: "Sparkles",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["folder"],
+    order: 60,
+    tabKey: "studio",
+  },
+  {
+    id: "context-tab",
+    label: "Context",
+    iconName: "FileText",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["folder", "note", "file", "html", "code", "external"],
+    order: 70,
+    tabKey: "context",
+  },
 ];
 
 /**
