@@ -13,6 +13,7 @@ import {
   n8nBaseUrl,
   setN8nWorkflowActive,
 } from "./client";
+import { ensureN8nErrorHandler } from "./error-handler";
 import { N8N_ADAPTER_ENGINE, N8N_PAYLOAD_ENGINE } from "./meta";
 import { buildSeedWorkflow } from "./seed";
 
@@ -53,12 +54,26 @@ export async function createNativeN8nFlow(
     minted.token
   );
 
+  // Ensure the per-user DG Error Handler so a crash reports back (best-effort;
+  // a flow can exist without it, just won't auto-fail its run on error).
+  let errorWorkflowId: string | undefined;
+  try {
+    errorWorkflowId = (await ensureN8nErrorHandler(ownerId)).workflowId;
+  } catch (error) {
+    logger.warn({
+      layer: "route",
+      event: "workflows_n8n:ensure_error_handler_failed",
+      summary: error instanceof Error ? error.message : String(error),
+    });
+  }
+
   const webhookPath = randomUUID();
   const seed = buildSeedWorkflow({
     workflowName: title,
     callbackBaseUrl,
     webhookPath,
     credential: { id: cred.id, name: cred.name },
+    errorWorkflowId,
   });
   const wf = await createN8nWorkflow(seed);
   try {
