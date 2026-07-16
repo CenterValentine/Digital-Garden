@@ -8,6 +8,7 @@ import { Button } from "@/components/client/ui/button";
 import { Input } from "@/components/client/ui/input";
 import { SettingSection } from "@/components/settings/ui";
 import type { ServiceTokenDto } from "@/extensions/workflows/shared";
+import { WorkflowErrorHandlingSection } from "./WorkflowErrorHandlingSection";
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -278,6 +279,8 @@ export default function WorkflowsSettingsPage() {
           </p>
         )}
       </SettingSection>
+
+      <WorkflowErrorHandlingSection />
     </div>
   );
 }

@@ -173,3 +173,19 @@ export async function ensureN8nErrorHandler(
     created: true,
   };
 }
+
+/** Read the stored DG Error Handler (no create), for the settings status view. */
+export async function getStoredN8nErrorHandler(
+  ownerId: string
+): Promise<{ workflowId: string; editorUrl: string } | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: ownerId },
+    select: { settings: true },
+  });
+  const stored = readStoredErrorHandler(user?.settings);
+  if (!stored.workflowId) return null;
+  return {
+    workflowId: stored.workflowId,
+    editorUrl: `${n8nBaseUrl()}/workflow/${stored.workflowId}`,
+  };
+}
