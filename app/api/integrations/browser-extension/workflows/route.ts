@@ -12,6 +12,18 @@ import { handleRouteError } from "@/extensions/workflows/server/http";
 const ROUTE_PATH = "/api/integrations/browser-extension/workflows";
 
 /**
+ * Payload engines are versioned refs ("wdk-interpreter@1", "n8n@1"); the
+ * extension DTO promises the bare FAMILY ("wdk" | "n8n" | …) so chips stay
+ * stable across engine version bumps.
+ */
+function engineFamily(engine: string | null | undefined): string | null {
+  if (!engine) return null;
+  if (engine.startsWith("n8n")) return "n8n";
+  if (engine.startsWith("wdk")) return "wdk";
+  return engine.split("@")[0];
+}
+
+/**
  * Extension chooser list: the user's workflow content nodes with entry-trigger
  * info. `?pageUrl=` computes `matchesPage` server-side (only a SPECIFIC
  * page-capture pattern match counts — a blank catch-all matching everything
@@ -54,10 +66,10 @@ export async function GET(request: NextRequest) {
           id: node.id,
           title: node.title,
           enabled: node.workflowPayload?.enabled ?? false,
-          // Engine the workflow runs on ("wdk" = Trellis interpreter, "n8n",
-          // etc.). Lets the chooser label engine + explain the "not pushed to
-          // n8n yet" case; dispatch routing itself stays server-side.
-          engine: node.workflowPayload?.engine ?? null,
+          // Engine FAMILY ("wdk" = Trellis interpreter, "n8n", …). Lets the
+          // chooser label engine + explain the "not pushed to n8n yet" case;
+          // dispatch routing itself stays server-side.
+          engine: engineFamily(node.workflowPayload?.engine),
           triggerType: trigger.triggerType,
           urlPattern: trigger.urlPattern,
           matchesPage,
