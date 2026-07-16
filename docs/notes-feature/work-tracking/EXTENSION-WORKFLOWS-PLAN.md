@@ -97,12 +97,12 @@ The foundation the extension consumes. Build and freeze first.
 
 **Gate:** ✅ typecheck clean · lint 0 errors (151/175 warnings) · build compiled all 3 bearer routes + embed route. **Still owed** (needs a running dev server + trusted-install token — do at Phase 1 smoke): curl each bearer route; open a `workflow` id at `/embed/content/{id}` in a browser and confirm builder + runs render, not the fallback.
 
-### Phase 1 — Initiate + immediate acknowledgement (extension)
-- [ ] Background: `list-workflows` handler (bearer GET `/workflows?pageUrl=`); `dispatch-workflow` handler — extract rendered **pageText** via content script, bearer POST, return `{runId}`.
-- [ ] Popup: **"Run Workflow ▾" chooser** section — fetch workflows, list sorted with `matchesPage` first ("matches this page" hint), click a workflow → dispatch → inline "Dispatched — running…" state.
-- [ ] Overlay: **dispatch toast/pill** — mounts on dispatch, polls run status through the background, live-updates running → needs-review → done/failed, `[View]` → Phase 3 deep panel.
+### Phase 1 — Initiate + immediate acknowledgement (extension) ✅ CODE COMPLETE 2026-07-13 (smoke pending)
+- [x] Background: `list-workflows` (bearer GET `/workflows?pageUrl=`); `dispatch-workflow` — extracts rendered **pageText** via `dg-extract-page-text` content-script message (100k cap, degrades to URL-only on restricted pages), bearer POST with `workflowId`, returns `{runId}`, then best-effort mounts the pill; `get-workflow-run` poll target.
+- [x] Popup: **"Run Workflow ▾" chooser** — engine chip (Trellis / n8n), `matchesPage` rows first with "matches page" chip, disabled rows greyed; dispatch feedback via the existing status row.
+- [x] Overlay: **dispatch status pill** (standalone, bottom-right) — polls through the background every 3s (10-min cap), queued→running→needs-review→done/failed with engine chip for non-wdk; succeeded lingers 6s, failed stays until dismissed. `[View]` deliberately deferred to Phase 3.
 
-**Gate:** From a real third-party page, pick a workflow → a run appears in the app's runs list with non-empty captured `pageText`; the toast tracks it to a terminal state. `pnpm extension:build` + reload reminder in `chrome://extensions`.
+**Gate:** `pnpm extension:build` ✅ (72–83ms, dist verified). **Smoke owed (USER, needs reload in `chrome://extensions` + dev server):** from a real page, pick a workflow → run appears in the app with non-empty `pageText`; pill tracks to terminal. Also settle P0's owed embed check (`/embed/content/{workflowId}` renders builder+runs).
 
 ### Phase 2 — Ambient status (background + popup)
 - [ ] Background: `dg-workflow-poll` alarm (~60s baseline; tighter on-demand cadence while a dispatch from this browser is active) → bearer runs list → compute most-urgent state → `setBadgeText`/`setBadgeBackgroundColor`; cache runs in `chrome.storage`.
