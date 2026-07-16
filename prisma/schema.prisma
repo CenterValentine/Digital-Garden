@@ -2272,10 +2272,20 @@ model AgenticMetadata {
   sectionsMeta      Json        @default("{}")
   // Staleness: canonical hash of source content at generation time
   sourceContentHash String?     @db.VarChar(64)
+  // Dirty bit: set on save/move/delete for the node + its ancestor chain,
+  // cleared when the refresh engine regenerates (or damps) the node. Makes
+  // "what needs work" an indexed query instead of a per-node hash scan.
+  contextDirty      Boolean     @default(false)
+  // Output hash of the AI-owned sections (summary+structure). Cascade
+  // damping: folders hash children's summaryHash, so an edit that doesn't
+  // change a child's summary never propagates upward.
+  summaryHash       String?     @db.VarChar(64)
   model             String?     @db.VarChar(100)
   generatedAt       DateTime?   @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
   node              ContentNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([contextDirty])
 }
 
 // Folder Studio: per-folder source selection for grounded chat (Phase 3).

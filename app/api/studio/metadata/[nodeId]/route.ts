@@ -14,13 +14,27 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { logger, withRouteTrace } from "@/lib/core/logger";
+import { getUserSettings } from "@/lib/features/settings";
+import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import {
   getMetadataForNode,
   resolveRoleStrategyProposal,
   saveDirectives,
 } from "@/extensions/studio/server/metadata";
+import { refreshScope } from "@/extensions/studio/server/context-refresh";
+import { getStudioSettings } from "@/extensions/studio/settings";
+
+/**
+ * On-access auto-context contract (V1): opening the Context tab IS the
+ * "pattern trying to execute". Serve the current view immediately
+ * (stale-while-revalidate), schedule the refresh engine behind the response,
+ * and tell the client which of the four states it's in so the unconfigured
+ * banner can fire exactly when an attempt actually happened.
+ */
+export type AiContextStatus = "ok" | "off" | "unconfigured" | "refreshing";
 
 const ROUTE_PATH = "/api/studio/metadata/[nodeId]";
 
@@ -44,7 +58,25 @@ export async function GET(
           { status: 404 }
         );
       }
-      return NextResponse.json({ success: true, data: view });
+
+      let aiContextStatus: AiContextStatus = "ok";
+      if (!view.exists || view.stale) {
+        const settings = getStudioSettings(
+          await getUserSettings(session.user.id)
+        );
+        if (settings.autoContextMode === "off") {
+          aiContextStatus = "off";
+        } else if (
+          !(await resolvePrimaryRoute(session.user.id, "studio-metadata"))
+        ) {
+          aiContextStatus = "unconfigured";
+        } else {
+          aiContextStatus = "refreshing";
+          after(() => refreshScope(session.user.id, nodeId));
+        }
+      }
+
+      return NextResponse.json({ success: true, data: view, aiContextStatus });
     } catch (error) {
       return handleError(error, "get");
     }

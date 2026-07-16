@@ -307,6 +307,24 @@ const notificationsSettingsSchema = z
   })
   .optional();
 
+// Folder Studio. autoContextMode gates the AI-context refresh engine:
+// "off" = manual Generate only; "on-access" = stale-while-revalidate when a
+// context-consuming surface is opened; "on-access-sweep" adds the nightly
+// cron drain. Artifact fields are user DEFAULTS — per-run choices in the
+// Studio tool tiles override them. Model routing is NOT here (Feature
+// Routing owns it); normalization lives in extensions/studio/settings.ts.
+const studioSettingsSchema = z
+  .object({
+    autoContextMode: z
+      .enum(["off", "on-access", "on-access-sweep"])
+      .optional(),
+    reportDefaultVariant: z.string().min(1).max(60).optional(),
+    quizQuestionCount: z.number().int().min(3).max(25).optional(),
+    audioOverviewLength: z.enum(["brief", "standard"]).optional(),
+    slideCount: z.number().int().min(4).max(20).optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -322,6 +340,7 @@ export const userSettingsSchema = z.object({
   periodicNotes: periodicNotesSettingsSchema,
   flashcards: flashcardsSettingsSchema,
   notifications: notificationsSettingsSchema,
+  studio: studioSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -598,5 +617,12 @@ export const DEFAULT_SETTINGS: UserSettings = {
   notifications: {
     kinds: {},
     aiNotificationsEnabled: true,
+  },
+  studio: {
+    autoContextMode: "on-access",
+    reportDefaultVariant: "study-guide",
+    quizQuestionCount: 8,
+    audioOverviewLength: "standard",
+    slideCount: 12,
   },
 };

@@ -149,23 +149,39 @@ async function loadOwnedNode(userId: string, nodeId: string) {
   });
 }
 
-/**
- * Canonical hash of the generation inputs, used for staleness. Leaves hash
- * their own identity signal; folders hash their DIRECT children (the roll-up
- * unit — children roll up one level by design, parents flow down only as
- * prompt input).
- */
-async function computeSourceHash(node: {
+/** Minimal node shape the hash/generation helpers need. */
+export interface MetadataNodeShape {
   id: string;
   contentType: string;
   bodyHash: string | null;
   updatedAt: Date;
   title: string;
-}): Promise<string> {
+}
+
+/**
+ * Canonical hash of the generation inputs, used for staleness. Leaves hash
+ * their own identity signal; folders hash their DIRECT children (the roll-up
+ * unit — children roll up one level by design, parents flow down only as
+ * prompt input).
+ *
+ * Folders hash children's OUTPUT (summaryHash), not their input signals:
+ * this is the cascade damping cut. A child edit that doesn't change the
+ * child's summary leaves the folder's computed hash unchanged, so the folder
+ * never looks stale and the invalidation wave stops at the child. Uncovered
+ * children (no metadata yet) fall back to input signals so they still make
+ * the folder stale until first covered.
+ */
+export async function computeSourceHash(node: MetadataNodeShape): Promise<string> {
   if (node.contentType === "folder") {
     const children = await prisma.contentNode.findMany({
       where: { parentId: node.id, deletedAt: null },
-      select: { id: true, title: true, bodyHash: true, updatedAt: true },
+      select: {
+        id: true,
+        title: true,
+        bodyHash: true,
+        updatedAt: true,
+        agenticMetadata: { select: { summaryHash: true } },
+      },
       orderBy: { id: "asc" },
     });
     return stableHash({
@@ -174,11 +190,16 @@ async function computeSourceHash(node: {
       children: children.map((c) => ({
         id: c.id,
         title: c.title,
-        bodyHash: c.bodyHash,
-        updatedAt: c.updatedAt.toISOString(),
+        signal:
+          c.agenticMetadata?.summaryHash ??
+          c.bodyHash ??
+          c.updatedAt.toISOString(),
       })),
     });
   }
+  // Leaf hash keeps updatedAt as a catch-all for non-note payload changes
+  // (file replaced, external URL edited). A cosmetic touch can false-stale a
+  // leaf, costing one packed regen slot — damping stops it from cascading.
   return stableHash({
     id: node.id,
     title: node.title,
@@ -249,6 +270,8 @@ export async function saveDirectives(
     sourceContentHash: record?.sourceContentHash ?? null,
     model: record?.model ?? null,
     generatedAt: record?.generatedAt ?? null,
+    summaryHash: record?.summaryHash ?? null,
+    contextDirty: record?.contextDirty ?? false,
   });
   return getMetadataForNode(userId, nodeId);
 }
@@ -291,6 +314,8 @@ export async function resolveRoleStrategyProposal(
     sourceContentHash: record.sourceContentHash,
     model: record.model,
     generatedAt: record.generatedAt,
+    summaryHash: record.summaryHash,
+    contextDirty: record.contextDirty,
   });
   return getMetadataForNode(userId, nodeId);
 }
@@ -413,6 +438,8 @@ export async function generateMetadataForNode(
     sourceContentHash,
     model: route.modelId,
     generatedAt: now,
+    summaryHash: hashAiSections(sections.summary, sections.structure),
+    contextDirty: false,
   });
 
   logger.info({
@@ -425,7 +452,7 @@ export async function generateMetadataForNode(
   return getMetadataForNode(userId, nodeId);
 }
 
-async function assembleSourceText(node: {
+export async function assembleSourceText(node: {
   id: string;
   title: string;
   contentType: string;
@@ -471,30 +498,85 @@ async function upsertRecord(
     sourceContentHash: string | null;
     model: string | null;
     generatedAt: Date | null;
+    summaryHash: string | null;
+    contextDirty: boolean;
   }
 ): Promise<void> {
   const tiptapJson = writeSections(sections) as unknown as Prisma.InputJsonValue;
   const sectionsMeta = meta as unknown as Prisma.InputJsonValue;
   const derivedText = buildDerivedText(sections);
 
+  const data = {
+    tiptapJson,
+    sectionsMeta,
+    derivedText,
+    sourceContentHash: fields.sourceContentHash,
+    model: fields.model,
+    generatedAt: fields.generatedAt,
+    summaryHash: fields.summaryHash,
+    contextDirty: fields.contextDirty,
+  };
+
   await prisma.agenticMetadata.upsert({
     where: { nodeId },
-    create: {
-      nodeId,
-      tiptapJson,
-      sectionsMeta,
-      derivedText,
-      sourceContentHash: fields.sourceContentHash,
-      model: fields.model,
-      generatedAt: fields.generatedAt,
-    },
-    update: {
-      tiptapJson,
-      sectionsMeta,
-      derivedText,
-      sourceContentHash: fields.sourceContentHash,
-      model: fields.model,
-      generatedAt: fields.generatedAt,
-    },
+    create: { nodeId, ...data },
+    update: data,
   });
+}
+
+/** Output hash of the AI-owned sections — the damping signal. */
+function hashAiSections(summary: string, structure: string): string {
+  return stableHash({ summary, structure });
+}
+
+/**
+ * Write freshly generated AI-owned sections (summary/structure) for a node,
+ * with output-hash damping. Role-strategy and directives are preserved
+ * untouched — the auto-refresh path never writes proposals; only explicit
+ * generation does.
+ *
+ * Returns `changed: false` when the new output matches the stored
+ * summaryHash: the staleness hash is refreshed and the dirty bit cleared,
+ * but sections aren't rewritten — and since ancestors hash this node's
+ * summaryHash, the cascade stops here.
+ */
+export async function applyGeneratedSections(
+  node: MetadataNodeShape,
+  generated: { summary: string; structure: string },
+  modelId: string
+): Promise<{ changed: boolean }> {
+  const record = await prisma.agenticMetadata.findUnique({
+    where: { nodeId: node.id },
+  });
+  const newSummaryHash = hashAiSections(generated.summary, generated.structure);
+  const sourceContentHash = await computeSourceHash(node);
+
+  if (record && record.summaryHash === newSummaryHash) {
+    await prisma.agenticMetadata.update({
+      where: { nodeId: node.id },
+      data: { sourceContentHash, contextDirty: false },
+    });
+    return { changed: false };
+  }
+
+  const sections = readSections(record?.tiptapJson ?? null);
+  const meta: SectionsMeta = {
+    ...defaultMeta(),
+    ...((record?.sectionsMeta as SectionsMeta) ?? {}),
+  };
+  const now = new Date();
+  const stamp = { generatedAt: now.toISOString(), model: modelId };
+  sections.summary = generated.summary;
+  sections.structure = generated.structure;
+  meta.summary = { owner: "ai", ...stamp };
+  meta.structure = { owner: "ai", ...stamp };
+
+  await upsertRecord(node.id, sections, meta, {
+    sourceContentHash,
+    model: modelId,
+    generatedAt: now,
+    summaryHash: newSummaryHash,
+    contextDirty: false,
+  });
+  return { changed: true };
 }

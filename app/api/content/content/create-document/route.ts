@@ -8,6 +8,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { generateUniqueSlug } from "@/lib/domain/content";
@@ -366,6 +368,9 @@ export async function POST(request: NextRequest) {
           throw new Error("Failed to create content after retries");
         },
       );
+
+      // Folder Studio auto-context: a new child changes the parent's roll-up.
+      after(() => markContextDirty([parentId || null]));
 
       return NextResponse.json(
         {

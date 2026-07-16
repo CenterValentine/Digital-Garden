@@ -7,6 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
@@ -230,6 +232,13 @@ export async function POST(request: NextRequest) {
             }
           },
         );
+      }
+
+      // Folder Studio auto-context: a cross-parent move changes BOTH
+      // parents' roll-up inputs. Same-parent reorders don't — child order
+      // isn't part of the folder source hash.
+      if (finalParentId !== content.parentId) {
+        after(() => markContextDirty([content.parentId, finalParentId]));
       }
 
       return NextResponse.json({

@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
@@ -881,6 +883,10 @@ export async function POST(request: NextRequest) {
         throw new Error("Created external content could not be reloaded");
       }
     }
+
+    // Folder Studio auto-context: a new child changes the parent's roll-up
+    // inputs. Root-level creates have no parent chain to flag (no-op).
+    after(() => markContextDirty([parentId || null]));
 
     // Format response
     const response: ContentDetailResponse = {

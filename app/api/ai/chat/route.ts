@@ -108,7 +108,9 @@ import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
+import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -471,6 +473,13 @@ export async function POST(request: Request) {
           );
           if (folderGrounding) {
             mentionedContext += `\n\n${folderGrounding}`;
+            // Auto-context (stale-while-revalidate): THIS message used the
+            // context as-is; drain any dirty/uncovered Context in the folder
+            // behind the response so the next message is grounded fresher.
+            // Self-gates on the user's autoContextMode.
+            after(() =>
+              refreshContextOnAccess(session.user.id, contentId)
+            );
           }
         } catch (groundingError) {
           logger.warn({
