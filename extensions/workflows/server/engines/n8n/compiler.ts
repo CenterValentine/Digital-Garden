@@ -218,7 +218,9 @@ function buildGateNodes(
     name: node.id,
     ...N8N_TYPES.wait,
     position: nextPosition(),
-    parameters: { resume: "webhook" },
+    // httpMethod MUST be POST — the Wait resume webhook defaults to GET, and
+    // DG's approve path POSTs the payload (method mismatch = rejected resume).
+    parameters: { resume: "webhook", httpMethod: "POST" },
     webhookId: randomUUID(),
   };
   return { open, wait };

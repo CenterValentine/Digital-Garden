@@ -165,7 +165,11 @@ function buildHelperTemplates(opts: SeedOptions): N8nNode[] {
     typeVersion: 1.1,
     position: [260, 640],
     disabled: true,
-    parameters: { resume: "webhook" },
+    // httpMethod MUST be POST: the Wait node registers its resume webhook for
+    // GET by default, but DG's approve path (adapter.resumeGate) POSTs the
+    // approval payload — a GET-only registration 404s ("no waiting webhook
+    // with a matching path/method") and the approve surfaces as a 502.
+    parameters: { resume: "webhook", httpMethod: "POST" },
     webhookId: randomUUID(),
   };
   const event: N8nNode = {
