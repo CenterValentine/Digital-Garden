@@ -13,6 +13,8 @@
  */
 
 import { prisma } from "@/lib/database/client";
+import { getUserSettings } from "@/lib/features/settings";
+import { getStudioSettings } from "../settings";
 import { getGuidanceText } from "./metadata";
 
 interface ToolPromptTemplate {
@@ -85,7 +87,7 @@ const SINGLE_TOOL_TEMPLATES: Record<string, ToolPromptTemplate> = {
   // ── Practice shelf (Phase 7) — graded SESSIONS, not files ──────────────
   quiz: {
     title: "",
-    task: "Run an interactive multiple-choice quiz on the folder sources. One question at a time: state the question, offer options A-D (one clearly correct, distractors plausible), and STOP — wait for the user's answer. When they answer, grade it, explain why in 1-2 sentences citing the source title, then ask the next question. Default to 8 questions spanning the material from fundamental to subtle; adjust if the user asks. Track the running score silently.",
+    task: "Run an interactive multiple-choice quiz on the folder sources. One question at a time: state the question, offer options A-D (one clearly correct, distractors plausible), and STOP — wait for the user's answer. When they answer, grade it, explain why in 1-2 sentences citing the source title, then ask the next question. Default to {quizCount} questions spanning the material from fundamental to subtle; adjust if the user asks. Track the running score silently.",
     delivery:
       "This is a live session — do NOT create a note. After the final question, give the score, a breakdown of strong vs weak areas, and the 2-3 source sections worth rereading. Begin with question 1 immediately.",
   },
@@ -109,10 +111,17 @@ const SINGLE_TOOL_TEMPLATES: Record<string, ToolPromptTemplate> = {
 
 function templateFor(
   toolId: string,
-  variantId: string | undefined
+  variantId: string | undefined,
+  reportDefaultVariant: string
 ): ToolPromptTemplate | null {
   if (toolId === "report") {
-    return REPORT_VARIANTS[variantId ?? "study-guide"] ?? null;
+    // Settings-provided default, guarded: an unknown stored variant falls
+    // back to study-guide rather than failing the compose.
+    return (
+      REPORT_VARIANTS[variantId ?? reportDefaultVariant] ??
+      REPORT_VARIANTS["study-guide"] ??
+      null
+    );
   }
   if (toolId === "mind-map") {
     return MAP_FRAMES[variantId ?? "concept"] ?? null;
@@ -141,11 +150,16 @@ export async function composeToolPrompt(
   });
   if (!folder) return null;
 
-  const template = templateFor(toolId, variantId);
+  const studio = getStudioSettings(await getUserSettings(userId));
+  const template = templateFor(toolId, variantId, studio.reportDefaultVariant);
   if (!template) return null;
 
   const guidance = await getGuidanceText(folderId);
   const suggestedTitle = template.title.replace("{folder}", folder.title);
+  const task = template.task.replace(
+    "{quizCount}",
+    String(studio.quizQuestionCount)
+  );
 
   const delivery =
     template.delivery ??
@@ -161,7 +175,7 @@ export async function composeToolPrompt(
       .join(" ");
 
   const prompt = [
-    template.task,
+    task,
     guidance.roleStrategy.trim()
       ? `What this folder is for (its Context doc): ${guidance.roleStrategy.trim()}`
       : "",

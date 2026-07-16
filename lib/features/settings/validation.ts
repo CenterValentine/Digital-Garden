@@ -321,7 +321,8 @@ const studioSettingsSchema = z
     reportDefaultVariant: z.string().min(1).max(60).optional(),
     quizQuestionCount: z.number().int().min(3).max(25).optional(),
     audioOverviewLength: z.enum(["brief", "standard"]).optional(),
-    slideCount: z.number().int().min(4).max(20).optional(),
+    // Upper bound matches the slide-deck executor's schema cap (15).
+    slideCount: z.number().int().min(4).max(15).optional(),
   })
   .optional();
 

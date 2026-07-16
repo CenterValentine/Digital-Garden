@@ -46,6 +46,16 @@ export interface FeatureSpec {
     presetId: string;
     modelId: string;
   };
+  /**
+   * Optional deep-link to the surface-owned settings page for this feature.
+   * Feature Routing owns MODEL choice; behavior/defaults (e.g. Studio
+   * artifact defaults) live with the owning extension — this link bridges
+   * the two so neither page duplicates the other's concern.
+   */
+  settingsHref?: {
+    label: string;
+    href: string;
+  };
 }
 
 export const FEATURE_REGISTRY: FeatureSpec[] = [
@@ -154,6 +164,10 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       presetId: "anthropic",
       modelId: "claude-haiku-3-5",
     },
+    settingsHref: {
+      label: "Configure Studio defaults",
+      href: "/settings/extensions/studio",
+    },
   },
   {
     id: "studio-generation",
@@ -164,6 +178,10 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     defaultSuggestion: {
       presetId: "anthropic",
       modelId: "claude-sonnet-4",
+    },
+    settingsHref: {
+      label: "Configure Studio defaults",
+      href: "/settings/extensions/studio",
     },
   },
 ];

@@ -28,6 +28,8 @@ import { publishEvent } from "@/lib/domain/notifications/service";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
+import { getUserSettings } from "@/lib/features/settings";
+import { getStudioSettings } from "../settings";
 import { getStudioToolById } from "../registry";
 import { StudioModelUnavailableError } from "./metadata";
 import { getSelectionState } from "./source-selection";
@@ -444,20 +446,24 @@ const AUDIO_STYLES: Record<string, string> = {
     "a single narrator steelmanning both sides: present the strongest case FOR the material's position, then the strongest case AGAINST, then where the balance lands",
 };
 
-// One TTS call — provider hard limits sit near 4096 chars, so the script is
-// budgeted below that. Multi-voice + chunked long-form is the postponed
-// two-host work (plan → Non-goals).
-const AUDIO_SCRIPT_CHAR_BUDGET = 3_900;
+// One TTS call — provider hard limits sit near 4096 chars, so scripts are
+// budgeted below that. The user's audioOverviewLength setting picks the
+// budget ("standard" rides the provider ceiling; "brief" is a ~1-minute
+// listen). Multi-voice + chunked long-form is the postponed two-host work
+// (plan → Non-goals).
+const AUDIO_SCRIPT_CHAR_BUDGETS = { brief: 1_800, standard: 3_900 } as const;
 
-const AudioScriptSchema = z.object({
-  title: z.string().min(1).max(100).describe("Short episode-style title."),
-  script: z
-    .string()
-    .min(1)
-    .describe(
-      `The narration script: plain spoken prose for a single voice — no headings, no markdown, no stage directions. HARD BUDGET: ${AUDIO_SCRIPT_CHAR_BUDGET} characters; end on a complete sentence.`
-    ),
-});
+function audioScriptSchema(charBudget: number) {
+  return z.object({
+    title: z.string().min(1).max(100).describe("Short episode-style title."),
+    script: z
+      .string()
+      .min(1)
+      .describe(
+        `The narration script: plain spoken prose for a single voice — no headings, no markdown, no stage directions. HARD BUDGET: ${charBudget} characters; end on a complete sentence.`
+      ),
+  });
+}
 
 const runAudioOverview: Executor = async (ctx) => {
   await setStep(ctx.runId, 1, 3, "Reading sources");
@@ -470,6 +476,8 @@ const runAudioOverview: Executor = async (ctx) => {
 
   await setStep(ctx.runId, 2, 3, "Writing script");
   const { model, modelId } = await resolveGenerationModel(ctx.userId);
+  const studio = getStudioSettings(await getUserSettings(ctx.userId));
+  const charBudget = AUDIO_SCRIPT_CHAR_BUDGETS[studio.audioOverviewLength];
   const style = AUDIO_STYLES[ctx.variantId ?? "deep-dive"] ?? AUDIO_STYLES["deep-dive"];
   const prompt = [
     `Write ${style}, about the folder "${ctx.folderTitle}".`,
@@ -478,10 +486,10 @@ const runAudioOverview: Executor = async (ctx) => {
   ].join("\n\n");
   const { object } = await generateObject({
     model,
-    schema: AudioScriptSchema,
+    schema: audioScriptSchema(charBudget),
     prompt,
   });
-  const script = object.script.slice(0, AUDIO_SCRIPT_CHAR_BUDGET);
+  const script = object.script.slice(0, charBudget);
 
   await setStep(ctx.runId, 3, 3, "Generating audio");
   const { generateAndStoreSpeech } = await import(
@@ -552,8 +560,13 @@ const runSlideDeck: Executor = async (ctx) => {
 
   await setStep(ctx.runId, 2, 3, "Outlining deck");
   const { model, modelId } = await resolveGenerationModel(ctx.userId);
+  // User default from Studio settings, clamped to the schema's 3-15 window.
+  const targetSlides = Math.min(
+    15,
+    Math.max(3, getStudioSettings(await getUserSettings(ctx.userId)).slideCount)
+  );
   const prompt = [
-    `Outline a slide deck presenting the folder "${ctx.folderTitle}": a title slide comes free, so start with the first content slide. Structure: context → key points → synthesis/takeaways.`,
+    `Outline a slide deck presenting the folder "${ctx.folderTitle}": a title slide comes free, so start with the first content slide. Structure: context → key points → synthesis/takeaways. Target about ${targetSlides} content slides — fewer if the material is thin, never pad.`,
     "Work strictly from these sources:",
     sources.text,
   ].join("\n\n");

@@ -28,4 +28,12 @@ export const studioExtensionManifest: ExtensionManifest = {
   canDisable: true,
   navItems: [],
   surfaces: [],
+  settings: {
+    path: "/settings/extensions/studio",
+    label: "Folder Studio",
+    title: "Folder Studio",
+    description:
+      "Configure AI-context auto-updates and artifact defaults. Model routing lives in AI settings.",
+    order: 30,
+  },
 };
