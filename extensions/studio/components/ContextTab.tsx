@@ -12,7 +12,7 @@
 "use client";
 
 import { useState } from "react";
-import { Link as LinkIcon, Sparkles, Tag as TagIcon } from "lucide-react";
+import { BrainCircuit, Link as LinkIcon, Tag as TagIcon } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
@@ -23,14 +23,16 @@ import { ContextAiPanel } from "./ContextAiPanel";
 
 type ContextSubTab = "links" | "tags" | "ai";
 
+// AI Context leads (user direction 2026-07-16). BrainCircuit, not sparkles:
+// sparkles is reserved for generate ACTIONS, never surface identity.
 const SUB_TABS: Array<{
   id: ContextSubTab;
   label: string;
   icon: typeof LinkIcon;
 }> = [
+  { id: "ai", label: "AI Context", icon: BrainCircuit },
   { id: "links", label: "Links", icon: LinkIcon },
   { id: "tags", label: "Tags", icon: TagIcon },
-  { id: "ai", label: "AI Context", icon: Sparkles },
 ];
 
 /** Content types whose backlinks panel is meaningful (old Links tab scope). */

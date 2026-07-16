@@ -38,8 +38,10 @@ const TAB_SVG_PATHS: Record<string, string> = {
     "M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z",
   publish:
     "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9",
+  // Desk lamp (lucide LampDesk) — studio's study-room identity; the old
+  // sparkles glyph was overloaded across AI surfaces.
   studio:
-    "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
+    "M14 5l-3 3l2 7l8-8l-7-2Z M14 5l-3 3l-3-3l3-3l3 3Z M9.5 6.5L4 12l3 6 M3 22v-2c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v2H3Z",
   context:
     "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
 };

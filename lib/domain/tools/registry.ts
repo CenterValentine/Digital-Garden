@@ -205,7 +205,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   {
     id: "studio-tab",
     label: "Studio",
-    iconName: "Sparkles",
+    iconName: "LampDesk",
     surfaces: ["sidebar-tab"],
     contentTypes: ["folder"],
     order: 60,

@@ -6,7 +6,7 @@
 
 "use client";
 
-import { CheckCircle2, Sparkles, XCircle } from "lucide-react";
+import { CheckCircle2, LampDesk, XCircle } from "lucide-react";
 import type { NotificationDTO } from "@/lib/domain/notifications/types";
 import type { NotificationKindRenderer } from "@/lib/features/notifications/kind-renderer-types";
 
@@ -56,7 +56,7 @@ export const studioNotificationKindRenderers: Record<
   NotificationKindRenderer
 > = {
   "studio.run": {
-    icon: Sparkles,
+    icon: LampDesk,
     Body: RunBody,
   },
 };

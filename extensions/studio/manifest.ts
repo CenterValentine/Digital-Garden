@@ -23,7 +23,7 @@ export const studioExtensionManifest: ExtensionManifest = {
     "Turn folders into agentic hubs: chat grounded in a folder's contents, " +
     "generate reports, flashcards, maps, audio and more, and maintain per-note " +
     "context for the AI.",
-  iconName: "Sparkles",
+  iconName: "LampDesk",
   enabledByDefault: true,
   canDisable: true,
   navItems: [],

@@ -31,7 +31,7 @@ import {
   SPEED_READER_OPEN_EVENT,
   type SpeedReaderOpenEventDetail,
 } from "@/extensions/speed-reader/events";
-import { Sparkles } from "lucide-react";
+import { LampDesk } from "lucide-react";
 import { STUDIO_EXTENSION_ID } from "@/extensions/studio/manifest";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
@@ -232,7 +232,7 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           title="Open Folder Studio"
           type="button"
         >
-          <Sparkles className="h-4 w-4" />
+          <LampDesk className="h-4 w-4" />
         </button>
       )}
       {/* Speed Read — positioned before import/export (orders 75+) */}
