@@ -10,6 +10,18 @@ last_updated: 2026-07-16
 
 ---
 
+## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
+
+Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
+
+- [ ] **Richer n8n run step view** — n8n run input carries no `graph`, so `RunGraphSteps` renders nothing (graceful). A per-engine step renderer (n8n node names from callbacks) is now unblocked, still deferred.
+- [ ] **Chooser pre-flight "not pushed" badge for n8n workflows** — read `metadata.webhookPath` (n8n spoke now in-tree); today the dispatch toast surfaces the clean ENGINE_ERROR instead.
+- [ ] **Per-user extension-disabled parity in bearer routes** — extension enable/disable state is client-side only; the chooser's empty state covers today. Revisit if server-side per-user extension settings land.
+- [ ] **Bottom-sheet chooser <768px** — N/A for the Chrome toolbar popup (desktop-only surface); mobile runs through the app's WorkflowsPanel. Recorded so nobody re-plans it.
+- [ ] **System notifications channel** — deliberately dropped in design (no `notifications` permission); revisit only on user demand.
+
+---
+
 ## Folder Studio Followups (2026-07-16, branch `worktree-folder-studio`)
 
 Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the build:

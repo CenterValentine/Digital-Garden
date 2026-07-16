@@ -140,7 +140,13 @@ export default async function EmbedLayout({
         intercepts anchor clicks to forward external links to the parent overlay.
         Must stay inline (no Script component) so it executes before hydration.
       */}
-      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }} />
+      {/* suppressHydrationWarning: CSP nonce-hiding empties the attribute
+          before hydration compares it (see app/layout.tsx theme script). */}
+      <script
+        nonce={nonce}
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }}
+      />
       {children}
     </div>
   );

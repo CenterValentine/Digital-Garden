@@ -470,7 +470,16 @@ function openEmbedForPanel(state, panel) {
   panel.body.appendChild(iframe);
   state.iframePanel = panel;
 
-  if (state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
+  // Run deep-link (workflow panels): consume the one-shot marker and force a
+  // fresh src so ?run= reaches the embed viewer even if this content id is
+  // already loaded.
+  const pendingRunId =
+    state.pendingRunDeepLink && state.pendingRunDeepLink.contentId === panel.contentId
+      ? state.pendingRunDeepLink.runId
+      : null;
+  if (pendingRunId) state.pendingRunDeepLink = null;
+
+  if (!pendingRunId && state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
     // Already loaded — send a navigate message instead of reloading
     iframe.contentWindow?.postMessage({ type: "open", contentId: panel.contentId }, "*");
     iframe.setAttribute("data-active", "true");
@@ -502,9 +511,14 @@ function openEmbedForPanel(state, panel) {
       const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
       const targetPath = `/embed/content/${panel.contentId}`;
       const sessionToken = response.data?.token;
+      const runParam = pendingRunId
+        ? `run=${encodeURIComponent(pendingRunId)}`
+        : "";
       const iframeSrc = sessionToken
-        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}`
-        : targetUrl;
+        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}${runParam ? `&${runParam}` : ""}`
+        : runParam
+          ? `${targetUrl}?${runParam}`
+          : targetUrl;
 
       iframe.setAttribute("src", iframeSrc);
     });
@@ -2822,9 +2836,12 @@ function beginEmbedTargeting(state, panel) {
   document.body.style.cursor = "crosshair";
 }
 
-async function openAssociatedContent(state, contentId, contentKind) {
+async function openAssociatedContent(state, contentId, contentKind, runId) {
   // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
   const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
+  // Workflow run deep-link: consumed once by openEmbedForPanel, which appends
+  // ?run= so the embed viewer lands directly on that run's detail.
+  state.pendingRunDeepLink = runId ? { contentId, runId } : null;
   const context = state.resourceContext;
   const persisted =
     context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
@@ -3113,7 +3130,8 @@ function wireRootEvents(state) {
           await openAssociatedContent(
             state,
             message.payload?.contentId,
-            message.payload?.contentKind || "external"
+            message.payload?.contentKind || "external",
+            message.payload?.runId
           );
           sendResponse?.({ ok: true });
         } catch (error) {
@@ -4160,5 +4178,219 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   } else if (message.type === "dg-tts-stop") {
     dgStopTts();
+  }
+});
+
+// ── Workflows: page-text extraction + dispatch status pill ───────────────────
+// Standalone (like TTS above): no dependency on the overlay panel state, so
+// dispatch acknowledgement works even before the user ever opens the overlay.
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "dg-extract-page-text") {
+    // Rendered text (innerText respects visibility), not raw HTML — this is
+    // what the workflow's capture note stores. Sync response.
+    let text = "";
+    try {
+      text = document.body?.innerText || document.body?.textContent || "";
+    } catch (_) {}
+    sendResponse({ text: text.slice(0, 100000) });
+    return; // responded synchronously
+  }
+});
+
+const DG_WF_TERMINAL = new Set(["succeeded", "failed", "canceled"]);
+const DG_WF_STATUS = {
+  queued: { label: "Queued…", color: "#9aa4b2" },
+  running: { label: "Running…", color: "#7cb1ff" },
+  waiting: { label: "Needs your review", color: "#ffd27a" },
+  succeeded: { label: "Completed", color: "#8fe0b3" },
+  failed: { label: "Failed", color: "#ff8a8a" },
+  canceled: { label: "Canceled", color: "#9aa4b2" },
+};
+const DG_WF_POLL_MS = 3000;
+const DG_WF_POLL_MAX = 200; // ~10 min — a stuck run shouldn't poll forever
+const DG_WF_LINGER_MS = 6000;
+
+let dgWfPill = null;
+let dgWfPollTimer = null;
+let dgWfLingerTimer = null;
+/** { runId, workflowNodeId } for the run the pill currently tracks. */
+let dgWfCurrent = null;
+
+function dgWfEnsurePill() {
+  if (dgWfPill && document.documentElement.contains(dgWfPill.root)) {
+    return dgWfPill;
+  }
+  const style = document.createElement("style");
+  style.textContent = `
+    #dg-wf-pill {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(10, 14, 20, 0.95);
+      color: #e6e9ee;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(201, 168, 108, 0.35);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    #dg-wf-pill.dg-wf-in { opacity: 1; transform: translateY(0); }
+    #dg-wf-pill .dg-wf-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #9aa4b2; flex: none;
+    }
+    #dg-wf-pill .dg-wf-dot[data-live="true"] { animation: dg-wf-pulse 1.4s ease-in-out infinite; }
+    @keyframes dg-wf-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    #dg-wf-pill .dg-wf-title { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #dg-wf-pill .dg-wf-status { font-weight: 500; color: inherit; }
+    #dg-wf-pill .dg-wf-engine {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 1px 5px; border-radius: 8px;
+      border: 1px solid rgba(230,233,238,0.25); color: #b9c1cc; flex: none;
+    }
+    #dg-wf-pill .dg-wf-view {
+      all: unset; cursor: pointer; flex: none;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+      color: #e0c592; border: 1px solid rgba(201, 168, 108, 0.45);
+      border-radius: 10px; padding: 2px 8px;
+    }
+    #dg-wf-pill .dg-wf-view:hover { background: rgba(201, 168, 108, 0.15); color: #e9d3a8; }
+    #dg-wf-pill .dg-wf-close {
+      all: unset; cursor: pointer; color: #8b93a0; font-size: 13px;
+      line-height: 1; padding: 2px 3px; flex: none;
+    }
+    #dg-wf-pill .dg-wf-close:hover { color: #e6e9ee; }
+  `;
+  const root = document.createElement("div");
+  root.id = "dg-wf-pill";
+  root.innerHTML = `
+    <span class="dg-wf-dot"></span>
+    <span class="dg-wf-title"></span>
+    <span class="dg-wf-engine" style="display:none"></span>
+    <span class="dg-wf-status"></span>
+    <button class="dg-wf-view" style="display:none">View</button>
+    <button class="dg-wf-close" title="Dismiss" aria-label="Dismiss">✕</button>
+  `;
+  document.documentElement.appendChild(style);
+  document.documentElement.appendChild(root);
+  root.querySelector(".dg-wf-close").addEventListener("click", () => dgWfHide());
+  root.querySelector(".dg-wf-view").addEventListener("click", () => {
+    if (!dgWfCurrent?.workflowNodeId) return;
+    // Round-trip through the background's active-tab door (this tab) so the
+    // overlay opens the workflow panel deep-linked to this run's detail.
+    chrome.runtime.sendMessage({
+      type: "open-content-in-active-tab",
+      payload: {
+        contentId: dgWfCurrent.workflowNodeId,
+        contentKind: "workflow",
+        runId: dgWfCurrent.runId,
+      },
+    });
+  });
+  dgWfPill = {
+    root,
+    style,
+    dot: root.querySelector(".dg-wf-dot"),
+    title: root.querySelector(".dg-wf-title"),
+    engine: root.querySelector(".dg-wf-engine"),
+    status: root.querySelector(".dg-wf-status"),
+    view: root.querySelector(".dg-wf-view"),
+  };
+  return dgWfPill;
+}
+
+function dgWfHide() {
+  window.clearInterval(dgWfPollTimer);
+  window.clearTimeout(dgWfLingerTimer);
+  dgWfPollTimer = null;
+  dgWfCurrent = null;
+  if (!dgWfPill) return;
+  dgWfPill.root.classList.remove("dg-wf-in");
+  const pill = dgWfPill;
+  dgWfPill = null;
+  setTimeout(() => {
+    pill.root.remove();
+    pill.style.remove();
+  }, 250);
+}
+
+function dgWfRender(pill, run, fallbackTitle) {
+  const status = DG_WF_STATUS[run?.status] || DG_WF_STATUS.queued;
+  pill.title.textContent = run?.definition?.name || fallbackTitle;
+  pill.status.textContent = status.label;
+  pill.status.style.color = status.color;
+  pill.dot.style.background = status.color;
+  pill.dot.setAttribute(
+    "data-live",
+    run && !DG_WF_TERMINAL.has(run.status) ? "true" : "false"
+  );
+  const engine = run?.engine || "";
+  if (engine && engine !== "wdk") {
+    pill.engine.textContent = engine;
+    pill.engine.style.display = "";
+  } else {
+    pill.engine.style.display = "none";
+  }
+}
+
+/**
+ * The immediate acknowledgement: mount on dispatch, live-update by polling the
+ * run through the background (bearer read). Terminal states linger briefly;
+ * "waiting" (needs review) and "failed" stay until dismissed. A [View] action
+ * that opens the deep embed panel arrives with Phase 3.
+ */
+function dgWfShowRun(runId, workflowTitle, workflowNodeId) {
+  if (!runId) return;
+  dgWfHide();
+  dgWfCurrent = { runId, workflowNodeId: workflowNodeId || null };
+  const pill = dgWfEnsurePill();
+  pill.view.style.display = dgWfCurrent.workflowNodeId ? "" : "none";
+  dgWfRender(pill, null, workflowTitle || "Workflow");
+  requestAnimationFrame(() => pill.root.classList.add("dg-wf-in"));
+
+  let polls = 0;
+  const poll = () => {
+    polls += 1;
+    if (polls > DG_WF_POLL_MAX) {
+      dgWfHide();
+      return;
+    }
+    chrome.runtime.sendMessage(
+      { type: "get-workflow-run", payload: { runId } },
+      (response) => {
+        if (chrome.runtime.lastError || !response?.ok || !dgWfPill) return;
+        const run = response.data;
+        dgWfRender(dgWfPill, run, workflowTitle || "Workflow");
+        if (DG_WF_TERMINAL.has(run.status)) {
+          window.clearInterval(dgWfPollTimer);
+          dgWfPollTimer = null;
+          if (run.status === "succeeded" || run.status === "canceled") {
+            dgWfLingerTimer = window.setTimeout(() => dgWfHide(), DG_WF_LINGER_MS);
+          } // failed stays until dismissed
+        }
+      }
+    );
+  };
+  poll();
+  dgWfPollTimer = window.setInterval(poll, DG_WF_POLL_MS);
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "dg-workflow-run-started") {
+    dgWfShowRun(
+      message.payload?.runId,
+      message.payload?.workflowTitle,
+      message.payload?.workflowNodeId
+    );
   }
 });
