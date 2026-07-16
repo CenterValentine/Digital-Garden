@@ -467,6 +467,26 @@ export type WorkflowRunEvent = $Result.DefaultSelection<Prisma.$WorkflowRunEvent
  * 
  */
 export type WorkflowRunArtifact = $Result.DefaultSelection<Prisma.$WorkflowRunArtifactPayload>
+/**
+ * Model AgenticMetadata
+ * 
+ */
+export type AgenticMetadata = $Result.DefaultSelection<Prisma.$AgenticMetadataPayload>
+/**
+ * Model StudioSourceSelection
+ * 
+ */
+export type StudioSourceSelection = $Result.DefaultSelection<Prisma.$StudioSourceSelectionPayload>
+/**
+ * Model StudioGenerationRun
+ * 
+ */
+export type StudioGenerationRun = $Result.DefaultSelection<Prisma.$StudioGenerationRunPayload>
+/**
+ * Model StudioContextSpend
+ * 
+ */
+export type StudioContextSpend = $Result.DefaultSelection<Prisma.$StudioContextSpendPayload>
 
 /**
  * Enums
@@ -1918,6 +1938,46 @@ export class PrismaClient<
     * ```
     */
   get workflowRunArtifact(): Prisma.WorkflowRunArtifactDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.agenticMetadata`: Exposes CRUD operations for the **AgenticMetadata** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AgenticMetadata
+    * const agenticMetadata = await prisma.agenticMetadata.findMany()
+    * ```
+    */
+  get agenticMetadata(): Prisma.AgenticMetadataDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.studioSourceSelection`: Exposes CRUD operations for the **StudioSourceSelection** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more StudioSourceSelections
+    * const studioSourceSelections = await prisma.studioSourceSelection.findMany()
+    * ```
+    */
+  get studioSourceSelection(): Prisma.StudioSourceSelectionDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.studioGenerationRun`: Exposes CRUD operations for the **StudioGenerationRun** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more StudioGenerationRuns
+    * const studioGenerationRuns = await prisma.studioGenerationRun.findMany()
+    * ```
+    */
+  get studioGenerationRun(): Prisma.StudioGenerationRunDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.studioContextSpend`: Exposes CRUD operations for the **StudioContextSpend** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more StudioContextSpends
+    * const studioContextSpends = await prisma.studioContextSpend.findMany()
+    * ```
+    */
+  get studioContextSpend(): Prisma.StudioContextSpendDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2440,7 +2500,11 @@ export namespace Prisma {
     WorkflowDefinition: 'WorkflowDefinition',
     WorkflowRun: 'WorkflowRun',
     WorkflowRunEvent: 'WorkflowRunEvent',
-    WorkflowRunArtifact: 'WorkflowRunArtifact'
+    WorkflowRunArtifact: 'WorkflowRunArtifact',
+    AgenticMetadata: 'AgenticMetadata',
+    StudioSourceSelection: 'StudioSourceSelection',
+    StudioGenerationRun: 'StudioGenerationRun',
+    StudioContextSpend: 'StudioContextSpend'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2456,7 +2520,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "serviceToken" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "serviceToken" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact" | "agenticMetadata" | "studioSourceSelection" | "studioGenerationRun" | "studioContextSpend"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -9046,6 +9110,302 @@ export namespace Prisma {
           }
         }
       }
+      AgenticMetadata: {
+        payload: Prisma.$AgenticMetadataPayload<ExtArgs>
+        fields: Prisma.AgenticMetadataFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AgenticMetadataFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AgenticMetadataFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          findFirst: {
+            args: Prisma.AgenticMetadataFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AgenticMetadataFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          findMany: {
+            args: Prisma.AgenticMetadataFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          create: {
+            args: Prisma.AgenticMetadataCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          createMany: {
+            args: Prisma.AgenticMetadataCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AgenticMetadataCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          delete: {
+            args: Prisma.AgenticMetadataDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          update: {
+            args: Prisma.AgenticMetadataUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          deleteMany: {
+            args: Prisma.AgenticMetadataDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AgenticMetadataUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.AgenticMetadataUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          upsert: {
+            args: Prisma.AgenticMetadataUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          aggregate: {
+            args: Prisma.AgenticMetadataAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAgenticMetadata>
+          }
+          groupBy: {
+            args: Prisma.AgenticMetadataGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AgenticMetadataGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AgenticMetadataCountArgs<ExtArgs>
+            result: $Utils.Optional<AgenticMetadataCountAggregateOutputType> | number
+          }
+        }
+      }
+      StudioSourceSelection: {
+        payload: Prisma.$StudioSourceSelectionPayload<ExtArgs>
+        fields: Prisma.StudioSourceSelectionFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.StudioSourceSelectionFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.StudioSourceSelectionFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          findFirst: {
+            args: Prisma.StudioSourceSelectionFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.StudioSourceSelectionFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          findMany: {
+            args: Prisma.StudioSourceSelectionFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>[]
+          }
+          create: {
+            args: Prisma.StudioSourceSelectionCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          createMany: {
+            args: Prisma.StudioSourceSelectionCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.StudioSourceSelectionCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>[]
+          }
+          delete: {
+            args: Prisma.StudioSourceSelectionDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          update: {
+            args: Prisma.StudioSourceSelectionUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          deleteMany: {
+            args: Prisma.StudioSourceSelectionDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.StudioSourceSelectionUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.StudioSourceSelectionUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>[]
+          }
+          upsert: {
+            args: Prisma.StudioSourceSelectionUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioSourceSelectionPayload>
+          }
+          aggregate: {
+            args: Prisma.StudioSourceSelectionAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateStudioSourceSelection>
+          }
+          groupBy: {
+            args: Prisma.StudioSourceSelectionGroupByArgs<ExtArgs>
+            result: $Utils.Optional<StudioSourceSelectionGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.StudioSourceSelectionCountArgs<ExtArgs>
+            result: $Utils.Optional<StudioSourceSelectionCountAggregateOutputType> | number
+          }
+        }
+      }
+      StudioGenerationRun: {
+        payload: Prisma.$StudioGenerationRunPayload<ExtArgs>
+        fields: Prisma.StudioGenerationRunFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.StudioGenerationRunFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.StudioGenerationRunFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          findFirst: {
+            args: Prisma.StudioGenerationRunFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.StudioGenerationRunFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          findMany: {
+            args: Prisma.StudioGenerationRunFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>[]
+          }
+          create: {
+            args: Prisma.StudioGenerationRunCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          createMany: {
+            args: Prisma.StudioGenerationRunCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.StudioGenerationRunCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>[]
+          }
+          delete: {
+            args: Prisma.StudioGenerationRunDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          update: {
+            args: Prisma.StudioGenerationRunUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          deleteMany: {
+            args: Prisma.StudioGenerationRunDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.StudioGenerationRunUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.StudioGenerationRunUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>[]
+          }
+          upsert: {
+            args: Prisma.StudioGenerationRunUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioGenerationRunPayload>
+          }
+          aggregate: {
+            args: Prisma.StudioGenerationRunAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateStudioGenerationRun>
+          }
+          groupBy: {
+            args: Prisma.StudioGenerationRunGroupByArgs<ExtArgs>
+            result: $Utils.Optional<StudioGenerationRunGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.StudioGenerationRunCountArgs<ExtArgs>
+            result: $Utils.Optional<StudioGenerationRunCountAggregateOutputType> | number
+          }
+        }
+      }
+      StudioContextSpend: {
+        payload: Prisma.$StudioContextSpendPayload<ExtArgs>
+        fields: Prisma.StudioContextSpendFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.StudioContextSpendFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.StudioContextSpendFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          findFirst: {
+            args: Prisma.StudioContextSpendFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.StudioContextSpendFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          findMany: {
+            args: Prisma.StudioContextSpendFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>[]
+          }
+          create: {
+            args: Prisma.StudioContextSpendCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          createMany: {
+            args: Prisma.StudioContextSpendCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.StudioContextSpendCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>[]
+          }
+          delete: {
+            args: Prisma.StudioContextSpendDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          update: {
+            args: Prisma.StudioContextSpendUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          deleteMany: {
+            args: Prisma.StudioContextSpendDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.StudioContextSpendUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.StudioContextSpendUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>[]
+          }
+          upsert: {
+            args: Prisma.StudioContextSpendUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$StudioContextSpendPayload>
+          }
+          aggregate: {
+            args: Prisma.StudioContextSpendAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateStudioContextSpend>
+          }
+          groupBy: {
+            args: Prisma.StudioContextSpendGroupByArgs<ExtArgs>
+            result: $Utils.Optional<StudioContextSpendGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.StudioContextSpendCountArgs<ExtArgs>
+            result: $Utils.Optional<StudioContextSpendCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -9243,6 +9603,10 @@ export namespace Prisma {
     workflowRun?: WorkflowRunOmit
     workflowRunEvent?: WorkflowRunEventOmit
     workflowRunArtifact?: WorkflowRunArtifactOmit
+    agenticMetadata?: AgenticMetadataOmit
+    studioSourceSelection?: StudioSourceSelectionOmit
+    studioGenerationRun?: StudioGenerationRunOmit
+    studioContextSpend?: StudioContextSpendOmit
   }
 
   /* Types for Logging */
@@ -9346,6 +9710,8 @@ export namespace Prisma {
     webResourceLinks: number
     webResourceViewStates: number
     workflowRunArtifacts: number
+    studioSourceSelections: number
+    studioGenerationRuns: number
   }
 
   export type ContentNodeCountOutputTypeSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -9372,6 +9738,8 @@ export namespace Prisma {
     webResourceLinks?: boolean | ContentNodeCountOutputTypeCountWebResourceLinksArgs
     webResourceViewStates?: boolean | ContentNodeCountOutputTypeCountWebResourceViewStatesArgs
     workflowRunArtifacts?: boolean | ContentNodeCountOutputTypeCountWorkflowRunArtifactsArgs
+    studioSourceSelections?: boolean | ContentNodeCountOutputTypeCountStudioSourceSelectionsArgs
+    studioGenerationRuns?: boolean | ContentNodeCountOutputTypeCountStudioGenerationRunsArgs
   }
 
   // Custom InputTypes
@@ -9546,6 +9914,20 @@ export namespace Prisma {
     where?: WorkflowRunArtifactWhereInput
   }
 
+  /**
+   * ContentNodeCountOutputType without action
+   */
+  export type ContentNodeCountOutputTypeCountStudioSourceSelectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioSourceSelectionWhereInput
+  }
+
+  /**
+   * ContentNodeCountOutputType without action
+   */
+  export type ContentNodeCountOutputTypeCountStudioGenerationRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioGenerationRunWhereInput
+  }
+
 
   /**
    * Count Type FlashcardDeckCountOutputType
@@ -9671,6 +10053,9 @@ export namespace Prisma {
     webResources: number
     webResourceContentLinks: number
     webResourceViewStates: number
+    studioSourceSelections: number
+    studioGenerationRuns: number
+    studioContextSpend: number
     connectionInvitesSent: number
     connectionInvitesReceived: number
     connectionsAsA: number
@@ -9734,6 +10119,9 @@ export namespace Prisma {
     webResources?: boolean | UserCountOutputTypeCountWebResourcesArgs
     webResourceContentLinks?: boolean | UserCountOutputTypeCountWebResourceContentLinksArgs
     webResourceViewStates?: boolean | UserCountOutputTypeCountWebResourceViewStatesArgs
+    studioSourceSelections?: boolean | UserCountOutputTypeCountStudioSourceSelectionsArgs
+    studioGenerationRuns?: boolean | UserCountOutputTypeCountStudioGenerationRunsArgs
+    studioContextSpend?: boolean | UserCountOutputTypeCountStudioContextSpendArgs
     connectionInvitesSent?: boolean | UserCountOutputTypeCountConnectionInvitesSentArgs
     connectionInvitesReceived?: boolean | UserCountOutputTypeCountConnectionInvitesReceivedArgs
     connectionsAsA?: boolean | UserCountOutputTypeCountConnectionsAsAArgs
@@ -10093,6 +10481,27 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountWebResourceViewStatesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: WebResourceViewStateWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountStudioSourceSelectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioSourceSelectionWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountStudioGenerationRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioGenerationRunWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountStudioContextSpendArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioContextSpendWhereInput
   }
 
   /**
@@ -11554,6 +11963,9 @@ export namespace Prisma {
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
     workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
+    agenticMetadata?: boolean | ContentNode$agenticMetadataArgs<ExtArgs>
+    studioSourceSelections?: boolean | ContentNode$studioSourceSelectionsArgs<ExtArgs>
+    studioGenerationRuns?: boolean | ContentNode$studioGenerationRunsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["contentNode"]>
 
@@ -11687,6 +12099,9 @@ export namespace Prisma {
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
     workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
+    agenticMetadata?: boolean | ContentNode$agenticMetadataArgs<ExtArgs>
+    studioSourceSelections?: boolean | ContentNode$studioSourceSelectionsArgs<ExtArgs>
+    studioGenerationRuns?: boolean | ContentNode$studioGenerationRunsArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ContentNodeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -11753,6 +12168,9 @@ export namespace Prisma {
       webResourceLinks: Prisma.$WebResourceContentLinkPayload<ExtArgs>[]
       webResourceViewStates: Prisma.$WebResourceViewStatePayload<ExtArgs>[]
       workflowRunArtifacts: Prisma.$WorkflowRunArtifactPayload<ExtArgs>[]
+      agenticMetadata: Prisma.$AgenticMetadataPayload<ExtArgs> | null
+      studioSourceSelections: Prisma.$StudioSourceSelectionPayload<ExtArgs>[]
+      studioGenerationRuns: Prisma.$StudioGenerationRunPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -12214,6 +12632,9 @@ export namespace Prisma {
     webResourceLinks<T extends ContentNode$webResourceLinksArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceViewStates<T extends ContentNode$webResourceViewStatesArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceViewStatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceViewStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     workflowRunArtifacts<T extends ContentNode$workflowRunArtifactsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$workflowRunArtifactsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    agenticMetadata<T extends ContentNode$agenticMetadataArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$agenticMetadataArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    studioSourceSelections<T extends ContentNode$studioSourceSelectionsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$studioSourceSelectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    studioGenerationRuns<T extends ContentNode$studioGenerationRunsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$studioGenerationRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -13589,6 +14010,73 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.agenticMetadata
+   */
+  export type ContentNode$agenticMetadataArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    where?: AgenticMetadataWhereInput
+  }
+
+  /**
+   * ContentNode.studioSourceSelections
+   */
+  export type ContentNode$studioSourceSelectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    where?: StudioSourceSelectionWhereInput
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: StudioSourceSelectionScalarFieldEnum | StudioSourceSelectionScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.studioGenerationRuns
+   */
+  export type ContentNode$studioGenerationRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    where?: StudioGenerationRunWhereInput
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    cursor?: StudioGenerationRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: StudioGenerationRunScalarFieldEnum | StudioGenerationRunScalarFieldEnum[]
   }
 
   /**
@@ -30247,6 +30735,9 @@ export namespace Prisma {
     webResources?: boolean | User$webResourcesArgs<ExtArgs>
     webResourceContentLinks?: boolean | User$webResourceContentLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | User$webResourceViewStatesArgs<ExtArgs>
+    studioSourceSelections?: boolean | User$studioSourceSelectionsArgs<ExtArgs>
+    studioGenerationRuns?: boolean | User$studioGenerationRunsArgs<ExtArgs>
+    studioContextSpend?: boolean | User$studioContextSpendArgs<ExtArgs>
     connectionInvitesSent?: boolean | User$connectionInvitesSentArgs<ExtArgs>
     connectionInvitesReceived?: boolean | User$connectionInvitesReceivedArgs<ExtArgs>
     connectionsAsA?: boolean | User$connectionsAsAArgs<ExtArgs>
@@ -30369,6 +30860,9 @@ export namespace Prisma {
     webResources?: boolean | User$webResourcesArgs<ExtArgs>
     webResourceContentLinks?: boolean | User$webResourceContentLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | User$webResourceViewStatesArgs<ExtArgs>
+    studioSourceSelections?: boolean | User$studioSourceSelectionsArgs<ExtArgs>
+    studioGenerationRuns?: boolean | User$studioGenerationRunsArgs<ExtArgs>
+    studioContextSpend?: boolean | User$studioContextSpendArgs<ExtArgs>
     connectionInvitesSent?: boolean | User$connectionInvitesSentArgs<ExtArgs>
     connectionInvitesReceived?: boolean | User$connectionInvitesReceivedArgs<ExtArgs>
     connectionsAsA?: boolean | User$connectionsAsAArgs<ExtArgs>
@@ -30442,6 +30936,9 @@ export namespace Prisma {
       webResources: Prisma.$WebResourcePayload<ExtArgs>[]
       webResourceContentLinks: Prisma.$WebResourceContentLinkPayload<ExtArgs>[]
       webResourceViewStates: Prisma.$WebResourceViewStatePayload<ExtArgs>[]
+      studioSourceSelections: Prisma.$StudioSourceSelectionPayload<ExtArgs>[]
+      studioGenerationRuns: Prisma.$StudioGenerationRunPayload<ExtArgs>[]
+      studioContextSpend: Prisma.$StudioContextSpendPayload<ExtArgs>[]
       connectionInvitesSent: Prisma.$ConnectionInvitePayload<ExtArgs>[]
       connectionInvitesReceived: Prisma.$ConnectionInvitePayload<ExtArgs>[]
       connectionsAsA: Prisma.$UserConnectionPayload<ExtArgs>[]
@@ -30914,6 +31411,9 @@ export namespace Prisma {
     webResources<T extends User$webResourcesArgs<ExtArgs> = {}>(args?: Subset<T, User$webResourcesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourcePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceContentLinks<T extends User$webResourceContentLinksArgs<ExtArgs> = {}>(args?: Subset<T, User$webResourceContentLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceViewStates<T extends User$webResourceViewStatesArgs<ExtArgs> = {}>(args?: Subset<T, User$webResourceViewStatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceViewStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    studioSourceSelections<T extends User$studioSourceSelectionsArgs<ExtArgs> = {}>(args?: Subset<T, User$studioSourceSelectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    studioGenerationRuns<T extends User$studioGenerationRunsArgs<ExtArgs> = {}>(args?: Subset<T, User$studioGenerationRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    studioContextSpend<T extends User$studioContextSpendArgs<ExtArgs> = {}>(args?: Subset<T, User$studioContextSpendArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     connectionInvitesSent<T extends User$connectionInvitesSentArgs<ExtArgs> = {}>(args?: Subset<T, User$connectionInvitesSentArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConnectionInvitePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     connectionInvitesReceived<T extends User$connectionInvitesReceivedArgs<ExtArgs> = {}>(args?: Subset<T, User$connectionInvitesReceivedArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConnectionInvitePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     connectionsAsA<T extends User$connectionsAsAArgs<ExtArgs> = {}>(args?: Subset<T, User$connectionsAsAArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -32534,6 +33034,78 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: WebResourceViewStateScalarFieldEnum | WebResourceViewStateScalarFieldEnum[]
+  }
+
+  /**
+   * User.studioSourceSelections
+   */
+  export type User$studioSourceSelectionsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    where?: StudioSourceSelectionWhereInput
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: StudioSourceSelectionScalarFieldEnum | StudioSourceSelectionScalarFieldEnum[]
+  }
+
+  /**
+   * User.studioGenerationRuns
+   */
+  export type User$studioGenerationRunsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    where?: StudioGenerationRunWhereInput
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    cursor?: StudioGenerationRunWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: StudioGenerationRunScalarFieldEnum | StudioGenerationRunScalarFieldEnum[]
+  }
+
+  /**
+   * User.studioContextSpend
+   */
+  export type User$studioContextSpendArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    where?: StudioContextSpendWhereInput
+    orderBy?: StudioContextSpendOrderByWithRelationInput | StudioContextSpendOrderByWithRelationInput[]
+    cursor?: StudioContextSpendWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: StudioContextSpendScalarFieldEnum | StudioContextSpendScalarFieldEnum[]
   }
 
   /**
@@ -117793,6 +118365,4613 @@ export namespace Prisma {
 
 
   /**
+   * Model AgenticMetadata
+   */
+
+  export type AggregateAgenticMetadata = {
+    _count: AgenticMetadataCountAggregateOutputType | null
+    _min: AgenticMetadataMinAggregateOutputType | null
+    _max: AgenticMetadataMaxAggregateOutputType | null
+  }
+
+  export type AgenticMetadataMinAggregateOutputType = {
+    id: string | null
+    nodeId: string | null
+    derivedText: string | null
+    sourceContentHash: string | null
+    contextDirty: boolean | null
+    summaryHash: string | null
+    contextOptOut: boolean | null
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AgenticMetadataMaxAggregateOutputType = {
+    id: string | null
+    nodeId: string | null
+    derivedText: string | null
+    sourceContentHash: string | null
+    contextDirty: boolean | null
+    summaryHash: string | null
+    contextOptOut: boolean | null
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AgenticMetadataCountAggregateOutputType = {
+    id: number
+    nodeId: number
+    tiptapJson: number
+    derivedText: number
+    sectionsMeta: number
+    sourceContentHash: number
+    contextDirty: number
+    summaryHash: number
+    contextOptOut: number
+    model: number
+    generatedAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AgenticMetadataMinAggregateInputType = {
+    id?: true
+    nodeId?: true
+    derivedText?: true
+    sourceContentHash?: true
+    contextDirty?: true
+    summaryHash?: true
+    contextOptOut?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+  }
+
+  export type AgenticMetadataMaxAggregateInputType = {
+    id?: true
+    nodeId?: true
+    derivedText?: true
+    sourceContentHash?: true
+    contextDirty?: true
+    summaryHash?: true
+    contextOptOut?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+  }
+
+  export type AgenticMetadataCountAggregateInputType = {
+    id?: true
+    nodeId?: true
+    tiptapJson?: true
+    derivedText?: true
+    sectionsMeta?: true
+    sourceContentHash?: true
+    contextDirty?: true
+    summaryHash?: true
+    contextOptOut?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AgenticMetadataAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AgenticMetadata to aggregate.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AgenticMetadata
+    **/
+    _count?: true | AgenticMetadataCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AgenticMetadataMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AgenticMetadataMaxAggregateInputType
+  }
+
+  export type GetAgenticMetadataAggregateType<T extends AgenticMetadataAggregateArgs> = {
+        [P in keyof T & keyof AggregateAgenticMetadata]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAgenticMetadata[P]>
+      : GetScalarType<T[P], AggregateAgenticMetadata[P]>
+  }
+
+
+
+
+  export type AgenticMetadataGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AgenticMetadataWhereInput
+    orderBy?: AgenticMetadataOrderByWithAggregationInput | AgenticMetadataOrderByWithAggregationInput[]
+    by: AgenticMetadataScalarFieldEnum[] | AgenticMetadataScalarFieldEnum
+    having?: AgenticMetadataScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AgenticMetadataCountAggregateInputType | true
+    _min?: AgenticMetadataMinAggregateInputType
+    _max?: AgenticMetadataMaxAggregateInputType
+  }
+
+  export type AgenticMetadataGroupByOutputType = {
+    id: string
+    nodeId: string
+    tiptapJson: JsonValue
+    derivedText: string
+    sectionsMeta: JsonValue
+    sourceContentHash: string | null
+    contextDirty: boolean
+    summaryHash: string | null
+    contextOptOut: boolean
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date
+    _count: AgenticMetadataCountAggregateOutputType | null
+    _min: AgenticMetadataMinAggregateOutputType | null
+    _max: AgenticMetadataMaxAggregateOutputType | null
+  }
+
+  type GetAgenticMetadataGroupByPayload<T extends AgenticMetadataGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AgenticMetadataGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AgenticMetadataGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AgenticMetadataGroupByOutputType[P]>
+            : GetScalarType<T[P], AgenticMetadataGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AgenticMetadataSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    contextDirty?: boolean
+    summaryHash?: boolean
+    contextOptOut?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    contextDirty?: boolean
+    summaryHash?: boolean
+    contextOptOut?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    contextDirty?: boolean
+    summaryHash?: boolean
+    contextOptOut?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectScalar = {
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    contextDirty?: boolean
+    summaryHash?: boolean
+    contextOptOut?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AgenticMetadataOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "nodeId" | "tiptapJson" | "derivedText" | "sectionsMeta" | "sourceContentHash" | "contextDirty" | "summaryHash" | "contextOptOut" | "model" | "generatedAt" | "updatedAt", ExtArgs["result"]["agenticMetadata"]>
+  export type AgenticMetadataInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type AgenticMetadataIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type AgenticMetadataIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $AgenticMetadataPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AgenticMetadata"
+    objects: {
+      node: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      nodeId: string
+      tiptapJson: Prisma.JsonValue
+      derivedText: string
+      sectionsMeta: Prisma.JsonValue
+      sourceContentHash: string | null
+      contextDirty: boolean
+      summaryHash: string | null
+      contextOptOut: boolean
+      model: string | null
+      generatedAt: Date | null
+      updatedAt: Date
+    }, ExtArgs["result"]["agenticMetadata"]>
+    composites: {}
+  }
+
+  type AgenticMetadataGetPayload<S extends boolean | null | undefined | AgenticMetadataDefaultArgs> = $Result.GetResult<Prisma.$AgenticMetadataPayload, S>
+
+  type AgenticMetadataCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AgenticMetadataFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AgenticMetadataCountAggregateInputType | true
+    }
+
+  export interface AgenticMetadataDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AgenticMetadata'], meta: { name: 'AgenticMetadata' } }
+    /**
+     * Find zero or one AgenticMetadata that matches the filter.
+     * @param {AgenticMetadataFindUniqueArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AgenticMetadataFindUniqueArgs>(args: SelectSubset<T, AgenticMetadataFindUniqueArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AgenticMetadata that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AgenticMetadataFindUniqueOrThrowArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AgenticMetadataFindUniqueOrThrowArgs>(args: SelectSubset<T, AgenticMetadataFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AgenticMetadata that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindFirstArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AgenticMetadataFindFirstArgs>(args?: SelectSubset<T, AgenticMetadataFindFirstArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AgenticMetadata that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindFirstOrThrowArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AgenticMetadataFindFirstOrThrowArgs>(args?: SelectSubset<T, AgenticMetadataFindFirstOrThrowArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AgenticMetadata that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findMany()
+     * 
+     * // Get first 10 AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AgenticMetadataFindManyArgs>(args?: SelectSubset<T, AgenticMetadataFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AgenticMetadata.
+     * @param {AgenticMetadataCreateArgs} args - Arguments to create a AgenticMetadata.
+     * @example
+     * // Create one AgenticMetadata
+     * const AgenticMetadata = await prisma.agenticMetadata.create({
+     *   data: {
+     *     // ... data to create a AgenticMetadata
+     *   }
+     * })
+     * 
+     */
+    create<T extends AgenticMetadataCreateArgs>(args: SelectSubset<T, AgenticMetadataCreateArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AgenticMetadata.
+     * @param {AgenticMetadataCreateManyArgs} args - Arguments to create many AgenticMetadata.
+     * @example
+     * // Create many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AgenticMetadataCreateManyArgs>(args?: SelectSubset<T, AgenticMetadataCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AgenticMetadata and returns the data saved in the database.
+     * @param {AgenticMetadataCreateManyAndReturnArgs} args - Arguments to create many AgenticMetadata.
+     * @example
+     * // Create many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AgenticMetadata and only return the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AgenticMetadataCreateManyAndReturnArgs>(args?: SelectSubset<T, AgenticMetadataCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AgenticMetadata.
+     * @param {AgenticMetadataDeleteArgs} args - Arguments to delete one AgenticMetadata.
+     * @example
+     * // Delete one AgenticMetadata
+     * const AgenticMetadata = await prisma.agenticMetadata.delete({
+     *   where: {
+     *     // ... filter to delete one AgenticMetadata
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AgenticMetadataDeleteArgs>(args: SelectSubset<T, AgenticMetadataDeleteArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AgenticMetadata.
+     * @param {AgenticMetadataUpdateArgs} args - Arguments to update one AgenticMetadata.
+     * @example
+     * // Update one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AgenticMetadataUpdateArgs>(args: SelectSubset<T, AgenticMetadataUpdateArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AgenticMetadata.
+     * @param {AgenticMetadataDeleteManyArgs} args - Arguments to filter AgenticMetadata to delete.
+     * @example
+     * // Delete a few AgenticMetadata
+     * const { count } = await prisma.agenticMetadata.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AgenticMetadataDeleteManyArgs>(args?: SelectSubset<T, AgenticMetadataDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AgenticMetadataUpdateManyArgs>(args: SelectSubset<T, AgenticMetadataUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AgenticMetadata and returns the data updated in the database.
+     * @param {AgenticMetadataUpdateManyAndReturnArgs} args - Arguments to update many AgenticMetadata.
+     * @example
+     * // Update many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more AgenticMetadata and only return the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends AgenticMetadataUpdateManyAndReturnArgs>(args: SelectSubset<T, AgenticMetadataUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one AgenticMetadata.
+     * @param {AgenticMetadataUpsertArgs} args - Arguments to update or create a AgenticMetadata.
+     * @example
+     * // Update or create a AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.upsert({
+     *   create: {
+     *     // ... data to create a AgenticMetadata
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AgenticMetadata we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AgenticMetadataUpsertArgs>(args: SelectSubset<T, AgenticMetadataUpsertArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataCountArgs} args - Arguments to filter AgenticMetadata to count.
+     * @example
+     * // Count the number of AgenticMetadata
+     * const count = await prisma.agenticMetadata.count({
+     *   where: {
+     *     // ... the filter for the AgenticMetadata we want to count
+     *   }
+     * })
+    **/
+    count<T extends AgenticMetadataCountArgs>(
+      args?: Subset<T, AgenticMetadataCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AgenticMetadataCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AgenticMetadataAggregateArgs>(args: Subset<T, AgenticMetadataAggregateArgs>): Prisma.PrismaPromise<GetAgenticMetadataAggregateType<T>>
+
+    /**
+     * Group by AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AgenticMetadataGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AgenticMetadataGroupByArgs['orderBy'] }
+        : { orderBy?: AgenticMetadataGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AgenticMetadataGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAgenticMetadataGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AgenticMetadata model
+   */
+  readonly fields: AgenticMetadataFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AgenticMetadata.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AgenticMetadataClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    node<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AgenticMetadata model
+   */
+  interface AgenticMetadataFieldRefs {
+    readonly id: FieldRef<"AgenticMetadata", 'String'>
+    readonly nodeId: FieldRef<"AgenticMetadata", 'String'>
+    readonly tiptapJson: FieldRef<"AgenticMetadata", 'Json'>
+    readonly derivedText: FieldRef<"AgenticMetadata", 'String'>
+    readonly sectionsMeta: FieldRef<"AgenticMetadata", 'Json'>
+    readonly sourceContentHash: FieldRef<"AgenticMetadata", 'String'>
+    readonly contextDirty: FieldRef<"AgenticMetadata", 'Boolean'>
+    readonly summaryHash: FieldRef<"AgenticMetadata", 'String'>
+    readonly contextOptOut: FieldRef<"AgenticMetadata", 'Boolean'>
+    readonly model: FieldRef<"AgenticMetadata", 'String'>
+    readonly generatedAt: FieldRef<"AgenticMetadata", 'DateTime'>
+    readonly updatedAt: FieldRef<"AgenticMetadata", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AgenticMetadata findUnique
+   */
+  export type AgenticMetadataFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata findUniqueOrThrow
+   */
+  export type AgenticMetadataFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata findFirst
+   */
+  export type AgenticMetadataFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AgenticMetadata.
+     */
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata findFirstOrThrow
+   */
+  export type AgenticMetadataFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AgenticMetadata.
+     */
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata findMany
+   */
+  export type AgenticMetadataFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata create
+   */
+  export type AgenticMetadataCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataCreateInput, AgenticMetadataUncheckedCreateInput>
+  }
+
+  /**
+   * AgenticMetadata createMany
+   */
+  export type AgenticMetadataCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AgenticMetadata.
+     */
+    data: AgenticMetadataCreateManyInput | AgenticMetadataCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AgenticMetadata createManyAndReturn
+   */
+  export type AgenticMetadataCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * The data used to create many AgenticMetadata.
+     */
+    data: AgenticMetadataCreateManyInput | AgenticMetadataCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AgenticMetadata update
+   */
+  export type AgenticMetadataUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateInput, AgenticMetadataUncheckedUpdateInput>
+    /**
+     * Choose, which AgenticMetadata to update.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata updateMany
+   */
+  export type AgenticMetadataUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateManyMutationInput, AgenticMetadataUncheckedUpdateManyInput>
+    /**
+     * Filter which AgenticMetadata to update
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AgenticMetadata updateManyAndReturn
+   */
+  export type AgenticMetadataUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * The data used to update AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateManyMutationInput, AgenticMetadataUncheckedUpdateManyInput>
+    /**
+     * Filter which AgenticMetadata to update
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AgenticMetadata upsert
+   */
+  export type AgenticMetadataUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AgenticMetadata to update in case it exists.
+     */
+    where: AgenticMetadataWhereUniqueInput
+    /**
+     * In case the AgenticMetadata found by the `where` argument doesn't exist, create a new AgenticMetadata with this data.
+     */
+    create: XOR<AgenticMetadataCreateInput, AgenticMetadataUncheckedCreateInput>
+    /**
+     * In case the AgenticMetadata was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AgenticMetadataUpdateInput, AgenticMetadataUncheckedUpdateInput>
+  }
+
+  /**
+   * AgenticMetadata delete
+   */
+  export type AgenticMetadataDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter which AgenticMetadata to delete.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata deleteMany
+   */
+  export type AgenticMetadataDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AgenticMetadata to delete
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AgenticMetadata without action
+   */
+  export type AgenticMetadataDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model StudioSourceSelection
+   */
+
+  export type AggregateStudioSourceSelection = {
+    _count: StudioSourceSelectionCountAggregateOutputType | null
+    _avg: StudioSourceSelectionAvgAggregateOutputType | null
+    _sum: StudioSourceSelectionSumAggregateOutputType | null
+    _min: StudioSourceSelectionMinAggregateOutputType | null
+    _max: StudioSourceSelectionMaxAggregateOutputType | null
+  }
+
+  export type StudioSourceSelectionAvgAggregateOutputType = {
+    tokenBudget: number | null
+  }
+
+  export type StudioSourceSelectionSumAggregateOutputType = {
+    tokenBudget: number | null
+  }
+
+  export type StudioSourceSelectionMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    folderId: string | null
+    tokenBudget: number | null
+    updatedAt: Date | null
+  }
+
+  export type StudioSourceSelectionMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    folderId: string | null
+    tokenBudget: number | null
+    updatedAt: Date | null
+  }
+
+  export type StudioSourceSelectionCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    folderId: number
+    includedNodeIds: number
+    excludedNodeIds: number
+    tokenBudget: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type StudioSourceSelectionAvgAggregateInputType = {
+    tokenBudget?: true
+  }
+
+  export type StudioSourceSelectionSumAggregateInputType = {
+    tokenBudget?: true
+  }
+
+  export type StudioSourceSelectionMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    tokenBudget?: true
+    updatedAt?: true
+  }
+
+  export type StudioSourceSelectionMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    tokenBudget?: true
+    updatedAt?: true
+  }
+
+  export type StudioSourceSelectionCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    includedNodeIds?: true
+    excludedNodeIds?: true
+    tokenBudget?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type StudioSourceSelectionAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioSourceSelection to aggregate.
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioSourceSelections to fetch.
+     */
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioSourceSelections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioSourceSelections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned StudioSourceSelections
+    **/
+    _count?: true | StudioSourceSelectionCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: StudioSourceSelectionAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: StudioSourceSelectionSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: StudioSourceSelectionMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: StudioSourceSelectionMaxAggregateInputType
+  }
+
+  export type GetStudioSourceSelectionAggregateType<T extends StudioSourceSelectionAggregateArgs> = {
+        [P in keyof T & keyof AggregateStudioSourceSelection]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateStudioSourceSelection[P]>
+      : GetScalarType<T[P], AggregateStudioSourceSelection[P]>
+  }
+
+
+
+
+  export type StudioSourceSelectionGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioSourceSelectionWhereInput
+    orderBy?: StudioSourceSelectionOrderByWithAggregationInput | StudioSourceSelectionOrderByWithAggregationInput[]
+    by: StudioSourceSelectionScalarFieldEnum[] | StudioSourceSelectionScalarFieldEnum
+    having?: StudioSourceSelectionScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: StudioSourceSelectionCountAggregateInputType | true
+    _avg?: StudioSourceSelectionAvgAggregateInputType
+    _sum?: StudioSourceSelectionSumAggregateInputType
+    _min?: StudioSourceSelectionMinAggregateInputType
+    _max?: StudioSourceSelectionMaxAggregateInputType
+  }
+
+  export type StudioSourceSelectionGroupByOutputType = {
+    id: string
+    ownerId: string
+    folderId: string
+    includedNodeIds: JsonValue
+    excludedNodeIds: JsonValue
+    tokenBudget: number
+    updatedAt: Date
+    _count: StudioSourceSelectionCountAggregateOutputType | null
+    _avg: StudioSourceSelectionAvgAggregateOutputType | null
+    _sum: StudioSourceSelectionSumAggregateOutputType | null
+    _min: StudioSourceSelectionMinAggregateOutputType | null
+    _max: StudioSourceSelectionMaxAggregateOutputType | null
+  }
+
+  type GetStudioSourceSelectionGroupByPayload<T extends StudioSourceSelectionGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<StudioSourceSelectionGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof StudioSourceSelectionGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], StudioSourceSelectionGroupByOutputType[P]>
+            : GetScalarType<T[P], StudioSourceSelectionGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type StudioSourceSelectionSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    includedNodeIds?: boolean
+    excludedNodeIds?: boolean
+    tokenBudget?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioSourceSelection"]>
+
+  export type StudioSourceSelectionSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    includedNodeIds?: boolean
+    excludedNodeIds?: boolean
+    tokenBudget?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioSourceSelection"]>
+
+  export type StudioSourceSelectionSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    includedNodeIds?: boolean
+    excludedNodeIds?: boolean
+    tokenBudget?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioSourceSelection"]>
+
+  export type StudioSourceSelectionSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    includedNodeIds?: boolean
+    excludedNodeIds?: boolean
+    tokenBudget?: boolean
+    updatedAt?: boolean
+  }
+
+  export type StudioSourceSelectionOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "folderId" | "includedNodeIds" | "excludedNodeIds" | "tokenBudget" | "updatedAt", ExtArgs["result"]["studioSourceSelection"]>
+  export type StudioSourceSelectionInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type StudioSourceSelectionIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type StudioSourceSelectionIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $StudioSourceSelectionPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "StudioSourceSelection"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      folder: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      folderId: string
+      includedNodeIds: Prisma.JsonValue
+      excludedNodeIds: Prisma.JsonValue
+      tokenBudget: number
+      updatedAt: Date
+    }, ExtArgs["result"]["studioSourceSelection"]>
+    composites: {}
+  }
+
+  type StudioSourceSelectionGetPayload<S extends boolean | null | undefined | StudioSourceSelectionDefaultArgs> = $Result.GetResult<Prisma.$StudioSourceSelectionPayload, S>
+
+  type StudioSourceSelectionCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<StudioSourceSelectionFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: StudioSourceSelectionCountAggregateInputType | true
+    }
+
+  export interface StudioSourceSelectionDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['StudioSourceSelection'], meta: { name: 'StudioSourceSelection' } }
+    /**
+     * Find zero or one StudioSourceSelection that matches the filter.
+     * @param {StudioSourceSelectionFindUniqueArgs} args - Arguments to find a StudioSourceSelection
+     * @example
+     * // Get one StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends StudioSourceSelectionFindUniqueArgs>(args: SelectSubset<T, StudioSourceSelectionFindUniqueArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one StudioSourceSelection that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {StudioSourceSelectionFindUniqueOrThrowArgs} args - Arguments to find a StudioSourceSelection
+     * @example
+     * // Get one StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends StudioSourceSelectionFindUniqueOrThrowArgs>(args: SelectSubset<T, StudioSourceSelectionFindUniqueOrThrowArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioSourceSelection that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionFindFirstArgs} args - Arguments to find a StudioSourceSelection
+     * @example
+     * // Get one StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends StudioSourceSelectionFindFirstArgs>(args?: SelectSubset<T, StudioSourceSelectionFindFirstArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioSourceSelection that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionFindFirstOrThrowArgs} args - Arguments to find a StudioSourceSelection
+     * @example
+     * // Get one StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends StudioSourceSelectionFindFirstOrThrowArgs>(args?: SelectSubset<T, StudioSourceSelectionFindFirstOrThrowArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more StudioSourceSelections that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all StudioSourceSelections
+     * const studioSourceSelections = await prisma.studioSourceSelection.findMany()
+     * 
+     * // Get first 10 StudioSourceSelections
+     * const studioSourceSelections = await prisma.studioSourceSelection.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const studioSourceSelectionWithIdOnly = await prisma.studioSourceSelection.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends StudioSourceSelectionFindManyArgs>(args?: SelectSubset<T, StudioSourceSelectionFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a StudioSourceSelection.
+     * @param {StudioSourceSelectionCreateArgs} args - Arguments to create a StudioSourceSelection.
+     * @example
+     * // Create one StudioSourceSelection
+     * const StudioSourceSelection = await prisma.studioSourceSelection.create({
+     *   data: {
+     *     // ... data to create a StudioSourceSelection
+     *   }
+     * })
+     * 
+     */
+    create<T extends StudioSourceSelectionCreateArgs>(args: SelectSubset<T, StudioSourceSelectionCreateArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many StudioSourceSelections.
+     * @param {StudioSourceSelectionCreateManyArgs} args - Arguments to create many StudioSourceSelections.
+     * @example
+     * // Create many StudioSourceSelections
+     * const studioSourceSelection = await prisma.studioSourceSelection.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends StudioSourceSelectionCreateManyArgs>(args?: SelectSubset<T, StudioSourceSelectionCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many StudioSourceSelections and returns the data saved in the database.
+     * @param {StudioSourceSelectionCreateManyAndReturnArgs} args - Arguments to create many StudioSourceSelections.
+     * @example
+     * // Create many StudioSourceSelections
+     * const studioSourceSelection = await prisma.studioSourceSelection.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many StudioSourceSelections and only return the `id`
+     * const studioSourceSelectionWithIdOnly = await prisma.studioSourceSelection.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends StudioSourceSelectionCreateManyAndReturnArgs>(args?: SelectSubset<T, StudioSourceSelectionCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a StudioSourceSelection.
+     * @param {StudioSourceSelectionDeleteArgs} args - Arguments to delete one StudioSourceSelection.
+     * @example
+     * // Delete one StudioSourceSelection
+     * const StudioSourceSelection = await prisma.studioSourceSelection.delete({
+     *   where: {
+     *     // ... filter to delete one StudioSourceSelection
+     *   }
+     * })
+     * 
+     */
+    delete<T extends StudioSourceSelectionDeleteArgs>(args: SelectSubset<T, StudioSourceSelectionDeleteArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one StudioSourceSelection.
+     * @param {StudioSourceSelectionUpdateArgs} args - Arguments to update one StudioSourceSelection.
+     * @example
+     * // Update one StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends StudioSourceSelectionUpdateArgs>(args: SelectSubset<T, StudioSourceSelectionUpdateArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more StudioSourceSelections.
+     * @param {StudioSourceSelectionDeleteManyArgs} args - Arguments to filter StudioSourceSelections to delete.
+     * @example
+     * // Delete a few StudioSourceSelections
+     * const { count } = await prisma.studioSourceSelection.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends StudioSourceSelectionDeleteManyArgs>(args?: SelectSubset<T, StudioSourceSelectionDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioSourceSelections.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many StudioSourceSelections
+     * const studioSourceSelection = await prisma.studioSourceSelection.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends StudioSourceSelectionUpdateManyArgs>(args: SelectSubset<T, StudioSourceSelectionUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioSourceSelections and returns the data updated in the database.
+     * @param {StudioSourceSelectionUpdateManyAndReturnArgs} args - Arguments to update many StudioSourceSelections.
+     * @example
+     * // Update many StudioSourceSelections
+     * const studioSourceSelection = await prisma.studioSourceSelection.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more StudioSourceSelections and only return the `id`
+     * const studioSourceSelectionWithIdOnly = await prisma.studioSourceSelection.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends StudioSourceSelectionUpdateManyAndReturnArgs>(args: SelectSubset<T, StudioSourceSelectionUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one StudioSourceSelection.
+     * @param {StudioSourceSelectionUpsertArgs} args - Arguments to update or create a StudioSourceSelection.
+     * @example
+     * // Update or create a StudioSourceSelection
+     * const studioSourceSelection = await prisma.studioSourceSelection.upsert({
+     *   create: {
+     *     // ... data to create a StudioSourceSelection
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the StudioSourceSelection we want to update
+     *   }
+     * })
+     */
+    upsert<T extends StudioSourceSelectionUpsertArgs>(args: SelectSubset<T, StudioSourceSelectionUpsertArgs<ExtArgs>>): Prisma__StudioSourceSelectionClient<$Result.GetResult<Prisma.$StudioSourceSelectionPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of StudioSourceSelections.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionCountArgs} args - Arguments to filter StudioSourceSelections to count.
+     * @example
+     * // Count the number of StudioSourceSelections
+     * const count = await prisma.studioSourceSelection.count({
+     *   where: {
+     *     // ... the filter for the StudioSourceSelections we want to count
+     *   }
+     * })
+    **/
+    count<T extends StudioSourceSelectionCountArgs>(
+      args?: Subset<T, StudioSourceSelectionCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], StudioSourceSelectionCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a StudioSourceSelection.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends StudioSourceSelectionAggregateArgs>(args: Subset<T, StudioSourceSelectionAggregateArgs>): Prisma.PrismaPromise<GetStudioSourceSelectionAggregateType<T>>
+
+    /**
+     * Group by StudioSourceSelection.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioSourceSelectionGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends StudioSourceSelectionGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: StudioSourceSelectionGroupByArgs['orderBy'] }
+        : { orderBy?: StudioSourceSelectionGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, StudioSourceSelectionGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetStudioSourceSelectionGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the StudioSourceSelection model
+   */
+  readonly fields: StudioSourceSelectionFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for StudioSourceSelection.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__StudioSourceSelectionClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    folder<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the StudioSourceSelection model
+   */
+  interface StudioSourceSelectionFieldRefs {
+    readonly id: FieldRef<"StudioSourceSelection", 'String'>
+    readonly ownerId: FieldRef<"StudioSourceSelection", 'String'>
+    readonly folderId: FieldRef<"StudioSourceSelection", 'String'>
+    readonly includedNodeIds: FieldRef<"StudioSourceSelection", 'Json'>
+    readonly excludedNodeIds: FieldRef<"StudioSourceSelection", 'Json'>
+    readonly tokenBudget: FieldRef<"StudioSourceSelection", 'Int'>
+    readonly updatedAt: FieldRef<"StudioSourceSelection", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * StudioSourceSelection findUnique
+   */
+  export type StudioSourceSelectionFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioSourceSelection to fetch.
+     */
+    where: StudioSourceSelectionWhereUniqueInput
+  }
+
+  /**
+   * StudioSourceSelection findUniqueOrThrow
+   */
+  export type StudioSourceSelectionFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioSourceSelection to fetch.
+     */
+    where: StudioSourceSelectionWhereUniqueInput
+  }
+
+  /**
+   * StudioSourceSelection findFirst
+   */
+  export type StudioSourceSelectionFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioSourceSelection to fetch.
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioSourceSelections to fetch.
+     */
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioSourceSelections.
+     */
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioSourceSelections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioSourceSelections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioSourceSelections.
+     */
+    distinct?: StudioSourceSelectionScalarFieldEnum | StudioSourceSelectionScalarFieldEnum[]
+  }
+
+  /**
+   * StudioSourceSelection findFirstOrThrow
+   */
+  export type StudioSourceSelectionFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioSourceSelection to fetch.
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioSourceSelections to fetch.
+     */
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioSourceSelections.
+     */
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioSourceSelections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioSourceSelections.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioSourceSelections.
+     */
+    distinct?: StudioSourceSelectionScalarFieldEnum | StudioSourceSelectionScalarFieldEnum[]
+  }
+
+  /**
+   * StudioSourceSelection findMany
+   */
+  export type StudioSourceSelectionFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioSourceSelections to fetch.
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioSourceSelections to fetch.
+     */
+    orderBy?: StudioSourceSelectionOrderByWithRelationInput | StudioSourceSelectionOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing StudioSourceSelections.
+     */
+    cursor?: StudioSourceSelectionWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioSourceSelections from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioSourceSelections.
+     */
+    skip?: number
+    distinct?: StudioSourceSelectionScalarFieldEnum | StudioSourceSelectionScalarFieldEnum[]
+  }
+
+  /**
+   * StudioSourceSelection create
+   */
+  export type StudioSourceSelectionCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * The data needed to create a StudioSourceSelection.
+     */
+    data: XOR<StudioSourceSelectionCreateInput, StudioSourceSelectionUncheckedCreateInput>
+  }
+
+  /**
+   * StudioSourceSelection createMany
+   */
+  export type StudioSourceSelectionCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many StudioSourceSelections.
+     */
+    data: StudioSourceSelectionCreateManyInput | StudioSourceSelectionCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * StudioSourceSelection createManyAndReturn
+   */
+  export type StudioSourceSelectionCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * The data used to create many StudioSourceSelections.
+     */
+    data: StudioSourceSelectionCreateManyInput | StudioSourceSelectionCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioSourceSelection update
+   */
+  export type StudioSourceSelectionUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * The data needed to update a StudioSourceSelection.
+     */
+    data: XOR<StudioSourceSelectionUpdateInput, StudioSourceSelectionUncheckedUpdateInput>
+    /**
+     * Choose, which StudioSourceSelection to update.
+     */
+    where: StudioSourceSelectionWhereUniqueInput
+  }
+
+  /**
+   * StudioSourceSelection updateMany
+   */
+  export type StudioSourceSelectionUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update StudioSourceSelections.
+     */
+    data: XOR<StudioSourceSelectionUpdateManyMutationInput, StudioSourceSelectionUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioSourceSelections to update
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * Limit how many StudioSourceSelections to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioSourceSelection updateManyAndReturn
+   */
+  export type StudioSourceSelectionUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * The data used to update StudioSourceSelections.
+     */
+    data: XOR<StudioSourceSelectionUpdateManyMutationInput, StudioSourceSelectionUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioSourceSelections to update
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * Limit how many StudioSourceSelections to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioSourceSelection upsert
+   */
+  export type StudioSourceSelectionUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * The filter to search for the StudioSourceSelection to update in case it exists.
+     */
+    where: StudioSourceSelectionWhereUniqueInput
+    /**
+     * In case the StudioSourceSelection found by the `where` argument doesn't exist, create a new StudioSourceSelection with this data.
+     */
+    create: XOR<StudioSourceSelectionCreateInput, StudioSourceSelectionUncheckedCreateInput>
+    /**
+     * In case the StudioSourceSelection was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<StudioSourceSelectionUpdateInput, StudioSourceSelectionUncheckedUpdateInput>
+  }
+
+  /**
+   * StudioSourceSelection delete
+   */
+  export type StudioSourceSelectionDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+    /**
+     * Filter which StudioSourceSelection to delete.
+     */
+    where: StudioSourceSelectionWhereUniqueInput
+  }
+
+  /**
+   * StudioSourceSelection deleteMany
+   */
+  export type StudioSourceSelectionDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioSourceSelections to delete
+     */
+    where?: StudioSourceSelectionWhereInput
+    /**
+     * Limit how many StudioSourceSelections to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioSourceSelection without action
+   */
+  export type StudioSourceSelectionDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioSourceSelection
+     */
+    select?: StudioSourceSelectionSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioSourceSelection
+     */
+    omit?: StudioSourceSelectionOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioSourceSelectionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model StudioGenerationRun
+   */
+
+  export type AggregateStudioGenerationRun = {
+    _count: StudioGenerationRunCountAggregateOutputType | null
+    _avg: StudioGenerationRunAvgAggregateOutputType | null
+    _sum: StudioGenerationRunSumAggregateOutputType | null
+    _min: StudioGenerationRunMinAggregateOutputType | null
+    _max: StudioGenerationRunMaxAggregateOutputType | null
+  }
+
+  export type StudioGenerationRunAvgAggregateOutputType = {
+    stepIndex: number | null
+    stepTotal: number | null
+  }
+
+  export type StudioGenerationRunSumAggregateOutputType = {
+    stepIndex: number | null
+    stepTotal: number | null
+  }
+
+  export type StudioGenerationRunMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    folderId: string | null
+    toolId: string | null
+    variantId: string | null
+    status: string | null
+    stepIndex: number | null
+    stepTotal: number | null
+    stepLabel: string | null
+    outputNodeId: string | null
+    outputBodyHash: string | null
+    error: string | null
+    promptSnapshot: string | null
+    model: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type StudioGenerationRunMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    folderId: string | null
+    toolId: string | null
+    variantId: string | null
+    status: string | null
+    stepIndex: number | null
+    stepTotal: number | null
+    stepLabel: string | null
+    outputNodeId: string | null
+    outputBodyHash: string | null
+    error: string | null
+    promptSnapshot: string | null
+    model: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type StudioGenerationRunCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    folderId: number
+    toolId: number
+    variantId: number
+    sourceNodeIds: number
+    status: number
+    stepIndex: number
+    stepTotal: number
+    stepLabel: number
+    outputNodeId: number
+    outputBodyHash: number
+    error: number
+    promptSnapshot: number
+    model: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type StudioGenerationRunAvgAggregateInputType = {
+    stepIndex?: true
+    stepTotal?: true
+  }
+
+  export type StudioGenerationRunSumAggregateInputType = {
+    stepIndex?: true
+    stepTotal?: true
+  }
+
+  export type StudioGenerationRunMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    toolId?: true
+    variantId?: true
+    status?: true
+    stepIndex?: true
+    stepTotal?: true
+    stepLabel?: true
+    outputNodeId?: true
+    outputBodyHash?: true
+    error?: true
+    promptSnapshot?: true
+    model?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type StudioGenerationRunMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    toolId?: true
+    variantId?: true
+    status?: true
+    stepIndex?: true
+    stepTotal?: true
+    stepLabel?: true
+    outputNodeId?: true
+    outputBodyHash?: true
+    error?: true
+    promptSnapshot?: true
+    model?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type StudioGenerationRunCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    folderId?: true
+    toolId?: true
+    variantId?: true
+    sourceNodeIds?: true
+    status?: true
+    stepIndex?: true
+    stepTotal?: true
+    stepLabel?: true
+    outputNodeId?: true
+    outputBodyHash?: true
+    error?: true
+    promptSnapshot?: true
+    model?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type StudioGenerationRunAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioGenerationRun to aggregate.
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioGenerationRuns to fetch.
+     */
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: StudioGenerationRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioGenerationRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioGenerationRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned StudioGenerationRuns
+    **/
+    _count?: true | StudioGenerationRunCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: StudioGenerationRunAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: StudioGenerationRunSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: StudioGenerationRunMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: StudioGenerationRunMaxAggregateInputType
+  }
+
+  export type GetStudioGenerationRunAggregateType<T extends StudioGenerationRunAggregateArgs> = {
+        [P in keyof T & keyof AggregateStudioGenerationRun]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateStudioGenerationRun[P]>
+      : GetScalarType<T[P], AggregateStudioGenerationRun[P]>
+  }
+
+
+
+
+  export type StudioGenerationRunGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioGenerationRunWhereInput
+    orderBy?: StudioGenerationRunOrderByWithAggregationInput | StudioGenerationRunOrderByWithAggregationInput[]
+    by: StudioGenerationRunScalarFieldEnum[] | StudioGenerationRunScalarFieldEnum
+    having?: StudioGenerationRunScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: StudioGenerationRunCountAggregateInputType | true
+    _avg?: StudioGenerationRunAvgAggregateInputType
+    _sum?: StudioGenerationRunSumAggregateInputType
+    _min?: StudioGenerationRunMinAggregateInputType
+    _max?: StudioGenerationRunMaxAggregateInputType
+  }
+
+  export type StudioGenerationRunGroupByOutputType = {
+    id: string
+    ownerId: string
+    folderId: string
+    toolId: string
+    variantId: string | null
+    sourceNodeIds: JsonValue
+    status: string
+    stepIndex: number
+    stepTotal: number
+    stepLabel: string
+    outputNodeId: string | null
+    outputBodyHash: string | null
+    error: string | null
+    promptSnapshot: string
+    model: string
+    createdAt: Date
+    updatedAt: Date
+    _count: StudioGenerationRunCountAggregateOutputType | null
+    _avg: StudioGenerationRunAvgAggregateOutputType | null
+    _sum: StudioGenerationRunSumAggregateOutputType | null
+    _min: StudioGenerationRunMinAggregateOutputType | null
+    _max: StudioGenerationRunMaxAggregateOutputType | null
+  }
+
+  type GetStudioGenerationRunGroupByPayload<T extends StudioGenerationRunGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<StudioGenerationRunGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof StudioGenerationRunGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], StudioGenerationRunGroupByOutputType[P]>
+            : GetScalarType<T[P], StudioGenerationRunGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type StudioGenerationRunSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    toolId?: boolean
+    variantId?: boolean
+    sourceNodeIds?: boolean
+    status?: boolean
+    stepIndex?: boolean
+    stepTotal?: boolean
+    stepLabel?: boolean
+    outputNodeId?: boolean
+    outputBodyHash?: boolean
+    error?: boolean
+    promptSnapshot?: boolean
+    model?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioGenerationRun"]>
+
+  export type StudioGenerationRunSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    toolId?: boolean
+    variantId?: boolean
+    sourceNodeIds?: boolean
+    status?: boolean
+    stepIndex?: boolean
+    stepTotal?: boolean
+    stepLabel?: boolean
+    outputNodeId?: boolean
+    outputBodyHash?: boolean
+    error?: boolean
+    promptSnapshot?: boolean
+    model?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioGenerationRun"]>
+
+  export type StudioGenerationRunSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    toolId?: boolean
+    variantId?: boolean
+    sourceNodeIds?: boolean
+    status?: boolean
+    stepIndex?: boolean
+    stepTotal?: boolean
+    stepLabel?: boolean
+    outputNodeId?: boolean
+    outputBodyHash?: boolean
+    error?: boolean
+    promptSnapshot?: boolean
+    model?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioGenerationRun"]>
+
+  export type StudioGenerationRunSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    folderId?: boolean
+    toolId?: boolean
+    variantId?: boolean
+    sourceNodeIds?: boolean
+    status?: boolean
+    stepIndex?: boolean
+    stepTotal?: boolean
+    stepLabel?: boolean
+    outputNodeId?: boolean
+    outputBodyHash?: boolean
+    error?: boolean
+    promptSnapshot?: boolean
+    model?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type StudioGenerationRunOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "folderId" | "toolId" | "variantId" | "sourceNodeIds" | "status" | "stepIndex" | "stepTotal" | "stepLabel" | "outputNodeId" | "outputBodyHash" | "error" | "promptSnapshot" | "model" | "createdAt" | "updatedAt", ExtArgs["result"]["studioGenerationRun"]>
+  export type StudioGenerationRunInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type StudioGenerationRunIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type StudioGenerationRunIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+    folder?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $StudioGenerationRunPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "StudioGenerationRun"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+      folder: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      folderId: string
+      toolId: string
+      variantId: string | null
+      sourceNodeIds: Prisma.JsonValue
+      status: string
+      stepIndex: number
+      stepTotal: number
+      stepLabel: string
+      outputNodeId: string | null
+      outputBodyHash: string | null
+      error: string | null
+      promptSnapshot: string
+      model: string
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["studioGenerationRun"]>
+    composites: {}
+  }
+
+  type StudioGenerationRunGetPayload<S extends boolean | null | undefined | StudioGenerationRunDefaultArgs> = $Result.GetResult<Prisma.$StudioGenerationRunPayload, S>
+
+  type StudioGenerationRunCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<StudioGenerationRunFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: StudioGenerationRunCountAggregateInputType | true
+    }
+
+  export interface StudioGenerationRunDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['StudioGenerationRun'], meta: { name: 'StudioGenerationRun' } }
+    /**
+     * Find zero or one StudioGenerationRun that matches the filter.
+     * @param {StudioGenerationRunFindUniqueArgs} args - Arguments to find a StudioGenerationRun
+     * @example
+     * // Get one StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends StudioGenerationRunFindUniqueArgs>(args: SelectSubset<T, StudioGenerationRunFindUniqueArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one StudioGenerationRun that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {StudioGenerationRunFindUniqueOrThrowArgs} args - Arguments to find a StudioGenerationRun
+     * @example
+     * // Get one StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends StudioGenerationRunFindUniqueOrThrowArgs>(args: SelectSubset<T, StudioGenerationRunFindUniqueOrThrowArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioGenerationRun that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunFindFirstArgs} args - Arguments to find a StudioGenerationRun
+     * @example
+     * // Get one StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends StudioGenerationRunFindFirstArgs>(args?: SelectSubset<T, StudioGenerationRunFindFirstArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioGenerationRun that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunFindFirstOrThrowArgs} args - Arguments to find a StudioGenerationRun
+     * @example
+     * // Get one StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends StudioGenerationRunFindFirstOrThrowArgs>(args?: SelectSubset<T, StudioGenerationRunFindFirstOrThrowArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more StudioGenerationRuns that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all StudioGenerationRuns
+     * const studioGenerationRuns = await prisma.studioGenerationRun.findMany()
+     * 
+     * // Get first 10 StudioGenerationRuns
+     * const studioGenerationRuns = await prisma.studioGenerationRun.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const studioGenerationRunWithIdOnly = await prisma.studioGenerationRun.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends StudioGenerationRunFindManyArgs>(args?: SelectSubset<T, StudioGenerationRunFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a StudioGenerationRun.
+     * @param {StudioGenerationRunCreateArgs} args - Arguments to create a StudioGenerationRun.
+     * @example
+     * // Create one StudioGenerationRun
+     * const StudioGenerationRun = await prisma.studioGenerationRun.create({
+     *   data: {
+     *     // ... data to create a StudioGenerationRun
+     *   }
+     * })
+     * 
+     */
+    create<T extends StudioGenerationRunCreateArgs>(args: SelectSubset<T, StudioGenerationRunCreateArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many StudioGenerationRuns.
+     * @param {StudioGenerationRunCreateManyArgs} args - Arguments to create many StudioGenerationRuns.
+     * @example
+     * // Create many StudioGenerationRuns
+     * const studioGenerationRun = await prisma.studioGenerationRun.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends StudioGenerationRunCreateManyArgs>(args?: SelectSubset<T, StudioGenerationRunCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many StudioGenerationRuns and returns the data saved in the database.
+     * @param {StudioGenerationRunCreateManyAndReturnArgs} args - Arguments to create many StudioGenerationRuns.
+     * @example
+     * // Create many StudioGenerationRuns
+     * const studioGenerationRun = await prisma.studioGenerationRun.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many StudioGenerationRuns and only return the `id`
+     * const studioGenerationRunWithIdOnly = await prisma.studioGenerationRun.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends StudioGenerationRunCreateManyAndReturnArgs>(args?: SelectSubset<T, StudioGenerationRunCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a StudioGenerationRun.
+     * @param {StudioGenerationRunDeleteArgs} args - Arguments to delete one StudioGenerationRun.
+     * @example
+     * // Delete one StudioGenerationRun
+     * const StudioGenerationRun = await prisma.studioGenerationRun.delete({
+     *   where: {
+     *     // ... filter to delete one StudioGenerationRun
+     *   }
+     * })
+     * 
+     */
+    delete<T extends StudioGenerationRunDeleteArgs>(args: SelectSubset<T, StudioGenerationRunDeleteArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one StudioGenerationRun.
+     * @param {StudioGenerationRunUpdateArgs} args - Arguments to update one StudioGenerationRun.
+     * @example
+     * // Update one StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends StudioGenerationRunUpdateArgs>(args: SelectSubset<T, StudioGenerationRunUpdateArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more StudioGenerationRuns.
+     * @param {StudioGenerationRunDeleteManyArgs} args - Arguments to filter StudioGenerationRuns to delete.
+     * @example
+     * // Delete a few StudioGenerationRuns
+     * const { count } = await prisma.studioGenerationRun.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends StudioGenerationRunDeleteManyArgs>(args?: SelectSubset<T, StudioGenerationRunDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioGenerationRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many StudioGenerationRuns
+     * const studioGenerationRun = await prisma.studioGenerationRun.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends StudioGenerationRunUpdateManyArgs>(args: SelectSubset<T, StudioGenerationRunUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioGenerationRuns and returns the data updated in the database.
+     * @param {StudioGenerationRunUpdateManyAndReturnArgs} args - Arguments to update many StudioGenerationRuns.
+     * @example
+     * // Update many StudioGenerationRuns
+     * const studioGenerationRun = await prisma.studioGenerationRun.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more StudioGenerationRuns and only return the `id`
+     * const studioGenerationRunWithIdOnly = await prisma.studioGenerationRun.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends StudioGenerationRunUpdateManyAndReturnArgs>(args: SelectSubset<T, StudioGenerationRunUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one StudioGenerationRun.
+     * @param {StudioGenerationRunUpsertArgs} args - Arguments to update or create a StudioGenerationRun.
+     * @example
+     * // Update or create a StudioGenerationRun
+     * const studioGenerationRun = await prisma.studioGenerationRun.upsert({
+     *   create: {
+     *     // ... data to create a StudioGenerationRun
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the StudioGenerationRun we want to update
+     *   }
+     * })
+     */
+    upsert<T extends StudioGenerationRunUpsertArgs>(args: SelectSubset<T, StudioGenerationRunUpsertArgs<ExtArgs>>): Prisma__StudioGenerationRunClient<$Result.GetResult<Prisma.$StudioGenerationRunPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of StudioGenerationRuns.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunCountArgs} args - Arguments to filter StudioGenerationRuns to count.
+     * @example
+     * // Count the number of StudioGenerationRuns
+     * const count = await prisma.studioGenerationRun.count({
+     *   where: {
+     *     // ... the filter for the StudioGenerationRuns we want to count
+     *   }
+     * })
+    **/
+    count<T extends StudioGenerationRunCountArgs>(
+      args?: Subset<T, StudioGenerationRunCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], StudioGenerationRunCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a StudioGenerationRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends StudioGenerationRunAggregateArgs>(args: Subset<T, StudioGenerationRunAggregateArgs>): Prisma.PrismaPromise<GetStudioGenerationRunAggregateType<T>>
+
+    /**
+     * Group by StudioGenerationRun.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioGenerationRunGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends StudioGenerationRunGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: StudioGenerationRunGroupByArgs['orderBy'] }
+        : { orderBy?: StudioGenerationRunGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, StudioGenerationRunGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetStudioGenerationRunGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the StudioGenerationRun model
+   */
+  readonly fields: StudioGenerationRunFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for StudioGenerationRun.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__StudioGenerationRunClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    folder<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the StudioGenerationRun model
+   */
+  interface StudioGenerationRunFieldRefs {
+    readonly id: FieldRef<"StudioGenerationRun", 'String'>
+    readonly ownerId: FieldRef<"StudioGenerationRun", 'String'>
+    readonly folderId: FieldRef<"StudioGenerationRun", 'String'>
+    readonly toolId: FieldRef<"StudioGenerationRun", 'String'>
+    readonly variantId: FieldRef<"StudioGenerationRun", 'String'>
+    readonly sourceNodeIds: FieldRef<"StudioGenerationRun", 'Json'>
+    readonly status: FieldRef<"StudioGenerationRun", 'String'>
+    readonly stepIndex: FieldRef<"StudioGenerationRun", 'Int'>
+    readonly stepTotal: FieldRef<"StudioGenerationRun", 'Int'>
+    readonly stepLabel: FieldRef<"StudioGenerationRun", 'String'>
+    readonly outputNodeId: FieldRef<"StudioGenerationRun", 'String'>
+    readonly outputBodyHash: FieldRef<"StudioGenerationRun", 'String'>
+    readonly error: FieldRef<"StudioGenerationRun", 'String'>
+    readonly promptSnapshot: FieldRef<"StudioGenerationRun", 'String'>
+    readonly model: FieldRef<"StudioGenerationRun", 'String'>
+    readonly createdAt: FieldRef<"StudioGenerationRun", 'DateTime'>
+    readonly updatedAt: FieldRef<"StudioGenerationRun", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * StudioGenerationRun findUnique
+   */
+  export type StudioGenerationRunFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioGenerationRun to fetch.
+     */
+    where: StudioGenerationRunWhereUniqueInput
+  }
+
+  /**
+   * StudioGenerationRun findUniqueOrThrow
+   */
+  export type StudioGenerationRunFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioGenerationRun to fetch.
+     */
+    where: StudioGenerationRunWhereUniqueInput
+  }
+
+  /**
+   * StudioGenerationRun findFirst
+   */
+  export type StudioGenerationRunFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioGenerationRun to fetch.
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioGenerationRuns to fetch.
+     */
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioGenerationRuns.
+     */
+    cursor?: StudioGenerationRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioGenerationRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioGenerationRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioGenerationRuns.
+     */
+    distinct?: StudioGenerationRunScalarFieldEnum | StudioGenerationRunScalarFieldEnum[]
+  }
+
+  /**
+   * StudioGenerationRun findFirstOrThrow
+   */
+  export type StudioGenerationRunFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioGenerationRun to fetch.
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioGenerationRuns to fetch.
+     */
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioGenerationRuns.
+     */
+    cursor?: StudioGenerationRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioGenerationRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioGenerationRuns.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioGenerationRuns.
+     */
+    distinct?: StudioGenerationRunScalarFieldEnum | StudioGenerationRunScalarFieldEnum[]
+  }
+
+  /**
+   * StudioGenerationRun findMany
+   */
+  export type StudioGenerationRunFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioGenerationRuns to fetch.
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioGenerationRuns to fetch.
+     */
+    orderBy?: StudioGenerationRunOrderByWithRelationInput | StudioGenerationRunOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing StudioGenerationRuns.
+     */
+    cursor?: StudioGenerationRunWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioGenerationRuns from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioGenerationRuns.
+     */
+    skip?: number
+    distinct?: StudioGenerationRunScalarFieldEnum | StudioGenerationRunScalarFieldEnum[]
+  }
+
+  /**
+   * StudioGenerationRun create
+   */
+  export type StudioGenerationRunCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * The data needed to create a StudioGenerationRun.
+     */
+    data: XOR<StudioGenerationRunCreateInput, StudioGenerationRunUncheckedCreateInput>
+  }
+
+  /**
+   * StudioGenerationRun createMany
+   */
+  export type StudioGenerationRunCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many StudioGenerationRuns.
+     */
+    data: StudioGenerationRunCreateManyInput | StudioGenerationRunCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * StudioGenerationRun createManyAndReturn
+   */
+  export type StudioGenerationRunCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * The data used to create many StudioGenerationRuns.
+     */
+    data: StudioGenerationRunCreateManyInput | StudioGenerationRunCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioGenerationRun update
+   */
+  export type StudioGenerationRunUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * The data needed to update a StudioGenerationRun.
+     */
+    data: XOR<StudioGenerationRunUpdateInput, StudioGenerationRunUncheckedUpdateInput>
+    /**
+     * Choose, which StudioGenerationRun to update.
+     */
+    where: StudioGenerationRunWhereUniqueInput
+  }
+
+  /**
+   * StudioGenerationRun updateMany
+   */
+  export type StudioGenerationRunUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update StudioGenerationRuns.
+     */
+    data: XOR<StudioGenerationRunUpdateManyMutationInput, StudioGenerationRunUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioGenerationRuns to update
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * Limit how many StudioGenerationRuns to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioGenerationRun updateManyAndReturn
+   */
+  export type StudioGenerationRunUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * The data used to update StudioGenerationRuns.
+     */
+    data: XOR<StudioGenerationRunUpdateManyMutationInput, StudioGenerationRunUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioGenerationRuns to update
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * Limit how many StudioGenerationRuns to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioGenerationRun upsert
+   */
+  export type StudioGenerationRunUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * The filter to search for the StudioGenerationRun to update in case it exists.
+     */
+    where: StudioGenerationRunWhereUniqueInput
+    /**
+     * In case the StudioGenerationRun found by the `where` argument doesn't exist, create a new StudioGenerationRun with this data.
+     */
+    create: XOR<StudioGenerationRunCreateInput, StudioGenerationRunUncheckedCreateInput>
+    /**
+     * In case the StudioGenerationRun was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<StudioGenerationRunUpdateInput, StudioGenerationRunUncheckedUpdateInput>
+  }
+
+  /**
+   * StudioGenerationRun delete
+   */
+  export type StudioGenerationRunDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+    /**
+     * Filter which StudioGenerationRun to delete.
+     */
+    where: StudioGenerationRunWhereUniqueInput
+  }
+
+  /**
+   * StudioGenerationRun deleteMany
+   */
+  export type StudioGenerationRunDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioGenerationRuns to delete
+     */
+    where?: StudioGenerationRunWhereInput
+    /**
+     * Limit how many StudioGenerationRuns to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioGenerationRun without action
+   */
+  export type StudioGenerationRunDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioGenerationRun
+     */
+    select?: StudioGenerationRunSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioGenerationRun
+     */
+    omit?: StudioGenerationRunOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioGenerationRunInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model StudioContextSpend
+   */
+
+  export type AggregateStudioContextSpend = {
+    _count: StudioContextSpendCountAggregateOutputType | null
+    _avg: StudioContextSpendAvgAggregateOutputType | null
+    _sum: StudioContextSpendSumAggregateOutputType | null
+    _min: StudioContextSpendMinAggregateOutputType | null
+    _max: StudioContextSpendMaxAggregateOutputType | null
+  }
+
+  export type StudioContextSpendAvgAggregateOutputType = {
+    generationCalls: number | null
+  }
+
+  export type StudioContextSpendSumAggregateOutputType = {
+    generationCalls: number | null
+  }
+
+  export type StudioContextSpendMinAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    day: string | null
+    generationCalls: number | null
+    updatedAt: Date | null
+  }
+
+  export type StudioContextSpendMaxAggregateOutputType = {
+    id: string | null
+    ownerId: string | null
+    day: string | null
+    generationCalls: number | null
+    updatedAt: Date | null
+  }
+
+  export type StudioContextSpendCountAggregateOutputType = {
+    id: number
+    ownerId: number
+    day: number
+    generationCalls: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type StudioContextSpendAvgAggregateInputType = {
+    generationCalls?: true
+  }
+
+  export type StudioContextSpendSumAggregateInputType = {
+    generationCalls?: true
+  }
+
+  export type StudioContextSpendMinAggregateInputType = {
+    id?: true
+    ownerId?: true
+    day?: true
+    generationCalls?: true
+    updatedAt?: true
+  }
+
+  export type StudioContextSpendMaxAggregateInputType = {
+    id?: true
+    ownerId?: true
+    day?: true
+    generationCalls?: true
+    updatedAt?: true
+  }
+
+  export type StudioContextSpendCountAggregateInputType = {
+    id?: true
+    ownerId?: true
+    day?: true
+    generationCalls?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type StudioContextSpendAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioContextSpend to aggregate.
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioContextSpends to fetch.
+     */
+    orderBy?: StudioContextSpendOrderByWithRelationInput | StudioContextSpendOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: StudioContextSpendWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioContextSpends from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioContextSpends.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned StudioContextSpends
+    **/
+    _count?: true | StudioContextSpendCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: StudioContextSpendAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: StudioContextSpendSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: StudioContextSpendMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: StudioContextSpendMaxAggregateInputType
+  }
+
+  export type GetStudioContextSpendAggregateType<T extends StudioContextSpendAggregateArgs> = {
+        [P in keyof T & keyof AggregateStudioContextSpend]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateStudioContextSpend[P]>
+      : GetScalarType<T[P], AggregateStudioContextSpend[P]>
+  }
+
+
+
+
+  export type StudioContextSpendGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: StudioContextSpendWhereInput
+    orderBy?: StudioContextSpendOrderByWithAggregationInput | StudioContextSpendOrderByWithAggregationInput[]
+    by: StudioContextSpendScalarFieldEnum[] | StudioContextSpendScalarFieldEnum
+    having?: StudioContextSpendScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: StudioContextSpendCountAggregateInputType | true
+    _avg?: StudioContextSpendAvgAggregateInputType
+    _sum?: StudioContextSpendSumAggregateInputType
+    _min?: StudioContextSpendMinAggregateInputType
+    _max?: StudioContextSpendMaxAggregateInputType
+  }
+
+  export type StudioContextSpendGroupByOutputType = {
+    id: string
+    ownerId: string
+    day: string
+    generationCalls: number
+    updatedAt: Date
+    _count: StudioContextSpendCountAggregateOutputType | null
+    _avg: StudioContextSpendAvgAggregateOutputType | null
+    _sum: StudioContextSpendSumAggregateOutputType | null
+    _min: StudioContextSpendMinAggregateOutputType | null
+    _max: StudioContextSpendMaxAggregateOutputType | null
+  }
+
+  type GetStudioContextSpendGroupByPayload<T extends StudioContextSpendGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<StudioContextSpendGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof StudioContextSpendGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], StudioContextSpendGroupByOutputType[P]>
+            : GetScalarType<T[P], StudioContextSpendGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type StudioContextSpendSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    day?: boolean
+    generationCalls?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioContextSpend"]>
+
+  export type StudioContextSpendSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    day?: boolean
+    generationCalls?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioContextSpend"]>
+
+  export type StudioContextSpendSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    ownerId?: boolean
+    day?: boolean
+    generationCalls?: boolean
+    updatedAt?: boolean
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["studioContextSpend"]>
+
+  export type StudioContextSpendSelectScalar = {
+    id?: boolean
+    ownerId?: boolean
+    day?: boolean
+    generationCalls?: boolean
+    updatedAt?: boolean
+  }
+
+  export type StudioContextSpendOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "day" | "generationCalls" | "updatedAt", ExtArgs["result"]["studioContextSpend"]>
+  export type StudioContextSpendInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type StudioContextSpendIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type StudioContextSpendIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    owner?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $StudioContextSpendPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "StudioContextSpend"
+    objects: {
+      owner: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      ownerId: string
+      day: string
+      generationCalls: number
+      updatedAt: Date
+    }, ExtArgs["result"]["studioContextSpend"]>
+    composites: {}
+  }
+
+  type StudioContextSpendGetPayload<S extends boolean | null | undefined | StudioContextSpendDefaultArgs> = $Result.GetResult<Prisma.$StudioContextSpendPayload, S>
+
+  type StudioContextSpendCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<StudioContextSpendFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: StudioContextSpendCountAggregateInputType | true
+    }
+
+  export interface StudioContextSpendDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['StudioContextSpend'], meta: { name: 'StudioContextSpend' } }
+    /**
+     * Find zero or one StudioContextSpend that matches the filter.
+     * @param {StudioContextSpendFindUniqueArgs} args - Arguments to find a StudioContextSpend
+     * @example
+     * // Get one StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends StudioContextSpendFindUniqueArgs>(args: SelectSubset<T, StudioContextSpendFindUniqueArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one StudioContextSpend that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {StudioContextSpendFindUniqueOrThrowArgs} args - Arguments to find a StudioContextSpend
+     * @example
+     * // Get one StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends StudioContextSpendFindUniqueOrThrowArgs>(args: SelectSubset<T, StudioContextSpendFindUniqueOrThrowArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioContextSpend that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendFindFirstArgs} args - Arguments to find a StudioContextSpend
+     * @example
+     * // Get one StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends StudioContextSpendFindFirstArgs>(args?: SelectSubset<T, StudioContextSpendFindFirstArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first StudioContextSpend that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendFindFirstOrThrowArgs} args - Arguments to find a StudioContextSpend
+     * @example
+     * // Get one StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends StudioContextSpendFindFirstOrThrowArgs>(args?: SelectSubset<T, StudioContextSpendFindFirstOrThrowArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more StudioContextSpends that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all StudioContextSpends
+     * const studioContextSpends = await prisma.studioContextSpend.findMany()
+     * 
+     * // Get first 10 StudioContextSpends
+     * const studioContextSpends = await prisma.studioContextSpend.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const studioContextSpendWithIdOnly = await prisma.studioContextSpend.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends StudioContextSpendFindManyArgs>(args?: SelectSubset<T, StudioContextSpendFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a StudioContextSpend.
+     * @param {StudioContextSpendCreateArgs} args - Arguments to create a StudioContextSpend.
+     * @example
+     * // Create one StudioContextSpend
+     * const StudioContextSpend = await prisma.studioContextSpend.create({
+     *   data: {
+     *     // ... data to create a StudioContextSpend
+     *   }
+     * })
+     * 
+     */
+    create<T extends StudioContextSpendCreateArgs>(args: SelectSubset<T, StudioContextSpendCreateArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many StudioContextSpends.
+     * @param {StudioContextSpendCreateManyArgs} args - Arguments to create many StudioContextSpends.
+     * @example
+     * // Create many StudioContextSpends
+     * const studioContextSpend = await prisma.studioContextSpend.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends StudioContextSpendCreateManyArgs>(args?: SelectSubset<T, StudioContextSpendCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many StudioContextSpends and returns the data saved in the database.
+     * @param {StudioContextSpendCreateManyAndReturnArgs} args - Arguments to create many StudioContextSpends.
+     * @example
+     * // Create many StudioContextSpends
+     * const studioContextSpend = await prisma.studioContextSpend.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many StudioContextSpends and only return the `id`
+     * const studioContextSpendWithIdOnly = await prisma.studioContextSpend.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends StudioContextSpendCreateManyAndReturnArgs>(args?: SelectSubset<T, StudioContextSpendCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a StudioContextSpend.
+     * @param {StudioContextSpendDeleteArgs} args - Arguments to delete one StudioContextSpend.
+     * @example
+     * // Delete one StudioContextSpend
+     * const StudioContextSpend = await prisma.studioContextSpend.delete({
+     *   where: {
+     *     // ... filter to delete one StudioContextSpend
+     *   }
+     * })
+     * 
+     */
+    delete<T extends StudioContextSpendDeleteArgs>(args: SelectSubset<T, StudioContextSpendDeleteArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one StudioContextSpend.
+     * @param {StudioContextSpendUpdateArgs} args - Arguments to update one StudioContextSpend.
+     * @example
+     * // Update one StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends StudioContextSpendUpdateArgs>(args: SelectSubset<T, StudioContextSpendUpdateArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more StudioContextSpends.
+     * @param {StudioContextSpendDeleteManyArgs} args - Arguments to filter StudioContextSpends to delete.
+     * @example
+     * // Delete a few StudioContextSpends
+     * const { count } = await prisma.studioContextSpend.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends StudioContextSpendDeleteManyArgs>(args?: SelectSubset<T, StudioContextSpendDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioContextSpends.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many StudioContextSpends
+     * const studioContextSpend = await prisma.studioContextSpend.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends StudioContextSpendUpdateManyArgs>(args: SelectSubset<T, StudioContextSpendUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more StudioContextSpends and returns the data updated in the database.
+     * @param {StudioContextSpendUpdateManyAndReturnArgs} args - Arguments to update many StudioContextSpends.
+     * @example
+     * // Update many StudioContextSpends
+     * const studioContextSpend = await prisma.studioContextSpend.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more StudioContextSpends and only return the `id`
+     * const studioContextSpendWithIdOnly = await prisma.studioContextSpend.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends StudioContextSpendUpdateManyAndReturnArgs>(args: SelectSubset<T, StudioContextSpendUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one StudioContextSpend.
+     * @param {StudioContextSpendUpsertArgs} args - Arguments to update or create a StudioContextSpend.
+     * @example
+     * // Update or create a StudioContextSpend
+     * const studioContextSpend = await prisma.studioContextSpend.upsert({
+     *   create: {
+     *     // ... data to create a StudioContextSpend
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the StudioContextSpend we want to update
+     *   }
+     * })
+     */
+    upsert<T extends StudioContextSpendUpsertArgs>(args: SelectSubset<T, StudioContextSpendUpsertArgs<ExtArgs>>): Prisma__StudioContextSpendClient<$Result.GetResult<Prisma.$StudioContextSpendPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of StudioContextSpends.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendCountArgs} args - Arguments to filter StudioContextSpends to count.
+     * @example
+     * // Count the number of StudioContextSpends
+     * const count = await prisma.studioContextSpend.count({
+     *   where: {
+     *     // ... the filter for the StudioContextSpends we want to count
+     *   }
+     * })
+    **/
+    count<T extends StudioContextSpendCountArgs>(
+      args?: Subset<T, StudioContextSpendCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], StudioContextSpendCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a StudioContextSpend.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends StudioContextSpendAggregateArgs>(args: Subset<T, StudioContextSpendAggregateArgs>): Prisma.PrismaPromise<GetStudioContextSpendAggregateType<T>>
+
+    /**
+     * Group by StudioContextSpend.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {StudioContextSpendGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends StudioContextSpendGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: StudioContextSpendGroupByArgs['orderBy'] }
+        : { orderBy?: StudioContextSpendGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, StudioContextSpendGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetStudioContextSpendGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the StudioContextSpend model
+   */
+  readonly fields: StudioContextSpendFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for StudioContextSpend.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__StudioContextSpendClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the StudioContextSpend model
+   */
+  interface StudioContextSpendFieldRefs {
+    readonly id: FieldRef<"StudioContextSpend", 'String'>
+    readonly ownerId: FieldRef<"StudioContextSpend", 'String'>
+    readonly day: FieldRef<"StudioContextSpend", 'String'>
+    readonly generationCalls: FieldRef<"StudioContextSpend", 'Int'>
+    readonly updatedAt: FieldRef<"StudioContextSpend", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * StudioContextSpend findUnique
+   */
+  export type StudioContextSpendFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioContextSpend to fetch.
+     */
+    where: StudioContextSpendWhereUniqueInput
+  }
+
+  /**
+   * StudioContextSpend findUniqueOrThrow
+   */
+  export type StudioContextSpendFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioContextSpend to fetch.
+     */
+    where: StudioContextSpendWhereUniqueInput
+  }
+
+  /**
+   * StudioContextSpend findFirst
+   */
+  export type StudioContextSpendFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioContextSpend to fetch.
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioContextSpends to fetch.
+     */
+    orderBy?: StudioContextSpendOrderByWithRelationInput | StudioContextSpendOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioContextSpends.
+     */
+    cursor?: StudioContextSpendWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioContextSpends from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioContextSpends.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioContextSpends.
+     */
+    distinct?: StudioContextSpendScalarFieldEnum | StudioContextSpendScalarFieldEnum[]
+  }
+
+  /**
+   * StudioContextSpend findFirstOrThrow
+   */
+  export type StudioContextSpendFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioContextSpend to fetch.
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioContextSpends to fetch.
+     */
+    orderBy?: StudioContextSpendOrderByWithRelationInput | StudioContextSpendOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for StudioContextSpends.
+     */
+    cursor?: StudioContextSpendWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioContextSpends from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioContextSpends.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of StudioContextSpends.
+     */
+    distinct?: StudioContextSpendScalarFieldEnum | StudioContextSpendScalarFieldEnum[]
+  }
+
+  /**
+   * StudioContextSpend findMany
+   */
+  export type StudioContextSpendFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter, which StudioContextSpends to fetch.
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of StudioContextSpends to fetch.
+     */
+    orderBy?: StudioContextSpendOrderByWithRelationInput | StudioContextSpendOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing StudioContextSpends.
+     */
+    cursor?: StudioContextSpendWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` StudioContextSpends from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` StudioContextSpends.
+     */
+    skip?: number
+    distinct?: StudioContextSpendScalarFieldEnum | StudioContextSpendScalarFieldEnum[]
+  }
+
+  /**
+   * StudioContextSpend create
+   */
+  export type StudioContextSpendCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * The data needed to create a StudioContextSpend.
+     */
+    data: XOR<StudioContextSpendCreateInput, StudioContextSpendUncheckedCreateInput>
+  }
+
+  /**
+   * StudioContextSpend createMany
+   */
+  export type StudioContextSpendCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many StudioContextSpends.
+     */
+    data: StudioContextSpendCreateManyInput | StudioContextSpendCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * StudioContextSpend createManyAndReturn
+   */
+  export type StudioContextSpendCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * The data used to create many StudioContextSpends.
+     */
+    data: StudioContextSpendCreateManyInput | StudioContextSpendCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioContextSpend update
+   */
+  export type StudioContextSpendUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * The data needed to update a StudioContextSpend.
+     */
+    data: XOR<StudioContextSpendUpdateInput, StudioContextSpendUncheckedUpdateInput>
+    /**
+     * Choose, which StudioContextSpend to update.
+     */
+    where: StudioContextSpendWhereUniqueInput
+  }
+
+  /**
+   * StudioContextSpend updateMany
+   */
+  export type StudioContextSpendUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update StudioContextSpends.
+     */
+    data: XOR<StudioContextSpendUpdateManyMutationInput, StudioContextSpendUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioContextSpends to update
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * Limit how many StudioContextSpends to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioContextSpend updateManyAndReturn
+   */
+  export type StudioContextSpendUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * The data used to update StudioContextSpends.
+     */
+    data: XOR<StudioContextSpendUpdateManyMutationInput, StudioContextSpendUncheckedUpdateManyInput>
+    /**
+     * Filter which StudioContextSpends to update
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * Limit how many StudioContextSpends to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * StudioContextSpend upsert
+   */
+  export type StudioContextSpendUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * The filter to search for the StudioContextSpend to update in case it exists.
+     */
+    where: StudioContextSpendWhereUniqueInput
+    /**
+     * In case the StudioContextSpend found by the `where` argument doesn't exist, create a new StudioContextSpend with this data.
+     */
+    create: XOR<StudioContextSpendCreateInput, StudioContextSpendUncheckedCreateInput>
+    /**
+     * In case the StudioContextSpend was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<StudioContextSpendUpdateInput, StudioContextSpendUncheckedUpdateInput>
+  }
+
+  /**
+   * StudioContextSpend delete
+   */
+  export type StudioContextSpendDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+    /**
+     * Filter which StudioContextSpend to delete.
+     */
+    where: StudioContextSpendWhereUniqueInput
+  }
+
+  /**
+   * StudioContextSpend deleteMany
+   */
+  export type StudioContextSpendDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which StudioContextSpends to delete
+     */
+    where?: StudioContextSpendWhereInput
+    /**
+     * Limit how many StudioContextSpends to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * StudioContextSpend without action
+   */
+  export type StudioContextSpendDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the StudioContextSpend
+     */
+    select?: StudioContextSpendSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the StudioContextSpend
+     */
+    omit?: StudioContextSpendOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: StudioContextSpendInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -119239,6 +124418,71 @@ export namespace Prisma {
   export type WorkflowRunArtifactScalarFieldEnum = (typeof WorkflowRunArtifactScalarFieldEnum)[keyof typeof WorkflowRunArtifactScalarFieldEnum]
 
 
+  export const AgenticMetadataScalarFieldEnum: {
+    id: 'id',
+    nodeId: 'nodeId',
+    tiptapJson: 'tiptapJson',
+    derivedText: 'derivedText',
+    sectionsMeta: 'sectionsMeta',
+    sourceContentHash: 'sourceContentHash',
+    contextDirty: 'contextDirty',
+    summaryHash: 'summaryHash',
+    contextOptOut: 'contextOptOut',
+    model: 'model',
+    generatedAt: 'generatedAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AgenticMetadataScalarFieldEnum = (typeof AgenticMetadataScalarFieldEnum)[keyof typeof AgenticMetadataScalarFieldEnum]
+
+
+  export const StudioSourceSelectionScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    folderId: 'folderId',
+    includedNodeIds: 'includedNodeIds',
+    excludedNodeIds: 'excludedNodeIds',
+    tokenBudget: 'tokenBudget',
+    updatedAt: 'updatedAt'
+  };
+
+  export type StudioSourceSelectionScalarFieldEnum = (typeof StudioSourceSelectionScalarFieldEnum)[keyof typeof StudioSourceSelectionScalarFieldEnum]
+
+
+  export const StudioGenerationRunScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    folderId: 'folderId',
+    toolId: 'toolId',
+    variantId: 'variantId',
+    sourceNodeIds: 'sourceNodeIds',
+    status: 'status',
+    stepIndex: 'stepIndex',
+    stepTotal: 'stepTotal',
+    stepLabel: 'stepLabel',
+    outputNodeId: 'outputNodeId',
+    outputBodyHash: 'outputBodyHash',
+    error: 'error',
+    promptSnapshot: 'promptSnapshot',
+    model: 'model',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type StudioGenerationRunScalarFieldEnum = (typeof StudioGenerationRunScalarFieldEnum)[keyof typeof StudioGenerationRunScalarFieldEnum]
+
+
+  export const StudioContextSpendScalarFieldEnum: {
+    id: 'id',
+    ownerId: 'ownerId',
+    day: 'day',
+    generationCalls: 'generationCalls',
+    updatedAt: 'updatedAt'
+  };
+
+  export type StudioContextSpendScalarFieldEnum = (typeof StudioContextSpendScalarFieldEnum)[keyof typeof StudioContextSpendScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -119903,6 +125147,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
     workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
+    agenticMetadata?: XOR<AgenticMetadataNullableScalarRelationFilter, AgenticMetadataWhereInput> | null
+    studioSourceSelections?: StudioSourceSelectionListRelationFilter
+    studioGenerationRuns?: StudioGenerationRunListRelationFilter
   }
 
   export type ContentNodeOrderByWithRelationInput = {
@@ -119971,6 +125218,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkOrderByRelationAggregateInput
     webResourceViewStates?: WebResourceViewStateOrderByRelationAggregateInput
     workflowRunArtifacts?: WorkflowRunArtifactOrderByRelationAggregateInput
+    agenticMetadata?: AgenticMetadataOrderByWithRelationInput
+    studioSourceSelections?: StudioSourceSelectionOrderByRelationAggregateInput
+    studioGenerationRuns?: StudioGenerationRunOrderByRelationAggregateInput
   }
 
   export type ContentNodeWhereUniqueInput = Prisma.AtLeast<{
@@ -120043,6 +125293,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
     workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
+    agenticMetadata?: XOR<AgenticMetadataNullableScalarRelationFilter, AgenticMetadataWhereInput> | null
+    studioSourceSelections?: StudioSourceSelectionListRelationFilter
+    studioGenerationRuns?: StudioGenerationRunListRelationFilter
   }, "id" | "ownerId_slug">
 
   export type ContentNodeOrderByWithAggregationInput = {
@@ -121414,6 +126667,9 @@ export namespace Prisma {
     webResources?: WebResourceListRelationFilter
     webResourceContentLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
+    studioSourceSelections?: StudioSourceSelectionListRelationFilter
+    studioGenerationRuns?: StudioGenerationRunListRelationFilter
+    studioContextSpend?: StudioContextSpendListRelationFilter
     connectionInvitesSent?: ConnectionInviteListRelationFilter
     connectionInvitesReceived?: ConnectionInviteListRelationFilter
     connectionsAsA?: UserConnectionListRelationFilter
@@ -121493,6 +126749,9 @@ export namespace Prisma {
     webResources?: WebResourceOrderByRelationAggregateInput
     webResourceContentLinks?: WebResourceContentLinkOrderByRelationAggregateInput
     webResourceViewStates?: WebResourceViewStateOrderByRelationAggregateInput
+    studioSourceSelections?: StudioSourceSelectionOrderByRelationAggregateInput
+    studioGenerationRuns?: StudioGenerationRunOrderByRelationAggregateInput
+    studioContextSpend?: StudioContextSpendOrderByRelationAggregateInput
     connectionInvitesSent?: ConnectionInviteOrderByRelationAggregateInput
     connectionInvitesReceived?: ConnectionInviteOrderByRelationAggregateInput
     connectionsAsA?: UserConnectionOrderByRelationAggregateInput
@@ -121575,6 +126834,9 @@ export namespace Prisma {
     webResources?: WebResourceListRelationFilter
     webResourceContentLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
+    studioSourceSelections?: StudioSourceSelectionListRelationFilter
+    studioGenerationRuns?: StudioGenerationRunListRelationFilter
+    studioContextSpend?: StudioContextSpendListRelationFilter
     connectionInvitesSent?: ConnectionInviteListRelationFilter
     connectionInvitesReceived?: ConnectionInviteListRelationFilter
     connectionsAsA?: UserConnectionListRelationFilter
@@ -127801,6 +133063,345 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"WorkflowRunArtifact"> | Date | string
   }
 
+  export type AgenticMetadataWhereInput = {
+    AND?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    OR?: AgenticMetadataWhereInput[]
+    NOT?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    id?: UuidFilter<"AgenticMetadata"> | string
+    nodeId?: UuidFilter<"AgenticMetadata"> | string
+    tiptapJson?: JsonFilter<"AgenticMetadata">
+    derivedText?: StringFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    contextDirty?: BoolFilter<"AgenticMetadata"> | boolean
+    summaryHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    contextOptOut?: BoolFilter<"AgenticMetadata"> | boolean
+    model?: StringNullableFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeFilter<"AgenticMetadata"> | Date | string
+    node?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type AgenticMetadataOrderByWithRelationInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrderInput | SortOrder
+    contextDirty?: SortOrder
+    summaryHash?: SortOrderInput | SortOrder
+    contextOptOut?: SortOrder
+    model?: SortOrderInput | SortOrder
+    generatedAt?: SortOrderInput | SortOrder
+    updatedAt?: SortOrder
+    node?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type AgenticMetadataWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    nodeId?: string
+    AND?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    OR?: AgenticMetadataWhereInput[]
+    NOT?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    tiptapJson?: JsonFilter<"AgenticMetadata">
+    derivedText?: StringFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    contextDirty?: BoolFilter<"AgenticMetadata"> | boolean
+    summaryHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    contextOptOut?: BoolFilter<"AgenticMetadata"> | boolean
+    model?: StringNullableFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeFilter<"AgenticMetadata"> | Date | string
+    node?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id" | "nodeId">
+
+  export type AgenticMetadataOrderByWithAggregationInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrderInput | SortOrder
+    contextDirty?: SortOrder
+    summaryHash?: SortOrderInput | SortOrder
+    contextOptOut?: SortOrder
+    model?: SortOrderInput | SortOrder
+    generatedAt?: SortOrderInput | SortOrder
+    updatedAt?: SortOrder
+    _count?: AgenticMetadataCountOrderByAggregateInput
+    _max?: AgenticMetadataMaxOrderByAggregateInput
+    _min?: AgenticMetadataMinOrderByAggregateInput
+  }
+
+  export type AgenticMetadataScalarWhereWithAggregatesInput = {
+    AND?: AgenticMetadataScalarWhereWithAggregatesInput | AgenticMetadataScalarWhereWithAggregatesInput[]
+    OR?: AgenticMetadataScalarWhereWithAggregatesInput[]
+    NOT?: AgenticMetadataScalarWhereWithAggregatesInput | AgenticMetadataScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"AgenticMetadata"> | string
+    nodeId?: UuidWithAggregatesFilter<"AgenticMetadata"> | string
+    tiptapJson?: JsonWithAggregatesFilter<"AgenticMetadata">
+    derivedText?: StringWithAggregatesFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonWithAggregatesFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableWithAggregatesFilter<"AgenticMetadata"> | string | null
+    contextDirty?: BoolWithAggregatesFilter<"AgenticMetadata"> | boolean
+    summaryHash?: StringNullableWithAggregatesFilter<"AgenticMetadata"> | string | null
+    contextOptOut?: BoolWithAggregatesFilter<"AgenticMetadata"> | boolean
+    model?: StringNullableWithAggregatesFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableWithAggregatesFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeWithAggregatesFilter<"AgenticMetadata"> | Date | string
+  }
+
+  export type StudioSourceSelectionWhereInput = {
+    AND?: StudioSourceSelectionWhereInput | StudioSourceSelectionWhereInput[]
+    OR?: StudioSourceSelectionWhereInput[]
+    NOT?: StudioSourceSelectionWhereInput | StudioSourceSelectionWhereInput[]
+    id?: UuidFilter<"StudioSourceSelection"> | string
+    ownerId?: UuidFilter<"StudioSourceSelection"> | string
+    folderId?: UuidFilter<"StudioSourceSelection"> | string
+    includedNodeIds?: JsonFilter<"StudioSourceSelection">
+    excludedNodeIds?: JsonFilter<"StudioSourceSelection">
+    tokenBudget?: IntFilter<"StudioSourceSelection"> | number
+    updatedAt?: DateTimeFilter<"StudioSourceSelection"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    folder?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type StudioSourceSelectionOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    includedNodeIds?: SortOrder
+    excludedNodeIds?: SortOrder
+    tokenBudget?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+    folder?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type StudioSourceSelectionWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerId_folderId?: StudioSourceSelectionOwnerIdFolderIdCompoundUniqueInput
+    AND?: StudioSourceSelectionWhereInput | StudioSourceSelectionWhereInput[]
+    OR?: StudioSourceSelectionWhereInput[]
+    NOT?: StudioSourceSelectionWhereInput | StudioSourceSelectionWhereInput[]
+    ownerId?: UuidFilter<"StudioSourceSelection"> | string
+    folderId?: UuidFilter<"StudioSourceSelection"> | string
+    includedNodeIds?: JsonFilter<"StudioSourceSelection">
+    excludedNodeIds?: JsonFilter<"StudioSourceSelection">
+    tokenBudget?: IntFilter<"StudioSourceSelection"> | number
+    updatedAt?: DateTimeFilter<"StudioSourceSelection"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    folder?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id" | "ownerId_folderId">
+
+  export type StudioSourceSelectionOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    includedNodeIds?: SortOrder
+    excludedNodeIds?: SortOrder
+    tokenBudget?: SortOrder
+    updatedAt?: SortOrder
+    _count?: StudioSourceSelectionCountOrderByAggregateInput
+    _avg?: StudioSourceSelectionAvgOrderByAggregateInput
+    _max?: StudioSourceSelectionMaxOrderByAggregateInput
+    _min?: StudioSourceSelectionMinOrderByAggregateInput
+    _sum?: StudioSourceSelectionSumOrderByAggregateInput
+  }
+
+  export type StudioSourceSelectionScalarWhereWithAggregatesInput = {
+    AND?: StudioSourceSelectionScalarWhereWithAggregatesInput | StudioSourceSelectionScalarWhereWithAggregatesInput[]
+    OR?: StudioSourceSelectionScalarWhereWithAggregatesInput[]
+    NOT?: StudioSourceSelectionScalarWhereWithAggregatesInput | StudioSourceSelectionScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"StudioSourceSelection"> | string
+    ownerId?: UuidWithAggregatesFilter<"StudioSourceSelection"> | string
+    folderId?: UuidWithAggregatesFilter<"StudioSourceSelection"> | string
+    includedNodeIds?: JsonWithAggregatesFilter<"StudioSourceSelection">
+    excludedNodeIds?: JsonWithAggregatesFilter<"StudioSourceSelection">
+    tokenBudget?: IntWithAggregatesFilter<"StudioSourceSelection"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"StudioSourceSelection"> | Date | string
+  }
+
+  export type StudioGenerationRunWhereInput = {
+    AND?: StudioGenerationRunWhereInput | StudioGenerationRunWhereInput[]
+    OR?: StudioGenerationRunWhereInput[]
+    NOT?: StudioGenerationRunWhereInput | StudioGenerationRunWhereInput[]
+    id?: UuidFilter<"StudioGenerationRun"> | string
+    ownerId?: UuidFilter<"StudioGenerationRun"> | string
+    folderId?: UuidFilter<"StudioGenerationRun"> | string
+    toolId?: StringFilter<"StudioGenerationRun"> | string
+    variantId?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    sourceNodeIds?: JsonFilter<"StudioGenerationRun">
+    status?: StringFilter<"StudioGenerationRun"> | string
+    stepIndex?: IntFilter<"StudioGenerationRun"> | number
+    stepTotal?: IntFilter<"StudioGenerationRun"> | number
+    stepLabel?: StringFilter<"StudioGenerationRun"> | string
+    outputNodeId?: UuidNullableFilter<"StudioGenerationRun"> | string | null
+    outputBodyHash?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    error?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    promptSnapshot?: StringFilter<"StudioGenerationRun"> | string
+    model?: StringFilter<"StudioGenerationRun"> | string
+    createdAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+    updatedAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    folder?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type StudioGenerationRunOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    toolId?: SortOrder
+    variantId?: SortOrderInput | SortOrder
+    sourceNodeIds?: SortOrder
+    status?: SortOrder
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+    stepLabel?: SortOrder
+    outputNodeId?: SortOrderInput | SortOrder
+    outputBodyHash?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    promptSnapshot?: SortOrder
+    model?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+    folder?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type StudioGenerationRunWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    AND?: StudioGenerationRunWhereInput | StudioGenerationRunWhereInput[]
+    OR?: StudioGenerationRunWhereInput[]
+    NOT?: StudioGenerationRunWhereInput | StudioGenerationRunWhereInput[]
+    ownerId?: UuidFilter<"StudioGenerationRun"> | string
+    folderId?: UuidFilter<"StudioGenerationRun"> | string
+    toolId?: StringFilter<"StudioGenerationRun"> | string
+    variantId?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    sourceNodeIds?: JsonFilter<"StudioGenerationRun">
+    status?: StringFilter<"StudioGenerationRun"> | string
+    stepIndex?: IntFilter<"StudioGenerationRun"> | number
+    stepTotal?: IntFilter<"StudioGenerationRun"> | number
+    stepLabel?: StringFilter<"StudioGenerationRun"> | string
+    outputNodeId?: UuidNullableFilter<"StudioGenerationRun"> | string | null
+    outputBodyHash?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    error?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    promptSnapshot?: StringFilter<"StudioGenerationRun"> | string
+    model?: StringFilter<"StudioGenerationRun"> | string
+    createdAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+    updatedAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+    folder?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id">
+
+  export type StudioGenerationRunOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    toolId?: SortOrder
+    variantId?: SortOrderInput | SortOrder
+    sourceNodeIds?: SortOrder
+    status?: SortOrder
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+    stepLabel?: SortOrder
+    outputNodeId?: SortOrderInput | SortOrder
+    outputBodyHash?: SortOrderInput | SortOrder
+    error?: SortOrderInput | SortOrder
+    promptSnapshot?: SortOrder
+    model?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: StudioGenerationRunCountOrderByAggregateInput
+    _avg?: StudioGenerationRunAvgOrderByAggregateInput
+    _max?: StudioGenerationRunMaxOrderByAggregateInput
+    _min?: StudioGenerationRunMinOrderByAggregateInput
+    _sum?: StudioGenerationRunSumOrderByAggregateInput
+  }
+
+  export type StudioGenerationRunScalarWhereWithAggregatesInput = {
+    AND?: StudioGenerationRunScalarWhereWithAggregatesInput | StudioGenerationRunScalarWhereWithAggregatesInput[]
+    OR?: StudioGenerationRunScalarWhereWithAggregatesInput[]
+    NOT?: StudioGenerationRunScalarWhereWithAggregatesInput | StudioGenerationRunScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"StudioGenerationRun"> | string
+    ownerId?: UuidWithAggregatesFilter<"StudioGenerationRun"> | string
+    folderId?: UuidWithAggregatesFilter<"StudioGenerationRun"> | string
+    toolId?: StringWithAggregatesFilter<"StudioGenerationRun"> | string
+    variantId?: StringNullableWithAggregatesFilter<"StudioGenerationRun"> | string | null
+    sourceNodeIds?: JsonWithAggregatesFilter<"StudioGenerationRun">
+    status?: StringWithAggregatesFilter<"StudioGenerationRun"> | string
+    stepIndex?: IntWithAggregatesFilter<"StudioGenerationRun"> | number
+    stepTotal?: IntWithAggregatesFilter<"StudioGenerationRun"> | number
+    stepLabel?: StringWithAggregatesFilter<"StudioGenerationRun"> | string
+    outputNodeId?: UuidNullableWithAggregatesFilter<"StudioGenerationRun"> | string | null
+    outputBodyHash?: StringNullableWithAggregatesFilter<"StudioGenerationRun"> | string | null
+    error?: StringNullableWithAggregatesFilter<"StudioGenerationRun"> | string | null
+    promptSnapshot?: StringWithAggregatesFilter<"StudioGenerationRun"> | string
+    model?: StringWithAggregatesFilter<"StudioGenerationRun"> | string
+    createdAt?: DateTimeWithAggregatesFilter<"StudioGenerationRun"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"StudioGenerationRun"> | Date | string
+  }
+
+  export type StudioContextSpendWhereInput = {
+    AND?: StudioContextSpendWhereInput | StudioContextSpendWhereInput[]
+    OR?: StudioContextSpendWhereInput[]
+    NOT?: StudioContextSpendWhereInput | StudioContextSpendWhereInput[]
+    id?: UuidFilter<"StudioContextSpend"> | string
+    ownerId?: UuidFilter<"StudioContextSpend"> | string
+    day?: StringFilter<"StudioContextSpend"> | string
+    generationCalls?: IntFilter<"StudioContextSpend"> | number
+    updatedAt?: DateTimeFilter<"StudioContextSpend"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type StudioContextSpendOrderByWithRelationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    day?: SortOrder
+    generationCalls?: SortOrder
+    updatedAt?: SortOrder
+    owner?: UserOrderByWithRelationInput
+  }
+
+  export type StudioContextSpendWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    ownerId_day?: StudioContextSpendOwnerIdDayCompoundUniqueInput
+    AND?: StudioContextSpendWhereInput | StudioContextSpendWhereInput[]
+    OR?: StudioContextSpendWhereInput[]
+    NOT?: StudioContextSpendWhereInput | StudioContextSpendWhereInput[]
+    ownerId?: UuidFilter<"StudioContextSpend"> | string
+    day?: StringFilter<"StudioContextSpend"> | string
+    generationCalls?: IntFilter<"StudioContextSpend"> | number
+    updatedAt?: DateTimeFilter<"StudioContextSpend"> | Date | string
+    owner?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "ownerId_day">
+
+  export type StudioContextSpendOrderByWithAggregationInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    day?: SortOrder
+    generationCalls?: SortOrder
+    updatedAt?: SortOrder
+    _count?: StudioContextSpendCountOrderByAggregateInput
+    _avg?: StudioContextSpendAvgOrderByAggregateInput
+    _max?: StudioContextSpendMaxOrderByAggregateInput
+    _min?: StudioContextSpendMinOrderByAggregateInput
+    _sum?: StudioContextSpendSumOrderByAggregateInput
+  }
+
+  export type StudioContextSpendScalarWhereWithAggregatesInput = {
+    AND?: StudioContextSpendScalarWhereWithAggregatesInput | StudioContextSpendScalarWhereWithAggregatesInput[]
+    OR?: StudioContextSpendScalarWhereWithAggregatesInput[]
+    NOT?: StudioContextSpendScalarWhereWithAggregatesInput | StudioContextSpendScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"StudioContextSpend"> | string
+    ownerId?: UuidWithAggregatesFilter<"StudioContextSpend"> | string
+    day?: StringWithAggregatesFilter<"StudioContextSpend"> | string
+    generationCalls?: IntWithAggregatesFilter<"StudioContextSpend"> | number
+    updatedAt?: DateTimeWithAggregatesFilter<"StudioContextSpend"> | Date | string
+  }
+
   export type ContentNodeCreateInput = {
     id?: string
     title: string
@@ -127861,6 +133462,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateInput = {
@@ -127923,6 +133527,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUpdateInput = {
@@ -127985,6 +133592,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateInput = {
@@ -128047,6 +133657,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateManyInput = {
@@ -129540,6 +135153,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -129618,6 +135234,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -129696,6 +135315,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -129774,6 +135396,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -136446,6 +142071,371 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AgenticMetadataCreateInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    contextDirty?: boolean
+    summaryHash?: string | null
+    contextOptOut?: boolean
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+    node: ContentNodeCreateNestedOneWithoutAgenticMetadataInput
+  }
+
+  export type AgenticMetadataUncheckedCreateInput = {
+    id?: string
+    nodeId: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    contextDirty?: boolean
+    summaryHash?: string | null
+    contextOptOut?: boolean
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    node?: ContentNodeUpdateOneRequiredWithoutAgenticMetadataNestedInput
+  }
+
+  export type AgenticMetadataUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataCreateManyInput = {
+    id?: string
+    nodeId: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    contextDirty?: boolean
+    summaryHash?: string | null
+    contextOptOut?: boolean
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionCreateInput = {
+    id?: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutStudioSourceSelectionsInput
+    folder: ContentNodeCreateNestedOneWithoutStudioSourceSelectionsInput
+  }
+
+  export type StudioSourceSelectionUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    folderId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioSourceSelectionUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput
+    folder?: ContentNodeUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionCreateManyInput = {
+    id?: string
+    ownerId: string
+    folderId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioSourceSelectionUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunCreateInput = {
+    id?: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutStudioGenerationRunsInput
+    folder: ContentNodeCreateNestedOneWithoutStudioGenerationRunsInput
+  }
+
+  export type StudioGenerationRunUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    folderId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutStudioGenerationRunsNestedInput
+    folder?: ContentNodeUpdateOneRequiredWithoutStudioGenerationRunsNestedInput
+  }
+
+  export type StudioGenerationRunUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunCreateManyInput = {
+    id?: string
+    ownerId: string
+    folderId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendCreateInput = {
+    id?: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutStudioContextSpendInput
+  }
+
+  export type StudioContextSpendUncheckedCreateInput = {
+    id?: string
+    ownerId: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioContextSpendUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutStudioContextSpendNestedInput
+  }
+
+  export type StudioContextSpendUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendCreateManyInput = {
+    id?: string
+    ownerId: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioContextSpendUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -136778,6 +142768,23 @@ export namespace Prisma {
     none?: WorkflowRunArtifactWhereInput
   }
 
+  export type AgenticMetadataNullableScalarRelationFilter = {
+    is?: AgenticMetadataWhereInput | null
+    isNot?: AgenticMetadataWhereInput | null
+  }
+
+  export type StudioSourceSelectionListRelationFilter = {
+    every?: StudioSourceSelectionWhereInput
+    some?: StudioSourceSelectionWhereInput
+    none?: StudioSourceSelectionWhereInput
+  }
+
+  export type StudioGenerationRunListRelationFilter = {
+    every?: StudioGenerationRunWhereInput
+    some?: StudioGenerationRunWhereInput
+    none?: StudioGenerationRunWhereInput
+  }
+
   export type SortOrderInput = {
     sort: SortOrder
     nulls?: NullsOrder
@@ -136864,6 +142871,14 @@ export namespace Prisma {
   }
 
   export type WorkflowRunArtifactOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type StudioSourceSelectionOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type StudioGenerationRunOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -138370,6 +144385,12 @@ export namespace Prisma {
     none?: WebResourceWhereInput
   }
 
+  export type StudioContextSpendListRelationFilter = {
+    every?: StudioContextSpendWhereInput
+    some?: StudioContextSpendWhereInput
+    none?: StudioContextSpendWhereInput
+  }
+
   export type ConnectionInviteListRelationFilter = {
     every?: ConnectionInviteWhereInput
     some?: ConnectionInviteWhereInput
@@ -138541,6 +144562,10 @@ export namespace Prisma {
   }
 
   export type WebResourceOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type StudioContextSpendOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -142311,6 +148336,191 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type AgenticMetadataCountOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrder
+    contextDirty?: SortOrder
+    summaryHash?: SortOrder
+    contextOptOut?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AgenticMetadataMaxOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    derivedText?: SortOrder
+    sourceContentHash?: SortOrder
+    contextDirty?: SortOrder
+    summaryHash?: SortOrder
+    contextOptOut?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AgenticMetadataMinOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    derivedText?: SortOrder
+    sourceContentHash?: SortOrder
+    contextDirty?: SortOrder
+    summaryHash?: SortOrder
+    contextOptOut?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioSourceSelectionOwnerIdFolderIdCompoundUniqueInput = {
+    ownerId: string
+    folderId: string
+  }
+
+  export type StudioSourceSelectionCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    includedNodeIds?: SortOrder
+    excludedNodeIds?: SortOrder
+    tokenBudget?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioSourceSelectionAvgOrderByAggregateInput = {
+    tokenBudget?: SortOrder
+  }
+
+  export type StudioSourceSelectionMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    tokenBudget?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioSourceSelectionMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    tokenBudget?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioSourceSelectionSumOrderByAggregateInput = {
+    tokenBudget?: SortOrder
+  }
+
+  export type StudioGenerationRunCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    toolId?: SortOrder
+    variantId?: SortOrder
+    sourceNodeIds?: SortOrder
+    status?: SortOrder
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+    stepLabel?: SortOrder
+    outputNodeId?: SortOrder
+    outputBodyHash?: SortOrder
+    error?: SortOrder
+    promptSnapshot?: SortOrder
+    model?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioGenerationRunAvgOrderByAggregateInput = {
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+  }
+
+  export type StudioGenerationRunMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    toolId?: SortOrder
+    variantId?: SortOrder
+    status?: SortOrder
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+    stepLabel?: SortOrder
+    outputNodeId?: SortOrder
+    outputBodyHash?: SortOrder
+    error?: SortOrder
+    promptSnapshot?: SortOrder
+    model?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioGenerationRunMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    folderId?: SortOrder
+    toolId?: SortOrder
+    variantId?: SortOrder
+    status?: SortOrder
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+    stepLabel?: SortOrder
+    outputNodeId?: SortOrder
+    outputBodyHash?: SortOrder
+    error?: SortOrder
+    promptSnapshot?: SortOrder
+    model?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioGenerationRunSumOrderByAggregateInput = {
+    stepIndex?: SortOrder
+    stepTotal?: SortOrder
+  }
+
+  export type StudioContextSpendOwnerIdDayCompoundUniqueInput = {
+    ownerId: string
+    day: string
+  }
+
+  export type StudioContextSpendCountOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    day?: SortOrder
+    generationCalls?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioContextSpendAvgOrderByAggregateInput = {
+    generationCalls?: SortOrder
+  }
+
+  export type StudioContextSpendMaxOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    day?: SortOrder
+    generationCalls?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioContextSpendMinOrderByAggregateInput = {
+    id?: SortOrder
+    ownerId?: SortOrder
+    day?: SortOrder
+    generationCalls?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type StudioContextSpendSumOrderByAggregateInput = {
+    generationCalls?: SortOrder
+  }
+
   export type AuditLogCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -142598,6 +148808,26 @@ export namespace Prisma {
     connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
   }
 
+  export type AgenticMetadataCreateNestedOneWithoutNodeInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    connect?: AgenticMetadataWhereUniqueInput
+  }
+
+  export type StudioSourceSelectionCreateNestedManyWithoutFolderInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput> | StudioSourceSelectionCreateWithoutFolderInput[] | StudioSourceSelectionUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutFolderInput | StudioSourceSelectionCreateOrConnectWithoutFolderInput[]
+    createMany?: StudioSourceSelectionCreateManyFolderInputEnvelope
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+  }
+
+  export type StudioGenerationRunCreateNestedManyWithoutFolderInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput> | StudioGenerationRunCreateWithoutFolderInput[] | StudioGenerationRunUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutFolderInput | StudioGenerationRunCreateOrConnectWithoutFolderInput[]
+    createMany?: StudioGenerationRunCreateManyFolderInputEnvelope
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+  }
+
   export type AuditLogUncheckedCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -142847,6 +149077,26 @@ export namespace Prisma {
     connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
     createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
     connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+  }
+
+  export type AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    connect?: AgenticMetadataWhereUniqueInput
+  }
+
+  export type StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput> | StudioSourceSelectionCreateWithoutFolderInput[] | StudioSourceSelectionUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutFolderInput | StudioSourceSelectionCreateOrConnectWithoutFolderInput[]
+    createMany?: StudioSourceSelectionCreateManyFolderInputEnvelope
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+  }
+
+  export type StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput> | StudioGenerationRunCreateWithoutFolderInput[] | StudioGenerationRunUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutFolderInput | StudioGenerationRunCreateOrConnectWithoutFolderInput[]
+    createMany?: StudioGenerationRunCreateManyFolderInputEnvelope
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -143415,6 +149665,44 @@ export namespace Prisma {
     deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
   }
 
+  export type AgenticMetadataUpdateOneWithoutNodeNestedInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    upsert?: AgenticMetadataUpsertWithoutNodeInput
+    disconnect?: AgenticMetadataWhereInput | boolean
+    delete?: AgenticMetadataWhereInput | boolean
+    connect?: AgenticMetadataWhereUniqueInput
+    update?: XOR<XOR<AgenticMetadataUpdateToOneWithWhereWithoutNodeInput, AgenticMetadataUpdateWithoutNodeInput>, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+  }
+
+  export type StudioSourceSelectionUpdateManyWithoutFolderNestedInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput> | StudioSourceSelectionCreateWithoutFolderInput[] | StudioSourceSelectionUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutFolderInput | StudioSourceSelectionCreateOrConnectWithoutFolderInput[]
+    upsert?: StudioSourceSelectionUpsertWithWhereUniqueWithoutFolderInput | StudioSourceSelectionUpsertWithWhereUniqueWithoutFolderInput[]
+    createMany?: StudioSourceSelectionCreateManyFolderInputEnvelope
+    set?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    disconnect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    delete?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    update?: StudioSourceSelectionUpdateWithWhereUniqueWithoutFolderInput | StudioSourceSelectionUpdateWithWhereUniqueWithoutFolderInput[]
+    updateMany?: StudioSourceSelectionUpdateManyWithWhereWithoutFolderInput | StudioSourceSelectionUpdateManyWithWhereWithoutFolderInput[]
+    deleteMany?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+  }
+
+  export type StudioGenerationRunUpdateManyWithoutFolderNestedInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput> | StudioGenerationRunCreateWithoutFolderInput[] | StudioGenerationRunUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutFolderInput | StudioGenerationRunCreateOrConnectWithoutFolderInput[]
+    upsert?: StudioGenerationRunUpsertWithWhereUniqueWithoutFolderInput | StudioGenerationRunUpsertWithWhereUniqueWithoutFolderInput[]
+    createMany?: StudioGenerationRunCreateManyFolderInputEnvelope
+    set?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    disconnect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    delete?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    update?: StudioGenerationRunUpdateWithWhereUniqueWithoutFolderInput | StudioGenerationRunUpdateWithWhereUniqueWithoutFolderInput[]
+    updateMany?: StudioGenerationRunUpdateManyWithWhereWithoutFolderInput | StudioGenerationRunUpdateManyWithWhereWithoutFolderInput[]
+    deleteMany?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
+  }
+
   export type AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -143885,6 +150173,44 @@ export namespace Prisma {
     update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput[]
     updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput | WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput[]
     deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+  }
+
+  export type AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    upsert?: AgenticMetadataUpsertWithoutNodeInput
+    disconnect?: AgenticMetadataWhereInput | boolean
+    delete?: AgenticMetadataWhereInput | boolean
+    connect?: AgenticMetadataWhereUniqueInput
+    update?: XOR<XOR<AgenticMetadataUpdateToOneWithWhereWithoutNodeInput, AgenticMetadataUpdateWithoutNodeInput>, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput> | StudioSourceSelectionCreateWithoutFolderInput[] | StudioSourceSelectionUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutFolderInput | StudioSourceSelectionCreateOrConnectWithoutFolderInput[]
+    upsert?: StudioSourceSelectionUpsertWithWhereUniqueWithoutFolderInput | StudioSourceSelectionUpsertWithWhereUniqueWithoutFolderInput[]
+    createMany?: StudioSourceSelectionCreateManyFolderInputEnvelope
+    set?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    disconnect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    delete?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    update?: StudioSourceSelectionUpdateWithWhereUniqueWithoutFolderInput | StudioSourceSelectionUpdateWithWhereUniqueWithoutFolderInput[]
+    updateMany?: StudioSourceSelectionUpdateManyWithWhereWithoutFolderInput | StudioSourceSelectionUpdateManyWithWhereWithoutFolderInput[]
+    deleteMany?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+  }
+
+  export type StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput> | StudioGenerationRunCreateWithoutFolderInput[] | StudioGenerationRunUncheckedCreateWithoutFolderInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutFolderInput | StudioGenerationRunCreateOrConnectWithoutFolderInput[]
+    upsert?: StudioGenerationRunUpsertWithWhereUniqueWithoutFolderInput | StudioGenerationRunUpsertWithWhereUniqueWithoutFolderInput[]
+    createMany?: StudioGenerationRunCreateManyFolderInputEnvelope
+    set?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    disconnect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    delete?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    update?: StudioGenerationRunUpdateWithWhereUniqueWithoutFolderInput | StudioGenerationRunUpdateWithWhereUniqueWithoutFolderInput[]
+    updateMany?: StudioGenerationRunUpdateManyWithWhereWithoutFolderInput | StudioGenerationRunUpdateManyWithWhereWithoutFolderInput[]
+    deleteMany?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
   }
 
   export type UserCreateNestedOneWithoutPeriodicNoteIndexesInput = {
@@ -144758,6 +151084,27 @@ export namespace Prisma {
     connect?: WebResourceViewStateWhereUniqueInput | WebResourceViewStateWhereUniqueInput[]
   }
 
+  export type StudioSourceSelectionCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput> | StudioSourceSelectionCreateWithoutOwnerInput[] | StudioSourceSelectionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutOwnerInput | StudioSourceSelectionCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioSourceSelectionCreateManyOwnerInputEnvelope
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+  }
+
+  export type StudioGenerationRunCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput> | StudioGenerationRunCreateWithoutOwnerInput[] | StudioGenerationRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutOwnerInput | StudioGenerationRunCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioGenerationRunCreateManyOwnerInputEnvelope
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+  }
+
+  export type StudioContextSpendCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput> | StudioContextSpendCreateWithoutOwnerInput[] | StudioContextSpendUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioContextSpendCreateOrConnectWithoutOwnerInput | StudioContextSpendCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioContextSpendCreateManyOwnerInputEnvelope
+    connect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+  }
+
   export type ConnectionInviteCreateNestedManyWithoutInviterInput = {
     create?: XOR<ConnectionInviteCreateWithoutInviterInput, ConnectionInviteUncheckedCreateWithoutInviterInput> | ConnectionInviteCreateWithoutInviterInput[] | ConnectionInviteUncheckedCreateWithoutInviterInput[]
     connectOrCreate?: ConnectionInviteCreateOrConnectWithoutInviterInput | ConnectionInviteCreateOrConnectWithoutInviterInput[]
@@ -145176,6 +151523,27 @@ export namespace Prisma {
     connectOrCreate?: WebResourceViewStateCreateOrConnectWithoutUserInput | WebResourceViewStateCreateOrConnectWithoutUserInput[]
     createMany?: WebResourceViewStateCreateManyUserInputEnvelope
     connect?: WebResourceViewStateWhereUniqueInput | WebResourceViewStateWhereUniqueInput[]
+  }
+
+  export type StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput> | StudioSourceSelectionCreateWithoutOwnerInput[] | StudioSourceSelectionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutOwnerInput | StudioSourceSelectionCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioSourceSelectionCreateManyOwnerInputEnvelope
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+  }
+
+  export type StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput> | StudioGenerationRunCreateWithoutOwnerInput[] | StudioGenerationRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutOwnerInput | StudioGenerationRunCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioGenerationRunCreateManyOwnerInputEnvelope
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+  }
+
+  export type StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput = {
+    create?: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput> | StudioContextSpendCreateWithoutOwnerInput[] | StudioContextSpendUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioContextSpendCreateOrConnectWithoutOwnerInput | StudioContextSpendCreateOrConnectWithoutOwnerInput[]
+    createMany?: StudioContextSpendCreateManyOwnerInputEnvelope
+    connect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
   }
 
   export type ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput = {
@@ -145946,6 +152314,48 @@ export namespace Prisma {
     update?: WebResourceViewStateUpdateWithWhereUniqueWithoutUserInput | WebResourceViewStateUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: WebResourceViewStateUpdateManyWithWhereWithoutUserInput | WebResourceViewStateUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: WebResourceViewStateScalarWhereInput | WebResourceViewStateScalarWhereInput[]
+  }
+
+  export type StudioSourceSelectionUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput> | StudioSourceSelectionCreateWithoutOwnerInput[] | StudioSourceSelectionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutOwnerInput | StudioSourceSelectionCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioSourceSelectionUpsertWithWhereUniqueWithoutOwnerInput | StudioSourceSelectionUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioSourceSelectionCreateManyOwnerInputEnvelope
+    set?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    disconnect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    delete?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    update?: StudioSourceSelectionUpdateWithWhereUniqueWithoutOwnerInput | StudioSourceSelectionUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioSourceSelectionUpdateManyWithWhereWithoutOwnerInput | StudioSourceSelectionUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+  }
+
+  export type StudioGenerationRunUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput> | StudioGenerationRunCreateWithoutOwnerInput[] | StudioGenerationRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutOwnerInput | StudioGenerationRunCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioGenerationRunUpsertWithWhereUniqueWithoutOwnerInput | StudioGenerationRunUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioGenerationRunCreateManyOwnerInputEnvelope
+    set?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    disconnect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    delete?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    update?: StudioGenerationRunUpdateWithWhereUniqueWithoutOwnerInput | StudioGenerationRunUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioGenerationRunUpdateManyWithWhereWithoutOwnerInput | StudioGenerationRunUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
+  }
+
+  export type StudioContextSpendUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput> | StudioContextSpendCreateWithoutOwnerInput[] | StudioContextSpendUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioContextSpendCreateOrConnectWithoutOwnerInput | StudioContextSpendCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioContextSpendUpsertWithWhereUniqueWithoutOwnerInput | StudioContextSpendUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioContextSpendCreateManyOwnerInputEnvelope
+    set?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    disconnect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    delete?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    connect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    update?: StudioContextSpendUpdateWithWhereUniqueWithoutOwnerInput | StudioContextSpendUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioContextSpendUpdateManyWithWhereWithoutOwnerInput | StudioContextSpendUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioContextSpendScalarWhereInput | StudioContextSpendScalarWhereInput[]
   }
 
   export type ConnectionInviteUpdateManyWithoutInviterNestedInput = {
@@ -146786,6 +153196,48 @@ export namespace Prisma {
     update?: WebResourceViewStateUpdateWithWhereUniqueWithoutUserInput | WebResourceViewStateUpdateWithWhereUniqueWithoutUserInput[]
     updateMany?: WebResourceViewStateUpdateManyWithWhereWithoutUserInput | WebResourceViewStateUpdateManyWithWhereWithoutUserInput[]
     deleteMany?: WebResourceViewStateScalarWhereInput | WebResourceViewStateScalarWhereInput[]
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput> | StudioSourceSelectionCreateWithoutOwnerInput[] | StudioSourceSelectionUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioSourceSelectionCreateOrConnectWithoutOwnerInput | StudioSourceSelectionCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioSourceSelectionUpsertWithWhereUniqueWithoutOwnerInput | StudioSourceSelectionUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioSourceSelectionCreateManyOwnerInputEnvelope
+    set?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    disconnect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    delete?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    connect?: StudioSourceSelectionWhereUniqueInput | StudioSourceSelectionWhereUniqueInput[]
+    update?: StudioSourceSelectionUpdateWithWhereUniqueWithoutOwnerInput | StudioSourceSelectionUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioSourceSelectionUpdateManyWithWhereWithoutOwnerInput | StudioSourceSelectionUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+  }
+
+  export type StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput> | StudioGenerationRunCreateWithoutOwnerInput[] | StudioGenerationRunUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioGenerationRunCreateOrConnectWithoutOwnerInput | StudioGenerationRunCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioGenerationRunUpsertWithWhereUniqueWithoutOwnerInput | StudioGenerationRunUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioGenerationRunCreateManyOwnerInputEnvelope
+    set?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    disconnect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    delete?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    connect?: StudioGenerationRunWhereUniqueInput | StudioGenerationRunWhereUniqueInput[]
+    update?: StudioGenerationRunUpdateWithWhereUniqueWithoutOwnerInput | StudioGenerationRunUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioGenerationRunUpdateManyWithWhereWithoutOwnerInput | StudioGenerationRunUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
+  }
+
+  export type StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput = {
+    create?: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput> | StudioContextSpendCreateWithoutOwnerInput[] | StudioContextSpendUncheckedCreateWithoutOwnerInput[]
+    connectOrCreate?: StudioContextSpendCreateOrConnectWithoutOwnerInput | StudioContextSpendCreateOrConnectWithoutOwnerInput[]
+    upsert?: StudioContextSpendUpsertWithWhereUniqueWithoutOwnerInput | StudioContextSpendUpsertWithWhereUniqueWithoutOwnerInput[]
+    createMany?: StudioContextSpendCreateManyOwnerInputEnvelope
+    set?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    disconnect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    delete?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    connect?: StudioContextSpendWhereUniqueInput | StudioContextSpendWhereUniqueInput[]
+    update?: StudioContextSpendUpdateWithWhereUniqueWithoutOwnerInput | StudioContextSpendUpdateWithWhereUniqueWithoutOwnerInput[]
+    updateMany?: StudioContextSpendUpdateManyWithWhereWithoutOwnerInput | StudioContextSpendUpdateManyWithWhereWithoutOwnerInput[]
+    deleteMany?: StudioContextSpendScalarWhereInput | StudioContextSpendScalarWhereInput[]
   }
 
   export type ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput = {
@@ -151439,6 +157891,90 @@ export namespace Prisma {
     update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutWorkflowRunArtifactsInput, ContentNodeUpdateWithoutWorkflowRunArtifactsInput>, ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput>
   }
 
+  export type ContentNodeCreateNestedOneWithoutAgenticMetadataInput = {
+    create?: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAgenticMetadataInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutAgenticMetadataNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAgenticMetadataInput
+    upsert?: ContentNodeUpsertWithoutAgenticMetadataInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutAgenticMetadataInput, ContentNodeUpdateWithoutAgenticMetadataInput>, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+  }
+
+  export type UserCreateNestedOneWithoutStudioSourceSelectionsInput = {
+    create?: XOR<UserCreateWithoutStudioSourceSelectionsInput, UserUncheckedCreateWithoutStudioSourceSelectionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioSourceSelectionsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ContentNodeCreateNestedOneWithoutStudioSourceSelectionsInput = {
+    create?: XOR<ContentNodeCreateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedCreateWithoutStudioSourceSelectionsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutStudioSourceSelectionsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput = {
+    create?: XOR<UserCreateWithoutStudioSourceSelectionsInput, UserUncheckedCreateWithoutStudioSourceSelectionsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioSourceSelectionsInput
+    upsert?: UserUpsertWithoutStudioSourceSelectionsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutStudioSourceSelectionsInput, UserUpdateWithoutStudioSourceSelectionsInput>, UserUncheckedUpdateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedCreateWithoutStudioSourceSelectionsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutStudioSourceSelectionsInput
+    upsert?: ContentNodeUpsertWithoutStudioSourceSelectionsInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutStudioSourceSelectionsInput, ContentNodeUpdateWithoutStudioSourceSelectionsInput>, ContentNodeUncheckedUpdateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type UserCreateNestedOneWithoutStudioGenerationRunsInput = {
+    create?: XOR<UserCreateWithoutStudioGenerationRunsInput, UserUncheckedCreateWithoutStudioGenerationRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioGenerationRunsInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ContentNodeCreateNestedOneWithoutStudioGenerationRunsInput = {
+    create?: XOR<ContentNodeCreateWithoutStudioGenerationRunsInput, ContentNodeUncheckedCreateWithoutStudioGenerationRunsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutStudioGenerationRunsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutStudioGenerationRunsNestedInput = {
+    create?: XOR<UserCreateWithoutStudioGenerationRunsInput, UserUncheckedCreateWithoutStudioGenerationRunsInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioGenerationRunsInput
+    upsert?: UserUpsertWithoutStudioGenerationRunsInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutStudioGenerationRunsInput, UserUpdateWithoutStudioGenerationRunsInput>, UserUncheckedUpdateWithoutStudioGenerationRunsInput>
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutStudioGenerationRunsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutStudioGenerationRunsInput, ContentNodeUncheckedCreateWithoutStudioGenerationRunsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutStudioGenerationRunsInput
+    upsert?: ContentNodeUpsertWithoutStudioGenerationRunsInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutStudioGenerationRunsInput, ContentNodeUpdateWithoutStudioGenerationRunsInput>, ContentNodeUncheckedUpdateWithoutStudioGenerationRunsInput>
+  }
+
+  export type UserCreateNestedOneWithoutStudioContextSpendInput = {
+    create?: XOR<UserCreateWithoutStudioContextSpendInput, UserUncheckedCreateWithoutStudioContextSpendInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioContextSpendInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type UserUpdateOneRequiredWithoutStudioContextSpendNestedInput = {
+    create?: XOR<UserCreateWithoutStudioContextSpendInput, UserUncheckedCreateWithoutStudioContextSpendInput>
+    connectOrCreate?: UserCreateOrConnectWithoutStudioContextSpendInput
+    upsert?: UserUpsertWithoutStudioContextSpendInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutStudioContextSpendInput, UserUpdateWithoutStudioContextSpendInput>, UserUncheckedUpdateWithoutStudioContextSpendInput>
+  }
+
   export type NestedUuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -152877,6 +159413,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -152954,6 +159493,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -153032,6 +159574,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChildrenInput = {
@@ -153093,6 +159638,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChildrenInput = {
@@ -153159,6 +159707,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutParentInput = {
@@ -153220,6 +159771,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutParentInput = {
@@ -153291,6 +159845,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedEmbedsInput = {
@@ -153352,6 +159909,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedEmbedsInput = {
@@ -153418,6 +159978,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedByNoteInput = {
@@ -153479,6 +160042,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedByNoteInput = {
@@ -154367,6 +160933,115 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type AgenticMetadataCreateWithoutNodeInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    contextDirty?: boolean
+    summaryHash?: string | null
+    contextOptOut?: boolean
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUncheckedCreateWithoutNodeInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    contextDirty?: boolean
+    summaryHash?: string | null
+    contextOptOut?: boolean
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataCreateOrConnectWithoutNodeInput = {
+    where: AgenticMetadataWhereUniqueInput
+    create: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+  }
+
+  export type StudioSourceSelectionCreateWithoutFolderInput = {
+    id?: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutStudioSourceSelectionsInput
+  }
+
+  export type StudioSourceSelectionUncheckedCreateWithoutFolderInput = {
+    id?: string
+    ownerId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioSourceSelectionCreateOrConnectWithoutFolderInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    create: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput>
+  }
+
+  export type StudioSourceSelectionCreateManyFolderInputEnvelope = {
+    data: StudioSourceSelectionCreateManyFolderInput | StudioSourceSelectionCreateManyFolderInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type StudioGenerationRunCreateWithoutFolderInput = {
+    id?: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutStudioGenerationRunsInput
+  }
+
+  export type StudioGenerationRunUncheckedCreateWithoutFolderInput = {
+    id?: string
+    ownerId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunCreateOrConnectWithoutFolderInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    create: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput>
+  }
+
+  export type StudioGenerationRunCreateManyFolderInputEnvelope = {
+    data: StudioGenerationRunCreateManyFolderInput | StudioGenerationRunCreateManyFolderInput[]
+    skipDuplicates?: boolean
+  }
+
   export type AuditLogUpsertWithWhereUniqueWithoutTargetContentInput = {
     where: AuditLogWhereUniqueInput
     update: XOR<AuditLogUpdateWithoutTargetContentInput, AuditLogUncheckedUpdateWithoutTargetContentInput>
@@ -154961,6 +161636,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -155038,6 +161716,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -155122,6 +161803,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChildrenInput = {
@@ -155183,6 +161867,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutParentInput = {
@@ -155298,6 +161985,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedEmbedsInput = {
@@ -155359,6 +162049,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutOwnedByNoteInput = {
@@ -156187,6 +162880,113 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"WorkflowRunArtifact"> | Date | string
   }
 
+  export type AgenticMetadataUpsertWithoutNodeInput = {
+    update: XOR<AgenticMetadataUpdateWithoutNodeInput, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+    create: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    where?: AgenticMetadataWhereInput
+  }
+
+  export type AgenticMetadataUpdateToOneWithWhereWithoutNodeInput = {
+    where?: AgenticMetadataWhereInput
+    data: XOR<AgenticMetadataUpdateWithoutNodeInput, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+  }
+
+  export type AgenticMetadataUpdateWithoutNodeInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataUncheckedUpdateWithoutNodeInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextDirty?: BoolFieldUpdateOperationsInput | boolean
+    summaryHash?: NullableStringFieldUpdateOperationsInput | string | null
+    contextOptOut?: BoolFieldUpdateOperationsInput | boolean
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionUpsertWithWhereUniqueWithoutFolderInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    update: XOR<StudioSourceSelectionUpdateWithoutFolderInput, StudioSourceSelectionUncheckedUpdateWithoutFolderInput>
+    create: XOR<StudioSourceSelectionCreateWithoutFolderInput, StudioSourceSelectionUncheckedCreateWithoutFolderInput>
+  }
+
+  export type StudioSourceSelectionUpdateWithWhereUniqueWithoutFolderInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    data: XOR<StudioSourceSelectionUpdateWithoutFolderInput, StudioSourceSelectionUncheckedUpdateWithoutFolderInput>
+  }
+
+  export type StudioSourceSelectionUpdateManyWithWhereWithoutFolderInput = {
+    where: StudioSourceSelectionScalarWhereInput
+    data: XOR<StudioSourceSelectionUpdateManyMutationInput, StudioSourceSelectionUncheckedUpdateManyWithoutFolderInput>
+  }
+
+  export type StudioSourceSelectionScalarWhereInput = {
+    AND?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+    OR?: StudioSourceSelectionScalarWhereInput[]
+    NOT?: StudioSourceSelectionScalarWhereInput | StudioSourceSelectionScalarWhereInput[]
+    id?: UuidFilter<"StudioSourceSelection"> | string
+    ownerId?: UuidFilter<"StudioSourceSelection"> | string
+    folderId?: UuidFilter<"StudioSourceSelection"> | string
+    includedNodeIds?: JsonFilter<"StudioSourceSelection">
+    excludedNodeIds?: JsonFilter<"StudioSourceSelection">
+    tokenBudget?: IntFilter<"StudioSourceSelection"> | number
+    updatedAt?: DateTimeFilter<"StudioSourceSelection"> | Date | string
+  }
+
+  export type StudioGenerationRunUpsertWithWhereUniqueWithoutFolderInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    update: XOR<StudioGenerationRunUpdateWithoutFolderInput, StudioGenerationRunUncheckedUpdateWithoutFolderInput>
+    create: XOR<StudioGenerationRunCreateWithoutFolderInput, StudioGenerationRunUncheckedCreateWithoutFolderInput>
+  }
+
+  export type StudioGenerationRunUpdateWithWhereUniqueWithoutFolderInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    data: XOR<StudioGenerationRunUpdateWithoutFolderInput, StudioGenerationRunUncheckedUpdateWithoutFolderInput>
+  }
+
+  export type StudioGenerationRunUpdateManyWithWhereWithoutFolderInput = {
+    where: StudioGenerationRunScalarWhereInput
+    data: XOR<StudioGenerationRunUpdateManyMutationInput, StudioGenerationRunUncheckedUpdateManyWithoutFolderInput>
+  }
+
+  export type StudioGenerationRunScalarWhereInput = {
+    AND?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
+    OR?: StudioGenerationRunScalarWhereInput[]
+    NOT?: StudioGenerationRunScalarWhereInput | StudioGenerationRunScalarWhereInput[]
+    id?: UuidFilter<"StudioGenerationRun"> | string
+    ownerId?: UuidFilter<"StudioGenerationRun"> | string
+    folderId?: UuidFilter<"StudioGenerationRun"> | string
+    toolId?: StringFilter<"StudioGenerationRun"> | string
+    variantId?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    sourceNodeIds?: JsonFilter<"StudioGenerationRun">
+    status?: StringFilter<"StudioGenerationRun"> | string
+    stepIndex?: IntFilter<"StudioGenerationRun"> | number
+    stepTotal?: IntFilter<"StudioGenerationRun"> | number
+    stepLabel?: StringFilter<"StudioGenerationRun"> | string
+    outputNodeId?: UuidNullableFilter<"StudioGenerationRun"> | string | null
+    outputBodyHash?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    error?: StringNullableFilter<"StudioGenerationRun"> | string | null
+    promptSnapshot?: StringFilter<"StudioGenerationRun"> | string
+    model?: StringFilter<"StudioGenerationRun"> | string
+    createdAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+    updatedAt?: DateTimeFilter<"StudioGenerationRun"> | Date | string
+  }
+
   export type UserCreateWithoutPeriodicNoteIndexesInput = {
     id?: string
     username: string
@@ -156250,6 +163050,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -156327,6 +163130,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -156405,6 +163211,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeriodicNoteIndexesInput = {
@@ -156466,6 +163275,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeriodicNoteIndexesInput = {
@@ -156547,6 +163359,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -156624,6 +163439,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -156708,6 +163526,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeriodicNoteIndexesInput = {
@@ -156769,6 +163590,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutFlashcardDecksInput = {
@@ -156834,6 +163658,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -156911,6 +163738,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -157163,6 +163993,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -157240,6 +164073,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -157413,6 +164249,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -157490,6 +164329,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -157607,6 +164449,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceFlashcardsInput = {
@@ -157668,6 +164513,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceFlashcardsInput = {
@@ -157797,6 +164645,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -157874,6 +164725,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -158003,6 +164857,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceFlashcardsInput = {
@@ -158064,6 +164921,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type FlashcardReviewAttemptUpsertWithWhereUniqueWithoutFlashcardInput = {
@@ -158239,6 +165099,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -158316,6 +165179,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -158486,6 +165352,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -158563,6 +165432,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -158636,6 +165508,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutNotePayloadInput = {
@@ -158697,6 +165572,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutNotePayloadInput = {
@@ -158774,6 +165652,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutNotePayloadInput = {
@@ -158835,6 +165716,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutFilePayloadInput = {
@@ -158896,6 +165780,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFilePayloadInput = {
@@ -158957,6 +165844,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFilePayloadInput = {
@@ -159034,6 +165924,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFilePayloadInput = {
@@ -159095,6 +165988,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutHtmlPayloadInput = {
@@ -159156,6 +166052,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHtmlPayloadInput = {
@@ -159217,6 +166116,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHtmlPayloadInput = {
@@ -159294,6 +166196,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHtmlPayloadInput = {
@@ -159355,6 +166260,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutCodePayloadInput = {
@@ -159416,6 +166324,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCodePayloadInput = {
@@ -159477,6 +166388,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCodePayloadInput = {
@@ -159554,6 +166468,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCodePayloadInput = {
@@ -159615,6 +166532,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutContentHistoryInput = {
@@ -159680,6 +166600,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -159757,6 +166680,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -159835,6 +166761,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHistoryInput = {
@@ -159896,6 +166825,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHistoryInput = {
@@ -159977,6 +166909,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -160054,6 +166989,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -160138,6 +167076,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHistoryInput = {
@@ -160199,6 +167140,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutContentPathInput = {
@@ -160260,6 +167204,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentPathInput = {
@@ -160321,6 +167268,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentPathInput = {
@@ -160398,6 +167348,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentPathInput = {
@@ -160459,6 +167412,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutSourceLinksInput = {
@@ -160520,6 +167476,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceLinksInput = {
@@ -160581,6 +167540,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceLinksInput = {
@@ -160647,6 +167609,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTargetLinksInput = {
@@ -160708,6 +167673,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTargetLinksInput = {
@@ -160785,6 +167753,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceLinksInput = {
@@ -160846,6 +167817,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUpsertWithoutTargetLinksInput = {
@@ -160918,6 +167892,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTargetLinksInput = {
@@ -160979,6 +167956,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutContentTagsInput = {
@@ -161040,6 +168020,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentTagsInput = {
@@ -161101,6 +168084,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentTagsInput = {
@@ -161201,6 +168187,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentTagsInput = {
@@ -161262,6 +168251,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type TagUpsertWithoutContentTagsInput = {
@@ -161352,6 +168344,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTrashBinEntryInput = {
@@ -161413,6 +168408,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTrashBinEntryInput = {
@@ -161483,6 +168481,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -161560,6 +168561,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -161649,6 +168653,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTrashBinEntryInput = {
@@ -161710,6 +168717,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserUpsertWithoutTrashedContentInput = {
@@ -161786,6 +168796,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -161863,6 +168876,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -161940,6 +168956,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -162017,6 +169036,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -162110,6 +169132,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -162187,6 +169212,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -162494,6 +169522,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnerInput = {
@@ -162555,6 +169586,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnerInput = {
@@ -164233,6 +171267,106 @@ export namespace Prisma {
 
   export type WebResourceViewStateCreateManyUserInputEnvelope = {
     data: WebResourceViewStateCreateManyUserInput | WebResourceViewStateCreateManyUserInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type StudioSourceSelectionCreateWithoutOwnerInput = {
+    id?: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+    folder: ContentNodeCreateNestedOneWithoutStudioSourceSelectionsInput
+  }
+
+  export type StudioSourceSelectionUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    folderId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioSourceSelectionCreateOrConnectWithoutOwnerInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    create: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioSourceSelectionCreateManyOwnerInputEnvelope = {
+    data: StudioSourceSelectionCreateManyOwnerInput | StudioSourceSelectionCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type StudioGenerationRunCreateWithoutOwnerInput = {
+    id?: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    folder: ContentNodeCreateNestedOneWithoutStudioGenerationRunsInput
+  }
+
+  export type StudioGenerationRunUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    folderId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunCreateOrConnectWithoutOwnerInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    create: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioGenerationRunCreateManyOwnerInputEnvelope = {
+    data: StudioGenerationRunCreateManyOwnerInput | StudioGenerationRunCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type StudioContextSpendCreateWithoutOwnerInput = {
+    id?: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioContextSpendUncheckedCreateWithoutOwnerInput = {
+    id?: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioContextSpendCreateOrConnectWithoutOwnerInput = {
+    where: StudioContextSpendWhereUniqueInput
+    create: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioContextSpendCreateManyOwnerInputEnvelope = {
+    data: StudioContextSpendCreateManyOwnerInput | StudioContextSpendCreateManyOwnerInput[]
     skipDuplicates?: boolean
   }
 
@@ -165924,6 +173058,65 @@ export namespace Prisma {
     data: XOR<WebResourceViewStateUpdateManyMutationInput, WebResourceViewStateUncheckedUpdateManyWithoutUserInput>
   }
 
+  export type StudioSourceSelectionUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    update: XOR<StudioSourceSelectionUpdateWithoutOwnerInput, StudioSourceSelectionUncheckedUpdateWithoutOwnerInput>
+    create: XOR<StudioSourceSelectionCreateWithoutOwnerInput, StudioSourceSelectionUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioSourceSelectionUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: StudioSourceSelectionWhereUniqueInput
+    data: XOR<StudioSourceSelectionUpdateWithoutOwnerInput, StudioSourceSelectionUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type StudioSourceSelectionUpdateManyWithWhereWithoutOwnerInput = {
+    where: StudioSourceSelectionScalarWhereInput
+    data: XOR<StudioSourceSelectionUpdateManyMutationInput, StudioSourceSelectionUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type StudioGenerationRunUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    update: XOR<StudioGenerationRunUpdateWithoutOwnerInput, StudioGenerationRunUncheckedUpdateWithoutOwnerInput>
+    create: XOR<StudioGenerationRunCreateWithoutOwnerInput, StudioGenerationRunUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioGenerationRunUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: StudioGenerationRunWhereUniqueInput
+    data: XOR<StudioGenerationRunUpdateWithoutOwnerInput, StudioGenerationRunUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type StudioGenerationRunUpdateManyWithWhereWithoutOwnerInput = {
+    where: StudioGenerationRunScalarWhereInput
+    data: XOR<StudioGenerationRunUpdateManyMutationInput, StudioGenerationRunUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type StudioContextSpendUpsertWithWhereUniqueWithoutOwnerInput = {
+    where: StudioContextSpendWhereUniqueInput
+    update: XOR<StudioContextSpendUpdateWithoutOwnerInput, StudioContextSpendUncheckedUpdateWithoutOwnerInput>
+    create: XOR<StudioContextSpendCreateWithoutOwnerInput, StudioContextSpendUncheckedCreateWithoutOwnerInput>
+  }
+
+  export type StudioContextSpendUpdateWithWhereUniqueWithoutOwnerInput = {
+    where: StudioContextSpendWhereUniqueInput
+    data: XOR<StudioContextSpendUpdateWithoutOwnerInput, StudioContextSpendUncheckedUpdateWithoutOwnerInput>
+  }
+
+  export type StudioContextSpendUpdateManyWithWhereWithoutOwnerInput = {
+    where: StudioContextSpendScalarWhereInput
+    data: XOR<StudioContextSpendUpdateManyMutationInput, StudioContextSpendUncheckedUpdateManyWithoutOwnerInput>
+  }
+
+  export type StudioContextSpendScalarWhereInput = {
+    AND?: StudioContextSpendScalarWhereInput | StudioContextSpendScalarWhereInput[]
+    OR?: StudioContextSpendScalarWhereInput[]
+    NOT?: StudioContextSpendScalarWhereInput | StudioContextSpendScalarWhereInput[]
+    id?: UuidFilter<"StudioContextSpend"> | string
+    ownerId?: UuidFilter<"StudioContextSpend"> | string
+    day?: StringFilter<"StudioContextSpend"> | string
+    generationCalls?: IntFilter<"StudioContextSpend"> | number
+    updatedAt?: DateTimeFilter<"StudioContextSpend"> | Date | string
+  }
+
   export type ConnectionInviteUpsertWithWhereUniqueWithoutInviterInput = {
     where: ConnectionInviteWhereUniqueInput
     update: XOR<ConnectionInviteUpdateWithoutInviterInput, ConnectionInviteUncheckedUpdateWithoutInviterInput>
@@ -166312,6 +173505,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -166389,6 +173585,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -166467,6 +173666,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewWorkspacesInput = {
@@ -166528,6 +173730,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewWorkspacesInput = {
@@ -166639,6 +173844,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -166716,6 +173924,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -166800,6 +174011,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewWorkspacesInput = {
@@ -166861,6 +174075,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
@@ -166981,6 +174198,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkspaceItemsInput = {
@@ -167042,6 +174262,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkspaceItemsInput = {
@@ -167168,6 +174391,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput = {
@@ -167229,6 +174455,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutCategoriesInput = {
@@ -167294,6 +174523,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -167371,6 +174603,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -167449,6 +174684,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCategoryInput = {
@@ -167510,6 +174748,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCategoryInput = {
@@ -167596,6 +174837,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -167673,6 +174917,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -167790,6 +175037,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -167867,6 +175117,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -167976,6 +175229,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -168053,6 +175309,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -168126,6 +175385,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewGrantsInput = {
@@ -168187,6 +175449,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewGrantsInput = {
@@ -168257,6 +175522,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -168334,6 +175602,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -168423,6 +175694,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewGrantsInput = {
@@ -168484,6 +175758,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserUpsertWithoutViewGrantsInput = {
@@ -168560,6 +175837,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -168637,6 +175917,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -168710,6 +175993,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationDocumentInput = {
@@ -168771,6 +176057,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationDocumentInput = {
@@ -168841,6 +176130,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -168918,6 +176210,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -169007,6 +176302,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput = {
@@ -169068,6 +176366,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserUpsertWithoutCollaborationDocumentsInput = {
@@ -169144,6 +176445,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -169221,6 +176525,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -169294,6 +176601,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationPresenceRecordsInput = {
@@ -169355,6 +176665,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationPresenceRecordsInput = {
@@ -169432,6 +176745,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationPresenceRecordsInput = {
@@ -169493,6 +176809,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutPeopleGroupsInput = {
@@ -169558,6 +176877,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -169635,6 +176957,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -169717,6 +177042,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -169794,6 +177122,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -170015,6 +177346,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleGroupInput = {
@@ -170076,6 +177410,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleGroupInput = {
@@ -170192,6 +177529,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -170269,6 +177609,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -170357,6 +177700,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -170434,6 +177780,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -170624,6 +177973,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -170701,6 +178053,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -170822,6 +178177,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonInput = {
@@ -170883,6 +178241,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonInput = {
@@ -171027,6 +178388,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -171104,6 +178468,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -171278,6 +178645,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -171355,6 +178725,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -171433,6 +178806,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -171494,6 +178870,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -171665,6 +179044,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -171742,6 +179124,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -171826,6 +179211,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -171887,6 +179275,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type PeopleGroupUpsertWithoutFileTreeMountsInput = {
@@ -172054,6 +179445,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -172131,6 +179525,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -172209,6 +179606,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonMentionsInput = {
@@ -172270,6 +179670,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonMentionsInput = {
@@ -172398,6 +179801,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -172475,6 +179881,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -172559,6 +179968,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonMentionsInput = {
@@ -172620,6 +180032,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type PersonUpsertWithoutMentionsInput = {
@@ -172738,6 +180153,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -172815,6 +180233,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -172908,6 +180329,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -172985,6 +180409,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -173062,6 +180489,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -173139,6 +180569,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -173232,6 +180665,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -173309,6 +180745,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -173386,6 +180825,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -173463,6 +180905,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -173645,6 +181090,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -173722,6 +181170,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -173866,6 +181317,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -173943,6 +181397,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -174151,6 +181608,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -174228,6 +181688,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -174391,6 +181854,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -174468,6 +181934,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -174581,6 +182050,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncRootsInput = {
@@ -174642,6 +182114,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncRootsInput = {
@@ -174787,6 +182262,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -174864,6 +182342,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -174989,6 +182470,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncRootsInput = {
@@ -175050,6 +182534,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type BookmarkSyncLinkUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -175362,6 +182849,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncLinksInput = {
@@ -175423,6 +182913,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncLinksInput = {
@@ -175545,6 +183038,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncLinksInput = {
@@ -175606,6 +183102,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutWebResourcesInput = {
@@ -175671,6 +183170,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -175748,6 +183250,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -175979,6 +183484,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -176056,6 +183564,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -176209,6 +183720,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -176286,6 +183800,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -176403,6 +183920,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceLinksInput = {
@@ -176464,6 +183984,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceLinksInput = {
@@ -176545,6 +184068,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -176622,6 +184148,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -176751,6 +184280,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceLinksInput = {
@@ -176812,6 +184344,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutWebResourceViewStatesInput = {
@@ -176877,6 +184412,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -176954,6 +184492,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -177116,6 +184657,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceViewStatesInput = {
@@ -177177,6 +184721,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceViewStatesInput = {
@@ -177258,6 +184805,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -177335,6 +184885,9 @@ export namespace Prisma {
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -177515,6 +185068,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceViewStatesInput = {
@@ -177576,6 +185132,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutAccountsInput = {
@@ -177641,6 +185200,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -177718,6 +185280,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -177811,6 +185376,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -177888,6 +185456,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -177961,6 +185532,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
@@ -178022,6 +185596,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
@@ -178092,6 +185669,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -178169,6 +185749,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -178251,6 +185834,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -178328,6 +185914,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -178417,6 +186006,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
@@ -178478,6 +186070,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserUpsertWithoutAuditTargetsInput = {
@@ -178554,6 +186149,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -178631,6 +186229,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -178719,6 +186320,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -178796,6 +186400,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -178869,6 +186476,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFolderPayloadInput = {
@@ -178930,6 +186540,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFolderPayloadInput = {
@@ -179007,6 +186620,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFolderPayloadInput = {
@@ -179068,6 +186684,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutExternalPayloadInput = {
@@ -179129,6 +186748,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutExternalPayloadInput = {
@@ -179190,6 +186812,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutExternalPayloadInput = {
@@ -179306,6 +186931,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutExternalPayloadInput = {
@@ -179367,6 +186995,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type WebResourceUpsertWithoutExternalPayloadsInput = {
@@ -179473,6 +187104,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChatPayloadInput = {
@@ -179534,6 +187168,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChatPayloadInput = {
@@ -179611,6 +187248,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChatPayloadInput = {
@@ -179672,6 +187312,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutConversationsInput = {
@@ -179737,6 +187380,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -179814,6 +187460,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -179892,6 +187541,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutArchivedConversationInput = {
@@ -179953,6 +187605,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutArchivedConversationInput = {
@@ -180173,6 +187828,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -180250,6 +187908,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -180334,6 +187995,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutArchivedConversationInput = {
@@ -180395,6 +188059,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ChatContextUpsertWithoutConversationsInput = {
@@ -180556,6 +188223,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -180633,6 +188303,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -180762,6 +188435,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -180839,6 +188515,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -181153,6 +188832,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutConversationAssociationsInput = {
@@ -181214,6 +188896,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutConversationAssociationsInput = {
@@ -181328,6 +189013,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutConversationAssociationsInput = {
@@ -181389,6 +189077,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutAiConnectionsInput = {
@@ -181454,6 +189145,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -181531,6 +189225,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -181654,6 +189351,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -181731,6 +189431,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -181824,6 +189527,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -181901,6 +189607,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -182035,6 +189744,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -182112,6 +189824,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -182232,6 +189947,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutVisualizationPayloadInput = {
@@ -182293,6 +190011,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutVisualizationPayloadInput = {
@@ -182370,6 +190091,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput = {
@@ -182431,6 +190155,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutDataPayloadInput = {
@@ -182492,6 +190219,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutDataPayloadInput = {
@@ -182553,6 +190283,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutDataPayloadInput = {
@@ -182630,6 +190363,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutDataPayloadInput = {
@@ -182691,6 +190427,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutHopePayloadInput = {
@@ -182752,6 +190491,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHopePayloadInput = {
@@ -182813,6 +190555,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHopePayloadInput = {
@@ -182890,6 +190635,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHopePayloadInput = {
@@ -182951,6 +190699,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeCreateWithoutWorkflowPayloadInput = {
@@ -183012,6 +190763,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowPayloadInput = {
@@ -183073,6 +190827,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowPayloadInput = {
@@ -183150,6 +190907,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput = {
@@ -183211,6 +190971,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type UserCreateWithoutReusableCategoriesInput = {
@@ -183276,6 +191039,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -183353,6 +191119,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -183679,6 +191448,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -183756,6 +191528,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -183993,6 +191768,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -184070,6 +191848,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -184206,6 +191987,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -184283,6 +192067,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -184397,6 +192184,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -184474,6 +192264,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -184610,6 +192403,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -184687,6 +192483,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -184801,6 +192600,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -184878,6 +192680,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -185014,6 +192819,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -185091,6 +192899,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -185205,6 +193016,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -185282,6 +193096,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -185418,6 +193235,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -185495,6 +193315,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -185572,6 +193395,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -185649,6 +193475,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -185790,6 +193619,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -185867,6 +193699,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -185960,6 +193795,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -186037,6 +193875,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -186223,6 +194064,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -186300,6 +194144,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -186434,6 +194281,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -186511,6 +194361,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -186632,6 +194485,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCalendarEventsInput = {
@@ -186693,6 +194549,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCalendarEventsInput = {
@@ -186800,6 +194659,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -186877,6 +194739,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -187010,6 +194875,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCalendarEventsInput = {
@@ -187071,6 +194939,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput = {
@@ -187276,6 +195147,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -187353,6 +195227,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -187617,6 +195494,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -187694,6 +195574,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -187792,6 +195675,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -187869,6 +195755,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -188135,6 +196024,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -188212,6 +196104,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -188533,6 +196428,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -188610,6 +196508,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -188819,6 +196720,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -188896,6 +196800,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -189069,6 +196976,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -189146,6 +197056,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -189239,6 +197152,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -189316,6 +197232,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -189429,6 +197348,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPublicItemsInput = {
@@ -189490,6 +197412,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPublicItemsInput = {
@@ -189988,6 +197913,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -190065,6 +197993,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -190190,6 +198121,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPublicItemsInput = {
@@ -190251,6 +198185,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type PublicPathUpsertWithoutItemsInput = {
@@ -190808,6 +198745,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -190885,6 +198825,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -191209,6 +199152,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -191286,6 +199232,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -191525,6 +199474,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -191602,6 +199554,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -191842,6 +199797,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -191919,6 +199877,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -192236,6 +200197,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -192313,6 +200277,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -192487,6 +200454,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -192564,6 +200534,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -193734,6 +201707,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
     connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
@@ -193811,6 +201787,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
     connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
@@ -193893,6 +201872,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
     connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
@@ -193970,6 +201952,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
     connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
@@ -194063,6 +202048,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
     connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
@@ -194140,6 +202128,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
     connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
@@ -194228,6 +202219,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
     connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
@@ -194305,6 +202299,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
     connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
@@ -194382,6 +202379,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
@@ -194459,6 +202459,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
@@ -194541,6 +202544,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -194618,6 +202624,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -194711,6 +202720,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
@@ -194788,6 +202800,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
@@ -194876,6 +202891,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -194953,6 +202971,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -195030,6 +203051,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -195107,6 +203131,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -195189,6 +203216,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -195266,6 +203296,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -195359,6 +203392,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -195436,6 +203472,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -195524,6 +203563,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -195601,6 +203643,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -195678,6 +203723,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -195755,6 +203803,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -195878,6 +203929,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -195955,6 +204009,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -196077,6 +204134,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -196154,6 +204214,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -196282,6 +204345,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -196359,6 +204425,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -196547,6 +204616,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -196624,6 +204696,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -196746,6 +204821,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -196823,6 +204901,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -196923,6 +205004,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -197000,6 +205084,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -197122,6 +205209,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -197199,6 +205289,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -197276,6 +205369,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -197353,6 +205449,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -197496,6 +205595,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -197573,6 +205675,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -197666,6 +205771,9 @@ export namespace Prisma {
     webResources?: WebResourceCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
@@ -197743,6 +205851,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
     connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
     connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
     connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
@@ -197954,6 +206065,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -198031,6 +206145,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
@@ -198364,6 +206481,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput = {
@@ -198425,6 +206545,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowRunArtifactsInput = {
@@ -198553,6 +206676,9 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput = {
@@ -198614,6 +206740,1833 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
+  }
+
+  export type ContentNodeCreateWithoutAgenticMetadataInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutAgenticMetadataInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutAgenticMetadataInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+  }
+
+  export type ContentNodeUpsertWithoutAgenticMetadataInput = {
+    update: XOR<ContentNodeUpdateWithoutAgenticMetadataInput, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+    create: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutAgenticMetadataInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutAgenticMetadataInput, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+  }
+
+  export type ContentNodeUpdateWithoutAgenticMetadataInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutAgenticMetadataInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
+  }
+
+  export type UserCreateWithoutStudioSourceSelectionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutStudioSourceSelectionsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutStudioSourceSelectionsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutStudioSourceSelectionsInput, UserUncheckedCreateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type ContentNodeCreateWithoutStudioSourceSelectionsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutStudioSourceSelectionsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutStudioSourceSelectionsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedCreateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type UserUpsertWithoutStudioSourceSelectionsInput = {
+    update: XOR<UserUpdateWithoutStudioSourceSelectionsInput, UserUncheckedUpdateWithoutStudioSourceSelectionsInput>
+    create: XOR<UserCreateWithoutStudioSourceSelectionsInput, UserUncheckedCreateWithoutStudioSourceSelectionsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutStudioSourceSelectionsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutStudioSourceSelectionsInput, UserUncheckedUpdateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type UserUpdateWithoutStudioSourceSelectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutStudioSourceSelectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type ContentNodeUpsertWithoutStudioSourceSelectionsInput = {
+    update: XOR<ContentNodeUpdateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedUpdateWithoutStudioSourceSelectionsInput>
+    create: XOR<ContentNodeCreateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedCreateWithoutStudioSourceSelectionsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutStudioSourceSelectionsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutStudioSourceSelectionsInput, ContentNodeUncheckedUpdateWithoutStudioSourceSelectionsInput>
+  }
+
+  export type ContentNodeUpdateWithoutStudioSourceSelectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutStudioSourceSelectionsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
+  }
+
+  export type UserCreateWithoutStudioGenerationRunsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutStudioGenerationRunsInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioContextSpend?: StudioContextSpendUncheckedCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutStudioGenerationRunsInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutStudioGenerationRunsInput, UserUncheckedCreateWithoutStudioGenerationRunsInput>
+  }
+
+  export type ContentNodeCreateWithoutStudioGenerationRunsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutStudioGenerationRunsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutStudioGenerationRunsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutStudioGenerationRunsInput, ContentNodeUncheckedCreateWithoutStudioGenerationRunsInput>
+  }
+
+  export type UserUpsertWithoutStudioGenerationRunsInput = {
+    update: XOR<UserUpdateWithoutStudioGenerationRunsInput, UserUncheckedUpdateWithoutStudioGenerationRunsInput>
+    create: XOR<UserCreateWithoutStudioGenerationRunsInput, UserUncheckedCreateWithoutStudioGenerationRunsInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutStudioGenerationRunsInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutStudioGenerationRunsInput, UserUncheckedUpdateWithoutStudioGenerationRunsInput>
+  }
+
+  export type UserUpdateWithoutStudioGenerationRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutStudioGenerationRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type ContentNodeUpsertWithoutStudioGenerationRunsInput = {
+    update: XOR<ContentNodeUpdateWithoutStudioGenerationRunsInput, ContentNodeUncheckedUpdateWithoutStudioGenerationRunsInput>
+    create: XOR<ContentNodeCreateWithoutStudioGenerationRunsInput, ContentNodeUncheckedCreateWithoutStudioGenerationRunsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutStudioGenerationRunsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutStudioGenerationRunsInput, ContentNodeUncheckedUpdateWithoutStudioGenerationRunsInput>
+  }
+
+  export type ContentNodeUpdateWithoutStudioGenerationRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutStudioGenerationRunsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+  }
+
+  export type UserCreateWithoutStudioContextSpendInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutStudioContextSpendInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutOwnerInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutOwnerInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutStudioContextSpendInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutStudioContextSpendInput, UserUncheckedCreateWithoutStudioContextSpendInput>
+  }
+
+  export type UserUpsertWithoutStudioContextSpendInput = {
+    update: XOR<UserUpdateWithoutStudioContextSpendInput, UserUncheckedUpdateWithoutStudioContextSpendInput>
+    create: XOR<UserCreateWithoutStudioContextSpendInput, UserUncheckedCreateWithoutStudioContextSpendInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutStudioContextSpendInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutStudioContextSpendInput, UserUncheckedUpdateWithoutStudioContextSpendInput>
+  }
+
+  export type UserUpdateWithoutStudioContextSpendInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutStudioContextSpendInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
   }
 
   export type AuditLogCreateManyTargetContentInput = {
@@ -198941,6 +208894,34 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
+  export type StudioSourceSelectionCreateManyFolderInput = {
+    id?: string
+    ownerId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunCreateManyFolderInput = {
+    id?: string
+    ownerId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type AuditLogUpdateWithoutTargetContentInput = {
     id?: StringFieldUpdateOperationsInput | string
     action?: StringFieldUpdateOperationsInput | string
@@ -199111,6 +209092,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutParentInput = {
@@ -199172,6 +209156,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutParentInput = {
@@ -199256,6 +209243,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedByNoteInput = {
@@ -199317,6 +209307,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnedByNoteInput = {
@@ -200096,6 +210089,90 @@ export namespace Prisma {
     kind?: StringFieldUpdateOperationsInput | string
     label?: StringFieldUpdateOperationsInput | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionUpdateWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateManyWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunUpdateWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutStudioGenerationRunsNestedInput
+  }
+
+  export type StudioGenerationRunUncheckedUpdateWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunUncheckedUpdateManyWithoutFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type FlashcardDeckCreateManyParentInput = {
@@ -201030,6 +211107,41 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type StudioSourceSelectionCreateManyOwnerInput = {
+    id?: string
+    folderId: string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: number
+    updatedAt?: Date | string
+  }
+
+  export type StudioGenerationRunCreateManyOwnerInput = {
+    id?: string
+    folderId: string
+    toolId: string
+    variantId?: string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: string
+    stepIndex?: number
+    stepTotal?: number
+    stepLabel?: string
+    outputNodeId?: string | null
+    outputBodyHash?: string | null
+    error?: string | null
+    promptSnapshot?: string
+    model?: string
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type StudioContextSpendCreateManyOwnerInput = {
+    id?: string
+    day: string
+    generationCalls?: number
+    updatedAt?: Date | string
+  }
+
   export type ConnectionInviteCreateManyInviterInput = {
     id?: string
     inviteeIdentifier: string
@@ -201458,6 +211570,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnerInput = {
@@ -201519,6 +211634,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnerInput = {
@@ -203337,6 +213455,111 @@ export namespace Prisma {
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type StudioSourceSelectionUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    folder?: ContentNodeUpdateOneRequiredWithoutStudioSourceSelectionsNestedInput
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioSourceSelectionUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    includedNodeIds?: JsonNullValueInput | InputJsonValue
+    excludedNodeIds?: JsonNullValueInput | InputJsonValue
+    tokenBudget?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    folder?: ContentNodeUpdateOneRequiredWithoutStudioGenerationRunsNestedInput
+  }
+
+  export type StudioGenerationRunUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioGenerationRunUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    folderId?: StringFieldUpdateOperationsInput | string
+    toolId?: StringFieldUpdateOperationsInput | string
+    variantId?: NullableStringFieldUpdateOperationsInput | string | null
+    sourceNodeIds?: JsonNullValueInput | InputJsonValue
+    status?: StringFieldUpdateOperationsInput | string
+    stepIndex?: IntFieldUpdateOperationsInput | number
+    stepTotal?: IntFieldUpdateOperationsInput | number
+    stepLabel?: StringFieldUpdateOperationsInput | string
+    outputNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    outputBodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    error?: NullableStringFieldUpdateOperationsInput | string | null
+    promptSnapshot?: StringFieldUpdateOperationsInput | string
+    model?: StringFieldUpdateOperationsInput | string
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendUncheckedUpdateWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type StudioContextSpendUncheckedUpdateManyWithoutOwnerInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    day?: StringFieldUpdateOperationsInput | string
+    generationCalls?: IntFieldUpdateOperationsInput | number
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type ConnectionInviteUpdateWithoutInviterInput = {
     id?: StringFieldUpdateOperationsInput | string
     inviteeIdentifier?: StringFieldUpdateOperationsInput | string
@@ -203842,6 +214065,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCategoryInput = {
@@ -203903,6 +214129,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutCategoryInput = {
@@ -204194,6 +214423,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleGroupInput = {
@@ -204255,6 +214487,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPeopleGroupInput = {
@@ -204411,6 +214646,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonInput = {
@@ -204472,6 +214710,9 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPersonInput = {
@@ -206164,6 +216405,9 @@ export namespace Prisma {
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
@@ -206241,6 +216485,9 @@ export namespace Prisma {
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
     webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutOwnerNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutOwnerNestedInput
+    studioContextSpend?: StudioContextSpendUncheckedUpdateManyWithoutOwnerNestedInput
     connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
     connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
     connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput

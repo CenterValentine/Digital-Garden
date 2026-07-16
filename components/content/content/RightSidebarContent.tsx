@@ -10,10 +10,8 @@
 "use client";
 
 import { createElement } from "react";
-import { BacklinksPanel } from "../BacklinksPanel";
 import { OutlinePanel } from "../OutlinePanel";
 import { ChatOutlinePanel } from "../ChatOutlinePanel";
-import { TagsPanel } from "../TagsPanel";
 import { MultiConversationSidebar } from "../ai/MultiConversationSidebar";
 import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
@@ -21,6 +19,8 @@ import { useContentStore } from "@/state/content-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
 import { PublishTab } from "@/extensions/publishing/components/sidebar/PublishTab";
+import { StudioTab } from "@/extensions/studio/components/StudioTab";
+import { ContextTab } from "@/extensions/studio/components/ContextTab";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
@@ -74,9 +74,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
 
   return (
     <div className="flex-1 overflow-hidden">
-      {activeTab === "backlinks" && (
-        <BacklinksPanel contentId={selectedContentId} />
-      )}
+      {/* Links + Tags live inside the Context tab's subrail since 2026-07-16. */}
       {activeTab === "outline" &&
         (isChat ? (
           <ChatOutlinePanel
@@ -90,12 +88,13 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
             onHeadingClick={handleHeadingClick}
           />
         ))}
-      {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
       {activeTab === "chat" && <MultiConversationSidebar contentId={selectedContentId} />}
       {activeTab === "properties" && <PropertiesPanel />}
       {activeTab === "publish" && (
         <PublishTab contentId={selectedContentId} contentTitle={selectedContentTitle} />
       )}
+      {activeTab === "studio" && <StudioTab />}
+      {activeTab === "context" && <ContextTab />}
     </div>
   );
 }

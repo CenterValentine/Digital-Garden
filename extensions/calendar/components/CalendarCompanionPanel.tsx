@@ -48,7 +48,7 @@ export function CalendarCompanionPanel() {
       <div className="border-b border-white/10 px-4 py-4">
         <div className="mb-2 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-gray-500">Calendar</p>
+            <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">Calendar</p>
             <h3 className="text-lg font-semibold text-white">{format(selected, "MMMM yyyy")}</h3>
           </div>
           <Button size="sm" variant="ghost" onClick={() => openQuickAdd(null)}>

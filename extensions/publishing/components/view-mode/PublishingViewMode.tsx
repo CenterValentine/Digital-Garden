@@ -50,10 +50,11 @@ export function PublishingViewMode() {
       )}
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100 shrink-0">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-gray-500 uppercase tracking-wider">
-          <Globe className="w-3.5 h-3.5" />
-          <span>Publishing</span>
-        </div>
+        {/* Icon dropped + label normalized to the inbox header standard —
+            the rail icon already identifies the surface. */}
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+          Publishing
+        </p>
         <div className="flex items-center gap-1">
           <button
             onClick={load}

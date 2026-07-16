@@ -18,7 +18,7 @@ export const workflowsExtensionManifest: ExtensionManifest = {
       label: "Workflows",
       title: "Workflows",
       iconName: "Workflow",
-      order: 60,
+      order: 30,
     },
   ],
   surfaces: ["left-sidebar"],

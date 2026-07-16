@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-12
+last_updated: 2026-07-16
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,30 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 16, 2026 (later)**: Auto-context V1.1 — anchored ripple engine + privacy opt-out + manual refresh (commits `0cb910e`/`ca5f697`/+menu)
+
+- **Anchored regeneration** (temperature-noise fix): all metadata-lane calls run at temperature 0 and carry the stored summary under an echo-verbatim contract — the model judges "did this change matter?" inside the call; verbatim echo = damping verdict. Packs group per PARENT folder only (siblings share calls, unrelated branches never mix) with folder orientation headers.
+- **Settle gate**: 10-min drain-time debounce (marks reset the clock); **piggyback ripple**: the user's own PATCH traffic drains settled work via `after()` (throttled indexed pre-check) — presence-powered, no timers. **Anchored incremental patching** for folders, used only when single-delta is proven by hash substitution.
+- **Privacy opt-out** (`AgenticMetadata.contextOptOut`): toolbar Eye/EyeOff toggle (the eye moved from publishing, whose pill now uses Globe/GlobeLock) + Context panel checkbox. Opted-out content is never generated (manual Generate 409s), never re-dirtied, excluded from roll-up inputs/hashes and folder-chat defaults+assembly; folders shield subtrees.
+- **Manual refresh**: file-tree right-click → AI → "Update AI context" (`POST /api/studio/context/refresh`, bypasses settle+mode, keeps model gate + spend caps) — the recovery path for failed ripples.
+- **Daily spend ceiling**: `StudioContextSpend` counter (per user, UTC day) + `studio.dailyCallCap` setting (default 200 calls, slider). Engine pre-checks before scanning, stops drains mid-way (leftover stays dirty for tomorrow), records once per drain; explicit refresh 409s honestly; manual Generate uncounted by design.
+
+**July 16, 2026**: Folder Studio auto-context V1 — tree-wide AI context that maintains itself (branch `worktree-folder-studio`, commits `dce7634`/`ef791d8`/+sweep)
+
+- **Dirty-bit cascade**: save/rename/create/move/delete flag the node + ancestor chain (one recursive CTE + indexed `updateMany`); marking is free and always on, spending is gated by the new `studio.autoContextMode` setting (Off / On-access default / On-access + nightly sweep).
+- **Efficient refresh engine** (`extensions/studio/server/context-refresh.ts`): output-hash damping (folder staleness now hashes children's `summaryHash` — meaning-free edits stop cascading at the first unchanged output, killing the always-dirty-root problem), compositional roll-ups (folders read children's derived Context only), packed leaf batches (8 docs per `generateObject` call), deepest-first ordering, per-run caps (24 leaves / 12 folders / 200-node scan). Auto-refresh writes AI-owned sections only — role-strategy proposals stay exclusive to explicit Generate.
+- **Triggers**: stale-while-revalidate via `after()` on Context tab GET + folder-chat grounding; opt-in nightly cron (`/api/cron/studio-context-sweep`, capped 10 users × 5 roots).
+- **Studio settings surface** (`/settings/extensions/studio` + Extensions-rail tile): auto-context mode + artifact defaults (report variant, quiz length, audio brief/standard, slide count) consumed by the prompt composer and run executors; Feature Routing cards deep-link both ways (`FeatureSpec.settingsHref`).
+- **Unconfigured banner**: once-per-session (sessionStorage), fires only when an auto-context attempt actually reports `unconfigured`, links to Feature Routing.
+- DB: `AgenticMetadata.contextDirty` + `summaryHash` via targeted SQL (drift debt tracked in BACKLOG).
+
+**July 16, 2026**: Folder Studio Phases 0–7 — folders as agentic hubs (branch `worktree-folder-studio`, PR pending)
+
+- **Every shelf wired end-to-end** per `FOLDER-STUDIO-PLAN.md`: Studio + Context sidebar tabs (Tool Surfaces mount, extension-disable filtered), 13-tool registry-rendered grid, agentic metadata layer (`AgenticMetadata` sidecar; ownership-sectioned Context doc — AI summary/structure, proposed Role & Strategy diff, human directives; staleness hashes), grounded folder chat (BFS token-budget source selection, tri-state picker with size bars / NO TEXT / GEN locks, system-prompt injection in the chat route), chat-invocation tools (report/mind-map/glossary/compare/prerequisites/flashcards via composed prompts + existing `createNote`/propose_* conventions), job runs (`StudioGenerationRun` interim table — WorkflowRun declined for its definition FK; `after()` execution survives tab close; `studio.run` inbox kind), heavy artifacts (infographic HTML, single-voice audio overview via existing TTS pipeline, real `.pptx` decks via new `pptxgenjs` dep), and the four Practice sessions (quiz / teach-back / oral exam / FSRS-aware study plan).
+- **Two feature-routing entries** (`studio-metadata`, `studio-generation`) give model pickers via the existing Feature Routing settings page — no bespoke settings section needed.
+- **Anti-feedback-loop GEN lock**: unedited studio outputs are excluded from sources until their bodyHash diverges (edited ⇒ eligible).
+- Deferred (BACKLOG "Folder Studio Followups"): Option A folder-view mount, image vision pass, custom report variants from ChatContext, diffusion infographic, per-conversation selection overrides, browser smoke (surfaces are auth-gated).
 
 **July 13, 2026**: Workflows Builder + Interpreter — Plan 2 complete incl. canvas stretch (branch `feature/workflows-foundation`, PR pending)
 

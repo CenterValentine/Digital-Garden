@@ -1,6 +1,5 @@
 "use client";
 
-import { Puzzle } from "lucide-react";
 import Link from "next/link";
 import {
   renderExtensionIcon,
@@ -58,18 +57,19 @@ export function LeftSidebarExtensions() {
 
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col p-4">
-        <div className="mb-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <Puzzle className="h-5 w-5 text-gold-primary" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extensions</h3>
-          </div>
+      <div className="flex h-full min-h-0 flex-col">
+        {/* Header — inbox-navigator theme: tracked label + subheader, with
+            the divider line running beneath BOTH (2026-07-16). */}
+        <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+            Extensions
+          </p>
           <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
             {enabledCount} built-in extension{enabledCount === 1 ? "" : "s"}.
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 pr-2">
           <div className="grid auto-rows-[minmax(8.5rem,auto)] grid-cols-2 content-start gap-3">
             {extensions.map((extension) => {
               const isSelected = selectedExtension?.id === extension.id;
@@ -88,7 +88,8 @@ export function LeftSidebarExtensions() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-current/20 bg-current/10">
                     {renderExtensionIcon(extension.iconName, "h-6 w-6")}
                   </div>
-                  <span className="max-w-full truncate text-sm font-semibold">
+                  {/* Wrap before truncating — clamp only after two lines */}
+                  <span className="line-clamp-2 max-w-full break-words text-sm font-semibold leading-tight">
                     {extension.label}
                   </span>
                   <span className="text-[11px] text-gray-500 dark:text-gray-400">

@@ -285,6 +285,14 @@ function FeatureRow({
             ))}
           </div>
           <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
+          {feature.settingsHref && (
+            <Link
+              href={feature.settingsHref.href}
+              className="mt-1 inline-block text-xs text-gold-primary underline underline-offset-2 hover:text-gold-primary/80"
+            >
+              {feature.settingsHref.label} →
+            </Link>
+          )}
         </div>
       </div>
 
