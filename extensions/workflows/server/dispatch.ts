@@ -8,6 +8,11 @@ import { WDK_INTERPRETER_ENGINE, workflowGraphSchema } from "../graph/schema";
 import { validateGraph } from "../graph/validate";
 import { ensureDefinition, getDefinitionSpec } from "./definitions";
 import { getEngineAdapter } from "./engines/registry";
+import {
+  N8N_ADAPTER_ENGINE,
+  N8N_PAYLOAD_ENGINE,
+  readN8nMetadata,
+} from "./engines/n8n/meta";
 import { createRun, finishRun, setEngineRunId } from "./runs";
 
 export type DispatchErrorCode =
@@ -280,13 +285,6 @@ export async function dispatchWorkflowFromContent(
       message: "This workflow is disabled.",
     };
   }
-  if (node.workflowPayload.engine !== WDK_INTERPRETER_ENGINE) {
-    return {
-      ok: false,
-      code: "ENGINE_ERROR",
-      message: `Unsupported workflow engine "${node.workflowPayload.engine}".`,
-    };
-  }
   const parsed = workflowGraphSchema.safeParse(node.workflowPayload.definition);
   if (!parsed.success) {
     return {
@@ -301,6 +299,50 @@ export async function dispatchWorkflowFromContent(
       ok: false,
       code: "VALIDATION_ERROR",
       message: `Workflow graph failed validation: ${structural.issues[0]?.message ?? ""}`,
+    };
+  }
+
+  // n8n engine: the compiled workflow (pushed on Save) runs in n8n; dispatch
+  // just creates the run and pokes the webhook. Run input = the dispatch data
+  // (n8n receives it as { runId, input } and threads it via expressions).
+  if (node.workflowPayload.engine === N8N_PAYLOAD_ENGINE) {
+    const n8nMeta = readN8nMetadata(node.workflowPayload.metadata);
+    if (!n8nMeta.webhookPath) {
+      return {
+        ok: false,
+        code: "ENGINE_ERROR",
+        message: "This workflow hasn't been pushed to n8n yet — save it to push.",
+      };
+    }
+    const definition = await prisma.workflowDefinition.upsert({
+      where: { ownerId_slug: { ownerId, slug: `content:${contentNodeId}` } },
+      create: {
+        ownerId,
+        slug: `content:${contentNodeId}`,
+        name: node.title,
+        engine: N8N_ADAPTER_ENGINE,
+        engineRef: n8nMeta.webhookPath,
+      },
+      update: {
+        name: node.title,
+        engine: N8N_ADAPTER_ENGINE,
+        engineRef: n8nMeta.webhookPath,
+      },
+    });
+    const run = await createRun({
+      definitionId: definition.id,
+      ownerId,
+      engine: definition.engine,
+      input: data,
+    });
+    return startEngineForRun(definition, run);
+  }
+
+  if (node.workflowPayload.engine !== WDK_INTERPRETER_ENGINE) {
+    return {
+      ok: false,
+      code: "ENGINE_ERROR",
+      message: `Unsupported workflow engine "${node.workflowPayload.engine}".`,
     };
   }
 
