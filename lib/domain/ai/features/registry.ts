@@ -143,6 +143,18 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       modelId: "claude-haiku-3-5",
     },
   },
+  {
+    id: "studio-metadata",
+    label: "Studio Context Generation",
+    description:
+      "Generates the per-note Context doc (summary, structure, role proposal) that grounds Folder Studio chat and tools. Runs per node on demand; low-cost models preferred.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-3-5",
+    },
+  },
 ];
 
 export const FEATURE_BY_ID: Record<string, FeatureSpec> = Object.fromEntries(

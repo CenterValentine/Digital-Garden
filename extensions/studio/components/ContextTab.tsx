@@ -1,18 +1,38 @@
 /**
- * Context sidebar tab — per-node agentic metadata (plan → Phase 1 stub).
+ * Context sidebar tab — per-node agentic metadata (live since Phase 2).
  *
- * Shows the four metadata sections with their ownership contract so the
- * design can be pressure-tested in real chrome before Phase 2 wires the
- * AgenticMetadata table, the restricted TipTap editor, and the generator.
- * Section list and ownership come from the frozen contracts, not local data.
+ * Renders the Context doc from /api/studio/metadata/:nodeId with the
+ * ownership contract visible: AI sections regenerate freely, Role & Strategy
+ * arrives as a proposal to accept/dismiss, Directives are yours alone and
+ * autosave (2s debounce, REST last-write-wins — deliberately not
+ * collaborative). Staleness badges appear when sources changed since the
+ * last generation.
  */
 
 "use client";
 
-import { Sparkles } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Check, RefreshCw, Sparkles, X } from "lucide-react";
 import { useContentStore } from "@/state/content-store";
-import { METADATA_SECTION_OWNERS } from "../types";
 import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
+
+// Mirrors MetadataView from extensions/studio/server/metadata.ts (kept as a
+// local DTO — the server module imports Prisma and must stay unimported here).
+interface SectionMetaDto {
+  owner: MetadataSectionOwner;
+  generatedAt?: string;
+  model?: string;
+  proposal?: string;
+  proposedAt?: string;
+}
+interface MetadataViewDto {
+  exists: boolean;
+  sections: Record<MetadataSectionKind, string>;
+  sectionsMeta: Partial<Record<MetadataSectionKind, SectionMetaDto>>;
+  generatedAt: string | null;
+  model: string | null;
+  stale: boolean;
+}
 
 const SECTION_ORDER: MetadataSectionKind[] = [
   "summary",
@@ -36,16 +56,14 @@ const SECTION_EMPTY_HINTS: Record<MetadataSectionKind, string> = {
   directives: "Your standing instructions — the AI reads these every time.",
 };
 
-const OWNER_BADGES: Record<MetadataSectionOwner, { label: string; className: string }> = {
-  ai: {
-    label: "AI",
-    className:
-      "border-gold-primary/30 text-gold-primary/90",
-  },
+const OWNER_BADGES: Record<
+  MetadataSectionOwner,
+  { label: string; className: string }
+> = {
+  ai: { label: "AI", className: "border-gold-primary/30 text-gold-primary/90" },
   "ai-proposed": {
     label: "AI proposes",
-    className:
-      "border-blue-400/30 text-blue-500 dark:text-blue-400",
+    className: "border-blue-400/30 text-blue-500 dark:text-blue-400",
   },
   human: {
     label: "Yours",
@@ -53,6 +71,8 @@ const OWNER_BADGES: Record<MetadataSectionOwner, { label: string; className: str
       "border-black/15 text-gray-500 dark:border-white/20 dark:text-gray-400",
   },
 };
+
+type SaveState = "idle" | "dirty" | "saving" | "saved";
 
 export function ContextTab() {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
@@ -62,6 +82,124 @@ export function ContextTab() {
       : null
   );
 
+  // Result keyed by the node it was fetched for; loading is derived, so the
+  // fetch effect never sets state synchronously (React Compiler rule).
+  const [result, setResult] = useState<{
+    forNodeId: string;
+    data: MetadataViewDto | null;
+    error: string | null;
+  } | null>(null);
+  const [busy, setBusy] = useState<"generate" | "proposal" | null>(null);
+  const [draft, setDraft] = useState<{ forNodeId: string; text: string } | null>(
+    null
+  );
+  const [saveState, setSaveState] = useState<SaveState>("idle");
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const fetchView = useCallback((nodeId: string) => {
+    fetch(`/api/studio/metadata/${nodeId}`)
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) {
+          throw new Error(body.error ?? `Request failed (${res.status})`);
+        }
+        setResult({ forNodeId: nodeId, data: body.data, error: null });
+      })
+      .catch((err: unknown) => {
+        setResult({
+          forNodeId: nodeId,
+          data: null,
+          error: err instanceof Error ? err.message : "Failed to load context",
+        });
+      });
+  }, []);
+
+  useEffect(() => {
+    if (!selectedContentId) return;
+    fetchView(selectedContentId);
+  }, [selectedContentId, fetchView]);
+
+  // Clear any pending directive save on unmount.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
+  const current =
+    selectedContentId && result?.forNodeId === selectedContentId
+      ? result
+      : null;
+  const view = current?.data ?? null;
+
+  const saveDirectives = useCallback(
+    (nodeId: string, text: string) => {
+      setSaveState("saving");
+      fetch(`/api/studio/metadata/${nodeId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ directives: text }),
+      })
+        .then(async (res) => {
+          const body = await res.json();
+          if (!res.ok || !body.success) throw new Error(body.error);
+          setResult({ forNodeId: nodeId, data: body.data, error: null });
+          setSaveState("saved");
+        })
+        .catch(() => setSaveState("dirty"));
+    },
+    []
+  );
+
+  const handleDirectivesChange = (text: string) => {
+    if (!selectedContentId) return;
+    setDraft({ forNodeId: selectedContentId, text });
+    setSaveState("dirty");
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    const nodeId = selectedContentId;
+    saveTimer.current = setTimeout(() => saveDirectives(nodeId, text), 2000);
+  };
+
+  const handleGenerate = () => {
+    if (!selectedContentId || busy) return;
+    const nodeId = selectedContentId;
+    setBusy("generate");
+    fetch(`/api/studio/metadata/${nodeId}/generate`, { method: "POST" })
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) {
+          throw new Error(body.error ?? "Generation failed");
+        }
+        setResult({ forNodeId: nodeId, data: body.data, error: null });
+      })
+      .catch((err: unknown) => {
+        setResult({
+          forNodeId: nodeId,
+          data: view,
+          error: err instanceof Error ? err.message : "Generation failed",
+        });
+      })
+      .finally(() => setBusy(null));
+  };
+
+  const handleProposal = (action: "accept" | "dismiss") => {
+    if (!selectedContentId || busy) return;
+    const nodeId = selectedContentId;
+    setBusy("proposal");
+    fetch(`/api/studio/metadata/${nodeId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roleStrategyAction: action }),
+    })
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error);
+        setResult({ forNodeId: nodeId, data: body.data, error: null });
+      })
+      .catch(() => undefined)
+      .finally(() => setBusy(null));
+  };
+
   if (!selectedContentId) {
     return (
       <div className="px-4 py-6 text-sm text-gray-400 dark:text-gray-500">
@@ -70,21 +208,42 @@ export function ContextTab() {
     );
   }
 
+  const loading = current === null;
+  const directivesText =
+    draft?.forNodeId === selectedContentId
+      ? draft.text
+      : (view?.sections.directives ?? "");
+  const proposal = view?.sectionsMeta["role-strategy"]?.proposal;
+
   return (
     <div className="scrollbar-hide h-full overflow-y-auto px-3 py-3">
-      <p className="px-1 text-xs text-gray-400 dark:text-gray-500">
-        Context for{" "}
-        <span className="text-gray-600 dark:text-gray-300">
-          {selectedContentTitle ?? "this content"}
-        </span>{" "}
-        — the AI&apos;s working knowledge of it. Grounds folder chat and every
-        studio tool.
-      </p>
+      <div className="flex items-start justify-between gap-2 px-1">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          Context for{" "}
+          <span className="text-gray-600 dark:text-gray-300">
+            {selectedContentTitle ?? "this content"}
+          </span>
+        </p>
+        {view?.stale && (
+          <span className="shrink-0 rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-amber-600 dark:text-amber-400">
+            Sources changed
+          </span>
+        )}
+      </div>
+
+      {current?.error && (
+        <p className="mt-2 px-1 text-xs text-red-500/90">{current.error}</p>
+      )}
 
       <div className="mt-3 space-y-2.5">
         {SECTION_ORDER.map((kind) => {
-          const owner = METADATA_SECTION_OWNERS[kind];
+          const owner = view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
           const badge = OWNER_BADGES[owner];
+          const text = view?.sections[kind] ?? "";
+          const isDirectives = kind === "directives";
+          const showStale =
+            view?.stale && (owner === "ai" || owner === "ai-proposed") && text;
+
           return (
             <section
               key={kind}
@@ -94,15 +253,78 @@ export function ContextTab() {
                 <h3 className="text-sm text-gray-700 dark:text-gray-200">
                   {SECTION_LABELS[kind]}
                 </h3>
-                <span
-                  className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${badge.className}`}
-                >
-                  {badge.label}
+                <span className="flex items-center gap-1.5">
+                  {showStale && (
+                    <span
+                      className="h-1.5 w-1.5 rounded-full bg-amber-500"
+                      title="Sources changed since this was generated"
+                    />
+                  )}
+                  <span
+                    className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wide ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
                 </span>
               </div>
-              <p className="mt-1.5 text-xs italic leading-relaxed text-gray-400 dark:text-gray-500">
-                {SECTION_EMPTY_HINTS[kind]}
-              </p>
+
+              {isDirectives ? (
+                <>
+                  <textarea
+                    value={directivesText}
+                    onChange={(e) => handleDirectivesChange(e.target.value)}
+                    placeholder={SECTION_EMPTY_HINTS.directives}
+                    rows={3}
+                    className="mt-1.5 w-full resize-y rounded-md border border-black/10 bg-transparent px-2 py-1.5 text-xs leading-relaxed text-gray-700 placeholder:italic placeholder:text-gray-400 focus:border-gold-primary/50 focus:outline-none dark:border-white/10 dark:text-gray-200 dark:placeholder:text-gray-500"
+                  />
+                  <p className="mt-0.5 text-right text-[10px] text-gray-400 dark:text-gray-500">
+                    {saveState === "saving"
+                      ? "Saving…"
+                      : saveState === "saved"
+                        ? "Saved"
+                        : saveState === "dirty"
+                          ? "Unsaved changes"
+                          : " "}
+                  </p>
+                </>
+              ) : text ? (
+                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                  {text}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-xs italic leading-relaxed text-gray-400 dark:text-gray-500">
+                  {loading ? "Loading…" : SECTION_EMPTY_HINTS[kind]}
+                </p>
+              )}
+
+              {kind === "role-strategy" && proposal && (
+                <div className="mt-2 rounded-md border border-blue-400/30 bg-blue-500/[0.04] px-2.5 py-2 dark:bg-blue-400/[0.06]">
+                  <p className="text-[10px] font-medium uppercase tracking-wide text-blue-500 dark:text-blue-400">
+                    Proposed update
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-300">
+                    {proposal}
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleProposal("accept")}
+                      disabled={busy !== null}
+                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-blue-400/40 text-xs text-blue-600 hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
+                    >
+                      <Check className="h-3 w-3" /> Accept
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleProposal("dismiss")}
+                      disabled={busy !== null}
+                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-black/15 text-xs text-gray-500 hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/[0.06]"
+                    >
+                      <X className="h-3 w-3" /> Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
             </section>
           );
         })}
@@ -110,13 +332,28 @@ export function ContextTab() {
 
       <button
         type="button"
-        disabled
-        title="Metadata generation arrives in Phase 2"
-        className="mt-3 flex min-h-[44px] w-full cursor-default items-center justify-center gap-2 rounded-md border border-dashed border-black/15 text-xs text-gray-400 dark:border-white/15 dark:text-gray-500"
+        onClick={handleGenerate}
+        disabled={busy !== null || loading}
+        className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-gold-primary/40 text-xs text-gold-primary transition-colors hover:bg-gold-primary/10 disabled:cursor-default disabled:opacity-50"
       >
-        <Sparkles className="h-3.5 w-3.5" />
-        Generate context — coming in Phase 2
+        {busy === "generate" ? (
+          <>
+            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating…
+          </>
+        ) : (
+          <>
+            <Sparkles className="h-3.5 w-3.5" />
+            {view?.exists ? "Regenerate context" : "Generate context"}
+          </>
+        )}
       </button>
     </div>
   );
 }
+
+const OWNER_DEFAULTS: Record<MetadataSectionKind, MetadataSectionOwner> = {
+  summary: "ai",
+  structure: "ai",
+  "role-strategy": "ai-proposed",
+  directives: "human",
+};

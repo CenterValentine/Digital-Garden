@@ -457,6 +457,11 @@ export type WorkflowRunEvent = $Result.DefaultSelection<Prisma.$WorkflowRunEvent
  * 
  */
 export type WorkflowRunArtifact = $Result.DefaultSelection<Prisma.$WorkflowRunArtifactPayload>
+/**
+ * Model AgenticMetadata
+ * 
+ */
+export type AgenticMetadata = $Result.DefaultSelection<Prisma.$AgenticMetadataPayload>
 
 /**
  * Enums
@@ -1898,6 +1903,16 @@ export class PrismaClient<
     * ```
     */
   get workflowRunArtifact(): Prisma.WorkflowRunArtifactDelegate<ExtArgs, ClientOptions>;
+
+  /**
+   * `prisma.agenticMetadata`: Exposes CRUD operations for the **AgenticMetadata** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more AgenticMetadata
+    * const agenticMetadata = await prisma.agenticMetadata.findMany()
+    * ```
+    */
+  get agenticMetadata(): Prisma.AgenticMetadataDelegate<ExtArgs, ClientOptions>;
 }
 
 export namespace Prisma {
@@ -2419,7 +2434,8 @@ export namespace Prisma {
     WorkflowDefinition: 'WorkflowDefinition',
     WorkflowRun: 'WorkflowRun',
     WorkflowRunEvent: 'WorkflowRunEvent',
-    WorkflowRunArtifact: 'WorkflowRunArtifact'
+    WorkflowRunArtifact: 'WorkflowRunArtifact',
+    AgenticMetadata: 'AgenticMetadata'
   };
 
   export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -2435,7 +2451,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact" | "agenticMetadata"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -8951,6 +8967,80 @@ export namespace Prisma {
           }
         }
       }
+      AgenticMetadata: {
+        payload: Prisma.$AgenticMetadataPayload<ExtArgs>
+        fields: Prisma.AgenticMetadataFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.AgenticMetadataFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.AgenticMetadataFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          findFirst: {
+            args: Prisma.AgenticMetadataFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.AgenticMetadataFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          findMany: {
+            args: Prisma.AgenticMetadataFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          create: {
+            args: Prisma.AgenticMetadataCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          createMany: {
+            args: Prisma.AgenticMetadataCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.AgenticMetadataCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          delete: {
+            args: Prisma.AgenticMetadataDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          update: {
+            args: Prisma.AgenticMetadataUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          deleteMany: {
+            args: Prisma.AgenticMetadataDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.AgenticMetadataUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.AgenticMetadataUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>[]
+          }
+          upsert: {
+            args: Prisma.AgenticMetadataUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$AgenticMetadataPayload>
+          }
+          aggregate: {
+            args: Prisma.AgenticMetadataAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateAgenticMetadata>
+          }
+          groupBy: {
+            args: Prisma.AgenticMetadataGroupByArgs<ExtArgs>
+            result: $Utils.Optional<AgenticMetadataGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.AgenticMetadataCountArgs<ExtArgs>
+            result: $Utils.Optional<AgenticMetadataCountAggregateOutputType> | number
+          }
+        }
+      }
     }
   } & {
     other: {
@@ -9147,6 +9237,7 @@ export namespace Prisma {
     workflowRun?: WorkflowRunOmit
     workflowRunEvent?: WorkflowRunEventOmit
     workflowRunArtifact?: WorkflowRunArtifactOmit
+    agenticMetadata?: AgenticMetadataOmit
   }
 
   /* Types for Logging */
@@ -11449,6 +11540,7 @@ export namespace Prisma {
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
     workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
+    agenticMetadata?: boolean | ContentNode$agenticMetadataArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["contentNode"]>
 
@@ -11582,6 +11674,7 @@ export namespace Prisma {
     webResourceLinks?: boolean | ContentNode$webResourceLinksArgs<ExtArgs>
     webResourceViewStates?: boolean | ContentNode$webResourceViewStatesArgs<ExtArgs>
     workflowRunArtifacts?: boolean | ContentNode$workflowRunArtifactsArgs<ExtArgs>
+    agenticMetadata?: boolean | ContentNode$agenticMetadataArgs<ExtArgs>
     _count?: boolean | ContentNodeCountOutputTypeDefaultArgs<ExtArgs>
   }
   export type ContentNodeIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -11648,6 +11741,7 @@ export namespace Prisma {
       webResourceLinks: Prisma.$WebResourceContentLinkPayload<ExtArgs>[]
       webResourceViewStates: Prisma.$WebResourceViewStatePayload<ExtArgs>[]
       workflowRunArtifacts: Prisma.$WorkflowRunArtifactPayload<ExtArgs>[]
+      agenticMetadata: Prisma.$AgenticMetadataPayload<ExtArgs> | null
     }
     scalars: $Extensions.GetPayloadResult<{
       id: string
@@ -12109,6 +12203,7 @@ export namespace Prisma {
     webResourceLinks<T extends ContentNode$webResourceLinksArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceLinksArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceContentLinkPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     webResourceViewStates<T extends ContentNode$webResourceViewStatesArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$webResourceViewStatesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WebResourceViewStatePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     workflowRunArtifacts<T extends ContentNode$workflowRunArtifactsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$workflowRunArtifactsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunArtifactPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    agenticMetadata<T extends ContentNode$agenticMetadataArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$agenticMetadataArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
      * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -13484,6 +13579,25 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: WorkflowRunArtifactScalarFieldEnum | WorkflowRunArtifactScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.agenticMetadata
+   */
+  export type ContentNode$agenticMetadataArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    where?: AgenticMetadataWhereInput
   }
 
   /**
@@ -116528,6 +116642,1108 @@ export namespace Prisma {
 
 
   /**
+   * Model AgenticMetadata
+   */
+
+  export type AggregateAgenticMetadata = {
+    _count: AgenticMetadataCountAggregateOutputType | null
+    _min: AgenticMetadataMinAggregateOutputType | null
+    _max: AgenticMetadataMaxAggregateOutputType | null
+  }
+
+  export type AgenticMetadataMinAggregateOutputType = {
+    id: string | null
+    nodeId: string | null
+    derivedText: string | null
+    sourceContentHash: string | null
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AgenticMetadataMaxAggregateOutputType = {
+    id: string | null
+    nodeId: string | null
+    derivedText: string | null
+    sourceContentHash: string | null
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type AgenticMetadataCountAggregateOutputType = {
+    id: number
+    nodeId: number
+    tiptapJson: number
+    derivedText: number
+    sectionsMeta: number
+    sourceContentHash: number
+    model: number
+    generatedAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type AgenticMetadataMinAggregateInputType = {
+    id?: true
+    nodeId?: true
+    derivedText?: true
+    sourceContentHash?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+  }
+
+  export type AgenticMetadataMaxAggregateInputType = {
+    id?: true
+    nodeId?: true
+    derivedText?: true
+    sourceContentHash?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+  }
+
+  export type AgenticMetadataCountAggregateInputType = {
+    id?: true
+    nodeId?: true
+    tiptapJson?: true
+    derivedText?: true
+    sectionsMeta?: true
+    sourceContentHash?: true
+    model?: true
+    generatedAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type AgenticMetadataAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AgenticMetadata to aggregate.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned AgenticMetadata
+    **/
+    _count?: true | AgenticMetadataCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: AgenticMetadataMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: AgenticMetadataMaxAggregateInputType
+  }
+
+  export type GetAgenticMetadataAggregateType<T extends AgenticMetadataAggregateArgs> = {
+        [P in keyof T & keyof AggregateAgenticMetadata]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateAgenticMetadata[P]>
+      : GetScalarType<T[P], AggregateAgenticMetadata[P]>
+  }
+
+
+
+
+  export type AgenticMetadataGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: AgenticMetadataWhereInput
+    orderBy?: AgenticMetadataOrderByWithAggregationInput | AgenticMetadataOrderByWithAggregationInput[]
+    by: AgenticMetadataScalarFieldEnum[] | AgenticMetadataScalarFieldEnum
+    having?: AgenticMetadataScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: AgenticMetadataCountAggregateInputType | true
+    _min?: AgenticMetadataMinAggregateInputType
+    _max?: AgenticMetadataMaxAggregateInputType
+  }
+
+  export type AgenticMetadataGroupByOutputType = {
+    id: string
+    nodeId: string
+    tiptapJson: JsonValue
+    derivedText: string
+    sectionsMeta: JsonValue
+    sourceContentHash: string | null
+    model: string | null
+    generatedAt: Date | null
+    updatedAt: Date
+    _count: AgenticMetadataCountAggregateOutputType | null
+    _min: AgenticMetadataMinAggregateOutputType | null
+    _max: AgenticMetadataMaxAggregateOutputType | null
+  }
+
+  type GetAgenticMetadataGroupByPayload<T extends AgenticMetadataGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<AgenticMetadataGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof AgenticMetadataGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], AgenticMetadataGroupByOutputType[P]>
+            : GetScalarType<T[P], AgenticMetadataGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type AgenticMetadataSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["agenticMetadata"]>
+
+  export type AgenticMetadataSelectScalar = {
+    id?: boolean
+    nodeId?: boolean
+    tiptapJson?: boolean
+    derivedText?: boolean
+    sectionsMeta?: boolean
+    sourceContentHash?: boolean
+    model?: boolean
+    generatedAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type AgenticMetadataOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "nodeId" | "tiptapJson" | "derivedText" | "sectionsMeta" | "sourceContentHash" | "model" | "generatedAt" | "updatedAt", ExtArgs["result"]["agenticMetadata"]>
+  export type AgenticMetadataInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type AgenticMetadataIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+  export type AgenticMetadataIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    node?: boolean | ContentNodeDefaultArgs<ExtArgs>
+  }
+
+  export type $AgenticMetadataPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "AgenticMetadata"
+    objects: {
+      node: Prisma.$ContentNodePayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      nodeId: string
+      tiptapJson: Prisma.JsonValue
+      derivedText: string
+      sectionsMeta: Prisma.JsonValue
+      sourceContentHash: string | null
+      model: string | null
+      generatedAt: Date | null
+      updatedAt: Date
+    }, ExtArgs["result"]["agenticMetadata"]>
+    composites: {}
+  }
+
+  type AgenticMetadataGetPayload<S extends boolean | null | undefined | AgenticMetadataDefaultArgs> = $Result.GetResult<Prisma.$AgenticMetadataPayload, S>
+
+  type AgenticMetadataCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<AgenticMetadataFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: AgenticMetadataCountAggregateInputType | true
+    }
+
+  export interface AgenticMetadataDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['AgenticMetadata'], meta: { name: 'AgenticMetadata' } }
+    /**
+     * Find zero or one AgenticMetadata that matches the filter.
+     * @param {AgenticMetadataFindUniqueArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends AgenticMetadataFindUniqueArgs>(args: SelectSubset<T, AgenticMetadataFindUniqueArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one AgenticMetadata that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {AgenticMetadataFindUniqueOrThrowArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends AgenticMetadataFindUniqueOrThrowArgs>(args: SelectSubset<T, AgenticMetadataFindUniqueOrThrowArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AgenticMetadata that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindFirstArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends AgenticMetadataFindFirstArgs>(args?: SelectSubset<T, AgenticMetadataFindFirstArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first AgenticMetadata that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindFirstOrThrowArgs} args - Arguments to find a AgenticMetadata
+     * @example
+     * // Get one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends AgenticMetadataFindFirstOrThrowArgs>(args?: SelectSubset<T, AgenticMetadataFindFirstOrThrowArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more AgenticMetadata that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findMany()
+     * 
+     * // Get first 10 AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends AgenticMetadataFindManyArgs>(args?: SelectSubset<T, AgenticMetadataFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a AgenticMetadata.
+     * @param {AgenticMetadataCreateArgs} args - Arguments to create a AgenticMetadata.
+     * @example
+     * // Create one AgenticMetadata
+     * const AgenticMetadata = await prisma.agenticMetadata.create({
+     *   data: {
+     *     // ... data to create a AgenticMetadata
+     *   }
+     * })
+     * 
+     */
+    create<T extends AgenticMetadataCreateArgs>(args: SelectSubset<T, AgenticMetadataCreateArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many AgenticMetadata.
+     * @param {AgenticMetadataCreateManyArgs} args - Arguments to create many AgenticMetadata.
+     * @example
+     * // Create many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends AgenticMetadataCreateManyArgs>(args?: SelectSubset<T, AgenticMetadataCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many AgenticMetadata and returns the data saved in the database.
+     * @param {AgenticMetadataCreateManyAndReturnArgs} args - Arguments to create many AgenticMetadata.
+     * @example
+     * // Create many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many AgenticMetadata and only return the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends AgenticMetadataCreateManyAndReturnArgs>(args?: SelectSubset<T, AgenticMetadataCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a AgenticMetadata.
+     * @param {AgenticMetadataDeleteArgs} args - Arguments to delete one AgenticMetadata.
+     * @example
+     * // Delete one AgenticMetadata
+     * const AgenticMetadata = await prisma.agenticMetadata.delete({
+     *   where: {
+     *     // ... filter to delete one AgenticMetadata
+     *   }
+     * })
+     * 
+     */
+    delete<T extends AgenticMetadataDeleteArgs>(args: SelectSubset<T, AgenticMetadataDeleteArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one AgenticMetadata.
+     * @param {AgenticMetadataUpdateArgs} args - Arguments to update one AgenticMetadata.
+     * @example
+     * // Update one AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends AgenticMetadataUpdateArgs>(args: SelectSubset<T, AgenticMetadataUpdateArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more AgenticMetadata.
+     * @param {AgenticMetadataDeleteManyArgs} args - Arguments to filter AgenticMetadata to delete.
+     * @example
+     * // Delete a few AgenticMetadata
+     * const { count } = await prisma.agenticMetadata.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends AgenticMetadataDeleteManyArgs>(args?: SelectSubset<T, AgenticMetadataDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends AgenticMetadataUpdateManyArgs>(args: SelectSubset<T, AgenticMetadataUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more AgenticMetadata and returns the data updated in the database.
+     * @param {AgenticMetadataUpdateManyAndReturnArgs} args - Arguments to update many AgenticMetadata.
+     * @example
+     * // Update many AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more AgenticMetadata and only return the `id`
+     * const agenticMetadataWithIdOnly = await prisma.agenticMetadata.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends AgenticMetadataUpdateManyAndReturnArgs>(args: SelectSubset<T, AgenticMetadataUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one AgenticMetadata.
+     * @param {AgenticMetadataUpsertArgs} args - Arguments to update or create a AgenticMetadata.
+     * @example
+     * // Update or create a AgenticMetadata
+     * const agenticMetadata = await prisma.agenticMetadata.upsert({
+     *   create: {
+     *     // ... data to create a AgenticMetadata
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the AgenticMetadata we want to update
+     *   }
+     * })
+     */
+    upsert<T extends AgenticMetadataUpsertArgs>(args: SelectSubset<T, AgenticMetadataUpsertArgs<ExtArgs>>): Prisma__AgenticMetadataClient<$Result.GetResult<Prisma.$AgenticMetadataPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataCountArgs} args - Arguments to filter AgenticMetadata to count.
+     * @example
+     * // Count the number of AgenticMetadata
+     * const count = await prisma.agenticMetadata.count({
+     *   where: {
+     *     // ... the filter for the AgenticMetadata we want to count
+     *   }
+     * })
+    **/
+    count<T extends AgenticMetadataCountArgs>(
+      args?: Subset<T, AgenticMetadataCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], AgenticMetadataCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends AgenticMetadataAggregateArgs>(args: Subset<T, AgenticMetadataAggregateArgs>): Prisma.PrismaPromise<GetAgenticMetadataAggregateType<T>>
+
+    /**
+     * Group by AgenticMetadata.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {AgenticMetadataGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends AgenticMetadataGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: AgenticMetadataGroupByArgs['orderBy'] }
+        : { orderBy?: AgenticMetadataGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, AgenticMetadataGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetAgenticMetadataGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the AgenticMetadata model
+   */
+  readonly fields: AgenticMetadataFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for AgenticMetadata.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__AgenticMetadataClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    node<T extends ContentNodeDefaultArgs<ExtArgs> = {}>(args?: Subset<T, ContentNodeDefaultArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the AgenticMetadata model
+   */
+  interface AgenticMetadataFieldRefs {
+    readonly id: FieldRef<"AgenticMetadata", 'String'>
+    readonly nodeId: FieldRef<"AgenticMetadata", 'String'>
+    readonly tiptapJson: FieldRef<"AgenticMetadata", 'Json'>
+    readonly derivedText: FieldRef<"AgenticMetadata", 'String'>
+    readonly sectionsMeta: FieldRef<"AgenticMetadata", 'Json'>
+    readonly sourceContentHash: FieldRef<"AgenticMetadata", 'String'>
+    readonly model: FieldRef<"AgenticMetadata", 'String'>
+    readonly generatedAt: FieldRef<"AgenticMetadata", 'DateTime'>
+    readonly updatedAt: FieldRef<"AgenticMetadata", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * AgenticMetadata findUnique
+   */
+  export type AgenticMetadataFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata findUniqueOrThrow
+   */
+  export type AgenticMetadataFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata findFirst
+   */
+  export type AgenticMetadataFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AgenticMetadata.
+     */
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata findFirstOrThrow
+   */
+  export type AgenticMetadataFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of AgenticMetadata.
+     */
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata findMany
+   */
+  export type AgenticMetadataFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter, which AgenticMetadata to fetch.
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of AgenticMetadata to fetch.
+     */
+    orderBy?: AgenticMetadataOrderByWithRelationInput | AgenticMetadataOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing AgenticMetadata.
+     */
+    cursor?: AgenticMetadataWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` AgenticMetadata from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` AgenticMetadata.
+     */
+    skip?: number
+    distinct?: AgenticMetadataScalarFieldEnum | AgenticMetadataScalarFieldEnum[]
+  }
+
+  /**
+   * AgenticMetadata create
+   */
+  export type AgenticMetadataCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The data needed to create a AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataCreateInput, AgenticMetadataUncheckedCreateInput>
+  }
+
+  /**
+   * AgenticMetadata createMany
+   */
+  export type AgenticMetadataCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many AgenticMetadata.
+     */
+    data: AgenticMetadataCreateManyInput | AgenticMetadataCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * AgenticMetadata createManyAndReturn
+   */
+  export type AgenticMetadataCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * The data used to create many AgenticMetadata.
+     */
+    data: AgenticMetadataCreateManyInput | AgenticMetadataCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AgenticMetadata update
+   */
+  export type AgenticMetadataUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The data needed to update a AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateInput, AgenticMetadataUncheckedUpdateInput>
+    /**
+     * Choose, which AgenticMetadata to update.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata updateMany
+   */
+  export type AgenticMetadataUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateManyMutationInput, AgenticMetadataUncheckedUpdateManyInput>
+    /**
+     * Filter which AgenticMetadata to update
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * AgenticMetadata updateManyAndReturn
+   */
+  export type AgenticMetadataUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * The data used to update AgenticMetadata.
+     */
+    data: XOR<AgenticMetadataUpdateManyMutationInput, AgenticMetadataUncheckedUpdateManyInput>
+    /**
+     * Filter which AgenticMetadata to update
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * AgenticMetadata upsert
+   */
+  export type AgenticMetadataUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * The filter to search for the AgenticMetadata to update in case it exists.
+     */
+    where: AgenticMetadataWhereUniqueInput
+    /**
+     * In case the AgenticMetadata found by the `where` argument doesn't exist, create a new AgenticMetadata with this data.
+     */
+    create: XOR<AgenticMetadataCreateInput, AgenticMetadataUncheckedCreateInput>
+    /**
+     * In case the AgenticMetadata was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<AgenticMetadataUpdateInput, AgenticMetadataUncheckedUpdateInput>
+  }
+
+  /**
+   * AgenticMetadata delete
+   */
+  export type AgenticMetadataDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+    /**
+     * Filter which AgenticMetadata to delete.
+     */
+    where: AgenticMetadataWhereUniqueInput
+  }
+
+  /**
+   * AgenticMetadata deleteMany
+   */
+  export type AgenticMetadataDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which AgenticMetadata to delete
+     */
+    where?: AgenticMetadataWhereInput
+    /**
+     * Limit how many AgenticMetadata to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * AgenticMetadata without action
+   */
+  export type AgenticMetadataDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the AgenticMetadata
+     */
+    select?: AgenticMetadataSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the AgenticMetadata
+     */
+    omit?: AgenticMetadataOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: AgenticMetadataInclude<ExtArgs> | null
+  }
+
+
+  /**
    * Enums
    */
 
@@ -117957,6 +119173,21 @@ export namespace Prisma {
   export type WorkflowRunArtifactScalarFieldEnum = (typeof WorkflowRunArtifactScalarFieldEnum)[keyof typeof WorkflowRunArtifactScalarFieldEnum]
 
 
+  export const AgenticMetadataScalarFieldEnum: {
+    id: 'id',
+    nodeId: 'nodeId',
+    tiptapJson: 'tiptapJson',
+    derivedText: 'derivedText',
+    sectionsMeta: 'sectionsMeta',
+    sourceContentHash: 'sourceContentHash',
+    model: 'model',
+    generatedAt: 'generatedAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type AgenticMetadataScalarFieldEnum = (typeof AgenticMetadataScalarFieldEnum)[keyof typeof AgenticMetadataScalarFieldEnum]
+
+
   export const SortOrder: {
     asc: 'asc',
     desc: 'desc'
@@ -118621,6 +119852,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
     workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
+    agenticMetadata?: XOR<AgenticMetadataNullableScalarRelationFilter, AgenticMetadataWhereInput> | null
   }
 
   export type ContentNodeOrderByWithRelationInput = {
@@ -118689,6 +119921,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkOrderByRelationAggregateInput
     webResourceViewStates?: WebResourceViewStateOrderByRelationAggregateInput
     workflowRunArtifacts?: WorkflowRunArtifactOrderByRelationAggregateInput
+    agenticMetadata?: AgenticMetadataOrderByWithRelationInput
   }
 
   export type ContentNodeWhereUniqueInput = Prisma.AtLeast<{
@@ -118761,6 +119994,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkListRelationFilter
     webResourceViewStates?: WebResourceViewStateListRelationFilter
     workflowRunArtifacts?: WorkflowRunArtifactListRelationFilter
+    agenticMetadata?: XOR<AgenticMetadataNullableScalarRelationFilter, AgenticMetadataWhereInput> | null
   }, "id" | "ownerId_slug">
 
   export type ContentNodeOrderByWithAggregationInput = {
@@ -126431,6 +127665,81 @@ export namespace Prisma {
     createdAt?: DateTimeWithAggregatesFilter<"WorkflowRunArtifact"> | Date | string
   }
 
+  export type AgenticMetadataWhereInput = {
+    AND?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    OR?: AgenticMetadataWhereInput[]
+    NOT?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    id?: UuidFilter<"AgenticMetadata"> | string
+    nodeId?: UuidFilter<"AgenticMetadata"> | string
+    tiptapJson?: JsonFilter<"AgenticMetadata">
+    derivedText?: StringFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    model?: StringNullableFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeFilter<"AgenticMetadata"> | Date | string
+    node?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }
+
+  export type AgenticMetadataOrderByWithRelationInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrderInput | SortOrder
+    model?: SortOrderInput | SortOrder
+    generatedAt?: SortOrderInput | SortOrder
+    updatedAt?: SortOrder
+    node?: ContentNodeOrderByWithRelationInput
+  }
+
+  export type AgenticMetadataWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    nodeId?: string
+    AND?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    OR?: AgenticMetadataWhereInput[]
+    NOT?: AgenticMetadataWhereInput | AgenticMetadataWhereInput[]
+    tiptapJson?: JsonFilter<"AgenticMetadata">
+    derivedText?: StringFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableFilter<"AgenticMetadata"> | string | null
+    model?: StringNullableFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeFilter<"AgenticMetadata"> | Date | string
+    node?: XOR<ContentNodeScalarRelationFilter, ContentNodeWhereInput>
+  }, "id" | "nodeId">
+
+  export type AgenticMetadataOrderByWithAggregationInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrderInput | SortOrder
+    model?: SortOrderInput | SortOrder
+    generatedAt?: SortOrderInput | SortOrder
+    updatedAt?: SortOrder
+    _count?: AgenticMetadataCountOrderByAggregateInput
+    _max?: AgenticMetadataMaxOrderByAggregateInput
+    _min?: AgenticMetadataMinOrderByAggregateInput
+  }
+
+  export type AgenticMetadataScalarWhereWithAggregatesInput = {
+    AND?: AgenticMetadataScalarWhereWithAggregatesInput | AgenticMetadataScalarWhereWithAggregatesInput[]
+    OR?: AgenticMetadataScalarWhereWithAggregatesInput[]
+    NOT?: AgenticMetadataScalarWhereWithAggregatesInput | AgenticMetadataScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"AgenticMetadata"> | string
+    nodeId?: UuidWithAggregatesFilter<"AgenticMetadata"> | string
+    tiptapJson?: JsonWithAggregatesFilter<"AgenticMetadata">
+    derivedText?: StringWithAggregatesFilter<"AgenticMetadata"> | string
+    sectionsMeta?: JsonWithAggregatesFilter<"AgenticMetadata">
+    sourceContentHash?: StringNullableWithAggregatesFilter<"AgenticMetadata"> | string | null
+    model?: StringNullableWithAggregatesFilter<"AgenticMetadata"> | string | null
+    generatedAt?: DateTimeNullableWithAggregatesFilter<"AgenticMetadata"> | Date | string | null
+    updatedAt?: DateTimeWithAggregatesFilter<"AgenticMetadata"> | Date | string
+  }
+
   export type ContentNodeCreateInput = {
     id?: string
     title: string
@@ -126491,6 +127800,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateInput = {
@@ -126553,6 +127863,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUpdateInput = {
@@ -126615,6 +127926,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateInput = {
@@ -126677,6 +127989,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateManyInput = {
@@ -134975,6 +136288,89 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
+  export type AgenticMetadataCreateInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+    node: ContentNodeCreateNestedOneWithoutAgenticMetadataInput
+  }
+
+  export type AgenticMetadataUncheckedCreateInput = {
+    id?: string
+    nodeId: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    node?: ContentNodeUpdateOneRequiredWithoutAgenticMetadataNestedInput
+  }
+
+  export type AgenticMetadataUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataCreateManyInput = {
+    id?: string
+    nodeId: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    nodeId?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -135305,6 +136701,11 @@ export namespace Prisma {
     every?: WorkflowRunArtifactWhereInput
     some?: WorkflowRunArtifactWhereInput
     none?: WorkflowRunArtifactWhereInput
+  }
+
+  export type AgenticMetadataNullableScalarRelationFilter = {
+    is?: AgenticMetadataWhereInput | null
+    isNot?: AgenticMetadataWhereInput | null
   }
 
   export type SortOrderInput = {
@@ -140790,6 +142191,38 @@ export namespace Prisma {
     createdAt?: SortOrder
   }
 
+  export type AgenticMetadataCountOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    tiptapJson?: SortOrder
+    derivedText?: SortOrder
+    sectionsMeta?: SortOrder
+    sourceContentHash?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AgenticMetadataMaxOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    derivedText?: SortOrder
+    sourceContentHash?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type AgenticMetadataMinOrderByAggregateInput = {
+    id?: SortOrder
+    nodeId?: SortOrder
+    derivedText?: SortOrder
+    sourceContentHash?: SortOrder
+    model?: SortOrder
+    generatedAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
   export type AuditLogCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -141077,6 +142510,12 @@ export namespace Prisma {
     connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
   }
 
+  export type AgenticMetadataCreateNestedOneWithoutNodeInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    connect?: AgenticMetadataWhereUniqueInput
+  }
+
   export type AuditLogUncheckedCreateNestedManyWithoutTargetContentInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -141326,6 +142765,12 @@ export namespace Prisma {
     connectOrCreate?: WorkflowRunArtifactCreateOrConnectWithoutContentInput | WorkflowRunArtifactCreateOrConnectWithoutContentInput[]
     createMany?: WorkflowRunArtifactCreateManyContentInputEnvelope
     connect?: WorkflowRunArtifactWhereUniqueInput | WorkflowRunArtifactWhereUniqueInput[]
+  }
+
+  export type AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    connect?: AgenticMetadataWhereUniqueInput
   }
 
   export type StringFieldUpdateOperationsInput = {
@@ -141894,6 +143339,16 @@ export namespace Prisma {
     deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
   }
 
+  export type AgenticMetadataUpdateOneWithoutNodeNestedInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    upsert?: AgenticMetadataUpsertWithoutNodeInput
+    disconnect?: AgenticMetadataWhereInput | boolean
+    delete?: AgenticMetadataWhereInput | boolean
+    connect?: AgenticMetadataWhereUniqueInput
+    update?: XOR<XOR<AgenticMetadataUpdateToOneWithWhereWithoutNodeInput, AgenticMetadataUpdateWithoutNodeInput>, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+  }
+
   export type AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput = {
     create?: XOR<AuditLogCreateWithoutTargetContentInput, AuditLogUncheckedCreateWithoutTargetContentInput> | AuditLogCreateWithoutTargetContentInput[] | AuditLogUncheckedCreateWithoutTargetContentInput[]
     connectOrCreate?: AuditLogCreateOrConnectWithoutTargetContentInput | AuditLogCreateOrConnectWithoutTargetContentInput[]
@@ -142364,6 +143819,16 @@ export namespace Prisma {
     update?: WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput | WorkflowRunArtifactUpdateWithWhereUniqueWithoutContentInput[]
     updateMany?: WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput | WorkflowRunArtifactUpdateManyWithWhereWithoutContentInput[]
     deleteMany?: WorkflowRunArtifactScalarWhereInput | WorkflowRunArtifactScalarWhereInput[]
+  }
+
+  export type AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput = {
+    create?: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    connectOrCreate?: AgenticMetadataCreateOrConnectWithoutNodeInput
+    upsert?: AgenticMetadataUpsertWithoutNodeInput
+    disconnect?: AgenticMetadataWhereInput | boolean
+    delete?: AgenticMetadataWhereInput | boolean
+    connect?: AgenticMetadataWhereUniqueInput
+    update?: XOR<XOR<AgenticMetadataUpdateToOneWithWhereWithoutNodeInput, AgenticMetadataUpdateWithoutNodeInput>, AgenticMetadataUncheckedUpdateWithoutNodeInput>
   }
 
   export type UserCreateNestedOneWithoutPeriodicNoteIndexesInput = {
@@ -149853,6 +151318,20 @@ export namespace Prisma {
     update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutWorkflowRunArtifactsInput, ContentNodeUpdateWithoutWorkflowRunArtifactsInput>, ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput>
   }
 
+  export type ContentNodeCreateNestedOneWithoutAgenticMetadataInput = {
+    create?: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAgenticMetadataInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
+  export type ContentNodeUpdateOneRequiredWithoutAgenticMetadataNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutAgenticMetadataInput
+    upsert?: ContentNodeUpsertWithoutAgenticMetadataInput
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutAgenticMetadataInput, ContentNodeUpdateWithoutAgenticMetadataInput>, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+  }
+
   export type NestedUuidFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel>
     in?: string[] | ListStringFieldRefInput<$PrismaModel>
@@ -151444,6 +152923,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChildrenInput = {
@@ -151505,6 +152985,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChildrenInput = {
@@ -151571,6 +153052,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutParentInput = {
@@ -151632,6 +153114,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutParentInput = {
@@ -151703,6 +153186,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedEmbedsInput = {
@@ -151764,6 +153248,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedEmbedsInput = {
@@ -151830,6 +153315,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnedByNoteInput = {
@@ -151891,6 +153377,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnedByNoteInput = {
@@ -152779,6 +154266,33 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type AgenticMetadataCreateWithoutNodeInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataUncheckedCreateWithoutNodeInput = {
+    id?: string
+    tiptapJson: JsonNullValueInput | InputJsonValue
+    derivedText?: string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: string | null
+    model?: string | null
+    generatedAt?: Date | string | null
+    updatedAt?: Date | string
+  }
+
+  export type AgenticMetadataCreateOrConnectWithoutNodeInput = {
+    where: AgenticMetadataWhereUniqueInput
+    create: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+  }
+
   export type AuditLogUpsertWithWhereUniqueWithoutTargetContentInput = {
     where: AuditLogWhereUniqueInput
     update: XOR<AuditLogUpdateWithoutTargetContentInput, AuditLogUncheckedUpdateWithoutTargetContentInput>
@@ -153532,6 +155046,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChildrenInput = {
@@ -153593,6 +155108,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutParentInput = {
@@ -153708,6 +155224,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedEmbedsInput = {
@@ -153769,6 +155286,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUpsertWithWhereUniqueWithoutOwnedByNoteInput = {
@@ -154597,6 +156115,39 @@ export namespace Prisma {
     createdAt?: DateTimeFilter<"WorkflowRunArtifact"> | Date | string
   }
 
+  export type AgenticMetadataUpsertWithoutNodeInput = {
+    update: XOR<AgenticMetadataUpdateWithoutNodeInput, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+    create: XOR<AgenticMetadataCreateWithoutNodeInput, AgenticMetadataUncheckedCreateWithoutNodeInput>
+    where?: AgenticMetadataWhereInput
+  }
+
+  export type AgenticMetadataUpdateToOneWithWhereWithoutNodeInput = {
+    where?: AgenticMetadataWhereInput
+    data: XOR<AgenticMetadataUpdateWithoutNodeInput, AgenticMetadataUncheckedUpdateWithoutNodeInput>
+  }
+
+  export type AgenticMetadataUpdateWithoutNodeInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type AgenticMetadataUncheckedUpdateWithoutNodeInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tiptapJson?: JsonNullValueInput | InputJsonValue
+    derivedText?: StringFieldUpdateOperationsInput | string
+    sectionsMeta?: JsonNullValueInput | InputJsonValue
+    sourceContentHash?: NullableStringFieldUpdateOperationsInput | string | null
+    model?: NullableStringFieldUpdateOperationsInput | string | null
+    generatedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
   export type UserCreateWithoutPeriodicNoteIndexesInput = {
     id?: string
     username: string
@@ -154813,6 +156364,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeriodicNoteIndexesInput = {
@@ -154874,6 +156426,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeriodicNoteIndexesInput = {
@@ -155114,6 +156667,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeriodicNoteIndexesInput = {
@@ -155175,6 +156729,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutFlashcardDecksInput = {
@@ -156007,6 +157562,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceFlashcardsInput = {
@@ -156068,6 +157624,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceFlashcardsInput = {
@@ -156401,6 +157958,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceFlashcardsInput = {
@@ -156462,6 +158020,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type FlashcardReviewAttemptUpsertWithWhereUniqueWithoutFlashcardInput = {
@@ -157030,6 +158589,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutNotePayloadInput = {
@@ -157091,6 +158651,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutNotePayloadInput = {
@@ -157168,6 +158729,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutNotePayloadInput = {
@@ -157229,6 +158791,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutFilePayloadInput = {
@@ -157290,6 +158853,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFilePayloadInput = {
@@ -157351,6 +158915,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFilePayloadInput = {
@@ -157428,6 +158993,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFilePayloadInput = {
@@ -157489,6 +159055,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutHtmlPayloadInput = {
@@ -157550,6 +159117,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHtmlPayloadInput = {
@@ -157611,6 +159179,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHtmlPayloadInput = {
@@ -157688,6 +159257,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHtmlPayloadInput = {
@@ -157749,6 +159319,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutCodePayloadInput = {
@@ -157810,6 +159381,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCodePayloadInput = {
@@ -157871,6 +159443,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCodePayloadInput = {
@@ -157948,6 +159521,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCodePayloadInput = {
@@ -158009,6 +159583,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutContentHistoryInput = {
@@ -158227,6 +159802,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHistoryInput = {
@@ -158288,6 +159864,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHistoryInput = {
@@ -158528,6 +160105,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHistoryInput = {
@@ -158589,6 +160167,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutContentPathInput = {
@@ -158650,6 +160229,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentPathInput = {
@@ -158711,6 +160291,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentPathInput = {
@@ -158788,6 +160369,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentPathInput = {
@@ -158849,6 +160431,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutSourceLinksInput = {
@@ -158910,6 +160493,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutSourceLinksInput = {
@@ -158971,6 +160555,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutSourceLinksInput = {
@@ -159037,6 +160622,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTargetLinksInput = {
@@ -159098,6 +160684,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTargetLinksInput = {
@@ -159175,6 +160762,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutSourceLinksInput = {
@@ -159236,6 +160824,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUpsertWithoutTargetLinksInput = {
@@ -159308,6 +160897,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTargetLinksInput = {
@@ -159369,6 +160959,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutContentTagsInput = {
@@ -159430,6 +161021,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutContentTagsInput = {
@@ -159491,6 +161083,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutContentTagsInput = {
@@ -159591,6 +161184,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutContentTagsInput = {
@@ -159652,6 +161246,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type TagUpsertWithoutContentTagsInput = {
@@ -159742,6 +161337,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutTrashBinEntryInput = {
@@ -159803,6 +161399,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutTrashBinEntryInput = {
@@ -160037,6 +161634,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutTrashBinEntryInput = {
@@ -160098,6 +161696,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserUpsertWithoutTrashedContentInput = {
@@ -160876,6 +162475,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutOwnerInput = {
@@ -160937,6 +162537,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutOwnerInput = {
@@ -164778,6 +166379,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewWorkspacesInput = {
@@ -164839,6 +166441,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewWorkspacesInput = {
@@ -165109,6 +166712,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewWorkspacesInput = {
@@ -165170,6 +166774,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentWorkspaceItemUpsertWithWhereUniqueWithoutWorkspaceInput = {
@@ -165290,6 +166895,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkspaceItemsInput = {
@@ -165351,6 +166957,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkspaceItemsInput = {
@@ -165477,6 +167084,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkspaceItemsInput = {
@@ -165538,6 +167146,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutCategoriesInput = {
@@ -165756,6 +167365,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCategoryInput = {
@@ -165817,6 +167427,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCategoryInput = {
@@ -166427,6 +168038,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutViewGrantsInput = {
@@ -166488,6 +168100,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutViewGrantsInput = {
@@ -166722,6 +168335,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutViewGrantsInput = {
@@ -166783,6 +168397,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserUpsertWithoutViewGrantsInput = {
@@ -167007,6 +168622,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationDocumentInput = {
@@ -167068,6 +168684,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationDocumentInput = {
@@ -167302,6 +168919,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationDocumentInput = {
@@ -167363,6 +168981,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserUpsertWithoutCollaborationDocumentsInput = {
@@ -167587,6 +169206,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCollaborationPresenceRecordsInput = {
@@ -167648,6 +169268,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCollaborationPresenceRecordsInput = {
@@ -167725,6 +169346,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCollaborationPresenceRecordsInput = {
@@ -167786,6 +169408,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutPeopleGroupsInput = {
@@ -168304,6 +169927,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleGroupInput = {
@@ -168365,6 +169989,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleGroupInput = {
@@ -169105,6 +170730,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonInput = {
@@ -169166,6 +170792,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonInput = {
@@ -169712,6 +171339,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPeopleFileTreeMountsInput = {
@@ -169773,6 +171401,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPeopleFileTreeMountsInput = {
@@ -170103,6 +171732,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleFileTreeMountsInput = {
@@ -170164,6 +171794,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type PeopleGroupUpsertWithoutFileTreeMountsInput = {
@@ -170484,6 +172115,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPersonMentionsInput = {
@@ -170545,6 +172177,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPersonMentionsInput = {
@@ -170832,6 +172465,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonMentionsInput = {
@@ -170893,6 +172527,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type PersonUpsertWithoutMentionsInput = {
@@ -172516,6 +174151,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncRootsInput = {
@@ -172577,6 +174213,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncRootsInput = {
@@ -172922,6 +174559,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncRootsInput = {
@@ -172983,6 +174621,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type BookmarkSyncLinkUpsertWithWhereUniqueWithoutConnectionInput = {
@@ -173295,6 +174934,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutBookmarkSyncLinksInput = {
@@ -173356,6 +174996,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutBookmarkSyncLinksInput = {
@@ -173478,6 +175119,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutBookmarkSyncLinksInput = {
@@ -173539,6 +175181,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutWebResourcesInput = {
@@ -174330,6 +175973,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceLinksInput = {
@@ -174391,6 +176035,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceLinksInput = {
@@ -174676,6 +176321,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceLinksInput = {
@@ -174737,6 +176383,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutWebResourceViewStatesInput = {
@@ -175039,6 +176686,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWebResourceViewStatesInput = {
@@ -175100,6 +176748,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWebResourceViewStatesInput = {
@@ -175436,6 +177085,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWebResourceViewStatesInput = {
@@ -175497,6 +177147,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutAccountsInput = {
@@ -175878,6 +177529,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutAuditLogsInput = {
@@ -175939,6 +177591,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutAuditLogsInput = {
@@ -176330,6 +177983,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutAuditLogsInput = {
@@ -176391,6 +178045,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserUpsertWithoutAuditTargetsInput = {
@@ -176778,6 +178433,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutFolderPayloadInput = {
@@ -176839,6 +178495,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutFolderPayloadInput = {
@@ -176916,6 +178573,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutFolderPayloadInput = {
@@ -176977,6 +178635,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutExternalPayloadInput = {
@@ -177038,6 +178697,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutExternalPayloadInput = {
@@ -177099,6 +178759,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutExternalPayloadInput = {
@@ -177215,6 +178876,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutExternalPayloadInput = {
@@ -177276,6 +178938,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type WebResourceUpsertWithoutExternalPayloadsInput = {
@@ -177382,6 +179045,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutChatPayloadInput = {
@@ -177443,6 +179107,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutChatPayloadInput = {
@@ -177520,6 +179185,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutChatPayloadInput = {
@@ -177581,6 +179247,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutConversationsInput = {
@@ -177799,6 +179466,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutArchivedConversationInput = {
@@ -177860,6 +179528,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutArchivedConversationInput = {
@@ -178239,6 +179908,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutArchivedConversationInput = {
@@ -178300,6 +179970,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ChatContextUpsertWithoutConversationsInput = {
@@ -179054,6 +180725,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutConversationAssociationsInput = {
@@ -179115,6 +180787,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutConversationAssociationsInput = {
@@ -179229,6 +180902,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutConversationAssociationsInput = {
@@ -179290,6 +180964,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutAiConnectionsInput = {
@@ -180125,6 +181800,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutVisualizationPayloadInput = {
@@ -180186,6 +181862,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutVisualizationPayloadInput = {
@@ -180263,6 +181940,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutVisualizationPayloadInput = {
@@ -180324,6 +182002,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutDataPayloadInput = {
@@ -180385,6 +182064,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutDataPayloadInput = {
@@ -180446,6 +182126,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutDataPayloadInput = {
@@ -180523,6 +182204,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutDataPayloadInput = {
@@ -180584,6 +182266,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutHopePayloadInput = {
@@ -180645,6 +182328,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutHopePayloadInput = {
@@ -180706,6 +182390,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutHopePayloadInput = {
@@ -180783,6 +182468,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutHopePayloadInput = {
@@ -180844,6 +182530,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeCreateWithoutWorkflowPayloadInput = {
@@ -180905,6 +182592,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowPayloadInput = {
@@ -180966,6 +182654,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowPayloadInput = {
@@ -181043,6 +182732,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowPayloadInput = {
@@ -181104,6 +182794,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type UserCreateWithoutReusableCategoriesInput = {
@@ -184495,6 +186186,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutCalendarEventsInput = {
@@ -184556,6 +186248,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutCalendarEventsInput = {
@@ -184871,6 +186564,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCalendarEventsInput = {
@@ -184932,6 +186626,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type CalendarEventAttendeeUpsertWithWhereUniqueWithoutEventInput = {
@@ -187274,6 +188969,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutPublicItemsInput = {
@@ -187335,6 +189031,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutPublicItemsInput = {
@@ -188033,6 +189730,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPublicItemsInput = {
@@ -188094,6 +189792,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type PublicPathUpsertWithoutItemsInput = {
@@ -196147,6 +197846,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeUncheckedCreateWithoutWorkflowRunArtifactsInput = {
@@ -196208,6 +197908,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
     webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
     webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
   }
 
   export type ContentNodeCreateOrConnectWithoutWorkflowRunArtifactsInput = {
@@ -196336,6 +198037,7 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutWorkflowRunArtifactsInput = {
@@ -196397,6 +198099,271 @@ export namespace Prisma {
     bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+  }
+
+  export type ContentNodeCreateWithoutAgenticMetadataInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutAgenticMetadataInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutAgenticMetadataInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+  }
+
+  export type ContentNodeUpsertWithoutAgenticMetadataInput = {
+    update: XOR<ContentNodeUpdateWithoutAgenticMetadataInput, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+    create: XOR<ContentNodeCreateWithoutAgenticMetadataInput, ContentNodeUncheckedCreateWithoutAgenticMetadataInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutAgenticMetadataInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutAgenticMetadataInput, ContentNodeUncheckedUpdateWithoutAgenticMetadataInput>
+  }
+
+  export type ContentNodeUpdateWithoutAgenticMetadataInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutAgenticMetadataInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
   }
 
   export type AuditLogCreateManyTargetContentInput = {
@@ -196894,6 +198861,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutParentInput = {
@@ -196955,6 +198923,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutParentInput = {
@@ -197039,6 +199008,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnedByNoteInput = {
@@ -197100,6 +199070,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnedByNoteInput = {
@@ -199228,6 +201199,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutOwnerInput = {
@@ -199289,6 +201261,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutOwnerInput = {
@@ -201573,6 +203546,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutCategoryInput = {
@@ -201634,6 +203608,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutCategoryInput = {
@@ -201925,6 +203900,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPeopleGroupInput = {
@@ -201986,6 +203962,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPeopleGroupInput = {
@@ -202142,6 +204119,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateWithoutPersonInput = {
@@ -202203,6 +204181,7 @@ export namespace Prisma {
     webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
     webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
     workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
   }
 
   export type ContentNodeUncheckedUpdateManyWithoutPersonInput = {
