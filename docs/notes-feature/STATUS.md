@@ -53,6 +53,14 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 16, 2026 (later)**: Auto-context V1.1 — anchored ripple engine + privacy opt-out + manual refresh (commits `0cb910e`/`ca5f697`/+menu)
+
+- **Anchored regeneration** (temperature-noise fix): all metadata-lane calls run at temperature 0 and carry the stored summary under an echo-verbatim contract — the model judges "did this change matter?" inside the call; verbatim echo = damping verdict. Packs group per PARENT folder only (siblings share calls, unrelated branches never mix) with folder orientation headers.
+- **Settle gate**: 10-min drain-time debounce (marks reset the clock); **piggyback ripple**: the user's own PATCH traffic drains settled work via `after()` (throttled indexed pre-check) — presence-powered, no timers. **Anchored incremental patching** for folders, used only when single-delta is proven by hash substitution.
+- **Privacy opt-out** (`AgenticMetadata.contextOptOut`): toolbar Eye/EyeOff toggle (the eye moved from publishing, whose pill now uses Globe/GlobeLock) + Context panel checkbox. Opted-out content is never generated (manual Generate 409s), never re-dirtied, excluded from roll-up inputs/hashes and folder-chat defaults+assembly; folders shield subtrees.
+- **Manual refresh**: file-tree right-click → AI → "Update AI context" (`POST /api/studio/context/refresh`, bypasses settle+mode, keeps model gate + spend caps) — the recovery path for failed ripples.
+- Next up per user: per-user daily spend ceiling (BACKLOG).
+
 **July 16, 2026**: Folder Studio auto-context V1 — tree-wide AI context that maintains itself (branch `worktree-folder-studio`, commits `dce7634`/`ef791d8`/+sweep)
 
 - **Dirty-bit cascade**: save/rename/create/move/delete flag the node + ancestor chain (one recursive CTE + indexed `updateMany`); marking is free and always on, spending is gated by the new `studio.autoContextMode` setting (Off / On-access default / On-access + nightly sweep).
