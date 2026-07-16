@@ -1,0 +1,186 @@
+# Digital Garden — Mobile (Expo WebView spike)
+
+A thin **React Native + WebView** shell that wraps the existing Next.js
+Digital Garden web app. The web app stays the product core; this native
+shell exists to host mobile-only capabilities later (camera, mic, push,
+haptics, deep links). **Nothing in the web app is reimplemented natively.**
+
+> Phase 1 status: loads the web app in a WebView, handles external links via a
+> typed bridge, and ships the message contracts for future native features.
+
+---
+
+## Layout
+
+```
+mobile/
+  package.json          # isolated Expo app (NOT in the repo's pnpm workspace)
+  app.config.ts         # native identity + iOS-friendly defaults; reads env
+  index.ts              # Expo entry → registers App
+  App.tsx               # SafeAreaProvider + StatusBar + <MobileWebView/>
+  src/
+    config.ts           # web URL + origin helpers (env-driven)
+    MobileWebView.tsx   # the WebView shell (loading/error/refresh/nav policy)
+    bridge/
+      messages.ts       # WebToNative / NativeToWeb typed contract + parser
+      nativeBridge.ts   # message handlers + shouldOpenExternally() policy
+```
+
+The web side has a companion helper at
+[`lib/mobile-bridge/client.ts`](../lib/mobile-bridge/client.ts) (`postToNative`,
+`isNativeShell`, `openExternalUrl`) and a landing route at
+[`app/mobile/page.tsx`](../app/mobile/page.tsx).
+
+---
+
+## Why it's isolated from the main repo
+
+The repo has **no pnpm workspace**, so `pnpm install` at the root never
+descends into `mobile/`. This app manages its **own** dependencies with **npm**
+(Expo + Metro are happiest without pnpm's symlinked `node_modules`). The
+`mobile/` folder is also excluded from the root `tsconfig.json` and
+`eslint.config.mjs`, so React Native code never enters `pnpm typecheck` /
+`pnpm lint`.
+
+---
+
+## Install
+
+```bash
+cd mobile
+npm install
+
+# Align every dependency to the resolved Expo SDK (recommended after install,
+# and the canonical way to add native libs):
+npx expo install --fix
+npx expo install react-native-webview   # already in package.json; re-runs cleanly
+```
+
+> The versions in `package.json` target Expo SDK 52. If `expo install --fix`
+> bumps them, commit the result — that's expected.
+
+---
+
+## Run (iOS first)
+
+In **one** terminal, start the web app from the repo root:
+
+```bash
+pnpm dev            # serves http://localhost:3015
+```
+
+In **another**, start Expo and open iOS:
+
+```bash
+cd mobile
+npx expo start --ios     # or: npx expo start, then press "i"
+```
+
+You need Xcode + an iOS Simulator installed. The simulator can reach
+`http://localhost:3015`. A **physical device cannot** — see below.
+
+---
+
+## Pointing the shell at a different web URL
+
+The WebView URL is resolved from `EXPO_PUBLIC_DIGITAL_GARDEN_URL`, falling back
+to `http://localhost:3015/mobile`.
+
+```bash
+# Local dev (default)
+npx expo start
+
+# Physical device on the same Wi-Fi — use your Mac's LAN IP, not localhost:
+EXPO_PUBLIC_DIGITAL_GARDEN_URL=http://192.168.1.42:3015/mobile npx expo start
+
+# Staging / production
+EXPO_PUBLIC_DIGITAL_GARDEN_URL=https://davidvalentine.org/mobile npx expo start
+```
+
+Find your LAN IP with `ipconfig getifaddr en0` (macOS).
+
+---
+
+## The bridge
+
+Messages are a discriminated union shared in spirit by both sides
+(`mobile/src/bridge/messages.ts` ↔ `lib/mobile-bridge/client.ts`).
+
+**Web → Native** (`window.ReactNativeWebView.postMessage`):
+
+| type                    | Phase 1 | Behavior                                  |
+| ----------------------- | ------- | ----------------------------------------- |
+| `web:open-external-url` | ✅ live  | Opens the URL in the system browser       |
+| `web:set-title`         | ✅ live  | Hook for native title (callback provided) |
+| `web:haptic`            | stub    | Contract only — no-op                     |
+| `web:request-camera`    | stub    | Contract only — no-op                     |
+| `web:request-microphone`| stub    | Contract only — no-op                     |
+| `web:request-location`  | stub    | Contract only — no-op                     |
+
+**Native → Web** (`native:ready`, `native:app-state`,
+`native:permission-result`) are declared for later phases.
+
+From web code:
+
+```ts
+import { openExternalUrl, isNativeShell } from "@/lib/mobile-bridge/client";
+
+openExternalUrl("https://example.com"); // native browser in-shell, new tab otherwise
+if (isNativeShell()) { /* mobile-only UI */ }
+```
+
+### Navigation policy — `shouldOpenExternally()`
+
+`src/bridge/nativeBridge.ts` decides which link taps stay in the WebView vs.
+open in the system browser. The default keeps same-origin navigation in-app and
+externalizes other domains + `mailto:`/`tel:`. **This is the spot to tune for
+your auth flow** — OAuth/payment redirects sometimes need to round-trip back to
+your origin and should stay in-WebView. See the comment block in that file.
+
+---
+
+## Known limitations / risks (validate before relying on these)
+
+- **Email/password auth** — works in the shell as of the `navigateAfterAuth`
+  fix: WKWebView wouldn't attach a cookie set on a `fetch()` response to the
+  follow-up soft navigation, so login bounced back to `/sign-in`. The sign-in/up
+  pages now force a full document load (`window.location.assign`) when
+  `isNativeShell()` — desktop keeps soft nav. Still verify the session **persists
+  across app restarts** (`sharedCookiesEnabled` is on, but WKWebView cookie
+  persistence is worth confirming).
+- **Google OAuth** — **worked in testing inside the shell.** It's a pure
+  server-redirect flow: the button navigates same-origin to `/api/auth/google`,
+  which 302s to `accounts.google.com`. On iOS `onShouldStartLoadWithRequest`
+  does **not** fire for server redirects, so our external-link policy never
+  externalizes it and it stays in the WebView; the callback then sets
+  `session_token` at the document level, which WKWebView persists reliably.
+  Caveat: Google's `disallowed_useragent` block targets *fresh credential
+  entry* — this succeeded with an existing Google session. A user with no live
+  Google session may hit Google's "this browser is not secure" wall, in which
+  case the real fix is a **native auth session** (`expo-web-browser`
+  `openAuthSessionAsync` / ASWebAuthenticationSession + deep-link callback).
+- **TipTap editing on iOS** — verify keyboard, caret visibility, selection,
+  slash-menu positioning, and autosave inside the WebView.
+- **AI streaming** — verify the chat stream renders incrementally (no buffering)
+  and that session/CORS hold for streamed responses.
+- **File uploads** — the web upload buttons are **not** wired to native pickers
+  yet; confirm whether `<input type="file">` works in the WebView before relying
+  on it.
+- **`/mobile` deep-linking** — Flashcards and AI chat are panels inside
+  `/content` (the Flashcards view is `localStorage`-driven, not URL-driven), so
+  the landing links to the workspace and settings, not dedicated routes.
+- **Android** is best-effort in this phase; the focus is iPhone.
+
+---
+
+## Next recommended steps
+
+1. Manually run the four risk checks above (auth, TipTap, AI streaming, uploads).
+2. Implement `web:set-title` end-to-end (native header) if you add native chrome.
+3. Wire the first real native capability (likely `web:haptic` via `expo-haptics`
+   — cheap, validates the round trip).
+4. Add `native:app-state` emission (foreground/background) for the web app to
+   react to.
+5. Decide the production navigation allowlist in `shouldOpenExternally()`.
+6. Set up EAS Build when you're ready for a TestFlight build.
+```

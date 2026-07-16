@@ -13,6 +13,7 @@ import {
   Folder,
   FileText,
   FileSpreadsheet,
+  Presentation,
   FileType,
   FileCode,
   Code,
@@ -80,6 +81,7 @@ export interface NewContentCallbacks {
   onCreateData?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
+  onCreateN8nWorkflow?: (parentId: string | null) => void | Promise<void>;
   // AI category — initial entry is image generation; future entries
   // (audio, video, structured data) will share the same submenu.
   onCreateAiImage?: (parentId: string | null) => void | Promise<void>;
@@ -195,14 +197,14 @@ export function getNewContentMenuItems(
 
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         submenu,
       });
     } else {
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         shortcut: "A",
         onClick: () => callbacks.onCreateNote?.(normalizedParentId),
@@ -222,22 +224,22 @@ export function getNewContentMenuItems(
     disabled: !callbacks.onCreateChat,
   });
 
-  // External Link (Bookmark)
+  // External Link
   if (callbacks.onCreateExternal) {
     items.push({
       id: "new-external",
-      label: "External Link (Bookmark)",
+      label: "External Link",
       icon: <ExternalLink className="h-4 w-4" />,
       onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
       disabled: !callbacks.onCreateExternal,
     });
   }
 
-  // File (Upload)
+  // File Upload
   if (callbacks.onCreateFile) {
     items.push({
       id: "new-file",
-      label: "File (Upload)",
+      label: "File Upload",
       icon: <FileText className="h-4 w-4" />,
       onClick: () => callbacks.onCreateFile?.(normalizedParentId),
       disabled: !callbacks.onCreateFile,
@@ -324,6 +326,14 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateSpreadsheet,
     });
   }
+  // PowerPoint — stub, not implemented yet.
+  documentChildren.push({
+    id: "new-powerpoint",
+    label: "PowerPoint (.pptx)",
+    icon: <Presentation className="h-4 w-4" />,
+    onClick: () => undefined,
+    disabled: true,
+  });
   if (callbacks.onCreateHtml) {
     documentChildren.push({
       id: "new-html",
@@ -355,7 +365,7 @@ export function getNewContentMenuItems(
   // native graph-interpreter type, future engines slot in beneath it).
   items.push({
     id: "new-workflow",
-    label: "Workflow (Automation)",
+    label: "Workflow",
     icon: <GitBranch className="h-4 w-4" />,
     submenu: [
       {
@@ -365,6 +375,19 @@ export function getNewContentMenuItems(
         onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
         disabled: !callbacks.onCreateWorkflow,
       },
+      // n8n Flow only where the (heavier) create callback is wired — the header
+      // + menu. The file-tree context menu routes through the content-POST path
+      // and gets it once that path learns "n8n-workflow".
+      ...(callbacks.onCreateN8nWorkflow
+        ? [
+            {
+              id: "new-workflow-n8n",
+              label: "n8n Flow",
+              icon: <GitBranch className="h-4 w-4" />,
+              onClick: () => callbacks.onCreateN8nWorkflow?.(normalizedParentId),
+            },
+          ]
+        : []),
     ],
   });
 

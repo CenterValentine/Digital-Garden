@@ -2,7 +2,8 @@
 
 **Created:** 2026-07-11
 **Branch:** `feature/workflows-foundation`
-**Status:** Plan 1 ✅ COMPLETE (2026-07-12) · Plan 2 ✅ COMPLETE (S1–S6 incl. canvas stretch, 2026-07-13) · Plan 3 (n8n spoke) SKETCH, demoted · Plan 4 (MIT engine) STUB
+**Status:** Plan 1 ✅ · Plan 2 ✅ · **PR #103 MERGED** to main (Plans 1+2) · **Plan 3 (n8n spoke) BUILDING on `feature/workflows-n8n` — S1 ✅ 2026-07-14** · Plan 4 (MIT engine) STUB
+Plan 3 key decisions: hub-consistent (n8n workflows are ContentNodes compiled→pushed to n8n, nothing lives in n8n; builder gains an "n8n Node" step); small Dokploy/Coolify VPS hosts n8n (Hocuspocus migration = later 2nd-tenant experiment); one wide PAT per user (guard scoped to callback surface); SUL fine for personal/invite-only use (red line = charging money while n8n runs user workflows).
 Soak 2026-07-12: user verified real BYOK AI + DOCX artifact live ("Unknown application dossier.docx"). Soak lesson: URL-only dispatch against JS-rendered job boards yields empty research ("0% fit" + model apology) — extension capture is the reliable path; gate framing must adapt to empty research (Plan 2 S5).
 
 ## Direction pivot (2026-07-12, post-soak)
@@ -348,24 +349,27 @@ interface WorkflowGraph {
 
 ---
 
-# Plan 3 — External-engine machinery + n8n (SKETCH — demoted 2026-07-12, optional)
+# Plan 3 — n8n execution spoke (FULL — decisions locked 2026-07-14)
 
-**Goal:** everything any external engine will ever need, proven via n8n as the visual canvas spoke.
+**Goal:** the outside-integration long tail (n8n's ~1000 nodes) available inside Trellis, WITHOUT anything living in n8n. n8n is a compile target + execution substrate, never a second UI or a document store.
 
-**Scope sketch:**
-- PAT/service-token auth — hashed at rest, scoped, revocable; first machine-to-machine auth story in the app
-- PAT-authed callback routes — HTTP transport over the SAME `runs.ts` writers (events, artifacts, gates) + AI proxy endpoint (proxy-not-share now does real work: n8n never holds provider keys)
-- `n8n-nodes-digital-garden` community node package: credentials (base URL + PAT); nodes — Get Content, AI Complete, Record Event, Drop File, Notify Inbox, Open Gate, Run Succeeded/Failed
-- n8n adapter: `start` → webhook POST; `resumeGate` → POST to stored `engineGateRef` (Wait-node resume URL captured at gate-open)
-- n8n deployment: first tenant of the Coolify/Dokploy VPS (with its own Postgres DB on a shared server) — or Cloud Run beside Hocuspocus; decide at promotion
-- Engines settings panel: registered adapters, health ping, admin-gated console deep links (`engine` + `engineRunId` + console base URL), default engine
-- Security: n8n console NEVER bare on the internet (its credential store holds the DG PAT + third-party keys)
+## Decisions locked (calibration 2026-07-14)
 
-**Open questions to harvest from Plan 1:**
-- Exact callback route shapes (mirror whatever `runs.ts` settled into)
-- Event granularity expectations for engines that can't batch like in-process code
-- Gate-summary payload shape the inbox UX actually wants (soak finding)
-- PAT scope model (per-definition? per-engine? global machine token?)
+1. **Hub-consistent — n8n workflows are compile targets, not documents.** An n8n workflow is still a ContentNode + `WorkflowPayload` tagged `engine: "n8n@1"`, authored in the SAME Trellis builder/canvas. On Save, the graph is **compiled to n8n workflow JSON and pushed via n8n's REST API** (like source→binary). n8n executes; events/gates/artifacts flow back through callback routes into the same run tables; runs surface in the same panel/inbox. n8n's own UI is admin-debug only. Builder gains an **"n8n Node" step type** exposing installed n8n integrations (Slack/Gmail/Sheets/…).
+2. **Deployment: small VPS (Dokploy/Coolify, ~$6–12/mo)** hosts n8n + its Postgres. Cloud Run stays for Hocuspocus FOR NOW. VPS wins once ≥2 always-on services exist (Plan 3 is that moment); it also pre-homes the deferred trigger-firing workers. **Hocuspocus migration is a documented SECOND-TENANT experiment** (after n8n soaks a few weeks on the box) — NOT part of Plan 3. Measured, not a leap.
+3. **Auth: one wide PAT per user** (GitHub-style Personal Access Token; copy `BrowserExtensionToken` — hashed, revocable, shown once). No scope-picker UI. Blast radius contained structurally: the token guard mounts ONLY on the workflow callback surface — it physically cannot read notes or hit content APIs even though it's "wide."
+4. **Licensing: confirmed clear.** Self-hosted, zero revenue, invite-only, a family member co-testing = personal use under n8n's SUL. **RED LINE (documented tripwire):** if the site ever charges money while n8n executes users' workflows → crosses into n8n's paid embed license. Exit is bounded (swap substrate via the four-verb adapter), not a rewrite. Community node package must be MIT for n8n's registry.
+
+## Sessions (full detail pending promotion; sketch-level here)
+
+- **S1 — PAT auth** ✅ **built 2026-07-14** (typecheck/lint 151·0/build all green): `ServiceToken` model (mirror BrowserExtensionToken — sha256-hashed, `dgwf_` prefix, `scopes` default `["workflows:callback"]`, revocable) + additive migration `20260714120000_add_service_token`. Domain: `extensions/workflows/server/service-token.ts` (create/hash/validate/list/revoke) + guard `service-token-http.ts` (`requireServiceTokenAuth` — the SOLE intended importer of `validateServiceToken` from a request; mounting it only on `/api/workflows/callback/*` in S2 is what contains the wide token's blast radius). Management API (session-authed): `GET/POST /api/workflows/tokens`, `DELETE /api/workflows/tokens/[id]`. UI: `WorkflowsSettingsPage` registered as the workflows extension `settingsDialog` → shows at `/settings/extensions/workflows` (issue with show-once secret + copy, list with prefix/last-used, revoke). Client-safe DTOs + scope constant in `shared.ts`. **Not yet:** browser smoke; not committed. Modeled as an issue/revoke *list* (standard PAT rotation) — "one wide PAT" is about scope breadth, not count.
+- **S2 — Callback route surface** ✅ **built 2026-07-14** (typecheck/lint 151·0/build green; 401-guard smoke passed on all 7 routes): shared guard `extensions/workflows/server/callback.ts` — `requireCallbackRun(request, runId)` does two-layer auth (PAT via `getOptionalServiceTokenAuth` → 401, THEN owner-scoped `getRunForOwner` → 404 so a token can't probe others' runIds) + `CallbackError`/`handleCallbackError` (logs real error, returns generic fallback across the engine boundary — no internal leak). Routes under `/api/workflows/callback/runs/[id]/`: `running` (markRunning), `events` (recordEvent — restricted to `step.started`/`step.completed`/`log`; structural events stay dedicated so notifications/transitions can't be forged), `gate` (openGate + engineGateRef), `gate/close` (closeGate — engine-initiated resume), `artifacts` (attachArtifact + owner-check on contentNodeId), `finish` (finishRun; 409 if already terminal), `ai` (proxy-not-share: `generateViaChatRoute(run.ownerId, …)` — n8n holds no provider keys, returns `{text, stubbed}`). **Not yet:** happy-path smoke with a real token+run (S6 soak). proxy.ts does NOT tenant-gate `/api/workflows/*` (verified: token route 401s, not public-404).
+- **S3 — Graph→n8n compiler + adapter** ✅ **OUTBOUND PATH BUILT + VALIDATED 2026-07-15** (commits ec9b749/41f18a4/0434f61; typecheck/lint 151·0/build green). Node shapes probed against LIVE n8n 2.10.2 (create→read-back→delete): webhook v2, httpRequest v4.2, if v2.2, wait v1.1, httpHeaderAuth credential — all confirmed, not guessed. **execute-node endpoint** (`/callback/runs/[id]/execute-node`, PAT-authed) runs the DG executor and returns outputs = the proxy-not-share seam (n8n never holds keys). **Compiler** (`engines/n8n/compiler.ts`): DG step→HTTP Request POST to execute-node (config built as n8n expr from `{{nodeId.path}}` via a per-node output-ref map: DG outputs at `.data.outputs`, gate=Wait resume payload, input=trigger body); gate→openGate HTTP Request (engineGateRef=`$execution.resumeUrl`)+Wait(webhook); delay→Wait(timeInterval); branch→IF(boolean/loose); +finish node. **Adapter** (`engines/n8n/adapter.ts`, key "n8n"): start POSTs {runId,input} to `/webhook/<path>`; resumeGate POSTs run.engineGateRef; cancel best-effort. **push.ts+meta.ts**: pushWorkflowToN8n = compile+mint callback service-token→n8n httpHeaderAuth credential+create/update+activate; stores {workflowId,webhookPath,credentialId} in `WorkflowPayload.metadata.n8n` (NO schema change). Idempotent on re-push. **dispatch** branches payload.engine "n8n@1"→definition.engine "n8n"/engineRef=path. `POST /api/workflows/content/[id]/push-n8n` flips+pushes (pre-S4 selector); graph Save auto-re-pushes. FULL OUTBOUND validated live (credential→compile→create→activate=true→update→cleanup). **REMAINING = inbound run loop smoke** (n8n→app callbacks): needs `WORKFLOWS_CALLBACK_BASE_URL` = a PUBLIC app URL (n8n on the box can't reach localhost:3022 — use deployed preview or a tunnel).
+- **S4 — n8n Node step type in the builder**: palette entry listing installed n8n integrations; config maps to the target n8n node. Engine selector on the workflow (Trellis vs n8n) — `WorkflowPayload.engine`.
+- **S5 — VPS deploy + engines settings panel**: Dokploy/Coolify box, n8n + Postgres, reverse proxy + auth (n8n console NEVER bare — holds the DG PAT + third-party keys); settings panel with adapter registry, health ping, admin-gated console deep-link.
+- **S6 — parity + soak**: rebuild the job-application graph as an n8n-engine workflow; prove the same run/gate/artifact loop through n8n. Document the Hocuspocus-migration experiment as a followup.
+
+**Inherited from Plans 1–2 (the cheap part):** writer surface + idempotency, gate vocabulary + `engineGateRef` column, run panel, inbox notifications, the builder/canvas, the four-verb adapter contract. New work is auth + HTTP transport + compiler + one node type + the box.
 
 # Plan 4 — MIT engine spoke: Hatchet first, Temporal with cause (STUB)
 

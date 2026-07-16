@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { withRouteTrace } from "@/lib/core/logger";
+import { logger, withRouteTrace } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { workflowGraphSchema } from "@/extensions/workflows/graph/schema";
 import { validateGraph } from "@/extensions/workflows/graph/validate";
+import { n8nBaseUrl } from "@/extensions/workflows/server/engines/n8n/client";
+import {
+  N8N_PAYLOAD_ENGINE,
+  readN8nMetadata,
+} from "@/extensions/workflows/server/engines/n8n/meta";
+import { pushWorkflowToN8n } from "@/extensions/workflows/server/engines/n8n/push";
 import {
   errorResponse,
   handleRouteError,
@@ -21,7 +27,7 @@ async function loadWorkflowNode(id: string, ownerId: string) {
       id: true,
       title: true,
       workflowPayload: {
-        select: { engine: true, definition: true, enabled: true },
+        select: { engine: true, definition: true, enabled: true, metadata: true },
       },
     },
   });
@@ -39,6 +45,7 @@ export async function GET(
       if (!node?.workflowPayload) {
         return errorResponse(404, "NOT_FOUND", "Workflow not found.");
       }
+      const n8nMeta = readN8nMetadata(node.workflowPayload.metadata);
       return NextResponse.json({
         success: true,
         data: {
@@ -47,6 +54,13 @@ export async function GET(
           engine: node.workflowPayload.engine,
           enabled: node.workflowPayload.enabled,
           graph: node.workflowPayload.definition,
+          n8n: n8nMeta.workflowId
+            ? {
+                workflowId: n8nMeta.workflowId,
+                mode: n8nMeta.mode ?? "native",
+                editorUrl: `${n8nBaseUrl() ?? ""}/workflow/${n8nMeta.workflowId}`,
+              }
+            : null,
         },
       });
     } catch (error) {
@@ -98,7 +112,31 @@ export async function PUT(
           definition: parsed.data as unknown as Prisma.InputJsonValue,
         },
       });
-      return NextResponse.json({ success: true, data: { saved: true } });
+
+      // Already a COMPILED n8n workflow → keep n8n in sync on Save. Native
+      // ("n8n Flow") workflows are authored in n8n and must NOT be re-compiled
+      // from the placeholder graph (that would clobber the user's n8n edits).
+      // Best-effort: a push failure surfaces in the response but doesn't fail
+      // the save itself.
+      const isNativeN8n =
+        readN8nMetadata(node.workflowPayload.metadata).mode === "native";
+      let n8n: { pushed: boolean; error?: string } = { pushed: false };
+      if (node.workflowPayload.engine === N8N_PAYLOAD_ENGINE && !isNativeN8n) {
+        try {
+          await pushWorkflowToN8n(session.user.id, node.id);
+          n8n = { pushed: true };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "push failed";
+          logger.warn({
+            layer: "route",
+            event: "workflows_graph_save:n8n_push_failed",
+            summary: message,
+            attrs: { contentId: node.id },
+          });
+          n8n = { pushed: false, error: message };
+        }
+      }
+      return NextResponse.json({ success: true, data: { saved: true, n8n } });
     } catch (error) {
       return handleRouteError(error, "Failed to save workflow");
     }

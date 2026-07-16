@@ -51,7 +51,7 @@ export function PanelLayout({
   const glass0 = getSurfaceStyles("glass-0");
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex h-dvh flex-col overflow-hidden">
       {/* Main panel area */}
       <div className="flex-1 overflow-hidden">
         <Allotment

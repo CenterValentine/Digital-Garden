@@ -1,0 +1,105 @@
+/* Mobile note reader layout. Single column, comfortable mobile typography,
+ * slim sticky header. Dark-mode aware via the app's `.dark` class. */
+
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: #ffffff;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 4rem 1fr 4rem;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: saturate(180%) blur(12px);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.headerLink {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.headerLink:last-child {
+  text-align: right;
+}
+
+.headerTitle {
+  text-align: center;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #111827;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.body {
+  flex: 1;
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  /* Roomy bottom padding clears the home indicator. */
+  padding: 1.25rem 1.25rem calc(3rem + env(safe-area-inset-bottom));
+  /* Bump base size for thumb-distance reading. */
+  font-size: 1.0625rem;
+  line-height: 1.7;
+  color: #1f2937;
+}
+
+.fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 3rem 1rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.fallbackButton {
+  padding: 0.75rem 1.25rem;
+  border-radius: 12px;
+  background: #111827;
+  color: #ffffff;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* ── Dark mode ─────────────────────────────────────────────────────────── */
+:global(.dark) .main {
+  background: #0f1720;
+}
+
+:global(.dark) .header {
+  background: rgba(15, 23, 32, 0.85);
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+:global(.dark) .headerTitle {
+  color: #f9fafb;
+}
+
+:global(.dark) .headerLink {
+  color: #60a5fa;
+}
+
+:global(.dark) .body {
+  color: #e5e7eb;
+}
+
+:global(.dark) .fallbackButton {
+  background: #f9fafb;
+  color: #111827;
+}

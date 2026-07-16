@@ -49,7 +49,7 @@ interface TreeApiResponse {
 interface LeftSidebarContentProps {
   refreshTrigger: number;
   createTrigger?: {
-    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null;
@@ -380,6 +380,35 @@ export function LeftSidebarContent({
 
 
   // Watch for create trigger from + button
+  // n8n Flow create is a heavier server op (creates the n8n workflow +
+  // callback credential), so it uses its own endpoint rather than the
+  // optimistic content-create machinery. Refresh + select on success.
+  const createN8nFlow = useCallback(async () => {
+    try {
+      const res = await fetch("/api/workflows/n8n/create", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "n8n Flow" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.error?.message || "Failed to create n8n Flow");
+      }
+      await fetchTree();
+      setSelectedContentId(json.data.contentId, {
+        title: "n8n Flow",
+        contentType: "workflow",
+      });
+      toast.success("Created n8n Flow — open it in n8n's editor");
+    } catch (err) {
+      setErrorDialog({
+        title: "Failed to create n8n Flow",
+        message: err instanceof Error ? err.message : "Unknown error occurred.",
+      });
+    }
+  }, [fetchTree, setSelectedContentId]);
+
   useEffect(() => {
     if (createTrigger) {
       // For external links, show dialog for name and URL
@@ -391,6 +420,8 @@ export function LeftSidebarContent({
           initialUrl: "https://",
           editingId: null,
         });
+      } else if (createTrigger.type === "n8n-workflow") {
+        void createN8nFlow();
       } else {
         // Pass the actual type from createTrigger (folder, note, docx, or xlsx)
         // parentId will be determined in handleCreate based on current selection

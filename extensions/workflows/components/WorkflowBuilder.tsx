@@ -54,6 +54,7 @@ import type {
 } from "../graph/schema";
 import { deriveChain, edgesFromChain } from "../graph/chain";
 import { ENGINE_DISPLAY_NAMES } from "../graph/schema";
+import { N8nFlowView } from "./N8nFlowView";
 import { validateGraph, type GraphValidationIssue } from "../graph/validate";
 import { WorkflowCanvas } from "./WorkflowCanvas";
 
@@ -243,6 +244,10 @@ export function WorkflowBuilder({
   const [serverIssues, setServerIssues] = useState<GraphValidationIssue[]>([]);
   const [view, setView] = useState<"list" | "canvas">("list");
   const [runForm, setRunForm] = useState<Record<string, string> | null>(null);
+  const [n8nInfo, setN8nInfo] = useState<{
+    mode: string;
+    editorUrl: string;
+  } | null>(null);
 
   const load = useCallback(async () => {
     if (!selectedContentId) return;
@@ -252,10 +257,15 @@ export function WorkflowBuilder({
       );
       if (!response.ok) return;
       const body = (await response.json()) as {
-        data: { title: string; graph: WorkflowGraph };
+        data: {
+          title: string;
+          graph: WorkflowGraph;
+          n8n?: { mode: string; editorUrl: string } | null;
+        };
       };
       setTitle(body.data.title);
       setGraph(body.data.graph);
+      setN8nInfo(body.data.n8n ?? null);
       setDirty(false);
       setServerIssues([]);
     } catch {
@@ -457,6 +467,18 @@ export function WorkflowBuilder({
       <div className="flex h-full items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
       </div>
+    );
+  }
+
+  // Native n8n flows are authored in n8n's own editor — render the deep-link
+  // view instead of the Trellis builder (the placeholder graph is ignored).
+  if (n8nInfo?.mode === "native" && selectedContentId) {
+    return (
+      <N8nFlowView
+        contentId={selectedContentId}
+        title={title}
+        editorUrl={n8nInfo.editorUrl}
+      />
     );
   }
 

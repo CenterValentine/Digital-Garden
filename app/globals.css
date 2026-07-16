@@ -128,6 +128,20 @@ body:has(.public-route) main {
 }
 
 /* ────────────────────────────────────────────────────────────────────────
+ * Native mobile shell — when the React Native WebView marks the document with
+ * `data-native-shell` (see mobile/src/MobileWebView.tsx), hide the global
+ * desktop nav + top padding on EVERY route. The attribute is never set on
+ * desktop, so these rules are inert there — no desktop layout change.
+ * ──────────────────────────────────────────────────────────────────────── */
+html[data-native-shell] .notes-route-hides-default-nav {
+  display: none !important;
+}
+html[data-native-shell] .notes-route-no-padding,
+html[data-native-shell] main {
+  padding-top: 0 !important;
+}
+
+/* ────────────────────────────────────────────────────────────────────────
  * Embed iframe — hide root chrome and let .embed-layout-page own the viewport.
  * Used when the browser-extension iframe loads /embed/* pages. The embed
  * layout fixed-positions itself over the whole viewport, but we also kill the
@@ -394,6 +408,14 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
+  /* Mobile / touch base — inert on desktop:
+   * - text-size-adjust: stop iOS Safari from auto-inflating font sizes in
+   *   landscape (a common cause of "text looks huge on my phone").
+   * - tap-highlight-color: remove the grey flash box on tap; the app's rich
+   *   :hover / :active states already provide press feedback. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -468,6 +490,12 @@ nav[class*="fixed"] {
   color: #1a1a1a;
   /* Extra bottom padding ensures block "+" buttons and margins don't create dead grey space near overflow edge */
   padding-bottom: 4rem;
+  /* touch-action: manipulation removes the ~300ms double-tap-to-zoom delay on
+   * touch devices that otherwise interrupts tap-to-place-cursor and text
+   * selection inside the editor. Pinch-zoom and panning are still allowed;
+   * native double-tap-to-select-word is unaffected (it's a text gesture, not
+   * a zoom gesture). */
+  touch-action: manipulation;
 }
 
 /* Tight flashcard editor: strip the 4rem bottom padding the main editor

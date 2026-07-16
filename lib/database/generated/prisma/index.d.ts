@@ -154,6 +154,16 @@ export type PersonMention = $Result.DefaultSelection<Prisma.$PersonMentionPayloa
  */
 export type Session = $Result.DefaultSelection<Prisma.$SessionPayload>
 /**
+ * Model ServiceToken
+ * Personal Access Token for machine-to-machine callers of the workflow
+ * callback surface (Trellis Plan 3 — the n8n execution spoke posts run
+ * events/gates/artifacts back through PAT-authed routes). One "wide" token
+ * per user: blast radius is contained structurally because the guard
+ * (requireServiceTokenAuth) is imported only by /api/workflows/callback/*.
+ * Hashed at rest (sha256), shown once, revocable. Mirrors BrowserExtensionToken.
+ */
+export type ServiceToken = $Result.DefaultSelection<Prisma.$ServiceTokenPayload>
+/**
  * Model BrowserExtensionToken
  * 
  */
@@ -1300,6 +1310,16 @@ export class PrismaClient<
   get session(): Prisma.SessionDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.serviceToken`: Exposes CRUD operations for the **ServiceToken** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more ServiceTokens
+    * const serviceTokens = await prisma.serviceToken.findMany()
+    * ```
+    */
+  get serviceToken(): Prisma.ServiceTokenDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.browserExtensionToken`: Exposes CRUD operations for the **BrowserExtensionToken** model.
     * Example usage:
     * ```ts
@@ -2360,6 +2380,7 @@ export namespace Prisma {
     PeopleFileTreeMount: 'PeopleFileTreeMount',
     PersonMention: 'PersonMention',
     Session: 'Session',
+    ServiceToken: 'ServiceToken',
     BrowserExtensionToken: 'BrowserExtensionToken',
     BrowserExtensionInstall: 'BrowserExtensionInstall',
     BookmarkSyncConnection: 'BookmarkSyncConnection',
@@ -2435,7 +2456,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "serviceToken" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload" | "connectionInvite" | "userConnection" | "userBlock" | "activityEvent" | "notificationRecipient" | "dmThread" | "dmParticipant" | "dmMessage" | "rateLimitCounter" | "workflowDefinition" | "workflowRun" | "workflowRunEvent" | "workflowRunArtifact"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -4508,6 +4529,80 @@ export namespace Prisma {
           count: {
             args: Prisma.SessionCountArgs<ExtArgs>
             result: $Utils.Optional<SessionCountAggregateOutputType> | number
+          }
+        }
+      }
+      ServiceToken: {
+        payload: Prisma.$ServiceTokenPayload<ExtArgs>
+        fields: Prisma.ServiceTokenFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.ServiceTokenFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.ServiceTokenFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          findFirst: {
+            args: Prisma.ServiceTokenFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.ServiceTokenFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          findMany: {
+            args: Prisma.ServiceTokenFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>[]
+          }
+          create: {
+            args: Prisma.ServiceTokenCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          createMany: {
+            args: Prisma.ServiceTokenCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.ServiceTokenCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>[]
+          }
+          delete: {
+            args: Prisma.ServiceTokenDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          update: {
+            args: Prisma.ServiceTokenUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          deleteMany: {
+            args: Prisma.ServiceTokenDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.ServiceTokenUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.ServiceTokenUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>[]
+          }
+          upsert: {
+            args: Prisma.ServiceTokenUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$ServiceTokenPayload>
+          }
+          aggregate: {
+            args: Prisma.ServiceTokenAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateServiceToken>
+          }
+          groupBy: {
+            args: Prisma.ServiceTokenGroupByArgs<ExtArgs>
+            result: $Utils.Optional<ServiceTokenGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.ServiceTokenCountArgs<ExtArgs>
+            result: $Utils.Optional<ServiceTokenCountAggregateOutputType> | number
           }
         }
       }
@@ -9087,6 +9182,7 @@ export namespace Prisma {
     peopleFileTreeMount?: PeopleFileTreeMountOmit
     personMention?: PersonMentionOmit
     session?: SessionOmit
+    serviceToken?: ServiceTokenOmit
     browserExtensionToken?: BrowserExtensionTokenOmit
     browserExtensionInstall?: BrowserExtensionInstallOmit
     bookmarkSyncConnection?: BookmarkSyncConnectionOmit
@@ -9568,6 +9664,7 @@ export namespace Prisma {
     publicPathRedirects: number
     ownedTenants: number
     series: number
+    serviceTokens: number
     browserExtensionTokens: number
     browserExtensionInstalls: number
     bookmarkSyncConnections: number
@@ -9630,6 +9727,7 @@ export namespace Prisma {
     publicPathRedirects?: boolean | UserCountOutputTypeCountPublicPathRedirectsArgs
     ownedTenants?: boolean | UserCountOutputTypeCountOwnedTenantsArgs
     series?: boolean | UserCountOutputTypeCountSeriesArgs
+    serviceTokens?: boolean | UserCountOutputTypeCountServiceTokensArgs
     browserExtensionTokens?: boolean | UserCountOutputTypeCountBrowserExtensionTokensArgs
     browserExtensionInstalls?: boolean | UserCountOutputTypeCountBrowserExtensionInstallsArgs
     bookmarkSyncConnections?: boolean | UserCountOutputTypeCountBookmarkSyncConnectionsArgs
@@ -9946,6 +10044,13 @@ export namespace Prisma {
    */
   export type UserCountOutputTypeCountSeriesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: SeriesWhereInput
+  }
+
+  /**
+   * UserCountOutputType without action
+   */
+  export type UserCountOutputTypeCountServiceTokensArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ServiceTokenWhereInput
   }
 
   /**
@@ -30135,6 +30240,7 @@ export namespace Prisma {
     primaryTenant?: boolean | User$primaryTenantArgs<ExtArgs>
     ownedTenants?: boolean | User$ownedTenantsArgs<ExtArgs>
     series?: boolean | User$seriesArgs<ExtArgs>
+    serviceTokens?: boolean | User$serviceTokensArgs<ExtArgs>
     browserExtensionTokens?: boolean | User$browserExtensionTokensArgs<ExtArgs>
     browserExtensionInstalls?: boolean | User$browserExtensionInstallsArgs<ExtArgs>
     bookmarkSyncConnections?: boolean | User$bookmarkSyncConnectionsArgs<ExtArgs>
@@ -30256,6 +30362,7 @@ export namespace Prisma {
     primaryTenant?: boolean | User$primaryTenantArgs<ExtArgs>
     ownedTenants?: boolean | User$ownedTenantsArgs<ExtArgs>
     series?: boolean | User$seriesArgs<ExtArgs>
+    serviceTokens?: boolean | User$serviceTokensArgs<ExtArgs>
     browserExtensionTokens?: boolean | User$browserExtensionTokensArgs<ExtArgs>
     browserExtensionInstalls?: boolean | User$browserExtensionInstallsArgs<ExtArgs>
     bookmarkSyncConnections?: boolean | User$bookmarkSyncConnectionsArgs<ExtArgs>
@@ -30328,6 +30435,7 @@ export namespace Prisma {
       primaryTenant: Prisma.$TenantPayload<ExtArgs> | null
       ownedTenants: Prisma.$TenantPayload<ExtArgs>[]
       series: Prisma.$SeriesPayload<ExtArgs>[]
+      serviceTokens: Prisma.$ServiceTokenPayload<ExtArgs>[]
       browserExtensionTokens: Prisma.$BrowserExtensionTokenPayload<ExtArgs>[]
       browserExtensionInstalls: Prisma.$BrowserExtensionInstallPayload<ExtArgs>[]
       bookmarkSyncConnections: Prisma.$BookmarkSyncConnectionPayload<ExtArgs>[]
@@ -30799,6 +30907,7 @@ export namespace Prisma {
     primaryTenant<T extends User$primaryTenantArgs<ExtArgs> = {}>(args?: Subset<T, User$primaryTenantArgs<ExtArgs>>): Prisma__TenantClient<$Result.GetResult<Prisma.$TenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     ownedTenants<T extends User$ownedTenantsArgs<ExtArgs> = {}>(args?: Subset<T, User$ownedTenantsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$TenantPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     series<T extends User$seriesArgs<ExtArgs> = {}>(args?: Subset<T, User$seriesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SeriesPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    serviceTokens<T extends User$serviceTokensArgs<ExtArgs> = {}>(args?: Subset<T, User$serviceTokensArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     browserExtensionTokens<T extends User$browserExtensionTokensArgs<ExtArgs> = {}>(args?: Subset<T, User$browserExtensionTokensArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BrowserExtensionTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     browserExtensionInstalls<T extends User$browserExtensionInstallsArgs<ExtArgs> = {}>(args?: Subset<T, User$browserExtensionInstallsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BrowserExtensionInstallPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     bookmarkSyncConnections<T extends User$bookmarkSyncConnectionsArgs<ExtArgs> = {}>(args?: Subset<T, User$bookmarkSyncConnectionsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$BookmarkSyncConnectionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -32257,6 +32366,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: SeriesScalarFieldEnum | SeriesScalarFieldEnum[]
+  }
+
+  /**
+   * User.serviceTokens
+   */
+  export type User$serviceTokensArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    where?: ServiceTokenWhereInput
+    orderBy?: ServiceTokenOrderByWithRelationInput | ServiceTokenOrderByWithRelationInput[]
+    cursor?: ServiceTokenWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ServiceTokenScalarFieldEnum | ServiceTokenScalarFieldEnum[]
   }
 
   /**
@@ -46833,6 +46966,1138 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: SessionInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model ServiceToken
+   */
+
+  export type AggregateServiceToken = {
+    _count: ServiceTokenCountAggregateOutputType | null
+    _min: ServiceTokenMinAggregateOutputType | null
+    _max: ServiceTokenMaxAggregateOutputType | null
+  }
+
+  export type ServiceTokenMinAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    name: string | null
+    tokenHash: string | null
+    tokenPrefix: string | null
+    lastUsedAt: Date | null
+    expiresAt: Date | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ServiceTokenMaxAggregateOutputType = {
+    id: string | null
+    userId: string | null
+    name: string | null
+    tokenHash: string | null
+    tokenPrefix: string | null
+    lastUsedAt: Date | null
+    expiresAt: Date | null
+    revokedAt: Date | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type ServiceTokenCountAggregateOutputType = {
+    id: number
+    userId: number
+    name: number
+    tokenHash: number
+    tokenPrefix: number
+    scopes: number
+    lastUsedAt: number
+    expiresAt: number
+    revokedAt: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type ServiceTokenMinAggregateInputType = {
+    id?: true
+    userId?: true
+    name?: true
+    tokenHash?: true
+    tokenPrefix?: true
+    lastUsedAt?: true
+    expiresAt?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ServiceTokenMaxAggregateInputType = {
+    id?: true
+    userId?: true
+    name?: true
+    tokenHash?: true
+    tokenPrefix?: true
+    lastUsedAt?: true
+    expiresAt?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type ServiceTokenCountAggregateInputType = {
+    id?: true
+    userId?: true
+    name?: true
+    tokenHash?: true
+    tokenPrefix?: true
+    scopes?: true
+    lastUsedAt?: true
+    expiresAt?: true
+    revokedAt?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type ServiceTokenAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ServiceToken to aggregate.
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ServiceTokens to fetch.
+     */
+    orderBy?: ServiceTokenOrderByWithRelationInput | ServiceTokenOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: ServiceTokenWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ServiceTokens from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ServiceTokens.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned ServiceTokens
+    **/
+    _count?: true | ServiceTokenCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: ServiceTokenMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: ServiceTokenMaxAggregateInputType
+  }
+
+  export type GetServiceTokenAggregateType<T extends ServiceTokenAggregateArgs> = {
+        [P in keyof T & keyof AggregateServiceToken]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateServiceToken[P]>
+      : GetScalarType<T[P], AggregateServiceToken[P]>
+  }
+
+
+
+
+  export type ServiceTokenGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ServiceTokenWhereInput
+    orderBy?: ServiceTokenOrderByWithAggregationInput | ServiceTokenOrderByWithAggregationInput[]
+    by: ServiceTokenScalarFieldEnum[] | ServiceTokenScalarFieldEnum
+    having?: ServiceTokenScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: ServiceTokenCountAggregateInputType | true
+    _min?: ServiceTokenMinAggregateInputType
+    _max?: ServiceTokenMaxAggregateInputType
+  }
+
+  export type ServiceTokenGroupByOutputType = {
+    id: string
+    userId: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes: string[]
+    lastUsedAt: Date | null
+    expiresAt: Date | null
+    revokedAt: Date | null
+    createdAt: Date
+    updatedAt: Date
+    _count: ServiceTokenCountAggregateOutputType | null
+    _min: ServiceTokenMinAggregateOutputType | null
+    _max: ServiceTokenMaxAggregateOutputType | null
+  }
+
+  type GetServiceTokenGroupByPayload<T extends ServiceTokenGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<ServiceTokenGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof ServiceTokenGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], ServiceTokenGroupByOutputType[P]>
+            : GetScalarType<T[P], ServiceTokenGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type ServiceTokenSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    name?: boolean
+    tokenHash?: boolean
+    tokenPrefix?: boolean
+    scopes?: boolean
+    lastUsedAt?: boolean
+    expiresAt?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["serviceToken"]>
+
+  export type ServiceTokenSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    name?: boolean
+    tokenHash?: boolean
+    tokenPrefix?: boolean
+    scopes?: boolean
+    lastUsedAt?: boolean
+    expiresAt?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["serviceToken"]>
+
+  export type ServiceTokenSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    userId?: boolean
+    name?: boolean
+    tokenHash?: boolean
+    tokenPrefix?: boolean
+    scopes?: boolean
+    lastUsedAt?: boolean
+    expiresAt?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["serviceToken"]>
+
+  export type ServiceTokenSelectScalar = {
+    id?: boolean
+    userId?: boolean
+    name?: boolean
+    tokenHash?: boolean
+    tokenPrefix?: boolean
+    scopes?: boolean
+    lastUsedAt?: boolean
+    expiresAt?: boolean
+    revokedAt?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type ServiceTokenOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "name" | "tokenHash" | "tokenPrefix" | "scopes" | "lastUsedAt" | "expiresAt" | "revokedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["serviceToken"]>
+  export type ServiceTokenInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ServiceTokenIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+  export type ServiceTokenIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    user?: boolean | UserDefaultArgs<ExtArgs>
+  }
+
+  export type $ServiceTokenPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "ServiceToken"
+    objects: {
+      user: Prisma.$UserPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      userId: string
+      name: string
+      tokenHash: string
+      tokenPrefix: string
+      scopes: string[]
+      lastUsedAt: Date | null
+      expiresAt: Date | null
+      revokedAt: Date | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["serviceToken"]>
+    composites: {}
+  }
+
+  type ServiceTokenGetPayload<S extends boolean | null | undefined | ServiceTokenDefaultArgs> = $Result.GetResult<Prisma.$ServiceTokenPayload, S>
+
+  type ServiceTokenCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<ServiceTokenFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: ServiceTokenCountAggregateInputType | true
+    }
+
+  export interface ServiceTokenDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['ServiceToken'], meta: { name: 'ServiceToken' } }
+    /**
+     * Find zero or one ServiceToken that matches the filter.
+     * @param {ServiceTokenFindUniqueArgs} args - Arguments to find a ServiceToken
+     * @example
+     * // Get one ServiceToken
+     * const serviceToken = await prisma.serviceToken.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends ServiceTokenFindUniqueArgs>(args: SelectSubset<T, ServiceTokenFindUniqueArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one ServiceToken that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {ServiceTokenFindUniqueOrThrowArgs} args - Arguments to find a ServiceToken
+     * @example
+     * // Get one ServiceToken
+     * const serviceToken = await prisma.serviceToken.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends ServiceTokenFindUniqueOrThrowArgs>(args: SelectSubset<T, ServiceTokenFindUniqueOrThrowArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ServiceToken that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenFindFirstArgs} args - Arguments to find a ServiceToken
+     * @example
+     * // Get one ServiceToken
+     * const serviceToken = await prisma.serviceToken.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends ServiceTokenFindFirstArgs>(args?: SelectSubset<T, ServiceTokenFindFirstArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first ServiceToken that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenFindFirstOrThrowArgs} args - Arguments to find a ServiceToken
+     * @example
+     * // Get one ServiceToken
+     * const serviceToken = await prisma.serviceToken.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends ServiceTokenFindFirstOrThrowArgs>(args?: SelectSubset<T, ServiceTokenFindFirstOrThrowArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more ServiceTokens that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all ServiceTokens
+     * const serviceTokens = await prisma.serviceToken.findMany()
+     * 
+     * // Get first 10 ServiceTokens
+     * const serviceTokens = await prisma.serviceToken.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const serviceTokenWithIdOnly = await prisma.serviceToken.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends ServiceTokenFindManyArgs>(args?: SelectSubset<T, ServiceTokenFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a ServiceToken.
+     * @param {ServiceTokenCreateArgs} args - Arguments to create a ServiceToken.
+     * @example
+     * // Create one ServiceToken
+     * const ServiceToken = await prisma.serviceToken.create({
+     *   data: {
+     *     // ... data to create a ServiceToken
+     *   }
+     * })
+     * 
+     */
+    create<T extends ServiceTokenCreateArgs>(args: SelectSubset<T, ServiceTokenCreateArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many ServiceTokens.
+     * @param {ServiceTokenCreateManyArgs} args - Arguments to create many ServiceTokens.
+     * @example
+     * // Create many ServiceTokens
+     * const serviceToken = await prisma.serviceToken.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends ServiceTokenCreateManyArgs>(args?: SelectSubset<T, ServiceTokenCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many ServiceTokens and returns the data saved in the database.
+     * @param {ServiceTokenCreateManyAndReturnArgs} args - Arguments to create many ServiceTokens.
+     * @example
+     * // Create many ServiceTokens
+     * const serviceToken = await prisma.serviceToken.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many ServiceTokens and only return the `id`
+     * const serviceTokenWithIdOnly = await prisma.serviceToken.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends ServiceTokenCreateManyAndReturnArgs>(args?: SelectSubset<T, ServiceTokenCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a ServiceToken.
+     * @param {ServiceTokenDeleteArgs} args - Arguments to delete one ServiceToken.
+     * @example
+     * // Delete one ServiceToken
+     * const ServiceToken = await prisma.serviceToken.delete({
+     *   where: {
+     *     // ... filter to delete one ServiceToken
+     *   }
+     * })
+     * 
+     */
+    delete<T extends ServiceTokenDeleteArgs>(args: SelectSubset<T, ServiceTokenDeleteArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one ServiceToken.
+     * @param {ServiceTokenUpdateArgs} args - Arguments to update one ServiceToken.
+     * @example
+     * // Update one ServiceToken
+     * const serviceToken = await prisma.serviceToken.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends ServiceTokenUpdateArgs>(args: SelectSubset<T, ServiceTokenUpdateArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more ServiceTokens.
+     * @param {ServiceTokenDeleteManyArgs} args - Arguments to filter ServiceTokens to delete.
+     * @example
+     * // Delete a few ServiceTokens
+     * const { count } = await prisma.serviceToken.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends ServiceTokenDeleteManyArgs>(args?: SelectSubset<T, ServiceTokenDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ServiceTokens.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many ServiceTokens
+     * const serviceToken = await prisma.serviceToken.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends ServiceTokenUpdateManyArgs>(args: SelectSubset<T, ServiceTokenUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more ServiceTokens and returns the data updated in the database.
+     * @param {ServiceTokenUpdateManyAndReturnArgs} args - Arguments to update many ServiceTokens.
+     * @example
+     * // Update many ServiceTokens
+     * const serviceToken = await prisma.serviceToken.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more ServiceTokens and only return the `id`
+     * const serviceTokenWithIdOnly = await prisma.serviceToken.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends ServiceTokenUpdateManyAndReturnArgs>(args: SelectSubset<T, ServiceTokenUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one ServiceToken.
+     * @param {ServiceTokenUpsertArgs} args - Arguments to update or create a ServiceToken.
+     * @example
+     * // Update or create a ServiceToken
+     * const serviceToken = await prisma.serviceToken.upsert({
+     *   create: {
+     *     // ... data to create a ServiceToken
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the ServiceToken we want to update
+     *   }
+     * })
+     */
+    upsert<T extends ServiceTokenUpsertArgs>(args: SelectSubset<T, ServiceTokenUpsertArgs<ExtArgs>>): Prisma__ServiceTokenClient<$Result.GetResult<Prisma.$ServiceTokenPayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of ServiceTokens.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenCountArgs} args - Arguments to filter ServiceTokens to count.
+     * @example
+     * // Count the number of ServiceTokens
+     * const count = await prisma.serviceToken.count({
+     *   where: {
+     *     // ... the filter for the ServiceTokens we want to count
+     *   }
+     * })
+    **/
+    count<T extends ServiceTokenCountArgs>(
+      args?: Subset<T, ServiceTokenCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], ServiceTokenCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a ServiceToken.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends ServiceTokenAggregateArgs>(args: Subset<T, ServiceTokenAggregateArgs>): Prisma.PrismaPromise<GetServiceTokenAggregateType<T>>
+
+    /**
+     * Group by ServiceToken.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {ServiceTokenGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends ServiceTokenGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: ServiceTokenGroupByArgs['orderBy'] }
+        : { orderBy?: ServiceTokenGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, ServiceTokenGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetServiceTokenGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the ServiceToken model
+   */
+  readonly fields: ServiceTokenFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for ServiceToken.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__ServiceTokenClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    user<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the ServiceToken model
+   */
+  interface ServiceTokenFieldRefs {
+    readonly id: FieldRef<"ServiceToken", 'String'>
+    readonly userId: FieldRef<"ServiceToken", 'String'>
+    readonly name: FieldRef<"ServiceToken", 'String'>
+    readonly tokenHash: FieldRef<"ServiceToken", 'String'>
+    readonly tokenPrefix: FieldRef<"ServiceToken", 'String'>
+    readonly scopes: FieldRef<"ServiceToken", 'String[]'>
+    readonly lastUsedAt: FieldRef<"ServiceToken", 'DateTime'>
+    readonly expiresAt: FieldRef<"ServiceToken", 'DateTime'>
+    readonly revokedAt: FieldRef<"ServiceToken", 'DateTime'>
+    readonly createdAt: FieldRef<"ServiceToken", 'DateTime'>
+    readonly updatedAt: FieldRef<"ServiceToken", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * ServiceToken findUnique
+   */
+  export type ServiceTokenFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter, which ServiceToken to fetch.
+     */
+    where: ServiceTokenWhereUniqueInput
+  }
+
+  /**
+   * ServiceToken findUniqueOrThrow
+   */
+  export type ServiceTokenFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter, which ServiceToken to fetch.
+     */
+    where: ServiceTokenWhereUniqueInput
+  }
+
+  /**
+   * ServiceToken findFirst
+   */
+  export type ServiceTokenFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter, which ServiceToken to fetch.
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ServiceTokens to fetch.
+     */
+    orderBy?: ServiceTokenOrderByWithRelationInput | ServiceTokenOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ServiceTokens.
+     */
+    cursor?: ServiceTokenWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ServiceTokens from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ServiceTokens.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ServiceTokens.
+     */
+    distinct?: ServiceTokenScalarFieldEnum | ServiceTokenScalarFieldEnum[]
+  }
+
+  /**
+   * ServiceToken findFirstOrThrow
+   */
+  export type ServiceTokenFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter, which ServiceToken to fetch.
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ServiceTokens to fetch.
+     */
+    orderBy?: ServiceTokenOrderByWithRelationInput | ServiceTokenOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for ServiceTokens.
+     */
+    cursor?: ServiceTokenWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ServiceTokens from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ServiceTokens.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of ServiceTokens.
+     */
+    distinct?: ServiceTokenScalarFieldEnum | ServiceTokenScalarFieldEnum[]
+  }
+
+  /**
+   * ServiceToken findMany
+   */
+  export type ServiceTokenFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter, which ServiceTokens to fetch.
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of ServiceTokens to fetch.
+     */
+    orderBy?: ServiceTokenOrderByWithRelationInput | ServiceTokenOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing ServiceTokens.
+     */
+    cursor?: ServiceTokenWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` ServiceTokens from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` ServiceTokens.
+     */
+    skip?: number
+    distinct?: ServiceTokenScalarFieldEnum | ServiceTokenScalarFieldEnum[]
+  }
+
+  /**
+   * ServiceToken create
+   */
+  export type ServiceTokenCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * The data needed to create a ServiceToken.
+     */
+    data: XOR<ServiceTokenCreateInput, ServiceTokenUncheckedCreateInput>
+  }
+
+  /**
+   * ServiceToken createMany
+   */
+  export type ServiceTokenCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many ServiceTokens.
+     */
+    data: ServiceTokenCreateManyInput | ServiceTokenCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * ServiceToken createManyAndReturn
+   */
+  export type ServiceTokenCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * The data used to create many ServiceTokens.
+     */
+    data: ServiceTokenCreateManyInput | ServiceTokenCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ServiceToken update
+   */
+  export type ServiceTokenUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * The data needed to update a ServiceToken.
+     */
+    data: XOR<ServiceTokenUpdateInput, ServiceTokenUncheckedUpdateInput>
+    /**
+     * Choose, which ServiceToken to update.
+     */
+    where: ServiceTokenWhereUniqueInput
+  }
+
+  /**
+   * ServiceToken updateMany
+   */
+  export type ServiceTokenUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update ServiceTokens.
+     */
+    data: XOR<ServiceTokenUpdateManyMutationInput, ServiceTokenUncheckedUpdateManyInput>
+    /**
+     * Filter which ServiceTokens to update
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * Limit how many ServiceTokens to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * ServiceToken updateManyAndReturn
+   */
+  export type ServiceTokenUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * The data used to update ServiceTokens.
+     */
+    data: XOR<ServiceTokenUpdateManyMutationInput, ServiceTokenUncheckedUpdateManyInput>
+    /**
+     * Filter which ServiceTokens to update
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * Limit how many ServiceTokens to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * ServiceToken upsert
+   */
+  export type ServiceTokenUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * The filter to search for the ServiceToken to update in case it exists.
+     */
+    where: ServiceTokenWhereUniqueInput
+    /**
+     * In case the ServiceToken found by the `where` argument doesn't exist, create a new ServiceToken with this data.
+     */
+    create: XOR<ServiceTokenCreateInput, ServiceTokenUncheckedCreateInput>
+    /**
+     * In case the ServiceToken was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<ServiceTokenUpdateInput, ServiceTokenUncheckedUpdateInput>
+  }
+
+  /**
+   * ServiceToken delete
+   */
+  export type ServiceTokenDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
+    /**
+     * Filter which ServiceToken to delete.
+     */
+    where: ServiceTokenWhereUniqueInput
+  }
+
+  /**
+   * ServiceToken deleteMany
+   */
+  export type ServiceTokenDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which ServiceTokens to delete
+     */
+    where?: ServiceTokenWhereInput
+    /**
+     * Limit how many ServiceTokens to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * ServiceToken without action
+   */
+  export type ServiceTokenDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ServiceToken
+     */
+    select?: ServiceTokenSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ServiceToken
+     */
+    omit?: ServiceTokenOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ServiceTokenInclude<ExtArgs> | null
   }
 
 
@@ -117017,6 +118282,23 @@ export namespace Prisma {
   export type SessionScalarFieldEnum = (typeof SessionScalarFieldEnum)[keyof typeof SessionScalarFieldEnum]
 
 
+  export const ServiceTokenScalarFieldEnum: {
+    id: 'id',
+    userId: 'userId',
+    name: 'name',
+    tokenHash: 'tokenHash',
+    tokenPrefix: 'tokenPrefix',
+    scopes: 'scopes',
+    lastUsedAt: 'lastUsedAt',
+    expiresAt: 'expiresAt',
+    revokedAt: 'revokedAt',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type ServiceTokenScalarFieldEnum = (typeof ServiceTokenScalarFieldEnum)[keyof typeof ServiceTokenScalarFieldEnum]
+
+
   export const BrowserExtensionTokenScalarFieldEnum: {
     id: 'id',
     userId: 'userId',
@@ -120125,6 +121407,7 @@ export namespace Prisma {
     primaryTenant?: XOR<TenantNullableScalarRelationFilter, TenantWhereInput> | null
     ownedTenants?: TenantListRelationFilter
     series?: SeriesListRelationFilter
+    serviceTokens?: ServiceTokenListRelationFilter
     browserExtensionTokens?: BrowserExtensionTokenListRelationFilter
     browserExtensionInstalls?: BrowserExtensionInstallListRelationFilter
     bookmarkSyncConnections?: BookmarkSyncConnectionListRelationFilter
@@ -120203,6 +121486,7 @@ export namespace Prisma {
     primaryTenant?: TenantOrderByWithRelationInput
     ownedTenants?: TenantOrderByRelationAggregateInput
     series?: SeriesOrderByRelationAggregateInput
+    serviceTokens?: ServiceTokenOrderByRelationAggregateInput
     browserExtensionTokens?: BrowserExtensionTokenOrderByRelationAggregateInput
     browserExtensionInstalls?: BrowserExtensionInstallOrderByRelationAggregateInput
     bookmarkSyncConnections?: BookmarkSyncConnectionOrderByRelationAggregateInput
@@ -120284,6 +121568,7 @@ export namespace Prisma {
     primaryTenant?: XOR<TenantNullableScalarRelationFilter, TenantWhereInput> | null
     ownedTenants?: TenantListRelationFilter
     series?: SeriesListRelationFilter
+    serviceTokens?: ServiceTokenListRelationFilter
     browserExtensionTokens?: BrowserExtensionTokenListRelationFilter
     browserExtensionInstalls?: BrowserExtensionInstallListRelationFilter
     bookmarkSyncConnections?: BookmarkSyncConnectionListRelationFilter
@@ -121384,6 +122669,91 @@ export namespace Prisma {
     token?: StringWithAggregatesFilter<"Session"> | string
     expiresAt?: DateTimeWithAggregatesFilter<"Session"> | Date | string
     createdAt?: DateTimeWithAggregatesFilter<"Session"> | Date | string
+  }
+
+  export type ServiceTokenWhereInput = {
+    AND?: ServiceTokenWhereInput | ServiceTokenWhereInput[]
+    OR?: ServiceTokenWhereInput[]
+    NOT?: ServiceTokenWhereInput | ServiceTokenWhereInput[]
+    id?: UuidFilter<"ServiceToken"> | string
+    userId?: UuidFilter<"ServiceToken"> | string
+    name?: StringFilter<"ServiceToken"> | string
+    tokenHash?: StringFilter<"ServiceToken"> | string
+    tokenPrefix?: StringFilter<"ServiceToken"> | string
+    scopes?: StringNullableListFilter<"ServiceToken">
+    lastUsedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    expiresAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    createdAt?: DateTimeFilter<"ServiceToken"> | Date | string
+    updatedAt?: DateTimeFilter<"ServiceToken"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }
+
+  export type ServiceTokenOrderByWithRelationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    name?: SortOrder
+    tokenHash?: SortOrder
+    tokenPrefix?: SortOrder
+    scopes?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    user?: UserOrderByWithRelationInput
+  }
+
+  export type ServiceTokenWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    tokenHash?: string
+    AND?: ServiceTokenWhereInput | ServiceTokenWhereInput[]
+    OR?: ServiceTokenWhereInput[]
+    NOT?: ServiceTokenWhereInput | ServiceTokenWhereInput[]
+    userId?: UuidFilter<"ServiceToken"> | string
+    name?: StringFilter<"ServiceToken"> | string
+    tokenPrefix?: StringFilter<"ServiceToken"> | string
+    scopes?: StringNullableListFilter<"ServiceToken">
+    lastUsedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    expiresAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    createdAt?: DateTimeFilter<"ServiceToken"> | Date | string
+    updatedAt?: DateTimeFilter<"ServiceToken"> | Date | string
+    user?: XOR<UserScalarRelationFilter, UserWhereInput>
+  }, "id" | "tokenHash">
+
+  export type ServiceTokenOrderByWithAggregationInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    name?: SortOrder
+    tokenHash?: SortOrder
+    tokenPrefix?: SortOrder
+    scopes?: SortOrder
+    lastUsedAt?: SortOrderInput | SortOrder
+    expiresAt?: SortOrderInput | SortOrder
+    revokedAt?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: ServiceTokenCountOrderByAggregateInput
+    _max?: ServiceTokenMaxOrderByAggregateInput
+    _min?: ServiceTokenMinOrderByAggregateInput
+  }
+
+  export type ServiceTokenScalarWhereWithAggregatesInput = {
+    AND?: ServiceTokenScalarWhereWithAggregatesInput | ServiceTokenScalarWhereWithAggregatesInput[]
+    OR?: ServiceTokenScalarWhereWithAggregatesInput[]
+    NOT?: ServiceTokenScalarWhereWithAggregatesInput | ServiceTokenScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"ServiceToken"> | string
+    userId?: UuidWithAggregatesFilter<"ServiceToken"> | string
+    name?: StringWithAggregatesFilter<"ServiceToken"> | string
+    tokenHash?: StringWithAggregatesFilter<"ServiceToken"> | string
+    tokenPrefix?: StringWithAggregatesFilter<"ServiceToken"> | string
+    scopes?: StringNullableListFilter<"ServiceToken">
+    lastUsedAt?: DateTimeNullableWithAggregatesFilter<"ServiceToken"> | Date | string | null
+    expiresAt?: DateTimeNullableWithAggregatesFilter<"ServiceToken"> | Date | string | null
+    revokedAt?: DateTimeNullableWithAggregatesFilter<"ServiceToken"> | Date | string | null
+    createdAt?: DateTimeWithAggregatesFilter<"ServiceToken"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"ServiceToken"> | Date | string
   }
 
   export type BrowserExtensionTokenWhereInput = {
@@ -128163,6 +129533,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -128240,6 +129611,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -128317,6 +129689,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -128394,6 +129767,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -129559,6 +130933,103 @@ export namespace Prisma {
     token?: StringFieldUpdateOperationsInput | string
     expiresAt?: DateTimeFieldUpdateOperationsInput | Date | string
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenCreateInput = {
+    id?: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    user: UserCreateNestedOneWithoutServiceTokensInput
+  }
+
+  export type ServiceTokenUncheckedCreateInput = {
+    id?: string
+    userId: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ServiceTokenUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    user?: UserUpdateOneRequiredWithoutServiceTokensNestedInput
+  }
+
+  export type ServiceTokenUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenCreateManyInput = {
+    id?: string
+    userId: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ServiceTokenUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    userId?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
 
   export type BrowserExtensionTokenCreateInput = {
@@ -136875,6 +138346,12 @@ export namespace Prisma {
     none?: SeriesWhereInput
   }
 
+  export type ServiceTokenListRelationFilter = {
+    every?: ServiceTokenWhereInput
+    some?: ServiceTokenWhereInput
+    none?: ServiceTokenWhereInput
+  }
+
   export type BrowserExtensionTokenListRelationFilter = {
     every?: BrowserExtensionTokenWhereInput
     some?: BrowserExtensionTokenWhereInput
@@ -137048,6 +138525,10 @@ export namespace Prisma {
   }
 
   export type SeriesOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ServiceTokenOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -137803,6 +139284,46 @@ export namespace Prisma {
     token?: SortOrder
     expiresAt?: SortOrder
     createdAt?: SortOrder
+  }
+
+  export type ServiceTokenCountOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    name?: SortOrder
+    tokenHash?: SortOrder
+    tokenPrefix?: SortOrder
+    scopes?: SortOrder
+    lastUsedAt?: SortOrder
+    expiresAt?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ServiceTokenMaxOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    name?: SortOrder
+    tokenHash?: SortOrder
+    tokenPrefix?: SortOrder
+    lastUsedAt?: SortOrder
+    expiresAt?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type ServiceTokenMinOrderByAggregateInput = {
+    id?: SortOrder
+    userId?: SortOrder
+    name?: SortOrder
+    tokenHash?: SortOrder
+    tokenPrefix?: SortOrder
+    lastUsedAt?: SortOrder
+    expiresAt?: SortOrder
+    revokedAt?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
   }
 
   export type BrowserExtensionInstallNullableScalarRelationFilter = {
@@ -143188,6 +144709,13 @@ export namespace Prisma {
     connect?: SeriesWhereUniqueInput | SeriesWhereUniqueInput[]
   }
 
+  export type ServiceTokenCreateNestedManyWithoutUserInput = {
+    create?: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput> | ServiceTokenCreateWithoutUserInput[] | ServiceTokenUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ServiceTokenCreateOrConnectWithoutUserInput | ServiceTokenCreateOrConnectWithoutUserInput[]
+    createMany?: ServiceTokenCreateManyUserInputEnvelope
+    connect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+  }
+
   export type BrowserExtensionTokenCreateNestedManyWithoutUserInput = {
     create?: XOR<BrowserExtensionTokenCreateWithoutUserInput, BrowserExtensionTokenUncheckedCreateWithoutUserInput> | BrowserExtensionTokenCreateWithoutUserInput[] | BrowserExtensionTokenUncheckedCreateWithoutUserInput[]
     connectOrCreate?: BrowserExtensionTokenCreateOrConnectWithoutUserInput | BrowserExtensionTokenCreateOrConnectWithoutUserInput[]
@@ -143599,6 +145127,13 @@ export namespace Prisma {
     connectOrCreate?: SeriesCreateOrConnectWithoutOwnerInput | SeriesCreateOrConnectWithoutOwnerInput[]
     createMany?: SeriesCreateManyOwnerInputEnvelope
     connect?: SeriesWhereUniqueInput | SeriesWhereUniqueInput[]
+  }
+
+  export type ServiceTokenUncheckedCreateNestedManyWithoutUserInput = {
+    create?: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput> | ServiceTokenCreateWithoutUserInput[] | ServiceTokenUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ServiceTokenCreateOrConnectWithoutUserInput | ServiceTokenCreateOrConnectWithoutUserInput[]
+    createMany?: ServiceTokenCreateManyUserInputEnvelope
+    connect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
   }
 
   export type BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput = {
@@ -144313,6 +145848,20 @@ export namespace Prisma {
     update?: SeriesUpdateWithWhereUniqueWithoutOwnerInput | SeriesUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: SeriesUpdateManyWithWhereWithoutOwnerInput | SeriesUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: SeriesScalarWhereInput | SeriesScalarWhereInput[]
+  }
+
+  export type ServiceTokenUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput> | ServiceTokenCreateWithoutUserInput[] | ServiceTokenUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ServiceTokenCreateOrConnectWithoutUserInput | ServiceTokenCreateOrConnectWithoutUserInput[]
+    upsert?: ServiceTokenUpsertWithWhereUniqueWithoutUserInput | ServiceTokenUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ServiceTokenCreateManyUserInputEnvelope
+    set?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    disconnect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    delete?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    connect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    update?: ServiceTokenUpdateWithWhereUniqueWithoutUserInput | ServiceTokenUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ServiceTokenUpdateManyWithWhereWithoutUserInput | ServiceTokenUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ServiceTokenScalarWhereInput | ServiceTokenScalarWhereInput[]
   }
 
   export type BrowserExtensionTokenUpdateManyWithoutUserNestedInput = {
@@ -145139,6 +146688,20 @@ export namespace Prisma {
     update?: SeriesUpdateWithWhereUniqueWithoutOwnerInput | SeriesUpdateWithWhereUniqueWithoutOwnerInput[]
     updateMany?: SeriesUpdateManyWithWhereWithoutOwnerInput | SeriesUpdateManyWithWhereWithoutOwnerInput[]
     deleteMany?: SeriesScalarWhereInput | SeriesScalarWhereInput[]
+  }
+
+  export type ServiceTokenUncheckedUpdateManyWithoutUserNestedInput = {
+    create?: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput> | ServiceTokenCreateWithoutUserInput[] | ServiceTokenUncheckedCreateWithoutUserInput[]
+    connectOrCreate?: ServiceTokenCreateOrConnectWithoutUserInput | ServiceTokenCreateOrConnectWithoutUserInput[]
+    upsert?: ServiceTokenUpsertWithWhereUniqueWithoutUserInput | ServiceTokenUpsertWithWhereUniqueWithoutUserInput[]
+    createMany?: ServiceTokenCreateManyUserInputEnvelope
+    set?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    disconnect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    delete?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    connect?: ServiceTokenWhereUniqueInput | ServiceTokenWhereUniqueInput[]
+    update?: ServiceTokenUpdateWithWhereUniqueWithoutUserInput | ServiceTokenUpdateWithWhereUniqueWithoutUserInput[]
+    updateMany?: ServiceTokenUpdateManyWithWhereWithoutUserInput | ServiceTokenUpdateManyWithWhereWithoutUserInput[]
+    deleteMany?: ServiceTokenScalarWhereInput | ServiceTokenScalarWhereInput[]
   }
 
   export type BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput = {
@@ -146193,6 +147756,29 @@ export namespace Prisma {
     upsert?: UserUpsertWithoutSessionsInput
     connect?: UserWhereUniqueInput
     update?: XOR<XOR<UserUpdateToOneWithWhereWithoutSessionsInput, UserUpdateWithoutSessionsInput>, UserUncheckedUpdateWithoutSessionsInput>
+  }
+
+  export type ServiceTokenCreatescopesInput = {
+    set: string[]
+  }
+
+  export type UserCreateNestedOneWithoutServiceTokensInput = {
+    create?: XOR<UserCreateWithoutServiceTokensInput, UserUncheckedCreateWithoutServiceTokensInput>
+    connectOrCreate?: UserCreateOrConnectWithoutServiceTokensInput
+    connect?: UserWhereUniqueInput
+  }
+
+  export type ServiceTokenUpdatescopesInput = {
+    set?: string[]
+    push?: string | string[]
+  }
+
+  export type UserUpdateOneRequiredWithoutServiceTokensNestedInput = {
+    create?: XOR<UserCreateWithoutServiceTokensInput, UserUncheckedCreateWithoutServiceTokensInput>
+    connectOrCreate?: UserCreateOrConnectWithoutServiceTokensInput
+    upsert?: UserUpsertWithoutServiceTokensInput
+    connect?: UserWhereUniqueInput
+    update?: XOR<XOR<UserUpdateToOneWithWhereWithoutServiceTokensInput, UserUpdateWithoutServiceTokensInput>, UserUncheckedUpdateWithoutServiceTokensInput>
   }
 
   export type BrowserExtensionTokenCreatescopesInput = {
@@ -151284,6 +152870,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -151360,6 +152947,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -153366,6 +154954,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -153442,6 +155031,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -154653,6 +156243,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -154729,6 +156320,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -154948,6 +156540,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -155024,6 +156617,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -155233,6 +156827,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -155309,6 +156904,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -155560,6 +157156,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -155636,6 +157233,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -155808,6 +157406,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -155884,6 +157483,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -156190,6 +157790,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -156266,6 +157867,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -156630,6 +158232,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -156706,6 +158309,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -156875,6 +158479,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -156951,6 +158556,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -158067,6 +159673,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -158143,6 +159750,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -158362,6 +159970,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -158438,6 +160047,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -159866,6 +161476,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -159942,6 +161553,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -160167,6 +161779,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -160243,6 +161856,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -160319,6 +161933,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -160395,6 +162010,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -160487,6 +162103,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -160563,6 +162180,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -162321,6 +163939,42 @@ export namespace Prisma {
 
   export type SeriesCreateManyOwnerInputEnvelope = {
     data: SeriesCreateManyOwnerInput | SeriesCreateManyOwnerInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ServiceTokenCreateWithoutUserInput = {
+    id?: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ServiceTokenUncheckedCreateWithoutUserInput = {
+    id?: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type ServiceTokenCreateOrConnectWithoutUserInput = {
+    where: ServiceTokenWhereUniqueInput
+    create: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput>
+  }
+
+  export type ServiceTokenCreateManyUserInputEnvelope = {
+    data: ServiceTokenCreateManyUserInput | ServiceTokenCreateManyUserInput[]
     skipDuplicates?: boolean
   }
 
@@ -164084,6 +165738,39 @@ export namespace Prisma {
     updatedAt?: DateTimeFilter<"Series"> | Date | string
   }
 
+  export type ServiceTokenUpsertWithWhereUniqueWithoutUserInput = {
+    where: ServiceTokenWhereUniqueInput
+    update: XOR<ServiceTokenUpdateWithoutUserInput, ServiceTokenUncheckedUpdateWithoutUserInput>
+    create: XOR<ServiceTokenCreateWithoutUserInput, ServiceTokenUncheckedCreateWithoutUserInput>
+  }
+
+  export type ServiceTokenUpdateWithWhereUniqueWithoutUserInput = {
+    where: ServiceTokenWhereUniqueInput
+    data: XOR<ServiceTokenUpdateWithoutUserInput, ServiceTokenUncheckedUpdateWithoutUserInput>
+  }
+
+  export type ServiceTokenUpdateManyWithWhereWithoutUserInput = {
+    where: ServiceTokenScalarWhereInput
+    data: XOR<ServiceTokenUpdateManyMutationInput, ServiceTokenUncheckedUpdateManyWithoutUserInput>
+  }
+
+  export type ServiceTokenScalarWhereInput = {
+    AND?: ServiceTokenScalarWhereInput | ServiceTokenScalarWhereInput[]
+    OR?: ServiceTokenScalarWhereInput[]
+    NOT?: ServiceTokenScalarWhereInput | ServiceTokenScalarWhereInput[]
+    id?: UuidFilter<"ServiceToken"> | string
+    userId?: UuidFilter<"ServiceToken"> | string
+    name?: StringFilter<"ServiceToken"> | string
+    tokenHash?: StringFilter<"ServiceToken"> | string
+    tokenPrefix?: StringFilter<"ServiceToken"> | string
+    scopes?: StringNullableListFilter<"ServiceToken">
+    lastUsedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    expiresAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    revokedAt?: DateTimeNullableFilter<"ServiceToken"> | Date | string | null
+    createdAt?: DateTimeFilter<"ServiceToken"> | Date | string
+    updatedAt?: DateTimeFilter<"ServiceToken"> | Date | string
+  }
+
   export type BrowserExtensionTokenUpsertWithWhereUniqueWithoutUserInput = {
     where: BrowserExtensionTokenWhereUniqueInput
     update: XOR<BrowserExtensionTokenUpdateWithoutUserInput, BrowserExtensionTokenUncheckedUpdateWithoutUserInput>
@@ -164618,6 +166305,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -164694,6 +166382,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -164943,6 +166632,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -165019,6 +166709,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -165596,6 +167287,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -165672,6 +167364,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -165896,6 +167589,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -165972,6 +167666,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -166088,6 +167783,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -166164,6 +167860,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -166272,6 +167969,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -166348,6 +168046,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -166551,6 +168250,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -166627,6 +168327,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -166852,6 +168553,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -166928,6 +168630,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -167131,6 +168834,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -167207,6 +168911,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -167432,6 +169137,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -167508,6 +169214,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -167844,6 +169551,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -167920,6 +169628,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -168001,6 +169710,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -168077,6 +169787,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -168474,6 +170185,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -168550,6 +170262,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -168637,6 +170350,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -168713,6 +170427,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -168902,6 +170617,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -168978,6 +170694,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -169303,6 +171020,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -169379,6 +171097,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -169552,6 +171271,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -169628,6 +171348,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -169937,6 +171658,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -170013,6 +171735,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -170324,6 +172047,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -170400,6 +172124,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -170666,6 +172391,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -170742,6 +172468,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -171004,6 +172731,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -171080,6 +172808,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -171172,6 +172901,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -171218,6 +172948,331 @@ export namespace Prisma {
     contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
     conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
     chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
+    tags?: TagUncheckedUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUncheckedUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUncheckedUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUncheckedUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUncheckedUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUncheckedUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUncheckedUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUncheckedUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUncheckedUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUncheckedUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUncheckedUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUncheckedUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUncheckedUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
+    ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUncheckedUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUncheckedUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUncheckedUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUncheckedUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUncheckedUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUncheckedUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUncheckedUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUncheckedUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUncheckedUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserCreateWithoutServiceTokensInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    accounts?: AccountCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogCreateNestedManyWithoutUserInput
+    categories?: CategoryCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextCreateNestedManyWithoutOwnerInput
+    sessions?: SessionCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigCreateNestedManyWithoutUserInput
+    tags?: TagCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateCreateNestedManyWithoutUserInput
+    snippets?: SnippetCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
+    primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
+    ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    series?: SeriesCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
+    webResources?: WebResourceCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserUncheckedCreateWithoutServiceTokensInput = {
+    id?: string
+    username: string
+    passwordHash?: string | null
+    email: string
+    role?: $Enums.UserRole
+    canClaimCustomHosts?: boolean
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: number
+    fsrsMaxInterval?: number
+    defaultFlashcardDeckId?: string | null
+    primaryTenantId?: string | null
+    accounts?: AccountUncheckedCreateNestedManyWithoutUserInput
+    aiConnections?: AIConnectionUncheckedCreateNestedManyWithoutOwnerInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedCreateNestedManyWithoutOwnerInput
+    auditTargets?: AuditLogUncheckedCreateNestedManyWithoutTargetUserInput
+    adminActions?: AuditLogUncheckedCreateNestedManyWithoutUserInput
+    categories?: CategoryUncheckedCreateNestedManyWithoutOwnerInput
+    contentHistory?: ContentHistoryUncheckedCreateNestedManyWithoutUserInput
+    contentNodes?: ContentNodeUncheckedCreateNestedManyWithoutOwnerInput
+    conversations?: ConversationUncheckedCreateNestedManyWithoutOwnerInput
+    chatContexts?: ChatContextUncheckedCreateNestedManyWithoutOwnerInput
+    sessions?: SessionUncheckedCreateNestedManyWithoutUserInput
+    storageConfigs?: StorageProviderConfigUncheckedCreateNestedManyWithoutUserInput
+    tags?: TagUncheckedCreateNestedManyWithoutUserInput
+    trashedContent?: TrashBinUncheckedCreateNestedManyWithoutDeletedByUserInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutUserInput
+    peopleGroups?: PeopleGroupUncheckedCreateNestedManyWithoutOwnerInput
+    peopleDefaultGroups?: PeopleGroupUncheckedCreateNestedManyWithoutDefaultForOwnerInput
+    people?: PersonUncheckedCreateNestedManyWithoutOwnerInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutOwnerInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutOwnerInput
+    reusableCategories?: ReusableCategoryUncheckedCreateNestedManyWithoutUserInput
+    savedBlocks?: SavedBlockUncheckedCreateNestedManyWithoutUserInput
+    contentTemplates?: ContentTemplateUncheckedCreateNestedManyWithoutUserInput
+    snippets?: SnippetUncheckedCreateNestedManyWithoutUserInput
+    pageTemplates?: PageTemplateUncheckedCreateNestedManyWithoutUserInput
+    calendarConnections?: CalendarConnectionUncheckedCreateNestedManyWithoutUserInput
+    calendarSources?: CalendarSourceUncheckedCreateNestedManyWithoutUserInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutUserInput
+    contentWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutOwnerInput
+    collaborationDocuments?: CollaborationDocumentUncheckedCreateNestedManyWithoutOwnerInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutOwnerInput
+    flashcards?: FlashcardUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUncheckedCreateNestedManyWithoutOwnerInput
+    flashcardDecks?: FlashcardDeckUncheckedCreateNestedManyWithoutOwnerInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutOwnerInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutOwnerInput
+    publicItemRevisions?: PublicItemRevisionUncheckedCreateNestedManyWithoutAuthorInput
+    previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
+    ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
+    browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
+    webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
+    webResourceContentLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutUserInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutUserInput
+    connectionInvitesSent?: ConnectionInviteUncheckedCreateNestedManyWithoutInviterInput
+    connectionInvitesReceived?: ConnectionInviteUncheckedCreateNestedManyWithoutInviteeInput
+    connectionsAsA?: UserConnectionUncheckedCreateNestedManyWithoutUserAInput
+    connectionsAsB?: UserConnectionUncheckedCreateNestedManyWithoutUserBInput
+    blocksIssued?: UserBlockUncheckedCreateNestedManyWithoutBlockerInput
+    blocksReceived?: UserBlockUncheckedCreateNestedManyWithoutBlockedInput
+    activityEventsActed?: ActivityEventUncheckedCreateNestedManyWithoutActorInput
+    notificationInbox?: NotificationRecipientUncheckedCreateNestedManyWithoutUserInput
+    dmParticipations?: DmParticipantUncheckedCreateNestedManyWithoutUserInput
+    dmMessagesSent?: DmMessageUncheckedCreateNestedManyWithoutSenderInput
+    workflowDefinitions?: WorkflowDefinitionUncheckedCreateNestedManyWithoutOwnerInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutOwnerInput
+  }
+
+  export type UserCreateOrConnectWithoutServiceTokensInput = {
+    where: UserWhereUniqueInput
+    create: XOR<UserCreateWithoutServiceTokensInput, UserUncheckedCreateWithoutServiceTokensInput>
+  }
+
+  export type UserUpsertWithoutServiceTokensInput = {
+    update: XOR<UserUpdateWithoutServiceTokensInput, UserUncheckedUpdateWithoutServiceTokensInput>
+    create: XOR<UserCreateWithoutServiceTokensInput, UserUncheckedCreateWithoutServiceTokensInput>
+    where?: UserWhereInput
+  }
+
+  export type UserUpdateToOneWithWhereWithoutServiceTokensInput = {
+    where?: UserWhereInput
+    data: XOR<UserUpdateWithoutServiceTokensInput, UserUncheckedUpdateWithoutServiceTokensInput>
+  }
+
+  export type UserUpdateWithoutServiceTokensInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUpdateManyWithoutUserNestedInput
+    categories?: CategoryUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUpdateManyWithoutUserNestedInput
+    storageConfigs?: StorageProviderConfigUpdateManyWithoutUserNestedInput
+    tags?: TagUpdateManyWithoutUserNestedInput
+    trashedContent?: TrashBinUpdateManyWithoutDeletedByUserNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutUserNestedInput
+    peopleGroups?: PeopleGroupUpdateManyWithoutOwnerNestedInput
+    peopleDefaultGroups?: PeopleGroupUpdateManyWithoutDefaultForOwnerNestedInput
+    people?: PersonUpdateManyWithoutOwnerNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutOwnerNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutOwnerNestedInput
+    reusableCategories?: ReusableCategoryUpdateManyWithoutUserNestedInput
+    savedBlocks?: SavedBlockUpdateManyWithoutUserNestedInput
+    contentTemplates?: ContentTemplateUpdateManyWithoutUserNestedInput
+    snippets?: SnippetUpdateManyWithoutUserNestedInput
+    pageTemplates?: PageTemplateUpdateManyWithoutUserNestedInput
+    calendarConnections?: CalendarConnectionUpdateManyWithoutUserNestedInput
+    calendarSources?: CalendarSourceUpdateManyWithoutUserNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutUserNestedInput
+    contentWorkspaces?: ContentWorkspaceUpdateManyWithoutOwnerNestedInput
+    collaborationDocuments?: CollaborationDocumentUpdateManyWithoutOwnerNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutOwnerNestedInput
+    flashcards?: FlashcardUpdateManyWithoutOwnerNestedInput
+    flashcardReviewAttempts?: FlashcardReviewAttemptUpdateManyWithoutOwnerNestedInput
+    flashcardDecks?: FlashcardDeckUpdateManyWithoutOwnerNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutOwnerNestedInput
+    publicItems?: PublicItemUpdateManyWithoutOwnerNestedInput
+    publicItemRevisions?: PublicItemRevisionUpdateManyWithoutAuthorNestedInput
+    previewTokens?: PreviewTokenUpdateManyWithoutCreatorNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
+    primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
+    ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    series?: SeriesUpdateManyWithoutOwnerNestedInput
+    browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
+    browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
+    bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
+    webResources?: WebResourceUpdateManyWithoutUserNestedInput
+    webResourceContentLinks?: WebResourceContentLinkUpdateManyWithoutUserNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutUserNestedInput
+    connectionInvitesSent?: ConnectionInviteUpdateManyWithoutInviterNestedInput
+    connectionInvitesReceived?: ConnectionInviteUpdateManyWithoutInviteeNestedInput
+    connectionsAsA?: UserConnectionUpdateManyWithoutUserANestedInput
+    connectionsAsB?: UserConnectionUpdateManyWithoutUserBNestedInput
+    blocksIssued?: UserBlockUpdateManyWithoutBlockerNestedInput
+    blocksReceived?: UserBlockUpdateManyWithoutBlockedNestedInput
+    activityEventsActed?: ActivityEventUpdateManyWithoutActorNestedInput
+    notificationInbox?: NotificationRecipientUpdateManyWithoutUserNestedInput
+    dmParticipations?: DmParticipantUpdateManyWithoutUserNestedInput
+    dmMessagesSent?: DmMessageUpdateManyWithoutSenderNestedInput
+    workflowDefinitions?: WorkflowDefinitionUpdateManyWithoutOwnerNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutOwnerNestedInput
+  }
+
+  export type UserUncheckedUpdateWithoutServiceTokensInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    username?: StringFieldUpdateOperationsInput | string
+    passwordHash?: NullableStringFieldUpdateOperationsInput | string | null
+    email?: StringFieldUpdateOperationsInput | string
+    role?: EnumUserRoleFieldUpdateOperationsInput | $Enums.UserRole
+    canClaimCustomHosts?: BoolFieldUpdateOperationsInput | boolean
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    settings?: NullableJsonNullValueInput | InputJsonValue
+    settingsVersion?: IntFieldUpdateOperationsInput | number
+    fsrsParameters?: JsonNullValueInput | InputJsonValue
+    desiredRetention?: FloatFieldUpdateOperationsInput | number
+    fsrsMaxInterval?: IntFieldUpdateOperationsInput | number
+    defaultFlashcardDeckId?: NullableStringFieldUpdateOperationsInput | string | null
+    primaryTenantId?: NullableStringFieldUpdateOperationsInput | string | null
+    accounts?: AccountUncheckedUpdateManyWithoutUserNestedInput
+    aiConnections?: AIConnectionUncheckedUpdateManyWithoutOwnerNestedInput
+    aiFeatureRoutes?: AIFeatureRouteUncheckedUpdateManyWithoutOwnerNestedInput
+    auditTargets?: AuditLogUncheckedUpdateManyWithoutTargetUserNestedInput
+    adminActions?: AuditLogUncheckedUpdateManyWithoutUserNestedInput
+    categories?: CategoryUncheckedUpdateManyWithoutOwnerNestedInput
+    contentHistory?: ContentHistoryUncheckedUpdateManyWithoutUserNestedInput
+    contentNodes?: ContentNodeUncheckedUpdateManyWithoutOwnerNestedInput
+    conversations?: ConversationUncheckedUpdateManyWithoutOwnerNestedInput
+    chatContexts?: ChatContextUncheckedUpdateManyWithoutOwnerNestedInput
+    sessions?: SessionUncheckedUpdateManyWithoutUserNestedInput
     storageConfigs?: StorageProviderConfigUncheckedUpdateManyWithoutUserNestedInput
     tags?: TagUncheckedUpdateManyWithoutUserNestedInput
     trashedContent?: TrashBinUncheckedUpdateManyWithoutDeletedByUserNestedInput
@@ -171325,6 +173380,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
     webResources?: WebResourceCreateNestedManyWithoutUserInput
@@ -171401,6 +173457,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
@@ -171582,6 +173639,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
@@ -171658,6 +173716,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
@@ -171801,6 +173860,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
     webResources?: WebResourceCreateNestedManyWithoutUserInput
@@ -171877,6 +173937,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
@@ -172084,6 +174145,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
@@ -172160,6 +174222,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
@@ -172322,6 +174385,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     webResources?: WebResourceCreateNestedManyWithoutUserInput
@@ -172398,6 +174462,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     webResources?: WebResourceUncheckedCreateNestedManyWithoutUserInput
@@ -172716,6 +174781,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUpdateManyWithoutUserNestedInput
@@ -172792,6 +174858,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     webResources?: WebResourceUncheckedUpdateManyWithoutUserNestedInput
@@ -173598,6 +175665,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -173674,6 +175742,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -173904,6 +175973,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -173980,6 +176050,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -174132,6 +176203,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -174208,6 +176280,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -174466,6 +176539,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -174542,6 +176616,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -174796,6 +176871,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -174872,6 +176948,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -175175,6 +177252,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -175251,6 +177329,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -175555,6 +177634,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -175631,6 +177711,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -175723,6 +177804,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -175799,6 +177881,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -176002,6 +178085,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -176078,6 +178162,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -176159,6 +178244,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -176235,6 +178321,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -176460,6 +178547,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -176536,6 +178624,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -176623,6 +178712,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -176699,6 +178789,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -177639,6 +179730,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -177715,6 +179807,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -178073,6 +180166,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -178149,6 +180243,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -178454,6 +180549,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -178530,6 +180626,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -178658,6 +180755,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -178734,6 +180832,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -179348,6 +181447,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -179424,6 +181524,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -179546,6 +181647,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -179622,6 +181724,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -179714,6 +181817,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -179790,6 +181894,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -179923,6 +182028,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -179999,6 +182105,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -181162,6 +183269,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -181238,6 +183346,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -181563,6 +183672,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -181639,6 +183749,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -181875,6 +183986,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -181951,6 +184063,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -182086,6 +184199,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -182162,6 +184276,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -182275,6 +184390,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -182351,6 +184467,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -182486,6 +184603,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -182562,6 +184680,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -182675,6 +184794,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -182751,6 +184871,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -182886,6 +185007,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -182962,6 +185084,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -183075,6 +185198,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -183151,6 +185275,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -183286,6 +185411,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -183362,6 +185488,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -183438,6 +185565,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -183514,6 +185642,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -183654,6 +185783,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -183730,6 +185860,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -183822,6 +185953,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -183898,6 +186030,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -184083,6 +186216,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -184159,6 +186293,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -184292,6 +186427,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -184368,6 +186504,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -184656,6 +186793,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -184732,6 +186870,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -185130,6 +187269,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -185206,6 +187346,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -185469,6 +187610,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -185545,6 +187687,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -185642,6 +187785,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -185718,6 +187862,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -185983,6 +188128,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -186059,6 +188205,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -186379,6 +188526,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -186455,6 +188603,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -186663,6 +188812,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutOwnerInput
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -186739,6 +188889,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -186911,6 +189062,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -186987,6 +189139,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -187079,6 +189232,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -187155,6 +189309,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -187826,6 +189981,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -187902,6 +190058,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -188644,6 +190801,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -188720,6 +190878,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -189043,6 +191202,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -189119,6 +191279,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -189357,6 +191518,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -189433,6 +191595,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedCreateNestedManyWithoutCreatorInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -189672,6 +191835,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -189748,6 +191912,7 @@ export namespace Prisma {
     previewTokens?: PreviewTokenUncheckedUpdateManyWithoutCreatorNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -190064,6 +192229,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -190140,6 +192306,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -190313,6 +192480,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -190389,6 +192557,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -191558,6 +193727,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -191634,6 +193804,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -191715,6 +193886,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -191791,6 +193963,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -191883,6 +194056,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -191959,6 +194133,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -192046,6 +194221,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -192122,6 +194298,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -192198,6 +194375,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -192274,6 +194452,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -192355,6 +194534,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -192431,6 +194611,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -192523,6 +194704,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -192599,6 +194781,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -192686,6 +194869,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -192762,6 +194946,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -192838,6 +195023,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -192914,6 +195100,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -192995,6 +195182,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -193071,6 +195259,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -193163,6 +195352,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -193239,6 +195429,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -193326,6 +195517,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -193402,6 +195594,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -193478,6 +195671,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -193554,6 +195748,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -193676,6 +195871,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -193752,6 +195948,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -193873,6 +196070,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -193949,6 +196147,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -194076,6 +196275,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -194152,6 +196352,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -194339,6 +196540,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -194415,6 +196617,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -194536,6 +196739,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -194612,6 +196816,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -194711,6 +196916,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -194787,6 +196993,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -194908,6 +197115,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -194984,6 +197192,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -195060,6 +197269,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -195136,6 +197346,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -195278,6 +197489,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -195354,6 +197566,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -195446,6 +197659,7 @@ export namespace Prisma {
     primaryTenant?: TenantCreateNestedOneWithoutPrimaryForUsersInput
     ownedTenants?: TenantCreateNestedManyWithoutOwnerInput
     series?: SeriesCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionCreateNestedManyWithoutUserInput
@@ -195522,6 +197736,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutOwnerInput
     ownedTenants?: TenantUncheckedCreateNestedManyWithoutOwnerInput
     series?: SeriesUncheckedCreateNestedManyWithoutOwnerInput
+    serviceTokens?: ServiceTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedCreateNestedManyWithoutUserInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedCreateNestedManyWithoutUserInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutUserInput
@@ -195732,6 +197947,7 @@ export namespace Prisma {
     primaryTenant?: TenantUpdateOneWithoutPrimaryForUsersNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -195808,6 +198024,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
@@ -198710,6 +200927,19 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type ServiceTokenCreateManyUserInput = {
+    id?: string
+    name: string
+    tokenHash: string
+    tokenPrefix: string
+    scopes?: ServiceTokenCreatescopesInput | string[]
+    lastUsedAt?: Date | string | null
+    expiresAt?: Date | string | null
+    revokedAt?: Date | string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type BrowserExtensionTokenCreateManyUserInput = {
     id?: string
     name: string
@@ -200776,6 +203006,45 @@ export namespace Prisma {
     description?: NullableStringFieldUpdateOperationsInput | string | null
     heroImageUrl?: NullableStringFieldUpdateOperationsInput | string | null
     displayOrder?: IntFieldUpdateOperationsInput | number
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenUncheckedUpdateWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ServiceTokenUncheckedUpdateManyWithoutUserInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    name?: StringFieldUpdateOperationsInput | string
+    tokenHash?: StringFieldUpdateOperationsInput | string
+    tokenPrefix?: StringFieldUpdateOperationsInput | string
+    scopes?: ServiceTokenUpdatescopesInput | string[]
+    lastUsedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    revokedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -203888,6 +206157,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUpdateManyWithoutOwnerNestedInput
     series?: SeriesUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUpdateManyWithoutUserNestedInput
@@ -203964,6 +206234,7 @@ export namespace Prisma {
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutOwnerNestedInput
     ownedTenants?: TenantUncheckedUpdateManyWithoutOwnerNestedInput
     series?: SeriesUncheckedUpdateManyWithoutOwnerNestedInput
+    serviceTokens?: ServiceTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionTokens?: BrowserExtensionTokenUncheckedUpdateManyWithoutUserNestedInput
     browserExtensionInstalls?: BrowserExtensionInstallUncheckedUpdateManyWithoutUserNestedInput
     bookmarkSyncConnections?: BookmarkSyncConnectionUncheckedUpdateManyWithoutUserNestedInput
