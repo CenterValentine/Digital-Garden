@@ -183,6 +183,7 @@ model ContentNode {
   webResourceViewStates WebResourceViewState[]
   workflowRunArtifacts WorkflowRunArtifact[]
   agenticMetadata      AgenticMetadata?
+  studioSourceSelections StudioSourceSelection[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -568,6 +569,7 @@ model User {
   webResources         WebResource[]
   webResourceContentLinks WebResourceContentLink[]
   webResourceViewStates WebResourceViewState[]
+  studioSourceSelections StudioSourceSelection[]
 
   connectionInvitesSent     ConnectionInvite[]      @relation("ConnectionInvitesSent")
   connectionInvitesReceived ConnectionInvite[]      @relation("ConnectionInvitesReceived")
@@ -2272,4 +2274,22 @@ model AgenticMetadata {
   generatedAt       DateTime?   @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
   node              ContentNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+}
+
+// Folder Studio: per-folder source selection for grounded chat (Phase 3).
+// Per-folder (not per-conversation) by design in v1 — one curated source set
+// per folder; conversation-level overrides are a later refinement.
+model StudioSourceSelection {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String   @db.Uuid
+  folderId        String   @db.Uuid
+  // Leaf node ids explicitly included (folder tri-state derives client-side)
+  includedNodeIds Json     @default("[]")
+  excludedNodeIds Json     @default("[]")
+  tokenBudget     Int      @default(64000)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+  owner  User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder ContentNode @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, folderId])
 }

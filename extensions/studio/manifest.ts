@@ -11,10 +11,10 @@ export const STUDIO_CONTEXT_TAB_KEY = "context";
 /**
  * Folder Studio — folders as agentic hubs.
  *
- * Phase 0 ships the scaffold only: no nav items, no surfaces mounted, and
- * `enabledByDefault: false`. Later phases add the sidebar-tab tool definitions
- * and settings entry (Phase 1/2), then flip the default on at the end of
- * Phase 3. See docs/notes-feature/work-tracking/FOLDER-STUDIO-PLAN.md.
+ * Enabled by default since the end of Phase 3 (grounded folder chat works).
+ * Sidebar tabs mount via the Tool Surfaces registry (studio-tab/context-tab)
+ * and are filtered out of the right sidebar when this extension is disabled.
+ * See docs/notes-feature/work-tracking/FOLDER-STUDIO-PLAN.md.
  */
 export const studioExtensionManifest: ExtensionManifest = {
   id: STUDIO_EXTENSION_ID,
@@ -24,7 +24,7 @@ export const studioExtensionManifest: ExtensionManifest = {
     "generate reports, flashcards, maps, audio and more, and maintain per-note " +
     "context for the AI.",
   iconName: "Sparkles",
-  enabledByDefault: false,
+  enabledByDefault: true,
   canDisable: true,
   navItems: [],
   surfaces: [],
