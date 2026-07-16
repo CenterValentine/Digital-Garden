@@ -104,7 +104,10 @@ The foundation the extension consumes. Build and freeze first.
 
 **Gate:** ✅ **SMOKE PASSED 2026-07-16** (user-verified from portal.telnyx.com): chooser listed all 9 workflows, dispatch acknowledged in popup, pill tracked *Workflow II* → green **Completed**. P0's owed embed check ALSO passed — the overlay opened the workflow as a content panel rendering `EmbedWorkflowClient` (Runs/Edit tabs + real builder), not the fallback. Setup lessons recorded: Chrome loads the unpacked extension per-absolute-path (worktree ≠ main checkout → re-pair under new extension ID); Chrome 150 local-network-access prompt must be **Allowed** for https-page → localhost embeds. Remaining nit: verify the "Capture — …" note carries pageText (user to eyeball).
 
-### Phase 2 — Ambient status (background + popup)
+### Phase 2 — Ambient status (background + popup) ✅ CODE COMPLETE 2026-07-16 (smoke pending)
+Built (commit 2727ee3): global badge with frozen precedence (failed `!` red, 30-min decay → waiting `!` amber → running `●` blue → succeeded `✓` green ~10s decay → clear); 1-min `dg-workflow-badge` alarm + immediate refresh on dispatch and on pill-poll status transitions; per-tab bookmark dot yields to urgent states; popup **Recent Runs** (needs-review pinned, live dots, relative age, tap → overlay deep panel via `open-content-in-active-tab`); runs DTO + `workflowNodeId`. Smoke: reload extension → dispatch → badge turns blue then green ✓ for ~10s–1min; popup shows the run; tapping opens the overlay workflow panel.
+
+#### Original scope (for reference)
 - [ ] Background: `dg-workflow-poll` alarm (~60s baseline; tighter on-demand cadence while a dispatch from this browser is active) → bearer runs list → compute most-urgent state → `setBadgeText`/`setBadgeBackgroundColor`; cache runs in `chrome.storage`.
 - [ ] Popup: **Runs section** below the chooser — recent runs, status pills (reuse the app's `STATUS_STYLES` palette for consistency), `needsReview` flag pinned to top, tap → open deep. Empty/error/no-connection states.
 
