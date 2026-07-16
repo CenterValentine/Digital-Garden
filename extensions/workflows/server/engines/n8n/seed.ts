@@ -34,7 +34,11 @@ function credentials(opts: SeedOptions) {
 }
 
 function callbackUrl(opts: SeedOptions, action: string): string {
-  return `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${TRIGGER_NAME}').item.json.runId }}/${action}`;
+  // n8n's Webhook node nests the POST body under `.body`, so the runId DG posts
+  // to the webhook lives at `$json.body.runId` (not `$json.runId`). Reading it
+  // without `.body` yields undefined → the callback URL becomes `/runs//<action>`
+  // → 404 → the run strands at "running".
+  return `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${TRIGGER_NAME}').item.json.body.runId }}/${action}`;
 }
 
 export function buildSeedWorkflow(opts: SeedOptions): N8nWorkflow {

@@ -50,9 +50,10 @@ function buildRefMap(
   triggerId: string
 ): Map<string, OutputRef> {
   const map = new Map<string, OutputRef>();
-  // input.* comes from the trigger webhook body: { runId, input }.
+  // input.* comes from the trigger webhook body: { runId, input }. n8n's Webhook
+  // node nests the POST body under `.body`, so it lives at `$json.body.input`.
   map.set("input", {
-    expr: (rest) => `$('${triggerId}').item.json.input${rest}`,
+    expr: (rest) => `$('${triggerId}').item.json.body.input${rest}`,
   });
   for (const node of graph.nodes) {
     if (node.id === triggerId) continue;
@@ -123,7 +124,8 @@ function callbackUrl(
   triggerId: string,
   action: string
 ): string {
-  return `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${triggerId}').item.json.runId }}/${action}`;
+  // Webhook body is nested under `.body` (see buildRefMap); read runId there.
+  return `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${triggerId}').item.json.body.runId }}/${action}`;
 }
 
 function httpAuthParams() {
