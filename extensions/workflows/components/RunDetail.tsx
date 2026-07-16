@@ -315,18 +315,30 @@ export function RunDetail({
     }
   }, [runId, load]);
 
-  // Retry = re-dispatch with the FAILED run's input.data (captureNodeId and
-  // all) — the user may have left the captured page, so the stored capture is
-  // the only faithful input. Never re-captures.
+  // Retry = re-dispatch with the FAILED run's original data (captureNodeId
+  // and all) — the user may have left the captured page, so the stored
+  // capture is the only faithful input. Never re-captures. The workflow node
+  // id comes from the definition slug ("content:{id}") — present for EVERY
+  // content run regardless of engine, unlike input.workflowNodeId which only
+  // wdk-interpreter runs carry (n8n runs store the data object directly).
   const input = (run?.input ?? {}) as Record<string, unknown>;
-  const retryWorkflowNodeId =
-    typeof input.workflowNodeId === "string" ? input.workflowNodeId : null;
+  const definitionSlug = run?.definition.slug ?? "";
+  const retryWorkflowNodeId = definitionSlug.startsWith("content:")
+    ? definitionSlug.slice("content:".length)
+    : null;
   const retry = useCallback(async () => {
     if (!retryWorkflowNodeId) return;
     setRetrying(true);
     try {
+      // wdk runs snapshot { graph, data, workflowNodeId }; n8n runs store the
+      // dispatch data directly. Either way, re-send only the trigger data.
       const data =
-        typeof input.data === "object" && input.data !== null ? input.data : {};
+        typeof input.data === "object" && input.data !== null
+          ? input.data
+          : (() => {
+              const { graph: _graph, workflowNodeId: _nodeId, ...rest } = input;
+              return rest;
+            })();
       const response = await fetch(
         `/api/workflows/content/${retryWorkflowNodeId}/dispatch`,
         {
