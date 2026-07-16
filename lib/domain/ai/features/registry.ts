@@ -155,6 +155,17 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       modelId: "claude-haiku-3-5",
     },
   },
+  {
+    id: "studio-generation",
+    label: "Studio Artifact Generation",
+    description:
+      "Powers Folder Studio background jobs (infographics, audio scripts, slide outlines). Artifact quality tracks model capability — prefer a strong model.",
+    requiredCapabilities: ["text"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-sonnet-4",
+    },
+  },
 ];
 
 export const FEATURE_BY_ID: Record<string, FeatureSpec> = Object.fromEntries(

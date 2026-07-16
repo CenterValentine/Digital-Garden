@@ -22,6 +22,7 @@ export interface SourceRowDto {
   truncated: boolean;
   warning?: string;
   hasContext: boolean;
+  genLocked: boolean;
 }
 
 export interface SelectionStateDto {

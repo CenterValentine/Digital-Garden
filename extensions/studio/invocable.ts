@@ -13,6 +13,17 @@ export const CHAT_INVOCABLE_TOOL_IDS = [
   "flashcards",
 ] as const;
 
+/** Job tools whose executor is registered in server/runs.ts. */
+export const JOB_INVOCABLE_TOOL_IDS = ["infographic"] as const;
+
 export function isChatInvocable(toolId: string): boolean {
   return (CHAT_INVOCABLE_TOOL_IDS as readonly string[]).includes(toolId);
+}
+
+export function isJobInvocable(toolId: string): boolean {
+  return (JOB_INVOCABLE_TOOL_IDS as readonly string[]).includes(toolId);
+}
+
+export function isInvocable(toolId: string): boolean {
+  return isChatInvocable(toolId) || isJobInvocable(toolId);
 }

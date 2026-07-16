@@ -49,7 +49,7 @@ export function SourcePicker({ folderId }: SourcePickerProps) {
       const leaves: string[] = [];
       for (const child of childrenByParent.get(id) ?? []) {
         if (child.contentType === "folder") leaves.push(...collect(child.id));
-        else if (!child.empty) leaves.push(child.id);
+        else if (!child.empty && !child.genLocked) leaves.push(child.id);
       }
       map.set(id, leaves);
       return leaves;
@@ -185,7 +185,7 @@ export function SourcePicker({ folderId }: SourcePickerProps) {
                     : included.has(row.id)
                       ? "checked"
                       : "unchecked";
-                  const disabled = !isFolder && row.empty;
+                  const disabled = !isFolder && (row.empty || row.genLocked);
 
                   return (
                     <li key={row.id}>
@@ -199,7 +199,11 @@ export function SourcePicker({ folderId }: SourcePickerProps) {
                               : toggleLeaf(row)
                         }
                         disabled={disabled}
-                        title={row.warning}
+                        title={
+                          row.genLocked
+                            ? "Studio-generated and unedited — locked out of sources to keep the AI from summarizing itself. Edit it to make it eligible."
+                            : row.warning
+                        }
                         className={`flex min-h-[44px] w-full items-center gap-2 rounded-md px-1.5 text-left ${
                           disabled
                             ? "cursor-default opacity-50"
@@ -234,7 +238,12 @@ export function SourcePicker({ folderId }: SourcePickerProps) {
                           )}
                         </span>
 
-                        {row.empty && !isFolder && (
+                        {row.genLocked && !isFolder && (
+                          <span className="shrink-0 rounded-full border border-gold-primary/30 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-gold-primary/80">
+                            Gen
+                          </span>
+                        )}
+                        {row.empty && !row.genLocked && !isFolder && (
                           <span className="shrink-0 rounded-full border border-black/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-gray-400 dark:border-white/15 dark:text-gray-500">
                             No text
                           </span>

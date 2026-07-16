@@ -183,6 +183,7 @@ model ContentNode {
   workflowRunArtifacts         WorkflowRunArtifact[]
   agenticMetadata              AgenticMetadata?
   studioSourceSelections       StudioSourceSelection[]
+  studioGenerationRuns         StudioGenerationRun[]     @relation("StudioRunFolder")
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -567,6 +568,7 @@ model User {
   webResourceContentLinks  WebResourceContentLink[]
   webResourceViewStates    WebResourceViewState[]
   studioSourceSelections   StudioSourceSelection[]
+  studioGenerationRuns     StudioGenerationRun[]
 
   connectionInvitesSent     ConnectionInvite[]      @relation("ConnectionInvitesSent")
   connectionInvitesReceived ConnectionInvite[]      @relation("ConnectionInvitesReceived")
@@ -2283,4 +2285,35 @@ model StudioSourceSelection {
   folder          ContentNode @relation(fields: [folderId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, folderId])
+}
+
+// Folder Studio: job-execution runs (Phase 5). INTERIM table — WorkflowRun
+// requires a WorkflowDefinition FK that studio runs don't have; this is
+// shaped to migrate into it if that coupling ever loosens. promptSnapshot +
+// model are the artifact's provenance record.
+model StudioGenerationRun {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String      @db.Uuid
+  folderId       String      @db.Uuid
+  toolId         String      @db.VarChar(50)
+  variantId      String?     @db.VarChar(50)
+  sourceNodeIds  Json        @default("[]")
+  status         String      @default("running") @db.VarChar(20) // GenerationRunStatus contract
+  stepIndex      Int         @default(0)
+  stepTotal      Int         @default(1)
+  stepLabel      String      @default("") @db.VarChar(200)
+  outputNodeId   String?     @db.Uuid
+  // bodyHash of the output at creation — the GEN lock releases when the
+  // node's live hash diverges (human edited => eligible as a source again)
+  outputBodyHash String?     @db.VarChar(64)
+  error          String?
+  promptSnapshot String      @default("")
+  model          String      @default("") @db.VarChar(100)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(6)
+  owner          User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder         ContentNode @relation("StudioRunFolder", fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, folderId, createdAt])
+  @@index([outputNodeId])
 }

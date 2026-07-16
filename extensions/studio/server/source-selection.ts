@@ -16,6 +16,7 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import { createSourceContentResolver } from "./source-resolver";
+import { getGenLockedNodeIds } from "./gen-lock";
 import { estimateTokens } from "../tokens";
 
 // Guardrails: a pathological folder shouldn't turn one GET into thousands of
@@ -39,6 +40,11 @@ export interface SourceRow {
   warning?: string;
   /** Node has a generated Context doc (metadata is preferred at assembly). */
   hasContext: boolean;
+  /**
+   * Studio-generated output, unedited since generation — locked out of
+   * sources to prevent the AI summarizing its own summaries (GEN lock).
+   */
+  genLocked: boolean;
 }
 
 export interface SelectionState {
@@ -72,7 +78,7 @@ async function loadOwnedFolder(userId: string, folderId: string) {
 /** Breadth-first descendant walk with depth annotation, capped. */
 async function collectRows(
   folderId: string
-): Promise<{ rows: SourceRow[]; scanCapped: boolean }> {
+): Promise<{ rows: SourceRow[]; scanCapped: boolean; leafIds: string[] }> {
   const resolver = createSourceContentResolver();
   const rows: SourceRow[] = [];
   let frontier = [folderId];
@@ -114,6 +120,7 @@ async function collectRows(
           empty: true,
           truncated: false,
           hasContext: child.agenticMetadata !== null,
+          genLocked: false,
         });
         nextFrontier.push(child.id);
         continue;
@@ -135,12 +142,17 @@ async function collectRows(
         truncated: resolved.truncated,
         warning: resolved.warning,
         hasContext: child.agenticMetadata !== null,
+        genLocked: false,
       });
     }
     frontier = nextFrontier;
   }
 
-  return { rows, scanCapped };
+  // Stamp GEN locks in one batch query (see gen-lock.ts).
+  const leafIds = rows
+    .filter((r) => r.contentType !== "folder")
+    .map((r) => r.id);
+  return { rows, scanCapped, leafIds };
 }
 
 // ── Default selection (BFS budget fill) ───────────────────────────────────
@@ -150,7 +162,7 @@ export function computeDefaultSelection(
   tokenBudget: number
 ): { includedNodeIds: string[]; estimatedTokens: number; capApplied: boolean } {
   const leaves = rows
-    .filter((row) => row.contentType !== "folder" && !row.empty)
+    .filter((row) => row.contentType !== "folder" && !row.empty && !row.genLocked)
     // Breadth-first: shallow levels first, stable within a level.
     .sort((a, b) => a.depth - b.depth);
 
@@ -177,12 +189,18 @@ export async function getSelectionState(
   const folder = await loadOwnedFolder(userId, folderId);
   if (!folder) return null;
 
-  const [{ rows, scanCapped }, stored] = await Promise.all([
+  const [{ rows, scanCapped, leafIds }, stored] = await Promise.all([
     collectRows(folderId),
     prisma.studioSourceSelection.findUnique({
       where: { ownerId_folderId: { ownerId: userId, folderId } },
     }),
   ]);
+
+  // GEN lock (Phase 5): unedited studio outputs can't feed back into sources.
+  const locked = await getGenLockedNodeIds(userId, leafIds);
+  for (const row of rows) {
+    if (locked.has(row.id)) row.genLocked = true;
+  }
 
   const tokenBudget = stored?.tokenBudget ?? DEFAULT_TOKEN_BUDGET;
 
@@ -201,9 +219,10 @@ export async function getSelectionState(
   }
 
   // Stored ids may reference since-deleted/moved nodes — intersect with the
-  // live rows so the picker never shows phantom selections.
+  // live rows so the picker never shows phantom selections. GEN-locked ids
+  // drop out even if stored (the lock outranks an old explicit selection).
   const live = new Set(
-    rows.filter((r) => r.contentType !== "folder").map((r) => r.id)
+    rows.filter((r) => r.contentType !== "folder" && !r.genLocked).map((r) => r.id)
   );
   const includedNodeIds = (stored.includedNodeIds as string[]).filter((id) =>
     live.has(id)

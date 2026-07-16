@@ -1,14 +1,15 @@
 import type { ExtensionRuntime } from "@/lib/extensions/types";
 import { STUDIO_EXTENSION_ID } from "./manifest";
+import { studioNotificationKindRenderers } from "./components/notification-renderers";
 
 /**
  * Studio client runtime.
  *
- * Phase 0: intentionally empty — no panels or dialogs mount yet. The registry
- * and contracts exist; the visible surfaces (sidebar Studio tab, Context tab)
- * land in Phase 1. Registering the runtime now keeps the extension wired into
- * `installed.ts` so nothing else has to change when those surfaces arrive.
+ * The Studio/Context sidebar tabs mount via the Tool Surfaces registry (not
+ * this runtime); what registers here are the cross-surface contributions —
+ * currently the inbox renderer for "studio.run" notifications (Phase 5).
  */
 export const studioExtensionRuntime: ExtensionRuntime = {
   id: STUDIO_EXTENSION_ID,
+  notificationKindRenderers: studioNotificationKindRenderers,
 };

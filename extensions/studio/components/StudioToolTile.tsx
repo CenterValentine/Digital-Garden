@@ -18,7 +18,7 @@
 import { createElement, useEffect, useState } from "react";
 import { ChevronDown, Play, RefreshCw } from "lucide-react";
 import { resolveStudioToolVariants } from "../registry";
-import { isChatInvocable } from "../invocable";
+import { isInvocable } from "../invocable";
 import type { StudioToolDefinition, StudioToolVariant } from "../types";
 import { getStudioToolIcon } from "./studio-icons";
 
@@ -49,7 +49,7 @@ export function StudioToolTile({
 }: StudioToolTileProps) {
   const [variants, setVariants] = useState<StudioToolVariant[]>([]);
 
-  const live = Boolean(onInvoke) && isChatInvocable(tool.id) && !tool.stub;
+  const live = Boolean(onInvoke) && isInvocable(tool.id) && !tool.stub;
   const busy = invokingToolId === tool.id;
 
   // Variants may be a runtime resolver (e.g. custom reports), so resolve on
@@ -155,7 +155,11 @@ export function StudioToolTile({
             <span className="rounded border border-black/10 px-1 py-px uppercase tracking-wide dark:border-white/15">
               {tool.execution === "chat" ? "Chat" : "Background job"}
             </span>
-            {live ? "Runs in the folder conversation" : phaseHint(tool)}
+            {live
+              ? tool.execution === "chat"
+                ? "Runs in the folder conversation"
+                : "Runs in the background — watch the Runs panel"
+              : phaseHint(tool)}
           </p>
         </div>
       )}
