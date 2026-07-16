@@ -30,6 +30,13 @@ Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the b
 - [x] ~~Auto-context: per-folder opt-out~~ — SHIPPED broader in V1.1 as per-NODE `contextOptOut` (toolbar eye toggle + Context panel checkbox); folders shield their subtree.
 - [ ] **Auto-context: SourcePicker opted-out badge** — SourceRow already carries `optedOut` (hard-excluded from defaults + assembly); the picker should render a small privacy badge so users see why a row can't be included.
 - [ ] **Auto-context: settle window configurability** — fixed at 10 min (SETTLE_MINUTES). Expose in Studio settings only if real usage wants it.
+
+## References-as-children Followups (2026-07-16)
+
+- [ ] **Folder main-panel views still list note-owned references** — ListView/Grid/Kanban query by parentId + `includeReferencedContent`, so a reference shown under its note in the TREE also appears in the folder view listing. Decide: filter note-owned references out of folder views (they're reachable via the note) or keep as a flat inventory.
+- [ ] **Drag-attached references don't parentId-cascade with the note** — the move route's reference cascade follows the ContentLink embed graph; a reference attached by drag (not embedded) keeps its old storage parentId when the note moves folders. Display is correct (ownedByNoteId), but storage home drifts. Extend the cascade to also cover `ownedByNoteId`-children.
+- [ ] **Reference ordering under a note** — displayOrder is folder-scoped, so sibling references under a note sort by their folder order; fine for small counts, revisit if per-note ordering matters.
+- [ ] **Referenced-content visual treatment under notes** — consider a subtle badge/dimming for reference rows now that they nest (they read like normal children today).
 - [ ] **Auto-context banner on Studio tab** — v1 surfaces the once-per-session unconfigured banner via the Context tab GET only; the Studio tab's compose/runs 409 toasts cover explicit actions. Consider a shared status probe if users miss it.
 - [ ] **Audio overview TTS voice override** — Studio inherits the global AI speech voice by design (inherit-with-override pattern); add the per-studio override field only if requested.
 - [ ] **Two-host audio + video overview** — postponed per plan Non-goals (Gemini multi-speaker TTS is the gap-filler candidate); video tile ships as a stub.

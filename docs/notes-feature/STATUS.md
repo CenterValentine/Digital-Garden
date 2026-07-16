@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 16, 2026 (evening)**: References display as CHILDREN of their owning note (branch `worktree-folder-studio`)
+
+- Tree model change: `role: "referenced"` nodes with a live `ownedByNoteId` now render under that note in the file tree (notes grow a chevron); references with no owning note stay adjacent to primary content in their folder. **Display-only re-homing** — storage `parentId` remains the folder, so move cascades, folder scans, auto-context BFS, and materialized paths are untouched; implemented as a display-parent redirect in the tree route (owner must be in the same fetch; soft-deleted owners fall back to folder placement).
+- Drag rules: primary content still can NOT be dropped onto a leaf (deliberately not Notion). References CAN be dropped onto a note — the move route re-homes (`ownedByNoteId = note`, storage parent = note's folder); dropping a reference onto a folder or root detaches it from its note.
+- Deletion safety unchanged: ref-counting stays on the ContentLink embed graph, independent of ownership/placement.
+
 **July 16, 2026 (later)**: Auto-context V1.1 — anchored ripple engine + privacy opt-out + manual refresh (commits `0cb910e`/`ca5f697`/+menu)
 
 - **Anchored regeneration** (temperature-noise fix): all metadata-lane calls run at temperature 0 and carry the stored summary under an echo-verbatim contract — the model judges "did this change matter?" inside the call; verbatim echo = damping verdict. Packs group per PARENT folder only (siblings share calls, unrelated branches never mix) with folder orientation headers.

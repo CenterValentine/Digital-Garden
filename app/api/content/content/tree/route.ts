@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
               contentType: true,
               role: true,
               parentId: true,
+              ownedByNoteId: true,
               peopleGroupId: true,
               personId: true,
               displayOrder: true,
@@ -262,9 +263,23 @@ export async function GET(request: NextRequest) {
       const nodeMap = new Map<string, ContentTreeNode>();
       const rootNodes: ContentTreeNode[] = [];
 
+      // References display as CHILDREN of their owning note (2026-07-16
+      // model change; previously siblings). Display-only re-homing: storage
+      // parentId stays the folder, so move cascades / folder scans / paths
+      // are untouched. Owner must be in this fetch (a soft-deleted or
+      // filtered-out note falls back to folder placement).
+      const fetchedIds = new Set(allContent.map((item) => item.id));
+
       // First pass: Create all nodes
       for (const item of allContent) {
-        const treeParentId = item.parentId
+        const referenceOwnerId =
+          item.role === "referenced" &&
+          item.ownedByNoteId &&
+          fetchedIds.has(item.ownedByNoteId)
+            ? item.ownedByNoteId
+            : null;
+        const treeParentId = referenceOwnerId
+          ?? item.parentId
           ?? (item.personId ? `person:${item.personId}` : null)
           ?? (item.peopleGroupId ? `peopleGroup:${item.peopleGroupId}` : null);
         const node: ContentTreeNode = {

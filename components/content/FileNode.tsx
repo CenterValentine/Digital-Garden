@@ -295,10 +295,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
   };
 
-  // Get chevron for folders — wrapped in its own button so clicks
-  // expand/collapse without selecting the folder or bubbling to the row.
+  // Get chevron for any node with children — folders, and notes whose
+  // references display as children (2026-07-16 model). Wrapped in its own
+  // button so clicks expand/collapse without selecting or bubbling.
   const getChevron = () => {
-    if (!isFolder || !node.children || node.children.length === 0) {
+    if (!node.children || node.children.length === 0) {
       return <div className="h-4 w-4" />; // Empty space for alignment
     }
 
@@ -311,7 +312,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           node.toggle();       // Expand/collapse only — no selection
         }}
         tabIndex={-1}
-        aria-label={isOpen ? "Collapse folder" : "Expand folder"}
+        aria-label={isOpen ? "Collapse" : "Expand"}
       >
         {isOpen ? (
           <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />

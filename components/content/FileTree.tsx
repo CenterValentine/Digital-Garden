@@ -310,9 +310,17 @@ export function FileTree({
     // Always allow dropping at root level (parentNode is null)
     if (!parentNode) return true;
 
-    // Only allow dropping into folders
+    // Only allow dropping into folders — with ONE exception: referenced
+    // nodes may be dropped onto a NOTE (re-homing the reference under that
+    // note). Primary content can never gain a leaf parent; this is
+    // deliberately not Notion-style nesting.
     if (parentNode.data.contentType !== "folder") {
-      return false;
+      const allReferences =
+        dragNodes.length > 0 &&
+        dragNodes.every((dragNode) => dragNode.data.role === "referenced");
+      if (!(parentNode.data.contentType === "note" && allReferences)) {
+        return false;
+      }
     }
 
     if (parentNode.data.treeNodeKind && parentNode.data.treeNodeKind !== "content") {
