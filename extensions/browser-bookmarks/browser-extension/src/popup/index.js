@@ -517,6 +517,120 @@ document.getElementById("quick-capture-btn").addEventListener("click", async () 
   window.close();
 });
 
+// ── Workflows chooser ─────────────────────────────────────────────────────────
+// Explicit pick (locked design): the button lists YOUR workflows with a
+// "matches this page" hint; the chosen id goes to the background, which
+// extracts rendered page text and dispatches. Engine (Trellis/n8n) is a chip —
+// routing stays server-side.
+
+let workflowsCache = null;
+
+function workflowChooser() {
+  return document.getElementById("workflow-chooser");
+}
+function runWorkflowButton() {
+  return document.getElementById("run-workflow-btn");
+}
+
+function renderWorkflowChooser(workflows) {
+  const chooser = workflowChooser();
+  chooser.innerHTML = "";
+  if (!workflows || workflows.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "workflow-empty";
+    empty.textContent =
+      "No workflows yet. Create one in Digital Garden: + → Workflow.";
+    chooser.appendChild(empty);
+    return;
+  }
+  for (const workflow of workflows) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "workflow-row";
+    row.disabled = !workflow.enabled;
+    row.title = workflow.enabled ? "Run on this page" : "Disabled in Digital Garden";
+
+    const name = document.createElement("span");
+    name.className = "workflow-name";
+    name.textContent = workflow.title;
+    row.appendChild(name);
+
+    const engine = document.createElement("span");
+    engine.className = "workflow-chip workflow-chip-engine";
+    engine.textContent = workflow.engine === "n8n" ? "n8n" : "Trellis";
+    row.appendChild(engine);
+
+    if (workflow.matchesPage) {
+      const match = document.createElement("span");
+      match.className = "workflow-chip workflow-chip-match";
+      match.textContent = "matches page";
+      row.appendChild(match);
+    }
+
+    row.addEventListener("click", () => void dispatchWorkflow(workflow, row));
+    chooser.appendChild(row);
+  }
+}
+
+async function toggleWorkflowChooser() {
+  const chooser = workflowChooser();
+  const button = runWorkflowButton();
+  const isOpen = chooser.style.display !== "none";
+  if (isOpen) {
+    chooser.style.display = "none";
+    button.setAttribute("aria-expanded", "false");
+    return;
+  }
+  chooser.style.display = "block";
+  button.setAttribute("aria-expanded", "true");
+  if (workflowsCache === null) {
+    chooser.innerHTML = '<div class="workflow-empty">Loading workflows…</div>';
+    try {
+      const data = await sendMessage({ type: "list-workflows" });
+      workflowsCache = data.workflows || [];
+    } catch (error) {
+      chooser.innerHTML = "";
+      const failed = document.createElement("div");
+      failed.className = "workflow-empty";
+      failed.textContent =
+        error instanceof Error ? error.message : "Failed to load workflows.";
+      chooser.appendChild(failed);
+      return;
+    }
+    renderWorkflowChooser(workflowsCache);
+  }
+}
+
+async function dispatchWorkflow(workflow, row) {
+  const button = runWorkflowButton();
+  try {
+    row.classList.add("workflow-row-busy");
+    button.disabled = true;
+    setQuickSaveStatus(`Dispatching “${workflow.title}”…`, "saving");
+    await sendMessage({
+      type: "dispatch-workflow",
+      payload: { workflowId: workflow.id, workflowTitle: workflow.title },
+    });
+    setQuickSaveStatus(
+      "Workflow dispatched — track it on the page's status pill.",
+      "success"
+    );
+    workflowChooser().style.display = "none";
+    button.setAttribute("aria-expanded", "false");
+  } catch (error) {
+    console.error("[DG Popup] Workflow dispatch failed", error);
+    setQuickSaveStatus(
+      error instanceof Error ? error.message : "Failed to dispatch workflow.",
+      "error"
+    );
+  } finally {
+    row.classList.remove("workflow-row-busy");
+    button.disabled = false;
+  }
+}
+
+runWorkflowButton().addEventListener("click", () => void toggleWorkflowChooser());
+
 connectionSelect().addEventListener("change", async (event) => {
   const value = event.target.value;
   if (!value) return;

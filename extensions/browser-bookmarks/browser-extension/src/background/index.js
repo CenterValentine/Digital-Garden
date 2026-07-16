@@ -609,6 +609,92 @@ async function getCurrentTabSyncState() {
   };
 }
 
+// ── Workflows (Trellis) ───────────────────────────────────────────────────────
+// Proxy-not-share: the extension only ever sees compact DTOs + a runId. Engine
+// routing (wdk vs n8n) happens server-side behind the one dispatch door.
+
+// Server caps captures at 100k chars; match it so we never ship dead weight.
+const WORKFLOW_PAGE_TEXT_CAP = 100_000;
+
+/**
+ * Ask the overlay content script for the RENDERED page text. URL-only runs
+ * against JS-rendered pages are the documented soak failure — text is the
+ * capture's real payload. Restricted pages (chrome://, web store) have no
+ * content script; degrade to URL-only rather than failing the dispatch.
+ */
+async function extractPageTextFromTab(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "dg-extract-page-text",
+    });
+    const text = typeof response?.text === "string" ? response.text : "";
+    return text.slice(0, WORKFLOW_PAGE_TEXT_CAP);
+  } catch {
+    return "";
+  }
+}
+
+/** Chooser feed: the user's workflows, page-matches sorted first. */
+async function listWorkflowsForActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const pageUrl = tab?.url || "";
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows?pageUrl=${encodeURIComponent(pageUrl)}`
+  );
+  return { workflows: data.workflows || [], pageUrl };
+}
+
+/**
+ * Dispatch the chosen workflow against the active tab: extract rendered text,
+ * POST the capture, then ask the overlay to mount the live status pill. The
+ * pill is best-effort — on overlay-less pages the popup status line is the ack.
+ */
+async function dispatchWorkflowForActiveTab(payload) {
+  const workflowId =
+    typeof payload?.workflowId === "string" ? payload.workflowId : "";
+  if (!workflowId) throw new Error("No workflow selected");
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+
+  const pageText = await extractPageTextFromTab(tab.id);
+  const data = await apiFetch(
+    "/api/integrations/browser-extension/workflow-dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        workflowId,
+        input: {
+          pageUrl: tab.url || "",
+          pageTitle: tab.title || "",
+          ...(pageText ? { pageText } : {}),
+        },
+      }),
+    }
+  );
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, {
+      type: "dg-workflow-run-started",
+      payload: {
+        runId: data.runId,
+        workflowTitle: payload?.workflowTitle || "Workflow",
+      },
+    });
+  } catch {
+    // No overlay on this page — the popup's status line already acknowledged.
+  }
+  return data;
+}
+
+/** Status poll target for the overlay pill (bearer read-only run detail). */
+async function getWorkflowRun(runId) {
+  if (typeof runId !== "string" || !runId) throw new Error("Missing runId");
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows/runs/${encodeURIComponent(runId)}`
+  );
+  return data.run;
+}
+
 async function startQuickCaptureInActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("No active tab is available");
@@ -1730,6 +1816,24 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           message.payload?.contentId,
           message.payload?.contentKind || "external"
         ),
+      });
+      return;
+    }
+    if (message.type === "list-workflows") {
+      sendResponse({ ok: true, data: await listWorkflowsForActiveTab() });
+      return;
+    }
+    if (message.type === "dispatch-workflow") {
+      sendResponse({
+        ok: true,
+        data: await dispatchWorkflowForActiveTab(message.payload),
+      });
+      return;
+    }
+    if (message.type === "get-workflow-run") {
+      sendResponse({
+        ok: true,
+        data: await getWorkflowRun(message.payload?.runId),
       });
       return;
     }
