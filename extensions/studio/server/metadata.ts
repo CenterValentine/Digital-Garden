@@ -170,8 +170,15 @@ export interface MetadataNodeShape {
  * never looks stale and the invalidation wave stops at the child. Uncovered
  * children (no metadata yet) fall back to input signals so they still make
  * the folder stale until first covered.
+ *
+ * `overrideSignals` substitutes a child's signal (keyed by child id) — the
+ * refresh engine uses it to prove single-delta staleness before choosing
+ * incremental patch mode over a full roll-up rebuild.
  */
-export async function computeSourceHash(node: MetadataNodeShape): Promise<string> {
+export async function computeSourceHash(
+  node: MetadataNodeShape,
+  overrideSignals?: Map<string, string>
+): Promise<string> {
   if (node.contentType === "folder") {
     const children = await prisma.contentNode.findMany({
       where: { parentId: node.id, deletedAt: null },
@@ -191,6 +198,7 @@ export async function computeSourceHash(node: MetadataNodeShape): Promise<string
         id: c.id,
         title: c.title,
         signal:
+          overrideSignals?.get(c.id) ??
           c.agenticMetadata?.summaryHash ??
           c.bodyHash ??
           c.updatedAt.toISOString(),
@@ -411,10 +419,14 @@ export async function generateMetadataForNode(
     sourceText || "(no extractable text — describe what can be inferred from the title and type alone, and say so)",
   ].filter(Boolean);
 
+  // temperature 0 across the metadata lane: greedy decoding keeps outputs
+  // stable on unchanged inputs, which is what makes output-hash damping
+  // (summaryHash comparison) meaningful rather than sampling noise.
   const { object } = await generateObject({
     model,
     schema: GeneratedSectionsSchema,
     prompt: promptLines.join("\n"),
+    temperature: 0,
   });
 
   const now = new Date();
@@ -527,6 +539,31 @@ async function upsertRecord(
 /** Output hash of the AI-owned sections — the damping signal. */
 function hashAiSections(summary: string, structure: string): string {
   return stableHash({ summary, structure });
+}
+
+/**
+ * Bulk-read the stored AI-owned sections for a set of nodes — the anchor
+ * text for anchored regeneration (the refresh engine slots each node's
+ * existing summary/structure into the prompt with an echo-verbatim
+ * contract, making the model the semantic-significance judge).
+ */
+export async function getStoredAiSections(
+  nodeIds: string[]
+): Promise<Map<string, { summary: string; structure: string }>> {
+  const out = new Map<string, { summary: string; structure: string }>();
+  if (nodeIds.length === 0) return out;
+  const records = await prisma.agenticMetadata.findMany({
+    where: { nodeId: { in: nodeIds } },
+    select: { nodeId: true, tiptapJson: true },
+  });
+  for (const record of records) {
+    const sections = readSections(record.tiptapJson);
+    out.set(record.nodeId, {
+      summary: sections.summary,
+      structure: sections.structure,
+    });
+  }
+  return out;
 }
 
 /**

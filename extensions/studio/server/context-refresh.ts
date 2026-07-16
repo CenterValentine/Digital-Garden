@@ -39,6 +39,7 @@ import {
   applyGeneratedSections,
   assembleSourceText,
   computeSourceHash,
+  getStoredAiSections,
   type MetadataNodeShape,
 } from "./metadata";
 import { createSourceContentResolver } from "./source-resolver";
@@ -56,6 +57,13 @@ const MAX_FOLDERS_PER_RUN = 12;
 const LEAF_BATCH_SIZE = 8;
 /** Per-document text cap inside a pack (chars). */
 const LEAF_CHARS_IN_PACK = 6000;
+/**
+ * Settle gate: a node must have been quiet this long before any drain may
+ * spend on it (explicit Generate / right-click refresh bypass it). Enforced
+ * at drain time against the metadata row's updatedAt — marking re-bumps it,
+ * so an edit burst coalesces into one ripple ~10 minutes after it ends.
+ */
+const SETTLE_MINUTES = 10;
 
 // ── Shapes ────────────────────────────────────────────────────────────────
 
@@ -66,7 +74,14 @@ export interface RefreshStats {
   leavesFailed: number;
   foldersRefreshed: number;
   foldersDamped: number;
+  /** Dirty nodes skipped because they were marked < SETTLE_MINUTES ago. */
+  settleSkipped: number;
   capped: boolean;
+}
+
+export interface RefreshOptions {
+  /** Explicit human command (Generate / right-click refresh): skip settle. */
+  bypassSettle?: boolean;
 }
 
 export type RefreshOutcome =
@@ -82,7 +97,19 @@ interface ScopeNode extends MetadataNodeShape {
     exists: boolean;
     contextDirty: boolean;
     sourceContentHash: string | null;
+    summaryHash: string | null;
+    /** Last write to the metadata row — for dirty rows, the last mark. */
+    markedAt: Date | null;
   };
+}
+
+/** A leaf whose summary actually changed this run — folder patch input. */
+interface ChangedChild {
+  childId: string;
+  title: string;
+  oldSummary: string;
+  newSummary: string;
+  oldSummaryHash: string | null;
 }
 
 // ── Entry points ──────────────────────────────────────────────────────────
@@ -111,13 +138,14 @@ const inFlight = new Set<string>();
  */
 export async function refreshScope(
   userId: string,
-  rootId: string
+  rootId: string,
+  options: RefreshOptions = {}
 ): Promise<RefreshOutcome> {
   const flightKey = `${userId}:${rootId}`;
   if (inFlight.has(flightKey)) return { status: "skipped" };
   inFlight.add(flightKey);
   try {
-    return await runRefresh(userId, rootId);
+    return await runRefresh(userId, rootId, options);
   } finally {
     inFlight.delete(flightKey);
   }
@@ -125,7 +153,8 @@ export async function refreshScope(
 
 async function runRefresh(
   userId: string,
-  rootId: string
+  rootId: string,
+  options: RefreshOptions
 ): Promise<RefreshOutcome> {
   const route = await resolvePrimaryRoute(userId, "studio-metadata");
   if (!route) return { status: "unconfigured" };
@@ -137,6 +166,19 @@ async function runRefresh(
   const scope = await collectScope(userId, rootId);
   if (scope.length === 0) return { status: "skipped" };
 
+  // Settle gate (drain-time debounce): covered nodes settle on their last
+  // MARK (metadata updatedAt — every cascade re-mark resets the clock);
+  // uncovered nodes settle on the content's own updatedAt, so a just-created
+  // note isn't summarized mid-draft.
+  const settleCutoff = Date.now() - SETTLE_MINUTES * 60_000;
+  const isSettled = (node: ScopeNode): boolean => {
+    if (options.bypassSettle) return true;
+    const stamp = node.meta.exists
+      ? (node.meta.markedAt?.getTime() ?? 0)
+      : node.updatedAt.getTime();
+    return stamp <= settleCutoff;
+  };
+
   const stats: RefreshStats = {
     scopeNodes: scope.length,
     leavesRefreshed: 0,
@@ -144,6 +186,7 @@ async function runRefresh(
     leavesFailed: 0,
     foldersRefreshed: 0,
     foldersDamped: 0,
+    settleSkipped: 0,
     capped: false,
   };
 
@@ -160,6 +203,10 @@ async function runRefresh(
   const bitClearOnly: string[] = [];
   for (const node of leafCandidates) {
     if (genLocked.has(node.id)) continue; // studio outputs: never auto-covered
+    if (!isSettled(node)) {
+      stats.settleSkipped += 1;
+      continue;
+    }
     // Leaf source hashes are pure functions of fields already in hand —
     // verify true staleness before spending. Over-marked bits clear free.
     if (node.meta.exists) {
@@ -199,33 +246,82 @@ async function runRefresh(
     packable.push({ node, text: resolved.text });
   }
 
-  for (let i = 0; i < packable.length; i += LEAF_BATCH_SIZE) {
-    const batch = packable.slice(i, i + LEAF_BATCH_SIZE);
-    try {
-      const results = await generateLeafBatch(model, batch);
-      for (const { node } of batch) {
-        const generated = results.get(node.id);
-        if (!generated) {
-          stats.leavesFailed += 1; // stays dirty; retried next drain
-          continue;
+  // Anchors: stored AI sections for covered work nodes (echo-verbatim
+  // contract) and for parent folders (pack orientation headers).
+  const scopeById = new Map(scope.map((n) => [n.id, n]));
+  const parentIds = [
+    ...new Set(
+      packable
+        .map((p) => p.node.parentId)
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  const anchors = await getStoredAiSections([
+    ...packable.filter((p) => p.node.meta.exists).map((p) => p.node.id),
+    ...parentIds,
+  ]);
+
+  // Packs group by PARENT FOLDER: only siblings share a call. Related
+  // context sharpens each summary; unrelated branches never co-mingle
+  // (the chocolate/lye rule).
+  const packGroups = new Map<string, typeof packable>();
+  for (const item of packable) {
+    const key = item.node.parentId ?? "__rootless__";
+    const list = packGroups.get(key) ?? [];
+    list.push(item);
+    packGroups.set(key, list);
+  }
+
+  const changedByParent = new Map<string, ChangedChild[]>();
+
+  for (const [parentKey, group] of packGroups) {
+    const parentNode = scopeById.get(parentKey);
+    const orientation = {
+      title: parentNode?.title,
+      summary: anchors.get(parentKey)?.summary,
+    };
+    for (let i = 0; i < group.length; i += LEAF_BATCH_SIZE) {
+      const batch = group.slice(i, i + LEAF_BATCH_SIZE);
+      try {
+        const results = await generateLeafBatch(model, batch, anchors, orientation);
+        for (const { node } of batch) {
+          const generated = results.get(node.id);
+          if (!generated) {
+            stats.leavesFailed += 1; // stays dirty; retried next drain
+            continue;
+          }
+          const { changed } = await applyGeneratedSections(
+            node,
+            generated,
+            route.modelId
+          );
+          if (changed) {
+            stats.leavesRefreshed += 1;
+            if (node.parentId) {
+              const list = changedByParent.get(node.parentId) ?? [];
+              list.push({
+                childId: node.id,
+                title: node.title,
+                oldSummary: anchors.get(node.id)?.summary ?? "",
+                newSummary: generated.summary,
+                oldSummaryHash: node.meta.summaryHash,
+              });
+              changedByParent.set(node.parentId, list);
+            }
+          } else {
+            stats.leavesDamped += 1;
+          }
         }
-        const { changed } = await applyGeneratedSections(
-          node,
-          generated,
-          route.modelId
-        );
-        if (changed) stats.leavesRefreshed += 1;
-        else stats.leavesDamped += 1;
+      } catch (error) {
+        stats.leavesFailed += batch.length;
+        logger.error({
+          layer: "ai",
+          event: "studio:context_refresh:leaf_batch_caught",
+          summary: "packed leaf context batch failed — nodes stay dirty",
+          error,
+          attrs: { rootId, batchSize: batch.length },
+        });
       }
-    } catch (error) {
-      stats.leavesFailed += batch.length;
-      logger.error({
-        layer: "ai",
-        event: "studio:context_refresh:leaf_batch_caught",
-        summary: "packed leaf context batch failed — nodes stay dirty",
-        error,
-        attrs: { rootId, batchSize: batch.length },
-      });
     }
   }
 
@@ -235,8 +331,17 @@ async function runRefresh(
       (n) =>
         n.contentType === "folder" && (!n.meta.exists || n.meta.contextDirty)
     )
+    .filter((n) => {
+      if (isSettled(n)) return true;
+      stats.settleSkipped += 1;
+      return false;
+    })
     .sort((a, b) => b.depth - a.depth)
     .slice(0, MAX_FOLDERS_PER_RUN);
+
+  const folderAnchors = await getStoredAiSections(
+    folderWork.filter((f) => f.meta.exists).map((f) => f.id)
+  );
 
   for (const folder of folderWork) {
     try {
@@ -253,20 +358,42 @@ async function runRefresh(
         continue;
       }
 
-      const sourceText = await assembleSourceText(folder);
-      if (!sourceText.trim() && !folder.meta.exists) continue; // empty folder
+      const anchor = folderAnchors.get(folder.id);
+      const changed = changedByParent.get(folder.id) ?? [];
+
+      // Incremental patch mode — only when PROVEN single-delta: substituting
+      // the one changed child's OLD signal must reproduce the stored hash,
+      // i.e. nothing else moved since the last roll-up. Prevents silent
+      // drift from patches that would miss earlier unapplied child changes.
+      let prompt: string | null = null;
+      const single = changed.length === 1 ? changed[0] : null;
+      if (single?.oldSummaryHash && anchor?.summary && folder.meta.exists) {
+        const priorHash = await computeSourceHash(
+          folder,
+          new Map([[single.childId, single.oldSummaryHash]])
+        );
+        if (priorHash === folder.meta.sourceContentHash) {
+          prompt = buildFolderPatchPrompt(folder, anchor, single);
+        }
+      }
+      if (!prompt) {
+        const sourceText = await assembleSourceText(folder);
+        if (!sourceText.trim() && !folder.meta.exists) continue; // empty folder
+        prompt = buildFolderPrompt(folder, sourceText, anchor);
+      }
 
       const { object } = await generateObject({
         model,
         schema: FolderSectionsSchema,
-        prompt: buildFolderPrompt(folder, sourceText),
+        prompt,
+        temperature: 0,
       });
-      const { changed } = await applyGeneratedSections(
+      const { changed: rollupChanged } = await applyGeneratedSections(
         folder,
         object,
         route.modelId
       );
-      if (changed) stats.foldersRefreshed += 1;
+      if (rollupChanged) stats.foldersRefreshed += 1;
       else stats.foldersDamped += 1;
     } catch (error) {
       logger.error({
@@ -286,6 +413,56 @@ async function runRefresh(
     attrs: { rootId, model: route.modelId, ...stats },
   });
   return { status: "ran", stats };
+}
+
+// ── Piggyback ripple (the epicenter mechanism) ────────────────────────────
+
+/** Min gap between piggyback drains per user (per instance, best effort). */
+const RIPPLE_THROTTLE_MS = 60_000;
+const lastRippleAt = new Map<string, number>();
+
+/**
+ * Called (fire-and-forget, via after()) from the PATCH dirty-hook: the
+ * user's own editing traffic powers the ripple engine — no timers, no
+ * polling. Cost when there's nothing to do: one throttled indexed query.
+ *
+ * Targets the scope of a FOUND settled-dirty node (guaranteed productive)
+ * rather than the just-edited epicenter, whose own mark is by definition
+ * fresh and settle-gated; the epicenter drains the same way ~10 minutes
+ * after its edit burst ends, carried by later requests.
+ */
+export async function maybeRippleFromEdit(userId: string): Promise<void> {
+  try {
+    const last = lastRippleAt.get(userId) ?? 0;
+    if (Date.now() - last < RIPPLE_THROTTLE_MS) return;
+    lastRippleAt.set(userId, Date.now());
+
+    const cutoff = new Date(Date.now() - SETTLE_MINUTES * 60_000);
+    const settled = await prisma.agenticMetadata.findFirst({
+      where: {
+        contextDirty: true,
+        updatedAt: { lt: cutoff },
+        node: { ownerId: userId, deletedAt: null },
+      },
+      select: {
+        node: { select: { id: true, parentId: true, contentType: true } },
+      },
+    });
+    if (!settled) return;
+
+    const rootId =
+      settled.node.contentType === "folder"
+        ? settled.node.id
+        : (settled.node.parentId ?? settled.node.id);
+    await refreshContextOnAccess(userId, rootId);
+  } catch (error) {
+    logger.warn({
+      layer: "ai",
+      event: "studio:context_refresh:ripple_caught",
+      summary: "piggyback ripple failed — work stays dirty",
+      error,
+    });
+  }
 }
 
 // ── Nightly sweep (cron) ──────────────────────────────────────────────────
@@ -392,7 +569,12 @@ async function collectScope(
       bodyHash: true,
       updatedAt: true,
       agenticMetadata: {
-        select: { contextDirty: true, sourceContentHash: true },
+        select: {
+          contextDirty: true,
+          sourceContentHash: true,
+          summaryHash: true,
+          updatedAt: true,
+        },
       },
     },
   });
@@ -413,6 +595,8 @@ async function collectScope(
       exists: node.agenticMetadata !== null,
       contextDirty: node.agenticMetadata?.contextDirty ?? false,
       sourceContentHash: node.agenticMetadata?.sourceContentHash ?? null,
+      summaryHash: node.agenticMetadata?.summaryHash ?? null,
+      markedAt: node.agenticMetadata?.updatedAt ?? null,
     },
   });
 
@@ -433,7 +617,12 @@ async function collectScope(
         bodyHash: true,
         updatedAt: true,
         agenticMetadata: {
-          select: { contextDirty: true, sourceContentHash: true },
+          select: {
+            contextDirty: true,
+            sourceContentHash: true,
+            summaryHash: true,
+            updatedAt: true,
+          },
         },
       },
       orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
@@ -487,32 +676,85 @@ const LeafBatchSchema = z.object({
   ),
 });
 
-function buildFolderPrompt(folder: ScopeNode, sourceText: string): string {
+/**
+ * The echo-verbatim contract, shared by every anchored prompt. Verbatim echo
+ * on unchanged meaning is what makes output-hash damping deterministic
+ * instead of fighting sampling noise — the model itself becomes the
+ * "did this change matter?" judge, at the cost of a few anchor tokens.
+ */
+const ANCHOR_RULE =
+  "ANCHORING RULE: when an existing summary/structure is shown and it still accurately reflects the current content, return it VERBATIM, character for character. Rewrite only when the meaning actually changed.";
+
+function buildFolderPrompt(
+  folder: ScopeNode,
+  sourceText: string,
+  anchor?: { summary: string; structure: string }
+): string {
   return [
     `You maintain a working "Context" document about one folder in a user's knowledge base.`,
     `Folder: "${folder.title}"`,
     `Summarize what this folder contains as a whole, based on its children's context below.`,
+    anchor?.summary
+      ? `\nExisting summary:\n${anchor.summary}\nExisting structure:\n${anchor.structure}\n\n${ANCHOR_RULE}`
+      : "",
     "",
     "Children:",
     sourceText ||
       "(no children with extractable context — describe what can be inferred from the folder title alone, and say so)",
-  ].join("\n");
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+/**
+ * Incremental patch (single-delta proven by the caller): feed the existing
+ * roll-up plus only the one child summary that changed — O(change) tokens
+ * instead of O(children).
+ */
+function buildFolderPatchPrompt(
+  folder: ScopeNode,
+  anchor: { summary: string; structure: string },
+  change: ChangedChild
+): string {
+  return [
+    `You maintain a working "Context" document about the folder "${folder.title}" in a user's knowledge base.`,
+    `Exactly one item inside it changed. Update the folder's summary/structure ONLY as far as this change actually affects them.`,
+    "",
+    `Current folder summary:\n${anchor.summary}`,
+    `Current folder structure:\n${anchor.structure}`,
+    "",
+    `Changed item: "${change.title}"`,
+    change.oldSummary ? `Its previous summary:\n${change.oldSummary}` : "",
+    `Its new summary:\n${change.newSummary}`,
+    "",
+    ANCHOR_RULE,
+  ]
+    .filter(Boolean)
+    .join("\n");
 }
 
 async function generateLeafBatch(
   model: Parameters<typeof generateObject>[0]["model"],
-  batch: Array<{ node: ScopeNode; text: string }>
+  batch: Array<{ node: ScopeNode; text: string }>,
+  anchors: Map<string, { summary: string; structure: string }>,
+  orientation: { title?: string; summary?: string }
 ): Promise<Map<string, { summary: string; structure: string }>> {
   const docs = batch
-    .map(({ node, text }) =>
-      [
+    .map(({ node, text }) => {
+      const anchor = anchors.get(node.id);
+      return [
         `--- Document nodeId: ${node.id}`,
         `Title: "${node.title}" (type: ${node.contentType})`,
+        anchor?.summary
+          ? `Existing summary:\n${anchor.summary}\nExisting structure:\n${anchor.structure}`
+          : "",
         "Content:",
         text.slice(0, LEAF_CHARS_IN_PACK) ||
           "(no extractable text — describe what can be inferred from the title and type alone, and say so)",
-      ].join("\n")
-    )
+      ]
+        .filter(Boolean)
+        .join("\n");
+    })
     .join("\n\n");
 
   const { object } = await generateObject({
@@ -520,11 +762,21 @@ async function generateLeafBatch(
     schema: LeafBatchSchema,
     prompt: [
       `You maintain working "Context" documents about items in a user's knowledge base.`,
-      `Below are ${batch.length} documents. For EACH one, return one item with its nodeId copied exactly.`,
-      "The documents are neighbors in the same folder tree — use that shared context to summarize each one well, but keep every item strictly about its own document.",
+      orientation.title
+        ? `The ${batch.length} documents below are siblings inside the folder "${orientation.title}". Use that shared setting to summarize each one well.`
+        : `Below are ${batch.length} documents.`,
+      orientation.summary
+        ? `About this folder: ${orientation.summary.slice(0, 400)}`
+        : "",
+      `For EACH document, return one item with its nodeId copied exactly.`,
+      "Keep every item strictly about its own document — never blend content, terminology, or claims across documents.",
+      ANCHOR_RULE,
       "",
       docs,
-    ].join("\n"),
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    temperature: 0,
   });
 
   const results = new Map<string, { summary: string; structure: string }>();
