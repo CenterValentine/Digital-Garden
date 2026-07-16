@@ -81,6 +81,30 @@ const SINGLE_TOOL_TEMPLATES: Record<string, ToolPromptTemplate> = {
     delivery:
       "Deliver via the flashcard proposal tools (propose a deck, then cards). Do NOT create a note.",
   },
+
+  // ── Practice shelf (Phase 7) — graded SESSIONS, not files ──────────────
+  quiz: {
+    title: "",
+    task: "Run an interactive multiple-choice quiz on the folder sources. One question at a time: state the question, offer options A-D (one clearly correct, distractors plausible), and STOP — wait for the user's answer. When they answer, grade it, explain why in 1-2 sentences citing the source title, then ask the next question. Default to 8 questions spanning the material from fundamental to subtle; adjust if the user asks. Track the running score silently.",
+    delivery:
+      "This is a live session — do NOT create a note. After the final question, give the score, a breakdown of strong vs weak areas, and the 2-3 source sections worth rereading. Begin with question 1 immediately.",
+  },
+  "teach-back": {
+    title: "",
+    task: "Run a Feynman teach-it-back session. You play a curious student who has only skimmed the sources; the user must TEACH you the material. Open by asking them to explain the central concept in their own words. As they explain, ask the follow-up questions a sharp student would ask — especially about anything they gloss over. Note every gap, hand-wave, or error against the sources, but do NOT correct them mid-session; keep probing.",
+    delivery:
+      "This is a live session — do NOT create a note. After 3-5 exchanges (or when the user says they're done), drop the student persona and give honest feedback: what they explained well, what they skipped or got wrong (with what the sources actually say), and one suggestion for a stronger explanation. Start the session now.",
+  },
+  "oral-exam": {
+    title: "",
+    task: "Conduct an oral examination on the folder sources, one question at a time. If you have the generate_speech tool, speak each question aloud with it (keep each spoken question under 200 characters) in addition to writing it. The user may answer in text or by attaching a voice recording — treat a transcribed voice answer exactly like text. Grade each answer 0-5 with a one-sentence justification against the sources before asking the next. Ask 5 questions of increasing difficulty.",
+    delivery:
+      "This is a live session — do NOT create a note. After question 5, give the total score, per-question recap, and what to review. Ask question 1 now.",
+  },
+  "study-plan": {
+    title: "{folder} — Study plan",
+    task: "Build a 7-day study plan for this folder's material. First check the user's flashcard decks with list_decks (and search_decks if useful) for decks related to this material — factor due reviews into the schedule. Then design the plan: each day gets a focused reading target from the sources (specific titles), an active-recall task (self-quiz prompts, teach-back topic, or deck review), and an estimated time. Order topics prerequisite-first. Keep daily load realistic (30-45 min).",
+  },
 };
 
 function templateFor(

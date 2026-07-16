@@ -11,6 +11,11 @@ export const CHAT_INVOCABLE_TOOL_IDS = [
   "compare",
   "prerequisites",
   "flashcards",
+  // Practice shelf (Phase 7) — graded sessions run IN the conversation.
+  "quiz",
+  "teach-back",
+  "oral-exam",
+  "study-plan",
 ] as const;
 
 /** Job tools whose executor is registered in server/runs.ts. */
