@@ -1498,11 +1498,26 @@ export async function DELETE(
               },
             }),
 
-            // Create trash bin entry
-            prisma.trashBin.create({
-              data: {
+            // Trash bin entry — upsert, not create: contentId is unique and a
+            // delete→restore→delete cycle used to leave the old row behind,
+            // making every re-delete 500 on the constraint ("undeletable"
+            // content whose delete silently did nothing).
+            prisma.trashBin.upsert({
+              where: { contentId: id },
+              create: {
                 contentId: id,
                 deletedBy: session.user.id,
+                scheduledDeletion,
+                contentSnapshot: {
+                  title: existing.title,
+                  slug: existing.slug,
+                  parentId: existing.parentId,
+                  hasChildren: existing.children.length > 0,
+                },
+              },
+              update: {
+                deletedBy: session.user.id,
+                deletedAt: now,
                 scheduledDeletion,
                 contentSnapshot: {
                   title: existing.title,
@@ -1520,6 +1535,46 @@ export async function DELETE(
       // instead of returning a stale cached copy. The setCachedContent
       // guard for deletedAt prevents re-population from in-flight reads.
       invalidateCachedContent(id);
+
+      // Scrub the node from every workspace's saved pane state + assignments.
+      // Stored paneState isn't touched by the soft delete, so without this the
+      // workspace snapshot restore resurrects the deleted node's tab in the
+      // main panel (and the tab renders as if the content were never deleted).
+      try {
+        const { removeContentFromWorkspaces } = await import(
+          "@/extensions/workplaces/server/service"
+        );
+        await removeContentFromWorkspaces(session.user.id, id);
+      } catch (error) {
+        logger.warn({
+          layer: "route",
+          event: "content.delete.workspace_scrub_failed",
+          summary: `failed to scrub ${id} from workspaces`,
+          attrs: { content_id: id },
+          error,
+        });
+      }
+
+      // n8n Flows own an engine-side workflow whose production webhook stays
+      // live otherwise. Trash = deactivate (restore reactivates; purge tears
+      // down fully in lib/features/trash). Best-effort — n8n being down must
+      // not block the delete.
+      if (existing.contentType === "workflow") {
+        try {
+          const { deactivateN8nFlowForContent } = await import(
+            "@/extensions/workflows/server/engines/n8n/teardown"
+          );
+          await deactivateN8nFlowForContent(id);
+        } catch (error) {
+          logger.warn({
+            layer: "route",
+            event: "content.delete.n8n_deactivate_failed",
+            summary: `failed to deactivate n8n workflow for ${id}`,
+            attrs: { content_id: id },
+            error,
+          });
+        }
+      }
 
       // Chat nodes are Conversation-backed (ContentNode = shell,
       // Conversation = live data). Deleting the node deletes the chat, so

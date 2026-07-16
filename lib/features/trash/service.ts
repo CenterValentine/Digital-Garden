@@ -88,11 +88,28 @@ export async function restoreTrashItem(
     });
     return count > 0;
   }
-  const { count } = await prisma.contentNode.updateMany({
+  const node = await prisma.contentNode.findFirst({
     where: { id, ownerId: userId, deletedAt: { not: null } },
-    data: { deletedAt: null, deletedBy: null },
+    select: { id: true, contentType: true },
   });
-  return count > 0;
+  if (!node) return false;
+  await prisma.$transaction([
+    prisma.contentNode.update({
+      where: { id },
+      data: { deletedAt: null, deletedBy: null },
+    }),
+    // Clear the trash entry — contentId is unique on TrashBin, and a leftover
+    // row made every future delete of a restored node 500 on the constraint.
+    prisma.trashBin.deleteMany({ where: { contentId: id } }),
+  ]);
+  if (node.contentType === "workflow") {
+    // n8n Flows were deactivated engine-side on trash; bring the webhook back.
+    const { reactivateN8nFlowForContent } = await import(
+      "@/extensions/workflows/server/engines/n8n/teardown"
+    );
+    await reactivateN8nFlowForContent(id).catch(() => undefined);
+  }
+  return true;
 }
 
 /** Permanently delete a single soft-deleted item now. Ownership-gated. */
@@ -113,9 +130,18 @@ export async function purgeTrashItem(
   }
   const node = await prisma.contentNode.findFirst({
     where: { id, ownerId: userId, deletedAt: { not: null } },
-    select: { id: true },
+    select: { id: true, contentType: true },
   });
   if (!node) return false;
+  if (node.contentType === "workflow") {
+    // Engine teardown must read the WorkflowPayload (n8n ids) BEFORE the row
+    // delete cascades it away: delete n8n workflow + credential, revoke the
+    // callback token, drop the WorkflowDefinition (cascades its runs).
+    const { teardownN8nFlowForContent } = await import(
+      "@/extensions/workflows/server/engines/n8n/teardown"
+    );
+    await teardownN8nFlowForContent(id, userId).catch(() => undefined);
+  }
   await prisma.contentNode.delete({ where: { id } });
   return true;
 }
@@ -155,10 +181,32 @@ export async function purgeExpiredTrash(): Promise<{
   const expiredContentNodes = await prisma.contentNode.findMany({
     where: { deletedAt: { lt: cutoff } },
     select: {
+      id: true,
       ownerId: true,
+      contentType: true,
       filePayload: { select: { storageKey: true } },
     },
   });
+
+  // n8n Flows: tear down the engine side (n8n workflow + credential, callback
+  // token, WorkflowDefinition) BEFORE the row delete cascades the
+  // WorkflowPayload that holds the n8n ids — mirrors the blob cleanup below.
+  for (const node of expiredContentNodes) {
+    if (node.contentType !== "workflow") continue;
+    try {
+      const { teardownN8nFlowForContent } = await import(
+        "@/extensions/workflows/server/engines/n8n/teardown"
+      );
+      await teardownN8nFlowForContent(node.id, node.ownerId);
+    } catch (error) {
+      logger.warn({
+        layer: "route",
+        event: "trash.purge.workflow_teardown_failed",
+        summary: `failed n8n teardown for expired flow ${node.id}`,
+        error,
+      });
+    }
+  }
   // Resolve each owner's provider once, then drop their blobs.
   const keysByOwner = new Map<string, string[]>();
   for (const node of expiredContentNodes) {
