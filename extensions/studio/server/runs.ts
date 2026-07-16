@@ -431,12 +431,249 @@ const runInfographic: Executor = async (ctx) => {
   };
 };
 
-const EXECUTORS: Record<string, Executor> = {
-  infographic: runInfographic,
-  // audio-overview + slide-deck arrive in Phase 6 through this same table.
+// ── Phase 6: audio overview ───────────────────────────────────────────────
+
+const AUDIO_STYLES: Record<string, string> = {
+  "deep-dive":
+    "a thorough narrated walk-through: motivate why the material matters, then move through the key ideas in a logical arc with concrete examples from the sources",
+  brief:
+    "a tight 2-minute brief: only the essential points, stated plainly, for someone about to walk into a meeting on this",
+  critique:
+    "a critical review: what the material argues, where it's strong, where it's thin or contradictory, and what's missing",
+  debate:
+    "a single narrator steelmanning both sides: present the strongest case FOR the material's position, then the strongest case AGAINST, then where the balance lands",
 };
 
-/** Register (or replace) a job executor — Phase 6 adds its own through this. */
+// One TTS call — provider hard limits sit near 4096 chars, so the script is
+// budgeted below that. Multi-voice + chunked long-form is the postponed
+// two-host work (plan → Non-goals).
+const AUDIO_SCRIPT_CHAR_BUDGET = 3_900;
+
+const AudioScriptSchema = z.object({
+  title: z.string().min(1).max(100).describe("Short episode-style title."),
+  script: z
+    .string()
+    .min(1)
+    .describe(
+      `The narration script: plain spoken prose for a single voice — no headings, no markdown, no stage directions. HARD BUDGET: ${AUDIO_SCRIPT_CHAR_BUDGET} characters; end on a complete sentence.`
+    ),
+});
+
+const runAudioOverview: Executor = async (ctx) => {
+  await setStep(ctx.runId, 1, 3, "Reading sources");
+  const sources = await assembleSources(ctx.userId, ctx.folderId);
+  if (!sources.text) {
+    throw new Error(
+      "No readable sources selected — pick at least one source with text."
+    );
+  }
+
+  await setStep(ctx.runId, 2, 3, "Writing script");
+  const { model, modelId } = await resolveGenerationModel(ctx.userId);
+  const style = AUDIO_STYLES[ctx.variantId ?? "deep-dive"] ?? AUDIO_STYLES["deep-dive"];
+  const prompt = [
+    `Write ${style}, about the folder "${ctx.folderTitle}".`,
+    "Work strictly from these sources:",
+    sources.text,
+  ].join("\n\n");
+  const { object } = await generateObject({
+    model,
+    schema: AudioScriptSchema,
+    prompt,
+  });
+  const script = object.script.slice(0, AUDIO_SCRIPT_CHAR_BUDGET);
+
+  await setStep(ctx.runId, 3, 3, "Generating audio");
+  const { generateAndStoreSpeech } = await import(
+    "@/lib/domain/ai/speech/generate-and-store"
+  );
+  const speech = await generateAndStoreSpeech({
+    text: script,
+    userId: ctx.userId,
+    label: object.title || `${ctx.folderTitle} audio overview`,
+  });
+
+  // Relocate from the default placement into the Studio outputs folder and
+  // stamp the GEN-lock hash.
+  const outputsFolderId = await ensureOutputsFolder(ctx.userId, ctx.folderId);
+  const bodyHash = stableHash({ script });
+  await prisma.contentNode.update({
+    where: { id: speech.contentId },
+    data: {
+      parentId: outputsFolderId,
+      role: "primary",
+      ownedByNoteId: null,
+      bodyHash,
+    },
+  });
+
+  return {
+    nodeId: speech.contentId,
+    title: speech.fileName,
+    bodyHash,
+    promptSnapshot: prompt.slice(0, 20_000),
+    model: `${modelId} + ${speech.providerId}:${speech.modelId}`,
+    sourceNodeIds: sources.sourceNodeIds,
+  };
+};
+
+// ── Phase 6: slide deck (.pptx → OnlyOffice) ──────────────────────────────
+
+const SlideDeckSchema = z.object({
+  title: z.string().min(1).max(100).describe("Deck title."),
+  slides: z
+    .array(
+      z.object({
+        title: z.string().min(1).max(90),
+        bullets: z
+          .array(z.string().min(1).max(180))
+          .min(1)
+          .max(6)
+          .describe("Concise talking points — fragments, not paragraphs."),
+        notes: z
+          .string()
+          .max(600)
+          .optional()
+          .describe("Optional speaker notes for this slide."),
+      })
+    )
+    .min(3)
+    .max(15),
+});
+
+const runSlideDeck: Executor = async (ctx) => {
+  await setStep(ctx.runId, 1, 3, "Reading sources");
+  const sources = await assembleSources(ctx.userId, ctx.folderId);
+  if (!sources.text) {
+    throw new Error(
+      "No readable sources selected — pick at least one source with text."
+    );
+  }
+
+  await setStep(ctx.runId, 2, 3, "Outlining deck");
+  const { model, modelId } = await resolveGenerationModel(ctx.userId);
+  const prompt = [
+    `Outline a slide deck presenting the folder "${ctx.folderTitle}": a title slide comes free, so start with the first content slide. Structure: context → key points → synthesis/takeaways.`,
+    "Work strictly from these sources:",
+    sources.text,
+  ].join("\n\n");
+  const { object } = await generateObject({
+    model,
+    schema: SlideDeckSchema,
+    prompt,
+  });
+
+  await setStep(ctx.runId, 3, 3, "Building .pptx");
+  const { default: PptxGen } = await import("pptxgenjs");
+  const pres = new PptxGen();
+  pres.defineLayout({ name: "WIDE", width: 13.33, height: 7.5 });
+  pres.layout = "WIDE";
+
+  const titleSlide = pres.addSlide();
+  titleSlide.addText(object.title, {
+    x: 0.8,
+    y: 2.6,
+    w: 11.7,
+    h: 1.4,
+    fontSize: 40,
+    bold: true,
+  });
+  titleSlide.addText(`Generated from "${ctx.folderTitle}" — Folder Studio`, {
+    x: 0.8,
+    y: 4.1,
+    w: 11.7,
+    h: 0.6,
+    fontSize: 16,
+    color: "666666",
+  });
+
+  for (const slide of object.slides) {
+    const s = pres.addSlide();
+    s.addText(slide.title, {
+      x: 0.8,
+      y: 0.5,
+      w: 11.7,
+      h: 1.0,
+      fontSize: 28,
+      bold: true,
+    });
+    s.addText(
+      slide.bullets.map((b) => ({
+        text: b,
+        options: { bullet: true, breakLine: true },
+      })),
+      { x: 0.9, y: 1.8, w: 11.5, h: 5.0, fontSize: 18, valign: "top" }
+    );
+    if (slide.notes) s.addNotes(slide.notes);
+  }
+
+  const buffer = (await pres.write({ outputType: "nodebuffer" })) as Buffer;
+
+  // Store like any uploaded file (mirrors the speech pipeline).
+  const { getUserStorageProvider } = await import("@/lib/infrastructure/storage");
+  const storageProvider = await getUserStorageProvider(ctx.userId);
+  const { createHash, randomBytes } = await import("crypto");
+  const checksum = createHash("sha256").update(buffer).digest("hex");
+  const mimeType =
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation";
+  const storageKey = `uploads/${ctx.userId}/studio-deck-${Date.now()}-${randomBytes(8).toString("hex")}.pptx`;
+  await storageProvider.uploadFile(storageKey, buffer, mimeType);
+
+  const outputsFolderId = await ensureOutputsFolder(ctx.userId, ctx.folderId);
+  const safeBase = object.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Slide deck";
+  const fileName = `${safeBase}.pptx`;
+  const slug = await generateUniqueSlug(fileName, ctx.userId);
+  const bodyHash = stableHash({ deck: object });
+  const node = await prisma.contentNode.create({
+    data: {
+      ownerId: ctx.userId,
+      title: fileName,
+      slug,
+      contentType: "file",
+      parentId: outputsFolderId,
+      bodyHash,
+      filePayload: {
+        create: {
+          fileName,
+          fileExtension: "pptx",
+          mimeType,
+          fileSize: BigInt(buffer.length),
+          checksum,
+          storageProvider: "r2",
+          storageKey,
+          searchText: [
+            object.title,
+            ...object.slides.flatMap((s) => [s.title, ...s.bullets]),
+          ]
+            .join(" ")
+            .slice(0, 10_000),
+          uploadStatus: "ready",
+          uploadedAt: new Date(),
+          isProcessed: true,
+          processingStatus: "complete",
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  return {
+    nodeId: node.id,
+    title: fileName,
+    bodyHash,
+    promptSnapshot: prompt.slice(0, 20_000),
+    model: modelId,
+    sourceNodeIds: sources.sourceNodeIds,
+  };
+};
+
+const EXECUTORS: Record<string, Executor> = {
+  infographic: runInfographic,
+  "audio-overview": runAudioOverview,
+  "slide-deck": runSlideDeck,
+};
+
+/** Register (or replace) a job executor — later phases add through this. */
 export function registerStudioExecutor(toolId: string, executor: Executor) {
   EXECUTORS[toolId] = executor;
 }

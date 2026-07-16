@@ -14,7 +14,11 @@ export const CHAT_INVOCABLE_TOOL_IDS = [
 ] as const;
 
 /** Job tools whose executor is registered in server/runs.ts. */
-export const JOB_INVOCABLE_TOOL_IDS = ["infographic"] as const;
+export const JOB_INVOCABLE_TOOL_IDS = [
+  "infographic",
+  "audio-overview",
+  "slide-deck",
+] as const;
 
 export function isChatInvocable(toolId: string): boolean {
   return (CHAT_INVOCABLE_TOOL_IDS as readonly string[]).includes(toolId);
