@@ -1,5 +1,6 @@
 import { logger } from "@/lib/core/logger";
 
+import { closeGate } from "../../runs";
 import type { WorkflowEngineAdapter } from "../types";
 import { n8nBaseUrl, postToN8nUrl } from "./client";
 
@@ -43,7 +44,7 @@ export const n8nEngineAdapter: WorkflowEngineAdapter = {
     return { engineRunId: null };
   },
 
-  async resumeGate(run, _token, payload) {
+  async resumeGate(run, token, payload) {
     if (!run.engineGateRef) {
       throw new Error("No engine resume handle stored for this gate.");
     }
@@ -53,6 +54,11 @@ export const n8nEngineAdapter: WorkflowEngineAdapter = {
         `n8n resume returned ${status}: ${text.slice(0, 200)}`
       );
     }
+    // n8n accepted the resume — close the gate app-side (waiting → running)
+    // now, mirroring the WDK path (wdk/gate.ts). Without this the run shows
+    // "waiting" until the finish callback, however long the rest of the flow
+    // takes, and a second approve click double-posts to a dead resume URL.
+    await closeGate(run.id, token, payload);
   },
 
   async cancel(run) {

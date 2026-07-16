@@ -46,8 +46,25 @@ function GateActions({ notification }: { notification: NotificationDTO }) {
         body: JSON.stringify({ token: gateToken, payload: { approved: true } }),
       });
       if (!response.ok) {
-        // Already-resumed gates return 409 — treat as informative, not scary.
-        toast.info("This gate is no longer waiting.");
+        // Only an already-resumed gate (409 GATE_MISMATCH) is informative;
+        // anything else is a real failure and must surface as one.
+        if (response.status === 409) {
+          toast.info("This gate is no longer waiting.");
+          return;
+        }
+        let message = "Failed to approve.";
+        try {
+          const json: unknown = await response.json();
+          if (json && typeof json === "object" && "error" in json) {
+            const err = (json as { error?: { message?: unknown } }).error;
+            if (err && typeof err.message === "string" && err.message) {
+              message = err.message;
+            }
+          }
+        } catch {
+          // keep the generic message
+        }
+        toast.error(message);
         return;
       }
       toast.success("Approved — workflow resuming");
