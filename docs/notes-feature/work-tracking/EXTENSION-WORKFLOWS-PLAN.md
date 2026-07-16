@@ -113,7 +113,10 @@ Built (commit 2727ee3): global badge with frozen precedence (failed `!` red, 30-
 
 **Gate:** Badge reflects the run lifecycle across tab switches and after popup close; popup list matches the app's `WorkflowsPanel` for the same account.
 
-### Phase 3 — Deep supervise / tweak (overlay embed)
+### Phase 3 — Deep supervise / tweak (overlay embed) ✅ CODE COMPLETE 2026-07-16 (smoke pending)
+Built (commit c72cccf) on top of the P2-smoke-verified embed panel (Runs/Edit tabs + gate approve/decline all confirmed live 2026-07-16): pill **[View]** → background door → workflow panel deep-linked via one-shot `pendingRunDeepLink` → fresh iframe src with `?run=`; popup run rows land on their run's detail; **Retry with same input** on failed runs (re-dispatches `input.data` — never re-captures; both hosts jump to the new run). Embed toast alignment fixed (`.embed-layout-page` sonner rule — P2 smoke feedback). Smoke: dispatch → pill [View] → panel opens ON that run's detail; fail a run → Retry → new run appears using the original capture.
+
+#### Original scope (for reference)
 - [ ] Overlay: open a workflow/run via the **existing embed-iframe floating panel** pointed at `/embed/content/{workflowId}?run={runId}`. Reuse `attachEmbedForPanel`/session-token flow verbatim — no new iframe machinery.
 - [ ] Wire `[View]` / "Open in page" from the toast (Phase 1) and the popup list (Phase 2) into this panel.
 - [ ] **Retry** = re-dispatch reusing the failed run's `input.data` (including `captureNodeId`) via `dispatchWorkflowFromContent` — NOT a fresh capture; the user may have navigated away from the page, so the original stored capture is the only faithful input. Surfaced in the embed viewer + popup. **Gate approve/decline + cancel** happen inside the embedded real app (session-authed) — verify end-to-end. **Edit flow** = the embed viewer's Edit tab (`WorkflowBuilder`) → re-run.
