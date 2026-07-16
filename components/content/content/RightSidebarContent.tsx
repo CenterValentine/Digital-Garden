@@ -10,10 +10,8 @@
 "use client";
 
 import { createElement } from "react";
-import { BacklinksPanel } from "../BacklinksPanel";
 import { OutlinePanel } from "../OutlinePanel";
 import { ChatOutlinePanel } from "../ChatOutlinePanel";
-import { TagsPanel } from "../TagsPanel";
 import { MultiConversationSidebar } from "../ai/MultiConversationSidebar";
 import { PropertiesPanel } from "../blocks/PropertiesPanel";
 import { useOutlineStore } from "@/state/outline-store";
@@ -76,9 +74,7 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
 
   return (
     <div className="flex-1 overflow-hidden">
-      {activeTab === "backlinks" && (
-        <BacklinksPanel contentId={selectedContentId} />
-      )}
+      {/* Links + Tags live inside the Context tab's subrail since 2026-07-16. */}
       {activeTab === "outline" &&
         (isChat ? (
           <ChatOutlinePanel
@@ -92,7 +88,6 @@ export function RightSidebarContent({ activeTab }: RightSidebarContentProps) {
             onHeadingClick={handleHeadingClick}
           />
         ))}
-      {activeTab === "tags" && <TagsPanel contentId={selectedContentId} />}
       {activeTab === "chat" && <MultiConversationSidebar contentId={selectedContentId} />}
       {activeTab === "properties" && <PropertiesPanel />}
       {activeTab === "publish" && (

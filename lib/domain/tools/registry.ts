@@ -156,32 +156,17 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   },
 
   // ─── SIDEBAR TABS (matches current RightSidebar) ───
-  {
-    id: "backlinks-tab",
-    label: "Links",
-    iconName: "Link",
-    surfaces: ["sidebar-tab"],
-    contentTypes: ["note", "external"],
-    order: 10,
-    tabKey: "backlinks",
-  },
+  // Outline leads (decision 2026-07-16). The old standalone Links and Tags
+  // tabs are MERGED into the Context tab as sub-tabs (links · tags · AI) —
+  // see extensions/studio/components/ContextTab.tsx.
   {
     id: "outline-tab",
     label: "Outline",
     iconName: "List",
     surfaces: ["sidebar-tab"],
     contentTypes: ["note", "chat"],
-    order: 20,
+    order: 10,
     tabKey: "outline",
-  },
-  {
-    id: "tags-tab",
-    label: "Tags",
-    iconName: "Tag",
-    surfaces: ["sidebar-tab"],
-    contentTypes: "all",
-    order: 30,
-    tabKey: "tags",
   },
   {
     id: "chat-tab",
@@ -202,9 +187,21 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 50,
     tabKey: "publish",
   },
-  // Studio extension tabs — filtered out in the sidebar when the extension is
-  // disabled (see RightSidebar/RightSidebarHeader), matching the registry-
-  // filter rule for extension-owned surfaces.
+  // Context hub: links + tags + AI metadata sub-tabs. Hosted by the studio
+  // extension component but the links/tags sub-tabs are core surfaces, so
+  // the tab itself is NOT filtered by studio enablement (the AI sub-tab is).
+  {
+    id: "context-tab",
+    label: "Context",
+    iconName: "FileText",
+    surfaces: ["sidebar-tab"],
+    contentTypes: "all",
+    order: 20,
+    tabKey: "context",
+  },
+  // Studio tab — filtered out in the sidebar when the extension is disabled
+  // (see RightSidebar/RightSidebarHeader), the registry-filter rule for
+  // extension-owned surfaces.
   {
     id: "studio-tab",
     label: "Studio",
@@ -213,15 +210,6 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     contentTypes: ["folder"],
     order: 60,
     tabKey: "studio",
-  },
-  {
-    id: "context-tab",
-    label: "Context",
-    iconName: "FileText",
-    surfaces: ["sidebar-tab"],
-    contentTypes: ["folder", "note", "file", "html", "code", "external"],
-    order: 70,
-    tabKey: "context",
   },
 ];
 

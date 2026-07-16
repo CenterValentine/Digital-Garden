@@ -23,7 +23,6 @@ import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,
-  STUDIO_CONTEXT_TAB_KEY,
 } from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
@@ -86,16 +85,13 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
   const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
 
   // Get visible tabs from registry, filtered by current content type.
-  // Studio-owned tabs disappear when the extension is disabled (registry-
+  // The Studio tab disappears when the extension is disabled (registry-
   // filter rule — same mechanism ContentToolbar uses for speed-reader).
+  // Context stays: its links/tags sub-tabs are core surfaces.
   const registryTabs = queryTools({
     surface: "sidebar-tab",
     contentType: (selectedContentType as ContentType) ?? undefined,
-  }).filter(
-    (tool) =>
-      studioEnabled ||
-      (tool.tabKey !== STUDIO_TAB_KEY && tool.tabKey !== STUDIO_CONTEXT_TAB_KEY)
-  );
+  }).filter((tool) => studioEnabled || tool.tabKey !== STUDIO_TAB_KEY);
 
   const tabs = [...registryTabs];
   if (extensionTool) {
