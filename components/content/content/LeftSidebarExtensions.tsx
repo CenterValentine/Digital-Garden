@@ -1,6 +1,5 @@
 "use client";
 
-import { Puzzle } from "lucide-react";
 import Link from "next/link";
 import {
   renderExtensionIcon,
@@ -62,8 +61,7 @@ export function LeftSidebarExtensions() {
         {/* Header — inbox-navigator theme: tracked label + subheader, with
             the divider line running beneath BOTH (2026-07-16). */}
         <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
-          <p className="flex items-center gap-1.5 text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-            <Puzzle className="h-3.5 w-3.5 text-gold-primary" />
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
             Extensions
           </p>
           <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">

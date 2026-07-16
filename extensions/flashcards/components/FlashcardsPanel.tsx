@@ -521,7 +521,7 @@ export function FlashcardsPanel() {
       {/* Header — FLASHCARDS label on its own row so it can never be
           overrun by the action buttons regardless of panel width. */}
       <div className="border-b border-black/10 dark:border-white/10 px-3 pt-3 pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
           Flashcards
         </p>
         <div className="mt-1.5 flex items-center gap-1">

@@ -829,7 +829,7 @@ export function PeoplePanel() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="border-b border-white/10 px-3 pt-3 pb-2">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+        <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
           People
         </p>
         <div className="mt-1.5 flex items-center gap-1">
