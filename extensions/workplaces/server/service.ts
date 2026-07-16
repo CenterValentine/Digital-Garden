@@ -792,6 +792,41 @@ export async function saveWorkspaceState(
   return formatWorkspace(updatedWorkspace);
 }
 
+/**
+ * Scrub a content id out of every workspace the owner has — pane tabs
+ * (paneState JSON) and assignment items. Called on content delete: without
+ * this, the deleted node lingers in stored pane state and the workspace
+ * restore/snapshot sync resurrects its tab in the main panel.
+ */
+export async function removeContentFromWorkspaces(
+  ownerId: string,
+  contentId: string,
+) {
+  await prisma.contentWorkspaceItem.deleteMany({
+    where: { contentId, workspace: { ownerId } },
+  });
+
+  const workspaces = await prisma.contentWorkspace.findMany({
+    where: { ownerId },
+    select: { id: true, paneState: true },
+  });
+  for (const workspace of workspaces) {
+    const state = normalizeWorkspaceStatePayload(workspace.paneState);
+    const ids = getStateContentIds(state);
+    if (!ids.includes(contentId)) continue;
+    const allowed = new Set(ids.filter((id) => id !== contentId));
+    const filtered = filterWorkspaceStateToContentIds(state, allowed);
+    await prisma.contentWorkspace.update({
+      where: { id: workspace.id },
+      data: {
+        layoutMode: filtered.layoutMode,
+        activePaneId: filtered.activePaneId,
+        paneState: filtered as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
+}
+
 async function getAncestorIds(ownerId: string, contentId: string) {
   const ancestors: string[] = [];
   let current = await prisma.contentNode.findFirst({

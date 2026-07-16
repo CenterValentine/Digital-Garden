@@ -68,3 +68,34 @@ export const DISPATCHABLE_WORKFLOWS: Array<{
   name: string;
   needsUrl: boolean;
 }> = [{ slug: "gate-probe", name: "Gate Probe (plumbing test)", needsUrl: false }];
+
+/**
+ * The one scope a workflow service token (PAT) carries today. Execution
+ * spokes (Plan 3: n8n) present this token to the callback surface. It's
+ * intentionally singular — the token is "wide" but its blast radius is
+ * contained structurally: requireServiceTokenAuth is imported only by the
+ * /api/workflows/callback/* routes, so the token can't reach content APIs.
+ */
+export const WORKFLOWS_CALLBACK_SCOPE = "workflows:callback";
+
+/**
+ * Client-safe service-token record. The raw secret is NEVER in this shape —
+ * only the `tokenPrefix` (first chars, for at-a-glance identification). The
+ * full token is returned exactly once, at creation, in ServiceTokenCreateDto.
+ */
+export interface ServiceTokenDto {
+  id: string;
+  name: string;
+  tokenPrefix: string;
+  scopes: string[];
+  createdAt: string;
+  lastUsedAt: string | null;
+  expiresAt: string | null;
+  revokedAt: string | null;
+}
+
+/** Returned once, at creation: the plaintext `token` plus its record. */
+export interface ServiceTokenCreateDto {
+  token: string;
+  record: ServiceTokenDto;
+}

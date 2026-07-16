@@ -1,3 +1,4 @@
+import { n8nEngineAdapter } from "./n8n/adapter";
 import { wdkEngineAdapter } from "./wdk";
 import type { WorkflowEngineAdapter } from "./types";
 
@@ -8,6 +9,7 @@ import type { WorkflowEngineAdapter } from "./types";
  */
 const ENGINE_REGISTRY: Record<string, WorkflowEngineAdapter> = {
   [wdkEngineAdapter.id]: wdkEngineAdapter,
+  [n8nEngineAdapter.id]: n8nEngineAdapter,
 };
 
 export function getEngineAdapter(id: string): WorkflowEngineAdapter | null {

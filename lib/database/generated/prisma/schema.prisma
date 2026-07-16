@@ -561,6 +561,7 @@ model User {
   ownedTenants            Tenant[]                 @relation("OwnedTenants")
 
   series                   Series[]
+  serviceTokens            ServiceToken[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections  BookmarkSyncConnection[]
@@ -569,6 +570,7 @@ model User {
   webResourceViewStates    WebResourceViewState[]
   studioSourceSelections   StudioSourceSelection[]
   studioGenerationRuns     StudioGenerationRun[]
+  studioContextSpend       StudioContextSpend[]
 
   connectionInvitesSent     ConnectionInvite[]      @relation("ConnectionInvitesSent")
   connectionInvitesReceived ConnectionInvite[]      @relation("ConnectionInvitesReceived")
@@ -827,6 +829,30 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+/// Personal Access Token for machine-to-machine callers of the workflow
+/// callback surface (Trellis Plan 3 — the n8n execution spoke posts run
+/// events/gates/artifacts back through PAT-authed routes). One "wide" token
+/// per user: blast radius is contained structurally because the guard
+/// (requireServiceTokenAuth) is imported only by /api/workflows/callback/*.
+/// Hashed at rest (sha256), shown once, revocable. Mirrors BrowserExtensionToken.
+model ServiceToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  name        String    @db.VarChar(120)
+  tokenHash   String    @unique @db.Char(64)
+  tokenPrefix String    @db.VarChar(16)
+  scopes      String[]  @default(["workflows:callback"])
+  lastUsedAt  DateTime? @db.Timestamptz(6)
+  expiresAt   DateTime? @db.Timestamptz(6)
+  revokedAt   DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenPrefix])
 }
 
 model BrowserExtensionToken {
@@ -2263,10 +2289,24 @@ model AgenticMetadata {
   sectionsMeta      Json        @default("{}")
   // Staleness: canonical hash of source content at generation time
   sourceContentHash String?     @db.VarChar(64)
+  // Dirty bit: set on save/move/delete for the node + its ancestor chain,
+  // cleared when the refresh engine regenerates (or damps) the node. Makes
+  // "what needs work" an indexed query instead of a per-node hash scan.
+  contextDirty      Boolean     @default(false)
+  // Output hash of the AI-owned sections (summary+structure). Cascade
+  // damping: folders hash children's summaryHash, so an edit that doesn't
+  // change a child's summary never propagates upward.
+  summaryHash       String?     @db.VarChar(64)
+  // Privacy opt-out: AI context never reads this node (no auto-refresh, no
+  // manual Generate, excluded from folder roll-up inputs and from folder
+  // chat's default source selection). Folders shield their whole subtree.
+  contextOptOut     Boolean     @default(false)
   model             String?     @db.VarChar(100)
   generatedAt       DateTime?   @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
   node              ContentNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([contextDirty])
 }
 
 // Folder Studio: per-folder source selection for grounded chat (Phase 3).
@@ -2316,4 +2356,22 @@ model StudioGenerationRun {
 
   @@index([ownerId, folderId, createdAt])
   @@index([outputNodeId])
+}
+
+// Folder Studio auto-context: per-user daily spend counter (V1.1 follow-up).
+// One row per (owner, UTC day); `generationCalls` counts LLM requests made
+// by the refresh engine (packs + folder roll-ups — NOT the manual per-node
+// Generate button). The engine's gate stack refuses to start/continue a
+// drain once the user's dailyCallCap (Studio settings) is reached. Soft
+// ceiling: concurrent drains may overshoot by one per-run cap at most.
+model StudioContextSpend {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String   @db.Uuid
+  // UTC calendar day, "YYYY-MM-DD" — string keying keeps resets timezone-simple.
+  day             String   @db.VarChar(10)
+  generationCalls Int      @default(0)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, day])
 }

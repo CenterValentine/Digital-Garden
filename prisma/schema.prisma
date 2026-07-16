@@ -564,6 +564,7 @@ model User {
   ownedTenants         Tenant[]                @relation("OwnedTenants")
 
   series               Series[]
+  serviceTokens          ServiceToken[]
   browserExtensionTokens BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections BookmarkSyncConnection[]
@@ -831,6 +832,30 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+/// Personal Access Token for machine-to-machine callers of the workflow
+/// callback surface (Trellis Plan 3 — the n8n execution spoke posts run
+/// events/gates/artifacts back through PAT-authed routes). One "wide" token
+/// per user: blast radius is contained structurally because the guard
+/// (requireServiceTokenAuth) is imported only by /api/workflows/callback/*.
+/// Hashed at rest (sha256), shown once, revocable. Mirrors BrowserExtensionToken.
+model ServiceToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  name        String    @db.VarChar(120)
+  tokenHash   String    @unique @db.Char(64)
+  tokenPrefix String    @db.VarChar(16)
+  scopes      String[]  @default(["workflows:callback"])
+  lastUsedAt  DateTime? @db.Timestamptz(6)
+  expiresAt   DateTime? @db.Timestamptz(6)
+  revokedAt   DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenPrefix])
 }
 
 model BrowserExtensionToken {

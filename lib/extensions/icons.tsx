@@ -10,6 +10,7 @@ import {
   Users,
   Waypoints,
   Workflow,
+  Zap,
   type LucideIcon,
 } from "lucide-react";
 import type { ReactElement } from "react";
@@ -26,6 +27,7 @@ const EXTENSION_ICONS: Record<string, LucideIcon> = {
   Users,
   Waypoints,
   Workflow,
+  Zap,
 };
 
 export function getExtensionIcon(iconName: string): LucideIcon {

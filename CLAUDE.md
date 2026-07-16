@@ -521,9 +521,12 @@ These were all caught by enforcing the React Compiler rules during lint. Treat c
 ### Adding a New Extension Module
 
 1. Create `extensions/<name>/manifest.ts`, `client.tsx`, and (if needed) `server-runtime.ts`
-2. Register in `lib/extensions/installed.ts`
+2. Register in **both** extension lists — they are intentionally separate (installed.ts bundles client runtimes so it can't be imported from Server Components; manifests.ts is server-safe data). The **`pnpm extensions:check` gate** (in `build`) enforces they stay in sync, so a miss fails the build with a clear message rather than shipping silently:
+   - `lib/extensions/installed.ts` → `BUILT_IN_EXTENSIONS` (runtime: panels, content viewers, slash commands, `settingsDialog`).
+   - `lib/extensions/manifests.ts` → `ALL_EXTENSION_MANIFESTS` (server-safe manifest; drives `EXTENSION_IDS`, which the `/settings/extensions/[id]` route uses to validate ids). **Miss this and the extension's settings page 404s to the public site** even though its runtime works fine — the sidebar entry renders (it reads the runtime registry) but the route calls `notFound()`. (Bit the workflows extension, PR #103 → fixed 2026-07-14; the gate exists so it can't recur.) The gate also asserts each manifest's `iconName` resolves in `lib/extensions/icons.tsx` (an unmapped name silently renders the Puzzle fallback).
 3. Shell UI contributions go through runtime shell slots — do not import extension UI directly into shared components
 4. Content viewer: if the extension owns rendering for a specific content type, declare the matcher in `client.tsx`
+5. Settings body (optional): register a `settingsDialog` component in the runtime (`client.tsx`) to fill `/settings/extensions/<id>` and the Extensions dialog — one component, two mounts. Render `SettingSection` cards only; the shell provides the `SettingsPage` frame (title/toggle).
 
 ### Database Workflows
 
