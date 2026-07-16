@@ -4,10 +4,14 @@ import type { N8nNode, N8nWorkflow } from "./types";
 
 /**
  * The starter n8n workflow DG seeds for a native ("n8n Flow") authoring
- * session: a Webhook trigger (so DG can start runs) → a "DG: Finish run" node
- * (so a run always completes back in DG's timeline). The user builds their
- * integration nodes IN BETWEEN, in n8n's own editor. Optional supervision/event
- * callbacks are dropped in from the DG helper-node set.
+ * session:
+ *   Webhook "Trigger" → "DG: Running" → "DG: Finish run"
+ * The Trigger lets DG start runs; "DG: Running" stamps n8n's execution id onto
+ * the DG run (so the error handler can map failures back); "DG: Finish run"
+ * completes the run. The user builds their integration nodes in between, in
+ * n8n's own editor. `settings.errorWorkflow` points at the per-user DG Error
+ * Handler so a crash reports back. NOTE: the callbacks reference `$('Trigger')`
+ * by name — keep the webhook trigger; don't replace it with a manual trigger.
  *
  * Node shapes match the ones validated against live n8n 2.10.2 (see compiler.ts).
  */
@@ -17,13 +21,20 @@ export interface SeedOptions {
   callbackBaseUrl: string;
   webhookPath: string;
   credential: { id: string; name: string };
+  /** Per-user DG Error Handler workflow id → n8n `settings.errorWorkflow`. */
+  errorWorkflowId?: string;
 }
 
 const TRIGGER_NAME = "Trigger";
+const RUNNING_NAME = "DG: Running";
 const FINISH_NAME = "DG: Finish run";
 
 function credentials(opts: SeedOptions) {
   return { httpHeaderAuth: { id: opts.credential.id, name: opts.credential.name } };
+}
+
+function callbackUrl(opts: SeedOptions, action: string): string {
+  return `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${TRIGGER_NAME}').item.json.runId }}/${action}`;
 }
 
 export function buildSeedWorkflow(opts: SeedOptions): N8nWorkflow {
@@ -41,15 +52,33 @@ export function buildSeedWorkflow(opts: SeedOptions): N8nWorkflow {
     webhookId: opts.webhookPath,
   };
 
+  const running: N8nNode = {
+    id: randomUUID(),
+    name: RUNNING_NAME,
+    type: "n8n-nodes-base.httpRequest",
+    typeVersion: 4.2,
+    position: [240, 0],
+    parameters: {
+      method: "POST",
+      url: callbackUrl(opts, "running"),
+      sendBody: true,
+      specifyBody: "json",
+      jsonBody: `={{ ({ "engineExecutionId": String($execution.id) }) }}`,
+      authentication: "genericCredentialType",
+      genericAuthType: "httpHeaderAuth",
+    },
+    credentials: credentials(opts),
+  };
+
   const finish: N8nNode = {
     id: randomUUID(),
     name: FINISH_NAME,
     type: "n8n-nodes-base.httpRequest",
     typeVersion: 4.2,
-    position: [480, 0],
+    position: [720, 0],
     parameters: {
       method: "POST",
-      url: `=${opts.callbackBaseUrl}/api/workflows/callback/runs/{{ $('${TRIGGER_NAME}').item.json.runId }}/finish`,
+      url: callbackUrl(opts, "finish"),
       sendBody: true,
       specifyBody: "json",
       jsonBody: `={{ ({ "status": "succeeded", "output": { "outcome": "completed" } }) }}`,
@@ -61,10 +90,13 @@ export function buildSeedWorkflow(opts: SeedOptions): N8nWorkflow {
 
   return {
     name: opts.workflowName,
-    nodes: [trigger, finish],
+    nodes: [trigger, running, finish],
     connections: {
-      [TRIGGER_NAME]: { main: [[{ node: FINISH_NAME, type: "main", index: 0 }]] },
+      [TRIGGER_NAME]: { main: [[{ node: RUNNING_NAME, type: "main", index: 0 }]] },
+      [RUNNING_NAME]: { main: [[{ node: FINISH_NAME, type: "main", index: 0 }]] },
     },
-    settings: {},
+    settings: opts.errorWorkflowId
+      ? { errorWorkflow: opts.errorWorkflowId }
+      : {},
   };
 }

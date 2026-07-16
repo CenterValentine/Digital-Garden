@@ -13,7 +13,7 @@ import {
   N8N_PAYLOAD_ENGINE,
   readN8nMetadata,
 } from "./engines/n8n/meta";
-import { createRun, finishRun, setEngineRunId } from "./runs";
+import { createRun, finishRun, markRunning, setEngineRunId } from "./runs";
 
 export type DispatchErrorCode =
   | "UNKNOWN_WORKFLOW"
@@ -335,7 +335,15 @@ export async function dispatchWorkflowFromContent(
       engine: definition.engine,
       input: data,
     });
-    return startEngineForRun(definition, run);
+    const result = await startEngineForRun(definition, run);
+    // n8n's webhook returns on receipt; if it accepted the trigger the flow is
+    // executing, so reflect "running" until a callback finishes it. No-op if a
+    // fast flow already fired its finish callback — markRunning only touches
+    // queued/waiting runs.
+    if (!isDispatchFailure(result)) {
+      await markRunning(run.id);
+    }
+    return result;
   }
 
   if (node.workflowPayload.engine !== WDK_INTERPRETER_ENGINE) {
