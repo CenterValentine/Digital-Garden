@@ -123,13 +123,13 @@ Built (commit c72cccf) on top of the P2-smoke-verified embed panel (Runs/Edit ta
 
 **Gate:** toast → open deep → steps/timeline/gate visible → approve in-page → run resumes → completes; edit the graph in the Edit tab → re-run picks up the change.
 
-### Phase 4 — Secondary surfaces + polish + ship gates
-- [ ] Context-menu item "Run Digital Garden workflow on this page" (+ a selection variant where `pageText` = the selection). Reuses the Phase 1 dispatch path.
-- [ ] Disabled/empty parity: account with the Workflows extension disabled → chooser shows a graceful empty state, no dead surfaces.
-- [ ] Mobile alignment: adaptive chooser (popup dropdown on desktop, bottom-sheet <768px), ≥44px touch targets, width-fluid embed panel.
-- [ ] Full `typecheck → lint → build`; browser smoke on 2–3 real sites; update `STATUS.md` + `BACKLOG.md`; PR in **sprint format** with a grouped preflight checklist.
+### Phase 4 — Secondary surfaces + polish + ship gates ✅ CODE COMPLETE 2026-07-16
+- [x] Context menus (commit a5dc1b0): "Run workflow on this page" (page/action) + "Run workflow on selection" (`pageText` = selection). No chooser — server auto-routes by URL pattern; dispatch response now returns `workflowNodeId` so auto-routed pills get [View]; errors flash the badge red 5s (context menus have no UI surface).
+- [x] Disabled/empty parity — **resolved by decision**: per-user extension enable state is client-side only (registry helpers are static `enabledByDefault` filters); the chooser's graceful empty state covers reality. Backlogged for revisit if server-side per-user extension settings ever land.
+- [x] Mobile alignment: ≥44px run rows + taller tabs in the embed viewer (width-fluid since P0). Bottom-sheet chooser <768px recorded as N/A — the Chrome toolbar popup is a desktop-only surface; mobile flows through the app's WorkflowsPanel.
+- [x] Full gates green (typecheck / lint 0 err / production build / extension build); `STATUS.md` + `BACKLOG.md` updated; sprint-format PR body with grouped preflight checklist drafted (scratchpad — awaiting base-branch call: stack on foundation PR #103 vs wait-for-merge).
 
-**Gate:** all quality gates green; smoke passed on real pages; tracking docs updated.
+**Gate:** ✅ quality gates green 2026-07-16. Smoke owed (USER): pill [View] → run detail; Retry on a failed run; context menu page + selection variants.
 
 ---
 
