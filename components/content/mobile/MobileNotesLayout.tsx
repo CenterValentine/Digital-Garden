@@ -1,7 +1,8 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
+import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileDrawer } from "./MobileDrawer";
 
@@ -33,6 +34,20 @@ export function MobileNotesLayout({
 }: MobileNotesLayoutProps) {
   const openDrawer = useMobileUiStore((s) => s.openDrawer);
   const closeDrawer = useMobileUiStore((s) => s.closeDrawer);
+  const collapseMode = useLeftPanelCollapseStore((s) => s.mode);
+  const setCollapseMode = useLeftPanelCollapseStore((s) => s.setMode);
+
+  // The sidebar header's collapse toggle means "shrink to icon bar" on
+  // desktop, but inside a slide-over drawer that just leaves a hollow shell.
+  // On mobile, treat collapsing as "dismiss": close the drawer and restore
+  // "full" so the next open shows real content. (MobileBottomNav also sets
+  // "full" before opening, so this reset is belt-and-braces.)
+  useEffect(() => {
+    if (openDrawer === "left" && collapseMode === "hidden") {
+      closeDrawer();
+      setCollapseMode("full");
+    }
+  }, [openDrawer, collapseMode, closeDrawer, setCollapseMode]);
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

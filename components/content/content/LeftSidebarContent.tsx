@@ -27,6 +27,7 @@ import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { clientLogger } from "@/lib/core/logger/client";
+import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
 interface TreeApiResponse {
   success: boolean;
@@ -548,6 +549,10 @@ export function LeftSidebarContent({
       };
 
       setTreeData(insertTempNode(treeData));
+      // iOS: raise the keyboard now, inside the tap's user-activation window —
+      // the rename input mounts asynchronously and its autoFocus alone can't
+      // summon the keyboard (see lib/core/mobile-keyboard.ts).
+      warmUpMobileKeyboard();
       setCreatingItem({
         type: "note",
         parentId,
@@ -2277,6 +2282,11 @@ export function LeftSidebarContent({
     // Update tree with temporary node
     const newTreeData = insertTempNode(treeData);
     setTreeData(newTreeData);
+
+    // iOS: raise the keyboard now, inside the tap's user-activation window —
+    // the rename input mounts asynchronously and its autoFocus alone can't
+    // summon the keyboard (see lib/core/mobile-keyboard.ts).
+    warmUpMobileKeyboard();
 
     // Set creating state to track the temporary node
     setCreatingItem({
