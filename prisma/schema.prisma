@@ -2280,6 +2280,10 @@ model AgenticMetadata {
   // damping: folders hash children's summaryHash, so an edit that doesn't
   // change a child's summary never propagates upward.
   summaryHash       String?     @db.VarChar(64)
+  // Privacy opt-out: AI context never reads this node (no auto-refresh, no
+  // manual Generate, excluded from folder roll-up inputs and from folder
+  // chat's default source selection). Folders shield their whole subtree.
+  contextOptOut     Boolean     @default(false)
   model             String?     @db.VarChar(100)
   generatedAt       DateTime?   @db.Timestamptz(6)
   updatedAt         DateTime    @updatedAt @db.Timestamptz(6)

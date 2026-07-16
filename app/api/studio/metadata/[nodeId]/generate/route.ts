@@ -15,6 +15,7 @@ import { requireAuth } from "@/lib/infrastructure/auth";
 import { logger, withRouteTrace } from "@/lib/core/logger";
 import {
   generateMetadataForNode,
+  StudioContextOptedOutError,
   StudioModelUnavailableError,
 } from "@/extensions/studio/server/metadata";
 
@@ -38,6 +39,12 @@ export async function POST(
       return NextResponse.json({ success: true, data: view });
     } catch (error) {
       if (error instanceof StudioModelUnavailableError) {
+        return NextResponse.json(
+          { success: false, error: error.message },
+          { status: 409 }
+        );
+      }
+      if (error instanceof StudioContextOptedOutError) {
         return NextResponse.json(
           { success: false, error: error.message },
           { status: 409 }

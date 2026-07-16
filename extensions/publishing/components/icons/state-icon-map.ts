@@ -2,7 +2,7 @@ import {
   PencilLine,
   CheckCircle2,
   Clock,
-  EyeOff,
+  GlobeLock,
   Archive,
   CircleDashed,
   TriangleAlert,
@@ -34,7 +34,7 @@ export const PUBLISH_STATE_ICON: Record<PublishState, StateIconConfig> = {
     label: "Scheduled",
   },
   unpublished: {
-    Icon: EyeOff,
+    Icon: GlobeLock,
     color: "text-amber-500",
     label: "Unpublished",
   },

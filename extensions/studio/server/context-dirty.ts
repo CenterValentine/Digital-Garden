@@ -43,7 +43,12 @@ export async function markContextDirty(
     if (chain.length === 0) return;
 
     await prisma.agenticMetadata.updateMany({
-      where: { nodeId: { in: chain.map((row) => row.id) } },
+      // Opted-out rows never re-dirty — the flag means "the context system
+      // does not look at this node", including its staleness bookkeeping.
+      where: {
+        nodeId: { in: chain.map((row) => row.id) },
+        contextOptOut: false,
+      },
       data: { contextDirty: true },
     });
   } catch (error) {

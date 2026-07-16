@@ -33,6 +33,7 @@ import {
 } from "@/extensions/speed-reader/events";
 import { LampDesk } from "lucide-react";
 import { STUDIO_EXTENSION_ID } from "@/extensions/studio/manifest";
+import { AiContextToggleButton } from "@/extensions/studio/components/AiContextToggleButton";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 
@@ -195,6 +196,11 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     >
       {showPublishPill && (
         <PublishStatusPill contentId={sourceContentId} />
+      )}
+      {/* AI-context privacy toggle — any content type; sits where the old
+          publishing eye lived so "eye = who can read this" stays intuitive */}
+      {studioEnabled && !!sourceContentId && (
+        <AiContextToggleButton contentId={sourceContentId} />
       )}
       {canReadAloud && (
         <ReadAloudButton

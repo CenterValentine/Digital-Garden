@@ -100,6 +100,7 @@ interface ScopeNode extends MetadataNodeShape {
     summaryHash: string | null;
     /** Last write to the metadata row — for dirty rows, the last mark. */
     markedAt: Date | null;
+    optedOut: boolean;
   };
 }
 
@@ -574,11 +575,13 @@ async function collectScope(
           sourceContentHash: true,
           summaryHash: true,
           updatedAt: true,
+          contextOptOut: true,
         },
       },
     },
   });
-  if (!root) return [];
+  // Privacy: an opted-out root yields an empty scope — nothing is read.
+  if (!root || root.agenticMetadata?.contextOptOut) return [];
 
   const toScopeNode = (
     node: typeof root & { parentId: string | null },
@@ -597,6 +600,7 @@ async function collectScope(
       sourceContentHash: node.agenticMetadata?.sourceContentHash ?? null,
       summaryHash: node.agenticMetadata?.summaryHash ?? null,
       markedAt: node.agenticMetadata?.updatedAt ?? null,
+      optedOut: node.agenticMetadata?.contextOptOut ?? false,
     },
   });
 
@@ -622,6 +626,7 @@ async function collectScope(
             sourceContentHash: true,
             summaryHash: true,
             updatedAt: true,
+            contextOptOut: true,
           },
         },
       },
@@ -631,6 +636,9 @@ async function collectScope(
     const nextFrontier: string[] = [];
     for (const child of children) {
       if (scope.length >= MAX_SCOPE_NODES) break;
+      // Privacy: opted-out nodes never enter the scope, and an opted-out
+      // FOLDER shields its entire subtree (no descent).
+      if (child.agenticMetadata?.contextOptOut) continue;
       scope.push(toScopeNode(child, depth));
       if (child.contentType === "folder") nextFrontier.push(child.id);
     }

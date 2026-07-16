@@ -36,6 +36,7 @@ interface MetadataViewDto {
   generatedAt: string | null;
   model: string | null;
   stale: boolean;
+  optedOut: boolean;
 }
 
 const SECTION_ORDER: MetadataSectionKind[] = [
@@ -256,6 +257,40 @@ export function ContextAiPanel() {
         />
       )}
 
+      {/* Privacy toggle — same flag as the toolbar eye. Opted-out content is
+          never read by generation, roll-ups, or folder-chat sources. */}
+      {view && (
+        <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-black/10 px-3 py-2 dark:border-white/10">
+          <input
+            type="checkbox"
+            checked={!view.optedOut}
+            disabled={busy !== null}
+            onChange={() => {
+              if (!selectedContentId) return;
+              fetch(`/api/studio/metadata/${selectedContentId}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ contextOptOut: !view.optedOut }),
+              })
+                .then(() => fetchView(selectedContentId))
+                .catch(() => fetchView(selectedContentId));
+            }}
+            className="mt-0.5 h-3.5 w-3.5 accent-current"
+          />
+          <span className="min-w-0">
+            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">
+              AI may read this content
+            </span>
+            {view.optedOut && (
+              <span className="block text-[11px] text-amber-600 dark:text-amber-400">
+                Opted out — no auto-updates, no Generate, excluded from folder
+                roll-ups and chat sources.
+              </span>
+            )}
+          </span>
+        </label>
+      )}
+
       <div className="mt-3 space-y-2.5">
         {SECTION_ORDER.map((kind) => {
           const owner = view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
@@ -354,7 +389,7 @@ export function ContextAiPanel() {
       <button
         type="button"
         onClick={handleGenerate}
-        disabled={busy !== null || loading}
+        disabled={busy !== null || loading || view?.optedOut}
         className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-gold-primary/40 text-xs text-gold-primary transition-colors hover:bg-gold-primary/10 disabled:cursor-default disabled:opacity-50"
       >
         {busy === "generate" ? (

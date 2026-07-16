@@ -48,6 +48,8 @@ export interface MetadataView {
   model: string | null;
   /** True when source content changed since the last generation. */
   stale: boolean;
+  /** Privacy opt-out: AI context never reads this node. */
+  optedOut: boolean;
 }
 
 const SECTION_KINDS: MetadataSectionKind[] = [
@@ -187,22 +189,28 @@ export async function computeSourceHash(
         title: true,
         bodyHash: true,
         updatedAt: true,
-        agenticMetadata: { select: { summaryHash: true } },
+        agenticMetadata: {
+          select: { summaryHash: true, contextOptOut: true },
+        },
       },
       orderBy: { id: "asc" },
     });
     return stableHash({
       folder: node.id,
       title: node.title,
-      children: children.map((c) => ({
-        id: c.id,
-        title: c.title,
-        signal:
-          overrideSignals?.get(c.id) ??
-          c.agenticMetadata?.summaryHash ??
-          c.bodyHash ??
-          c.updatedAt.toISOString(),
-      })),
+      children: children
+        // Opted-out children are invisible to the roll-up, so they can't
+        // churn the folder's staleness either.
+        .filter((c) => !c.agenticMetadata?.contextOptOut)
+        .map((c) => ({
+          id: c.id,
+          title: c.title,
+          signal:
+            overrideSignals?.get(c.id) ??
+            c.agenticMetadata?.summaryHash ??
+            c.bodyHash ??
+            c.updatedAt.toISOString(),
+        })),
     });
   }
   // Leaf hash keeps updatedAt as a catch-all for non-note payload changes
@@ -237,6 +245,7 @@ export async function getMetadataForNode(
       generatedAt: null,
       model: null,
       stale: false,
+      optedOut: false,
     };
   }
 
@@ -253,7 +262,53 @@ export async function getMetadataForNode(
     stale:
       record.sourceContentHash !== null &&
       record.sourceContentHash !== currentHash,
+    optedOut: record.contextOptOut,
   };
+}
+
+/**
+ * Toggle the privacy opt-out for one node. Opting out clears the dirty bit
+ * (there is deliberately no work to do); opting back IN marks dirty so the
+ * refresh engine re-covers the node on the next drain. Stored sections are
+ * retained — the user can still read what was generated before opting out;
+ * the flag stops all future READS of the content by the context system.
+ */
+export async function setContextOptOut(
+  userId: string,
+  nodeId: string,
+  optedOut: boolean
+): Promise<MetadataView | null> {
+  const node = await loadOwnedNode(userId, nodeId);
+  if (!node) return null;
+
+  const record = await prisma.agenticMetadata.findUnique({ where: { nodeId } });
+  if (record) {
+    await prisma.agenticMetadata.update({
+      where: { nodeId },
+      data: { contextOptOut: optedOut, contextDirty: optedOut ? false : true },
+    });
+  } else {
+    const sections = readSections(null);
+    await upsertRecord(nodeId, sections, defaultMeta(), {
+      sourceContentHash: null,
+      model: null,
+      generatedAt: null,
+      summaryHash: null,
+      contextDirty: !optedOut,
+    });
+    await prisma.agenticMetadata.update({
+      where: { nodeId },
+      data: { contextOptOut: optedOut },
+    });
+  }
+  return getMetadataForNode(userId, nodeId);
+}
+
+export class StudioContextOptedOutError extends Error {
+  constructor() {
+    super("This content is opted out of AI context.");
+    this.name = "StudioContextOptedOutError";
+  }
 }
 
 /** Persist the human-owned Directives section. Last write wins by design. */
@@ -392,6 +447,12 @@ export async function generateMetadataForNode(
   const node = await loadOwnedNode(userId, nodeId);
   if (!node) return null;
 
+  const existing = await prisma.agenticMetadata.findUnique({
+    where: { nodeId },
+    select: { contextOptOut: true },
+  });
+  if (existing?.contextOptOut) throw new StudioContextOptedOutError();
+
   const route = await resolvePrimaryRoute(userId, "studio-metadata");
   if (!route) throw new StudioModelUnavailableError();
   const model = await resolveChatModelFromConnection(
@@ -476,12 +537,19 @@ export async function assembleSourceText(node: {
         id: true,
         title: true,
         contentType: true,
-        agenticMetadata: { select: { derivedText: true } },
+        agenticMetadata: {
+          select: { derivedText: true, contextOptOut: true },
+        },
       },
       orderBy: { displayOrder: "asc" },
     });
-    if (children.length === 0) return "";
-    return children
+    // Privacy: opted-out children are excluded entirely — not even their
+    // titles reach the roll-up prompt.
+    const visible = children.filter(
+      (child) => !child.agenticMetadata?.contextOptOut
+    );
+    if (visible.length === 0) return "";
+    return visible
       .map((child) => {
         const context = child.agenticMetadata?.derivedText?.trim();
         return context

@@ -23,6 +23,7 @@ import {
   getMetadataForNode,
   resolveRoleStrategyProposal,
   saveDirectives,
+  setContextOptOut,
 } from "@/extensions/studio/server/metadata";
 import { refreshScope } from "@/extensions/studio/server/context-refresh";
 import { getStudioSettings } from "@/extensions/studio/settings";
@@ -41,6 +42,8 @@ const ROUTE_PATH = "/api/studio/metadata/[nodeId]";
 interface PutBody {
   directives?: string;
   roleStrategyAction?: "accept" | "dismiss";
+  /** Privacy toggle: AI context stops reading this node. */
+  contextOptOut?: boolean;
 }
 
 export async function GET(
@@ -59,8 +62,13 @@ export async function GET(
         );
       }
 
+      // ?probe=1 — lightweight state read (toolbar opt-out toggle): never
+      // schedules a refresh, so mounting a toolbar doesn't count as
+      // "accessing context".
+      const probe = request.nextUrl.searchParams.get("probe") === "1";
+
       let aiContextStatus: AiContextStatus = "ok";
-      if (!view.exists || view.stale) {
+      if (!probe && !view.optedOut && (!view.exists || view.stale)) {
         const settings = getStudioSettings(
           await getUserSettings(session.user.id)
         );
@@ -104,7 +112,18 @@ export async function PUT(
           body.roleStrategyAction
         );
       }
-      if (view === null && typeof body.directives !== "string") {
+      if (typeof body.contextOptOut === "boolean") {
+        view = await setContextOptOut(
+          session.user.id,
+          nodeId,
+          body.contextOptOut
+        );
+      }
+      if (
+        view === null &&
+        typeof body.directives !== "string" &&
+        typeof body.contextOptOut !== "boolean"
+      ) {
         return NextResponse.json(
           { success: false, error: "No supported operation in body" },
           { status: 400 }

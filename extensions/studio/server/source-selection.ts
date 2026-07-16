@@ -45,6 +45,12 @@ export interface SourceRow {
    * sources to prevent the AI summarizing its own summaries (GEN lock).
    */
   genLocked: boolean;
+  /**
+   * Privacy opt-out: visible in the picker (the user's own UI) but
+   * hard-excluded from default selection AND from assembly — the flag wins
+   * even over an explicit include. Opted-out folders hide their subtree.
+   */
+  optedOut: boolean;
 }
 
 export interface SelectionState {
@@ -96,7 +102,7 @@ async function collectRows(
         contentType: true,
         parentId: true,
         displayOrder: true,
-        agenticMetadata: { select: { id: true } },
+        agenticMetadata: { select: { id: true, contextOptOut: true } },
       },
       orderBy: [{ parentId: "asc" }, { displayOrder: "asc" }],
     });
@@ -108,6 +114,8 @@ async function collectRows(
         break;
       }
       scanned += 1;
+
+      const optedOut = child.agenticMetadata?.contextOptOut ?? false;
 
       if (child.contentType === "folder") {
         rows.push({
@@ -121,8 +129,11 @@ async function collectRows(
           truncated: false,
           hasContext: child.agenticMetadata !== null,
           genLocked: false,
+          optedOut,
         });
-        nextFrontier.push(child.id);
+        // Opted-out folders shield their subtree — children aren't listed,
+        // so they can't be selected.
+        if (!optedOut) nextFrontier.push(child.id);
         continue;
       }
 
@@ -143,6 +154,7 @@ async function collectRows(
         warning: resolved.warning,
         hasContext: child.agenticMetadata !== null,
         genLocked: false,
+        optedOut,
       });
     }
     frontier = nextFrontier;
@@ -162,7 +174,13 @@ export function computeDefaultSelection(
   tokenBudget: number
 ): { includedNodeIds: string[]; estimatedTokens: number; capApplied: boolean } {
   const leaves = rows
-    .filter((row) => row.contentType !== "folder" && !row.empty && !row.genLocked)
+    .filter(
+      (row) =>
+        row.contentType !== "folder" &&
+        !row.empty &&
+        !row.genLocked &&
+        !row.optedOut
+    )
     // Breadth-first: shallow levels first, stable within a level.
     .sort((a, b) => a.depth - b.depth);
 
@@ -293,7 +311,11 @@ export async function assembleFolderChatContext(
   if (!state || state.includedNodeIds.length === 0) return null;
 
   const included = new Set(state.includedNodeIds);
-  const includedRows = state.rows.filter((r) => included.has(r.id));
+  // Privacy hard gate: opt-out wins even over an explicit include that
+  // predates the flag being set.
+  const includedRows = state.rows.filter(
+    (r) => included.has(r.id) && !r.optedOut
+  );
 
   const [folderMeta, childMetas] = await Promise.all([
     prisma.agenticMetadata.findUnique({
