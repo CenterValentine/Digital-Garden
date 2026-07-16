@@ -25,14 +25,17 @@ type ContextSubTab = "links" | "tags" | "ai";
 
 // AI Context leads (user direction 2026-07-16). BrainCircuit, not sparkles:
 // sparkles is reserved for generate ACTIONS, never surface identity.
+// BrainCircuit renders a size up — its detail muddies at 16px; the shared
+// 32px button container is what keeps the rail's framing consistent.
 const SUB_TABS: Array<{
   id: ContextSubTab;
   label: string;
   icon: typeof LinkIcon;
+  iconClassName: string;
 }> = [
-  { id: "ai", label: "AI Context", icon: BrainCircuit },
-  { id: "links", label: "Links", icon: LinkIcon },
-  { id: "tags", label: "Tags", icon: TagIcon },
+  { id: "ai", label: "AI Context", icon: BrainCircuit, iconClassName: "h-5 w-5" },
+  { id: "links", label: "Links", icon: LinkIcon, iconClassName: "h-4 w-4" },
+  { id: "tags", label: "Tags", icon: TagIcon, iconClassName: "h-4 w-4" },
 ];
 
 /** Content types whose backlinks panel is meaningful (old Links tab scope). */
@@ -90,7 +93,7 @@ export function ContextTab() {
       <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
         <div className="flex items-center gap-1">
           {SUB_TABS.filter(({ id }) => available.includes(id)).map(
-            ({ id, label, icon: Icon }) => {
+            ({ id, label, icon: Icon, iconClassName }) => {
               const isActive = activeSubTab === id;
               return (
                 <button
@@ -107,7 +110,7 @@ export function ContextTab() {
                       : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
                   )}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={iconClassName} />
                 </button>
               );
             }
