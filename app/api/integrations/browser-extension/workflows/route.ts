@@ -34,7 +34,9 @@ export async function GET(request: NextRequest) {
         select: {
           id: true,
           title: true,
-          workflowPayload: { select: { enabled: true, definition: true } },
+          workflowPayload: {
+            select: { enabled: true, engine: true, definition: true },
+          },
         },
         take: 100,
       });
@@ -52,6 +54,10 @@ export async function GET(request: NextRequest) {
           id: node.id,
           title: node.title,
           enabled: node.workflowPayload?.enabled ?? false,
+          // Engine the workflow runs on ("wdk" = Trellis interpreter, "n8n",
+          // etc.). Lets the chooser label engine + explain the "not pushed to
+          // n8n yet" case; dispatch routing itself stays server-side.
+          engine: node.workflowPayload?.engine ?? null,
           triggerType: trigger.triggerType,
           urlPattern: trigger.urlPattern,
           matchesPage,

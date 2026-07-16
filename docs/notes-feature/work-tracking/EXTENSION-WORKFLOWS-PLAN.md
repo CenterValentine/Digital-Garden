@@ -55,6 +55,7 @@ interface ExtensionWorkflowListItem {
   id: string;            // workflow ContentNode id
   title: string;
   enabled: boolean;
+  engine: string | null;          // "wdk" (Trellis) | "n8n" | … — for the engine chip
   triggerType: string | null;     // e.g. "trigger-page-capture"
   urlPattern: string | null;      // page-capture glob, if any
   matchesPage: boolean;           // computed server-side from ?pageUrl=
@@ -65,6 +66,7 @@ interface ExtensionRunListItem {
   id: string;
   status: WorkflowRunStatusValue; // reuse the shared union
   workflowName: string;
+  engine: string;                 // denormalized run engine ("wdk" | "n8n" | …)
   needsReview: boolean;           // status === "waiting" && gateToken != null
   createdAt: string;              // ISO
   finishedAt: string | null;
@@ -137,7 +139,56 @@ The foundation the extension consumes. Build and freeze first.
 
 ---
 
+## Two-engine architecture — P3 (n8n) reconciliation (assessed 2026-07-13)
+
+P3 (`feature/workflows-n8n`, PR #107, **complete; parity soak deferred**) is a
+sibling branch, NOT in this base. Its architecture changes what "run a workflow
+in the browser" means, and this plan must complement it. Findings:
+
+- **One workflow type, many engines.** There is no separate "n8n workflow." A
+  Trellis Flow (`contentType: "workflow"`) carries a `workflowPayload.engine`
+  column (`"wdk"` | `"n8n"` | …). Authoring is always the Trellis builder; the
+  engine is a property, chosen/pushed there. "Any desired workflow type in the
+  browser" = **any engine**, not a second content type.
+- **Browser dispatch is already engine-agnostic BY DELEGATION.** Our
+  `dispatchCaptureToWorkflowContent` → `dispatchWorkflowFromContent`, and P3
+  taught *that one function* to branch on engine (`n8n` → poke the pushed
+  webhook; `wdk` → interpreter). Our wrapper adds zero engine logic, so once P3
+  merges, **browser capture runs n8n workflows for free.** Do NOT re-add an
+  engine guard in the wrapper — the single trigger door owns routing.
+- **Schema needs nothing new.** `WorkflowPayload.engine`/`.metadata` and
+  `WorkflowRun.engine` already exist in this base — P3 added no columns. So the
+  extension DTOs carry `engine` **now** (done in Phase 0), and Phases 1–3 are
+  built engine-aware from the start, not retrofitted.
+- **RunDetail degrades gracefully for n8n.** P3's n8n run input is `data` only
+  (no `graph`), so `RunGraphSteps` safe-parses undefined → renders nothing;
+  timeline, status, gates, artifacts still render. A richer n8n step view is a
+  **deferred enhancement**, not a P0 blocker.
+- **"Not pushed yet" is communicated by error, not pre-flight.** Dispatching an
+  n8n workflow with no `webhookPath` returns a clean `ENGINE_ERROR` ("hasn't
+  been pushed to n8n yet — save it to push"), which the dispatch toast surfaces.
+  A chooser pre-flight badge (read `metadata.webhookPath`) is a nicety for after
+  the merge, when P3's `readN8nMetadata` shape is in-tree.
+
+### What each extension surface does with `engine` (Phases 1–3)
+- **Popup chooser** — show an engine chip (Trellis / n8n) per workflow; the pick
+  still just sends `workflowId`. Un-pushed n8n → dispatch error in the toast.
+- **Dispatch toast / popup runs list / badge** — carry the run's `engine` so the
+  user sees *where* it runs; status semantics are identical across engines.
+- **Embed deep surface** — Runs tab reuses `RunDetail` (graceful n8n degrade);
+  Edit tab reuses `WorkflowBuilder`, inheriting P3's engine selector + push-on-
+  save. Editing an n8n workflow in-page then re-running Just Works via the door.
+
+### Merge reconciliation with P3
+Both branches edited `extensions/workflows/server/dispatch.ts`. Expect a textual
+conflict; the resolution is **semantically clean**: keep P3's engine branching
+inside `dispatchWorkflowFromContent`; keep our `url-match.ts` extraction,
+`buildCaptureRunData`, and `dispatchCaptureToWorkflowContent` wrapper. The
+wrapper is engine-neutral, so no logic merges — only imports + adjacent hunks.
+Land order is arbitrary; whoever rebases second resolves the import block.
+
 ## Cross-branch coordination
 - `feature/workflows-foundation` — parent; **PR #103 → main is OPEN (2026-07-13)**. This plan cannot ship before it. If #103 takes review changes, rebase this worktree; once it merges, retarget this branch onto main. Foundation still needs a real prisma migration (was `db push`) — that lands there, not here.
+- `feature/workflows-n8n` — sibling (PR #107, complete). Shares `dispatch.ts`; see reconciliation above. Both should converge on foundation/main; neither blocks the other's build.
 - `feat/mobile-compat` — width-fluid embed + touch targets align here; land Phase 3's embed viewer mindful of ResizablePanels/right-sidebar conflicts (the embed viewer is a new route, so conflict surface is low).
 - `feat/settings-reorg` (unmerged) — if the extension exposes a settings toggle (e.g. default workflow), mount under `/settings/extensions/browser-bookmarks`.

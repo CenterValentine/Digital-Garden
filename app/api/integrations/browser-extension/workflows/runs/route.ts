@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
             id: run.id,
             status: run.status,
             workflowName: run.definition.name,
+            // Denormalized engine ("wdk" | "n8n" | …) so the badge/popup can
+            // show which substrate a run executes on.
+            engine: run.engine,
             needsReview: run.status === "waiting" && run.gateToken !== null,
             createdAt: run.createdAt.toISOString(),
             finishedAt: run.finishedAt ? run.finishedAt.toISOString() : null,
