@@ -789,6 +789,59 @@ async function listWorkflowRuns(limit = 6) {
   return { runs: data.runs || [] };
 }
 
+/**
+ * Context-menu path: NO chooser — the server auto-routes by the page URL
+ * against page-capture trigger patterns (first capture auto-creates a
+ * template workflow). `selectionText`, when present, becomes the capture
+ * text instead of the full page — "run a workflow on just this passage".
+ * Context menus have no UI for errors, so failures flash the badge red
+ * briefly rather than dying silently.
+ */
+async function dispatchWorkflowAutoRoute(selectionText) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+  try {
+    const pageText =
+      typeof selectionText === "string" && selectionText.trim()
+        ? selectionText.slice(0, WORKFLOW_PAGE_TEXT_CAP)
+        : await extractPageTextFromTab(tab.id);
+    const data = await apiFetch(
+      "/api/integrations/browser-extension/workflow-dispatch",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          input: {
+            pageUrl: tab.url || "",
+            pageTitle: tab.title || "",
+            ...(pageText ? { pageText } : {}),
+          },
+        }),
+      }
+    );
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "dg-workflow-run-started",
+        payload: {
+          runId: data.runId,
+          workflowTitle: "Workflow",
+          workflowNodeId: data.workflowNodeId || null,
+        },
+      });
+    } catch {
+      // Restricted page — the badge is the remaining ambient signal.
+    }
+    void refreshWorkflowBadge();
+    return data;
+  } catch (error) {
+    await chrome.action.setBadgeText({ text: "!" }).catch(() => {});
+    await chrome.action
+      .setBadgeBackgroundColor({ color: "#dc2626" })
+      .catch(() => {});
+    setTimeout(() => void refreshWorkflowBadge(), 5000);
+    throw error;
+  }
+}
+
 async function startQuickCaptureInActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("No active tab is available");
@@ -1683,6 +1736,16 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Research job posting in Digital Garden",
     contexts: ["page", "action"],
   });
+  chrome.contextMenus.create({
+    id: "dg-run-workflow",
+    title: "Run workflow on this page",
+    contexts: ["page", "action"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-run-workflow-selection",
+    title: "Run workflow on selection",
+    contexts: ["selection"],
+  });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
   chrome.alarms.create(WORKFLOW_BADGE_ALARM, { periodInMinutes: 1 });
@@ -1707,6 +1770,12 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     }
     if (info.menuItemId === "dg-research-job") {
       await researchJobPosting();
+    }
+    if (info.menuItemId === "dg-run-workflow") {
+      await dispatchWorkflowAutoRoute();
+    }
+    if (info.menuItemId === "dg-run-workflow-selection") {
+      await dispatchWorkflowAutoRoute(info.selectionText);
     }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);

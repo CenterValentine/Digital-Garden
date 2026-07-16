@@ -82,7 +82,7 @@ function RunsList({
           <button
             type="button"
             onClick={() => onSelect(run.id)}
-            className="flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+            className="flex min-h-[44px] w-full items-center gap-2 px-3 py-2 text-left hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-xs font-medium text-gray-900 dark:text-gray-100">
@@ -126,7 +126,7 @@ export function EmbedWorkflowClient({
               setTab(value);
               if (value === "runs") setSelectedRunId(null);
             }}
-            className={`rounded-md px-2.5 py-1 text-xs font-medium capitalize ${
+            className={`min-h-[36px] rounded-md px-3 py-1.5 text-xs font-medium capitalize ${
               tab === value
                 ? "bg-gold-primary/90 text-white"
                 : "text-gray-600 hover:bg-black/5 dark:text-gray-300 dark:hover:bg-white/10"

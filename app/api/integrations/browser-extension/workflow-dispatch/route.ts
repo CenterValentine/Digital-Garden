@@ -74,9 +74,21 @@ export async function POST(request: NextRequest) {
           result.message
         );
       }
+      // workflowNodeId comes from the run's input snapshot (content runs carry
+      // { graph, data, workflowNodeId }) — lets the pill's [View] deep-open the
+      // workflow even for auto-routed dispatches where the caller sent no id.
+      const runInput = result.run.input as Record<string, unknown> | null;
+      const dispatchedNodeId =
+        runInput && typeof runInput.workflowNodeId === "string"
+          ? runInput.workflowNodeId
+          : null;
       return NextResponse.json({
         success: true,
-        data: { runId: result.run.id, status: result.run.status },
+        data: {
+          runId: result.run.id,
+          status: result.run.status,
+          workflowNodeId: dispatchedNodeId,
+        },
       });
     } catch (error) {
       return handleRouteError(error, "Failed to dispatch workflow");
