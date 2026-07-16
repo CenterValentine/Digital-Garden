@@ -14,6 +14,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, RefreshCw, Sparkles, X } from "lucide-react";
 import { useContentStore } from "@/state/content-store";
+import {
+  AiContextUnconfiguredBanner,
+  shouldShowAiContextBannerOnce,
+} from "./AiContextBanner";
 import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
 
 // Mirrors MetadataView from extensions/studio/server/metadata.ts (kept as a
@@ -88,6 +92,7 @@ export function ContextAiPanel() {
     forNodeId: string;
     data: MetadataViewDto | null;
     error: string | null;
+    showAiBanner?: boolean;
   } | null>(null);
   const [busy, setBusy] = useState<"generate" | "proposal" | null>(null);
   const [draft, setDraft] = useState<{ forNodeId: string; text: string } | null>(
@@ -103,7 +108,13 @@ export function ContextAiPanel() {
         if (!res.ok || !body.success) {
           throw new Error(body.error ?? `Request failed (${res.status})`);
         }
-        setResult({ forNodeId: nodeId, data: body.data, error: null });
+        // Once-per-session banner: the GET is the auto-context pattern
+        // "trying to execute" — surface the unconfigured state exactly when
+        // an attempt actually happened, and only the first time.
+        const showAiBanner =
+          body.aiContextStatus === "unconfigured" &&
+          shouldShowAiContextBannerOnce();
+        setResult({ forNodeId: nodeId, data: body.data, error: null, showAiBanner });
       })
       .catch((err: unknown) => {
         setResult({
@@ -233,6 +244,16 @@ export function ContextAiPanel() {
 
       {current?.error && (
         <p className="mt-2 px-1 text-xs text-red-500/90">{current.error}</p>
+      )}
+
+      {current?.showAiBanner && (
+        <AiContextUnconfiguredBanner
+          onDismiss={() =>
+            setResult((prev) =>
+              prev ? { ...prev, showAiBanner: false } : prev
+            )
+          }
+        />
       )}
 
       <div className="mt-3 space-y-2.5">

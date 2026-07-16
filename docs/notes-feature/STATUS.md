@@ -53,6 +53,15 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 16, 2026**: Folder Studio auto-context V1 — tree-wide AI context that maintains itself (branch `worktree-folder-studio`, commits `dce7634`/`ef791d8`/+sweep)
+
+- **Dirty-bit cascade**: save/rename/create/move/delete flag the node + ancestor chain (one recursive CTE + indexed `updateMany`); marking is free and always on, spending is gated by the new `studio.autoContextMode` setting (Off / On-access default / On-access + nightly sweep).
+- **Efficient refresh engine** (`extensions/studio/server/context-refresh.ts`): output-hash damping (folder staleness now hashes children's `summaryHash` — meaning-free edits stop cascading at the first unchanged output, killing the always-dirty-root problem), compositional roll-ups (folders read children's derived Context only), packed leaf batches (8 docs per `generateObject` call), deepest-first ordering, per-run caps (24 leaves / 12 folders / 200-node scan). Auto-refresh writes AI-owned sections only — role-strategy proposals stay exclusive to explicit Generate.
+- **Triggers**: stale-while-revalidate via `after()` on Context tab GET + folder-chat grounding; opt-in nightly cron (`/api/cron/studio-context-sweep`, capped 10 users × 5 roots).
+- **Studio settings surface** (`/settings/extensions/studio` + Extensions-rail tile): auto-context mode + artifact defaults (report variant, quiz length, audio brief/standard, slide count) consumed by the prompt composer and run executors; Feature Routing cards deep-link both ways (`FeatureSpec.settingsHref`).
+- **Unconfigured banner**: once-per-session (sessionStorage), fires only when an auto-context attempt actually reports `unconfigured`, links to Feature Routing.
+- DB: `AgenticMetadata.contextDirty` + `summaryHash` via targeted SQL (drift debt tracked in BACKLOG).
+
 **July 16, 2026**: Folder Studio Phases 0–7 — folders as agentic hubs (branch `worktree-folder-studio`, PR pending)
 
 - **Every shelf wired end-to-end** per `FOLDER-STUDIO-PLAN.md`: Studio + Context sidebar tabs (Tool Surfaces mount, extension-disable filtered), 13-tool registry-rendered grid, agentic metadata layer (`AgenticMetadata` sidecar; ownership-sectioned Context doc — AI summary/structure, proposed Role & Strategy diff, human directives; staleness hashes), grounded folder chat (BFS token-budget source selection, tri-state picker with size bars / NO TEXT / GEN locks, system-prompt injection in the chat route), chat-invocation tools (report/mind-map/glossary/compare/prerequisites/flashcards via composed prompts + existing `createNote`/propose_* conventions), job runs (`StudioGenerationRun` interim table — WorkflowRun declined for its definition FK; `after()` execution survives tab close; `studio.run` inbox kind), heavy artifacts (infographic HTML, single-voice audio overview via existing TTS pipeline, real `.pptx` decks via new `pptxgenjs` dep), and the four Practice sessions (quiz / teach-back / oral exam / FSRS-aware study plan).

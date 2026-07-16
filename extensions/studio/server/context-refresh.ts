@@ -288,6 +288,94 @@ async function runRefresh(
   return { status: "ran", stats };
 }
 
+// ── Nightly sweep (cron) ──────────────────────────────────────────────────
+
+/** Users processed per sweep invocation; the rest wait for the next night. */
+const SWEEP_MAX_USERS = 10;
+/** Sweep roots per user per invocation (each root is one bounded drain). */
+const SWEEP_MAX_ROOTS_PER_USER = 5;
+/** Dirty rows sampled to discover sweep work. */
+const SWEEP_SAMPLE_ROWS = 500;
+
+export interface SweepStats {
+  usersConsidered: number;
+  usersSwept: number;
+  rootsSwept: number;
+}
+
+/**
+ * Cron entry: drain dirty context tree-wide for users who opted into
+ * "on-access-sweep". Discovers work from the dirty-bit index (never a
+ * full-table hash scan), groups it into subtree roots, and reuses the same
+ * bounded refreshScope drains as on-access — caps stack multiplicatively,
+ * so one invocation's worst case stays small and predictable. Unfinished
+ * work simply stays dirty for tomorrow.
+ */
+export async function runContextSweep(): Promise<SweepStats> {
+  const dirtyRows = await prisma.agenticMetadata.findMany({
+    where: { contextDirty: true, node: { deletedAt: null } },
+    select: {
+      node: {
+        select: {
+          id: true,
+          parentId: true,
+          contentType: true,
+          ownerId: true,
+        },
+      },
+    },
+    take: SWEEP_SAMPLE_ROWS,
+  });
+
+  const byOwner = new Map<
+    string,
+    Array<{ id: string; parentId: string | null; contentType: string }>
+  >();
+  for (const row of dirtyRows) {
+    const list = byOwner.get(row.node.ownerId) ?? [];
+    list.push(row.node);
+    byOwner.set(row.node.ownerId, list);
+  }
+
+  const stats: SweepStats = {
+    usersConsidered: byOwner.size,
+    usersSwept: 0,
+    rootsSwept: 0,
+  };
+
+  for (const [ownerId, nodes] of [...byOwner.entries()].slice(
+    0,
+    SWEEP_MAX_USERS
+  )) {
+    const settings = getStudioSettings(await getUserSettings(ownerId));
+    if (settings.autoContextMode !== "on-access-sweep") continue;
+    stats.usersSwept += 1;
+
+    // Dirty folders drain their own subtree; dirty leaves drain from their
+    // parent so sibling work packs into shared batches. Overlapping roots
+    // cost little — the second drain finds damped/clean nodes.
+    const roots = new Set<string>();
+    for (const node of nodes) {
+      roots.add(
+        node.contentType === "folder" ? node.id : (node.parentId ?? node.id)
+      );
+      if (roots.size >= SWEEP_MAX_ROOTS_PER_USER) break;
+    }
+    for (const rootId of roots) {
+      await refreshScope(ownerId, rootId);
+      stats.rootsSwept += 1;
+    }
+  }
+
+  logger.info({
+    layer: "ai",
+    event: "studio:context_sweep:completed",
+    summary: "nightly auto-context sweep finished",
+    attrs: { ...stats },
+  });
+  return stats;
+}
+
 // ── Scope collection ──────────────────────────────────────────────────────
 
 async function collectScope(

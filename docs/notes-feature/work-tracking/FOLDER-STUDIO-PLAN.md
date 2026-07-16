@@ -1,7 +1,7 @@
 ---
 title: Folder Studio Plan — folders as LLM/agentic hubs
-status: building (Phase 0 complete + gate-green; Phase 1 next)
-last_updated: 2026-07-15
+status: built (Phases 0–7 + auto-context V1; PR pending)
+last_updated: 2026-07-16
 owner: centervalentine
 branch: worktree-folder-studio (worktree `.claude/worktrees/folder-studio`, off origin/main which already has mobile-compat #102 + workflows #103 merged)
 design_stubs: https://claude.ai/code/artifact/ab4a9965-6b58-457b-9566-8c264a2f815b
@@ -15,6 +15,15 @@ related:
   - lib/features/office/blank-document-generator.ts
 ---
 
+> **Addendum (2026-07-16): auto-context V1 BUILT on top** — dirty-bit cascade
+> on content mutations, output-hash-damped refresh engine (packed leaf
+> batches, compositional roll-ups, deepest-first), on-access
+> stale-while-revalidate triggers + opt-in nightly sweep cron, Studio
+> settings surface (`/settings/extensions/studio`: autoContextMode +
+> artifact defaults), Feature Routing cross-links, once-per-session
+> unconfigured-model banner. Folder staleness is now OUTPUT-based (children's
+> summaryHash), not input-based. Details: STATUS.md 2026-07-16 entry.
+>
 > **Status (2026-07-16): Phases 0–7 BUILT** on branch `worktree-folder-studio`
 > (all gates green per phase; one commit per phase). Option B (sidebar Studio
 > tab) is the shipped mount; Option A (folder view) is the remaining Phase 8
