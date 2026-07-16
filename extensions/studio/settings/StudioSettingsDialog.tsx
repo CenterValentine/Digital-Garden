@@ -133,6 +133,29 @@ export default function StudioSettingsDialog() {
         </div>
       </section>
 
+      <section className="space-y-2">
+        <label className="block space-y-2 text-sm text-gray-700 dark:text-gray-300">
+          Daily auto-update budget ({studio.dailyCallCap} generation calls)
+          <input
+            type="range"
+            min={20}
+            max={1000}
+            step={20}
+            value={studio.dailyCallCap}
+            onChange={(e) =>
+              void setStudioSettings({ dailyCallCap: Number(e.target.value) })
+            }
+            className="w-full"
+          />
+        </label>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Hard ceiling on background context updates per day (one call ≈ one
+          batch of up to 8 notes, or one folder roll-up). Leftover work stays
+          queued and resumes after midnight UTC. The Generate button on a
+          single item is never blocked by this.
+        </p>
+      </section>
+
       <section className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
           Artifact defaults

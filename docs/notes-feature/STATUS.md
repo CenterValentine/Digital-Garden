@@ -59,7 +59,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 - **Settle gate**: 10-min drain-time debounce (marks reset the clock); **piggyback ripple**: the user's own PATCH traffic drains settled work via `after()` (throttled indexed pre-check) — presence-powered, no timers. **Anchored incremental patching** for folders, used only when single-delta is proven by hash substitution.
 - **Privacy opt-out** (`AgenticMetadata.contextOptOut`): toolbar Eye/EyeOff toggle (the eye moved from publishing, whose pill now uses Globe/GlobeLock) + Context panel checkbox. Opted-out content is never generated (manual Generate 409s), never re-dirtied, excluded from roll-up inputs/hashes and folder-chat defaults+assembly; folders shield subtrees.
 - **Manual refresh**: file-tree right-click → AI → "Update AI context" (`POST /api/studio/context/refresh`, bypasses settle+mode, keeps model gate + spend caps) — the recovery path for failed ripples.
-- Next up per user: per-user daily spend ceiling (BACKLOG).
+- **Daily spend ceiling**: `StudioContextSpend` counter (per user, UTC day) + `studio.dailyCallCap` setting (default 200 calls, slider). Engine pre-checks before scanning, stops drains mid-way (leftover stays dirty for tomorrow), records once per drain; explicit refresh 409s honestly; manual Generate uncounted by design.
 
 **July 16, 2026**: Folder Studio auto-context V1 — tree-wide AI context that maintains itself (branch `worktree-folder-studio`, commits `dce7634`/`ef791d8`/+sweep)
 

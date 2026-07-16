@@ -15,7 +15,10 @@ import { requireAuth } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import { logger, withRouteTrace } from "@/lib/core/logger";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
+import { getUserSettings } from "@/lib/features/settings";
+import { getStudioSettings } from "@/extensions/studio/settings";
 import { refreshScope } from "@/extensions/studio/server/context-refresh";
+import { getTodaySpend } from "@/extensions/studio/server/context-spend";
 
 const ROUTE_PATH = "/api/studio/context/refresh";
 
@@ -50,6 +53,23 @@ export async function POST(request: NextRequest) {
             success: false,
             error:
               "No model available for Studio Context Generation. Configure one under Settings → AI → Feature Routing.",
+          },
+          { status: 409 }
+        );
+      }
+
+      // Honest 409 instead of a silent post-202 no-op: the engine would
+      // refuse the drain anyway (daily ceiling is in its gate stack), but an
+      // explicit click deserves to know why nothing will happen.
+      const cap = getStudioSettings(
+        await getUserSettings(session.user.id)
+      ).dailyCallCap;
+      const used = await getTodaySpend(session.user.id);
+      if (used >= cap) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: `Daily AI-context budget reached (${cap} calls). Raise it in Folder Studio settings, or try again after midnight UTC.`,
           },
           { status: 409 }
         );

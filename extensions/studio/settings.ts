@@ -16,6 +16,8 @@ export type AudioOverviewLength = "brief" | "standard";
 
 export interface StudioSettings {
   autoContextMode: AutoContextMode;
+  /** Daily ceiling on auto-context generation calls (engine-enforced). */
+  dailyCallCap: number;
   reportDefaultVariant: string;
   quizQuestionCount: number;
   audioOverviewLength: AudioOverviewLength;
@@ -24,6 +26,7 @@ export interface StudioSettings {
 
 export const STUDIO_SETTINGS_DEFAULTS: StudioSettings = {
   autoContextMode: DEFAULT_SETTINGS.studio?.autoContextMode ?? "on-access",
+  dailyCallCap: DEFAULT_SETTINGS.studio?.dailyCallCap ?? 200,
   reportDefaultVariant:
     DEFAULT_SETTINGS.studio?.reportDefaultVariant ?? "study-guide",
   quizQuestionCount: DEFAULT_SETTINGS.studio?.quizQuestionCount ?? 8,
@@ -39,6 +42,7 @@ export function getStudioSettings(
   return {
     autoContextMode:
       stored?.autoContextMode ?? STUDIO_SETTINGS_DEFAULTS.autoContextMode,
+    dailyCallCap: stored?.dailyCallCap ?? STUDIO_SETTINGS_DEFAULTS.dailyCallCap,
     reportDefaultVariant:
       stored?.reportDefaultVariant?.trim() ||
       STUDIO_SETTINGS_DEFAULTS.reportDefaultVariant,

@@ -318,6 +318,9 @@ const studioSettingsSchema = z
     autoContextMode: z
       .enum(["off", "on-access", "on-access-sweep"])
       .optional(),
+    // Daily ceiling on auto-context LLM calls (packs + roll-ups). Manual
+    // per-node Generate is not counted — a human click rate-limits itself.
+    dailyCallCap: z.number().int().min(20).max(1000).optional(),
     reportDefaultVariant: z.string().min(1).max(60).optional(),
     quizQuestionCount: z.number().int().min(3).max(25).optional(),
     audioOverviewLength: z.enum(["brief", "standard"]).optional(),
@@ -621,6 +624,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   },
   studio: {
     autoContextMode: "on-access",
+    dailyCallCap: 200,
     reportDefaultVariant: "study-guide",
     quizQuestionCount: 8,
     audioOverviewLength: "standard",

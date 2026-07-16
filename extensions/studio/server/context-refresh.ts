@@ -44,6 +44,7 @@ import {
 } from "./metadata";
 import { createSourceContentResolver } from "./source-resolver";
 import { getGenLockedNodeIds } from "./gen-lock";
+import { getTodaySpend, recordSpend } from "./context-spend";
 
 // ── Budgets ───────────────────────────────────────────────────────────────
 
@@ -76,6 +77,10 @@ export interface RefreshStats {
   foldersDamped: number;
   /** Dirty nodes skipped because they were marked < SETTLE_MINUTES ago. */
   settleSkipped: number;
+  /** LLM requests this drain made (counted against the daily ceiling). */
+  generationCalls: number;
+  /** True when the daily ceiling stopped the drain mid-way. */
+  budgetStopped: boolean;
   capped: boolean;
 }
 
@@ -88,6 +93,7 @@ export type RefreshOutcome =
   | { status: "off" }
   | { status: "unconfigured" }
   | { status: "skipped" }
+  | { status: "budgetExhausted" }
   | { status: "ran"; stats: RefreshStats };
 
 interface ScopeNode extends MetadataNodeShape {
@@ -159,6 +165,22 @@ async function runRefresh(
 ): Promise<RefreshOutcome> {
   const route = await resolvePrimaryRoute(userId, "studio-metadata");
   if (!route) return { status: "unconfigured" };
+
+  // Daily spend ceiling — the last initiation gate before any scan/spend.
+  // Checked again before every LLM call below; leftover work simply stays
+  // dirty and drains after the UTC-midnight reset (or a raised cap).
+  const cap = getStudioSettings(await getUserSettings(userId)).dailyCallCap;
+  let callsRemaining = cap - (await getTodaySpend(userId));
+  if (callsRemaining <= 0) {
+    logger.info({
+      layer: "ai",
+      event: "studio:context_refresh:budget_exhausted",
+      summary: "daily auto-context budget reached — drain refused",
+      attrs: { rootId, cap },
+    });
+    return { status: "budgetExhausted" };
+  }
+
   const model = await resolveChatModelFromConnection(
     route.connection,
     route.modelId
@@ -188,6 +210,8 @@ async function runRefresh(
     foldersRefreshed: 0,
     foldersDamped: 0,
     settleSkipped: 0,
+    generationCalls: 0,
+    budgetStopped: false,
     capped: false,
   };
 
@@ -276,13 +300,21 @@ async function runRefresh(
   const changedByParent = new Map<string, ChangedChild[]>();
 
   for (const [parentKey, group] of packGroups) {
+    if (stats.budgetStopped) break;
     const parentNode = scopeById.get(parentKey);
     const orientation = {
       title: parentNode?.title,
       summary: anchors.get(parentKey)?.summary,
     };
     for (let i = 0; i < group.length; i += LEAF_BATCH_SIZE) {
+      if (callsRemaining <= 0) {
+        stats.budgetStopped = true;
+        stats.capped = true;
+        break;
+      }
       const batch = group.slice(i, i + LEAF_BATCH_SIZE);
+      callsRemaining -= 1;
+      stats.generationCalls += 1;
       try {
         const results = await generateLeafBatch(model, batch, anchors, orientation);
         for (const { node } of batch) {
@@ -345,6 +377,11 @@ async function runRefresh(
   );
 
   for (const folder of folderWork) {
+    if (callsRemaining <= 0) {
+      stats.budgetStopped = true;
+      stats.capped = true;
+      break;
+    }
     try {
       // Damping cut: the folder hash is built from children's summaryHash,
       // so if no child's MEANING changed this run, the recomputed hash
@@ -383,6 +420,8 @@ async function runRefresh(
         prompt = buildFolderPrompt(folder, sourceText, anchor);
       }
 
+      callsRemaining -= 1;
+      stats.generationCalls += 1;
       const { object } = await generateObject({
         model,
         schema: FolderSectionsSchema,
@@ -406,6 +445,8 @@ async function runRefresh(
       });
     }
   }
+
+  await recordSpend(userId, stats.generationCalls);
 
   logger.info({
     layer: "ai",
