@@ -116,6 +116,8 @@ export async function createNativeN8nFlow(
               webhookPath,
               credentialId: cred.id,
               credentialName: cred.name,
+              // Recorded so purge-time teardown can revoke the callback token.
+              serviceTokenId: minted.record.id,
               mode: "native",
             },
           } as unknown as Prisma.InputJsonValue,
