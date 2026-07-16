@@ -733,6 +733,46 @@ export function useConversationEngine({
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
 
+  // ── Folder Studio tool invocation ──
+  // A studio tool tile stashes its composed prompt in sessionStorage before
+  // switching the sidebar to the chat tab; the engine consumes it exactly
+  // once as soon as it can send. Storage (not a CustomEvent) makes the
+  // hand-off survive the tab-mount race; removeItem-before-send makes it
+  // single-shot even under StrictMode double-effects.
+  useEffect(() => {
+    if (!contentId || status !== "ready") return;
+    let prompt: string | null = null;
+    try {
+      const key = `dg:studio-invoke:${contentId}`;
+      prompt = window.sessionStorage.getItem(key);
+      if (prompt) window.sessionStorage.removeItem(key);
+    } catch {
+      return; // storage unavailable — tile falls back to nothing sent
+    }
+    if (!prompt || !prompt.trim()) return;
+    sendMessage(
+      { parts: [{ type: "text", text: prompt }] },
+      {
+        body: {
+          contentId,
+          conversationId,
+          contextId: activeContextId ?? null,
+          providerId,
+          modelId,
+          mentionedContentIds: [],
+        },
+      },
+    );
+  }, [
+    contentId,
+    status,
+    sendMessage,
+    conversationId,
+    activeContextId,
+    providerId,
+    modelId,
+  ]);
+
   // ── send ──
   // `input` is already canonical `@[Title](id)` (the composer's
   // contenteditable serializer emits that form). Dynamic request data

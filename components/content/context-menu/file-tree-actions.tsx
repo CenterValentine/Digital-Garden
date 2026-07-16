@@ -34,6 +34,7 @@ import {
   ArrowDownRight,
   FolderInput,
   Captions,
+  LampDesk,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
@@ -57,6 +58,7 @@ import {
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useExtensionActivationStore } from "@/state/extension-activation-store";
 
 /**
  * Context passed to file tree action provider
@@ -582,9 +584,12 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     });
   }
 
-  // Section 6.5: AI — transcribe an audio file into a sibling note (Phase 5).
-  // Single audio file only. Opt-in (explicit click); the speech-to-text route
-  // is auto-discovered server-side.
+  // Section 6.5: AI — transcribe (audio files) + explicit AI-context update.
+  const aiActions: ContextMenuAction[] = [];
+
+  // Transcribe an audio file into a sibling note (Phase 5). Single audio
+  // file only. Opt-in (explicit click); the speech-to-text route is
+  // auto-discovered server-side.
   if (
     isSingleSelection &&
     clickedId &&
@@ -592,43 +597,85 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     clickedNode.file?.mimeType?.startsWith("audio/")
   ) {
     const audioId = clickedId;
-    sections.push({
-      title: "AI",
-      actions: [
-        {
-          id: "transcribe-audio",
-          label: "Transcribe to note",
-          icon: <Captions className="h-4 w-4" />,
-          onClick: async () => {
-            const toastId = toast.loading("Transcribing audio…");
-            try {
-              const res = await fetch("/api/ai/transcribe", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ contentId: audioId }),
-              });
-              const json = (await res.json().catch(() => null)) as {
-                success?: boolean;
-                error?: string;
-                data?: { noteId?: string | null };
-              } | null;
-              if (!res.ok || !json?.success) {
-                throw new Error(json?.error || "Transcription failed");
-              }
-              toast.success("Transcript note created", { id: toastId });
-              await onRefresh?.();
-            } catch (error) {
-              toast.error("Couldn't transcribe audio", {
-                id: toastId,
-                description:
-                  error instanceof Error ? error.message : "Transcription failed",
-              });
-            }
-          },
-        },
-      ],
+    aiActions.push({
+      id: "transcribe-audio",
+      label: "Transcribe to note",
+      icon: <Captions className="h-4 w-4" />,
+      onClick: async () => {
+        const toastId = toast.loading("Transcribing audio…");
+        try {
+          const res = await fetch("/api/ai/transcribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ contentId: audioId }),
+          });
+          const json = (await res.json().catch(() => null)) as {
+            success?: boolean;
+            error?: string;
+            data?: { noteId?: string | null };
+          } | null;
+          if (!res.ok || !json?.success) {
+            throw new Error(json?.error || "Transcription failed");
+          }
+          toast.success("Transcript note created", { id: toastId });
+          await onRefresh?.();
+        } catch (error) {
+          toast.error("Couldn't transcribe audio", {
+            id: toastId,
+            description:
+              error instanceof Error ? error.message : "Transcription failed",
+          });
+        }
+      },
     });
+  }
+
+  // Explicit AI-context update (Folder Studio auto-context) — the manual
+  // recovery path for failed/pending ripples. Bypasses the settle debounce
+  // and mode gate server-side; a folder drains its subtree, a leaf just
+  // itself. Extension-gated via the activation store (manifest default on).
+  const studioEnabled =
+    useExtensionActivationStore.getState().overrides["studio"] ?? true;
+  if (isSingleSelection && clickedId && studioEnabled) {
+    const targetId = clickedId;
+    aiActions.push({
+      id: "update-ai-context",
+      label: "Update AI context",
+      icon: <LampDesk className="h-4 w-4" />,
+      onClick: async () => {
+        try {
+          const res = await fetch("/api/studio/context/refresh", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ nodeId: targetId }),
+          });
+          const json = (await res.json().catch(() => null)) as {
+            success?: boolean;
+            error?: string;
+          } | null;
+          if (!res.ok || !json?.success) {
+            throw new Error(json?.error || "Could not start the update");
+          }
+          toast.success("AI context update started", {
+            description:
+              clickedNode?.contentType === "folder"
+                ? "Refreshing stale context in this folder."
+                : "Refreshing this item's context.",
+          });
+        } catch (error) {
+          toast.error("Couldn't update AI context", {
+            description:
+              error instanceof Error ? error.message : "Request failed",
+          });
+        }
+      },
+    });
+  }
+
+  if (aiActions.length > 0) {
+    sections.push({ title: "AI", actions: aiActions });
   }
 
   // Section 7: Destructive actions

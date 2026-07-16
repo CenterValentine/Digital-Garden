@@ -15,9 +15,14 @@ export type RightSidebarTab =
   | "chat"
   | "properties"
   | "publish"
+  | "studio"
+  | "context"
   | "extension";
 
-export const DEFAULT_RIGHT_SIDEBAR_TAB: RightSidebarTab = "backlinks";
+// Outline leads the rail (2026-07-16); "backlinks"/"tags" remain in the union
+// only so persisted per-content values from before the Context merge still
+// parse — resolveRightSidebarTab falls them back to an available tab.
+export const DEFAULT_RIGHT_SIDEBAR_TAB: RightSidebarTab = "outline";
 
 interface RightSidebarState {
   activeTabByContentId: Record<string, RightSidebarTab>;

@@ -17,6 +17,7 @@ import { speedReaderBuiltInExtension } from "@/extensions/speed-reader/module";
 import { workplacesBuiltInExtension } from "@/extensions/workplaces/module";
 import { publishingBuiltInExtension } from "@/extensions/publishing/module";
 import { workflowsBuiltInExtension } from "@/extensions/workflows/module";
+import { studioBuiltInExtension } from "@/extensions/studio/module";
 import type { BuiltInExtension } from "./types";
 
 export const BUILT_IN_EXTENSIONS: BuiltInExtension[] = [
@@ -29,4 +30,5 @@ export const BUILT_IN_EXTENSIONS: BuiltInExtension[] = [
   publishingBuiltInExtension,
   speedReaderBuiltInExtension,
   workflowsBuiltInExtension,
+  studioBuiltInExtension,
 ];

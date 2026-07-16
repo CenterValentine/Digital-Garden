@@ -60,10 +60,12 @@ export function InboxLeftPanel() {
             );
           })}
         </div>
-        <h3 className="mt-2 text-sm font-semibold text-gray-900 dark:text-white">
-          {TABS.find((entry) => entry.id === tab)?.label ?? "Inbox"}
-        </h3>
       </div>
+
+      {/* Active-tab label sits BENEATH the divider line (fix 2026-07-16) */}
+      <h3 className="shrink-0 px-3 pt-3 text-sm font-semibold text-gray-900 dark:text-white">
+        {TABS.find((entry) => entry.id === tab)?.label ?? "Inbox"}
+      </h3>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "notifications" ? (

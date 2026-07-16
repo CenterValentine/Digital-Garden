@@ -10,15 +10,42 @@ last_updated: 2026-07-16
 
 ---
 
-## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`)
+## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
-Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live. Deferred by design:
+Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
 
-- [ ] **Richer n8n run step view** — n8n run input carries no `graph`, so `RunGraphSteps` renders nothing (graceful). A per-engine step renderer (n8n node names from callbacks) is a post-P3-merge enhancement.
-- [ ] **Chooser pre-flight "not pushed" badge for n8n workflows** — read `metadata.webhookPath` once P3 (n8n spoke) merges; today the dispatch toast surfaces the clean ENGINE_ERROR instead.
+- [ ] **Richer n8n run step view** — n8n run input carries no `graph`, so `RunGraphSteps` renders nothing (graceful). A per-engine step renderer (n8n node names from callbacks) is now unblocked, still deferred.
+- [ ] **Chooser pre-flight "not pushed" badge for n8n workflows** — read `metadata.webhookPath` (n8n spoke now in-tree); today the dispatch toast surfaces the clean ENGINE_ERROR instead.
 - [ ] **Per-user extension-disabled parity in bearer routes** — extension enable/disable state is client-side only; the chooser's empty state covers today. Revisit if server-side per-user extension settings land.
 - [ ] **Bottom-sheet chooser <768px** — N/A for the Chrome toolbar popup (desktop-only surface); mobile runs through the app's WorkflowsPanel. Recorded so nobody re-plans it.
 - [ ] **System notifications channel** — deliberately dropped in design (no `notifications` permission); revisit only on user demand.
+
+---
+
+## Folder Studio Followups (2026-07-16, branch `worktree-folder-studio`)
+
+Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the build:
+
+- [ ] **Option A — Studio as a folder view** (plan Phase 8 first half) — second mount of the existing StudioTab surfaces inside `FolderViewContainer`; registry-driven, no new logic. Deferred to land the working feature first; revisit Option C ("expand" tab) with usage evidence.
+- [ ] **Browser smoke + Playwright activation** — all studio surfaces are auth-gated; blocked on the shared e2e auth fixture (same blocker as workflows/flashcards specs). Manual smoke checklist in the PR body.
+- [ ] **Image sources vision pass** (plan Phase 2 item) — images currently resolve empty ("NO TEXT" flag flows honestly); wire a vision-model description pass + decide the `enableOCR` fallback flip.
+- [ ] **Custom report variants from ChatContext presets** — the variant-resolver contract supports it (`variants` as async resolver); wire `ChatContext` list → report tile flyout.
+- [ ] **Infographic diffusion mode** — the `image` variant of the infographic tool fails gracefully today; wire through `lib/domain/ai/image/` when prioritized.
+- [ ] **Per-conversation source-selection overrides** — v1 persists selection per (owner, folder) in `StudioSourceSelection`; the plan's original shape was per-conversation via `ConversationAssociation`. Add an override layer if folder-level proves too coarse.
+- [ ] **Study plan → daily notes** — plan wanted the FSRS study plan written into daily notes; v1 creates a folder note. Needs periodic-notes resolve integration.
+- [ ] **Wiki-links in generated artifacts render as literal `[[Title]]` text** — `markdownToTiptap` doesn't produce wikiLink nodes; add a post-conversion pass (or extend the converter) so generated Sources sections are real links.
+- [ ] **Schema drift debt (shared Neon dev DB)** — `AgenticMetadata`, `StudioSourceSelection`, `StudioGenerationRun` were created via targeted SQL because `prisma db push` wanted to drop another worktree's `ServiceToken` table; the auto-context V1 columns (`AgenticMetadata.contextDirty` + `summaryHash` + index) were added the same way. Before prod deploy: create proper migrations (`migrate dev --create-only`) and reconcile drift per `DATABASE-CHANGE-CHECKLIST.md`.
+- [x] ~~Auto-context: per-user daily spend ceiling~~ — SHIPPED 2026-07-16: `StudioContextSpend` (owner, UTC day, generationCalls) + `studio.dailyCallCap` setting (default 200, slider in Studio settings). Engine gate stack pre-checks and stops drains mid-way (`budgetExhausted`/`budgetStopped`); explicit right-click refresh 409s with a clear message; manual per-node Generate deliberately uncounted. Soft ceiling (concurrent drains may overshoot one per-run cap).
+- [ ] **Auto-context: budget surfacing in UI** — the ceiling is enforced + logged; consider a "budget used today" readout in Studio settings and a `budget-exhausted` variant of the aiContextStatus banner.
+- [x] ~~Auto-context: incremental roll-up patching (mechanism D)~~ — SHIPPED in V1.1 as anchored patching, used only when single-delta is PROVEN via hash substitution (see context-refresh.ts).
+- [ ] **Auto-context: dirty hooks for duplicate + upload finalize** — duplicate and file-upload finalize create children without flagging the parent's roll-up; on-access staleness (uncovered-node discovery) papers over it, but the bits should be set at the source like create/move/delete.
+- [x] ~~Auto-context: per-folder opt-out~~ — SHIPPED broader in V1.1 as per-NODE `contextOptOut` (toolbar eye toggle + Context panel checkbox); folders shield their subtree.
+- [ ] **Auto-context: SourcePicker opted-out badge** — SourceRow already carries `optedOut` (hard-excluded from defaults + assembly); the picker should render a small privacy badge so users see why a row can't be included.
+- [ ] **Auto-context: settle window configurability** — fixed at 10 min (SETTLE_MINUTES). Expose in Studio settings only if real usage wants it.
+- [ ] **Auto-context banner on Studio tab** — v1 surfaces the once-per-session unconfigured banner via the Context tab GET only; the Studio tab's compose/runs 409 toasts cover explicit actions. Consider a shared status probe if users miss it.
+- [ ] **Audio overview TTS voice override** — Studio inherits the global AI speech voice by design (inherit-with-override pattern); add the per-studio override field only if requested.
+- [ ] **Two-host audio + video overview** — postponed per plan Non-goals (Gemini multi-speaker TTS is the gap-filler candidate); video tile ships as a stub.
+- [ ] **Mobile bottom-nav chat routing** — decision of record (Phase 3): the bottom-nav AI icon keeps opening the GLOBAL chat; folder-scoped chat is reached via the Studio tab's button. Revisit only with usage evidence.
 
 ---
 

@@ -69,6 +69,17 @@ export const workflowNotifyPayloadSchema = z.object({
   workflowName: z.string().max(200).optional(),
 });
 
+// Studio extension — a generation run reached a terminal status.
+export const studioRunPayloadSchema = z.object({
+  runId: z.string().uuid(),
+  status: z.enum(["done", "failed"]),
+  toolLabel: z.string().min(1).max(100),
+  folderName: z.string().min(1).max(255),
+  outputNodeId: z.string().uuid().optional(),
+  outputTitle: z.string().max(255).optional(),
+  error: z.string().max(500).optional(),
+});
+
 export interface NotificationKindDefinition {
   payloadSchema: z.ZodTypeAny;
   collapsible: boolean;
@@ -105,6 +116,10 @@ export const NOTIFICATION_KINDS = {
   },
   "workflow.notify": {
     payloadSchema: workflowNotifyPayloadSchema,
+    collapsible: false,
+  },
+  "studio.run": {
+    payloadSchema: studioRunPayloadSchema,
     collapsible: false,
   },
 } as const satisfies Record<string, NotificationKindDefinition>;

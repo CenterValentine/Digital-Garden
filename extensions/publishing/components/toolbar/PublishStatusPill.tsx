@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Eye, EyeOff } from "lucide-react";
+// Globe = published / GlobeLock = not published. The pill used Eye/EyeOff
+// until 2026-07-16; the eye pair moved to the AI-context privacy toggle and
+// publishing got publishing-flavored glyphs (globe = the public web).
+import { Globe, GlobeLock } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { usePublishStore } from "../../state/publish-store";
 import { fetchLinkedPublicItems } from "../../lib/client-api";
@@ -36,7 +39,7 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
 
   // Icon-only indicator (no text → can never wrap, and stays a fixed width so
   // adjacent toolbar changes don't reflow it). The full state lives in the
-  // tooltip. Eye = published, Eye-off = not published.
+  // tooltip. Globe = published, GlobeLock = not published.
   if (linkedItems.length === 0) {
     return (
       <div
@@ -44,7 +47,7 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
         title="Not published"
         aria-label="Not published"
       >
-        <EyeOff className="h-4 w-4 opacity-50" />
+        <GlobeLock className="h-4 w-4 opacity-50" />
       </div>
     );
   }
@@ -55,8 +58,8 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
     representativeItem.hasPendingChanges &&
     representativeItem.state === "published";
 
-  // Keep the color/label from the state map for the tooltip, but render Eye so
-  // the published indicator reads consistently regardless of sub-state.
+  // Keep the color/label from the state map for the tooltip, but render Globe
+  // so the published indicator reads consistently regardless of sub-state.
   const { color, label } = pendingChanges ? PENDING_CHANGES_ICON : stateIcon;
   const tooltip = pendingChanges
     ? `Changes pending · /${representativeItem.slug}`
@@ -74,7 +77,7 @@ export function PublishStatusPill({ contentId }: PublishStatusPillProps) {
       title={tooltip}
       aria-label={tooltip}
     >
-      <Eye className={cn("h-4 w-4", color)} />
+      <Globe className={cn("h-4 w-4", color)} />
     </div>
   );
 }

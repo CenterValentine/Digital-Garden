@@ -10,7 +10,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
+import { maybeRippleFromEdit } from "@/extensions/studio/server/context-refresh";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getOptionalBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";
@@ -1315,6 +1318,20 @@ export async function PATCH(
         }
       }
 
+      // Folder Studio auto-context: flag this node + its ancestor chain for
+      // the refresh engine. Unconditional on successful PATCH — over-marking
+      // is cheap (an indexed bit write) and output-hash damping stops
+      // meaning-free changes from cascading or respending.
+      //
+      // The piggyback ripple rides the same hook: the user's own editing
+      // traffic opportunistically drains OTHER settled dirty work (throttled,
+      // one cheap indexed pre-check when idle) — serverless can't hold a
+      // debounce timer, so presence powers the cascade instead.
+      after(async () => {
+        await markContextDirty([id]);
+        await maybeRippleFromEdit(userId);
+      });
+
       // Format response
       const response: ContentDetailResponse = {
         id: updated.id,
@@ -1535,6 +1552,11 @@ export async function DELETE(
       // instead of returning a stale cached copy. The setCachedContent
       // guard for deletedAt prevents re-population from in-flight reads.
       invalidateCachedContent(id);
+
+      // Folder Studio auto-context: removal changes the parent's roll-up
+      // inputs. The deleted node's own metadata row is ignored by the
+      // refresh engine (scope queries filter deletedAt).
+      after(() => markContextDirty([existing.parentId]));
 
       // Scrub the node from every workspace's saved pane state + assignments.
       // Stored paneState isn't touched by the soft delete, so without this the

@@ -33,6 +33,7 @@ interface SettingsStore extends UserSettings {
   setPeriodicNotesSettings: (periodicNotes: Partial<NonNullable<UserSettings["periodicNotes"]>>) => Promise<void>;
   setFlashcardSettings: (flashcards: Partial<NonNullable<UserSettings["flashcards"]>>) => Promise<void>;
   setNotificationsSettings: (notifications: Partial<NonNullable<UserSettings["notifications"]>>) => Promise<void>;
+  setStudioSettings: (studio: Partial<NonNullable<UserSettings["studio"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -101,6 +102,7 @@ export const useSettingsStore = create<SettingsStore>()(
           periodicNotes: current.periodicNotes,
           flashcards: current.flashcards,
           notifications: current.notifications,
+          studio: current.studio,
         };
 
         set({ isSyncing: true, error: null });
@@ -272,6 +274,17 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.notifications?.kinds,
               ...notifications.kinds,
             },
+          },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setStudioSettings: async (studio) => {
+        set((state) => ({
+          studio: {
+            ...state.studio,
+            ...studio,
           },
           hasPendingChanges: true,
         }));
