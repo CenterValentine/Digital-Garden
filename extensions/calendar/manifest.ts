@@ -20,7 +20,7 @@ export const calendarExtensionManifest: ExtensionManifest = {
       label: "Calendar",
       title: "Calendar",
       iconName: "CalendarDays",
-      order: 30,
+      order: 20,
     },
   ],
   surfaces: ["left-sidebar", "main-workspace", "right-sidebar", "global-dialog"],

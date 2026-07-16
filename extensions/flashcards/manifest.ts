@@ -17,7 +17,7 @@ export const flashcardsExtensionManifest: ExtensionManifest = {
       label: "Flashcards",
       title: "Flashcards",
       iconName: "Layers",
-      order: 25,
+      order: 40,
     },
   ],
   surfaces: ["left-sidebar", "global-dialog"],

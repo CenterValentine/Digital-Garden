@@ -16,7 +16,7 @@ export const peopleExtensionManifest: ExtensionManifest = {
       label: "People",
       title: "People",
       iconName: "Users",
-      order: 20,
+      order: 10,
     },
   ],
   surfaces: ["left-sidebar", "content-viewer"],
