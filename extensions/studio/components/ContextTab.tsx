@@ -1,17 +1,19 @@
 /**
  * Context sidebar tab — the per-node context HUB (restructured 2026-07-16).
  *
- * One tab, three sub-tabs on an iconized subrail (UI parity with the left
- * sidebar's file-tree subrail): Links (backlinks), Tags, and AI (the agentic
- * metadata doc). The old standalone Links/Tags right-sidebar tabs merged in
- * here; the AI sub-tab follows studio extension enablement while links/tags
- * are core and always available for their content types.
+ * One tab, three sub-tabs: Links (backlinks), Tags, and AI (the agentic
+ * metadata doc). Layout mirrors the inbox left-panel navigator — a row of
+ * rounded icon buttons inside a bordered header (no section title above it),
+ * with the active sub-tab's label BENEATH the divider line. The AI sub-tab
+ * follows studio extension enablement; links/tags are core and always
+ * available for their content types.
  */
 
 "use client";
 
 import { useState } from "react";
 import { Link as LinkIcon, Sparkles, Tag as TagIcon } from "lucide-react";
+import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
 import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import { BacklinksPanel } from "@/components/content/BacklinksPanel";
@@ -20,6 +22,16 @@ import { STUDIO_EXTENSION_ID } from "../manifest";
 import { ContextAiPanel } from "./ContextAiPanel";
 
 type ContextSubTab = "links" | "tags" | "ai";
+
+const SUB_TABS: Array<{
+  id: ContextSubTab;
+  label: string;
+  icon: typeof LinkIcon;
+}> = [
+  { id: "links", label: "Links", icon: LinkIcon },
+  { id: "tags", label: "Tags", icon: TagIcon },
+  { id: "ai", label: "AI Context", icon: Sparkles },
+];
 
 /** Content types whose backlinks panel is meaningful (old Links tab scope). */
 const LINKS_CONTENT_TYPES = new Set(["note", "external"]);
@@ -32,11 +44,6 @@ const AI_CONTENT_TYPES = new Set([
   "code",
   "external",
 ]);
-
-// Subrail class parity with LeftSidebarHeader's sub-affordance row.
-const SUB_ACTIVE = "bg-white dark:bg-white/20 text-gold-primary";
-const SUB_INACTIVE =
-  "text-gray-500 dark:text-gray-400 hover:bg-white/60 dark:hover:bg-white/10 hover:text-gold-primary";
 
 export function ContextTab() {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
@@ -77,44 +84,39 @@ export function ContextTab() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Sub-affordance rail — mirrors the left sidebar's file-tree subrail */}
-      <div className="h-0.5 shrink-0 bg-gray-100 dark:bg-gray-800" />
-      <div className="flex h-6 shrink-0 items-center gap-0.5 border-b border-gray-200 bg-gray-100 px-1.5 dark:border-white/10 dark:bg-gray-800">
-        {available.includes("links") && (
-          <button
-            type="button"
-            onClick={() => setChosen("links")}
-            className={`rounded p-0.5 transition-colors ${
-              activeSubTab === "links" ? SUB_ACTIVE : SUB_INACTIVE
-            }`}
-            title="Links — what references this"
-          >
-            <LinkIcon className="h-4 w-4" />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => setChosen("tags")}
-          className={`rounded p-0.5 transition-colors ${
-            activeSubTab === "tags" ? SUB_ACTIVE : SUB_INACTIVE
-          }`}
-          title="Tags"
-        >
-          <TagIcon className="h-4 w-4" />
-        </button>
-        {available.includes("ai") && (
-          <button
-            type="button"
-            onClick={() => setChosen("ai")}
-            className={`rounded p-0.5 transition-colors ${
-              activeSubTab === "ai" ? SUB_ACTIVE : SUB_INACTIVE
-            }`}
-            title="AI context — the model's working knowledge of this content"
-          >
-            <Sparkles className="h-4 w-4" />
-          </button>
-        )}
+      {/* Icon row — inbox-navigator styling, no section title above it */}
+      <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
+        <div className="flex items-center gap-1">
+          {SUB_TABS.filter(({ id }) => available.includes(id)).map(
+            ({ id, label, icon: Icon }) => {
+              const isActive = activeSubTab === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setChosen(id)}
+                  aria-label={label}
+                  aria-current={isActive ? "page" : undefined}
+                  title={label}
+                  className={cn(
+                    "flex h-8 w-8 items-center justify-center rounded-lg transition-colors",
+                    isActive
+                      ? "bg-black/[0.06] text-foreground dark:bg-white/10"
+                      : "text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/5"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                </button>
+              );
+            }
+          )}
+        </div>
       </div>
+
+      {/* Active sub-tab label — beneath the divider line, per inbox parity */}
+      <h3 className="shrink-0 px-3 pt-3 text-sm font-semibold text-gray-900 dark:text-white">
+        {SUB_TABS.find((entry) => entry.id === activeSubTab)?.label ?? "Context"}
+      </h3>
 
       <div className="min-h-0 flex-1 overflow-hidden">
         {activeSubTab === "links" && (
