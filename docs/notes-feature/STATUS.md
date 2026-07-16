@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-12
+last_updated: 2026-07-16
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,13 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 16, 2026**: Folder Studio Phases 0–7 — folders as agentic hubs (branch `worktree-folder-studio`, PR pending)
+
+- **Every shelf wired end-to-end** per `FOLDER-STUDIO-PLAN.md`: Studio + Context sidebar tabs (Tool Surfaces mount, extension-disable filtered), 13-tool registry-rendered grid, agentic metadata layer (`AgenticMetadata` sidecar; ownership-sectioned Context doc — AI summary/structure, proposed Role & Strategy diff, human directives; staleness hashes), grounded folder chat (BFS token-budget source selection, tri-state picker with size bars / NO TEXT / GEN locks, system-prompt injection in the chat route), chat-invocation tools (report/mind-map/glossary/compare/prerequisites/flashcards via composed prompts + existing `createNote`/propose_* conventions), job runs (`StudioGenerationRun` interim table — WorkflowRun declined for its definition FK; `after()` execution survives tab close; `studio.run` inbox kind), heavy artifacts (infographic HTML, single-voice audio overview via existing TTS pipeline, real `.pptx` decks via new `pptxgenjs` dep), and the four Practice sessions (quiz / teach-back / oral exam / FSRS-aware study plan).
+- **Two feature-routing entries** (`studio-metadata`, `studio-generation`) give model pickers via the existing Feature Routing settings page — no bespoke settings section needed.
+- **Anti-feedback-loop GEN lock**: unedited studio outputs are excluded from sources until their bodyHash diverges (edited ⇒ eligible).
+- Deferred (BACKLOG "Folder Studio Followups"): Option A folder-view mount, image vision pass, custom report variants from ChatContext, diffusion infographic, per-conversation selection overrides, browser smoke (surfaces are auth-gated).
 
 **July 13, 2026**: Workflows Builder + Interpreter — Plan 2 complete incl. canvas stretch (branch `feature/workflows-foundation`, PR pending)
 

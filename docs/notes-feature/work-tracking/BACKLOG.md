@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-12
+last_updated: 2026-07-16
 ---
 
 # Sprint Backlog
@@ -7,6 +7,24 @@ last_updated: 2026-07-12
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Folder Studio Followups (2026-07-16, branch `worktree-folder-studio`)
+
+Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the build:
+
+- [ ] **Option A — Studio as a folder view** (plan Phase 8 first half) — second mount of the existing StudioTab surfaces inside `FolderViewContainer`; registry-driven, no new logic. Deferred to land the working feature first; revisit Option C ("expand" tab) with usage evidence.
+- [ ] **Browser smoke + Playwright activation** — all studio surfaces are auth-gated; blocked on the shared e2e auth fixture (same blocker as workflows/flashcards specs). Manual smoke checklist in the PR body.
+- [ ] **Image sources vision pass** (plan Phase 2 item) — images currently resolve empty ("NO TEXT" flag flows honestly); wire a vision-model description pass + decide the `enableOCR` fallback flip.
+- [ ] **Custom report variants from ChatContext presets** — the variant-resolver contract supports it (`variants` as async resolver); wire `ChatContext` list → report tile flyout.
+- [ ] **Infographic diffusion mode** — the `image` variant of the infographic tool fails gracefully today; wire through `lib/domain/ai/image/` when prioritized.
+- [ ] **Per-conversation source-selection overrides** — v1 persists selection per (owner, folder) in `StudioSourceSelection`; the plan's original shape was per-conversation via `ConversationAssociation`. Add an override layer if folder-level proves too coarse.
+- [ ] **Study plan → daily notes** — plan wanted the FSRS study plan written into daily notes; v1 creates a folder note. Needs periodic-notes resolve integration.
+- [ ] **Wiki-links in generated artifacts render as literal `[[Title]]` text** — `markdownToTiptap` doesn't produce wikiLink nodes; add a post-conversion pass (or extend the converter) so generated Sources sections are real links.
+- [ ] **Schema drift debt (shared Neon dev DB)** — `AgenticMetadata`, `StudioSourceSelection`, `StudioGenerationRun` were created via targeted SQL because `prisma db push` wanted to drop another worktree's `ServiceToken` table. Before prod deploy: create proper migrations (`migrate dev --create-only`) and reconcile drift per `DATABASE-CHANGE-CHECKLIST.md`.
+- [ ] **Two-host audio + video overview** — postponed per plan Non-goals (Gemini multi-speaker TTS is the gap-filler candidate); video tile ships as a stub.
+- [ ] **Mobile bottom-nav chat routing** — decision of record (Phase 3): the bottom-nav AI icon keeps opening the GLOBAL chat; folder-scoped chat is reached via the Studio tab's button. Revisit only with usage evidence.
 
 ---
 

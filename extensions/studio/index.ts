@@ -19,6 +19,7 @@ export {
   getStudioToolById,
   resolveStudioToolVariants,
 } from "./registry";
+export * from "./invocable";
 export {
   STUDIO_EXTENSION_ID,
   STUDIO_TAB_KEY,

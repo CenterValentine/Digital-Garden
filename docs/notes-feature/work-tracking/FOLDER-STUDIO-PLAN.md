@@ -15,6 +15,16 @@ related:
   - lib/features/office/blank-document-generator.ts
 ---
 
+> **Status (2026-07-16): Phases 0–7 BUILT** on branch `worktree-folder-studio`
+> (all gates green per phase; one commit per phase). Option B (sidebar Studio
+> tab) is the shipped mount; Option A (folder view) is the remaining Phase 8
+> half — deferred with the other intentional gaps to BACKLOG.md → "Folder
+> Studio Followups (2026-07-16)". Deviations of record from this plan:
+> per-FOLDER source selection (not per-conversation), interim
+> `StudioGenerationRun` table (WorkflowRun declined — hard `definitionId` FK),
+> study plan lands as a folder note (not daily notes), bottom-nav chat stays
+> global. Browser smoke pending (auth-gated surfaces).
+>
 > **Status (2026-07-12):** Direction approved off the round-1 design stub board.
 > Layout decision of record: **Option B first** (chat-first right-sidebar Studio tab),
 > **Option A second** (Studio as a folder view), **Option C deferred** (main-panel
