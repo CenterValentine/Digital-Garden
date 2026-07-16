@@ -13,8 +13,9 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useContentStore } from "@/state/content-store";
+import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 import { getStudioToolsGroupedByShelf } from "../registry";
 import type { StudioShelf } from "../types";
 import { StudioToolTile } from "./StudioToolTile";
@@ -34,15 +35,57 @@ const SHELF_HINTS: Record<StudioShelf, string> = {
 
 export function StudioTab() {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const setActiveTab = useRightSidebarStateStore((s) => s.setActiveTab);
   const [openToolId, setOpenToolId] = useState<string | null>(null);
+  const [invokingToolId, setInvokingToolId] = useState<string | null>(null);
+  const [invokeError, setInvokeError] = useState<string | null>(null);
 
   // The registry is module-stable; grouping is cheap but keep render pure.
   const shelves = useMemo(() => getStudioToolsGroupedByShelf(), []);
+
+  // Tool invocation (Phase 4): compose the prompt server-side, stash it for
+  // the conversation engine (sessionStorage survives the tab-mount race),
+  // then jump to the chat tab where the engine sends it.
+  const handleInvoke = useCallback(
+    (toolId: string, variantId?: string) => {
+      if (!selectedContentId) return;
+      const folderId = selectedContentId;
+      setInvokingToolId(toolId);
+      setInvokeError(null);
+      fetch("/api/studio/tools/compose", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ toolId, variantId, folderId }),
+      })
+        .then(async (res) => {
+          const body = await res.json();
+          if (!res.ok || !body.success) {
+            throw new Error(body.error ?? "Could not start the tool");
+          }
+          window.sessionStorage.setItem(
+            `dg:studio-invoke:${folderId}`,
+            body.data.prompt
+          );
+          setActiveTab(folderId, "chat");
+        })
+        .catch((err: unknown) => {
+          setInvokeError(
+            err instanceof Error ? err.message : "Could not start the tool"
+          );
+        })
+        .finally(() => setInvokingToolId(null));
+    },
+    [selectedContentId, setActiveTab]
+  );
 
   return (
     <div className="scrollbar-hide h-full overflow-y-auto px-3 py-3">
       {/* ── Source picker — selection that grounds folder chat + tools ── */}
       {selectedContentId && <SourcePicker folderId={selectedContentId} />}
+
+      {invokeError && (
+        <p className="mt-2 px-1 text-xs text-red-500/90">{invokeError}</p>
+      )}
 
       {/* ── Shelves — rendered purely from the registry ── */}
       {shelves.map(({ shelf, tools }) =>
@@ -65,6 +108,8 @@ export function StudioTab() {
                       current === tool.id ? null : tool.id
                     )
                   }
+                  onInvoke={handleInvoke}
+                  invokingToolId={invokingToolId}
                 />
               ))}
             </div>

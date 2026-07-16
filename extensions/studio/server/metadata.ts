@@ -295,6 +295,25 @@ export async function resolveRoleStrategyProposal(
   return getMetadataForNode(userId, nodeId);
 }
 
+/**
+ * Guidance sections for prompt assembly (tool prompts slot these in). Reads
+ * the accepted Role & Strategy and the human Directives — never proposals.
+ */
+export async function getGuidanceText(nodeId: string): Promise<{
+  roleStrategy: string;
+  directives: string;
+}> {
+  const record = await prisma.agenticMetadata.findUnique({
+    where: { nodeId },
+    select: { tiptapJson: true },
+  });
+  const sections = readSections(record?.tiptapJson ?? null);
+  return {
+    roleStrategy: sections["role-strategy"],
+    directives: sections.directives,
+  };
+}
+
 // ── Generation ────────────────────────────────────────────────────────────
 
 const GeneratedSectionsSchema = z.object({
