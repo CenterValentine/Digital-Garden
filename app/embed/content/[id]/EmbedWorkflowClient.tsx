@@ -143,6 +143,7 @@ export function EmbedWorkflowClient({
             <RunDetail
               runId={selectedRunId}
               onBack={() => setSelectedRunId(null)}
+              onRetried={(newRunId) => setSelectedRunId(newRunId)}
             />
           ) : (
             <div className="h-full overflow-y-auto">

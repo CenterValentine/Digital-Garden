@@ -8,7 +8,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { ArrowLeft, Ban, Check, Loader2, X } from "lucide-react";
+import { ArrowLeft, Ban, Check, Loader2, RotateCcw, X } from "lucide-react";
 import { toast } from "sonner";
 import {
   isTerminal,
@@ -261,12 +261,16 @@ function GateCard({
 export function RunDetail({
   runId,
   onBack,
+  onRetried,
 }: {
   runId: string;
   onBack: () => void;
+  /** Called with the NEW run id after a failed run is retried. */
+  onRetried?: (newRunId: string) => void;
 }) {
   const [run, setRun] = useState<WorkflowRunDto | null>(null);
   const [canceling, setCanceling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -310,6 +314,43 @@ export function RunDetail({
       setCanceling(false);
     }
   }, [runId, load]);
+
+  // Retry = re-dispatch with the FAILED run's input.data (captureNodeId and
+  // all) — the user may have left the captured page, so the stored capture is
+  // the only faithful input. Never re-captures.
+  const input = (run?.input ?? {}) as Record<string, unknown>;
+  const retryWorkflowNodeId =
+    typeof input.workflowNodeId === "string" ? input.workflowNodeId : null;
+  const retry = useCallback(async () => {
+    if (!retryWorkflowNodeId) return;
+    setRetrying(true);
+    try {
+      const data =
+        typeof input.data === "object" && input.data !== null ? input.data : {};
+      const response = await fetch(
+        `/api/workflows/content/${retryWorkflowNodeId}/dispatch`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ input: data }),
+        }
+      );
+      if (!response.ok) {
+        toast.error(await readError(response));
+        return;
+      }
+      const body = (await response.json()) as {
+        data: { runId: string };
+      };
+      toast.success("Retrying — new run started");
+      onRetried?.(body.data.runId);
+    } catch {
+      toast.error("Failed to retry the run.");
+    } finally {
+      setRetrying(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- input.data is derived from `run`, tracked via retryWorkflowNodeId + run identity
+  }, [retryWorkflowNodeId, run, onRetried]);
 
   return (
     <div className="flex h-full flex-col">
@@ -382,21 +423,38 @@ export function RunDetail({
               <RunTimeline run={run} />
             </div>
 
-            {!isTerminal(run.status) ? (
-              <button
-                type="button"
-                disabled={canceling}
-                onClick={() => void cancel()}
-                className="inline-flex items-center gap-1 rounded-md border border-red-300/70 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/30 disabled:opacity-50"
-              >
-                {canceling ? (
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                ) : (
-                  <Ban className="h-3 w-3" />
-                )}
-                Cancel run
-              </button>
-            ) : null}
+            <div className="flex items-center gap-2">
+              {!isTerminal(run.status) ? (
+                <button
+                  type="button"
+                  disabled={canceling}
+                  onClick={() => void cancel()}
+                  className="inline-flex items-center gap-1 rounded-md border border-red-300/70 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/30 disabled:opacity-50"
+                >
+                  {canceling ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <Ban className="h-3 w-3" />
+                  )}
+                  Cancel run
+                </button>
+              ) : null}
+              {run.status === "failed" && retryWorkflowNodeId ? (
+                <button
+                  type="button"
+                  disabled={retrying}
+                  onClick={() => void retry()}
+                  className="inline-flex items-center gap-1 rounded-md border border-gold-primary/50 px-2.5 py-1 text-xs font-medium text-gold-primary hover:bg-gold-primary/10 disabled:opacity-50"
+                >
+                  {retrying ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    <RotateCcw className="h-3 w-3" />
+                  )}
+                  Retry with same input
+                </button>
+              ) : null}
+            </div>
           </>
         )}
       </div>

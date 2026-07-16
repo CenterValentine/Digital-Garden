@@ -661,7 +661,11 @@ async function openWorkflowDeepPanel(run) {
   try {
     await sendMessage({
       type: "open-content-in-active-tab",
-      payload: { contentId: run.workflowNodeId, contentKind: "workflow" },
+      payload: {
+        contentId: run.workflowNodeId,
+        contentKind: "workflow",
+        runId: run.id, // land directly on this run's detail
+      },
     });
     window.close();
   } catch (error) {

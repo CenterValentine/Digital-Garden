@@ -470,7 +470,16 @@ function openEmbedForPanel(state, panel) {
   panel.body.appendChild(iframe);
   state.iframePanel = panel;
 
-  if (state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
+  // Run deep-link (workflow panels): consume the one-shot marker and force a
+  // fresh src so ?run= reaches the embed viewer even if this content id is
+  // already loaded.
+  const pendingRunId =
+    state.pendingRunDeepLink && state.pendingRunDeepLink.contentId === panel.contentId
+      ? state.pendingRunDeepLink.runId
+      : null;
+  if (pendingRunId) state.pendingRunDeepLink = null;
+
+  if (!pendingRunId && state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
     // Already loaded — send a navigate message instead of reloading
     iframe.contentWindow?.postMessage({ type: "open", contentId: panel.contentId }, "*");
     iframe.setAttribute("data-active", "true");
@@ -502,9 +511,14 @@ function openEmbedForPanel(state, panel) {
       const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
       const targetPath = `/embed/content/${panel.contentId}`;
       const sessionToken = response.data?.token;
+      const runParam = pendingRunId
+        ? `run=${encodeURIComponent(pendingRunId)}`
+        : "";
       const iframeSrc = sessionToken
-        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}`
-        : targetUrl;
+        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}${runParam ? `&${runParam}` : ""}`
+        : runParam
+          ? `${targetUrl}?${runParam}`
+          : targetUrl;
 
       iframe.setAttribute("src", iframeSrc);
     });
@@ -2822,9 +2836,12 @@ function beginEmbedTargeting(state, panel) {
   document.body.style.cursor = "crosshair";
 }
 
-async function openAssociatedContent(state, contentId, contentKind) {
+async function openAssociatedContent(state, contentId, contentKind, runId) {
   // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
   const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
+  // Workflow run deep-link: consumed once by openEmbedForPanel, which appends
+  // ?run= so the embed viewer lands directly on that run's detail.
+  state.pendingRunDeepLink = runId ? { contentId, runId } : null;
   const context = state.resourceContext;
   const persisted =
     context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
@@ -3113,7 +3130,8 @@ function wireRootEvents(state) {
           await openAssociatedContent(
             state,
             message.payload?.contentId,
-            message.payload?.contentKind || "external"
+            message.payload?.contentKind || "external",
+            message.payload?.runId
           );
           sendResponse?.({ ok: true });
         } catch (error) {
@@ -4196,6 +4214,8 @@ const DG_WF_LINGER_MS = 6000;
 let dgWfPill = null;
 let dgWfPollTimer = null;
 let dgWfLingerTimer = null;
+/** { runId, workflowNodeId } for the run the pill currently tracks. */
+let dgWfCurrent = null;
 
 function dgWfEnsurePill() {
   if (dgWfPill && document.documentElement.contains(dgWfPill.root)) {
@@ -4238,6 +4258,13 @@ function dgWfEnsurePill() {
       padding: 1px 5px; border-radius: 8px;
       border: 1px solid rgba(230,233,238,0.25); color: #b9c1cc; flex: none;
     }
+    #dg-wf-pill .dg-wf-view {
+      all: unset; cursor: pointer; flex: none;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+      color: #e0c592; border: 1px solid rgba(201, 168, 108, 0.45);
+      border-radius: 10px; padding: 2px 8px;
+    }
+    #dg-wf-pill .dg-wf-view:hover { background: rgba(201, 168, 108, 0.15); color: #e9d3a8; }
     #dg-wf-pill .dg-wf-close {
       all: unset; cursor: pointer; color: #8b93a0; font-size: 13px;
       line-height: 1; padding: 2px 3px; flex: none;
@@ -4251,11 +4278,25 @@ function dgWfEnsurePill() {
     <span class="dg-wf-title"></span>
     <span class="dg-wf-engine" style="display:none"></span>
     <span class="dg-wf-status"></span>
+    <button class="dg-wf-view" style="display:none">View</button>
     <button class="dg-wf-close" title="Dismiss" aria-label="Dismiss">✕</button>
   `;
   document.documentElement.appendChild(style);
   document.documentElement.appendChild(root);
   root.querySelector(".dg-wf-close").addEventListener("click", () => dgWfHide());
+  root.querySelector(".dg-wf-view").addEventListener("click", () => {
+    if (!dgWfCurrent?.workflowNodeId) return;
+    // Round-trip through the background's active-tab door (this tab) so the
+    // overlay opens the workflow panel deep-linked to this run's detail.
+    chrome.runtime.sendMessage({
+      type: "open-content-in-active-tab",
+      payload: {
+        contentId: dgWfCurrent.workflowNodeId,
+        contentKind: "workflow",
+        runId: dgWfCurrent.runId,
+      },
+    });
+  });
   dgWfPill = {
     root,
     style,
@@ -4263,6 +4304,7 @@ function dgWfEnsurePill() {
     title: root.querySelector(".dg-wf-title"),
     engine: root.querySelector(".dg-wf-engine"),
     status: root.querySelector(".dg-wf-status"),
+    view: root.querySelector(".dg-wf-view"),
   };
   return dgWfPill;
 }
@@ -4271,6 +4313,7 @@ function dgWfHide() {
   window.clearInterval(dgWfPollTimer);
   window.clearTimeout(dgWfLingerTimer);
   dgWfPollTimer = null;
+  dgWfCurrent = null;
   if (!dgWfPill) return;
   dgWfPill.root.classList.remove("dg-wf-in");
   const pill = dgWfPill;
@@ -4306,10 +4349,12 @@ function dgWfRender(pill, run, fallbackTitle) {
  * "waiting" (needs review) and "failed" stay until dismissed. A [View] action
  * that opens the deep embed panel arrives with Phase 3.
  */
-function dgWfShowRun(runId, workflowTitle) {
+function dgWfShowRun(runId, workflowTitle, workflowNodeId) {
   if (!runId) return;
   dgWfHide();
+  dgWfCurrent = { runId, workflowNodeId: workflowNodeId || null };
   const pill = dgWfEnsurePill();
+  pill.view.style.display = dgWfCurrent.workflowNodeId ? "" : "none";
   dgWfRender(pill, null, workflowTitle || "Workflow");
   requestAnimationFrame(() => pill.root.classList.add("dg-wf-in"));
 
@@ -4342,6 +4387,10 @@ function dgWfShowRun(runId, workflowTitle) {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "dg-workflow-run-started") {
-    dgWfShowRun(message.payload?.runId, message.payload?.workflowTitle);
+    dgWfShowRun(
+      message.payload?.runId,
+      message.payload?.workflowTitle,
+      message.payload?.workflowNodeId
+    );
   }
 });

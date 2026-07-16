@@ -212,7 +212,13 @@ export function WorkflowsPanel() {
   );
 
   if (selectedRunId) {
-    return <RunDetail runId={selectedRunId} onBack={() => selectRun(null)} />;
+    return (
+      <RunDetail
+        runId={selectedRunId}
+        onBack={() => selectRun(null)}
+        onRetried={(newRunId) => selectRun(newRunId)}
+      />
+    );
   }
 
   return (

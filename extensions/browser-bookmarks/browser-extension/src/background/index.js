@@ -686,6 +686,7 @@ async function dispatchWorkflowForActiveTab(payload) {
       payload: {
         runId: data.runId,
         workflowTitle: payload?.workflowTitle || "Workflow",
+        workflowNodeId: workflowId, // pill [View] deep-opens this workflow
       },
     });
   } catch {
@@ -820,7 +821,7 @@ async function showTreePanelInActiveTab() {
   }
 }
 
-async function openContentInActiveTab(contentId, contentKind = "external") {
+async function openContentInActiveTab(contentId, contentKind = "external", runId) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     throw new Error("No active tab is available");
@@ -832,6 +833,7 @@ async function openContentInActiveTab(contentId, contentKind = "external") {
       payload: {
         contentId,
         contentKind,
+        runId, // workflow panels: deep-link the embed viewer to this run
       },
     });
     return { openedInOverlay: true, tabId: tab.id };
@@ -1911,7 +1913,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ok: true,
         data: await openContentInActiveTab(
           message.payload?.contentId,
-          message.payload?.contentKind || "external"
+          message.payload?.contentKind || "external",
+          message.payload?.runId
         ),
       });
       return;
