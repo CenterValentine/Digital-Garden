@@ -121,7 +121,15 @@ export default async function RootLayout({
           hatch next-themes uses for this exact case.
           See lib/features/theme/script.ts.
         */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* suppressHydrationWarning: browsers wipe the nonce ATTRIBUTE once CSP
+            is active (nonce-hiding, readable only via the .nonce property), so
+            hydration always sees "" vs the SSR value. The script ran at parse
+            time — the diff is expected and harmless. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+        />
         <Head />
       </head>
       <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable}`}>
