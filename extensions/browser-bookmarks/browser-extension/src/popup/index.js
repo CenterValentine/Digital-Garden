@@ -631,6 +631,118 @@ async function dispatchWorkflow(workflow, row) {
 
 runWorkflowButton().addEventListener("click", () => void toggleWorkflowChooser());
 
+// ── Recent runs (ambient status, popup layer) ─────────────────────────────────
+// Read-only mirror of the app's runs list: needs-review pinned, tap a row to
+// open the workflow's deep panel in the page overlay. Gate RESOLUTION stays
+// in the session-authed embed surface by design — no approve buttons here.
+
+const RUN_STATUS_COLORS = {
+  queued: "#9aa4b2",
+  running: "#7cb1ff",
+  waiting: "#ffd27a",
+  succeeded: "#8fe0b3",
+  failed: "#ff8a8a",
+  canceled: "#9aa4b2",
+};
+
+function formatRunAge(iso) {
+  const ms = Date.now() - Date.parse(iso);
+  if (!Number.isFinite(ms) || ms < 0) return "";
+  const minutes = Math.floor(ms / 60_000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
+}
+
+async function openWorkflowDeepPanel(run) {
+  if (!run.workflowNodeId) return;
+  try {
+    await sendMessage({
+      type: "open-content-in-active-tab",
+      payload: { contentId: run.workflowNodeId, contentKind: "workflow" },
+    });
+    window.close();
+  } catch (error) {
+    setQuickSaveStatus(
+      error instanceof Error ? error.message : "Overlay unavailable on this page.",
+      "error"
+    );
+  }
+}
+
+function renderRecentRuns(runs) {
+  const section = document.getElementById("workflow-runs");
+  const list = document.getElementById("workflow-runs-list");
+  if (!runs || runs.length === 0) {
+    section.style.display = "none";
+    return;
+  }
+  // Needs-review first (the popup's whole job is surfacing "you're needed"),
+  // otherwise keep the server's newest-first order.
+  const ordered = [...runs].sort(
+    (a, b) => Number(b.needsReview) - Number(a.needsReview)
+  );
+  list.innerHTML = "";
+  for (const run of ordered) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "workflow-run-row";
+    row.disabled = !run.workflowNodeId;
+    row.title = run.workflowNodeId
+      ? "Open in the page overlay"
+      : "Diagnostic run";
+
+    const dot = document.createElement("span");
+    dot.className = "workflow-run-dot";
+    dot.style.background = RUN_STATUS_COLORS[run.status] || "#9aa4b2";
+    if (run.status === "running" || run.status === "queued") {
+      dot.classList.add("workflow-run-dot-live");
+    }
+    row.appendChild(dot);
+
+    const name = document.createElement("span");
+    name.className = "workflow-run-name";
+    name.textContent = run.workflowName;
+    row.appendChild(name);
+
+    if (run.needsReview) {
+      const review = document.createElement("span");
+      review.className = "workflow-chip workflow-chip-review";
+      review.textContent = "review";
+      row.appendChild(review);
+    } else {
+      const status = document.createElement("span");
+      status.className = "workflow-run-status";
+      status.style.color = RUN_STATUS_COLORS[run.status] || "#9aa4b2";
+      status.textContent = run.status;
+      row.appendChild(status);
+    }
+
+    const age = document.createElement("span");
+    age.className = "workflow-run-age";
+    age.textContent = formatRunAge(run.createdAt);
+    row.appendChild(age);
+
+    row.addEventListener("click", () => void openWorkflowDeepPanel(run));
+    list.appendChild(row);
+  }
+  section.style.display = "block";
+}
+
+async function loadRecentRuns() {
+  try {
+    const data = await sendMessage({
+      type: "list-workflow-runs",
+      payload: { limit: 6 },
+    });
+    renderRecentRuns(data.runs);
+  } catch {
+    // Unpaired or offline — the section simply doesn't render.
+  }
+}
+
 connectionSelect().addEventListener("change", async (event) => {
   const value = event.target.value;
   if (!value) return;
@@ -654,6 +766,7 @@ descriptionInput().addEventListener("input", () => {
 (async () => {
   setPopupLoading(true);
   void populatePageContext();
+  void loadRecentRuns(); // ambient layer — never blocks the bookmark form
   try {
     const { connections, pageState } = await loadConfigAndConnections();
     setPopupLoading(false);

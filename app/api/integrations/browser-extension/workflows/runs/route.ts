@@ -51,6 +51,12 @@ export async function GET(request: NextRequest) {
             id: run.id,
             status: run.status,
             workflowName: run.definition.name,
+            // Content-node id for user-authored workflows (definition slug is
+            // "content:{id}") — lets the popup open the overlay deep panel.
+            // Null for diagnostic slugs.
+            workflowNodeId: run.definition.slug.startsWith("content:")
+              ? run.definition.slug.slice("content:".length)
+              : null,
             // Denormalized engine ("wdk" | "n8n" | …) so the badge/popup can
             // show which substrate a run executes on.
             engine: run.engine,

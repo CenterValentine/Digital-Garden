@@ -428,8 +428,16 @@ async function updateTabBadge(tabId, url) {
       assoc = await fetchAndCacheUrlAssociation(url);
     }
     if (assoc?.hasNote || assoc?.hasExternal) {
-      await chrome.action.setBadgeText({ text: "●", tabId });
-      await chrome.action.setBadgeBackgroundColor({ color: "#c9a86c", tabId });
+      if (workflowBadgeState?.urgent) {
+        // A failed / needs-review workflow badge (global) must never be masked
+        // by the per-tab bookmark dot. Empty per-tab text falls back to the
+        // global badge; the dot returns on the next tab update once urgency
+        // clears.
+        await chrome.action.setBadgeText({ text: "", tabId });
+      } else {
+        await chrome.action.setBadgeText({ text: "●", tabId });
+        await chrome.action.setBadgeBackgroundColor({ color: "#c9a86c", tabId });
+      }
     } else {
       await chrome.action.setBadgeText({ text: "", tabId });
     }
@@ -683,6 +691,7 @@ async function dispatchWorkflowForActiveTab(payload) {
   } catch {
     // No overlay on this page — the popup's status line already acknowledged.
   }
+  void refreshWorkflowBadge(); // a fresh run should show ambiently right away
   return data;
 }
 
@@ -692,7 +701,91 @@ async function getWorkflowRun(runId) {
   const data = await apiFetch(
     `/api/integrations/browser-extension/workflows/runs/${encodeURIComponent(runId)}`
   );
-  return data.run;
+  // Piggyback: a pill poll observing a status TRANSITION is exactly when the
+  // ambient badge is stale — refresh it once per transition, not per poll.
+  const run = data.run;
+  if (run && lastBadgeRunStatus.get(run.id) !== run.status) {
+    lastBadgeRunStatus.set(run.id, run.status);
+    void refreshWorkflowBadge();
+  }
+  return run;
+}
+
+// ── Workflow ambient badge (global; most-urgent run wins) ────────────────────
+// Precedence (frozen in the plan): failed (red) → waiting/needs-review (amber)
+// → running/queued (blue) → recently succeeded (green, ~10s) → clear. The
+// bookmark feature's per-tab gold dot yields to URGENT states only (see
+// updateTabBadge) so a failure is never masked on a bookmarked tab.
+
+const WORKFLOW_BADGE_ALARM = "dg-workflow-badge";
+const WORKFLOW_SUCCESS_LINGER_MS = 10_000;
+const WORKFLOW_FAILURE_LINGER_MS = 30 * 60_000; // failures decay after 30 min
+
+/** null = no badge; else { text, color, urgent, transient } */
+let workflowBadgeState = null;
+let workflowBadgeInFlight = null;
+const lastBadgeRunStatus = new Map();
+
+function computeWorkflowBadge(runs, now = Date.now()) {
+  let waiting = false;
+  let active = false;
+  let recentFailure = false;
+  let recentSuccess = false;
+  for (const run of runs) {
+    if (run.status === "waiting") waiting = true;
+    if (run.status === "running" || run.status === "queued") active = true;
+    const finishedAt = run.finishedAt ? Date.parse(run.finishedAt) : NaN;
+    if (Number.isNaN(finishedAt)) continue;
+    if (run.status === "failed" && now - finishedAt < WORKFLOW_FAILURE_LINGER_MS) {
+      recentFailure = true;
+    }
+    if (run.status === "succeeded" && now - finishedAt < WORKFLOW_SUCCESS_LINGER_MS) {
+      recentSuccess = true;
+    }
+  }
+  if (recentFailure) return { text: "!", color: "#dc2626", urgent: true, transient: false };
+  if (waiting) return { text: "!", color: "#d97706", urgent: true, transient: false };
+  if (active) return { text: "●", color: "#2563eb", urgent: false, transient: false };
+  if (recentSuccess) return { text: "✓", color: "#059669", urgent: false, transient: true };
+  return null;
+}
+
+async function refreshWorkflowBadge() {
+  if (workflowBadgeInFlight) return workflowBadgeInFlight;
+  workflowBadgeInFlight = (async () => {
+    try {
+      const data = await apiFetch(
+        "/api/integrations/browser-extension/workflows/runs?limit=15"
+      );
+      workflowBadgeState = computeWorkflowBadge(data.runs || []);
+      if (workflowBadgeState) {
+        await chrome.action.setBadgeText({ text: workflowBadgeState.text });
+        await chrome.action.setBadgeBackgroundColor({
+          color: workflowBadgeState.color,
+        });
+        if (workflowBadgeState.transient) {
+          // Best-effort green decay (~10s). If MV3 kills the worker first,
+          // the 1-minute alarm clears it instead.
+          setTimeout(() => void refreshWorkflowBadge(), WORKFLOW_SUCCESS_LINGER_MS + 1000);
+        }
+      } else {
+        await chrome.action.setBadgeText({ text: "" });
+      }
+    } catch {
+      // Unpaired / offline — leave the badge alone; the next alarm retries.
+    } finally {
+      workflowBadgeInFlight = null;
+    }
+  })();
+  return workflowBadgeInFlight;
+}
+
+/** Popup feed: compact recent runs (needs-review pinned client-side). */
+async function listWorkflowRuns(limit = 6) {
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows/runs?limit=${limit}`
+  );
+  return { runs: data.runs || [] };
 }
 
 async function startQuickCaptureInActiveTab() {
@@ -1590,6 +1683,7 @@ chrome.runtime.onInstalled.addListener(async () => {
   });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
+  chrome.alarms.create(WORKFLOW_BADGE_ALARM, { periodInMinutes: 1 });
   // Plant the initial cookie so the iframe works right away after install/update
   await exchangeEmbedSession();
 });
@@ -1627,6 +1721,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await exchangeEmbedSession({ force: true }).catch((error) => {
       console.error("[DG Bookmarks] Embed session refresh failed", error);
     });
+  }
+  if (alarm.name === WORKFLOW_BADGE_ALARM) {
+    await refreshWorkflowBadge();
   }
 });
 
@@ -1834,6 +1931,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({
         ok: true,
         data: await getWorkflowRun(message.payload?.runId),
+      });
+      return;
+    }
+    if (message.type === "list-workflow-runs") {
+      sendResponse({
+        ok: true,
+        data: await listWorkflowRuns(message.payload?.limit),
       });
       return;
     }

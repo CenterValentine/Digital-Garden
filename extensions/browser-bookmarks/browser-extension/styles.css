@@ -896,3 +896,83 @@ body.options-page {
   background: rgba(201, 168, 108, 0.12);
   color: rgba(233, 211, 168, 0.95);
 }
+
+.workflow-chip-review {
+  border: 1px solid rgba(255, 210, 122, 0.5);
+  background: rgba(255, 210, 122, 0.14);
+  color: rgba(255, 210, 122, 0.95);
+}
+
+/* ── Recent runs (popup ambient status) ────────────────────────────────────── */
+
+.workflow-runs {
+  margin-top: 8px;
+}
+
+.workflow-runs-header {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(230, 233, 238, 0.4);
+  padding: 0 2px 4px;
+}
+
+.workflow-run-row {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: var(--radius-md);
+  font-size: 11.5px;
+  color: rgba(230, 233, 238, 0.85);
+  cursor: pointer;
+}
+
+.workflow-run-row:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.workflow-run-row:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.workflow-run-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.workflow-run-dot-live {
+  animation: workflow-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes workflow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.workflow-run-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workflow-run-status {
+  flex: none;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+.workflow-run-age {
+  flex: none;
+  font-size: 10px;
+  color: rgba(230, 233, 238, 0.35);
+}
