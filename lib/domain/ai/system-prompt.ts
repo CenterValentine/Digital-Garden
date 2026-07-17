@@ -104,6 +104,18 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const sections: string[] = [BASE_PROMPT];
 
+  // Date only (no time) so the prompt stays byte-stable within a day —
+  // preserves provider prompt-cache hits across a session (cache-aware
+  // layout, AI v3 core). Without this, models guess "today" from their
+  // training era and search queries carry years-stale dates.
+  sections.push(
+    `Current date: ${new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
+  );
   sections.push(
     "Tool discipline: if a tool result is empty or unhelpful, do NOT repeat the same or a near-identical call — vary the approach once at most, then answer with what you have and state the limitation plainly.",
   );
