@@ -28,6 +28,7 @@ export type {
 } from "./types";
 export { createAcquisitionBudget } from "./types";
 export { evaluateAcquirePolicy } from "./policy";
+export { resolveNativeWebSearchTool } from "./native-search";
 
 export async function acquire(
   request: AcquireRequest,

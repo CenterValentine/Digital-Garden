@@ -19,6 +19,7 @@ import {
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
+  "search_web",
   "read_page",
   "searchNotes",
   "getCurrentNote",
@@ -49,6 +50,11 @@ export interface BaseToolMeta {
 }
 
 export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
+  search_web: {
+    name: "Web Search",
+    description:
+      "Search the web with cited results using the active provider's native search (Anthropic, OpenAI, Google, xAI)",
+  },
   read_page: {
     name: "Read Web Page",
     description:

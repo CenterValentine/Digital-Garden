@@ -89,6 +89,7 @@ import {
 } from "@/lib/features/ai-connections";
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
+import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
 import {
   resolvePrimaryRoute,
@@ -385,6 +386,17 @@ export async function POST(request: Request) {
           ([id]) => toolConfig[id]?.enabled !== false,
         ),
       );
+
+      // P0 (AI v3 core S2): provider-native web search, resolved per active
+      // provider at request composition. The vendor executes the search
+      // server-side and streams back cited results; providers without a
+      // native tool simply don't get search_web (read_page still covers
+      // direct URLs via the owned P1 pipeline).
+      const nativeSearch = resolveNativeWebSearchTool(providerId);
+      if (nativeSearch && toolConfig["search_web"]?.enabled !== false) {
+        (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+      }
+
       const toolsActive = Object.keys(tools).length > 0;
 
       // Resolve attachments for the model: keep file parts the active

@@ -109,6 +109,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Could not read the page: ${result.reason ?? "unknown error"}.`;
         }
         const c = result.content;
+        // Bot-walled sites (Indeed, LinkedIn, …) return a challenge page —
+        // tiny after extraction. Name the situation for the model so it
+        // relays the right workaround instead of guessing.
+        if (c.content.length < 200) {
+          return (
+            `The page returned almost no readable content (${c.content.length} chars) — ` +
+            `this site likely blocks automated access. Ask the user to either paste the ` +
+            `content directly, or try a direct/public version of the page (e.g. the ` +
+            `company's own careers page instead of a job-board aggregator).`
+          );
+        }
         return {
           url: c.url,
           canonicalUrl: c.canonicalUrl,
