@@ -104,6 +104,9 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const sections: string[] = [BASE_PROMPT];
 
+  sections.push(
+    "Tool discipline: if a tool result is empty or unhelpful, do NOT repeat the same or a near-identical call — vary the approach once at most, then answer with what you have and state the limitation plainly.",
+  );
   if (ctx.hasWebSearch) {
     sections.push(
       "You have a `search_web` tool that searches the live web and returns cited results. Use it whenever the user asks about current events, weather, prices, recent releases, or anything after your training data — do NOT claim you lack real-time access; search instead. Always carry the citations into your answer. You also have `read_page` for reading a specific URL the user provides.",

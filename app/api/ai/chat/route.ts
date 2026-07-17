@@ -388,11 +388,29 @@ export async function POST(request: Request) {
       );
 
       // P0 (AI v3 core S2): provider-native web search, resolved per active
-      // provider at request composition. The vendor executes the search
-      // server-side and streams back cited results; providers without a
-      // native tool simply don't get search_web (read_page still covers
-      // direct URLs via the owned P1 pipeline).
-      const nativeSearch = resolveNativeWebSearchTool(providerId);
+      // provider at request composition. CRITICAL: key off the EXECUTED
+      // provider, not the requested one — the resolver above may have landed
+      // on a different vendor's connection (preset fall-through, feature
+      // route), and attaching vendor A's server tool to vendor B's model
+      // gets it silently dropped, leaving the model to flail on note tools.
+      // Aggregator transports (gateway, OpenRouter) are skipped until their
+      // provider-tool passthrough is verified. read_page (owned P1) always
+      // remains available.
+      const NATIVE_TOOL_VENDORS = new Set([
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+      ]);
+      const executedProviderId = activeConnection
+        ? activeConnection.presetId
+        : transport === "direct"
+          ? providerId
+          : null;
+      const nativeSearch =
+        executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
+          ? resolveNativeWebSearchTool(executedProviderId)
+          : null;
       if (nativeSearch && toolConfig["search_web"]?.enabled !== false) {
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
       }
@@ -533,6 +551,7 @@ export async function POST(request: Request) {
             // handle provider-defined tools differently than direct).
             tool_names: Object.keys(tools).join(","),
             native_search: "search_web" in tools,
+            executed_provider: executedProviderId ?? "aggregator",
           },
           summary: `${providerId}:${modelId} streaming`,
         },
