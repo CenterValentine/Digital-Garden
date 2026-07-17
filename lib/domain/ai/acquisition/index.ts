@@ -13,6 +13,7 @@
  */
 
 import { logger } from "@/lib/core/logger";
+import { hydrateExternalPayload } from "./hydrate";
 import { evaluateAcquirePolicy } from "./policy";
 import { serverFetchAcquire } from "./server-fetch";
 import type { AcquireContext, AcquireRequest, AcquireResult } from "./types";
@@ -58,6 +59,9 @@ export async function acquire(
 
   try {
     const content = await serverFetchAcquire(request);
+    // Garden-as-corpus: if the user already has this URL as an external
+    // node, cache the extraction on it. Fire-and-forget by contract.
+    void hydrateExternalPayload(ctx.userId, content);
     logger.info({
       layer: "ai",
       event: "acquisition:fetch",
