@@ -180,6 +180,15 @@ body:has(.notes-layout-page) .toaster {
   top: 64px !important; /* 56px navbar + 8px spacing */
 }
 
+/* Embed iframe (browser-extension overlay panel): no navbar and a narrow
+   viewport — pin toasts tight to the top edge and cap their width so the
+   close button never clips outside the frame. */
+body:has(.embed-layout-page) [data-sonner-toaster][data-y-position="top"] {
+  top: 8px !important;
+  right: 8px !important;
+  --width: min(340px, calc(100vw - 24px));
+}
+
 :root {
   --font-size: 16px;
   

@@ -5,6 +5,11 @@ import type {
   WorkflowRun,
 } from "@/lib/database/generated/prisma";
 import { WDK_INTERPRETER_ENGINE, workflowGraphSchema } from "../graph/schema";
+import {
+  parseUrlPatterns,
+  readEntryTrigger,
+  urlMatchesPatterns,
+} from "../graph/url-match";
 import { validateGraph } from "../graph/validate";
 import { ensureDefinition, getDefinitionSpec } from "./definitions";
 import { getEngineAdapter } from "./engines/registry";
@@ -153,10 +158,22 @@ async function startEngineForRun(
  * with no workflows auto-creates one from the capture-entry template — the
  * user's own editable graph from day one, no hardened recipes.
  */
-export async function dispatchCaptureToUserWorkflow(
+export interface CapturePayload {
+  pageUrl?: string;
+  pageTitle?: string;
+  pageText?: string;
+}
+
+/**
+ * Persist the capture as a note (when it carries text) and shape the trigger
+ * data record. Shared by the auto-route and chosen-workflow dispatch paths so
+ * BOTH persist the rendered page text — URL-only runs against JS-rendered
+ * pages are the documented soak failure.
+ */
+async function buildCaptureRunData(
   ownerId: string,
-  capture: { pageUrl?: string; pageTitle?: string; pageText?: string }
-): Promise<DispatchResult> {
+  capture: CapturePayload
+): Promise<Record<string, unknown>> {
   const data: Record<string, unknown> = {
     ...(capture.pageUrl ? { pageUrl: capture.pageUrl } : {}),
     ...(capture.pageTitle ? { pageTitle: capture.pageTitle } : {}),
@@ -169,6 +186,28 @@ export async function dispatchCaptureToUserWorkflow(
       pageText: capture.pageText,
     });
   }
+  return data;
+}
+
+/**
+ * Extension chooser path: the user explicitly picked WHICH workflow to run
+ * on this page. Store the capture, then dispatch that content node directly —
+ * no URL routing, no template auto-create.
+ */
+export async function dispatchCaptureToWorkflowContent(
+  ownerId: string,
+  workflowNodeId: string,
+  capture: CapturePayload
+): Promise<DispatchResult> {
+  const data = await buildCaptureRunData(ownerId, capture);
+  return dispatchWorkflowFromContent(ownerId, workflowNodeId, data);
+}
+
+export async function dispatchCaptureToUserWorkflow(
+  ownerId: string,
+  capture: CapturePayload
+): Promise<DispatchResult> {
+  const data = await buildCaptureRunData(ownerId, capture);
 
   // Prefer a workflow whose page-capture trigger's URL pattern matches; fall
   // back to the most recently updated enabled workflow.
@@ -213,19 +252,12 @@ export async function dispatchCaptureToUserWorkflow(
   return dispatchWorkflowFromContent(ownerId, target.id, data);
 }
 
-function globToRegExp(glob: string): RegExp {
-  const escaped = glob
-    .trim()
-    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
-    .replace(/\*/g, ".*");
-  return new RegExp(`^${escaped}$`, "i");
-}
-
 /**
  * Choose the capture target: among workflows whose entry is a page-capture
  * trigger, prefer one whose URL pattern matches (a specific pattern beats a
  * blank catch-all); else the first candidate (most-recently-updated). Returns
- * null when no page-capture-triggered workflow exists.
+ * null when no page-capture-triggered workflow exists. Pattern semantics live
+ * in graph/url-match.ts, shared with the extension chooser endpoint.
  */
 function pickCaptureTarget(
   candidates: Array<{ id: string; workflowPayload: { definition: unknown } | null }>,
@@ -233,24 +265,14 @@ function pickCaptureTarget(
 ): { id: string } | null {
   let catchAll: { id: string } | null = null;
   for (const candidate of candidates) {
-    const parsed = workflowGraphSchema.safeParse(
-      candidate.workflowPayload?.definition
-    );
-    if (!parsed.success) continue;
-    const graph = parsed.data;
-    const entry = graph.nodes.find((n) => n.id === graph.entryNodeId);
-    if (entry?.type !== "trigger-page-capture") continue;
-    const patternRaw =
-      typeof entry.config.urlPattern === "string" ? entry.config.urlPattern : "";
-    const patterns = patternRaw
-      .split(",")
-      .map((p) => p.trim())
-      .filter(Boolean);
+    const trigger = readEntryTrigger(candidate.workflowPayload?.definition);
+    if (trigger.triggerType !== "trigger-page-capture") continue;
+    const patterns = parseUrlPatterns(trigger.urlPattern ?? "");
     if (patterns.length === 0) {
       catchAll ??= { id: candidate.id };
       continue;
     }
-    if (pageUrl && patterns.some((p) => globToRegExp(p).test(pageUrl))) {
+    if (pageUrl && urlMatchesPatterns(pageUrl, patterns)) {
       return { id: candidate.id }; // specific match wins immediately
     }
   }

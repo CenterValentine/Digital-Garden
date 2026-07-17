@@ -53,11 +53,19 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**July 16, 2026 (evening)**: References display as CHILDREN of their owning note (branch `worktree-folder-studio`)
+**July 16, 2026 (evening)**: References display as CHILDREN of their owning note (branch `worktree-folder-studio`, post-#110 — PR pending)
 
 - Tree model change: `role: "referenced"` nodes with a live `ownedByNoteId` now render under that note in the file tree (notes grow a chevron); references with no owning note stay adjacent to primary content in their folder. **Display-only re-homing** — storage `parentId` remains the folder, so move cascades, folder scans, auto-context BFS, and materialized paths are untouched; implemented as a display-parent redirect in the tree route (owner must be in the same fetch; soft-deleted owners fall back to folder placement).
 - Drag rules: primary content still can NOT be dropped onto a leaf (deliberately not Notion). References CAN be dropped onto a note — the move route re-homes (`ownedByNoteId = note`, storage parent = note's folder); dropping a reference onto a folder or root detaches it from its note.
 - Deletion safety unchanged: ref-counting stays on the ContentLink embed graph, independent of ownership/placement.
+
+**July 16, 2026**: Extension Workflows — capture/supervise workflows from the browser, Phases 0–4 (branch `feature/workflows-extension`, **PR #111** → main; P0–P2 smoke-passed live from portal.telnyx.com)
+
+- **Bearer seam** (`/api/integrations/browser-extension/workflows[...]`): chooser list with URL-glob `matchesPage` (shared `graph/url-match.ts` — one matcher for auto-router + chooser), targeted dispatch (`workflowId` → `dispatchCaptureToWorkflowContent`; both paths persist rendered `pageText` via shared `buildCaptureRunData`), compact runs feed (+`workflowNodeId`, engine family normalized from versioned refs), read-only run detail. Gate resolution stays session-authed in the embed by design.
+- **Workflow embed viewer**: `workflow` content type renders `EmbedWorkflowClient` (Runs/Edit tabs; extracted `RunDetail` + plug-and-play `WorkflowBuilder`) instead of the fallback; `?run=` deep-links; verified live including the FULL GATE LOOP (dispatch → waiting → Approve in-page → resumed → finished).
+- **Extension surfaces**: popup "Run Workflow ▾" chooser (Trellis/n8n engine chips, matches-page hint) + Recent Runs (needs-review pinned, tap → run detail); overlay live status pill (3s poll, engine chip, [View] deep-open); global toolbar badge with urgency precedence (failed !red 30m → waiting !amber → running ●blue → ✓green 10s) where the bookmark dot yields to urgent states; context-menu "Run workflow on this page/selection" via server URL-pattern auto-routing.
+- **Retry with same input** on failed runs — re-dispatches the run's stored trigger data (capture note id and all), never re-captures; engine-agnostic (node id from definition slug). **n8n spoke merged mid-build (#107–#109)** — main merged in conflict-free, so n8n workflows dispatch from the browser with zero extension changes.
+- Fixes en route: CSP nonce-hiding hydration warning (suppressHydrationWarning on inline scripts), embed toast alignment (`.embed-layout-page` sonner rule), versioned-engine DTO normalization.
 
 **July 16, 2026 (later)**: Auto-context V1.1 — anchored ripple engine + privacy opt-out + manual refresh (commits `0cb910e`/`ca5f697`/+menu)
 
