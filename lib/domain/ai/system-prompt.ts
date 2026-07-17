@@ -91,6 +91,8 @@ This chat has an attached notes panel (a TipTap editor keyed to this chat's cont
 export interface SystemPromptContext {
   hasImageTools: boolean;
   hasFlashcardTools: boolean;
+  /** True when the provider-native search_web tool is attached (AI v3 S2). */
+  hasWebSearch: boolean;
   editableContentId: string | undefined;
   isChatContent: boolean;
   chatContentId: string | undefined;
@@ -102,6 +104,11 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const sections: string[] = [BASE_PROMPT];
 
+  if (ctx.hasWebSearch) {
+    sections.push(
+      "You have a `search_web` tool that searches the live web and returns cited results. Use it whenever the user asks about current events, weather, prices, recent releases, or anything after your training data — do NOT claim you lack real-time access; search instead. Always carry the citations into your answer. You also have `read_page` for reading a specific URL the user provides.",
+    );
+  }
   if (ctx.hasImageTools) sections.push(IMAGE_SECTION);
   if (ctx.hasFlashcardTools) sections.push(flashcardSection(ctx.autoPronounceDefault));
   if (ctx.editableContentId) sections.push(editorSection(ctx.editableContentId));

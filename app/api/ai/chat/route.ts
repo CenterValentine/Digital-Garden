@@ -528,6 +528,11 @@ export async function POST(request: Request) {
             model: modelId,
             messages: modelMessages.length,
             tools: tools ? Object.keys(tools).length : 0,
+            // S2 debug surface: which tools actually attached, and whether
+            // the native search tool made it in (gateway transports may
+            // handle provider-defined tools differently than direct).
+            tool_names: Object.keys(tools).join(","),
+            native_search: "search_web" in tools,
           },
           summary: `${providerId}:${modelId} streaming`,
         },
@@ -566,6 +571,7 @@ export async function POST(request: Request) {
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
+          hasWebSearch: "search_web" in tools,
           editableContentId,
           isChatContent,
           chatContentId: isChatContent ? contentId : undefined,
