@@ -125,6 +125,11 @@ export interface ListConversationsOptions {
    * all of the user's conversations.
    */
   forContentNodeIds?: string[];
+  /**
+   * Restrict to conversations whose target folder is this node — the
+   * "chats of this folder" history view (AI v3 core S3).
+   */
+  targetFolderId?: string;
   /** Cursor: conversation id to start after (sorted by updatedAt desc). */
   cursor?: string;
   /** Page size. Default 25, max 100. */

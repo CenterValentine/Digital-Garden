@@ -67,6 +67,12 @@ export async function listConversations(
     deletedAt: null,
   };
 
+  // Folder history (AI v3 core S3): every conversation targeted at this
+  // folder — the "chats of this folder" view.
+  if (options.targetFolderId) {
+    where.targetFolderId = options.targetFolderId;
+  }
+
   if (options.forContentNodeIds && options.forContentNodeIds.length > 0) {
     where.associations = {
       some: { contentNodeId: { in: options.forContentNodeIds } },
