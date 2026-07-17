@@ -30,6 +30,7 @@ export type {
 export { createAcquisitionBudget } from "./types";
 export { evaluateAcquirePolicy } from "./policy";
 export { resolveNativeWebSearchTool } from "./native-search";
+export { findOrCreatePageNode } from "./page-node";
 
 export async function acquire(
   request: AcquireRequest,

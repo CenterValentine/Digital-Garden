@@ -15,7 +15,9 @@ import { prisma } from "@/lib/database/client";
 import {
   acquire,
   createAcquisitionBudget,
+  findOrCreatePageNode,
 } from "@/lib/domain/ai/acquisition";
+import { addAutoAssociation } from "@/lib/features/conversations";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
@@ -120,6 +122,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             `company's own careers page instead of a job-board aggregator).`
           );
         }
+        // Settle-then-associate (AI v3 core S3, umbrella #14): a successful
+        // read in a targeted conversation files the page into the garden
+        // (find-or-create, owner-wide dedupe) and links the chat to it —
+        // the read IS the settle signal.
+        let gardenNodeId: string | undefined;
+        if (ctx.conversationId && ctx.targetFolderId) {
+          const nodeId = await findOrCreatePageNode(
+            ctx.userId,
+            ctx.targetFolderId,
+            c,
+          );
+          if (nodeId) {
+            gardenNodeId = nodeId;
+            void addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              nodeId,
+              "tool-call",
+            ).catch(() => null);
+          }
+        }
         return {
           url: c.url,
           canonicalUrl: c.canonicalUrl,
@@ -129,6 +152,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           retrievedAt: c.retrievedAt,
           extraction: c.extraction,
           truncated: c.truncated,
+          gardenNodeId,
           // Field name carries the trust label on purpose — structural
           // reinforcement of the never-instructions rule above.
           untrustedWebContent: c.content,

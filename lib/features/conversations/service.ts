@@ -88,6 +88,7 @@ export async function listConversations(
       title: true,
       archivedToContentNodeId: true,
       activeContextId: true,
+      targetFolderId: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -510,6 +511,21 @@ export async function updateConversation(
     if (!owned) throw new ConversationNotFoundError(patch.activeContextId);
   }
 
+  // Validate target-folder ownership before linking (AI v3 core S3) —
+  // same never-trust-a-client-id rule as contexts; must be a live folder.
+  if ("targetFolderId" in patch && patch.targetFolderId != null) {
+    const ownedFolder = await prisma.contentNode.findFirst({
+      where: {
+        id: patch.targetFolderId,
+        ownerId: userId,
+        deletedAt: null,
+        contentType: "folder",
+      },
+      select: { id: true },
+    });
+    if (!ownedFolder) throw new ConversationNotFoundError(patch.targetFolderId);
+  }
+
   // Ownership gate: updateMany returns count = 0 if the row doesn't
   // belong to this user, leaving the DB untouched. Then we re-read.
   const { count } = await prisma.conversation.updateMany({
@@ -520,6 +536,9 @@ export async function updateConversation(
       // being coalesced to "no change".
       ...("activeContextId" in patch && {
         activeContextId: patch.activeContextId ?? null,
+      }),
+      ...("targetFolderId" in patch && {
+        targetFolderId: patch.targetFolderId ?? null,
       }),
     },
   });
@@ -533,6 +552,7 @@ export async function updateConversation(
       title: true,
       archivedToContentNodeId: true,
       activeContextId: true,
+      targetFolderId: true,
       createdAt: true,
       updatedAt: true,
     },
@@ -821,6 +841,7 @@ type ConversationRow = {
   title: string | null;
   archivedToContentNodeId: string | null;
   activeContextId: string | null;
+  targetFolderId: string | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -831,6 +852,7 @@ function toSummary(row: ConversationRow): ConversationSummary {
     title: row.title,
     archivedToContentNodeId: row.archivedToContentNodeId,
     activeContextId: row.activeContextId,
+    targetFolderId: row.targetFolderId,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.updatedAt.toISOString(),

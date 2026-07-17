@@ -363,9 +363,33 @@ export async function POST(request: Request) {
         break; // only the most recent batch of attachments
       }
 
+      // Bound Conversation entity (sidebar multi-conv / full-page chat).
+      // Hoisted above toolCtx (AI v3 core S3) so tools can associate the
+      // content they touch; the mention/tool-call interceptors below reuse it.
+      const conversationIdForAssoc: string | null =
+        typeof body.conversationId === "string" ? body.conversationId : null;
+
+      // The conversation's target folder (umbrella decision #7) rides into
+      // tool context: read_page files page nodes there; document tools
+      // default their destination to it.
+      let targetFolderId: string | undefined;
+      if (conversationIdForAssoc) {
+        const conv = await prisma.conversation.findFirst({
+          where: {
+            id: conversationIdForAssoc,
+            ownerId: session.user.id,
+            deletedAt: null,
+          },
+          select: { targetFolderId: true },
+        });
+        targetFolderId = conv?.targetFolderId ?? undefined;
+      }
+
       const toolCtx = {
         userId: session.user.id,
         contentId: editableContentId,
+        conversationId: conversationIdForAssoc ?? undefined,
+        targetFolderId,
         // When the user is viewing this conversation in full-page mode the
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
@@ -442,8 +466,7 @@ export async function POST(request: Request) {
       // multi-conv mode), each @mention writes an `auto` association.
       // Folder cascade is intentionally not handled — folder mentions
       // bind to the folder only, per the locked plan decision.
-      const conversationIdForAssoc: string | null =
-        typeof body.conversationId === "string" ? body.conversationId : null;
+      // (conversationIdForAssoc is hoisted above toolCtx — S3.)
       if (conversationIdForAssoc && mentionedContentIds.length > 0) {
         // Fire-and-forget — failure here shouldn't block the chat call.
         // Each call is idempotent (upsert) and capped via LRU inside.

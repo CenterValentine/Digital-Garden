@@ -9694,6 +9694,7 @@ export namespace Prisma {
     children: number
     ownedEmbeds: number
     conversationAssociations: number
+    targetedByConversations: number
     peopleFileTreeMounts: number
     collaborationPresenceRecords: number
     contentTags: number
@@ -9722,6 +9723,7 @@ export namespace Prisma {
     children?: boolean | ContentNodeCountOutputTypeCountChildrenArgs
     ownedEmbeds?: boolean | ContentNodeCountOutputTypeCountOwnedEmbedsArgs
     conversationAssociations?: boolean | ContentNodeCountOutputTypeCountConversationAssociationsArgs
+    targetedByConversations?: boolean | ContentNodeCountOutputTypeCountTargetedByConversationsArgs
     peopleFileTreeMounts?: boolean | ContentNodeCountOutputTypeCountPeopleFileTreeMountsArgs
     collaborationPresenceRecords?: boolean | ContentNodeCountOutputTypeCountCollaborationPresenceRecordsArgs
     contentTags?: boolean | ContentNodeCountOutputTypeCountContentTagsArgs
@@ -9800,6 +9802,13 @@ export namespace Prisma {
    */
   export type ContentNodeCountOutputTypeCountConversationAssociationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: ConversationAssociationWhereInput
+  }
+
+  /**
+   * ContentNodeCountOutputType without action
+   */
+  export type ContentNodeCountOutputTypeCountTargetedByConversationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: ConversationWhereInput
   }
 
   /**
@@ -11943,6 +11952,7 @@ export namespace Prisma {
     peopleGroup?: boolean | ContentNode$peopleGroupArgs<ExtArgs>
     archivedConversation?: boolean | ContentNode$archivedConversationArgs<ExtArgs>
     conversationAssociations?: boolean | ContentNode$conversationAssociationsArgs<ExtArgs>
+    targetedByConversations?: boolean | ContentNode$targetedByConversationsArgs<ExtArgs>
     person?: boolean | ContentNode$personArgs<ExtArgs>
     peopleFileTreeMounts?: boolean | ContentNode$peopleFileTreeMountsArgs<ExtArgs>
     collaborationDocument?: boolean | ContentNode$collaborationDocumentArgs<ExtArgs>
@@ -12079,6 +12089,7 @@ export namespace Prisma {
     peopleGroup?: boolean | ContentNode$peopleGroupArgs<ExtArgs>
     archivedConversation?: boolean | ContentNode$archivedConversationArgs<ExtArgs>
     conversationAssociations?: boolean | ContentNode$conversationAssociationsArgs<ExtArgs>
+    targetedByConversations?: boolean | ContentNode$targetedByConversationsArgs<ExtArgs>
     person?: boolean | ContentNode$personArgs<ExtArgs>
     peopleFileTreeMounts?: boolean | ContentNode$peopleFileTreeMountsArgs<ExtArgs>
     collaborationDocument?: boolean | ContentNode$collaborationDocumentArgs<ExtArgs>
@@ -12148,6 +12159,7 @@ export namespace Prisma {
       peopleGroup: Prisma.$PeopleGroupPayload<ExtArgs> | null
       archivedConversation: Prisma.$ConversationPayload<ExtArgs> | null
       conversationAssociations: Prisma.$ConversationAssociationPayload<ExtArgs>[]
+      targetedByConversations: Prisma.$ConversationPayload<ExtArgs>[]
       person: Prisma.$PersonPayload<ExtArgs> | null
       peopleFileTreeMounts: Prisma.$PeopleFileTreeMountPayload<ExtArgs>[]
       collaborationDocument: Prisma.$CollaborationDocumentPayload<ExtArgs> | null
@@ -12612,6 +12624,7 @@ export namespace Prisma {
     peopleGroup<T extends ContentNode$peopleGroupArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$peopleGroupArgs<ExtArgs>>): Prisma__PeopleGroupClient<$Result.GetResult<Prisma.$PeopleGroupPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     archivedConversation<T extends ContentNode$archivedConversationArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$archivedConversationArgs<ExtArgs>>): Prisma__ConversationClient<$Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     conversationAssociations<T extends ContentNode$conversationAssociationsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$conversationAssociationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationAssociationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    targetedByConversations<T extends ContentNode$targetedByConversationsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$targetedByConversationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     person<T extends ContentNode$personArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$personArgs<ExtArgs>>): Prisma__PersonClient<$Result.GetResult<Prisma.$PersonPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     peopleFileTreeMounts<T extends ContentNode$peopleFileTreeMountsArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$peopleFileTreeMountsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PeopleFileTreeMountPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     collaborationDocument<T extends ContentNode$collaborationDocumentArgs<ExtArgs> = {}>(args?: Subset<T, ContentNode$collaborationDocumentArgs<ExtArgs>>): Prisma__CollaborationDocumentClient<$Result.GetResult<Prisma.$CollaborationDocumentPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
@@ -13550,6 +13563,30 @@ export namespace Prisma {
     take?: number
     skip?: number
     distinct?: ConversationAssociationScalarFieldEnum | ConversationAssociationScalarFieldEnum[]
+  }
+
+  /**
+   * ContentNode.targetedByConversations
+   */
+  export type ContentNode$targetedByConversationsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the Conversation
+     */
+    select?: ConversationSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the Conversation
+     */
+    omit?: ConversationOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ConversationInclude<ExtArgs> | null
+    where?: ConversationWhereInput
+    orderBy?: ConversationOrderByWithRelationInput | ConversationOrderByWithRelationInput[]
+    cursor?: ConversationWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: ConversationScalarFieldEnum | ConversationScalarFieldEnum[]
   }
 
   /**
@@ -63972,6 +64009,7 @@ export namespace Prisma {
     title: string | null
     archivedToContentNodeId: string | null
     activeContextId: string | null
+    targetFolderId: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -63983,6 +64021,7 @@ export namespace Prisma {
     title: string | null
     archivedToContentNodeId: string | null
     activeContextId: string | null
+    targetFolderId: string | null
     createdAt: Date | null
     updatedAt: Date | null
     deletedAt: Date | null
@@ -63994,6 +64033,7 @@ export namespace Prisma {
     title: number
     archivedToContentNodeId: number
     activeContextId: number
+    targetFolderId: number
     createdAt: number
     updatedAt: number
     deletedAt: number
@@ -64007,6 +64047,7 @@ export namespace Prisma {
     title?: true
     archivedToContentNodeId?: true
     activeContextId?: true
+    targetFolderId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -64018,6 +64059,7 @@ export namespace Prisma {
     title?: true
     archivedToContentNodeId?: true
     activeContextId?: true
+    targetFolderId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -64029,6 +64071,7 @@ export namespace Prisma {
     title?: true
     archivedToContentNodeId?: true
     activeContextId?: true
+    targetFolderId?: true
     createdAt?: true
     updatedAt?: true
     deletedAt?: true
@@ -64113,6 +64156,7 @@ export namespace Prisma {
     title: string | null
     archivedToContentNodeId: string | null
     activeContextId: string | null
+    targetFolderId: string | null
     createdAt: Date
     updatedAt: Date
     deletedAt: Date | null
@@ -64141,12 +64185,14 @@ export namespace Prisma {
     title?: boolean
     archivedToContentNodeId?: boolean
     activeContextId?: boolean
+    targetFolderId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
     workflowRuns?: boolean | Conversation$workflowRunsArgs<ExtArgs>
@@ -64159,12 +64205,14 @@ export namespace Prisma {
     title?: boolean
     archivedToContentNodeId?: boolean
     activeContextId?: boolean
+    targetFolderId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -64173,12 +64221,14 @@ export namespace Prisma {
     title?: boolean
     archivedToContentNodeId?: boolean
     activeContextId?: boolean
+    targetFolderId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
   }, ExtArgs["result"]["conversation"]>
 
   export type ConversationSelectScalar = {
@@ -64187,16 +64237,18 @@ export namespace Prisma {
     title?: boolean
     archivedToContentNodeId?: boolean
     activeContextId?: boolean
+    targetFolderId?: boolean
     createdAt?: boolean
     updatedAt?: boolean
     deletedAt?: boolean
   }
 
-  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "archivedToContentNodeId" | "activeContextId" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["conversation"]>
+  export type ConversationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "ownerId" | "title" | "archivedToContentNodeId" | "activeContextId" | "targetFolderId" | "createdAt" | "updatedAt" | "deletedAt", ExtArgs["result"]["conversation"]>
   export type ConversationInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
     messages?: boolean | Conversation$messagesArgs<ExtArgs>
     associations?: boolean | Conversation$associationsArgs<ExtArgs>
     workflowRuns?: boolean | Conversation$workflowRunsArgs<ExtArgs>
@@ -64206,11 +64258,13 @@ export namespace Prisma {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
   }
   export type ConversationIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     owner?: boolean | UserDefaultArgs<ExtArgs>
     archivedToContentNode?: boolean | Conversation$archivedToContentNodeArgs<ExtArgs>
     activeContext?: boolean | Conversation$activeContextArgs<ExtArgs>
+    targetFolder?: boolean | Conversation$targetFolderArgs<ExtArgs>
   }
 
   export type $ConversationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -64219,6 +64273,7 @@ export namespace Prisma {
       owner: Prisma.$UserPayload<ExtArgs>
       archivedToContentNode: Prisma.$ContentNodePayload<ExtArgs> | null
       activeContext: Prisma.$ChatContextPayload<ExtArgs> | null
+      targetFolder: Prisma.$ContentNodePayload<ExtArgs> | null
       messages: Prisma.$ConversationMessagePayload<ExtArgs>[]
       associations: Prisma.$ConversationAssociationPayload<ExtArgs>[]
       workflowRuns: Prisma.$WorkflowRunPayload<ExtArgs>[]
@@ -64229,6 +64284,7 @@ export namespace Prisma {
       title: string | null
       archivedToContentNodeId: string | null
       activeContextId: string | null
+      targetFolderId: string | null
       createdAt: Date
       updatedAt: Date
       deletedAt: Date | null
@@ -64629,6 +64685,7 @@ export namespace Prisma {
     owner<T extends UserDefaultArgs<ExtArgs> = {}>(args?: Subset<T, UserDefaultArgs<ExtArgs>>): Prisma__UserClient<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
     archivedToContentNode<T extends Conversation$archivedToContentNodeArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$archivedToContentNodeArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     activeContext<T extends Conversation$activeContextArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$activeContextArgs<ExtArgs>>): Prisma__ChatContextClient<$Result.GetResult<Prisma.$ChatContextPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+    targetFolder<T extends Conversation$targetFolderArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$targetFolderArgs<ExtArgs>>): Prisma__ContentNodeClient<$Result.GetResult<Prisma.$ContentNodePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
     messages<T extends Conversation$messagesArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$messagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationMessagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     associations<T extends Conversation$associationsArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$associationsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$ConversationAssociationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     workflowRuns<T extends Conversation$workflowRunsArgs<ExtArgs> = {}>(args?: Subset<T, Conversation$workflowRunsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$WorkflowRunPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -64666,6 +64723,7 @@ export namespace Prisma {
     readonly title: FieldRef<"Conversation", 'String'>
     readonly archivedToContentNodeId: FieldRef<"Conversation", 'String'>
     readonly activeContextId: FieldRef<"Conversation", 'String'>
+    readonly targetFolderId: FieldRef<"Conversation", 'String'>
     readonly createdAt: FieldRef<"Conversation", 'DateTime'>
     readonly updatedAt: FieldRef<"Conversation", 'DateTime'>
     readonly deletedAt: FieldRef<"Conversation", 'DateTime'>
@@ -65100,6 +65158,25 @@ export namespace Prisma {
      */
     include?: ChatContextInclude<ExtArgs> | null
     where?: ChatContextWhereInput
+  }
+
+  /**
+   * Conversation.targetFolder
+   */
+  export type Conversation$targetFolderArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the ContentNode
+     */
+    select?: ContentNodeSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the ContentNode
+     */
+    omit?: ContentNodeOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: ContentNodeInclude<ExtArgs> | null
+    where?: ContentNodeWhereInput
   }
 
   /**
@@ -123711,6 +123788,7 @@ export namespace Prisma {
     title: 'title',
     archivedToContentNodeId: 'archivedToContentNodeId',
     activeContextId: 'activeContextId',
+    targetFolderId: 'targetFolderId',
     createdAt: 'createdAt',
     updatedAt: 'updatedAt',
     deletedAt: 'deletedAt'
@@ -125127,6 +125205,7 @@ export namespace Prisma {
     peopleGroup?: XOR<PeopleGroupNullableScalarRelationFilter, PeopleGroupWhereInput> | null
     archivedConversation?: XOR<ConversationNullableScalarRelationFilter, ConversationWhereInput> | null
     conversationAssociations?: ConversationAssociationListRelationFilter
+    targetedByConversations?: ConversationListRelationFilter
     person?: XOR<PersonNullableScalarRelationFilter, PersonWhereInput> | null
     peopleFileTreeMounts?: PeopleFileTreeMountListRelationFilter
     collaborationDocument?: XOR<CollaborationDocumentNullableScalarRelationFilter, CollaborationDocumentWhereInput> | null
@@ -125198,6 +125277,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupOrderByWithRelationInput
     archivedConversation?: ConversationOrderByWithRelationInput
     conversationAssociations?: ConversationAssociationOrderByRelationAggregateInput
+    targetedByConversations?: ConversationOrderByRelationAggregateInput
     person?: PersonOrderByWithRelationInput
     peopleFileTreeMounts?: PeopleFileTreeMountOrderByRelationAggregateInput
     collaborationDocument?: CollaborationDocumentOrderByWithRelationInput
@@ -125273,6 +125353,7 @@ export namespace Prisma {
     peopleGroup?: XOR<PeopleGroupNullableScalarRelationFilter, PeopleGroupWhereInput> | null
     archivedConversation?: XOR<ConversationNullableScalarRelationFilter, ConversationWhereInput> | null
     conversationAssociations?: ConversationAssociationListRelationFilter
+    targetedByConversations?: ConversationListRelationFilter
     person?: XOR<PersonNullableScalarRelationFilter, PersonWhereInput> | null
     peopleFileTreeMounts?: PeopleFileTreeMountListRelationFilter
     collaborationDocument?: XOR<CollaborationDocumentNullableScalarRelationFilter, CollaborationDocumentWhereInput> | null
@@ -129239,12 +129320,14 @@ export namespace Prisma {
     title?: StringNullableFilter<"Conversation"> | string | null
     archivedToContentNodeId?: UuidNullableFilter<"Conversation"> | string | null
     activeContextId?: UuidNullableFilter<"Conversation"> | string | null
+    targetFolderId?: UuidNullableFilter<"Conversation"> | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     owner?: XOR<UserScalarRelationFilter, UserWhereInput>
     archivedToContentNode?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
     activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
+    targetFolder?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
     workflowRuns?: WorkflowRunListRelationFilter
@@ -129256,12 +129339,14 @@ export namespace Prisma {
     title?: SortOrderInput | SortOrder
     archivedToContentNodeId?: SortOrderInput | SortOrder
     activeContextId?: SortOrderInput | SortOrder
+    targetFolderId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
     owner?: UserOrderByWithRelationInput
     archivedToContentNode?: ContentNodeOrderByWithRelationInput
     activeContext?: ChatContextOrderByWithRelationInput
+    targetFolder?: ContentNodeOrderByWithRelationInput
     messages?: ConversationMessageOrderByRelationAggregateInput
     associations?: ConversationAssociationOrderByRelationAggregateInput
     workflowRuns?: WorkflowRunOrderByRelationAggregateInput
@@ -129276,12 +129361,14 @@ export namespace Prisma {
     ownerId?: UuidFilter<"Conversation"> | string
     title?: StringNullableFilter<"Conversation"> | string | null
     activeContextId?: UuidNullableFilter<"Conversation"> | string | null
+    targetFolderId?: UuidNullableFilter<"Conversation"> | string | null
     createdAt?: DateTimeFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
     owner?: XOR<UserScalarRelationFilter, UserWhereInput>
     archivedToContentNode?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
     activeContext?: XOR<ChatContextNullableScalarRelationFilter, ChatContextWhereInput> | null
+    targetFolder?: XOR<ContentNodeNullableScalarRelationFilter, ContentNodeWhereInput> | null
     messages?: ConversationMessageListRelationFilter
     associations?: ConversationAssociationListRelationFilter
     workflowRuns?: WorkflowRunListRelationFilter
@@ -129293,6 +129380,7 @@ export namespace Prisma {
     title?: SortOrderInput | SortOrder
     archivedToContentNodeId?: SortOrderInput | SortOrder
     activeContextId?: SortOrderInput | SortOrder
+    targetFolderId?: SortOrderInput | SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrderInput | SortOrder
@@ -129310,6 +129398,7 @@ export namespace Prisma {
     title?: StringNullableWithAggregatesFilter<"Conversation"> | string | null
     archivedToContentNodeId?: UuidNullableWithAggregatesFilter<"Conversation"> | string | null
     activeContextId?: UuidNullableWithAggregatesFilter<"Conversation"> | string | null
+    targetFolderId?: UuidNullableWithAggregatesFilter<"Conversation"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Conversation"> | Date | string
     deletedAt?: DateTimeNullableWithAggregatesFilter<"Conversation"> | Date | string | null
@@ -133442,6 +133531,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -133508,6 +133598,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -133572,6 +133663,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -133638,6 +133730,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -137992,6 +138085,7 @@ export namespace Prisma {
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
@@ -138003,6 +138097,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -138020,6 +138115,7 @@ export namespace Prisma {
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
@@ -138031,6 +138127,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -138045,6 +138142,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -138064,6 +138162,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -142652,6 +142751,12 @@ export namespace Prisma {
     none?: ConversationAssociationWhereInput
   }
 
+  export type ConversationListRelationFilter = {
+    every?: ConversationWhereInput
+    some?: ConversationWhereInput
+    none?: ConversationWhereInput
+  }
+
   export type PersonNullableScalarRelationFilter = {
     is?: PersonWhereInput | null
     isNot?: PersonWhereInput | null
@@ -142807,6 +142912,10 @@ export namespace Prisma {
   }
 
   export type ConversationAssociationOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type ConversationOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -144224,12 +144333,6 @@ export namespace Prisma {
     none?: CategoryWhereInput
   }
 
-  export type ConversationListRelationFilter = {
-    every?: ConversationWhereInput
-    some?: ConversationWhereInput
-    none?: ConversationWhereInput
-  }
-
   export type ChatContextListRelationFilter = {
     every?: ChatContextWhereInput
     some?: ChatContextWhereInput
@@ -144458,10 +144561,6 @@ export namespace Prisma {
   }
 
   export type CategoryOrderByRelationAggregateInput = {
-    _count?: SortOrder
-  }
-
-  export type ConversationOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -146063,6 +146162,7 @@ export namespace Prisma {
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
     activeContextId?: SortOrder
+    targetFolderId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -146074,6 +146174,7 @@ export namespace Prisma {
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
     activeContextId?: SortOrder
+    targetFolderId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -146085,6 +146186,7 @@ export namespace Prisma {
     title?: SortOrder
     archivedToContentNodeId?: SortOrder
     activeContextId?: SortOrder
+    targetFolderId?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
     deletedAt?: SortOrder
@@ -148672,6 +148774,13 @@ export namespace Prisma {
     connect?: ConversationAssociationWhereUniqueInput | ConversationAssociationWhereUniqueInput[]
   }
 
+  export type ConversationCreateNestedManyWithoutTargetFolderInput = {
+    create?: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput> | ConversationCreateWithoutTargetFolderInput[] | ConversationUncheckedCreateWithoutTargetFolderInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutTargetFolderInput | ConversationCreateOrConnectWithoutTargetFolderInput[]
+    createMany?: ConversationCreateManyTargetFolderInputEnvelope
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+  }
+
   export type PersonCreateNestedOneWithoutContentNodesInput = {
     create?: XOR<PersonCreateWithoutContentNodesInput, PersonUncheckedCreateWithoutContentNodesInput>
     connectOrCreate?: PersonCreateOrConnectWithoutContentNodesInput
@@ -148947,6 +149056,13 @@ export namespace Prisma {
     connectOrCreate?: ConversationAssociationCreateOrConnectWithoutContentNodeInput | ConversationAssociationCreateOrConnectWithoutContentNodeInput[]
     createMany?: ConversationAssociationCreateManyContentNodeInputEnvelope
     connect?: ConversationAssociationWhereUniqueInput | ConversationAssociationWhereUniqueInput[]
+  }
+
+  export type ConversationUncheckedCreateNestedManyWithoutTargetFolderInput = {
+    create?: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput> | ConversationCreateWithoutTargetFolderInput[] | ConversationUncheckedCreateWithoutTargetFolderInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutTargetFolderInput | ConversationCreateOrConnectWithoutTargetFolderInput[]
+    createMany?: ConversationCreateManyTargetFolderInputEnvelope
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
   }
 
   export type PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput = {
@@ -149399,6 +149515,20 @@ export namespace Prisma {
     update?: ConversationAssociationUpdateWithWhereUniqueWithoutContentNodeInput | ConversationAssociationUpdateWithWhereUniqueWithoutContentNodeInput[]
     updateMany?: ConversationAssociationUpdateManyWithWhereWithoutContentNodeInput | ConversationAssociationUpdateManyWithWhereWithoutContentNodeInput[]
     deleteMany?: ConversationAssociationScalarWhereInput | ConversationAssociationScalarWhereInput[]
+  }
+
+  export type ConversationUpdateManyWithoutTargetFolderNestedInput = {
+    create?: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput> | ConversationCreateWithoutTargetFolderInput[] | ConversationUncheckedCreateWithoutTargetFolderInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutTargetFolderInput | ConversationCreateOrConnectWithoutTargetFolderInput[]
+    upsert?: ConversationUpsertWithWhereUniqueWithoutTargetFolderInput | ConversationUpsertWithWhereUniqueWithoutTargetFolderInput[]
+    createMany?: ConversationCreateManyTargetFolderInputEnvelope
+    set?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    disconnect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    delete?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    update?: ConversationUpdateWithWhereUniqueWithoutTargetFolderInput | ConversationUpdateWithWhereUniqueWithoutTargetFolderInput[]
+    updateMany?: ConversationUpdateManyWithWhereWithoutTargetFolderInput | ConversationUpdateManyWithWhereWithoutTargetFolderInput[]
+    deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
   }
 
   export type PersonUpdateOneWithoutContentNodesNestedInput = {
@@ -149919,6 +150049,20 @@ export namespace Prisma {
     update?: ConversationAssociationUpdateWithWhereUniqueWithoutContentNodeInput | ConversationAssociationUpdateWithWhereUniqueWithoutContentNodeInput[]
     updateMany?: ConversationAssociationUpdateManyWithWhereWithoutContentNodeInput | ConversationAssociationUpdateManyWithWhereWithoutContentNodeInput[]
     deleteMany?: ConversationAssociationScalarWhereInput | ConversationAssociationScalarWhereInput[]
+  }
+
+  export type ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput = {
+    create?: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput> | ConversationCreateWithoutTargetFolderInput[] | ConversationUncheckedCreateWithoutTargetFolderInput[]
+    connectOrCreate?: ConversationCreateOrConnectWithoutTargetFolderInput | ConversationCreateOrConnectWithoutTargetFolderInput[]
+    upsert?: ConversationUpsertWithWhereUniqueWithoutTargetFolderInput | ConversationUpsertWithWhereUniqueWithoutTargetFolderInput[]
+    createMany?: ConversationCreateManyTargetFolderInputEnvelope
+    set?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    disconnect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    delete?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    connect?: ConversationWhereUniqueInput | ConversationWhereUniqueInput[]
+    update?: ConversationUpdateWithWhereUniqueWithoutTargetFolderInput | ConversationUpdateWithWhereUniqueWithoutTargetFolderInput[]
+    updateMany?: ConversationUpdateManyWithWhereWithoutTargetFolderInput | ConversationUpdateManyWithWhereWithoutTargetFolderInput[]
+    deleteMany?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
   }
 
   export type PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput = {
@@ -155008,6 +155152,12 @@ export namespace Prisma {
     connect?: ChatContextWhereUniqueInput
   }
 
+  export type ContentNodeCreateNestedOneWithoutTargetedByConversationsInput = {
+    create?: XOR<ContentNodeCreateWithoutTargetedByConversationsInput, ContentNodeUncheckedCreateWithoutTargetedByConversationsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutTargetedByConversationsInput
+    connect?: ContentNodeWhereUniqueInput
+  }
+
   export type ConversationMessageCreateNestedManyWithoutConversationInput = {
     create?: XOR<ConversationMessageCreateWithoutConversationInput, ConversationMessageUncheckedCreateWithoutConversationInput> | ConversationMessageCreateWithoutConversationInput[] | ConversationMessageUncheckedCreateWithoutConversationInput[]
     connectOrCreate?: ConversationMessageCreateOrConnectWithoutConversationInput | ConversationMessageCreateOrConnectWithoutConversationInput[]
@@ -155076,6 +155226,16 @@ export namespace Prisma {
     delete?: ChatContextWhereInput | boolean
     connect?: ChatContextWhereUniqueInput
     update?: XOR<XOR<ChatContextUpdateToOneWithWhereWithoutConversationsInput, ChatContextUpdateWithoutConversationsInput>, ChatContextUncheckedUpdateWithoutConversationsInput>
+  }
+
+  export type ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput = {
+    create?: XOR<ContentNodeCreateWithoutTargetedByConversationsInput, ContentNodeUncheckedCreateWithoutTargetedByConversationsInput>
+    connectOrCreate?: ContentNodeCreateOrConnectWithoutTargetedByConversationsInput
+    upsert?: ContentNodeUpsertWithoutTargetedByConversationsInput
+    disconnect?: ContentNodeWhereInput | boolean
+    delete?: ContentNodeWhereInput | boolean
+    connect?: ContentNodeWhereUniqueInput
+    update?: XOR<XOR<ContentNodeUpdateToOneWithWhereWithoutTargetedByConversationsInput, ContentNodeUpdateWithoutTargetedByConversationsInput>, ContentNodeUncheckedUpdateWithoutTargetedByConversationsInput>
   }
 
   export type ConversationMessageUpdateManyWithoutConversationNestedInput = {
@@ -159554,6 +159714,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -159619,6 +159780,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -159687,6 +159849,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -159752,6 +159915,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -159825,6 +159989,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -159890,6 +160055,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -159958,6 +160124,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -160023,6 +160190,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -160108,6 +160276,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
@@ -160118,6 +160287,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -160154,6 +160324,44 @@ export namespace Prisma {
 
   export type ConversationAssociationCreateManyContentNodeInputEnvelope = {
     data: ConversationAssociationCreateManyContentNodeInput | ConversationAssociationCreateManyContentNodeInput[]
+    skipDuplicates?: boolean
+  }
+
+  export type ConversationCreateWithoutTargetFolderInput = {
+    id?: string
+    title?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    owner: UserCreateNestedOneWithoutConversationsInput
+    archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    messages?: ConversationMessageCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationUncheckedCreateWithoutTargetFolderInput = {
+    id?: string
+    ownerId: string
+    title?: string | null
+    archivedToContentNodeId?: string | null
+    activeContextId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    messages?: ConversationMessageUncheckedCreateNestedManyWithoutConversationInput
+    associations?: ConversationAssociationUncheckedCreateNestedManyWithoutConversationInput
+    workflowRuns?: WorkflowRunUncheckedCreateNestedManyWithoutConversationInput
+  }
+
+  export type ConversationCreateOrConnectWithoutTargetFolderInput = {
+    where: ConversationWhereUniqueInput
+    create: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput>
+  }
+
+  export type ConversationCreateManyTargetFolderInputEnvelope = {
+    data: ConversationCreateManyTargetFolderInput | ConversationCreateManyTargetFolderInput[]
     skipDuplicates?: boolean
   }
 
@@ -161783,6 +161991,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -161848,6 +162057,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -161965,6 +162175,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -162030,6 +162241,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -162138,6 +162350,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
@@ -162148,6 +162361,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -162182,6 +162396,37 @@ export namespace Prisma {
     lastReferencedAt?: DateTimeFilter<"ConversationAssociation"> | Date | string
     referenceCount?: IntFilter<"ConversationAssociation"> | number
     createdAt?: DateTimeFilter<"ConversationAssociation"> | Date | string
+  }
+
+  export type ConversationUpsertWithWhereUniqueWithoutTargetFolderInput = {
+    where: ConversationWhereUniqueInput
+    update: XOR<ConversationUpdateWithoutTargetFolderInput, ConversationUncheckedUpdateWithoutTargetFolderInput>
+    create: XOR<ConversationCreateWithoutTargetFolderInput, ConversationUncheckedCreateWithoutTargetFolderInput>
+  }
+
+  export type ConversationUpdateWithWhereUniqueWithoutTargetFolderInput = {
+    where: ConversationWhereUniqueInput
+    data: XOR<ConversationUpdateWithoutTargetFolderInput, ConversationUncheckedUpdateWithoutTargetFolderInput>
+  }
+
+  export type ConversationUpdateManyWithWhereWithoutTargetFolderInput = {
+    where: ConversationScalarWhereInput
+    data: XOR<ConversationUpdateManyMutationInput, ConversationUncheckedUpdateManyWithoutTargetFolderInput>
+  }
+
+  export type ConversationScalarWhereInput = {
+    AND?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
+    OR?: ConversationScalarWhereInput[]
+    NOT?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
+    id?: UuidFilter<"Conversation"> | string
+    ownerId?: UuidFilter<"Conversation"> | string
+    title?: StringNullableFilter<"Conversation"> | string | null
+    archivedToContentNodeId?: UuidNullableFilter<"Conversation"> | string | null
+    activeContextId?: UuidNullableFilter<"Conversation"> | string | null
+    targetFolderId?: UuidNullableFilter<"Conversation"> | string | null
+    createdAt?: DateTimeFilter<"Conversation"> | Date | string
+    updatedAt?: DateTimeFilter<"Conversation"> | Date | string
+    deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
   }
 
   export type PersonUpsertWithoutContentNodesInput = {
@@ -163192,6 +163437,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -163257,6 +163503,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -163507,6 +163754,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -163572,6 +163820,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -164430,6 +164679,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -164495,6 +164745,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -164838,6 +165089,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -164903,6 +165155,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -165488,6 +165741,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -165553,6 +165807,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -165632,6 +165887,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -165697,6 +165953,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -165760,6 +166017,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -165825,6 +166083,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -165904,6 +166163,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -165969,6 +166229,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -166032,6 +166293,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -166097,6 +166359,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -166176,6 +166439,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -166241,6 +166505,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -166304,6 +166569,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -166369,6 +166635,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -166448,6 +166715,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -166513,6 +166781,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -166741,6 +167010,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -166806,6 +167076,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -167056,6 +167327,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -167121,6 +167393,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -167185,6 +167458,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -167250,6 +167524,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -167329,6 +167604,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -167394,6 +167670,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -167456,6 +167733,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -167521,6 +167799,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -167589,6 +167868,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -167654,6 +167934,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -167733,6 +168014,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -167798,6 +168080,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -167872,6 +168155,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -167937,6 +168221,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -168001,6 +168286,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -168066,6 +168352,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -168168,6 +168455,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -168233,6 +168521,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -168325,6 +168614,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -168390,6 +168680,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -168634,6 +168925,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -168699,6 +168991,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -169502,6 +169795,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -169567,6 +169861,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -169609,6 +169904,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
@@ -169619,6 +169915,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -171958,20 +172255,6 @@ export namespace Prisma {
     data: XOR<ConversationUpdateManyMutationInput, ConversationUncheckedUpdateManyWithoutOwnerInput>
   }
 
-  export type ConversationScalarWhereInput = {
-    AND?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
-    OR?: ConversationScalarWhereInput[]
-    NOT?: ConversationScalarWhereInput | ConversationScalarWhereInput[]
-    id?: UuidFilter<"Conversation"> | string
-    ownerId?: UuidFilter<"Conversation"> | string
-    title?: StringNullableFilter<"Conversation"> | string | null
-    archivedToContentNodeId?: UuidNullableFilter<"Conversation"> | string | null
-    activeContextId?: UuidNullableFilter<"Conversation"> | string | null
-    createdAt?: DateTimeFilter<"Conversation"> | Date | string
-    updatedAt?: DateTimeFilter<"Conversation"> | Date | string
-    deletedAt?: DateTimeNullableFilter<"Conversation"> | Date | string | null
-  }
-
   export type ChatContextUpsertWithWhereUniqueWithoutOwnerInput = {
     where: ChatContextWhereUniqueInput
     update: XOR<ChatContextUpdateWithoutOwnerInput, ChatContextUncheckedUpdateWithoutOwnerInput>
@@ -173647,6 +173930,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -173712,6 +173996,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -173992,6 +174277,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -174057,6 +174343,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -174179,6 +174466,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -174244,6 +174532,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -174372,6 +174661,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -174437,6 +174727,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -174664,6 +174955,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -174729,6 +175021,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -175366,6 +175659,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -175431,6 +175725,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -175675,6 +175970,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -175740,6 +176036,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -175974,6 +176271,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
@@ -176039,6 +176337,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
@@ -176283,6 +176582,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
@@ -176348,6 +176648,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
@@ -176582,6 +176883,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -176647,6 +176949,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
@@ -176726,6 +177029,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -176791,6 +177095,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
@@ -177326,6 +177631,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -177391,6 +177697,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -178158,6 +178465,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
@@ -178222,6 +178530,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -178787,6 +179096,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
@@ -178852,6 +179162,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
     contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
@@ -179192,6 +179503,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
@@ -179257,6 +179569,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
     contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
@@ -179587,6 +179900,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -179652,6 +179966,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -179949,6 +180264,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -180014,6 +180330,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -182031,6 +182348,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -182096,6 +182414,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -182451,6 +182770,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -182516,6 +182836,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -182830,6 +183151,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -182895,6 +183217,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -183019,6 +183342,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -183084,6 +183408,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -183901,6 +184226,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -183966,6 +184292,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -184261,6 +184588,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -184326,6 +184654,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -184638,6 +184967,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -184703,6 +185033,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -185049,6 +185380,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -185114,6 +185446,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -185512,6 +185845,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -185577,6 +185911,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -185986,6 +186321,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -186051,6 +186387,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -186456,6 +186793,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -186521,6 +186859,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -186600,6 +186939,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -186665,6 +187005,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -186728,6 +187069,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -186793,6 +187135,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -186911,6 +187254,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -186976,6 +187320,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -187084,6 +187429,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -187149,6 +187495,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -187228,6 +187575,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -187293,6 +187641,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -187521,6 +187870,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -187586,6 +187936,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -187638,6 +187989,141 @@ export namespace Prisma {
   export type ChatContextCreateOrConnectWithoutConversationsInput = {
     where: ChatContextWhereUniqueInput
     create: XOR<ChatContextCreateWithoutConversationsInput, ChatContextUncheckedCreateWithoutConversationsInput>
+  }
+
+  export type ContentNodeCreateWithoutTargetedByConversationsInput = {
+    id?: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    displayOrder?: number
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    auditLogs?: AuditLogCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadCreateNestedOneWithoutContentInput
+    history?: ContentHistoryCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkCreateNestedManyWithoutTargetInput
+    category?: CategoryCreateNestedOneWithoutContentNodesInput
+    owner: UserCreateNestedOneWithoutContentNodesInput
+    parent?: ContentNodeCreateNestedOneWithoutChildrenInput
+    children?: ContentNodeCreateNestedManyWithoutParentInput
+    ownedByNote?: ContentNodeCreateNestedOneWithoutOwnedEmbedsInput
+    ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
+    peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
+    archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    person?: PersonCreateNestedOneWithoutContentNodesInput
+    peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeUncheckedCreateWithoutTargetedByConversationsInput = {
+    id?: string
+    ownerId: string
+    title: string
+    slug: string
+    contentType: $Enums.ContentType
+    role?: $Enums.ContentRole
+    parentId?: string | null
+    displayOrder?: number
+    categoryId?: string | null
+    isPublished?: boolean
+    bodyHash?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+    deletedBy?: string | null
+    lastViewedAt?: Date | string | null
+    customIcon?: string | null
+    iconColor?: string | null
+    peopleGroupId?: string | null
+    personId?: string | null
+    ownedByNoteId?: string | null
+    auditLogs?: AuditLogUncheckedCreateNestedManyWithoutTargetContentInput
+    codePayload?: CodePayloadUncheckedCreateNestedOneWithoutContentInput
+    filePayload?: FilePayloadUncheckedCreateNestedOneWithoutContentInput
+    htmlPayload?: HtmlPayloadUncheckedCreateNestedOneWithoutContentInput
+    notePayload?: NotePayloadUncheckedCreateNestedOneWithoutContentInput
+    folderPayload?: FolderPayloadUncheckedCreateNestedOneWithoutContentInput
+    externalPayload?: ExternalPayloadUncheckedCreateNestedOneWithoutContentInput
+    chatPayload?: ChatPayloadUncheckedCreateNestedOneWithoutContentInput
+    visualizationPayload?: VisualizationPayloadUncheckedCreateNestedOneWithoutContentInput
+    dataPayload?: DataPayloadUncheckedCreateNestedOneWithoutContentInput
+    hopePayload?: HopePayloadUncheckedCreateNestedOneWithoutContentInput
+    workflowPayload?: WorkflowPayloadUncheckedCreateNestedOneWithoutContentInput
+    history?: ContentHistoryUncheckedCreateNestedManyWithoutContentInput
+    sourceLinks?: ContentLinkUncheckedCreateNestedManyWithoutSourceInput
+    targetLinks?: ContentLinkUncheckedCreateNestedManyWithoutTargetInput
+    children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
+    ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
+    archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
+    collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
+    contentPath?: ContentPathUncheckedCreateNestedOneWithoutContentInput
+    contentTags?: ContentTagUncheckedCreateNestedManyWithoutContentInput
+    personMentions?: PersonMentionUncheckedCreateNestedManyWithoutContentInput
+    trashBinEntry?: TrashBinUncheckedCreateNestedOneWithoutContentInput
+    viewGrants?: ViewGrantUncheckedCreateNestedManyWithoutContentInput
+    calendarEvents?: CalendarEventUncheckedCreateNestedManyWithoutLinkedContentInput
+    workspaceItems?: ContentWorkspaceItemUncheckedCreateNestedManyWithoutContentInput
+    viewWorkspaces?: ContentWorkspaceUncheckedCreateNestedManyWithoutViewRootInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedCreateNestedManyWithoutContentInput
+    sourceFlashcards?: FlashcardUncheckedCreateNestedManyWithoutSourceContentInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutContentNodeInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedCreateNestedManyWithoutContentInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedCreateNestedManyWithoutAppRootInput
+    webResourceLinks?: WebResourceContentLinkUncheckedCreateNestedManyWithoutContentInput
+    webResourceViewStates?: WebResourceViewStateUncheckedCreateNestedManyWithoutContentInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedCreateNestedManyWithoutContentInput
+    agenticMetadata?: AgenticMetadataUncheckedCreateNestedOneWithoutNodeInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedCreateNestedManyWithoutFolderInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedCreateNestedManyWithoutFolderInput
+  }
+
+  export type ContentNodeCreateOrConnectWithoutTargetedByConversationsInput = {
+    where: ContentNodeWhereUniqueInput
+    create: XOR<ContentNodeCreateWithoutTargetedByConversationsInput, ContentNodeUncheckedCreateWithoutTargetedByConversationsInput>
   }
 
   export type ConversationMessageCreateWithoutConversationInput = {
@@ -187975,6 +188461,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -188040,6 +188527,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -188093,6 +188581,147 @@ export namespace Prisma {
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  }
+
+  export type ContentNodeUpsertWithoutTargetedByConversationsInput = {
+    update: XOR<ContentNodeUpdateWithoutTargetedByConversationsInput, ContentNodeUncheckedUpdateWithoutTargetedByConversationsInput>
+    create: XOR<ContentNodeCreateWithoutTargetedByConversationsInput, ContentNodeUncheckedCreateWithoutTargetedByConversationsInput>
+    where?: ContentNodeWhereInput
+  }
+
+  export type ContentNodeUpdateToOneWithWhereWithoutTargetedByConversationsInput = {
+    where?: ContentNodeWhereInput
+    data: XOR<ContentNodeUpdateWithoutTargetedByConversationsInput, ContentNodeUncheckedUpdateWithoutTargetedByConversationsInput>
+  }
+
+  export type ContentNodeUpdateWithoutTargetedByConversationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUpdateManyWithoutTargetNestedInput
+    category?: CategoryUpdateOneWithoutContentNodesNestedInput
+    owner?: UserUpdateOneRequiredWithoutContentNodesNestedInput
+    parent?: ContentNodeUpdateOneWithoutChildrenNestedInput
+    children?: ContentNodeUpdateManyWithoutParentNestedInput
+    ownedByNote?: ContentNodeUpdateOneWithoutOwnedEmbedsNestedInput
+    ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
+    peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
+    archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    person?: PersonUpdateOneWithoutContentNodesNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUpdateManyWithoutFolderNestedInput
+  }
+
+  export type ContentNodeUncheckedUpdateWithoutTargetedByConversationsInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    contentType?: EnumContentTypeFieldUpdateOperationsInput | $Enums.ContentType
+    role?: EnumContentRoleFieldUpdateOperationsInput | $Enums.ContentRole
+    parentId?: NullableStringFieldUpdateOperationsInput | string | null
+    displayOrder?: IntFieldUpdateOperationsInput | number
+    categoryId?: NullableStringFieldUpdateOperationsInput | string | null
+    isPublished?: BoolFieldUpdateOperationsInput | boolean
+    bodyHash?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    deletedBy?: NullableStringFieldUpdateOperationsInput | string | null
+    lastViewedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    customIcon?: NullableStringFieldUpdateOperationsInput | string | null
+    iconColor?: NullableStringFieldUpdateOperationsInput | string | null
+    peopleGroupId?: NullableStringFieldUpdateOperationsInput | string | null
+    personId?: NullableStringFieldUpdateOperationsInput | string | null
+    ownedByNoteId?: NullableStringFieldUpdateOperationsInput | string | null
+    auditLogs?: AuditLogUncheckedUpdateManyWithoutTargetContentNestedInput
+    codePayload?: CodePayloadUncheckedUpdateOneWithoutContentNestedInput
+    filePayload?: FilePayloadUncheckedUpdateOneWithoutContentNestedInput
+    htmlPayload?: HtmlPayloadUncheckedUpdateOneWithoutContentNestedInput
+    notePayload?: NotePayloadUncheckedUpdateOneWithoutContentNestedInput
+    folderPayload?: FolderPayloadUncheckedUpdateOneWithoutContentNestedInput
+    externalPayload?: ExternalPayloadUncheckedUpdateOneWithoutContentNestedInput
+    chatPayload?: ChatPayloadUncheckedUpdateOneWithoutContentNestedInput
+    visualizationPayload?: VisualizationPayloadUncheckedUpdateOneWithoutContentNestedInput
+    dataPayload?: DataPayloadUncheckedUpdateOneWithoutContentNestedInput
+    hopePayload?: HopePayloadUncheckedUpdateOneWithoutContentNestedInput
+    workflowPayload?: WorkflowPayloadUncheckedUpdateOneWithoutContentNestedInput
+    history?: ContentHistoryUncheckedUpdateManyWithoutContentNestedInput
+    sourceLinks?: ContentLinkUncheckedUpdateManyWithoutSourceNestedInput
+    targetLinks?: ContentLinkUncheckedUpdateManyWithoutTargetNestedInput
+    children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
+    ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
+    archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
+    collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
+    collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
+    contentPath?: ContentPathUncheckedUpdateOneWithoutContentNestedInput
+    contentTags?: ContentTagUncheckedUpdateManyWithoutContentNestedInput
+    personMentions?: PersonMentionUncheckedUpdateManyWithoutContentNestedInput
+    trashBinEntry?: TrashBinUncheckedUpdateOneWithoutContentNestedInput
+    viewGrants?: ViewGrantUncheckedUpdateManyWithoutContentNestedInput
+    calendarEvents?: CalendarEventUncheckedUpdateManyWithoutLinkedContentNestedInput
+    workspaceItems?: ContentWorkspaceItemUncheckedUpdateManyWithoutContentNestedInput
+    viewWorkspaces?: ContentWorkspaceUncheckedUpdateManyWithoutViewRootNestedInput
+    periodicNoteIndexes?: PeriodicNoteIndexUncheckedUpdateManyWithoutContentNestedInput
+    sourceFlashcards?: FlashcardUncheckedUpdateManyWithoutSourceContentNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutContentNodeNestedInput
+    bookmarkSyncLinks?: BookmarkSyncLinkUncheckedUpdateManyWithoutContentNestedInput
+    bookmarkSyncRoots?: BookmarkSyncConnectionUncheckedUpdateManyWithoutAppRootNestedInput
+    webResourceLinks?: WebResourceContentLinkUncheckedUpdateManyWithoutContentNestedInput
+    webResourceViewStates?: WebResourceViewStateUncheckedUpdateManyWithoutContentNestedInput
+    workflowRunArtifacts?: WorkflowRunArtifactUncheckedUpdateManyWithoutContentNestedInput
+    agenticMetadata?: AgenticMetadataUncheckedUpdateOneWithoutNodeNestedInput
+    studioSourceSelections?: StudioSourceSelectionUncheckedUpdateManyWithoutFolderNestedInput
+    studioGenerationRuns?: StudioGenerationRunUncheckedUpdateManyWithoutFolderNestedInput
   }
 
   export type ConversationMessageUpsertWithWhereUniqueWithoutConversationInput = {
@@ -188333,6 +188962,7 @@ export namespace Prisma {
     deletedAt?: Date | string | null
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
@@ -188343,6 +188973,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -188557,6 +189188,7 @@ export namespace Prisma {
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
@@ -188567,6 +189199,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -188670,6 +189303,7 @@ export namespace Prisma {
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
@@ -188680,6 +189314,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -188751,6 +189386,7 @@ export namespace Prisma {
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     workflowRuns?: WorkflowRunCreateNestedManyWithoutConversationInput
   }
@@ -188761,6 +189397,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -188812,6 +189449,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeCreateNestedManyWithoutOwnedByNoteInput
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -188877,6 +189515,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedCreateNestedManyWithoutParentInput
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -188926,6 +189565,7 @@ export namespace Prisma {
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
   }
@@ -188936,6 +189576,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -188993,6 +189634,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -189058,6 +189700,7 @@ export namespace Prisma {
     children?: ContentNodeUncheckedUpdateManyWithoutParentNestedInput
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -189927,6 +190570,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -189992,6 +190636,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -190071,6 +190716,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -190136,6 +190782,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -190199,6 +190846,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -190264,6 +190912,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -190343,6 +190992,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -190408,6 +191058,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -190471,6 +191122,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -190536,6 +191188,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -190615,6 +191268,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -190680,6 +191334,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -190743,6 +191398,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -190808,6 +191464,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -190887,6 +191544,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -190952,6 +191610,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -194466,6 +195125,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -194531,6 +195191,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -194856,6 +195517,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -194921,6 +195583,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -197329,6 +197992,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -197394,6 +198058,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -198102,6 +198767,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -198167,6 +198833,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -205912,6 +206579,7 @@ export namespace Prisma {
     owner: UserCreateNestedOneWithoutConversationsInput
     archivedToContentNode?: ContentNodeCreateNestedOneWithoutArchivedConversationInput
     activeContext?: ChatContextCreateNestedOneWithoutConversationsInput
+    targetFolder?: ContentNodeCreateNestedOneWithoutTargetedByConversationsInput
     messages?: ConversationMessageCreateNestedManyWithoutConversationInput
     associations?: ConversationAssociationCreateNestedManyWithoutConversationInput
   }
@@ -205922,6 +206590,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -206218,6 +206887,7 @@ export namespace Prisma {
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
   }
@@ -206228,6 +206898,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -206462,6 +207133,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -206527,6 +207199,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -206657,6 +207330,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -206722,6 +207396,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -206785,6 +207460,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -206850,6 +207526,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -206929,6 +207606,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -206994,6 +207672,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -207222,6 +207901,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -207287,6 +207967,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -207537,6 +208218,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -207602,6 +208284,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -207830,6 +208513,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupCreateNestedOneWithoutContentNodesInput
     archivedConversation?: ConversationCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationCreateNestedManyWithoutTargetFolderInput
     person?: PersonCreateNestedOneWithoutContentNodesInput
     peopleFileTreeMounts?: PeopleFileTreeMountCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentCreateNestedOneWithoutContentInput
@@ -207895,6 +208579,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedCreateNestedManyWithoutOwnedByNoteInput
     archivedConversation?: ConversationUncheckedCreateNestedOneWithoutArchivedToContentNodeInput
     conversationAssociations?: ConversationAssociationUncheckedCreateNestedManyWithoutContentNodeInput
+    targetedByConversations?: ConversationUncheckedCreateNestedManyWithoutTargetFolderInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedCreateNestedManyWithoutContentParentInput
     collaborationDocument?: CollaborationDocumentUncheckedCreateNestedOneWithoutContentInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedCreateNestedManyWithoutContentInput
@@ -208145,6 +208830,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -208210,6 +208896,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -208660,6 +209347,17 @@ export namespace Prisma {
     createdAt?: Date | string
   }
 
+  export type ConversationCreateManyTargetFolderInput = {
+    id?: string
+    ownerId: string
+    title?: string | null
+    archivedToContentNodeId?: string | null
+    activeContextId?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    deletedAt?: Date | string | null
+  }
+
   export type PeopleFileTreeMountCreateManyContentParentInput = {
     id?: string
     ownerId: string
@@ -209072,6 +209770,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -209137,6 +209836,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -209223,6 +209923,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -209288,6 +209989,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -209357,6 +210059,45 @@ export namespace Prisma {
     lastReferencedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     referenceCount?: IntFieldUpdateOperationsInput | number
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type ConversationUpdateWithoutTargetFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
+    archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
+  }
+
+  export type ConversationUncheckedUpdateWithoutTargetFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    messages?: ConversationMessageUncheckedUpdateManyWithoutConversationNestedInput
+    associations?: ConversationAssociationUncheckedUpdateManyWithoutConversationNestedInput
+    workflowRuns?: WorkflowRunUncheckedUpdateManyWithoutConversationNestedInput
+  }
+
+  export type ConversationUncheckedUpdateManyWithoutTargetFolderInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    title?: NullableStringFieldUpdateOperationsInput | string | null
+    archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   }
 
   export type PeopleFileTreeMountUpdateWithoutContentParentInput = {
@@ -210553,6 +211294,7 @@ export namespace Prisma {
     title?: string | null
     archivedToContentNodeId?: string | null
     activeContextId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -211550,6 +212292,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -211615,6 +212358,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -211670,6 +212414,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
     activeContext?: ChatContextUpdateOneWithoutConversationsNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
@@ -211680,6 +212425,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -211693,6 +212439,7 @@ export namespace Prisma {
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
     activeContextId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -214045,6 +214792,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -214110,6 +214858,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -214403,6 +215152,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     person?: PersonUpdateOneWithoutContentNodesNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
@@ -214468,6 +215218,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -214627,6 +215378,7 @@ export namespace Prisma {
     peopleGroup?: PeopleGroupUpdateOneWithoutContentNodesNestedInput
     archivedConversation?: ConversationUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUpdateManyWithoutContentNestedInput
@@ -214691,6 +215443,7 @@ export namespace Prisma {
     ownedEmbeds?: ContentNodeUncheckedUpdateManyWithoutOwnedByNoteNestedInput
     archivedConversation?: ConversationUncheckedUpdateOneWithoutArchivedToContentNodeNestedInput
     conversationAssociations?: ConversationAssociationUncheckedUpdateManyWithoutContentNodeNestedInput
+    targetedByConversations?: ConversationUncheckedUpdateManyWithoutTargetFolderNestedInput
     peopleFileTreeMounts?: PeopleFileTreeMountUncheckedUpdateManyWithoutContentParentNestedInput
     collaborationDocument?: CollaborationDocumentUncheckedUpdateOneWithoutContentNestedInput
     collaborationPresenceRecords?: CollaborationPresenceUncheckedUpdateManyWithoutContentNestedInput
@@ -215450,6 +216203,7 @@ export namespace Prisma {
     ownerId: string
     title?: string | null
     archivedToContentNodeId?: string | null
+    targetFolderId?: string | null
     createdAt?: Date | string
     updatedAt?: Date | string
     deletedAt?: Date | string | null
@@ -215463,6 +216217,7 @@ export namespace Prisma {
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     owner?: UserUpdateOneRequiredWithoutConversationsNestedInput
     archivedToContentNode?: ContentNodeUpdateOneWithoutArchivedConversationNestedInput
+    targetFolder?: ContentNodeUpdateOneWithoutTargetedByConversationsNestedInput
     messages?: ConversationMessageUpdateManyWithoutConversationNestedInput
     associations?: ConversationAssociationUpdateManyWithoutConversationNestedInput
     workflowRuns?: WorkflowRunUpdateManyWithoutConversationNestedInput
@@ -215473,6 +216228,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -215486,6 +216242,7 @@ export namespace Prisma {
     ownerId?: StringFieldUpdateOperationsInput | string
     title?: NullableStringFieldUpdateOperationsInput | string | null
     archivedToContentNodeId?: NullableStringFieldUpdateOperationsInput | string | null
+    targetFolderId?: NullableStringFieldUpdateOperationsInput | string | null
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
     deletedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
