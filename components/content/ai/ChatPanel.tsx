@@ -137,6 +137,7 @@ export function ChatPanel({
     stop,
     error,
     setMessages,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -588,6 +589,9 @@ export function ChatPanel({
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
                   onRevertEdit={revertEdit}
+                  onToolApprovalResponse={(opts) =>
+                    void addToolApprovalResponse(opts)
+                  }
                   revertableToolIds={revertableToolIds}
                 />
               );

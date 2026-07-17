@@ -24,7 +24,12 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage, type FileUIPart } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type UIMessage,
+  type FileUIPart,
+} from "ai";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -147,6 +152,16 @@ export interface UseConversationEngineResult {
   stop: () => void;
   error: Error | undefined;
   setMessages: ReturnType<typeof useChat>["setMessages"];
+  /**
+   * Respond to a tool approval request (AI SDK v6 native HITL — AI v3 core
+   * S1). Tools flagged `needsApproval` pause the loop in
+   * `approval-requested` state; the chat surface renders an approval card
+   * whose Approve/Reject calls this. The loop resumes automatically once
+   * all pending approvals are answered.
+   */
+  addToolApprovalResponse: ReturnType<
+    typeof useChat
+  >["addToolApprovalResponse"];
   /** True while the model is processing (submitted or streaming). */
   isActive: boolean;
 
@@ -494,6 +509,11 @@ export function useConversationEngine({
     id: conversationKey,
     messages: initialMessages,
     experimental_throttle: 100,
+    // Resume the tool loop automatically once every pending needsApproval
+    // request on the last assistant message has been answered (AI v3 core
+    // S1). Without this, an approval response would sit in client state and
+    // never re-trigger the server.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: (err) => {
       if (onError) {
         onError(err);
@@ -575,8 +595,16 @@ export function useConversationEngine({
     },
   });
 
-  const { messages, sendMessage, status, stop, error, setMessages, regenerate } =
-    chat;
+  const {
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+    setMessages,
+    regenerate,
+    addToolApprovalResponse,
+  } = chat;
   const isActive = status === "streaming" || status === "submitted";
 
   // ── per-message provider + model stamping ──
@@ -962,6 +990,7 @@ export function useConversationEngine({
     stop,
     error,
     setMessages,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,

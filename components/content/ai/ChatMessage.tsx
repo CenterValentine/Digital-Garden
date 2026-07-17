@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus, ShieldAlert, X } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
@@ -50,6 +50,8 @@ interface DetectedToolPart {
   state: string;
   input?: unknown;
   output?: unknown;
+  /** Present when state is approval-requested (needsApproval pause). */
+  approvalId?: string;
 }
 
 function detectToolPart(part: unknown): DetectedToolPart | null {
@@ -78,6 +80,7 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
     state: (p.state as string) || "unknown",
     input: p.input,
     output: p.output,
+    approvalId: (p.approval as { id?: string } | undefined)?.id,
   };
 }
 
@@ -199,6 +202,13 @@ interface ChatMessageProps {
    */
   onEdit?: (messageId: string, newText: string) => void;
   /**
+   * Respond to a `needsApproval` tool pause (AI v3 core S1). When provided,
+   * approval-requested tool parts render an approval card whose
+   * Approve/Reject call this; the engine's sendAutomaticallyWhen resumes
+   * the loop once all pending approvals are answered.
+   */
+  onToolApprovalResponse?: (opts: { id: string; approved: boolean }) => void;
+  /**
    * Regenerate an assistant message (Session 5a). When provided,
    * assistant messages show a hover refresh that re-runs the model.
    */
@@ -228,6 +238,7 @@ export const ChatMessage = memo(function ChatMessage({
   actionsDisabled = false,
   onRevertEdit,
   revertableToolIds,
+  onToolApprovalResponse,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -623,6 +634,22 @@ export const ChatMessage = memo(function ChatMessage({
           // Flashcard proposals render as DeckProposalCard / CardProposalList at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
+            // needsApproval pause: the loop is parked until the user
+            // responds. Render the approval card instead of the bubble.
+            if (
+              toolPart.state === "approval-requested" &&
+              toolPart.approvalId
+            ) {
+              return (
+                <ToolApprovalCard
+                  key={i}
+                  toolName={toolPart.toolName}
+                  args={toolPart.input}
+                  approvalId={toolPart.approvalId}
+                  onRespond={onToolApprovalResponse}
+                />
+              );
+            }
             if (toolPart.state === "output-available") {
               if (parseImagePayload(toolPart.output) !== null) return null;
               if (parseAudioPayload(toolPart.output) !== null) return null;
@@ -1420,6 +1447,90 @@ function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPaylo
  * (string length, array length, object keys, edit-payload action)
  * so the user sees *something* informative without expanding.
  */
+
+/**
+ * Approval card for `needsApproval` tool pauses (AI v3 core S1).
+ *
+ * The tool loop is parked in `approval-requested` state server-side; the
+ * user's Approve/Reject answers via useChat's addToolApprovalResponse and
+ * the engine's sendAutomaticallyWhen re-sends so the loop resumes. The
+ * card shows the tool's input so the user knows exactly what they are
+ * approving. After responding it collapses to a status line — the SDK
+ * flips the part to approval-responded on the next render, but keeping
+ * local state makes the transition instant.
+ */
+function ToolApprovalCard({
+  toolName,
+  args,
+  approvalId,
+  onRespond,
+}: {
+  toolName: string;
+  args: unknown;
+  approvalId: string;
+  onRespond?: (opts: { id: string; approved: boolean }) => void;
+}) {
+  const [responded, setResponded] = useState<"approved" | "rejected" | null>(
+    null,
+  );
+  const prettyName = toolName.replace(/_/g, " ");
+
+  const argsString = useMemo(() => {
+    if (args === undefined || args === null) return null;
+    try {
+      return typeof args === "string" ? args : JSON.stringify(args, null, 2);
+    } catch {
+      return null;
+    }
+  }, [args]);
+
+  const respond = (approved: boolean) => {
+    if (responded || !onRespond) return;
+    onRespond({ id: approvalId, approved });
+    setResponded(approved ? "approved" : "rejected");
+  };
+
+  return (
+    <div className="rounded-lg border border-amber-400/40 bg-amber-500/[0.06] text-xs overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <ShieldAlert className="h-3 w-3 shrink-0 text-amber-500" />
+        <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
+          Approval needed: {prettyName}
+        </span>
+      </div>
+      {argsString && (
+        <pre className="mx-3 mb-2 max-h-40 overflow-auto rounded-md bg-black/[0.04] dark:bg-white/[0.05] px-2 py-1.5 text-[11px] leading-snug whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
+          {argsString}
+        </pre>
+      )}
+      {responded === null ? (
+        <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            type="button"
+            onClick={() => respond(true)}
+            disabled={!onRespond}
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+          >
+            <Check className="h-3 w-3" /> Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => respond(false)}
+            disabled={!onRespond}
+            className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+          >
+            <X className="h-3 w-3" /> Reject
+          </button>
+        </div>
+      ) : (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          {responded === "approved" ? "Approved — resuming…" : "Rejected."}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolCallBubble({
   toolName,
   toolCallId,

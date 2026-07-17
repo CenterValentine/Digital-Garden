@@ -160,6 +160,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     }),
 
     createNote: tool({
+      // File creation is a mutating action: pause the tool loop for user
+      // approval before executing (AI SDK v6 native HITL). The chat surface
+      // renders the approval card; execution resumes via
+      // addToolApprovalResponse.
+      needsApproval: true,
       description:
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +

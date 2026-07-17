@@ -87,7 +87,8 @@ import {
   listConnections,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
-import { addAutoAssociation } from "@/lib/features/conversations";
+import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
+import { publishEvent } from "@/lib/domain/notifications";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
 import {
   resolvePrimaryRoute,
@@ -618,8 +619,88 @@ export async function POST(request: Request) {
       // The client's persist-on-finish path forwards it to the message
       // row, which the per-Connection usage meters read back for $
       // figures. Without this hop, telemetry is request-counts-only.
+      // Detach-resilience (AI v3 core S1): consume the stream server-side so
+      // the tool loop, onFinish, and persistence complete even if the client
+      // disconnects mid-run (navigation, tab close, workspace swap). The UI
+      // response below tees off the same stream — this does not starve it.
+      void result.consumeStream();
+
       return result.toUIMessageStreamResponse({
         sendReasoning: true,
+        onFinish: async ({ responseMessage, isAborted }) => {
+          // Server-side turn persistence + approval notification (S1). Only
+          // turns bound to a Conversation entity persist here; ephemeral
+          // surfaces keep their existing client-side persist path.
+          if (isAborted || !conversationIdForAssoc) return;
+
+          const rawParts = responseMessage.parts as Array<
+            Record<string, unknown>
+          >;
+
+          try {
+            const textCache = rawParts
+              .filter((p) => p.type === "text" && typeof p.text === "string")
+              .map((p) => p.text as string)
+              .join("\n");
+            await appendMessage(session.user.id, conversationIdForAssoc, {
+              id: responseMessage.id,
+              role: "assistant",
+              providerId,
+              modelId,
+              parts: responseMessage.parts,
+              textCache: textCache || null,
+              metadata: null,
+              parentId: null,
+            });
+          } catch (error) {
+            // P2002 = the client's persist-on-finish already wrote this
+            // message id — the expected outcome when the user stayed on the
+            // chat. Anything else is a real persistence failure.
+            if ((error as { code?: string }).code !== "P2002") {
+              logger.error({
+                layer: "ai",
+                event: "chat:server_persist:failed",
+                summary: "server-side assistant turn persistence failed",
+                error,
+              });
+            }
+          }
+
+          // Notification rule (owner, 2026-07-17): approval-requested is a
+          // notify trigger; run-finish notification arrives with playbook
+          // run semantics in S4. collapseKey coalesces repeated pauses in
+          // one conversation; subject enables mark-read-on-view later.
+          const pausedTools = rawParts
+            .filter((p) => p.state === "approval-requested")
+            .map((p) =>
+              typeof p.type === "string" && p.type.startsWith("tool-")
+                ? p.type.slice(5)
+                : "a tool",
+            );
+          if (pausedTools.length > 0) {
+            await publishEvent(prisma, {
+              kind: "ai.notify",
+              actorType: "ai",
+              actorLabel: "Assistant",
+              subjectType: "conversation",
+              subjectId: conversationIdForAssoc,
+              payload: {
+                title: "Approval needed",
+                body: `The assistant paused and needs your approval to run: ${pausedTools.join(", ")}.`.slice(
+                  0,
+                  1000,
+                ),
+                conversationId: conversationIdForAssoc,
+              },
+              recipients: [
+                {
+                  userId: session.user.id,
+                  collapseKey: `ai-approval:${conversationIdForAssoc}`,
+                },
+              ],
+            }).catch(() => null);
+          }
+        },
         messageMetadata: ({ part }) => {
           if (part.type === "finish") {
             return {

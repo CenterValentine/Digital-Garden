@@ -209,6 +209,7 @@ function ChatViewerInner({
     status,
     stop,
     error,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -663,6 +664,9 @@ function ChatViewerInner({
                     }
                     onEdit={(id, text) => void editMessage(id, text)}
                     onRegenerate={(id) => void regenerateMessage(id)}
+                    onToolApprovalResponse={(opts) =>
+                      void addToolApprovalResponse(opts)
+                    }
                     onBranch={
                       conversationId
                         ? (id) => void handleBranch(id)
