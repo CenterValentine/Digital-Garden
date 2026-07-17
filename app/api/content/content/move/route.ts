@@ -238,6 +238,25 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      // Detached reference that is STILL EMBEDDED in a live note: the tree's
+      // embed-graph ownership fallback will re-nest it under that note on the
+      // next fetch. Tell the client so it can snap back visibly (short delay
+      // + explanatory toast) instead of silently reverting on a later
+      // refresh. Non-embedded references detach freely — this stays null.
+      let stillReferencedBy: { id: string; title: string } | null = null;
+      if (ownerNoteUpdate === null) {
+        const liveEmbed = await prisma.contentLink.findFirst({
+          where: {
+            targetId: contentId,
+            linkType: { in: ["image-ref", "audio-ref"] },
+            source: { deletedAt: null },
+          },
+          orderBy: { createdAt: "asc" },
+          select: { source: { select: { id: true, title: true } } },
+        });
+        if (liveEmbed) stillReferencedBy = liveEmbed.source;
+      }
+
       // Update materialized path
       await updateMaterializedPath(contentId);
 
@@ -293,6 +312,7 @@ export async function POST(request: NextRequest) {
           id: updated.id,
           parentId: updated.parentId,
           displayOrder: updated.displayOrder,
+          stillReferencedBy,
           message: "Content moved successfully",
         },
       });

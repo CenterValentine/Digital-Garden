@@ -789,6 +789,11 @@ export function LeftSidebarContent({
       // (the server computes the final slot from current children).
       // Sequential keeps the contract simple and yields stable order.
       const failures: Array<{ id: string; message: string }> = [];
+      // A detached reference that's still embedded in a note will re-nest
+      // under it on the next tree fetch (embed-graph ownership). Capture the
+      // server's flag so the snap-back happens visibly after a beat, with an
+      // explanation — not silently on some later refresh.
+      let snapBackTo: { id: string; title: string } | null = null;
       for (let i = 0; i < dragged.length; i++) {
         const { id, node } = dragged[i];
         const pos = positions.get(id);
@@ -832,6 +837,13 @@ export function LeftSidebarContent({
             id,
             message: result.error?.message ?? `HTTP ${response.status}`,
           });
+        } else {
+          const moved = (
+            result as {
+              data?: { stillReferencedBy?: { id: string; title: string } | null };
+            }
+          ).data;
+          if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
         }
       }
 
@@ -860,6 +872,19 @@ export function LeftSidebarContent({
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
+
+      if (snapBackTo) {
+        const owner = snapBackTo;
+        // Let the drop land visibly, then snap back with the reason. The
+        // refetched tree re-nests via the embed-graph ownership fallback.
+        setTimeout(() => {
+          void fetchTree();
+          toast.info(`Snapped back — still embedded in "${owner.title}"`, {
+            description:
+              "References follow the note that embeds them. Remove it from the note to move it freely.",
+          });
+        }, 2500);
       }
     } catch (err) {
       clientLogger.error({
