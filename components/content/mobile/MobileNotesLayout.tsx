@@ -8,6 +8,7 @@ import { useContentStore } from "@/state/content-store";
 import { useIsPhone, useIsLandscape } from "@/components/common/useViewport";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileDrawer } from "./MobileDrawer";
+import { MobileFocusControls } from "./MobileFocusControls";
 
 /**
  * MobileNotesLayout — the single-pane content-IDE layout for phone widths.
@@ -37,6 +38,7 @@ export function MobileNotesLayout({
 }: MobileNotesLayoutProps) {
   const openDrawer = useMobileUiStore((s) => s.openDrawer);
   const closeDrawer = useMobileUiStore((s) => s.closeDrawer);
+  const focusMode = useMobileUiStore((s) => s.focusMode);
   const collapseMode = useLeftPanelCollapseStore((s) => s.mode);
   const setCollapseMode = useLeftPanelCollapseStore((s) => s.setMode);
   const rightCollapsed = useRightPanelCollapseStore((s) => s.isCollapsed);
@@ -85,7 +87,10 @@ export function MobileNotesLayout({
       {/* Editor / main pane fills the available space above the tab bar. */}
       <div className="relative z-0 min-h-0 flex-1 overflow-hidden">{children}</div>
 
-      <MobileBottomNav />
+      {/* Bottom nav hides in focus mode; the grab handle brings it back. */}
+      {!focusMode && <MobileBottomNav />}
+
+      <MobileFocusControls />
 
       <MobileDrawer
         side="left"
