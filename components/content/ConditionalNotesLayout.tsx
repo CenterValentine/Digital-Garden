@@ -21,6 +21,7 @@ import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 import { AuthSessionSync } from "./AuthSessionSync";
 import { useIsMobile } from "@/components/common/useIsMobile";
+import { useIsPhone } from "@/components/common/useViewport";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -35,7 +36,14 @@ export function ConditionalNotesLayout({
   glass0,
 }: ConditionalNotesLayoutProps) {
   const pathname = usePathname();
-  const isMobile = useIsMobile();
+  // Engage the single-pane mobile layout for narrow viewports (responsive
+  // desktop windows) AND for phones in any orientation — a landscape phone is
+  // ~844px wide, so the width-only check alone would drop it into the desktop
+  // 3-pane layout. Tablets (shorter side >= 768) stay on desktop.
+  // Both hooks must run unconditionally (rules-of-hooks) — no `||` short-circuit.
+  const isMobileWidth = useIsMobile();
+  const isPhone = useIsPhone();
+  const isMobile = isMobileWidth || isPhone;
   const isFullscreen = pathname?.includes("/fullscreen");
   const isFocusMode = pathname?.includes("/content/focus/");
 
