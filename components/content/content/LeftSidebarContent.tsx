@@ -880,9 +880,11 @@ export function LeftSidebarContent({
         // refetched tree re-nests via the embed-graph ownership fallback.
         setTimeout(() => {
           void fetchTree();
-          toast.info(`Snapped back — still embedded in "${owner.title}"`, {
-            description:
-              "References follow the note that embeds them. Remove it from the note to move it freely.",
+          // No "remove the embed to move it freely" advice here: removing
+          // the LAST embed garbage-collects the media to trash (see
+          // syncImageReferences ref-counting), which isn't "freeing" it.
+          toast.warning("Unable to move referenced content", {
+            description: `This content is still embedded in "${owner.title}".`,
           });
         }, 2500);
       }
