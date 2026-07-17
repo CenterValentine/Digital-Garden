@@ -566,13 +566,29 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     >
       <div className="flex items-center gap-1">
         {getChevron()}
-        <span data-file-icon>{getIcon()}</span>
+        {/* Referenced rows get the OS-alias idiom: a small link badge on
+            the icon's corner — the semantic marker that reads the same
+            nested under a note or adjacent to primaries in a folder. */}
+        {data.role === "referenced" ? (
+          <span data-file-icon className="relative inline-flex">
+            {getIcon()}
+            <span
+              aria-hidden
+              className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-gray-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15"
+            >
+              <LucideIcons.Link className="h-2 w-2" />
+            </span>
+          </span>
+        ) : (
+          <span data-file-icon>{getIcon()}</span>
+        )}
       </div>
       <span
         className={`
           flex-1 truncate text-sm
           ${node.isSelected ? "font-medium" : ""}
           ${data.deletedAt ? "line-through opacity-50" : ""}
+          ${data.role === "referenced" && !data.deletedAt && !node.isSelected ? "text-gray-500 dark:text-gray-400" : ""}
         `}
       >
         {node.isEditing ? (
