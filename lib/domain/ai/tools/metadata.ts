@@ -19,6 +19,7 @@ import {
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
+  "read_page",
   "searchNotes",
   "getCurrentNote",
   "createNote",
@@ -48,6 +49,11 @@ export interface BaseToolMeta {
 }
 
 export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
+  read_page: {
+    name: "Read Web Page",
+    description:
+      "Fetch and read a public web page's main content with source provenance (Acquisition Service)",
+  },
   searchNotes: {
     name: "Search Notes",
     description: "Search through your notes by title or content",
