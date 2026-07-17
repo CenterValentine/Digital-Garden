@@ -51,6 +51,19 @@ export function LeftSidebar() {
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
+
+  // Decoupled create entry point for surfaces outside this tree (the mobile
+  // bottom nav's "New"). Mirrors the existing `dg:create-from-template` window
+  // event rather than lifting createTrigger into a store: same inline-create
+  // flow, optimistic node + rename, no duplicated creation logic.
+  useEffect(() => {
+    const handleCreateNode = (event: Event) => {
+      const detail = (event as CustomEvent<{ type?: "folder" | "note" }>).detail;
+      setCreateTrigger({ type: detail?.type ?? "note", timestamp: Date.now() });
+    };
+    window.addEventListener("dg:create-node", handleCreateNode);
+    return () => window.removeEventListener("dg:create-node", handleCreateNode);
+  }, []);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
