@@ -89,6 +89,7 @@ export async function listConversations(
       archivedToContentNodeId: true,
       activeContextId: true,
       targetFolderId: true,
+      targetFolder: { select: { title: true } },
       createdAt: true,
       updatedAt: true,
     },
@@ -110,6 +111,7 @@ export async function getConversation(
         orderBy: { createdAt: "asc" },
       },
       associations: true,
+      targetFolder: { select: { title: true } },
     },
   });
 
@@ -553,6 +555,7 @@ export async function updateConversation(
       archivedToContentNodeId: true,
       activeContextId: true,
       targetFolderId: true,
+      targetFolder: { select: { title: true } },
       createdAt: true,
       updatedAt: true,
     },
@@ -842,6 +845,7 @@ type ConversationRow = {
   archivedToContentNodeId: string | null;
   activeContextId: string | null;
   targetFolderId: string | null;
+  targetFolder?: { title: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -853,6 +857,7 @@ function toSummary(row: ConversationRow): ConversationSummary {
     archivedToContentNodeId: row.archivedToContentNodeId,
     activeContextId: row.activeContextId,
     targetFolderId: row.targetFolderId,
+    targetFolderTitle: row.targetFolder?.title ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.updatedAt.toISOString(),

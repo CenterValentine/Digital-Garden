@@ -13,6 +13,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
+import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
@@ -261,8 +262,12 @@ function ChatViewerInner({
 
   // Bound mode: load/persist/title against the Conversation store — the
   // SAME hook the sidebar ChatPanel uses, so the surfaces stay identical.
-  const { loadingInitial, conversationTitle, initialActiveContextId } =
-    useConversationBinding({
+  const {
+    loadingInitial,
+    conversationTitle,
+    initialActiveContextId,
+    initialTargetFolder,
+  } = useConversationBinding({
       conversationId: conversationId ?? null,
       messages,
       setMessages: setMessages as unknown as (messages: unknown) => void,
@@ -279,6 +284,29 @@ function ChatViewerInner({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation;
+  // user changes persist via PATCH (validated server-side).
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  useEffect(() => {
+    setTargetFolder(initialTargetFolder);
+  }, [initialTargetFolder]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      setTargetFolder(next);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
 
   // Persist context changes to the conversation when bound; otherwise hold
   // in-session. Fire-and-forget.
@@ -632,9 +660,16 @@ function ChatViewerInner({
         {/* Reverse-view: which content this chat is pinned to. Renders
             nothing unless the chat is Conversation-backed with at least
             one association. */}
-        {conversationId && (
-          <AssociatedContentChips conversationId={conversationId} />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <TargetFolderChip
+            target={targetFolder}
+            disabled={!conversationId}
+            onChange={handleTargetChange}
+          />
+          {conversationId && (
+            <AssociatedContentChips conversationId={conversationId} />
+          )}
+        </div>
       </div>
 
       {/* Error banner — parsed + CTA for BYOK setup */}

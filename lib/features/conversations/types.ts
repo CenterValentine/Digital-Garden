@@ -32,6 +32,8 @@ export interface ConversationSummary {
   activeContextId: string | null;
   /** Target folder (AI v3 core S3) — inputs/outputs/grounding follow it. */
   targetFolderId: string | null;
+  /** Display title of the target folder (joined) — null when untargeted. */
+  targetFolderTitle: string | null;
   createdAt: string;
   updatedAt: string;
   /** Last seen activity timestamp — currently `updatedAt`; may track per-message later. */

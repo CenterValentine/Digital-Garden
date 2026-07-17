@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
+import { TargetFolderChip } from "./TargetFolderChip";
 import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -191,7 +192,8 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial, initialActiveContextId } = useConversationBinding({
+  const { loadingInitial, initialActiveContextId, initialTargetFolder } =
+    useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -212,6 +214,29 @@ export function ChatPanel({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation; user
+  // changes persist via PATCH (owner+is-folder validated server-side).
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  useEffect(() => {
+    setTargetFolder(initialTargetFolder);
+  }, [initialTargetFolder]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      setTargetFolder(next);
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId],
+  );
 
   // Change handler: update local state immediately (drives the engine body)
   // and, when bound, persist the choice to the conversation so reopening it
@@ -527,7 +552,14 @@ export function ChatPanel({
           chats auto-save to the bound Conversation. Delete is protected
           by a two-step confirm. */}
       <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
-        <HeaderTitle providerId={providerId} modelId={modelId} />
+        <div className="flex min-w-0 items-center gap-2">
+          <HeaderTitle providerId={providerId} modelId={modelId} />
+          <TargetFolderChip
+            target={targetFolder}
+            disabled={!conversationId}
+            onChange={handleTargetChange}
+          />
+        </div>
         <div className="flex items-center gap-1">
           {conversationId && (
             <button

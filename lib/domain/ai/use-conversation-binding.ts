@@ -120,6 +120,8 @@ interface UseConversationBindingResult {
    * picker selection from this.
    */
   initialActiveContextId: string | null;
+  /** Target folder seed (AI v3 core S3) — {id, title} or null when untargeted. */
+  initialTargetFolder: { id: string; title: string | null } | null;
 }
 
 export function useConversationBinding({
@@ -152,6 +154,10 @@ export function useConversationBinding({
   const [initialActiveContextId, setInitialActiveContextId] = useState<
     string | null
   >(null);
+  const [initialTargetFolder, setInitialTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -165,6 +171,7 @@ export function useConversationBinding({
       setLoadingInitial(false);
       setConversationTitle(null);
       setInitialActiveContextId(null);
+      setInitialTargetFolder(null);
       return;
     }
     // Stage 2 — transient promote: when the caller just created this
@@ -228,11 +235,18 @@ export function useConversationBinding({
             messages?: unknown[];
             title?: string | null;
             activeContextId?: string | null;
+            targetFolderId?: string | null;
+            targetFolderTitle?: string | null;
           };
         })?.data;
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
         setInitialActiveContextId(data?.activeContextId ?? null);
+        setInitialTargetFolder(
+          data?.targetFolderId
+            ? { id: data.targetFolderId, title: data.targetFolderTitle ?? null }
+            : null,
+        );
 
         clientLogger.info({
           layer: "ui",
@@ -490,5 +504,10 @@ export function useConversationBinding({
     };
   }, [conversationId]);
 
-  return { loadingInitial, conversationTitle, initialActiveContextId };
+  return {
+    loadingInitial,
+    conversationTitle,
+    initialActiveContextId,
+    initialTargetFolder,
+  };
 }
