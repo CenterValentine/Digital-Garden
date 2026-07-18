@@ -22,6 +22,7 @@ import {
   createDocxDocument,
   findOrCreateFolder,
 } from "@/lib/domain/ai/documents";
+import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
@@ -161,6 +162,81 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           // reinforcement of the never-instructions rule above.
           untrustedWebContent: c.content,
         };
+      },
+    }),
+    phase_checkpoint: tool({
+      // The tri-verdict pause (AI v3 core S4d): approval maps natively to
+      // the SDK — Approve = approved; Revise = denied + reason (redo the
+      // phase incorporating it); Approve-with-tweaks = approved + reason
+      // (apply the changes, then continue). Execution (post-approval)
+      // writes the Run Ledger so the folder carries the run state.
+      needsApproval: true,
+      description:
+        "Call at EVERY phase boundary of a multi-phase procedure/playbook. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
+        "Do NOT continue to the next phase without calling this. If the verdict includes revision feedback, redo the current phase incorporating it before checkpointing again. " +
+        "Summarize concretely: what was produced, key decisions, where artifacts were saved.",
+      inputSchema: z.object({
+        phase: z
+          .string()
+          .min(1)
+          .max(120)
+          .describe('Phase label, e.g. "Phase 1: Understand the company"'),
+        summary: z
+          .string()
+          .min(1)
+          .describe("Concise summary of what this phase produced and decided"),
+        artifacts: z
+          .array(z.string())
+          .optional()
+          .describe("Titles of notes/documents created in this phase"),
+        openQuestions: z
+          .array(z.string())
+          .optional()
+          .describe("Unresolved items the user should know about"),
+        next: z
+          .string()
+          .optional()
+          .describe("One line on what the next phase will do"),
+      }),
+      execute: async ({ phase, summary, artifacts, openQuestions, next }) => {
+        if (!ctx.targetFolderId) {
+          return {
+            __checkpoint: true,
+            phase,
+            recorded: false,
+            note: "Checkpoint acknowledged (no target folder set, so no Run Ledger was written). Wait for the user's verdict before continuing.",
+          };
+        }
+        try {
+          const ledger = await upsertRunLedger(ctx.userId, ctx.targetFolderId, {
+            phase,
+            summary,
+            artifacts,
+            openQuestions,
+            next,
+          });
+          if (ctx.conversationId) {
+            void addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              ledger.contentNodeId,
+              "tool-call",
+            ).catch(() => null);
+          }
+          return {
+            __checkpoint: true,
+            phase,
+            recorded: true,
+            ledgerNodeId: ledger.contentNodeId,
+          };
+        } catch (error) {
+          return {
+            __checkpoint: true,
+            phase,
+            recorded: false,
+            note: `Checkpoint acknowledged; ledger write failed (${error instanceof Error ? error.message : "unknown"}).`,
+          };
+        }
       },
     }),
     create_folder: tool({

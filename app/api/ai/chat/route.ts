@@ -686,6 +686,7 @@ export async function POST(request: Request) {
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
+          hasCheckpointTool: "phase_checkpoint" in tools,
           editableContentId,
           isChatContent,
           chatContentId: isChatContent ? contentId : undefined,

@@ -21,6 +21,7 @@ import {
 export const BASE_TOOL_IDS = [
   "search_web",
   "read_page",
+  "phase_checkpoint",
   "create_folder",
   "create_docx",
   "searchNotes",
@@ -61,6 +62,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Read Web Page",
     description:
       "Fetch and read a public web page's main content with source provenance (Acquisition Service)",
+  },
+  phase_checkpoint: {
+    name: "Phase Checkpoint",
+    description:
+      "Pause a multi-phase playbook for your verdict (approve / revise / tweak) and record the Run Ledger",
   },
   create_folder: {
     name: "Create Folder",

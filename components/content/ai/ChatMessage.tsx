@@ -207,7 +207,11 @@ interface ChatMessageProps {
    * Approve/Reject call this; the engine's sendAutomaticallyWhen resumes
    * the loop once all pending approvals are answered.
    */
-  onToolApprovalResponse?: (opts: { id: string; approved: boolean }) => void;
+  onToolApprovalResponse?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
   /**
    * False when this message is no longer the conversation's last — a
    * pending approval that far back can never execute (S4 smoke finding);
@@ -643,6 +647,23 @@ export const ChatMessage = memo(function ChatMessage({
           if (toolPart) {
             // needsApproval pause: the loop is parked until the user
             // responds. Render the approval card instead of the bubble.
+            if (
+              toolPart.state === "approval-requested" &&
+              toolPart.approvalId &&
+              toolPart.toolName === "phase_checkpoint"
+            ) {
+              return (
+                <PhaseCheckpointCard
+                  key={i}
+                  input={toolPart.input}
+                  approvalId={toolPart.approvalId}
+                  onRespond={
+                    approvalActionable ? onToolApprovalResponse : undefined
+                  }
+                  expired={!approvalActionable}
+                />
+              );
+            }
             if (
               toolPart.state === "approval-requested" &&
               toolPart.approvalId
@@ -1469,6 +1490,156 @@ function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPaylo
  * flips the part to approval-responded on the next render, but keeping
  * local state makes the transition instant.
  */
+/**
+ * Tri-verdict phase checkpoint (AI v3 core S4d, umbrella "Approvals,
+ * verdicts & background runs"). Maps natively onto SDK approvals:
+ * Approve → approved; Revise → denied + reason (the model redoes the
+ * phase incorporating it); Approve with tweaks → approved + reason (the
+ * model applies the changes, then continues). Free text still works —
+ * this card just formalizes the common verdicts.
+ */
+function PhaseCheckpointCard({
+  input,
+  approvalId,
+  onRespond,
+  expired = false,
+}: {
+  input: unknown;
+  approvalId: string;
+  onRespond?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
+  expired?: boolean;
+}) {
+  const [mode, setMode] = useState<"idle" | "revise" | "tweaks">("idle");
+  const [feedback, setFeedback] = useState("");
+  const [verdict, setVerdict] = useState<string | null>(null);
+
+  const data = (input ?? {}) as {
+    phase?: string;
+    summary?: string;
+    artifacts?: string[];
+    openQuestions?: string[];
+    next?: string;
+  };
+
+  const respond = (approved: boolean, reason?: string) => {
+    if (verdict || !onRespond) return;
+    onRespond({ id: approvalId, approved, reason });
+    setVerdict(
+      approved
+        ? reason
+          ? "Approved with tweaks — continuing…"
+          : "Approved — continuing…"
+        : "Revision requested — redoing the phase…",
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/[0.06] text-xs overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <GitBranch className="h-3 w-3 shrink-0 text-indigo-400" />
+        <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
+          {data.phase ?? "Phase checkpoint"}
+        </span>
+      </div>
+      {data.summary && (
+        <div className="mx-3 mb-2 whitespace-pre-wrap text-[11px] leading-snug text-gray-600 dark:text-gray-400">
+          {data.summary}
+        </div>
+      )}
+      {(data.artifacts?.length ?? 0) > 0 && (
+        <div className="mx-3 mb-2 text-[11px] text-gray-500 dark:text-gray-500">
+          Artifacts: {data.artifacts!.join(" · ")}
+        </div>
+      )}
+      {expired ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          Expired — the conversation moved on past this checkpoint.
+        </div>
+      ) : verdict ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          {verdict}
+        </div>
+      ) : (
+        <>
+          {mode !== "idle" && (
+            <div className="mx-3 mb-2">
+              <textarea
+                autoFocus
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder={
+                  mode === "revise"
+                    ? "What should change? The phase will be redone with this feedback…"
+                    : "What tweaks should be applied before continuing?"
+                }
+                className="w-full rounded-md border border-black/10 dark:border-white/15 bg-black/[0.03] dark:bg-white/[0.04] px-2 py-1.5 text-[11px] outline-none focus:border-indigo-400/50 min-h-[52px] resize-y"
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
+            {mode === "idle" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => respond(true)}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+                >
+                  <Check className="h-3 w-3" /> Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("revise")}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" /> Revise
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("tweaks")}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <Pencil className="h-3 w-3" /> Approve with tweaks
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() =>
+                    respond(mode === "tweaks", feedback.trim() || undefined)
+                  }
+                  disabled={!onRespond || feedback.trim().length === 0}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 hover:bg-indigo-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+                >
+                  <Check className="h-3 w-3" />
+                  {mode === "revise" ? "Send revision" : "Approve with tweaks"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("idle");
+                    setFeedback("");
+                  }}
+                  className="rounded-md px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function ToolApprovalCard({
   toolName,
   args,
@@ -1479,7 +1650,11 @@ function ToolApprovalCard({
   toolName: string;
   args: unknown;
   approvalId: string;
-  onRespond?: (opts: { id: string; approved: boolean }) => void;
+  onRespond?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
   /** Stale pause (message superseded) — render status, not buttons. */
   expired?: boolean;
 }) {
