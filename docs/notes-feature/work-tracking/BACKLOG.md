@@ -12,7 +12,7 @@ last_updated: 2026-07-18
 
 ## AI v3 Core Followups (2026-07-18, branch `worktree-ai-v3-core`, PR #114)
 
-S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6 below are now scheduled in `AI-V3.1-PLAN.md` (R1–R3, 2026-07-18); the memory-bank/JIT-retrieval thread is deferred to AI V4 (design discussion captured in that plan's final section).** Deferred by design (owner-requested UX first, engineering polish second):
+S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6, and 12 below are now scheduled in `AI-V3.1-PLAN.md` (R1–R4, 2026-07-18; item 12 extended to DeepSeek); the memory-bank/JIT-retrieval thread is deferred to AI V4 (design discussion captured in that plan's final section).** Deferred by design (owner-requested UX first, engineering polish second):
 
 - [ ] **Mid-run document review disruption** (owner: "the biggest disruption") — reviewing a created artifact mid-playbook navigates away and backtracks the chat. Fix family: review-without-leaving (side pane, peek overlay, or split view). Pairs with the item below.
 - [ ] **Note-card right-click "Open in pane"** (owner request) — open an AI-created note in a secondary pane instead of displacing the current view.
@@ -25,7 +25,7 @@ S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6 be
 - [ ] **Regen sweep for pre-fix degraded notes** — notes generated before the @tiptap/html server twins landed hold literal `##`/`**` text; content is intact, needs re-render through markdownToTiptap.
 - [ ] **Conversation title strategy for quick URL chats** — page title vs first-message summary (deferred S3-time call).
 - [ ] **Context-discipline near-term set** (approved with the plan, not yet built): JIT retrieval, validated compaction, extraction subagents, cache-aware layout upgrades, tokens-per-phase eval.
-- [ ] **Kimi/Moonshot catch-up** — P0 native search + gateway + explicit BYOK keys (umbrella post-V3 queue).
+- [ ] **Kimi/Moonshot + DeepSeek catch-up** — native search (Kimi; DeepSeek has none — straight-faced non-attachment) + gateway parity + BYOK adapters (→ 3.1 R4).
 - [ ] **Acquisition explainer session** for the owner (umbrella post-V3 queue).
 
 Completed en route (recorded here so nobody re-plans them): approval-card per-tool previews (486544c), citation-split bubble coalescing (65ae4e7), new-chat auto-targeting + move-follows (0a31ca0), connection-editor instant persistence + fieldset grammar (6fd3dcb/1ea57ee/88b1341).

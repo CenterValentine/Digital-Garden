@@ -1,8 +1,9 @@
-# AI v3.1 — Chat UX Polish (mid-run review, freshness, stickiness)
+# AI v3.1 — Chat UX Polish + Vendor Catch-up (mid-run review, freshness, stickiness, Kimi/DeepSeek)
 
 Successor round to AI v3 core (shipped, PR #114 / merge `9f15281`;
 plan: `AI-V3-CORE-PLAN.md`). Scope set by the owner 2026-07-18:
-**mid-run review + freshness now**; markdown source-view toggle excluded;
+**mid-run review + freshness now**, plus the cost-effective vendor
+catch-up (R4, owner addition); markdown source-view toggle excluded;
 the conversation memory bank deferred to **AI V4** (see final section —
 the design discussion is captured there so V4 starts warm).
 
@@ -62,6 +63,39 @@ resolves to the feature-route default.
   silent substitution (straight-faced routing, v3 law).
 - **Gate:** new chat opens on the last explicitly picked model; deleting
   its connection shows unavailable + remedies instead of flipping.
+
+## R4 — Cost-effective vendor catch-up: Moonshot (Kimi) + DeepSeek
+
+Owner addition 2026-07-18: both vendors are renowned price-performers;
+bring them to first-class status alongside the big four. Pulls the
+"Kimi/Moonshot catch-up" backlog item into 3.1 and extends it to
+DeepSeek.
+
+- **BYOK connections**: direct-key adapters for Moonshot and DeepSeek.
+  Both expose OpenAI-compatible APIs — prefer the official `@ai-sdk/deepseek`
+  provider; Moonshot via the OpenAI-compatible adapter with a base-URL
+  preset (verify whether an official provider package exists at build
+  time). Connection editor presets so the owner isn't hand-typing base
+  URLs.
+- **Gateway parity**: `moonshotai/*` and `deepseek/*` ids already flow
+  through the AI Gateway; verify executed-provider derivation (vendor
+  prefix mapping) and Suggested-sort priors cover both (Moonshot priors
+  exist; add DeepSeek family boosts).
+- **Native search, straight-faced**: Kimi — wire Moonshot's builtin
+  web-search tool into the `search_web` executed-provider switch (verify
+  current API shape at build time). DeepSeek — NO native search exists:
+  `search_web` must NOT attach (the prompt's search-awareness section
+  gates off with it), and the model states the limitation plainly rather
+  than silently borrowing another vendor's search. `read_page` works for
+  both regardless.
+- **Lessons-ledger pre-flight**: run the jobhunt-mini flagship on each
+  (the 12-law ledger in `AI-V3-CORE-PLAN.md` is the checklist — expect
+  vendor-specific quirks in tool_call strictness and retry-after
+  headers, as with the big four).
+- **Gate:** a playbook smoke passes on Kimi with cited native search;
+  DeepSeek completes the same run with `read_page`-grounded research and
+  an honest no-native-search notice; both selectable via BYOK connection
+  AND gateway, with correct Suggested-sort placement.
 
 ## Verification conventions
 
