@@ -151,27 +151,37 @@ export function useModelSelection() {
   const storedModelId = useSettingsStore((s) => s.ai?.modelId);
   const sessionProviderId = useAIChatStore((s) => s.activeProviderId);
   const sessionModelId = useAIChatStore((s) => s.activeModelId);
+  // Stickiness (v3.1 R3): the persisted last EXPLICIT pick outranks the
+  // settings default — a fresh session/blank chat opens on what the user
+  // last chose, not on configuration.
+  const lastExplicitProviderId = useAIChatStore(
+    (s) => s.lastExplicitProviderId,
+  );
+  const lastExplicitModelId = useAIChatStore((s) => s.lastExplicitModelId);
   const setActive = useAIChatStore((s) => s.setActiveModelSelection);
 
   const providerId =
-    sessionProviderId ?? storedProviderId ?? "anthropic";
-  const modelId = sessionModelId ?? storedModelId ?? "claude-sonnet-3-5";
+    sessionProviderId ?? lastExplicitProviderId ?? storedProviderId ?? "anthropic";
+  const modelId =
+    sessionModelId ?? lastExplicitModelId ?? storedModelId ?? "claude-sonnet-5";
 
-  // Hydrate the session store from settings on first render if empty
-  // — `useState` lazy init would also work but using an effect keeps
-  // the hook safely callable across many surfaces.
+  // Hydrate the session store on first render if empty — `useState` lazy
+  // init would also work but using an effect keeps the hook safely
+  // callable across many surfaces.
   useEffect(() => {
     if (sessionProviderId === null || sessionModelId === null) {
       setActive(providerId, modelId);
     }
-    // We intentionally depend only on the storedX inputs; rerunning on
+    // We intentionally depend only on the persisted inputs; rerunning on
     // every render would loop.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storedProviderId, storedModelId]);
+  }, [storedProviderId, storedModelId, lastExplicitProviderId, lastExplicitModelId]);
 
   const handleChange = useCallback(
     (newProviderId: string, newModelId: string) => {
-      setActive(newProviderId, newModelId);
+      // User-initiated pick: update session AND the persisted
+      // last-explicit-pick (the stickiness memory).
+      setActive(newProviderId, newModelId, { explicit: true });
     },
     [setActive],
   );
