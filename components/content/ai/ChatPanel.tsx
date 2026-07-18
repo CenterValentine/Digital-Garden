@@ -23,6 +23,7 @@ import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
+import { TargetFolderChip } from "./TargetFolderChip";
 import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -137,6 +138,7 @@ export function ChatPanel({
     stop,
     error,
     setMessages,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -190,7 +192,13 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial, initialActiveContextId } = useConversationBinding({
+  const {
+    loadingInitial,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+    initialTargetLocation,
+  } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -211,6 +219,111 @@ export function ChatPanel({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation; user
+  // changes persist via PATCH (owner+is-folder validated server-side).
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
+
+  // Location fallback (v3 ship fix, 2026-07-18): the service can only
+  // infer location for content-bound (full-page) conversations — sidebar
+  // chats have no archived chat node, and just-created conversations skip
+  // the initial load entirely, so new chats showed BLANK targets. "Chats
+  // serve their location": derive it from the open content — a folder is
+  // its own location, anything else locates to its parent. Keyed on
+  // contentId, so moving the chat/content re-derives it naturally.
+  const [locationFallback, setLocationFallback] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  useEffect(() => {
+    setLocationFallback(null);
+    if (!contentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/content/content/${encodeURIComponent(contentId)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as {
+          data?: {
+            contentType?: string;
+            title?: string | null;
+            parentId?: string | null;
+          };
+        };
+        const node = body?.data;
+        if (!node || cancelled) return;
+        if (node.contentType === "folder") {
+          setLocationFallback({ id: contentId, title: node.title ?? null });
+          return;
+        }
+        if (!node.parentId) return;
+        const parentRes = await fetch(
+          `/api/content/content/${encodeURIComponent(node.parentId)}`,
+          { credentials: "include" },
+        );
+        if (!parentRes.ok || cancelled) return;
+        const parentBody = (await parentRes.json()) as {
+          data?: { title?: string | null };
+        };
+        if (cancelled) return;
+        setLocationFallback({
+          id: node.parentId,
+          title: parentBody?.data?.title ?? null,
+        });
+      } catch {
+        // Best-effort — an unresolved location just leaves the chip
+        // untargeted; the server route has its own fallback for tools.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const effectiveLocation = initialTargetLocation ?? locationFallback;
+  useEffect(() => {
+    if (initialTargetFolder) {
+      setTargetFolder(initialTargetFolder);
+      setTargetInherited(initialTargetInherited);
+    } else if (effectiveLocation) {
+      // No explicit target: inherit the chat's location instead of
+      // rendering blank.
+      setTargetFolder(effectiveLocation);
+      setTargetInherited(true);
+    } else {
+      setTargetFolder(null);
+      setTargetInherited(false);
+    }
+  }, [initialTargetFolder, initialTargetInherited, effectiveLocation]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      // Explicit pick overrides inheritance; clearing an override falls
+      // back to the location-inferred target (chats serve their location).
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(effectiveLocation);
+        setTargetInherited(Boolean(effectiveLocation));
+      }
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId, effectiveLocation],
+  );
 
   // Change handler: update local state immediately (drives the engine body)
   // and, when bound, persist the choice to the conversation so reopening it
@@ -526,7 +639,16 @@ export function ChatPanel({
           chats auto-save to the bound Conversation. Delete is protected
           by a two-step confirm. */}
       <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
-        <HeaderTitle providerId={providerId} modelId={modelId} />
+        <div className="flex min-w-0 items-center gap-2">
+          <HeaderTitle providerId={providerId} modelId={modelId} />
+          <TargetFolderChip
+            target={targetFolder}
+            inherited={targetInherited}
+            location={effectiveLocation}
+            disabled={!conversationId}
+            onChange={handleTargetChange}
+          />
+        </div>
         <div className="flex items-center gap-1">
           {conversationId && (
             <button
@@ -588,6 +710,9 @@ export function ChatPanel({
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
                   onRevertEdit={revertEdit}
+                  onToolApprovalResponse={(opts) =>
+                    void addToolApprovalResponse(opts)
+                  }
                   revertableToolIds={revertableToolIds}
                 />
               );

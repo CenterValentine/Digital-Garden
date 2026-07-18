@@ -65,15 +65,28 @@ function extractRetryAfterMs(error: unknown): number | null {
   }
 
   if (error instanceof Error) {
-    const match = error.message.match(/try again in ([\d.]+)s/i);
-    if (match?.[1]) return Math.ceil(parseFloat(match[1]) * 1000);
+    // Both "try again in 6.604s" and "try again in 196ms" occur in the
+    // wild (the ms form slipped past the original s-only regex and fell
+    // back to slow exponential backoff). Small cushion added — provider
+    // retry-afters are optimistic under rolling TPM windows.
+    const match = error.message.match(/try again in ([\d.]+)\s*(ms|s)\b/i);
+    if (match?.[1] && match[2]) {
+      const value = parseFloat(match[1]);
+      const ms = match[2].toLowerCase() === "ms" ? value : value * 1000;
+      if (!isNaN(ms) && ms > 0) return Math.ceil(ms + 250);
+    }
   }
 
   return null;
 }
 
 export interface RateLimitRetryOptions {
-  /** Maximum number of retries after the initial attempt. Default: 3 */
+  /**
+   * Maximum number of retries after the initial attempt. Default: 5 —
+   * sized for rolling TPM windows: agent-loop steps saturate the window
+   * themselves, so waits must be long enough for tokens to age out
+   * (1+2+4+8+16s ≈ 31s of patience against a 60s window).
+   */
   maxRetries?: number;
   /** Base delay for exponential backoff when no retry-after hint is given. Default: 1000ms */
   baseDelayMs?: number;
@@ -84,7 +97,7 @@ export interface RateLimitRetryOptions {
 export function rateLimitRetryMiddleware(
   options: RateLimitRetryOptions = {},
 ): LanguageModelMiddleware {
-  const { maxRetries = 3, baseDelayMs = 1000, maxDelayMs = 30_000 } = options;
+  const { maxRetries = 5, baseDelayMs = 1000, maxDelayMs = 30_000 } = options;
 
   async function withRetry<T>(fn: () => PromiseLike<T>): Promise<T> {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {

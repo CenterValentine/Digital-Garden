@@ -13,6 +13,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
+import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
@@ -209,6 +210,7 @@ function ChatViewerInner({
     status,
     stop,
     error,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -260,8 +262,14 @@ function ChatViewerInner({
 
   // Bound mode: load/persist/title against the Conversation store — the
   // SAME hook the sidebar ChatPanel uses, so the surfaces stay identical.
-  const { loadingInitial, conversationTitle, initialActiveContextId } =
-    useConversationBinding({
+  const {
+    loadingInitial,
+    conversationTitle,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+    initialTargetLocation,
+  } = useConversationBinding({
       conversationId: conversationId ?? null,
       messages,
       setMessages: setMessages as unknown as (messages: unknown) => void,
@@ -278,6 +286,38 @@ function ChatViewerInner({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation;
+  // user changes persist via PATCH (validated server-side).
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
+  useEffect(() => {
+    setTargetFolder(initialTargetFolder);
+    setTargetInherited(initialTargetInherited);
+  }, [initialTargetFolder, initialTargetInherited]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(initialTargetLocation);
+        setTargetInherited(Boolean(initialTargetLocation));
+      }
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId, initialTargetLocation],
+  );
 
   // Persist context changes to the conversation when bound; otherwise hold
   // in-session. Fire-and-forget.
@@ -503,6 +543,20 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
+  // Basic per-run cost meter (S5, catalog F39): sums the token usage the
+  // chat route stamps onto assistant message metadata. Client-side only —
+  // the data already rides the loaded messages.
+  const runTokens = useMemo(
+    () =>
+      messages.reduce((sum, m) => {
+        const usage = (
+          m as { metadata?: { usage?: { totalTokens?: number } } }
+        ).metadata?.usage;
+        return sum + (usage?.totalTokens ?? 0);
+      }, 0),
+    [messages],
+  );
+
   // Inline rename (double-click the header title). A local override wins
   // over the loaded title so the change shows instantly; it routes through
   // the conversation PATCH (bound) or the content PATCH (legacy), both of
@@ -623,7 +677,11 @@ function ChatViewerInner({
             )}
             <p className="text-xs text-gray-500">
               {hasMessages
-                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}`
+                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}${
+                    runTokens > 0
+                      ? ` · ~${runTokens >= 1000 ? `${(runTokens / 1000).toFixed(1)}k` : runTokens} tokens`
+                      : ""
+                  }`
                 : "New conversation"}
             </p>
           </div>
@@ -631,9 +689,18 @@ function ChatViewerInner({
         {/* Reverse-view: which content this chat is pinned to. Renders
             nothing unless the chat is Conversation-backed with at least
             one association. */}
-        {conversationId && (
-          <AssociatedContentChips conversationId={conversationId} />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <TargetFolderChip
+            target={targetFolder}
+            inherited={targetInherited}
+            location={initialTargetLocation}
+            disabled={!conversationId}
+            onChange={handleTargetChange}
+          />
+          {conversationId && (
+            <AssociatedContentChips conversationId={conversationId} />
+          )}
+        </div>
       </div>
 
       {/* Error banner — parsed + CTA for BYOK setup */}
@@ -663,6 +730,9 @@ function ChatViewerInner({
                     }
                     onEdit={(id, text) => void editMessage(id, text)}
                     onRegenerate={(id) => void regenerateMessage(id)}
+                    onToolApprovalResponse={(opts) =>
+                      void addToolApprovalResponse(opts)
+                    }
                     onBranch={
                       conversationId
                         ? (id) => void handleBranch(id)

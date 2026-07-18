@@ -16,9 +16,19 @@ import {
   FLASHCARD_TOOL_METADATA as _FLASHCARD_TOOL_METADATA,
   type FlashcardToolId as _FlashcardToolId,
 } from "./flashcard-metadata";
+import {
+  WORKFLOW_TOOL_IDS as _WORKFLOW_TOOL_IDS,
+  WORKFLOW_TOOL_METADATA as _WORKFLOW_TOOL_METADATA,
+  type WorkflowToolId as _WorkflowToolId,
+} from "./workflow-metadata";
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
+  "search_web",
+  "read_page",
+  "phase_checkpoint",
+  "create_folder",
+  "create_docx",
   "searchNotes",
   "getCurrentNote",
   "createNote",
@@ -48,6 +58,31 @@ export interface BaseToolMeta {
 }
 
 export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
+  search_web: {
+    name: "Web Search",
+    description:
+      "Search the web with cited results using the active provider's native search (Anthropic, OpenAI, Google, xAI)",
+  },
+  read_page: {
+    name: "Read Web Page",
+    description:
+      "Fetch and read a public web page's main content with source provenance (Acquisition Service)",
+  },
+  phase_checkpoint: {
+    name: "Phase Checkpoint",
+    description:
+      "Pause a multi-phase playbook for your verdict (approve / revise / tweak) and record the Run Ledger",
+  },
+  create_folder: {
+    name: "Create Folder",
+    description:
+      "Find or create a folder (playbook destinations like job-search/{Company})",
+  },
+  create_docx: {
+    name: "Create Word Document",
+    description:
+      "Generate a .docx from markdown and file it in the target folder (approval-gated)",
+  },
   searchNotes: {
     name: "Search Notes",
     description: "Search through your notes by title or content",
@@ -95,11 +130,17 @@ export const FLASHCARD_TOOL_IDS = _FLASHCARD_TOOL_IDS;
 export const FLASHCARD_TOOL_METADATA = _FLASHCARD_TOOL_METADATA;
 export type FlashcardToolId = _FlashcardToolId;
 
-/** All tool IDs (base + editor + flashcards) for settings UI */
+// Re-export workflow tool metadata for unified access (AI v3 core S6)
+export const WORKFLOW_TOOL_IDS = _WORKFLOW_TOOL_IDS;
+export const WORKFLOW_TOOL_METADATA = _WORKFLOW_TOOL_METADATA;
+export type WorkflowToolId = _WorkflowToolId;
+
+/** All tool IDs (base + editor + flashcards + workflows) for settings UI */
 export const ALL_TOOL_IDS = [
   ...BASE_TOOL_IDS,
   ..._EDITOR_TOOL_IDS,
   ..._FLASHCARD_TOOL_IDS,
+  ..._WORKFLOW_TOOL_IDS,
 ] as const;
 
 /** All tool metadata combined */
@@ -110,4 +151,5 @@ export const ALL_TOOL_METADATA: Record<
   ...BASE_TOOL_METADATA,
   ..._EDITOR_TOOL_METADATA,
   ..._FLASHCARD_TOOL_METADATA,
+  ..._WORKFLOW_TOOL_METADATA,
 };

@@ -67,6 +67,12 @@ export async function listConversations(
     deletedAt: null,
   };
 
+  // Folder history (AI v3 core S3): every conversation targeted at this
+  // folder — the "chats of this folder" view.
+  if (options.targetFolderId) {
+    where.targetFolderId = options.targetFolderId;
+  }
+
   if (options.forContentNodeIds && options.forContentNodeIds.length > 0) {
     where.associations = {
       some: { contentNodeId: { in: options.forContentNodeIds } },
@@ -88,6 +94,8 @@ export async function listConversations(
       title: true,
       archivedToContentNodeId: true,
       activeContextId: true,
+      targetFolderId: true,
+      targetFolder: { select: { title: true } },
       createdAt: true,
       updatedAt: true,
     },
@@ -109,13 +117,23 @@ export async function getConversation(
         orderBy: { createdAt: "asc" },
       },
       associations: true,
+      targetFolder: { select: { title: true } },
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
     },
   });
 
   if (!row) throw new ConversationNotFoundError(conversationId);
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -181,6 +199,9 @@ export async function createConversation(
     include: {
       messages: true,
       associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
     },
   });
 
@@ -201,8 +222,14 @@ export async function createConversation(
     at: new Date().toISOString(),
   });
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -237,7 +264,13 @@ async function promoteContentNodeToConversation(
       ownerId: userId,
       archivedToContentNodeId: fromId,
     },
-    include: { messages: true, associations: true },
+    include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
   });
 
   if (existing) {
@@ -280,7 +313,13 @@ async function promoteContentNodeToConversation(
     }
     const reread = await prisma.conversation.findUniqueOrThrow({
       where: { id: existing.id },
-      include: { messages: true, associations: true },
+      include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
     });
     // Re-pinned an existing promoted chat — surface as a create so any
     // sidebar bound to these content nodes refreshes its tab list.
@@ -290,8 +329,12 @@ async function promoteContentNodeToConversation(
       contentNodeIds: reread.associations.map((a) => a.contentNodeId),
       at: new Date().toISOString(),
     });
+    const rereadParent = reread.archivedToContentNode?.parent ?? null;
     return {
       ...toSummary(reread),
+      inferredTargetFolder: rereadParent
+        ? { id: rereadParent.id, title: rereadParent.title }
+        : null,
       messages: reread.messages.map(toMessageView),
       associations: reread.associations.map(toAssociationView),
     };
@@ -369,7 +412,13 @@ async function promoteContentNodeToConversation(
           }
         : undefined,
     },
-    include: { messages: true, associations: true },
+    include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
   });
 
   logger.info({
@@ -391,8 +440,14 @@ async function promoteContentNodeToConversation(
     at: new Date().toISOString(),
   });
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -510,6 +565,21 @@ export async function updateConversation(
     if (!owned) throw new ConversationNotFoundError(patch.activeContextId);
   }
 
+  // Validate target-folder ownership before linking (AI v3 core S3) —
+  // same never-trust-a-client-id rule as contexts; must be a live folder.
+  if ("targetFolderId" in patch && patch.targetFolderId != null) {
+    const ownedFolder = await prisma.contentNode.findFirst({
+      where: {
+        id: patch.targetFolderId,
+        ownerId: userId,
+        deletedAt: null,
+        contentType: "folder",
+      },
+      select: { id: true },
+    });
+    if (!ownedFolder) throw new ConversationNotFoundError(patch.targetFolderId);
+  }
+
   // Ownership gate: updateMany returns count = 0 if the row doesn't
   // belong to this user, leaving the DB untouched. Then we re-read.
   const { count } = await prisma.conversation.updateMany({
@@ -520,6 +590,9 @@ export async function updateConversation(
       // being coalesced to "no change".
       ...("activeContextId" in patch && {
         activeContextId: patch.activeContextId ?? null,
+      }),
+      ...("targetFolderId" in patch && {
+        targetFolderId: patch.targetFolderId ?? null,
       }),
     },
   });
@@ -533,6 +606,8 @@ export async function updateConversation(
       title: true,
       archivedToContentNodeId: true,
       activeContextId: true,
+      targetFolderId: true,
+      targetFolder: { select: { title: true } },
       createdAt: true,
       updatedAt: true,
     },
@@ -584,6 +659,33 @@ export async function softDeleteConversation(
  * Verifies ownership before inserting. Bumps the conversation's
  * `updatedAt` so the sidebar tab ordering reflects recency.
  */
+/**
+ * Update a message's parts in place (AI v3 core S4 — continuation
+ * persistence). Approval resumes EXTEND an already-persisted assistant
+ * message; without this, resolved approvals and post-approval content
+ * evaporate on reload and the pending card resurrects. Ownership-gated
+ * via the conversation join; returns false when nothing matched.
+ */
+export async function updateMessageParts(
+  userId: string,
+  conversationId: string,
+  messageId: string,
+  parts: unknown,
+  textCache?: string | null,
+): Promise<boolean> {
+  const { count } = await prisma.conversationMessage.updateMany({
+    where: {
+      id: messageId,
+      conversation: { id: conversationId, ownerId: userId, deletedAt: null },
+    },
+    data: {
+      parts: parts as Prisma.InputJsonValue,
+      ...(textCache !== undefined && { textCache }),
+    },
+  });
+  return count > 0;
+}
+
 export async function appendMessage(
   userId: string,
   conversationId: string,
@@ -821,6 +923,8 @@ type ConversationRow = {
   title: string | null;
   archivedToContentNodeId: string | null;
   activeContextId: string | null;
+  targetFolderId: string | null;
+  targetFolder?: { title: string | null } | null;
   createdAt: Date;
   updatedAt: Date;
 };
@@ -831,6 +935,8 @@ function toSummary(row: ConversationRow): ConversationSummary {
     title: row.title,
     archivedToContentNodeId: row.archivedToContentNodeId,
     activeContextId: row.activeContextId,
+    targetFolderId: row.targetFolderId,
+    targetFolderTitle: row.targetFolder?.title ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     lastMessageAt: row.updatedAt.toISOString(),

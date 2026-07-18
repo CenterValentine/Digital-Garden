@@ -161,6 +161,7 @@ model ContentNode {
   peopleGroup                  PeopleGroup?              @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
   archivedConversation         Conversation?             @relation("ConversationArchive")
   conversationAssociations     ConversationAssociation[] @relation("ConversationAssoc")
+  targetedByConversations      Conversation[]            @relation("ConversationTarget")
   person                       Person?                   @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts         PeopleFileTreeMount[]     @relation("ContentNodePeopleMounts")
   collaborationDocument        CollaborationDocument?
@@ -1185,6 +1186,11 @@ model Conversation {
   // context per conversation (ChatGPT-style). SetNull so deleting a
   // context doesn't cascade-delete the chat — it just clears the link.
   activeContextId         String?   @db.Uuid
+  // Target folder (AI v3 core S3, umbrella decision #7): the folder this
+  // conversation operates in — page-node creation, document-tool
+  // destinations, and grounding follow it. SetNull: deleting the folder
+  // orphans the target, never the chat.
+  targetFolderId          String?   @db.Uuid
   createdAt               DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt               DateTime? @db.Timestamptz(6)
@@ -1192,12 +1198,14 @@ model Conversation {
   owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archivedToContentNode ContentNode?              @relation("ConversationArchive", fields: [archivedToContentNodeId], references: [id], onDelete: SetNull)
   activeContext         ChatContext?              @relation("ConversationActiveContext", fields: [activeContextId], references: [id], onDelete: SetNull)
+  targetFolder          ContentNode?              @relation("ConversationTarget", fields: [targetFolderId], references: [id], onDelete: SetNull)
   messages              ConversationMessage[]
   associations          ConversationAssociation[]
   workflowRuns          WorkflowRun[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, deletedAt])
+  @@index([ownerId, targetFolderId])
 }
 
 /// User-authored custom-instruction presets ("chat contexts"). Each is a

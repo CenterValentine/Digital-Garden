@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-16
+last_updated: 2026-07-18
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,15 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 18, 2026**: AI Infrastructure Upgrade v3 — core (app-side) build complete, S1–S6 (branch `worktree-ai-v3-core`, PR pending; plan: `work-tracking/AI-V3-CORE-PLAN.md`)
+
+- **Agentic tool loop (S1)**: AI SDK v6 `needsApproval` HITL — approval cards, auto-resume via `addToolApprovalResponse`, idempotent server-side message persistence, approval/finish notifications (deep-link to conversation).
+- **Acquisition Service (S2)**: `AcquiredContent` envelope + policy engine (SSRF guard, per-turn budgets), provider-native `search_web` across Anthropic/OpenAI/Google/xAI keyed off the EXECUTED provider, `read_page` server-fetch (Readability, 16k cap), garden hydration onto ExternalPayload page nodes.
+- **Targeted conversations (S3)**: `Conversation.targetFolderId` ("chats serve their location") — location inference, target chip UI (inherited/mismatch states), settle-then-associate page filing. ⚠ needs migration file pre-merge (see PR checklist).
+- **Playbook runtime (S4)**: `phase_checkpoint` tool — tri-verdict (Approve / Revise / Approve-with-tweaks via denial-channel framing), Run Ledger note per run, straight-faced model routing (MODEL_UNAVAILABLE 422, no silent substitution), continuation persistence (PATCH message parts).
+- **Flagship passed (S5)**: jobhunt playbook end-to-end on Anthropic (Company Profile → Fit Analysis → resume .md + .docx in target folder) through approvals + checkpoints; summarize-on-write abstracts; token meter; server-safe markdown→TipTap (@tiptap/html twins). Connection editor reworked to instant model persistence + per-field ✓ commits (fieldset persistence grammar).
+- **Workflow mastery (S6)**: 7 chat tools — runtime-rendered node catalog (8 triggers + 11 nodes + worked example, zero drift from builder metadata), list/get/propose/update/run + push-to-n8n. Engine fidelity: named engine > target's engine > **n8n default**; n8n-engine updates auto-re-push. Open workflow = chat's default subject. Workspace entity resolved as already-existing (`ContentWorkspace` + full API) — C3 documented for BROWSER-REACH.
 
 **July 16, 2026 (evening)**: References display as CHILDREN of their owning note (branch `worktree-folder-studio`, post-#110 — PR pending)
 

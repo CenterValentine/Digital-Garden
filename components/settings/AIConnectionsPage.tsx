@@ -10,6 +10,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { compareModelsBySuggested } from "@/lib/domain/ai/model-popularity";
 import { Plus, Trash2, Edit3, AlertCircle, Check, X, KeyRound, ExternalLink, HelpCircle, Sparkles, Search, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/glass/button";
@@ -383,6 +384,54 @@ function ConnectionForm({
   );
   const [saving, setSaving] = useState(false);
 
+  // Per-field commits (owner rule 2026-07-18): within a fieldset the
+  // persistence grammar is all-or-nothing. The model list auto-saves, so
+  // identity/credential fields get explicit per-field ✓ commits and the
+  // dialog-level Save disappears in EDIT mode. Create mode keeps its
+  // single "Add connection" — nothing exists server-side until then.
+  const savedFieldsRef = useRef({
+    label: existing?.label ?? template?.name ?? "",
+    baseURL: existing?.baseURL ?? "",
+  });
+  const persistField = useCallback(
+    async (patch: Record<string, unknown>, after?: () => void) => {
+      if (!isEdit || !editingId) return;
+      try {
+        const res = await fetch(`/api/ai/connections/${editingId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        after?.();
+        toast.success("Saved");
+      } catch {
+        toast.error("Couldn't save — try again");
+      }
+    },
+    [isEdit, editingId],
+  );
+  const labelDirty = isEdit && label.trim() !== savedFieldsRef.current.label;
+  const keyDirty = isEdit && apiKey.trim().length > 0;
+  const baseURLDirty =
+    isEdit && baseURL.trim() !== savedFieldsRef.current.baseURL;
+  const commitLabel = useCallback(() => {
+    const v = label.trim();
+    void persistField({ label: v }, () => {
+      savedFieldsRef.current.label = v;
+    });
+  }, [label, persistField]);
+  const commitKey = useCallback(() => {
+    void persistField({ apiKey: apiKey.trim() }, () => setApiKey(""));
+  }, [apiKey, persistField]);
+  const commitBaseURL = useCallback(() => {
+    const v = baseURL.trim();
+    void persistField({ baseURL: v || null }, () => {
+      savedFieldsRef.current.baseURL = v;
+    });
+  }, [baseURL, persistField]);
+
   const baseURLLocked = useMemo(
     () => Boolean(template?.baseURLLocked && !isEdit && template?.kind === "direct"),
     [template, isEdit],
@@ -469,34 +518,79 @@ function ConnectionForm({
       </div>
 
       <Field label="Label">
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && labelDirty) commitLabel();
+            }}
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
+          />
+          {labelDirty && (
+            <button
+              type="button"
+              onClick={commitLabel}
+              aria-label="Save label"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </Field>
 
       <Field label={isEdit ? "API key (leave blank to keep current)" : "API key"} hint={template?.apiKeyHint}>
-        <input
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
-          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
-        />
+        <div className="relative">
+          <input
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && keyDirty) commitKey();
+            }}
+            placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+          />
+          {keyDirty && (
+            <button
+              type="button"
+              onClick={commitKey}
+              aria-label="Save API key"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </Field>
 
       {!baseURLLocked && (
         <Field label="Base URL" hint="OpenAI-compatible endpoint URL. Leave blank for built-in providers.">
-          <input
-            type="text"
-            value={baseURL}
-            onChange={(e) => setBaseURL(e.target.value)}
-            placeholder="https://api.example.com/v1"
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={baseURL}
+              onChange={(e) => setBaseURL(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && baseURLDirty) commitBaseURL();
+              }}
+              placeholder="https://api.example.com/v1"
+              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+            />
+            {baseURLDirty && (
+              <button
+                type="button"
+                onClick={commitBaseURL}
+                aria-label="Save base URL"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </Field>
       )}
 
@@ -504,7 +598,11 @@ function ConnectionForm({
         <Field label="Adapter" hint="Which AI SDK adapter handles this endpoint.">
           <select
             value={adapterKind}
-            onChange={(e) => setAdapterKind(e.target.value as AdapterKind)}
+            onChange={(e) => {
+              const v = e.target.value as AdapterKind;
+              setAdapterKind(v);
+              if (isEdit) void persistField({ adapterKind: v });
+            }}
             className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
           >
             <option value="openai-compat">OpenAI-compatible (most third-party endpoints)</option>
@@ -528,17 +626,23 @@ function ConnectionForm({
       />
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="ghost" onClick={onDone} disabled={saving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : (
-            <>
-              <Check className="h-4 w-4 mr-1.5" />
-              {isEdit ? "Save" : "Add connection"}
-            </>
-          )}
-        </Button>
+        {isEdit ? (
+          <Button onClick={onDone}>Done</Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onDone} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : (
+                <>
+                  <Check className="h-4 w-4 mr-1.5" />
+                  Add connection
+                </>
+              )}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -613,17 +717,15 @@ function ModelEditor({
     Array<{ id: string; name: string; capabilities?: string[] }> | null
   >(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // Track which fetched-model ids the user has checked for bulk add.
-  // Default-empty: gateways with hundreds of models shouldn't pre-pick
-  // anything (last session's "auto-select missing" produced 273 ✓ out of
-  // 277 — too much). The user explicitly opts in to what they want.
-  const [selectedFetched, setSelectedFetched] = useState<Set<string>>(
-    () => new Set(),
-  );
   // Filter + sort for the fetched list panel. Filter is plain substring
   // match against id + display name; sort cycles asc/desc on id.
   const [fetchedFilter, setFetchedFilter] = useState("");
-  const [fetchedSort, setFetchedSort] = useState<"asc" | "desc">("asc");
+  // "suggested" (default): flagship vendors/families float, recency
+  // breaks ties — a 300-model gateway list starts with the models the
+  // user most likely wants, not "alibaba/…". A→Z / Z→A remain for lookup.
+  const [fetchedSort, setFetchedSort] = useState<"suggested" | "asc" | "desc">(
+    "suggested",
+  );
   // Capability type filter (null = all). Lets the user narrow a gateway's huge
   // model list to just image-capable (or vision, reasoning, …) models so they
   // can tell at a glance which to add for image generation.
@@ -658,58 +760,94 @@ function ModelEditor({
       }
       return true;
     });
-    filtered.sort((a, b) =>
-      fetchedSort === "asc"
+    filtered.sort((a, b) => {
+      if (fetchedSort === "suggested") return compareModelsBySuggested(a, b);
+      return fetchedSort === "asc"
         ? a.id.localeCompare(b.id)
-        : b.id.localeCompare(a.id),
-    );
+        : b.id.localeCompare(a.id);
+    });
     return filtered;
   }, [fetchedModels, fetchedFilter, fetchedSort, capabilityFilter]);
 
   /** Count of currently-visible rows that are already selected. */
-  const visibleSelectedCount = useMemo(() => {
-    let n = 0;
-    for (const m of visibleFetched) if (selectedFetched.has(m.id)) n++;
-    return n;
-  }, [visibleFetched, selectedFetched]);
+  /**
+   * Instant persistence (owner directive 2026-07-18): checking a fetched
+   * model adds it to the connection IMMEDIATELY; unchecking removes it.
+   * The old check → "Add selected" → "Save" chain silently lost
+   * selections (saves fired with stale model state) and was a three-step
+   * trap besides. Optimistic local update, targeted PATCH of just
+   * { models }, revert + toast on failure. The dialog's Save button still
+   * owns label/key/URL — the model list no longer waits on it.
+   */
+  const persistModels = useCallback(
+    async (next: ConnectionModel[], prev: ConnectionModel[]) => {
+      if (!connectionId) return;
+      try {
+        const res = await fetch(`/api/ai/connections/${connectionId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ models: next }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        setModels(prev);
+        toast.error("Couldn't update the model list — change reverted");
+      }
+    },
+    [connectionId, setModels],
+  );
 
-  const allVisibleSelected =
+  const allVisiblePresent =
     visibleFetched.length > 0 &&
-    visibleSelectedCount === visibleFetched.length;
+    visibleFetched.every((m) => models.some((mm) => mm.id === m.id));
 
   const toggleAllVisible = useCallback(() => {
-    setSelectedFetched((prev) => {
-      const next = new Set(prev);
-      if (allVisibleSelected) {
-        for (const m of visibleFetched) next.delete(m.id);
-      } else {
-        for (const m of visibleFetched) next.add(m.id);
-      }
-      return next;
-    });
-  }, [allVisibleSelected, visibleFetched]);
+    const prev = models;
+    let next: ConnectionModel[];
+    if (allVisiblePresent) {
+      const visibleIds = new Set(visibleFetched.map((m) => m.id));
+      next = prev.filter((m) => !visibleIds.has(m.id));
+    } else {
+      const existing = new Set(prev.map((m) => m.id));
+      const additions = visibleFetched
+        .filter((m) => !existing.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          capabilities: m.capabilities ?? ["text", "streaming"],
+        }));
+      next = [...prev, ...additions];
+    }
+    setModels(next);
+    void persistModels(next, prev);
+  }, [allVisiblePresent, visibleFetched, models, setModels, persistModels]);
 
   const closeFetchedPanel = useCallback(() => {
     setFetchedModels(null);
-    setSelectedFetched(new Set());
     setFetchedFilter("");
     setCapabilityFilter(null);
-    setFetchedSort("asc");
+    setFetchedSort("suggested");
   }, []);
 
   const addModel = useCallback(() => {
     if (!newId.trim()) return;
-    setModels([
+    const prev = models;
+    const next = [
       ...models,
       {
         id: newId.trim(),
         name: newName.trim() || newId.trim(),
         capabilities: ["text", "streaming"],
       },
-    ]);
+    ];
+    setModels(next);
+    // Instant persistence — the "+" IS the commit for the model list
+    // (no-op in create mode; the first Save persists everything then).
+    void persistModels(next, prev);
     setNewId("");
     setNewName("");
-  }, [models, newId, newName, setModels]);
+  }, [models, newId, newName, setModels, persistModels]);
 
   /** Click a suggestion → fill both inputs. */
   const pickSuggestion = useCallback(
@@ -723,9 +861,12 @@ function ModelEditor({
 
   const removeModel = useCallback(
     (id: string) => {
-      setModels(models.filter((m) => m.id !== id));
+      const prev = models;
+      const next = models.filter((m) => m.id !== id);
+      setModels(next);
+      void persistModels(next, prev);
     },
-    [models, setModels],
+    [models, setModels, persistModels],
   );
 
   /**
@@ -756,10 +897,9 @@ function ModelEditor({
       setFetchedModels(items);
       // Default to empty selection per user direction — pre-picking
       // doesn't scale when a gateway returns 277 models.
-      setSelectedFetched(new Set());
-      setFetchedFilter("");
+        setFetchedFilter("");
       setCapabilityFilter(null);
-      setFetchedSort("asc");
+      setFetchedSort("suggested");
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Network error");
       setFetchedModels(null);
@@ -768,52 +908,27 @@ function ModelEditor({
     }
   }, [canFetchModels, connectionId]);
 
-  /** Add every checked fetched-model entry not already present. */
-  const addSelectedFetched = useCallback(() => {
-    if (!fetchedModels) return;
-    const existing = new Set(models.map((m) => m.id));
-    const additions: ConnectionModel[] = [];
-    for (const item of fetchedModels) {
-      if (!selectedFetched.has(item.id) || existing.has(item.id)) continue;
-      additions.push({
-        id: item.id,
-        name: item.name,
-        // Catalog-augmented entries (image models) ship with their own
-        // capability hints; everything else falls back to the generic
-        // text/streaming default.
-        capabilities: item.capabilities ?? ["text", "streaming"],
-      });
-    }
-    if (additions.length > 0) setModels([...models, ...additions]);
-    setFetchedModels(null);
-    setSelectedFetched(new Set());
-  }, [fetchedModels, models, selectedFetched, setModels]);
-
-  /** Replace the entire model list with the checked fetched-model set. */
-  const replaceWithSelected = useCallback(() => {
-    if (!fetchedModels) return;
-    const replacement: ConnectionModel[] = [];
-    for (const item of fetchedModels) {
-      if (!selectedFetched.has(item.id)) continue;
-      replacement.push({
-        id: item.id,
-        name: item.name,
-        capabilities: item.capabilities ?? ["text", "streaming"],
-      });
-    }
-    setModels(replacement);
-    setFetchedModels(null);
-    setSelectedFetched(new Set());
-  }, [fetchedModels, selectedFetched, setModels]);
-
-  const toggleFetchedSelection = useCallback((id: string) => {
-    setSelectedFetched((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleFetchedSelection = useCallback(
+    (id: string) => {
+      const item = fetchedModels?.find((m) => m.id === id);
+      if (!item) return;
+      const prev = models;
+      const exists = prev.some((m) => m.id === id);
+      const next = exists
+        ? prev.filter((m) => m.id !== id)
+        : [
+            ...prev,
+            {
+              id: item.id,
+              name: item.name,
+              capabilities: item.capabilities ?? ["text", "streaming"],
+            },
+          ];
+      setModels(next);
+      void persistModels(next, prev);
+    },
+    [fetchedModels, models, setModels, persistModels],
+  );
 
   return (
     <Field
@@ -880,7 +995,7 @@ function ModelEditor({
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-amber-500/10">
               <div className="text-[11px] font-medium text-amber-200 uppercase tracking-wide">
                 {fetchedModels.length} models from upstream ·{" "}
-                {selectedFetched.size} selected
+                {models.length} in connection
                 {fetchedFilter && (
                   <span className="ml-1.5 text-amber-300/70 normal-case">
                     · {visibleFetched.length} match
@@ -914,14 +1029,26 @@ function ModelEditor({
               <button
                 type="button"
                 onClick={() =>
-                  setFetchedSort((s) => (s === "asc" ? "desc" : "asc"))
+                  setFetchedSort((s) =>
+                    s === "suggested" ? "asc" : s === "asc" ? "desc" : "suggested",
+                  )
                 }
-                aria-label={`Sort ${fetchedSort === "asc" ? "ascending" : "descending"}`}
-                title={`Sorted ${fetchedSort === "asc" ? "A → Z" : "Z → A"} (click to flip)`}
+                aria-label={`Sort: ${fetchedSort}`}
+                title={
+                  fetchedSort === "suggested"
+                    ? "Sorted by Suggested (flagship vendors + newest first) — click for A → Z"
+                    : fetchedSort === "asc"
+                      ? "Sorted A → Z — click for Z → A"
+                      : "Sorted Z → A — click for Suggested"
+                }
                 className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors"
               >
                 <ArrowUpDown className="h-3 w-3" />
-                {fetchedSort === "asc" ? "A→Z" : "Z→A"}
+                {fetchedSort === "suggested"
+                  ? "Suggested"
+                  : fetchedSort === "asc"
+                    ? "A→Z"
+                    : "Z→A"}
               </button>
               <button
                 type="button"
@@ -929,7 +1056,7 @@ function ModelEditor({
                 disabled={visibleFetched.length === 0}
                 className="rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {allVisibleSelected ? "Deselect view" : "Select view"}
+                {allVisiblePresent ? "Remove view" : "Add view"}
               </button>
             </div>
 
@@ -974,20 +1101,31 @@ function ModelEditor({
                 </div>
               ) : (
                 visibleFetched.map((item) => {
-                  const exists = models.some((m) => m.id === item.id);
-                  const checked = selectedFetched.has(item.id);
+                  const checked = models.some((m) => m.id === item.id);
                   const caps = modelCapabilities(item);
                   return (
-                    <label
+                    <div
                       key={item.id}
-                      className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-amber-500/[0.06] cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-amber-500/[0.06]"
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleFetchedSelection(item.id)}
-                        aria-label={`Select ${item.id}`}
-                      />
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={checked}
+                        aria-label={`${checked ? "Remove" : "Install"} ${item.id}`}
+                        onClick={() => toggleFetchedSelection(item.id)}
+                        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors cursor-pointer ${
+                          checked
+                            ? "bg-emerald-500/80"
+                            : "bg-black/30 border border-white/15"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                            checked ? "left-3.5" : "left-0.5"
+                          }`}
+                        />
+                      </button>
                       <div className="min-w-0 flex-1">
                         <div className="font-mono text-amber-200 truncate">
                           {item.id}
@@ -1016,34 +1154,20 @@ function ModelEditor({
                           ))}
                         </span>
                       )}
-                      {exists && (
-                        <span className="text-[9px] uppercase tracking-wide text-gray-500 shrink-0">
-                          added
+                      {checked && (
+                        <span className="text-[9px] uppercase tracking-wide text-emerald-400/80 shrink-0">
+                          in connection
                         </span>
                       )}
-                    </label>
+                    </div>
                   );
                 })
               )}
             </div>
 
-            {/* Action footer */}
-            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={replaceWithSelected}
-                disabled={selectedFetched.size === 0}
-              >
-                Replace all with selected
-              </Button>
-              <Button
-                size="sm"
-                onClick={addSelectedFetched}
-                disabled={selectedFetched.size === 0}
-              >
-                Add selected ({selectedFetched.size})
-              </Button>
+            {/* Instant-persistence footer (no staging, no save step) */}
+            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10 text-[11px] text-amber-200/70">
+              Checked models are saved to this connection instantly.
             </div>
           </div>
         )}

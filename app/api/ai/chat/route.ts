@@ -87,7 +87,11 @@ import {
   listConnections,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
-import { addAutoAssociation } from "@/lib/features/conversations";
+import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
+import { publishEvent } from "@/lib/domain/notifications";
+import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
 import {
   resolvePrimaryRoute,
@@ -105,8 +109,10 @@ import { buildSystemPrompt } from "@/lib/domain/ai/system-prompt";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
+import { createWorkflowTools } from "@/lib/domain/ai/tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
@@ -252,8 +258,47 @@ export async function POST(request: Request) {
         }
       }
 
-      if (!activeConnection) {
-        // Last resort before legacy: ask the feature router.
+      // Straight-faced routing (owner decision 2026-07-17): an EXPLICIT
+      // model selection is a contract. If no connection serves it, we say
+      // so — we do NOT silently substitute another vendor (the old
+      // "transition shim" behavior ran gpt-4o under a Sonnet label,
+      // misattributing spend, swapping tools, and surfacing rate-limit
+      // errors from a provider the user never picked). The feature-route
+      // fallback survives ONLY for surfaces that sent no explicit choice.
+      const explicitSelection =
+        typeof body.providerId === "string" || typeof body.modelId === "string";
+
+      if (
+        !activeConnection &&
+        explicitSelection &&
+        typeof body.apiKey !== "string"
+      ) {
+        // Legacy resolver can still serve the selection when the env-level
+        // gateway is configured; otherwise this selection is unservable.
+        if (!isGatewayEnabled()) {
+          const providerLabel =
+            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+            providerId;
+          return Response.json(
+            {
+              success: false,
+              error: {
+                code: "MODEL_UNAVAILABLE",
+                message:
+                  `No connection serves ${providerLabel} · ${modelId}. ` +
+                  `Add a ${providerLabel} API key in Settings → AI → Connections, ` +
+                  `add a gateway connection that lists ${providerId}/${modelId}, ` +
+                  `or pick one of the available (non-greyed) models.`,
+              },
+            },
+            { status: 422 },
+          );
+        }
+      }
+
+      if (!activeConnection && !explicitSelection) {
+        // No explicit pick — the feature router's primary is a genuine
+        // default, not a substitution.
         const primary = await resolvePrimaryRoute(session.user.id, "chat");
         if (primary) {
           activeConnection = primary.connection;
@@ -309,15 +354,39 @@ export async function POST(request: Request) {
       // document" context so the model doesn't try to "read" the chat as
       // a document (which confuses it and ignores actual attachments).
       let isChatContent = false;
+      // Open workflow (AI v3 core S6): when the open content is a Trellis
+      // workflow, the chat's DEFAULT subject is THAT workflow (owner rule,
+      // 2026-07-18 — "chats serve their location" applied to workflows).
+      // The system prompt states the default; get_workflow/update_workflow/
+      // run_workflow resolve to it when called with no arguments.
+      let openWorkflowTitle: string | undefined;
+      let openContentLocationId: string | undefined;
       if (contentId) {
         const node = await prisma.contentNode.findFirst({
           where: { id: contentId, ownerId: session.user.id },
-          select: { contentType: true },
+          select: { contentType: true, title: true, parentId: true },
         });
         isChatContent = node?.contentType === "chat";
+        if (node?.contentType === "workflow") openWorkflowTitle = node.title;
+        // Location inference fallback (v3 ship fix, 2026-07-18): "chats
+        // serve their location" must hold for sidebar chats too — they
+        // have no archived chat node for the inference below, which left
+        // their tools untargeted (files landed at the vault root). A
+        // folder is its own location; anything else locates to its parent.
+        openContentLocationId =
+          node?.contentType === "folder"
+            ? contentId
+            : (node?.parentId ?? undefined);
       }
+      // Workflows are not documents: keep document-editor tools (and the
+      // "you are viewing a document" prompt section) off when one is open —
+      // apply_diff/read_first_chunk operate on NotePayload and would only
+      // confuse the model. ctx.contentId still carries the open workflow id
+      // for the workflow tools' open-target resolution.
       const editableContentId =
-        contentId && !isChatContent ? contentId : undefined;
+        contentId && !isChatContent && !openWorkflowTitle
+          ? contentId
+          : undefined;
 
       // Create tools bound to the authenticated user, then filter by
       // per-tool `enabled` in settings. Tools default to enabled; only
@@ -361,9 +430,48 @@ export async function POST(request: Request) {
         break; // only the most recent batch of attachments
       }
 
+      // Bound Conversation entity (sidebar multi-conv / full-page chat).
+      // Hoisted above toolCtx (AI v3 core S3) so tools can associate the
+      // content they touch; the mention/tool-call interceptors below reuse it.
+      const conversationIdForAssoc: string | null =
+        typeof body.conversationId === "string" ? body.conversationId : null;
+
+      // The conversation's target folder (umbrella decision #7) rides into
+      // tool context: read_page files page nodes there; document tools
+      // default their destination to it.
+      let targetFolderId: string | undefined;
+      if (conversationIdForAssoc) {
+        const conv = await prisma.conversation.findFirst({
+          where: {
+            id: conversationIdForAssoc,
+            ownerId: session.user.id,
+            deletedAt: null,
+          },
+          select: {
+            targetFolderId: true,
+            // Location inference: chats serve their location — the chat
+            // node's parent folder is the target unless explicitly set.
+            archivedToContentNode: { select: { parentId: true } },
+          },
+        });
+        targetFolderId =
+          conv?.targetFolderId ??
+          conv?.archivedToContentNode?.parentId ??
+          undefined;
+      }
+      // Final fallback: the open content's folder (sidebar chats and
+      // transient chats have no chat node to infer from).
+      if (!targetFolderId) targetFolderId = openContentLocationId;
+
       const toolCtx = {
         userId: session.user.id,
-        contentId: editableContentId,
+        // Editor tools read this as "the document being edited"; workflow
+        // tools read it as "the open workflow" (they verify contentType
+        // themselves). editableContentId is deliberately undefined when a
+        // workflow is open, so thread the raw contentId through for it.
+        contentId: editableContentId ?? (openWorkflowTitle ? contentId : undefined),
+        conversationId: conversationIdForAssoc ?? undefined,
+        targetFolderId,
         // When the user is viewing this conversation in full-page mode the
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
@@ -373,6 +481,8 @@ export async function POST(request: Request) {
       const allTools = {
         ...createBaseTools(toolCtx),
         ...createFlashcardTools(toolCtx),
+        // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
+        ...createWorkflowTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
@@ -384,6 +494,46 @@ export async function POST(request: Request) {
           ([id]) => toolConfig[id]?.enabled !== false,
         ),
       );
+
+      // P0 (AI v3 core S2): provider-native web search, resolved per active
+      // provider at request composition. CRITICAL: key off the EXECUTED
+      // provider, not the requested one — the resolver above may have landed
+      // on a different vendor's connection (preset fall-through, feature
+      // route), and attaching vendor A's server tool to vendor B's model
+      // gets it silently dropped, leaving the model to flail on note tools.
+      // Aggregator transports (gateway, OpenRouter) are skipped until their
+      // provider-tool passthrough is verified. read_page (owned P1) always
+      // remains available.
+      const NATIVE_TOOL_VENDORS = new Set([
+        "anthropic",
+        "openai",
+        "google",
+        "xai",
+      ]);
+      // Vendor resolution: direct vendor connections use their preset;
+      // gateway connections serve namespaced models ("anthropic/…") — the
+      // prefix names the vendor that actually executes, and the Vercel AI
+      // Gateway passes provider-defined tools through to it (owner
+      // expectation: the Gateway serves everything; live smoke verifies).
+      const namespacedVendor =
+        activeConnection && activeModelId.includes("/")
+          ? activeModelId.split("/")[0]
+          : null;
+      const executedProviderId = activeConnection
+        ? activeConnection.presetId && NATIVE_TOOL_VENDORS.has(activeConnection.presetId)
+          ? activeConnection.presetId
+          : namespacedVendor
+        : transport === "direct" || transport === "gateway"
+          ? providerId
+          : null;
+      const nativeSearch =
+        executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
+          ? resolveNativeWebSearchTool(executedProviderId)
+          : null;
+      if (nativeSearch && toolConfig["search_web"]?.enabled !== false) {
+        (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+      }
+
       const toolsActive = Object.keys(tools).length > 0;
 
       // Resolve attachments for the model: keep file parts the active
@@ -392,8 +542,19 @@ export async function POST(request: Request) {
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
       const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      // Repair dangling tool calls BEFORE conversion (S4 smoke finding):
+      // an approval that never executed (network error, user typed past
+      // it) leaves tool_use without tool_result — Anthropic 400s on every
+      // later send, poisoning the conversation. Moved-past pre-output
+      // parts become honest error results; the live last message is
+      // untouched (that's the resume path).
+      // Payload diet server-side too (defense in depth — other surfaces
+      // and previously-persisted conversations still carry ciphertext).
+      const repairedMessages = compactToolOutputs(
+        repairDanglingToolCalls(messages),
+      );
       const resolvedMessages = resolveAttachmentsForModel(
-        messages,
+        repairedMessages,
         providerId,
         audioCapable,
       );
@@ -411,8 +572,7 @@ export async function POST(request: Request) {
       // multi-conv mode), each @mention writes an `auto` association.
       // Folder cascade is intentionally not handled — folder mentions
       // bind to the folder only, per the locked plan decision.
-      const conversationIdForAssoc: string | null =
-        typeof body.conversationId === "string" ? body.conversationId : null;
+      // (conversationIdForAssoc is hoisted above toolCtx — S3.)
       if (conversationIdForAssoc && mentionedContentIds.length > 0) {
         // Fire-and-forget — failure here shouldn't block the chat call.
         // Each call is idempotent (upsert) and capped via LRU inside.
@@ -515,6 +675,12 @@ export async function POST(request: Request) {
             model: modelId,
             messages: modelMessages.length,
             tools: tools ? Object.keys(tools).length : 0,
+            // S2 debug surface: which tools actually attached, and whether
+            // the native search tool made it in (gateway transports may
+            // handle provider-defined tools differently than direct).
+            tool_names: Object.keys(tools).join(","),
+            native_search: "search_web" in tools,
+            executed_provider: executedProviderId ?? "aggregator",
           },
           summary: `${providerId}:${modelId} streaming`,
         },
@@ -553,6 +719,9 @@ export async function POST(request: Request) {
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
+          hasWebSearch: "search_web" in tools,
+          hasCheckpointTool: "phase_checkpoint" in tools,
+          openWorkflowTitle,
           editableContentId,
           isChatContent,
           chatContentId: isChatContent ? contentId : undefined,
@@ -618,8 +787,128 @@ export async function POST(request: Request) {
       // The client's persist-on-finish path forwards it to the message
       // row, which the per-Connection usage meters read back for $
       // figures. Without this hop, telemetry is request-counts-only.
+      // Detach-resilience (AI v3 core S1): consume the stream server-side so
+      // the tool loop, onFinish, and persistence complete even if the client
+      // disconnects mid-run (navigation, tab close, workspace swap). The UI
+      // response below tees off the same stream — this does not starve it.
+      void result.consumeStream();
+
       return result.toUIMessageStreamResponse({
+        // Continuation awareness (smoke #4 root cause): approval resumes
+        // execute tools whose invocation lives in the LAST assistant
+        // message of the incoming history. Without originalMessages the
+        // stream starts a fresh message, the tool-result chunk finds no
+        // matching invocation, and the response pipe dies mid-stream
+        // (AI_UIMessageStreamError → browser "network error").
+        originalMessages: repairedMessages,
         sendReasoning: true,
+        onFinish: async ({ responseMessage, isAborted }) => {
+          // Server-side turn persistence + approval notification (S1). Only
+          // turns bound to a Conversation entity persist here; ephemeral
+          // surfaces keep their existing client-side persist path.
+          if (isAborted || !conversationIdForAssoc) return;
+
+          const rawParts = responseMessage.parts as Array<
+            Record<string, unknown>
+          >;
+
+          try {
+            const textCache = rawParts
+              .filter((p) => p.type === "text" && typeof p.text === "string")
+              .map((p) => p.text as string)
+              .join("\n");
+            // Empty/absent ids reach here on some continuation shapes —
+            // "" is not a valid uuid and was failing EVERY server persist
+            // silently (found in smoke #4's server log). Omit → DB
+            // generates.
+            // Fresh turns carry AI-SDK nanoid ids (not uuids) — the CLIENT
+            // owns their persistence (create + continuation PATCH). Server
+            // create/update only applies to uuid ids, i.e. messages loaded
+            // from history whose client id IS the DB row id.
+            const isUuid =
+              typeof responseMessage.id === "string" &&
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                responseMessage.id,
+              );
+            if (isUuid) {
+            const messageId = responseMessage.id;
+            await appendMessage(session.user.id, conversationIdForAssoc, {
+              id: messageId,
+              role: "assistant",
+              providerId,
+              modelId,
+              parts: responseMessage.parts,
+              textCache: textCache || null,
+              metadata: null,
+              parentId: null,
+            });
+            }
+          } catch (error) {
+            if ((error as { code?: string }).code === "P2002") {
+              // The row exists (client persisted the pre-approval half).
+              // A continuation carries NEW parts under the SAME id — update
+              // the row so post-approval content isn't lost.
+              try {
+                await prisma.conversationMessage.updateMany({
+                  where: {
+                    id: responseMessage.id,
+                    conversation: {
+                      id: conversationIdForAssoc,
+                      ownerId: session.user.id,
+                    },
+                  },
+                  data: {
+                    parts: responseMessage.parts as unknown as Prisma.InputJsonValue,
+                  },
+                });
+              } catch {
+                /* best-effort — client copy remains authoritative */
+              }
+            } else {
+              logger.error({
+                layer: "ai",
+                event: "chat:server_persist:failed",
+                summary: "server-side assistant turn persistence failed",
+                error,
+              });
+            }
+          }
+
+          // Notification rule (owner, 2026-07-17): approval-requested is a
+          // notify trigger; run-finish notification arrives with playbook
+          // run semantics in S4. collapseKey coalesces repeated pauses in
+          // one conversation; subject enables mark-read-on-view later.
+          const pausedTools = rawParts
+            .filter((p) => p.state === "approval-requested")
+            .map((p) =>
+              typeof p.type === "string" && p.type.startsWith("tool-")
+                ? p.type.slice(5)
+                : "a tool",
+            );
+          if (pausedTools.length > 0) {
+            await publishEvent(prisma, {
+              kind: "ai.notify",
+              actorType: "ai",
+              actorLabel: "Assistant",
+              subjectType: "conversation",
+              subjectId: conversationIdForAssoc,
+              payload: {
+                title: "Approval needed",
+                body: `The assistant paused and needs your approval to run: ${pausedTools.join(", ")}.`.slice(
+                  0,
+                  1000,
+                ),
+                conversationId: conversationIdForAssoc,
+              },
+              recipients: [
+                {
+                  userId: session.user.id,
+                  collapseKey: `ai-approval:${conversationIdForAssoc}`,
+                },
+              ],
+            }).catch(() => null);
+          }
+        },
         messageMetadata: ({ part }) => {
           if (part.type === "finish") {
             return {

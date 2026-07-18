@@ -30,6 +30,10 @@ export interface ConversationSummary {
   archivedToContentNodeId: string | null;
   /** Selected custom-instruction context for this chat, or null. */
   activeContextId: string | null;
+  /** Target folder (AI v3 core S3) — inputs/outputs/grounding follow it. */
+  targetFolderId: string | null;
+  /** Display title of the target folder (joined) — null when untargeted. */
+  targetFolderTitle: string | null;
   createdAt: string;
   updatedAt: string;
   /** Last seen activity timestamp — currently `updatedAt`; may track per-message later. */
@@ -40,6 +44,14 @@ export interface ConversationSummary {
 export interface ConversationDetail extends ConversationSummary {
   messages: ConversationMessageView[];
   associations: ConversationAssociationView[];
+  /**
+   * The chat node's LOCATION (its parent folder) — null when the chat is
+   * placeless (sidebar panel, browser). Chats serve their location: with
+   * no explicit target this IS the target; with an explicit target that
+   * differs, surfaces render a mismatch warning (S4a) so a forgotten
+   * override is visible instead of silently misdirecting output.
+   */
+  inferredTargetFolder: { id: string; title: string | null } | null;
 }
 
 export interface ConversationMessageView {
@@ -121,6 +133,11 @@ export interface ListConversationsOptions {
    * all of the user's conversations.
    */
   forContentNodeIds?: string[];
+  /**
+   * Restrict to conversations whose target folder is this node — the
+   * "chats of this folder" history view (AI v3 core S3).
+   */
+  targetFolderId?: string;
   /** Cursor: conversation id to start after (sorted by updatedAt desc). */
   cursor?: string;
   /** Page size. Default 25, max 100. */
@@ -135,4 +152,5 @@ export interface UpdateConversationPatch {
    * is validated server-side before the link is written.
    */
   activeContextId?: string | null;
+  targetFolderId?: string | null;
 }

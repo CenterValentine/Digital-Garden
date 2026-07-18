@@ -120,6 +120,12 @@ interface UseConversationBindingResult {
    * picker selection from this.
    */
   initialActiveContextId: string | null;
+  /** Target folder seed (AI v3 core S3) — {id, title} or null when untargeted. */
+  initialTargetFolder: { id: string; title: string | null } | null;
+  /** True when the seed came from the chat's location, not an explicit pick. */
+  initialTargetInherited: boolean;
+  /** The chat node's parent folder (location) — null when placeless. */
+  initialTargetLocation: { id: string; title: string | null } | null;
 }
 
 export function useConversationBinding({
@@ -143,6 +149,10 @@ export function useConversationBinding({
   // get their mapping from the persist response. Used to resolve the
   // truncate anchor for edit/regenerate.
   const dbIdByClientIdRef = useRef<Map<string, string>>(new Map());
+  // Parts signature per saved client id — detects continuations (approval
+  // resumes mutate/extend an already-saved assistant message) so the
+  // persister can PATCH the row instead of skipping it forever.
+  const savedPartsSigRef = useRef<Map<string, number>>(new Map());
   const [loadingInitial, setLoadingInitial] = useState<boolean>(
     Boolean(conversationId),
   );
@@ -152,6 +162,15 @@ export function useConversationBinding({
   const [initialActiveContextId, setInitialActiveContextId] = useState<
     string | null
   >(null);
+  const [initialTargetFolder, setInitialTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  const [initialTargetInherited, setInitialTargetInherited] = useState(false);
+  const [initialTargetLocation, setInitialTargetLocation] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -162,9 +181,13 @@ export function useConversationBinding({
     if (!conversationId) {
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
+      savedPartsSigRef.current = new Map();
       setLoadingInitial(false);
       setConversationTitle(null);
       setInitialActiveContextId(null);
+      setInitialTargetFolder(null);
+      setInitialTargetInherited(false);
+      setInitialTargetLocation(null);
       return;
     }
     // Stage 2 — transient promote: when the caller just created this
@@ -177,11 +200,13 @@ export function useConversationBinding({
       skipNextLoadRef.current = false;
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
+      savedPartsSigRef.current = new Map();
       setLoadingInitial(false);
       return;
     }
     savedIdsRef.current = new Set();
     dbIdByClientIdRef.current = new Map();
+    savedPartsSigRef.current = new Map();
     setLoadingInitial(true);
     let cancelled = false;
     (async () => {
@@ -228,11 +253,28 @@ export function useConversationBinding({
             messages?: unknown[];
             title?: string | null;
             activeContextId?: string | null;
+            targetFolderId?: string | null;
+            targetFolderTitle?: string | null;
+            inferredTargetFolder?: { id: string; title: string | null } | null;
           };
         })?.data;
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
         setInitialActiveContextId(data?.activeContextId ?? null);
+        setInitialTargetLocation(data?.inferredTargetFolder ?? null);
+        if (data?.targetFolderId) {
+          setInitialTargetFolder({
+            id: data.targetFolderId,
+            title: data.targetFolderTitle ?? null,
+          });
+          setInitialTargetInherited(false);
+        } else if (data?.inferredTargetFolder) {
+          setInitialTargetFolder(data.inferredTargetFolder);
+          setInitialTargetInherited(true);
+        } else {
+          setInitialTargetFolder(null);
+          setInitialTargetInherited(false);
+        }
 
         clientLogger.info({
           layer: "ui",
@@ -320,7 +362,36 @@ export function useConversationBinding({
     if (!conversationId || messages.length === 0) return;
     for (const m of messages) {
       if (m.role !== "user" && m.role !== "assistant") continue;
-      if (savedIdsRef.current.has(m.id)) continue;
+      if (savedIdsRef.current.has(m.id)) {
+        // Continuation persistence (S4): an approval resume EXTENDS a
+        // saved assistant message (resolved approval state + new parts).
+        // Detect via a parts signature and PATCH the row; a missing
+        // signature (message loaded from history) just sets the baseline.
+        if (m.role !== "assistant") continue;
+        const sig = JSON.stringify(m.parts).length;
+        const prevSig = savedPartsSigRef.current.get(m.id);
+        if (prevSig === undefined) {
+          savedPartsSigRef.current.set(m.id, sig);
+          continue;
+        }
+        if (prevSig === sig) continue;
+        const dbId = dbIdByClientIdRef.current.get(m.id) ?? m.id;
+        try {
+          const res = await fetch(
+            `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(dbId)}`,
+            {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ parts: m.parts }),
+            },
+          );
+          if (res.ok) savedPartsSigRef.current.set(m.id, sig);
+        } catch {
+          /* retried on the next finish pass — sig stays stale */
+        }
+        continue;
+      }
       const stamp = getMessageStamp(m.id, { providerId, modelId });
       // Prefer the exact parts the engine sent for a fresh user turn —
       // they reliably include attachment file parts, which AI SDK's
@@ -373,6 +444,7 @@ export function useConversationBinding({
         );
         if (res.ok) {
           savedIdsRef.current.add(m.id);
+          savedPartsSigRef.current.set(m.id, JSON.stringify(m.parts).length);
           // Capture the DB-generated row id so a later edit/regenerate
           // can resolve this session-created message to its DB anchor.
           try {
@@ -490,5 +562,12 @@ export function useConversationBinding({
     };
   }, [conversationId]);
 
-  return { loadingInitial, conversationTitle, initialActiveContextId };
+  return {
+    loadingInitial,
+    conversationTitle,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+    initialTargetLocation,
+  };
 }

@@ -25,6 +25,7 @@ import Link from "next/link";
 import { ChevronUp, ChevronDown, MoreHorizontal, Sparkles, AlertCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { compareModelRecency } from "@/lib/domain/ai/model-popularity";
 import {
   BIG_THREE_PROVIDER_IDS,
   getProviderTheme,
@@ -205,12 +206,12 @@ export function MakeAndModelPicker({
         // unknown for dynamic providers, but the picker only reads
         // name/id/costTier so coarse defaults are fine.
         models: Array.from(bareIds)
-          .sort((a, b) => a.localeCompare(b))
           .map((id) => ({
             id,
             name: id,
             costTier: "medium" as const,
-          })),
+          }))
+          .sort(compareModelRecency),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [connections]);
@@ -281,17 +282,25 @@ export function MakeAndModelPicker({
               costTier: "medium" as const,
             }))
         : [];
+      const merged = [
+        ...p.models.map((m) => ({
+          id: m.id,
+          name: m.name,
+          costTier: m.costTier,
+        })),
+        ...userModelEntries,
+      ].sort((a, b) => {
+        // Available models float above unavailable (greyed) ones; within
+        // each band, newer floats and older sinks.
+        const availA = isModelAvailable(p.id, a.id, connections) ? 1 : 0;
+        const availB = isModelAvailable(p.id, b.id, connections) ? 1 : 0;
+        if (availA !== availB) return availB - availA;
+        return compareModelRecency(a, b);
+      });
       return {
         id: p.id,
         name: p.name,
-        models: [
-          ...p.models.map((m) => ({
-            id: m.id,
-            name: m.name,
-            costTier: m.costTier,
-          })),
-          ...userModelEntries,
-        ],
+        models: merged,
       };
     });
     return [...fromCatalog, ...dynamicProviders];

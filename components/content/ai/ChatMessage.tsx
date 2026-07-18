@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus, ShieldAlert, X } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
@@ -50,6 +50,8 @@ interface DetectedToolPart {
   state: string;
   input?: unknown;
   output?: unknown;
+  /** Present when state is approval-requested (needsApproval pause). */
+  approvalId?: string;
 }
 
 function detectToolPart(part: unknown): DetectedToolPart | null {
@@ -78,6 +80,7 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
     state: (p.state as string) || "unknown",
     input: p.input,
     output: p.output,
+    approvalId: (p.approval as { id?: string } | undefined)?.id,
   };
 }
 
@@ -85,6 +88,8 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
 interface NotePayload {
   __notePayload: true;
   kind: "created" | "updated";
+  /** What was created — defaults to "note"; propose_workflow sends "workflow" (S6). */
+  noun?: string;
   contentId: string;
   title: string;
   parentId?: string | null;
@@ -199,6 +204,23 @@ interface ChatMessageProps {
    */
   onEdit?: (messageId: string, newText: string) => void;
   /**
+   * Respond to a `needsApproval` tool pause (AI v3 core S1). When provided,
+   * approval-requested tool parts render an approval card whose
+   * Approve/Reject call this; the engine's sendAutomaticallyWhen resumes
+   * the loop once all pending approvals are answered.
+   */
+  onToolApprovalResponse?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
+  /**
+   * False when this message is no longer the conversation's last — a
+   * pending approval that far back can never execute (S4 smoke finding);
+   * the card renders as expired instead of actionable.
+   */
+  approvalActionable?: boolean;
+  /**
    * Regenerate an assistant message (Session 5a). When provided,
    * assistant messages show a hover refresh that re-runs the model.
    */
@@ -228,6 +250,8 @@ export const ChatMessage = memo(function ChatMessage({
   actionsDisabled = false,
   onRevertEdit,
   revertableToolIds,
+  onToolApprovalResponse,
+  approvalActionable = true,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -383,6 +407,51 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // Coalesce text runs into single render units (v3 ship fix, 2026-07-18):
+  // provider-native web-search answers stream as MANY text parts — the
+  // provider emits a new part per cited span, so bubble-per-part produced
+  // a wall of fragment windows (a lone "." or a bare "- " each in its own
+  // bubble). One logical passage = ONE bubble. Join with "" — the split
+  // points are artificial; the model's own whitespace/newlines live inside
+  // the part texts, so plain concatenation reconstructs the original
+  // markdown. Invisible parts (citation sources, step boundaries) must not
+  // break a run either; only genuinely rendered parts (tools, files,
+  // reasoning) do.
+  type MessagePart = (typeof message.parts)[number];
+  const renderParts = useMemo(() => {
+    const units: Array<{ key: number; part: MessagePart }> = [];
+    let run: { key: number; text: string } | null = null;
+    const flush = () => {
+      if (run !== null) {
+        units.push({
+          key: run.key,
+          part: { type: "text", text: run.text } as MessagePart,
+        });
+        run = null;
+      }
+    };
+    for (let i = 0; i < message.parts.length; i++) {
+      const part = message.parts[i];
+      if (part.type === "text") {
+        const text = (part as { text?: string }).text ?? "";
+        if (run !== null) run.text += text;
+        else run = { key: i, text };
+        continue;
+      }
+      if (
+        part.type === "source-url" ||
+        part.type === "source-document" ||
+        part.type === "step-start"
+      ) {
+        continue;
+      }
+      flush();
+      units.push({ key: i, part });
+    }
+    flush();
+    return units;
+  }, [message.parts]);
+
   // NOTE: tree-refresh + content-updated dispatch for AI note writes
   // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
   // once per AI completion. Putting that logic here (in the render
@@ -480,8 +549,8 @@ export const ChatMessage = memo(function ChatMessage({
           </div>
         ) : (
         <>
-        {/* Render message parts */}
-        {message.parts.map((part, i) => {
+        {/* Render message parts (text runs pre-coalesced — see renderParts) */}
+        {renderParts.map(({ key: i, part }) => {
           // Reasoning / "thinking" parts (Session 6). Routed to a
           // provider-themed renderer keyed on this message's stamped
           // providerId — not the panel's active provider — so branched
@@ -623,6 +692,42 @@ export const ChatMessage = memo(function ChatMessage({
           // Flashcard proposals render as DeckProposalCard / CardProposalList at message level below.
           const toolPart = detectToolPart(part);
           if (toolPart) {
+            // needsApproval pause: the loop is parked until the user
+            // responds. Render the approval card instead of the bubble.
+            if (
+              toolPart.state === "approval-requested" &&
+              toolPart.approvalId &&
+              toolPart.toolName === "phase_checkpoint"
+            ) {
+              return (
+                <PhaseCheckpointCard
+                  key={i}
+                  input={toolPart.input}
+                  approvalId={toolPart.approvalId}
+                  onRespond={
+                    approvalActionable ? onToolApprovalResponse : undefined
+                  }
+                  expired={!approvalActionable}
+                />
+              );
+            }
+            if (
+              toolPart.state === "approval-requested" &&
+              toolPart.approvalId
+            ) {
+              return (
+                <ToolApprovalCard
+                  key={i}
+                  toolName={toolPart.toolName}
+                  args={toolPart.input}
+                  approvalId={toolPart.approvalId}
+                  onRespond={
+                    approvalActionable ? onToolApprovalResponse : undefined
+                  }
+                  expired={!approvalActionable}
+                />
+              );
+            }
             if (toolPart.state === "output-available") {
               if (parseImagePayload(toolPart.output) !== null) return null;
               if (parseAudioPayload(toolPart.output) !== null) return null;
@@ -1420,6 +1525,469 @@ function parseDeckWithCardsProposal(result: unknown): DeckWithCardsProposalPaylo
  * (string length, array length, object keys, edit-payload action)
  * so the user sees *something* informative without expanding.
  */
+
+/**
+ * Approval card for `needsApproval` tool pauses (AI v3 core S1).
+ *
+ * The tool loop is parked in `approval-requested` state server-side; the
+ * user's Approve/Reject answers via useChat's addToolApprovalResponse and
+ * the engine's sendAutomaticallyWhen re-sends so the loop resumes. The
+ * card shows the tool's input so the user knows exactly what they are
+ * approving. After responding it collapses to a status line — the SDK
+ * flips the part to approval-responded on the next render, but keeping
+ * local state makes the transition instant.
+ */
+/**
+ * Tri-verdict phase checkpoint (AI v3 core S4d, umbrella "Approvals,
+ * verdicts & background runs"). Maps natively onto SDK approvals:
+ * Approve → approved; Revise → denied + reason (the model redoes the
+ * phase incorporating it); Approve with tweaks → approved + reason (the
+ * model applies the changes, then continues). Free text still works —
+ * this card just formalizes the common verdicts.
+ */
+function PhaseCheckpointCard({
+  input,
+  approvalId,
+  onRespond,
+  expired = false,
+}: {
+  input: unknown;
+  approvalId: string;
+  onRespond?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
+  expired?: boolean;
+}) {
+  const [mode, setMode] = useState<"idle" | "revise" | "tweaks">("idle");
+  const [feedback, setFeedback] = useState("");
+  const [verdict, setVerdict] = useState<string | null>(null);
+
+  const data = (input ?? {}) as {
+    phase?: string;
+    summary?: string;
+    artifacts?: string[];
+    openQuestions?: string[];
+    next?: string;
+  };
+
+  // Verdict channels (SDK constraint discovered 2026-07-18): approval
+  // responses for client-executed tools are DROPPED from model messages —
+  // only denial reasons reach the model (as execution-denied results). So
+  // both feedback verdicts ride the denial channel with framing prefixes;
+  // the model re-runs or adjusts, then checkpoints again (which also gives
+  // tweaked phases a fresh ledger entry).
+  const respond = (
+    kind: "approve" | "revise" | "tweaks",
+    feedbackText?: string,
+  ) => {
+    if (verdict || !onRespond) return;
+    if (kind === "approve") {
+      onRespond({ id: approvalId, approved: true });
+      setVerdict("Approved — continuing…");
+      return;
+    }
+    const framed =
+      kind === "revise"
+        ? `REVISE THIS PHASE — redo it incorporating this feedback, then call phase_checkpoint again: ${feedbackText}`
+        : `APPROVED WITH TWEAKS — apply these changes to this phase's output, then call phase_checkpoint again: ${feedbackText}`;
+    onRespond({ id: approvalId, approved: false, reason: framed });
+    setVerdict(
+      kind === "revise"
+        ? "Revision requested — redoing the phase…"
+        : "Tweaks sent — applying, then re-checkpointing…",
+    );
+  };
+
+  return (
+    <div className="rounded-lg border border-indigo-400/40 bg-indigo-500/[0.06] text-xs overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <GitBranch className="h-3 w-3 shrink-0 text-indigo-400" />
+        <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
+          {data.phase ?? "Phase checkpoint"}
+        </span>
+      </div>
+      {data.summary && (
+        <div className="mx-3 mb-2 whitespace-pre-wrap text-[11px] leading-snug text-gray-600 dark:text-gray-400">
+          {data.summary}
+        </div>
+      )}
+      {(data.artifacts?.length ?? 0) > 0 && (
+        <div className="mx-3 mb-2 text-[11px] text-gray-500 dark:text-gray-500">
+          Artifacts: {data.artifacts!.join(" · ")}
+        </div>
+      )}
+      {expired ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          Expired — the conversation moved on past this checkpoint.
+        </div>
+      ) : verdict ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          {verdict}
+        </div>
+      ) : (
+        <>
+          {mode !== "idle" && (
+            <div className="mx-3 mb-2">
+              <textarea
+                autoFocus
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder={
+                  mode === "revise"
+                    ? "What should change? The phase will be redone with this feedback…"
+                    : "What tweaks should be applied before continuing?"
+                }
+                className="w-full rounded-md border border-black/10 dark:border-white/15 bg-black/[0.03] dark:bg-white/[0.04] px-2 py-1.5 text-[11px] outline-none focus:border-indigo-400/50 min-h-[52px] resize-y"
+              />
+            </div>
+          )}
+          <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
+            {mode === "idle" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => respond("approve")}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+                >
+                  <Check className="h-3 w-3" /> Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("revise")}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <RotateCcw className="h-3 w-3" /> Revise
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMode("tweaks")}
+                  disabled={!onRespond}
+                  className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+                >
+                  <Pencil className="h-3 w-3" /> Approve with tweaks
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => respond(mode, feedback.trim())}
+                  disabled={!onRespond || feedback.trim().length === 0}
+                  className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 hover:bg-indigo-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+                >
+                  <Check className="h-3 w-3" />
+                  {mode === "revise" ? "Send revision" : "Approve with tweaks"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("idle");
+                    setFeedback("");
+                  }}
+                  className="rounded-md px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Approval previews (owner request 2026-07-18: "no JSON, or less JSON") ──
+// Per-tool renderers show the action as it will actually LAND — a note
+// preview for document tools, a graph summary for workflow tools, labeled
+// rows otherwise. Raw JSON stays available in a collapsible <details> so
+// nothing is hidden, just demoted.
+
+const approvalMarkdownComponents: Components = {
+  h1: ({ children }) => (
+    <div className="mt-1.5 text-[12px] font-bold">{children}</div>
+  ),
+  h2: ({ children }) => (
+    <div className="mt-1.5 text-[11.5px] font-bold">{children}</div>
+  ),
+  h3: ({ children }) => (
+    <div className="mt-1 text-[11px] font-semibold">{children}</div>
+  ),
+  p: ({ children }) => <p className="my-1">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="my-1 list-disc pl-4 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-1 list-decimal pl-4 space-y-0.5">{children}</ol>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-black/[0.06] dark:bg-white/[0.08] px-1 text-[10.5px]">
+      {children}
+    </code>
+  ),
+  a: ({ children }) => <span className="underline">{children}</span>,
+  table: ({ children }) => (
+    <table className="my-1 text-[10.5px] border-collapse">{children}</table>
+  ),
+  th: ({ children }) => (
+    <th className="border border-black/10 dark:border-white/10 px-1.5 py-0.5 text-left font-semibold">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border border-black/10 dark:border-white/10 px-1.5 py-0.5">
+      {children}
+    </td>
+  ),
+};
+
+/** Collapsible raw JSON — the honest fallback, demoted not removed. */
+function ApprovalRawJson({ args }: { args: unknown }) {
+  const json = useMemo(() => {
+    if (args === undefined || args === null) return null;
+    try {
+      return typeof args === "string" ? args : JSON.stringify(args, null, 2);
+    } catch {
+      return null;
+    }
+  }, [args]);
+  if (!json) return null;
+  return (
+    <details className="mx-3 mb-2">
+      <summary className="cursor-pointer text-[10.5px] text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 select-none">
+        Raw JSON
+      </summary>
+      <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-black/[0.04] dark:bg-white/[0.05] px-2 py-1.5 text-[11px] leading-snug whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
+        {json}
+      </pre>
+    </details>
+  );
+}
+
+/** Labeled key→value rows for shallow primitive args. */
+function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
+  if (fields.length === 0) return null;
+  return (
+    <div className="mx-3 mb-1.5 space-y-0.5">
+      {fields.map(([label, value]) => (
+        <div key={label} className="flex gap-2 text-[11px]">
+          <span className="shrink-0 w-20 text-gray-500 dark:text-gray-500">
+            {label}
+          </span>
+          <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
+            {value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ApprovalPreview({
+  toolName,
+  args,
+}: {
+  toolName: string;
+  args: unknown;
+}) {
+  const a = (
+    typeof args === "object" && args !== null ? args : {}
+  ) as Record<string, unknown>;
+  const str = (key: string): string | undefined =>
+    typeof a[key] === "string" && (a[key] as string).length > 0
+      ? (a[key] as string)
+      : undefined;
+
+  // Document tools: render the note/document as it will actually look.
+  if (
+    toolName === "createNote" ||
+    toolName === "updateNote" ||
+    toolName === "create_docx"
+  ) {
+    const title = str("title") ?? str("fileName") ?? "(untitled)";
+    const abstract = str("abstract");
+    const content = str("content") ?? str("markdown");
+    return (
+      <>
+        <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2">
+          <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
+            {title}
+            {toolName === "create_docx" && (
+              <span className="ml-1.5 text-[10px] font-normal text-gray-500">
+                .docx
+              </span>
+            )}
+          </div>
+          {abstract && (
+            <div className="mt-0.5 text-[11px] italic text-gray-500 dark:text-gray-400">
+              {abstract}
+            </div>
+          )}
+          {content && (
+            <div className="mt-1.5 max-h-52 overflow-auto border-t border-black/[0.06] dark:border-white/[0.08] pt-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={approvalMarkdownComponents}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
+  // Workflow authoring: graph summary, not the graph JSON.
+  if (toolName === "propose_workflow" || toolName === "update_workflow") {
+    const graph = (
+      typeof a.graph === "object" && a.graph !== null ? a.graph : {}
+    ) as {
+      nodes?: Array<{ id?: string; type?: string; label?: string }>;
+      edges?: unknown[];
+    };
+    const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    const fields: Array<[string, string]> = [];
+    const wfName = str("name") ?? str("newName");
+    if (wfName) fields.push(["Name", wfName]);
+    fields.push([
+      "Engine",
+      str("engine") ??
+        (toolName === "propose_workflow" ? "n8n (default)" : "keeps current"),
+    ]);
+    fields.push([
+      "Shape",
+      `${nodes.length} node${nodes.length === 1 ? "" : "s"} · ${edges.length} connection${edges.length === 1 ? "" : "s"}`,
+    ]);
+    return (
+      <>
+        <ApprovalFieldRows fields={fields} />
+        {nodes.length > 0 && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 max-h-40 overflow-auto">
+            {nodes.map((node, idx) => (
+              <div
+                key={node.id ?? idx}
+                className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
+              >
+                <span className="text-gray-400 dark:text-gray-600">
+                  {idx + 1}.
+                </span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {node.label ?? node.id ?? "node"}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                  {node.type}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
+  // Generic: labeled rows for primitive fields, raw JSON for the rest.
+  const fields: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(a)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      const text = String(value);
+      fields.push([key, text.length > 140 ? `${text.slice(0, 140)}…` : text]);
+    }
+  }
+  const hasComplexArgs = Object.values(a).some(
+    (value) => typeof value === "object" && value !== null,
+  );
+  return (
+    <>
+      <ApprovalFieldRows fields={fields} />
+      {(hasComplexArgs || fields.length === 0) && (
+        <ApprovalRawJson args={args} />
+      )}
+    </>
+  );
+}
+
+function ToolApprovalCard({
+  toolName,
+  args,
+  approvalId,
+  onRespond,
+  expired = false,
+}: {
+  toolName: string;
+  args: unknown;
+  approvalId: string;
+  onRespond?: (opts: {
+    id: string;
+    approved: boolean;
+    reason?: string;
+  }) => void;
+  /** Stale pause (message superseded) — render status, not buttons. */
+  expired?: boolean;
+}) {
+  const [responded, setResponded] = useState<"approved" | "rejected" | null>(
+    null,
+  );
+  const prettyName = toolName.replace(/_/g, " ");
+
+  const respond = (approved: boolean) => {
+    if (responded || !onRespond) return;
+    onRespond({ id: approvalId, approved });
+    setResponded(approved ? "approved" : "rejected");
+  };
+
+  return (
+    <div className="rounded-lg border border-amber-400/40 bg-amber-500/[0.06] text-xs overflow-hidden">
+      <div className="flex items-center gap-2 px-3 py-1.5">
+        <ShieldAlert className="h-3 w-3 shrink-0 text-amber-500" />
+        <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
+          Approval needed: {prettyName}
+        </span>
+      </div>
+      <ApprovalPreview toolName={toolName} args={args} />
+      {expired ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          Expired — this action never ran. Ask again if it&apos;s still wanted.
+        </div>
+      ) : responded === null ? (
+        <div className="flex items-center gap-2 px-3 pb-2">
+          <button
+            type="button"
+            onClick={() => respond(true)}
+            disabled={!onRespond}
+            className="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
+          >
+            <Check className="h-3 w-3" /> Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => respond(false)}
+            disabled={!onRespond}
+            className="inline-flex items-center gap-1 rounded-md border border-black/10 dark:border-white/15 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] disabled:opacity-50 px-2.5 py-1 text-[11px] font-medium text-gray-700 dark:text-gray-300 transition-colors"
+          >
+            <X className="h-3 w-3" /> Reject
+          </button>
+        </div>
+      ) : (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          {responded === "approved" ? "Approved — resuming…" : "Rejected."}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ToolCallBubble({
   toolName,
   toolCallId,
@@ -1668,7 +2236,11 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
   // non-self payloads (a different note got created or updated), the
   // click navigates to that content as before.
   const selectedContentId = useContentStore((s) => s.selectedContentId);
-  const isSelfEdit = selectedContentId === payload.contentId;
+  // Self-edit only applies to the chat's own sidecar NOTES. A workflow
+  // payload matching the open content means the AI updated the workflow
+  // the user is looking at — that's not a notes-panel affair (S6).
+  const isSelfEdit =
+    selectedContentId === payload.contentId && (payload.noun ?? "note") === "note";
 
   const handleClick = useCallback(() => {
     if (isSelfEdit) {
@@ -1686,13 +2258,14 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
   }, [isSelfEdit, payload.contentId]);
 
   const verb = payload.kind === "updated" ? "Updated" : "Created";
+  const noun = payload.noun ?? "note";
   const wordCount =
     typeof payload.wordCount === "number" && payload.wordCount > 0
       ? ` · ${payload.wordCount.toLocaleString()} word${payload.wordCount === 1 ? "" : "s"}`
       : "";
   const subline = isSelfEdit
     ? `${verb} this chat's notes${wordCount} · click to view`
-    : `${verb} note${wordCount} · click to open`;
+    : `${verb} ${noun}${wordCount} · click to open`;
   const tooltipText = isSelfEdit
     ? "View the updated notes for this chat"
     : `Open "${payload.title}"`;
