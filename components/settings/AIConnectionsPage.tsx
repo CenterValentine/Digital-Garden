@@ -729,17 +729,22 @@ function ModelEditor({
 
   const addModel = useCallback(() => {
     if (!newId.trim()) return;
-    setModels([
+    const prev = models;
+    const next = [
       ...models,
       {
         id: newId.trim(),
         name: newName.trim() || newId.trim(),
         capabilities: ["text", "streaming"],
       },
-    ]);
+    ];
+    setModels(next);
+    // Instant persistence — the "+" IS the commit for the model list
+    // (no-op in create mode; the first Save persists everything then).
+    void persistModels(next, prev);
     setNewId("");
     setNewName("");
-  }, [models, newId, newName, setModels]);
+  }, [models, newId, newName, setModels, persistModels]);
 
   /** Click a suggestion → fill both inputs. */
   const pickSuggestion = useCallback(
@@ -753,9 +758,12 @@ function ModelEditor({
 
   const removeModel = useCallback(
     (id: string) => {
-      setModels(models.filter((m) => m.id !== id));
+      const prev = models;
+      const next = models.filter((m) => m.id !== id);
+      setModels(next);
+      void persistModels(next, prev);
     },
-    [models, setModels],
+    [models, setModels, persistModels],
   );
 
   /**
@@ -993,16 +1001,28 @@ function ModelEditor({
                   const checked = models.some((m) => m.id === item.id);
                   const caps = modelCapabilities(item);
                   return (
-                    <label
+                    <div
                       key={item.id}
-                      className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-amber-500/[0.06] cursor-pointer"
+                      className="flex items-center gap-2 px-3 py-1.5 text-xs hover:bg-amber-500/[0.06]"
                     >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => toggleFetchedSelection(item.id)}
-                        aria-label={`Select ${item.id}`}
-                      />
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={checked}
+                        aria-label={`${checked ? "Remove" : "Install"} ${item.id}`}
+                        onClick={() => toggleFetchedSelection(item.id)}
+                        className={`relative h-4 w-7 shrink-0 rounded-full transition-colors cursor-pointer ${
+                          checked
+                            ? "bg-emerald-500/80"
+                            : "bg-black/30 border border-white/15"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-all ${
+                            checked ? "left-3.5" : "left-0.5"
+                          }`}
+                        />
+                      </button>
                       <div className="min-w-0 flex-1">
                         <div className="font-mono text-amber-200 truncate">
                           {item.id}
@@ -1036,7 +1056,7 @@ function ModelEditor({
                           in connection
                         </span>
                       )}
-                    </label>
+                    </div>
                   );
                 })
               )}
