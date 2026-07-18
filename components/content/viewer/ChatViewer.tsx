@@ -543,6 +543,21 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
+  // Mid-run review (v3.1 R1): the run counts as "active" while streaming
+  // AND while parked on an unanswered approval (the stream has ended but
+  // the procedure hasn't — an approval card is waiting). In either state,
+  // artifact cards open in a split pane so review never displaces this
+  // full-page conversation.
+  const parkedOnApproval = useMemo(() => {
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return false;
+    return last.parts.some(
+      (part) =>
+        (part as { state?: string }).state === "approval-requested",
+    );
+  }, [messages]);
+  const midRunPaneOpen = isActive || parkedOnApproval;
+
   // Basic per-run cost meter (S5, catalog F39): sums the token usage the
   // chat route stamps onto assistant message metadata. Client-side only —
   // the data already rides the loaded messages.
@@ -739,6 +754,7 @@ function ChatViewerInner({
                         : undefined
                     }
                     actionsDisabled={isActive}
+                    midRunPaneOpen={midRunPaneOpen}
                   />
                 </div>
               );
