@@ -111,6 +111,7 @@ import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
@@ -757,6 +758,13 @@ export async function POST(request: Request) {
       void result.consumeStream();
 
       return result.toUIMessageStreamResponse({
+        // Continuation awareness (smoke #4 root cause): approval resumes
+        // execute tools whose invocation lives in the LAST assistant
+        // message of the incoming history. Without originalMessages the
+        // stream starts a fresh message, the tool-result chunk finds no
+        // matching invocation, and the response pipe dies mid-stream
+        // (AI_UIMessageStreamError → browser "network error").
+        originalMessages: repairedMessages,
         sendReasoning: true,
         onFinish: async ({ responseMessage, isAborted }) => {
           // Server-side turn persistence + approval notification (S1). Only
@@ -773,8 +781,17 @@ export async function POST(request: Request) {
               .filter((p) => p.type === "text" && typeof p.text === "string")
               .map((p) => p.text as string)
               .join("\n");
+            // Empty/absent ids reach here on some continuation shapes —
+            // "" is not a valid uuid and was failing EVERY server persist
+            // silently (found in smoke #4's server log). Omit → DB
+            // generates.
+            const messageId =
+              typeof responseMessage.id === "string" &&
+              responseMessage.id.length > 0
+                ? responseMessage.id
+                : undefined;
             await appendMessage(session.user.id, conversationIdForAssoc, {
-              id: responseMessage.id,
+              id: messageId,
               role: "assistant",
               providerId,
               modelId,
@@ -784,10 +801,27 @@ export async function POST(request: Request) {
               parentId: null,
             });
           } catch (error) {
-            // P2002 = the client's persist-on-finish already wrote this
-            // message id — the expected outcome when the user stayed on the
-            // chat. Anything else is a real persistence failure.
-            if ((error as { code?: string }).code !== "P2002") {
+            if ((error as { code?: string }).code === "P2002") {
+              // The row exists (client persisted the pre-approval half).
+              // A continuation carries NEW parts under the SAME id — update
+              // the row so post-approval content isn't lost.
+              try {
+                await prisma.conversationMessage.updateMany({
+                  where: {
+                    id: responseMessage.id,
+                    conversation: {
+                      id: conversationIdForAssoc,
+                      ownerId: session.user.id,
+                    },
+                  },
+                  data: {
+                    parts: responseMessage.parts as unknown as Prisma.InputJsonValue,
+                  },
+                });
+              } catch {
+                /* best-effort — client copy remains authoritative */
+              }
+            } else {
               logger.error({
                 layer: "ai",
                 event: "chat:server_persist:failed",
