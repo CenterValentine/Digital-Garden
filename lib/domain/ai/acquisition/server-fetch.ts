@@ -16,8 +16,15 @@ export const SERVER_FETCH_PROVIDER_ID = "server-fetch";
 const FETCH_TIMEOUT_MS = 15_000;
 /** Reject absurd payloads before parsing (jsdom cost scales with input). */
 const MAX_HTML_CHARS = 1_500_000;
-/** Default envelope content cap ≈ 10k tokens; callers may override. */
-const DEFAULT_MAX_CONTENT_CHARS = 40_000;
+/**
+ * Default envelope content cap ≈ 4k tokens. Deliberately tight: tool
+ * results ride EVERY subsequent step of an agent loop, so this number is
+ * the dominant per-step token term — 40k chars at 30k-TPM orgs meant ~3
+ * steps/minute before rate exhaustion (observed in the S4 smoke). A job
+ * posting or article body fits comfortably; callers may override upward,
+ * and the full content is in the garden snapshot when hydration matched.
+ */
+const DEFAULT_MAX_CONTENT_CHARS = 16_000;
 
 const ACCEPTED_CONTENT_TYPES = ["text/html", "application/xhtml", "text/plain"];
 
