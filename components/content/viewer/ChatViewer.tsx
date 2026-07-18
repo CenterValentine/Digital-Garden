@@ -543,6 +543,20 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
+  // Basic per-run cost meter (S5, catalog F39): sums the token usage the
+  // chat route stamps onto assistant message metadata. Client-side only —
+  // the data already rides the loaded messages.
+  const runTokens = useMemo(
+    () =>
+      messages.reduce((sum, m) => {
+        const usage = (
+          m as { metadata?: { usage?: { totalTokens?: number } } }
+        ).metadata?.usage;
+        return sum + (usage?.totalTokens ?? 0);
+      }, 0),
+    [messages],
+  );
+
   // Inline rename (double-click the header title). A local override wins
   // over the loaded title so the change shows instantly; it routes through
   // the conversation PATCH (bound) or the content PATCH (legacy), both of
@@ -663,7 +677,11 @@ function ChatViewerInner({
             )}
             <p className="text-xs text-gray-500">
               {hasMessages
-                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}`
+                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}${
+                    runTokens > 0
+                      ? ` · ~${runTokens >= 1000 ? `${(runTokens / 1000).toFixed(1)}k` : runTokens} tokens`
+                      : ""
+                  }`
                 : "New conversation"}
             </p>
           </div>

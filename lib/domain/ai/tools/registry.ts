@@ -371,7 +371,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           },
           include: {
             notePayload: {
-              select: { searchText: true },
+              select: { searchText: true, metadata: true },
             },
           },
           orderBy: { updatedAt: "desc" },
@@ -406,7 +406,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           },
           include: {
             notePayload: {
-              select: { searchText: true },
+              select: { searchText: true, metadata: true },
             },
           },
         });
@@ -420,7 +420,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
 
         const text = content.notePayload.searchText || "(empty note)";
-        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}\n\nContent:\n${text}`;
+        // Summarize-on-write (S5): abstract first, so multi-phase runs can
+        // often stop reading here instead of pulling full content into
+        // context.
+        const meta = content.notePayload.metadata as
+          | { abstract?: string }
+          | null;
+        const abstractLine = meta?.abstract
+          ? `\nAbstract: ${meta.abstract}\n`
+          : "";
+        return `Title: ${content.title}\nType: ${content.contentType}\nUpdated: ${content.updatedAt.toISOString()}${abstractLine}\nContent:\n${text}`;
       },
     }),
 
@@ -441,6 +450,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .min(1)
           .max(255)
           .describe("Title for the new note"),
+        abstract: z
+          .string()
+          .max(300)
+          .optional()
+          .describe(
+            "1-2 sentence abstract of the note. ALWAYS provide it — later phases and re-reads see the abstract first (summarize-on-write).",
+          ),
         content: z
           .string()
           .optional()
@@ -455,7 +471,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             "Optional UUID of a folder to create the note in. Defaults to the active chat's parent folder. Omit unless the user names a specific folder.",
           ),
       }),
-      execute: async ({ title, content = "", parentId }) => {
+      execute: async ({ title, abstract, content = "", parentId }) => {
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
         //   2. Chat's own parent folder (when in a chat context)
@@ -519,6 +535,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   wordCount,
                   characterCount: searchText.length,
                   readingTime: Math.ceil(wordCount / 200),
+                  // Summarize-on-write (S5): abstract-first re-reads.
+                  ...(abstract ? { abstract } : {}),
                 },
               },
             },
