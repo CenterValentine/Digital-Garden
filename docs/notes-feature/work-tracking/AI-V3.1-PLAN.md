@@ -55,6 +55,10 @@ A playbook turn runs minutes; mid-run artifacts stay invisible.
 - **Gate:** during a single multi-tool turn, created files appear in the
   tree as they're created; an AI `update_workflow` on an open canvas
   surfaces the banner and reloads cleanly when accepted.
+- **BUILT (2026-07-18)** — engine stream-time effect (status-gated,
+  module-level toolCallId dedupe shared with the onFinish backstop) +
+  `dg:workflow-refresh` event + WorkflowBuilder listener with dirty-
+  canvas banner. **Gate pending owner smoke** (batched with R1's).
 
 ## R3 — Model-selection stickiness (review-first, then fix)
 
