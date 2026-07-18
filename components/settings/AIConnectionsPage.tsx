@@ -614,13 +614,6 @@ function ModelEditor({
     Array<{ id: string; name: string; capabilities?: string[] }> | null
   >(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  // Track which fetched-model ids the user has checked for bulk add.
-  // Default-empty: gateways with hundreds of models shouldn't pre-pick
-  // anything (last session's "auto-select missing" produced 273 ✓ out of
-  // 277 — too much). The user explicitly opts in to what they want.
-  const [selectedFetched, setSelectedFetched] = useState<Set<string>>(
-    () => new Set(),
-  );
   // Filter + sort for the fetched list panel. Filter is plain substring
   // match against id + display name; sort cycles asc/desc on id.
   const [fetchedFilter, setFetchedFilter] = useState("");
@@ -674,31 +667,61 @@ function ModelEditor({
   }, [fetchedModels, fetchedFilter, fetchedSort, capabilityFilter]);
 
   /** Count of currently-visible rows that are already selected. */
-  const visibleSelectedCount = useMemo(() => {
-    let n = 0;
-    for (const m of visibleFetched) if (selectedFetched.has(m.id)) n++;
-    return n;
-  }, [visibleFetched, selectedFetched]);
+  /**
+   * Instant persistence (owner directive 2026-07-18): checking a fetched
+   * model adds it to the connection IMMEDIATELY; unchecking removes it.
+   * The old check → "Add selected" → "Save" chain silently lost
+   * selections (saves fired with stale model state) and was a three-step
+   * trap besides. Optimistic local update, targeted PATCH of just
+   * { models }, revert + toast on failure. The dialog's Save button still
+   * owns label/key/URL — the model list no longer waits on it.
+   */
+  const persistModels = useCallback(
+    async (next: ConnectionModel[], prev: ConnectionModel[]) => {
+      if (!connectionId) return;
+      try {
+        const res = await fetch(`/api/ai/connections/${connectionId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ models: next }),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+      } catch {
+        setModels(prev);
+        toast.error("Couldn't update the model list — change reverted");
+      }
+    },
+    [connectionId, setModels],
+  );
 
-  const allVisibleSelected =
+  const allVisiblePresent =
     visibleFetched.length > 0 &&
-    visibleSelectedCount === visibleFetched.length;
+    visibleFetched.every((m) => models.some((mm) => mm.id === m.id));
 
   const toggleAllVisible = useCallback(() => {
-    setSelectedFetched((prev) => {
-      const next = new Set(prev);
-      if (allVisibleSelected) {
-        for (const m of visibleFetched) next.delete(m.id);
-      } else {
-        for (const m of visibleFetched) next.add(m.id);
-      }
-      return next;
-    });
-  }, [allVisibleSelected, visibleFetched]);
+    const prev = models;
+    let next: ConnectionModel[];
+    if (allVisiblePresent) {
+      const visibleIds = new Set(visibleFetched.map((m) => m.id));
+      next = prev.filter((m) => !visibleIds.has(m.id));
+    } else {
+      const existing = new Set(prev.map((m) => m.id));
+      const additions = visibleFetched
+        .filter((m) => !existing.has(m.id))
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          capabilities: m.capabilities ?? ["text", "streaming"],
+        }));
+      next = [...prev, ...additions];
+    }
+    setModels(next);
+    void persistModels(next, prev);
+  }, [allVisiblePresent, visibleFetched, models, setModels, persistModels]);
 
   const closeFetchedPanel = useCallback(() => {
     setFetchedModels(null);
-    setSelectedFetched(new Set());
     setFetchedFilter("");
     setCapabilityFilter(null);
     setFetchedSort("suggested");
@@ -763,8 +786,7 @@ function ModelEditor({
       setFetchedModels(items);
       // Default to empty selection per user direction — pre-picking
       // doesn't scale when a gateway returns 277 models.
-      setSelectedFetched(new Set());
-      setFetchedFilter("");
+        setFetchedFilter("");
       setCapabilityFilter(null);
       setFetchedSort("suggested");
     } catch (e) {
@@ -775,52 +797,27 @@ function ModelEditor({
     }
   }, [canFetchModels, connectionId]);
 
-  /** Add every checked fetched-model entry not already present. */
-  const addSelectedFetched = useCallback(() => {
-    if (!fetchedModels) return;
-    const existing = new Set(models.map((m) => m.id));
-    const additions: ConnectionModel[] = [];
-    for (const item of fetchedModels) {
-      if (!selectedFetched.has(item.id) || existing.has(item.id)) continue;
-      additions.push({
-        id: item.id,
-        name: item.name,
-        // Catalog-augmented entries (image models) ship with their own
-        // capability hints; everything else falls back to the generic
-        // text/streaming default.
-        capabilities: item.capabilities ?? ["text", "streaming"],
-      });
-    }
-    if (additions.length > 0) setModels([...models, ...additions]);
-    setFetchedModels(null);
-    setSelectedFetched(new Set());
-  }, [fetchedModels, models, selectedFetched, setModels]);
-
-  /** Replace the entire model list with the checked fetched-model set. */
-  const replaceWithSelected = useCallback(() => {
-    if (!fetchedModels) return;
-    const replacement: ConnectionModel[] = [];
-    for (const item of fetchedModels) {
-      if (!selectedFetched.has(item.id)) continue;
-      replacement.push({
-        id: item.id,
-        name: item.name,
-        capabilities: item.capabilities ?? ["text", "streaming"],
-      });
-    }
-    setModels(replacement);
-    setFetchedModels(null);
-    setSelectedFetched(new Set());
-  }, [fetchedModels, selectedFetched, setModels]);
-
-  const toggleFetchedSelection = useCallback((id: string) => {
-    setSelectedFetched((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleFetchedSelection = useCallback(
+    (id: string) => {
+      const item = fetchedModels?.find((m) => m.id === id);
+      if (!item) return;
+      const prev = models;
+      const exists = prev.some((m) => m.id === id);
+      const next = exists
+        ? prev.filter((m) => m.id !== id)
+        : [
+            ...prev,
+            {
+              id: item.id,
+              name: item.name,
+              capabilities: item.capabilities ?? ["text", "streaming"],
+            },
+          ];
+      setModels(next);
+      void persistModels(next, prev);
+    },
+    [fetchedModels, models, setModels, persistModels],
+  );
 
   return (
     <Field
@@ -887,7 +884,7 @@ function ModelEditor({
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-amber-500/10">
               <div className="text-[11px] font-medium text-amber-200 uppercase tracking-wide">
                 {fetchedModels.length} models from upstream ·{" "}
-                {selectedFetched.size} selected
+                {models.length} in connection
                 {fetchedFilter && (
                   <span className="ml-1.5 text-amber-300/70 normal-case">
                     · {visibleFetched.length} match
@@ -948,7 +945,7 @@ function ModelEditor({
                 disabled={visibleFetched.length === 0}
                 className="rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {allVisibleSelected ? "Deselect view" : "Select view"}
+                {allVisiblePresent ? "Remove view" : "Add view"}
               </button>
             </div>
 
@@ -993,8 +990,7 @@ function ModelEditor({
                 </div>
               ) : (
                 visibleFetched.map((item) => {
-                  const exists = models.some((m) => m.id === item.id);
-                  const checked = selectedFetched.has(item.id);
+                  const checked = models.some((m) => m.id === item.id);
                   const caps = modelCapabilities(item);
                   return (
                     <label
@@ -1035,9 +1031,9 @@ function ModelEditor({
                           ))}
                         </span>
                       )}
-                      {exists && (
-                        <span className="text-[9px] uppercase tracking-wide text-gray-500 shrink-0">
-                          added
+                      {checked && (
+                        <span className="text-[9px] uppercase tracking-wide text-emerald-400/80 shrink-0">
+                          in connection
                         </span>
                       )}
                     </label>
@@ -1046,23 +1042,9 @@ function ModelEditor({
               )}
             </div>
 
-            {/* Action footer */}
-            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={replaceWithSelected}
-                disabled={selectedFetched.size === 0}
-              >
-                Replace all with selected
-              </Button>
-              <Button
-                size="sm"
-                onClick={addSelectedFetched}
-                disabled={selectedFetched.size === 0}
-              >
-                Add selected ({selectedFetched.size})
-              </Button>
+            {/* Instant-persistence footer (no staging, no save step) */}
+            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10 text-[11px] text-amber-200/70">
+              Checked models are saved to this connection instantly.
             </div>
           </div>
         )}
