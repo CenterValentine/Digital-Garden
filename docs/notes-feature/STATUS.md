@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 16, 2026 (evening)**: References display as CHILDREN of their owning note (branch `worktree-folder-studio`, post-#110 — PR pending)
+
+- Tree model change: `role: "referenced"` nodes with a live `ownedByNoteId` now render under that note in the file tree (notes grow a chevron); references with no owning note stay adjacent to primary content in their folder. **Display-only re-homing** — storage `parentId` remains the folder, so move cascades, folder scans, auto-context BFS, and materialized paths are untouched; implemented as a display-parent redirect in the tree route (owner must be in the same fetch; soft-deleted owners fall back to folder placement).
+- Drag rules: primary content still can NOT be dropped onto a leaf (deliberately not Notion). References CAN be dropped onto a note — the move route re-homes (`ownedByNoteId = note`, storage parent = note's folder); dropping a reference onto a folder or root detaches it from its note.
+- Deletion safety unchanged: ref-counting stays on the ContentLink embed graph, independent of ownership/placement.
+
 **July 16, 2026**: Extension Workflows — capture/supervise workflows from the browser, Phases 0–4 (branch `feature/workflows-extension`, **PR #111** → main; P0–P2 smoke-passed live from portal.telnyx.com)
 
 - **Bearer seam** (`/api/integrations/browser-extension/workflows[...]`): chooser list with URL-glob `matchesPage` (shared `graph/url-match.ts` — one matcher for auto-router + chooser), targeted dispatch (`workflowId` → `dispatchCaptureToWorkflowContent`; both paths persist rendered `pageText` via shared `buildCaptureRunData`), compact runs feed (+`workflowNodeId`, engine family normalized from versioned refs), read-only run detail. Gate resolution stays session-authed in the embed by design.

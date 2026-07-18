@@ -41,6 +41,12 @@ export interface TreeNode {
   title: string;
   slug: string;
   parentId: string | null;
+  /**
+   * Visibility role. "referenced" nodes are owned media/attachments; in the
+   * tree they display as CHILDREN of their owning note (ownedByNoteId), or
+   * adjacent to normal content in their folder when no note owns them.
+   */
+  role?: "primary" | "referenced";
   peopleGroupId?: string | null;
   personId?: string | null;
   displayOrder: number;

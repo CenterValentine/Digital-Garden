@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
               contentType: true,
               role: true,
               parentId: true,
+              ownedByNoteId: true,
               peopleGroupId: true,
               personId: true,
               displayOrder: true,
@@ -262,9 +263,54 @@ export async function GET(request: NextRequest) {
       const nodeMap = new Map<string, ContentTreeNode>();
       const rootNodes: ContentTreeNode[] = [];
 
+      // References display as CHILDREN of their owning note (2026-07-16
+      // model change; previously siblings). Display-only re-homing: storage
+      // parentId stays the folder, so move cascades / folder scans / paths
+      // are untouched. Owner must be in this fetch (a soft-deleted or
+      // filtered-out note falls back to folder placement).
+      const fetchedIds = new Set(allContent.map((item) => item.id));
+
+      // Ownership resolution is two-tier. Explicit ownedByNoteId (Path-A
+      // diagram embeds, drag re-homes) wins; otherwise fall back to the
+      // embed graph — pasted/uploaded media never gets ownedByNoteId, but
+      // syncImageReferences maintains ContentLink image-ref/audio-ref edges
+      // from note bodies on every save. First (oldest) live edge wins when
+      // multiple notes embed the same media. Consequence: an embedded
+      // reference dragged out to a folder re-nests while its embed persists
+      // — it IS still embedded there; full detach applies to non-embedded
+      // references only.
+      const referencedIds = allContent
+        .filter((item) => item.role === "referenced" && !item.ownedByNoteId)
+        .map((item) => item.id);
+      const linkOwnerByTarget = new Map<string, string>();
+      if (referencedIds.length > 0) {
+        const embedLinks = await prisma.contentLink.findMany({
+          where: {
+            targetId: { in: referencedIds },
+            linkType: { in: ["image-ref", "audio-ref"] },
+          },
+          select: { targetId: true, sourceId: true },
+          orderBy: { createdAt: "asc" },
+        });
+        for (const link of embedLinks) {
+          if (!linkOwnerByTarget.has(link.targetId)) {
+            linkOwnerByTarget.set(link.targetId, link.sourceId);
+          }
+        }
+      }
+
       // First pass: Create all nodes
       for (const item of allContent) {
-        const treeParentId = item.parentId
+        const ownerCandidate =
+          item.role === "referenced"
+            ? (item.ownedByNoteId ?? linkOwnerByTarget.get(item.id) ?? null)
+            : null;
+        const referenceOwnerId =
+          ownerCandidate && fetchedIds.has(ownerCandidate)
+            ? ownerCandidate
+            : null;
+        const treeParentId = referenceOwnerId
+          ?? item.parentId
           ?? (item.personId ? `person:${item.personId}` : null)
           ?? (item.peopleGroupId ? `peopleGroup:${item.peopleGroupId}` : null);
         const node: ContentTreeNode = {
