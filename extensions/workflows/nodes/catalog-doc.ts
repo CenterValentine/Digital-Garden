@@ -6,11 +6,13 @@
  */
 
 import { NODE_TYPE_METADATA } from "./metadata";
-import type { NodeConfigField } from "./metadata";
+import type { NodeConfigField, NodeTypeMetadata } from "./metadata";
+import { TRIGGER_TYPE_METADATA } from "./triggers";
 import {
   WORKFLOW_GRAPH_VERSION,
   WDK_INTERPRETER_ENGINE,
 } from "../graph/schema";
+import { jobApplicationGraph } from "../graph/fixtures/job-application";
 
 function renderField(field: NodeConfigField): string {
   const flags: string[] = [field.kind];
@@ -45,12 +47,12 @@ Fields marked "accepts {{templates}}" can reference earlier nodes' outputs
 as \`{{nodeId.outputKey}}\` (e.g. \`{{research.text}}\`, \`{{match.json.score}}\`)
 and the run's input as \`{{input.path}}\`. Number fields never interpolate.
 
-## Node types`,
+## Trigger types (a graph needs EXACTLY ONE, as its entry node)`,
   ];
 
-  for (const node of NODE_TYPE_METADATA) {
+  const renderNode = (node: NodeTypeMetadata, extra?: string): string => {
     const lines = [
-      `### \`${node.id}\` — ${node.label} (${node.execution})`,
+      `### \`${node.id}\` — ${node.label} (${node.execution})${extra ?? ""}`,
       node.description,
     ];
     if (node.fields.length) {
@@ -66,8 +68,35 @@ and the run's input as \`{{input.path}}\`. Number fields never interpolate.
           .join(", ")}`,
       );
     }
-    sections.push(lines.join("\n"));
+    return lines.join("\n");
+  };
+
+  for (const trigger of TRIGGER_TYPE_METADATA) {
+    sections.push(
+      renderNode(
+        trigger,
+        trigger.firing === "stubbed"
+          ? " — automatic firing NOT wired yet; runs start manually"
+          : "",
+      ),
+    );
   }
+
+  sections.push(`## Step & control node types`);
+  for (const node of NODE_TYPE_METADATA) {
+    sections.push(renderNode(node));
+  }
+
+  // Worked example: the real job-application fixture (ships with the app,
+  // validated in production dispatch) — an exemplar can't drift from the
+  // schema because it IS typed against it.
+  sections.push(
+    `## Worked example (a complete, valid graph)\n` +
+      `This graph ships with the app and passes validation as-is — model yours on its structure:\n` +
+      "```json\n" +
+      JSON.stringify(jobApplicationGraph, null, 1) +
+      "\n```",
+  );
 
   return sections.join("\n\n");
 }

@@ -28,6 +28,7 @@ import {
   isDispatchFailure,
 } from "@/extensions/workflows/server/dispatch";
 import { pushWorkflowToN8n } from "@/extensions/workflows/server/engines/n8n/push";
+import { N8N_PAYLOAD_ENGINE } from "@/extensions/workflows/server/engines/n8n/meta";
 import type { ToolExecuteContext } from "./types";
 
 /** Render schema/structural issues in a model-repairable form. */
@@ -48,6 +49,15 @@ function formatGraphIssues(
 }
 
 /**
+ * Payload-engine → user-facing label. Engines are NOT interchangeable
+ * (owner rule 2026-07-18): a workflow is written FOR its engine, and the
+ * AI must keep modifications on the target's engine.
+ */
+function engineLabel(engine: string): "n8n" | "Trellis" {
+  return engine === N8N_PAYLOAD_ENGINE ? "n8n" : "Trellis";
+}
+
+/**
  * Resolve which workflow a tool call refers to. Priority: explicit id >
  * title match > the workflow the user has OPEN (ctx.contentId is the open
  * content node for any non-chat type — set by the chat route). Returns an
@@ -62,6 +72,7 @@ async function resolveWorkflowNode(
       id: string;
       title: string;
       enabled: boolean;
+      engine: string;
       definition: unknown;
     }
   | string
@@ -77,7 +88,7 @@ async function resolveWorkflowNode(
       select: {
         id: true,
         title: true,
-        workflowPayload: { select: { enabled: true, definition: true } },
+        workflowPayload: { select: { enabled: true, engine: true, definition: true } },
       },
     });
     if (!node?.workflowPayload) {
@@ -87,6 +98,7 @@ async function resolveWorkflowNode(
       id: node.id,
       title: node.title,
       enabled: node.workflowPayload.enabled,
+      engine: node.workflowPayload.engine,
       definition: node.workflowPayload.definition,
     };
   }
@@ -103,7 +115,7 @@ async function resolveWorkflowNode(
       select: {
         id: true,
         title: true,
-        workflowPayload: { select: { enabled: true, definition: true } },
+        workflowPayload: { select: { enabled: true, engine: true, definition: true } },
       },
     });
     if (matches.length === 0) {
@@ -123,6 +135,7 @@ async function resolveWorkflowNode(
       id: only.id,
       title: only.title,
       enabled: only.workflowPayload.enabled,
+      engine: only.workflowPayload.engine,
       definition: only.workflowPayload.definition,
     };
   }
@@ -138,7 +151,7 @@ async function resolveWorkflowNode(
       select: {
         id: true,
         title: true,
-        workflowPayload: { select: { enabled: true, definition: true } },
+        workflowPayload: { select: { enabled: true, engine: true, definition: true } },
       },
     });
     if (open?.workflowPayload) {
@@ -146,6 +159,7 @@ async function resolveWorkflowNode(
         id: open.id,
         title: open.title,
         enabled: open.workflowPayload.enabled,
+        engine: open.workflowPayload.engine,
         definition: open.workflowPayload.definition,
       };
     }
@@ -190,7 +204,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
             id: true,
             title: true,
             updatedAt: true,
-            workflowPayload: { select: { enabled: true, definition: true } },
+            workflowPayload: { select: { enabled: true, engine: true, definition: true } },
           },
         });
         if (rows.length === 0) {
@@ -209,7 +223,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
                 )?.type ?? "none")
               : "unreadable-graph";
             const nodeCount = parsed.success ? parsed.data.nodes.length : 0;
-            return `- "${row.title}" (id: ${row.id}) — ${row.workflowPayload?.enabled ? "enabled" : "disabled"}, trigger: ${trigger}, ${nodeCount} node(s), updated ${row.updatedAt.toISOString().slice(0, 10)}`;
+            return `- "${row.title}" (id: ${row.id}) — engine: ${engineLabel(row.workflowPayload?.engine ?? "")}, ${row.workflowPayload?.enabled ? "enabled" : "disabled"}, trigger: ${trigger}, ${nodeCount} node(s), updated ${row.updatedAt.toISOString().slice(0, 10)}`;
           })
           .join("\n");
       },
@@ -247,7 +261,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
               .slice(0, 5)
               .map((issue) => `- ${issue.message}`)
               .join("\n")}`;
-        return `Workflow "${resolved.title}" (id: ${resolved.id}) — ${resolved.enabled ? "enabled" : "disabled"}, validation: ${status}\nGraph:\n${JSON.stringify(parsed.data, null, 1)}`;
+        return `Workflow "${resolved.title}" (id: ${resolved.id}) — engine: ${engineLabel(resolved.engine)}, ${resolved.enabled ? "enabled" : "disabled"}, validation: ${status}\nGraph:\n${JSON.stringify(parsed.data, null, 1)}`;
       },
     }),
 
@@ -256,9 +270,10 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       // approval-gated; the card shows the replacement graph JSON.
       needsApproval: true,
       description:
-        "Replace an existing Trellis workflow's graph with a new version you author — extend it, rewire it, or fix it. " +
+        "Replace an existing workflow's graph with a new version you author — extend it, rewire it, or fix it. " +
         "With no id/name it targets the workflow the user has OPEN: this is the DEFAULT for 'build (on) this workflow' requests, including a blank workflow that only has its trigger yet. " +
-        "ALWAYS call get_workflow first and author the replacement as a modification of what is there (keep existing node ids stable where possible). " +
+        "The update stays on the workflow's CURRENT engine (engines are not interchangeable): n8n-engine workflows are automatically re-pushed so n8n stays in sync; use push_workflow_to_n8n only to CHANGE a Trellis workflow's engine. " +
+        "ALWAYS call get_workflow first (it reports the engine) and author the replacement as a modification of what is there (keep existing node ids stable where possible). " +
         "Supply the COMPLETE graph, not a diff. Validation matches the visual builder; an invalid graph changes nothing.",
       inputSchema: z.object({
         workflowNodeId: z
@@ -317,13 +332,29 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
             "tool-call",
           );
         }
+
+        // Engine fidelity (owner rule): the update stays on the target's
+        // engine. n8n-engine workflows re-push automatically — otherwise
+        // the stored graph and the live n8n workflow silently diverge.
+        let syncNote = "";
+        if (resolved.engine === N8N_PAYLOAD_ENGINE) {
+          try {
+            const pushed = await pushWorkflowToN8n(ctx.userId, resolved.id);
+            syncNote = ` This workflow runs on n8n — the update was re-pushed and is live there (${pushed.n8nUrl}).`;
+          } catch (error) {
+            syncNote = ` WARNING: this workflow runs on n8n but the re-push FAILED (${error instanceof Error ? error.message : "unknown error"}) — n8n still runs the OLD version until push_workflow_to_n8n succeeds. Relay this plainly.`;
+          }
+        }
+
         return JSON.stringify({
           __notePayload: true,
           kind: "updated",
           noun: "workflow",
           contentId: resolved.id,
           title: newName ?? resolved.title,
-          note: "The canvas does NOT live-refresh: if the user has this workflow open they must reopen it to load the new graph before manual edits — saving a stale canvas would overwrite this change. Relay that in one short line.",
+          note:
+            "The canvas does NOT live-refresh: if the user has this workflow open they must reopen it to load the new graph before manual edits — saving a stale canvas would overwrite this change. Relay that in one short line." +
+            syncNote,
         });
       },
     }),
@@ -336,7 +367,8 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       // real review (the S6 gate).
       needsApproval: true,
       description:
-        "Create a NEW Trellis workflow from a graph you author. Call get_workflow_node_catalog FIRST and follow it exactly. " +
+        "Create a NEW workflow from a graph you author, targeting a specific execution engine. ENGINES ARE NOT INTERCHANGEABLE: use the engine the user names; when the user names NONE, the assumed default is n8n. " +
+        "The authoring model is the same graph either way (call get_workflow_node_catalog FIRST and follow it exactly) — the engine determines where it executes; engine \"n8n\" also pushes + activates it on the user's n8n instance. " +
         "If a workflow is OPEN in this chat, prefer update_workflow — the default assumption is that workflow requests are about the open workflow; only create a separate NEW one when the user explicitly wants that or nothing is open. " +
         "Validation runs the same checks as the visual builder (envelope schema, node types, per-node config fields, edge structure); an invalid graph is rejected with repairable issues and nothing is created. " +
         "After creation, tell the user to click the card to review the workflow on the canvas before running it. " +
@@ -352,6 +384,12 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           .describe(
             "The complete workflow graph object per get_workflow_node_catalog: { version, engine, entryNodeId, nodes, edges }.",
           ),
+        engine: z
+          .enum(["n8n", "trellis"])
+          .optional()
+          .describe(
+            "Execution engine. Use the one the user names; when they name none, omit it — n8n is the assumed default.",
+          ),
         parentId: z
           .string()
           .uuid()
@@ -360,7 +398,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
             "Optional folder UUID. Defaults to the chat's target folder. Omit unless the user names a folder.",
           ),
       }),
-      execute: async ({ name, graph, parentId }) => {
+      execute: async ({ name, graph, engine, parentId }) => {
         const parsed = workflowGraphSchema.safeParse(graph);
         if (!parsed.success) {
           return formatGraphIssues(
@@ -429,6 +467,24 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           );
         }
 
+        // Engine targeting (owner rule 2026-07-18): engines are not
+        // interchangeable — n8n is the assumed default when the user
+        // named none. n8n creation = create + push + activate in one
+        // approved action; a failed push leaves an honest Trellis-engine
+        // workflow pending push_workflow_to_n8n, never a silent nothing.
+        const targetEngine = engine ?? "n8n";
+        let engineNote: string;
+        if (targetEngine === "n8n") {
+          try {
+            const pushed = await pushWorkflowToN8n(ctx.userId, node.id);
+            engineNote = `Engine: n8n — pushed and activated (n8n workflow id ${pushed.workflowId}). n8n link to share with the user: ${pushed.n8nUrl}`;
+          } catch (error) {
+            engineNote = `Engine: n8n was requested but the push FAILED (${error instanceof Error ? error.message : "unknown error"}). The workflow exists on the Trellis engine for now — fix the n8n configuration, then push_workflow_to_n8n completes the switch. Relay this plainly; the failure is usually configuration, not the graph.`;
+          }
+        } else {
+          engineNote = "Engine: Trellis (built-in interpreter).";
+        }
+
         // __notePayload with noun renders the clickable open-on-canvas card
         // (same affordance family as createNote).
         return JSON.stringify({
@@ -438,6 +494,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           contentId: node.id,
           title: name,
           parentId: resolvedParentId,
+          note: engineNote,
         });
       },
     }),
@@ -447,10 +504,10 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       // user's external n8n instance and flips the engine — approval-gated.
       needsApproval: true,
       description:
-        "Compile a Trellis workflow's graph to n8n and push it to the user's n8n instance (create or update + activate), switching that workflow's execution engine to n8n. " +
-        "Authoring stays in the Trellis graph model — author/edit with propose_workflow or update_workflow FIRST, then push. Re-pushing after an update syncs the same n8n workflow (idempotent). " +
+        "SWITCH an existing Trellis-engine workflow to the n8n engine (compile → push → activate on the user's n8n instance), or force a re-sync after a failed automatic push. " +
+        "You rarely need this directly: NEW n8n workflows push automatically via propose_workflow (n8n is the default engine), and updates to n8n-engine workflows re-push automatically via update_workflow. " +
         "Every node type compiles: n8n orchestrates, and step nodes call back into the app to execute; gates/delays/branches become native n8n nodes. " +
-        "With no id/name it pushes the workflow the user has OPEN. Use only when the user asks for n8n — Trellis's built-in engine is the default. After pushing, runs still start via run_workflow (same door), they just execute on n8n.",
+        "With no id/name it pushes the workflow the user has OPEN. After pushing, runs still start via run_workflow (same door), they just execute on n8n.",
       inputSchema: z.object({
         workflowNodeId: z
           .string()

@@ -79,7 +79,7 @@ You have tools to read and edit the currently open document.
 function workflowSection(title: string): string {
   return `\
 ## Active Workflow ("${title}")
-The user has this Trellis workflow open on the canvas. DEFAULT ASSUMPTION: workflow requests in this chat are about THIS workflow — call get_workflow with no arguments to read its graph, then update_workflow to modify it (a blank workflow is just its trigger; build it out in place). Create a separate NEW workflow with propose_workflow ONLY when the user explicitly asks for another one.`;
+The user has this workflow open on the canvas. DEFAULT ASSUMPTION: workflow requests in this chat are about THIS workflow — call get_workflow with no arguments to read its graph and its ENGINE, then update_workflow to modify it (a blank workflow is just its trigger; build it out in place). Engines are NOT interchangeable: modifications stay on the workflow's current engine (n8n-engine workflows re-sync to n8n automatically). Create a separate NEW workflow with propose_workflow ONLY when the user explicitly asks for another one — using the engine they name, defaulting to n8n when they name none.`;
 }
 
 // ─── Chat content (full-page chat node) ──────────────────────────────────
