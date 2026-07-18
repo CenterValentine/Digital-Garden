@@ -74,6 +74,16 @@ resolves to the feature-route default.
   silent substitution (straight-faced routing, v3 law).
 - **Gate:** new chat opens on the last explicitly picked model; deleting
   its connection shows unavailable + remedies instead of flipping.
+- **BUILT (6cd7d2d, 2026-07-18) — review confirmed the hypotheses plus a
+  fossil**: explicit picks lived only in the non-persisted session store;
+  the binding's no-stamp fallback flipped blank chats to the SETTINGS
+  default; the hardcoded last-resort was the dead `claude-sonnet-3-5`
+  (the v3 smokes' "sonnet 3.x" mystery — now `claude-sonnet-5`). No code
+  ever auto-flipped on delete; that report was the same fallback after a
+  reload. Fix: persisted `lastExplicit*` slice (partialized; survives
+  reset), `{ explicit }` flag so only user picks write it, chain =
+  stamp > last-explicit > settings. Unservable picks stay selected →
+  MODEL_UNAVAILABLE remedies. **Gate pending batched owner smoke.**
 
 ## R4 — Cost-effective vendor catch-up: Moonshot (Kimi) + DeepSeek
 
