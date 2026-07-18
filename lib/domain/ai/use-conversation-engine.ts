@@ -62,8 +62,34 @@ const COMMAND_HINTS: Record<string, string> = {
  * That keeps the transport pure and side-steps the React Compiler's
  * render-time ref-read prohibition.
  */
+/**
+ * Per-chat baseline request bodies (S4 smoke fix, 2026-07-18).
+ *
+ * The SDK fires INTERNAL requests through the transport WITHOUT the
+ * per-call `sendMessage(msg, { body })` enrichment — the approval
+ * auto-resume (`sendAutomaticallyWhen` → makeRequest) was the
+ * reproducible "network error": a naked resume ran under default
+ * provider resolution with no conversation binding, so the approved
+ * tool executed against the wrong vendor and nothing persisted. Each
+ * engine instance registers a resolver keyed by its useChat id; the
+ * transport merges it UNDER any per-call body (per-call wins).
+ */
+const chatBodyResolvers = new Map<string, () => Record<string, unknown>>();
+
 const chatTransport = new DefaultChatTransport({
   api: "/api/ai/chat",
+  prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
+    // Replicates the SDK's default payload shape, plus the resolver
+    // baseline so internal sends carry the same context as user sends.
+    body: {
+      ...(id ? (chatBodyResolvers.get(id)?.() ?? {}) : {}),
+      ...(body ?? {}),
+      id,
+      messages,
+      trigger,
+      messageId,
+    },
+  }),
 });
 
 /**
@@ -605,6 +631,29 @@ export function useConversationEngine({
     regenerate,
     addToolApprovalResponse,
   } = chat;
+
+  // Keep the transport's baseline body for this chat current. Internal
+  // SDK sends (approval resume, regenerate) read it at request time.
+  useEffect(() => {
+    chatBodyResolvers.set(conversationKey, () => ({
+      contentId,
+      conversationId,
+      contextId: activeContextId ?? null,
+      providerId,
+      modelId,
+      mentionedContentIds: [] as string[],
+    }));
+    return () => {
+      chatBodyResolvers.delete(conversationKey);
+    };
+  }, [
+    conversationKey,
+    contentId,
+    conversationId,
+    activeContextId,
+    providerId,
+    modelId,
+  ]);
   const isActive = status === "streaming" || status === "submitted";
 
   // ── per-message provider + model stamping ──
