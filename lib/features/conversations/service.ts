@@ -659,6 +659,33 @@ export async function softDeleteConversation(
  * Verifies ownership before inserting. Bumps the conversation's
  * `updatedAt` so the sidebar tab ordering reflects recency.
  */
+/**
+ * Update a message's parts in place (AI v3 core S4 — continuation
+ * persistence). Approval resumes EXTEND an already-persisted assistant
+ * message; without this, resolved approvals and post-approval content
+ * evaporate on reload and the pending card resurrects. Ownership-gated
+ * via the conversation join; returns false when nothing matched.
+ */
+export async function updateMessageParts(
+  userId: string,
+  conversationId: string,
+  messageId: string,
+  parts: unknown,
+  textCache?: string | null,
+): Promise<boolean> {
+  const { count } = await prisma.conversationMessage.updateMany({
+    where: {
+      id: messageId,
+      conversation: { id: conversationId, ownerId: userId, deletedAt: null },
+    },
+    data: {
+      parts: parts as Prisma.InputJsonValue,
+      ...(textCache !== undefined && { textCache }),
+    },
+  });
+  return count > 0;
+}
+
 export async function appendMessage(
   userId: string,
   conversationId: string,

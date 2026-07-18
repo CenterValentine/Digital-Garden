@@ -785,11 +785,17 @@ export async function POST(request: Request) {
             // "" is not a valid uuid and was failing EVERY server persist
             // silently (found in smoke #4's server log). Omit → DB
             // generates.
-            const messageId =
+            // Fresh turns carry AI-SDK nanoid ids (not uuids) — the CLIENT
+            // owns their persistence (create + continuation PATCH). Server
+            // create/update only applies to uuid ids, i.e. messages loaded
+            // from history whose client id IS the DB row id.
+            const isUuid =
               typeof responseMessage.id === "string" &&
-              responseMessage.id.length > 0
-                ? responseMessage.id
-                : undefined;
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+                responseMessage.id,
+              );
+            if (isUuid) {
+            const messageId = responseMessage.id;
             await appendMessage(session.user.id, conversationIdForAssoc, {
               id: messageId,
               role: "assistant",
@@ -800,6 +806,7 @@ export async function POST(request: Request) {
               metadata: null,
               parentId: null,
             });
+            }
           } catch (error) {
             if ((error as { code?: string }).code === "P2002") {
               // The row exists (client persisted the pre-approval half).

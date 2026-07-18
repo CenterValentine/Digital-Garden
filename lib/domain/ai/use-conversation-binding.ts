@@ -149,6 +149,10 @@ export function useConversationBinding({
   // get their mapping from the persist response. Used to resolve the
   // truncate anchor for edit/regenerate.
   const dbIdByClientIdRef = useRef<Map<string, string>>(new Map());
+  // Parts signature per saved client id — detects continuations (approval
+  // resumes mutate/extend an already-saved assistant message) so the
+  // persister can PATCH the row instead of skipping it forever.
+  const savedPartsSigRef = useRef<Map<string, number>>(new Map());
   const [loadingInitial, setLoadingInitial] = useState<boolean>(
     Boolean(conversationId),
   );
@@ -177,6 +181,7 @@ export function useConversationBinding({
     if (!conversationId) {
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
+      savedPartsSigRef.current = new Map();
       setLoadingInitial(false);
       setConversationTitle(null);
       setInitialActiveContextId(null);
@@ -195,11 +200,13 @@ export function useConversationBinding({
       skipNextLoadRef.current = false;
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
+      savedPartsSigRef.current = new Map();
       setLoadingInitial(false);
       return;
     }
     savedIdsRef.current = new Set();
     dbIdByClientIdRef.current = new Map();
+    savedPartsSigRef.current = new Map();
     setLoadingInitial(true);
     let cancelled = false;
     (async () => {
@@ -355,7 +362,36 @@ export function useConversationBinding({
     if (!conversationId || messages.length === 0) return;
     for (const m of messages) {
       if (m.role !== "user" && m.role !== "assistant") continue;
-      if (savedIdsRef.current.has(m.id)) continue;
+      if (savedIdsRef.current.has(m.id)) {
+        // Continuation persistence (S4): an approval resume EXTENDS a
+        // saved assistant message (resolved approval state + new parts).
+        // Detect via a parts signature and PATCH the row; a missing
+        // signature (message loaded from history) just sets the baseline.
+        if (m.role !== "assistant") continue;
+        const sig = JSON.stringify(m.parts).length;
+        const prevSig = savedPartsSigRef.current.get(m.id);
+        if (prevSig === undefined) {
+          savedPartsSigRef.current.set(m.id, sig);
+          continue;
+        }
+        if (prevSig === sig) continue;
+        const dbId = dbIdByClientIdRef.current.get(m.id) ?? m.id;
+        try {
+          const res = await fetch(
+            `/api/conversations/${encodeURIComponent(conversationId)}/messages/${encodeURIComponent(dbId)}`,
+            {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ parts: m.parts }),
+            },
+          );
+          if (res.ok) savedPartsSigRef.current.set(m.id, sig);
+        } catch {
+          /* retried on the next finish pass — sig stays stale */
+        }
+        continue;
+      }
       const stamp = getMessageStamp(m.id, { providerId, modelId });
       // Prefer the exact parts the engine sent for a fresh user turn —
       // they reliably include attachment file parts, which AI SDK's
@@ -408,6 +444,7 @@ export function useConversationBinding({
         );
         if (res.ok) {
           savedIdsRef.current.add(m.id);
+          savedPartsSigRef.current.set(m.id, JSON.stringify(m.parts).length);
           // Capture the DB-generated row id so a later edit/regenerate
           // can resolve this session-created message to its DB anchor.
           try {
