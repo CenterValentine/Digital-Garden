@@ -254,8 +254,47 @@ export async function POST(request: Request) {
         }
       }
 
-      if (!activeConnection) {
-        // Last resort before legacy: ask the feature router.
+      // Straight-faced routing (owner decision 2026-07-17): an EXPLICIT
+      // model selection is a contract. If no connection serves it, we say
+      // so — we do NOT silently substitute another vendor (the old
+      // "transition shim" behavior ran gpt-4o under a Sonnet label,
+      // misattributing spend, swapping tools, and surfacing rate-limit
+      // errors from a provider the user never picked). The feature-route
+      // fallback survives ONLY for surfaces that sent no explicit choice.
+      const explicitSelection =
+        typeof body.providerId === "string" || typeof body.modelId === "string";
+
+      if (
+        !activeConnection &&
+        explicitSelection &&
+        typeof body.apiKey !== "string"
+      ) {
+        // Legacy resolver can still serve the selection when the env-level
+        // gateway is configured; otherwise this selection is unservable.
+        if (!isGatewayEnabled()) {
+          const providerLabel =
+            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+            providerId;
+          return Response.json(
+            {
+              success: false,
+              error: {
+                code: "MODEL_UNAVAILABLE",
+                message:
+                  `No connection serves ${providerLabel} · ${modelId}. ` +
+                  `Add a ${providerLabel} API key in Settings → AI → Connections, ` +
+                  `add a gateway connection that lists ${providerId}/${modelId}, ` +
+                  `or pick one of the available (non-greyed) models.`,
+              },
+            },
+            { status: 422 },
+          );
+        }
+      }
+
+      if (!activeConnection && !explicitSelection) {
+        // No explicit pick — the feature router's primary is a genuine
+        // default, not a substitution.
         const primary = await resolvePrimaryRoute(session.user.id, "chat");
         if (primary) {
           activeConnection = primary.connection;
@@ -434,9 +473,20 @@ export async function POST(request: Request) {
         "google",
         "xai",
       ]);
+      // Vendor resolution: direct vendor connections use their preset;
+      // gateway connections serve namespaced models ("anthropic/…") — the
+      // prefix names the vendor that actually executes, and the Vercel AI
+      // Gateway passes provider-defined tools through to it (owner
+      // expectation: the Gateway serves everything; live smoke verifies).
+      const namespacedVendor =
+        activeConnection && activeModelId.includes("/")
+          ? activeModelId.split("/")[0]
+          : null;
       const executedProviderId = activeConnection
-        ? activeConnection.presetId
-        : transport === "direct"
+        ? activeConnection.presetId && NATIVE_TOOL_VENDORS.has(activeConnection.presetId)
+          ? activeConnection.presetId
+          : namespacedVendor
+        : transport === "direct" || transport === "gateway"
           ? providerId
           : null;
       const nativeSearch =
