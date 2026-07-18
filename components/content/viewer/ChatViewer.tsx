@@ -268,6 +268,7 @@ function ChatViewerInner({
     initialActiveContextId,
     initialTargetFolder,
     initialTargetInherited,
+    initialTargetLocation,
   } = useConversationBinding({
       conversationId: conversationId ?? null,
       messages,
@@ -303,8 +304,9 @@ function ChatViewerInner({
         setTargetFolder(next);
         setTargetInherited(false);
       } else {
-        setTargetFolder(initialTargetInherited ? initialTargetFolder : null);
-        setTargetInherited(initialTargetInherited);
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(initialTargetLocation);
+        setTargetInherited(Boolean(initialTargetLocation));
       }
       if (!conversationId) return;
       void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
@@ -314,7 +316,7 @@ function ChatViewerInner({
         body: JSON.stringify({ targetFolderId: next?.id ?? null }),
       }).catch(() => {});
     },
-    [conversationId],
+    [conversationId, initialTargetLocation],
   );
 
   // Persist context changes to the conversation when bound; otherwise hold
@@ -673,6 +675,7 @@ function ChatViewerInner({
           <TargetFolderChip
             target={targetFolder}
             inherited={targetInherited}
+            location={initialTargetLocation}
             disabled={!conversationId}
             onChange={handleTargetChange}
           />

@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { FolderOpen, X, Search } from "lucide-react";
+import { FolderOpen, X, Search, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 interface TreeNodeLite {
@@ -52,6 +52,7 @@ export function TargetFolderChip({
   target,
   disabled = false,
   inherited = false,
+  location = null,
   onChange,
 }: {
   /** Current target — null renders the untargeted state. */
@@ -64,8 +65,18 @@ export function TargetFolderChip({
    * picking here becomes an override.
    */
   inherited?: boolean;
+  /**
+   * The chat's own folder (location), for mismatch signaling (S4a): when
+   * an explicit target differs from where the chat lives, an amber warning
+   * renders so a forgotten override is visible instead of silently
+   * misdirecting output. Null for placeless chats — no warning possible.
+   */
+  location?: { id: string; title: string | null } | null;
   onChange: (target: { id: string; title: string | null } | null) => void;
 }) {
+  const mismatch =
+    !inherited && target !== null && location !== null && target.id !== location.id;
+
   const [open, setOpen] = useState(false);
   const [folders, setFolders] = useState<FlatFolder[] | null>(null);
   const [filter, setFilter] = useState("");
@@ -136,9 +147,11 @@ export function TargetFolderChip({
         title={
           disabled
             ? "Save the chat to set a target folder"
-            : inherited
-              ? "Inherited from this chat's folder — click to override"
-              : "Target folder — new pages and documents from this chat land here"
+            : mismatch
+              ? `Target differs from this chat's folder (${location?.title ?? "its location"}) — outputs go to the target, not the chat's folder`
+              : inherited
+                ? "Inherited from this chat's folder — click to override"
+                : "Target folder — new pages and documents from this chat land here"
         }
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",
@@ -146,12 +159,18 @@ export function TargetFolderChip({
             ? "border-emerald-500/30 bg-emerald-500/[0.07] text-emerald-700 dark:text-emerald-300"
             : "border-black/10 dark:border-white/15 text-gray-500 dark:text-gray-400",
           inherited && "border-dashed",
+          mismatch &&
+            "border-amber-500/40 bg-amber-500/[0.07] text-amber-700 dark:text-amber-300",
           disabled
             ? "opacity-50 cursor-default"
             : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer",
         )}
       >
-        <FolderOpen className="h-3 w-3 shrink-0" />
+        {mismatch ? (
+          <AlertTriangle className="h-3 w-3 shrink-0" />
+        ) : (
+          <FolderOpen className="h-3 w-3 shrink-0" />
+        )}
         <span className="truncate">
           {target ? (target.title ?? "Untitled folder") : "No target"}
         </span>
@@ -193,6 +212,18 @@ export function TargetFolderChip({
               </button>
             ))}
           </div>
+          {mismatch && location && (
+            <button
+              type="button"
+              onClick={() =>
+                select({ id: location.id, title: location.title ?? "", depth: 0 })
+              }
+              className="flex w-full items-center gap-1.5 border-t border-amber-500/20 bg-amber-500/[0.05] px-3 py-1.5 text-amber-700 dark:text-amber-300 hover:bg-amber-500/[0.12]"
+            >
+              <FolderOpen className="h-3 w-3" />
+              Use this chat&apos;s folder ({location.title ?? "parent"})
+            </button>
+          )}
           {target && (
             <button
               type="button"

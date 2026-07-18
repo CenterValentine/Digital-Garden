@@ -45,10 +45,11 @@ export interface ConversationDetail extends ConversationSummary {
   messages: ConversationMessageView[];
   associations: ConversationAssociationView[];
   /**
-   * Location-inferred target (AI v3 core S3 refinement): when the chat is
-   * a ContentNode in a folder and no explicit target is set, the chat's
-   * parent folder serves as the target — chats serve their location. Null
-   * when an explicit target exists or the chat is placeless.
+   * The chat node's LOCATION (its parent folder) — null when the chat is
+   * placeless (sidebar panel, browser). Chats serve their location: with
+   * no explicit target this IS the target; with an explicit target that
+   * differs, surfaces render a mismatch warning (S4a) so a forgotten
+   * override is visible instead of silently misdirecting output.
    */
   inferredTargetFolder: { id: string; title: string | null } | null;
 }

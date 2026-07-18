@@ -197,6 +197,7 @@ export function ChatPanel({
     initialActiveContextId,
     initialTargetFolder,
     initialTargetInherited,
+    initialTargetLocation,
   } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
@@ -238,8 +239,9 @@ export function ChatPanel({
         setTargetFolder(next);
         setTargetInherited(false);
       } else {
-        setTargetFolder(initialTargetInherited ? initialTargetFolder : null);
-        setTargetInherited(initialTargetInherited);
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(initialTargetLocation);
+        setTargetInherited(Boolean(initialTargetLocation));
       }
       if (!conversationId) return;
       void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
@@ -249,7 +251,7 @@ export function ChatPanel({
         body: JSON.stringify({ targetFolderId: next?.id ?? null }),
       }).catch(() => {});
     },
-    [conversationId],
+    [conversationId, initialTargetLocation],
   );
 
   // Change handler: update local state immediately (drives the engine body)
@@ -267,7 +269,7 @@ export function ChatPanel({
         body: JSON.stringify({ activeContextId: id }),
       }).catch(() => {});
     },
-    [conversationId, initialTargetFolder, initialTargetInherited],
+    [conversationId],
   );
 
   // ─── Stage 2: wrap handleSend for transient auto-promote ───
@@ -571,6 +573,7 @@ export function ChatPanel({
           <TargetFolderChip
             target={targetFolder}
             inherited={targetInherited}
+            location={initialTargetLocation}
             disabled={!conversationId}
             onChange={handleTargetChange}
           />

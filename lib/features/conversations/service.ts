@@ -131,10 +131,9 @@ export async function getConversation(
     ...toSummary(row),
     // Chats serve their location: parent folder is the target unless the
     // user set an explicit one (explicit wins; inference fills the gap).
-    inferredTargetFolder:
-      !row.targetFolderId && chatParent
-        ? { id: chatParent.id, title: chatParent.title }
-        : null,
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -228,10 +227,9 @@ export async function createConversation(
     ...toSummary(row),
     // Chats serve their location: parent folder is the target unless the
     // user set an explicit one (explicit wins; inference fills the gap).
-    inferredTargetFolder:
-      !row.targetFolderId && chatParent
-        ? { id: chatParent.id, title: chatParent.title }
-        : null,
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -334,10 +332,9 @@ async function promoteContentNodeToConversation(
     const rereadParent = reread.archivedToContentNode?.parent ?? null;
     return {
       ...toSummary(reread),
-      inferredTargetFolder:
-        !reread.targetFolderId && rereadParent
-          ? { id: rereadParent.id, title: rereadParent.title }
-          : null,
+      inferredTargetFolder: rereadParent
+        ? { id: rereadParent.id, title: rereadParent.title }
+        : null,
       messages: reread.messages.map(toMessageView),
       associations: reread.associations.map(toAssociationView),
     };
@@ -448,10 +445,9 @@ async function promoteContentNodeToConversation(
     ...toSummary(row),
     // Chats serve their location: parent folder is the target unless the
     // user set an explicit one (explicit wins; inference fills the gap).
-    inferredTargetFolder:
-      !row.targetFolderId && chatParent
-        ? { id: chatParent.id, title: chatParent.title }
-        : null,
+    inferredTargetFolder: chatParent
+      ? { id: chatParent.id, title: chatParent.title }
+      : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };

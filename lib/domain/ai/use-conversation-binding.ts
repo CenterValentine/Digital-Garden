@@ -124,6 +124,8 @@ interface UseConversationBindingResult {
   initialTargetFolder: { id: string; title: string | null } | null;
   /** True when the seed came from the chat's location, not an explicit pick. */
   initialTargetInherited: boolean;
+  /** The chat node's parent folder (location) — null when placeless. */
+  initialTargetLocation: { id: string; title: string | null } | null;
 }
 
 export function useConversationBinding({
@@ -161,6 +163,10 @@ export function useConversationBinding({
     title: string | null;
   } | null>(null);
   const [initialTargetInherited, setInitialTargetInherited] = useState(false);
+  const [initialTargetLocation, setInitialTargetLocation] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -176,6 +182,7 @@ export function useConversationBinding({
       setInitialActiveContextId(null);
       setInitialTargetFolder(null);
       setInitialTargetInherited(false);
+      setInitialTargetLocation(null);
       return;
     }
     // Stage 2 — transient promote: when the caller just created this
@@ -247,6 +254,7 @@ export function useConversationBinding({
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
         setInitialActiveContextId(data?.activeContextId ?? null);
+        setInitialTargetLocation(data?.inferredTargetFolder ?? null);
         if (data?.targetFolderId) {
           setInitialTargetFolder({
             id: data.targetFolderId,
@@ -523,5 +531,6 @@ export function useConversationBinding({
     initialActiveContextId,
     initialTargetFolder,
     initialTargetInherited,
+    initialTargetLocation,
   };
 }
