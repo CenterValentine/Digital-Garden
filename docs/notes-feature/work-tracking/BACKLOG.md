@@ -12,7 +12,7 @@ last_updated: 2026-07-18
 
 ## AI v3 Core Followups (2026-07-18, branch `worktree-ai-v3-core`, PR #114)
 
-S1–S6 built; Anthropic + OpenAI flagship runs passed. Deferred by design (owner-requested UX first, engineering polish second):
+S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6 below are now scheduled in `AI-V3.1-PLAN.md` (R1–R3, 2026-07-18); the memory-bank/JIT-retrieval thread is deferred to AI V4 (design discussion captured in that plan's final section).** Deferred by design (owner-requested UX first, engineering polish second):
 
 - [ ] **Mid-run document review disruption** (owner: "the biggest disruption") — reviewing a created artifact mid-playbook navigates away and backtracks the chat. Fix family: review-without-leaving (side pane, peek overlay, or split view). Pairs with the item below.
 - [ ] **Note-card right-click "Open in pane"** (owner request) — open an AI-created note in a secondary pane instead of displacing the current view.
