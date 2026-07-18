@@ -28,6 +28,13 @@ mid-playbook navigates the main panel away and backtracks the chat.
 - **Gate:** run a playbook phase, open the produced note mid-run, verify
   the chat never loses position/draft; approve the next checkpoint
   without re-scrolling.
+- **BUILT (d84b710, 2026-07-18)** — `artifact-open.tsx` (split-pane open
+  targeting the non-active pane, single→dual-vertical upgrade, pinned
+  tab; portaled right-click menu) + NotePayloadCard wiring +
+  ChatViewer's active-or-parked-on-approval detection. Peek overlay
+  DESCOPED from v1: the sidebar chat already survives main-panel
+  navigation, so pane-open covers both surfaces; revisit only if the
+  sidebar smoke shows a need. **Gate pending owner smoke.**
 
 ## R2 — Freshness: stream-time refresh (file tree + canvas)
 
