@@ -407,6 +407,51 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // Coalesce text runs into single render units (v3 ship fix, 2026-07-18):
+  // provider-native web-search answers stream as MANY text parts — the
+  // provider emits a new part per cited span, so bubble-per-part produced
+  // a wall of fragment windows (a lone "." or a bare "- " each in its own
+  // bubble). One logical passage = ONE bubble. Join with "" — the split
+  // points are artificial; the model's own whitespace/newlines live inside
+  // the part texts, so plain concatenation reconstructs the original
+  // markdown. Invisible parts (citation sources, step boundaries) must not
+  // break a run either; only genuinely rendered parts (tools, files,
+  // reasoning) do.
+  type MessagePart = (typeof message.parts)[number];
+  const renderParts = useMemo(() => {
+    const units: Array<{ key: number; part: MessagePart }> = [];
+    let run: { key: number; text: string } | null = null;
+    const flush = () => {
+      if (run !== null) {
+        units.push({
+          key: run.key,
+          part: { type: "text", text: run.text } as MessagePart,
+        });
+        run = null;
+      }
+    };
+    for (let i = 0; i < message.parts.length; i++) {
+      const part = message.parts[i];
+      if (part.type === "text") {
+        const text = (part as { text?: string }).text ?? "";
+        if (run !== null) run.text += text;
+        else run = { key: i, text };
+        continue;
+      }
+      if (
+        part.type === "source-url" ||
+        part.type === "source-document" ||
+        part.type === "step-start"
+      ) {
+        continue;
+      }
+      flush();
+      units.push({ key: i, part });
+    }
+    flush();
+    return units;
+  }, [message.parts]);
+
   // NOTE: tree-refresh + content-updated dispatch for AI note writes
   // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
   // once per AI completion. Putting that logic here (in the render
@@ -504,8 +549,8 @@ export const ChatMessage = memo(function ChatMessage({
           </div>
         ) : (
         <>
-        {/* Render message parts */}
-        {message.parts.map((part, i) => {
+        {/* Render message parts (text runs pre-coalesced — see renderParts) */}
+        {renderParts.map(({ key: i, part }) => {
           // Reasoning / "thinking" parts (Session 6). Routed to a
           // provider-themed renderer keyed on this message's stamped
           // providerId — not the panel's active provider — so branched
