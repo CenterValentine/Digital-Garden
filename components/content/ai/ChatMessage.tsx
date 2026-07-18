@@ -1701,6 +1701,223 @@ function PhaseCheckpointCard({
   );
 }
 
+// ─── Approval previews (owner request 2026-07-18: "no JSON, or less JSON") ──
+// Per-tool renderers show the action as it will actually LAND — a note
+// preview for document tools, a graph summary for workflow tools, labeled
+// rows otherwise. Raw JSON stays available in a collapsible <details> so
+// nothing is hidden, just demoted.
+
+const approvalMarkdownComponents: Components = {
+  h1: ({ children }) => (
+    <div className="mt-1.5 text-[12px] font-bold">{children}</div>
+  ),
+  h2: ({ children }) => (
+    <div className="mt-1.5 text-[11.5px] font-bold">{children}</div>
+  ),
+  h3: ({ children }) => (
+    <div className="mt-1 text-[11px] font-semibold">{children}</div>
+  ),
+  p: ({ children }) => <p className="my-1">{children}</p>,
+  ul: ({ children }) => (
+    <ul className="my-1 list-disc pl-4 space-y-0.5">{children}</ul>
+  ),
+  ol: ({ children }) => (
+    <ol className="my-1 list-decimal pl-4 space-y-0.5">{children}</ol>
+  ),
+  code: ({ children }) => (
+    <code className="rounded bg-black/[0.06] dark:bg-white/[0.08] px-1 text-[10.5px]">
+      {children}
+    </code>
+  ),
+  a: ({ children }) => <span className="underline">{children}</span>,
+  table: ({ children }) => (
+    <table className="my-1 text-[10.5px] border-collapse">{children}</table>
+  ),
+  th: ({ children }) => (
+    <th className="border border-black/10 dark:border-white/10 px-1.5 py-0.5 text-left font-semibold">
+      {children}
+    </th>
+  ),
+  td: ({ children }) => (
+    <td className="border border-black/10 dark:border-white/10 px-1.5 py-0.5">
+      {children}
+    </td>
+  ),
+};
+
+/** Collapsible raw JSON — the honest fallback, demoted not removed. */
+function ApprovalRawJson({ args }: { args: unknown }) {
+  const json = useMemo(() => {
+    if (args === undefined || args === null) return null;
+    try {
+      return typeof args === "string" ? args : JSON.stringify(args, null, 2);
+    } catch {
+      return null;
+    }
+  }, [args]);
+  if (!json) return null;
+  return (
+    <details className="mx-3 mb-2">
+      <summary className="cursor-pointer text-[10.5px] text-gray-500 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 select-none">
+        Raw JSON
+      </summary>
+      <pre className="mt-1 max-h-40 overflow-auto rounded-md bg-black/[0.04] dark:bg-white/[0.05] px-2 py-1.5 text-[11px] leading-snug whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
+        {json}
+      </pre>
+    </details>
+  );
+}
+
+/** Labeled key→value rows for shallow primitive args. */
+function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
+  if (fields.length === 0) return null;
+  return (
+    <div className="mx-3 mb-1.5 space-y-0.5">
+      {fields.map(([label, value]) => (
+        <div key={label} className="flex gap-2 text-[11px]">
+          <span className="shrink-0 w-20 text-gray-500 dark:text-gray-500">
+            {label}
+          </span>
+          <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
+            {value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ApprovalPreview({
+  toolName,
+  args,
+}: {
+  toolName: string;
+  args: unknown;
+}) {
+  const a = (
+    typeof args === "object" && args !== null ? args : {}
+  ) as Record<string, unknown>;
+  const str = (key: string): string | undefined =>
+    typeof a[key] === "string" && (a[key] as string).length > 0
+      ? (a[key] as string)
+      : undefined;
+
+  // Document tools: render the note/document as it will actually look.
+  if (
+    toolName === "createNote" ||
+    toolName === "updateNote" ||
+    toolName === "create_docx"
+  ) {
+    const title = str("title") ?? str("fileName") ?? "(untitled)";
+    const abstract = str("abstract");
+    const content = str("content") ?? str("markdown");
+    return (
+      <>
+        <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-2">
+          <div className="text-[12.5px] font-semibold text-gray-800 dark:text-gray-200">
+            {title}
+            {toolName === "create_docx" && (
+              <span className="ml-1.5 text-[10px] font-normal text-gray-500">
+                .docx
+              </span>
+            )}
+          </div>
+          {abstract && (
+            <div className="mt-0.5 text-[11px] italic text-gray-500 dark:text-gray-400">
+              {abstract}
+            </div>
+          )}
+          {content && (
+            <div className="mt-1.5 max-h-52 overflow-auto border-t border-black/[0.06] dark:border-white/[0.08] pt-1.5 text-[11px] leading-snug text-gray-700 dark:text-gray-300">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={approvalMarkdownComponents}
+              >
+                {content}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
+  // Workflow authoring: graph summary, not the graph JSON.
+  if (toolName === "propose_workflow" || toolName === "update_workflow") {
+    const graph = (
+      typeof a.graph === "object" && a.graph !== null ? a.graph : {}
+    ) as {
+      nodes?: Array<{ id?: string; type?: string; label?: string }>;
+      edges?: unknown[];
+    };
+    const nodes = Array.isArray(graph.nodes) ? graph.nodes : [];
+    const edges = Array.isArray(graph.edges) ? graph.edges : [];
+    const fields: Array<[string, string]> = [];
+    const wfName = str("name") ?? str("newName");
+    if (wfName) fields.push(["Name", wfName]);
+    fields.push([
+      "Engine",
+      str("engine") ??
+        (toolName === "propose_workflow" ? "n8n (default)" : "keeps current"),
+    ]);
+    fields.push([
+      "Shape",
+      `${nodes.length} node${nodes.length === 1 ? "" : "s"} · ${edges.length} connection${edges.length === 1 ? "" : "s"}`,
+    ]);
+    return (
+      <>
+        <ApprovalFieldRows fields={fields} />
+        {nodes.length > 0 && (
+          <div className="mx-3 mb-1.5 rounded-md border border-black/10 dark:border-white/10 bg-white/70 dark:bg-black/25 px-3 py-1.5 max-h-40 overflow-auto">
+            {nodes.map((node, idx) => (
+              <div
+                key={node.id ?? idx}
+                className="flex items-baseline gap-1.5 text-[11px] leading-relaxed"
+              >
+                <span className="text-gray-400 dark:text-gray-600">
+                  {idx + 1}.
+                </span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">
+                  {node.label ?? node.id ?? "node"}
+                </span>
+                <span className="text-[10px] text-gray-500 dark:text-gray-500">
+                  {node.type}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <ApprovalRawJson args={args} />
+      </>
+    );
+  }
+
+  // Generic: labeled rows for primitive fields, raw JSON for the rest.
+  const fields: Array<[string, string]> = [];
+  for (const [key, value] of Object.entries(a)) {
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "boolean"
+    ) {
+      const text = String(value);
+      fields.push([key, text.length > 140 ? `${text.slice(0, 140)}…` : text]);
+    }
+  }
+  const hasComplexArgs = Object.values(a).some(
+    (value) => typeof value === "object" && value !== null,
+  );
+  return (
+    <>
+      <ApprovalFieldRows fields={fields} />
+      {(hasComplexArgs || fields.length === 0) && (
+        <ApprovalRawJson args={args} />
+      )}
+    </>
+  );
+}
+
 function ToolApprovalCard({
   toolName,
   args,
@@ -1724,15 +1941,6 @@ function ToolApprovalCard({
   );
   const prettyName = toolName.replace(/_/g, " ");
 
-  const argsString = useMemo(() => {
-    if (args === undefined || args === null) return null;
-    try {
-      return typeof args === "string" ? args : JSON.stringify(args, null, 2);
-    } catch {
-      return null;
-    }
-  }, [args]);
-
   const respond = (approved: boolean) => {
     if (responded || !onRespond) return;
     onRespond({ id: approvalId, approved });
@@ -1747,11 +1955,7 @@ function ToolApprovalCard({
           Approval needed: {prettyName}
         </span>
       </div>
-      {argsString && (
-        <pre className="mx-3 mb-2 max-h-40 overflow-auto rounded-md bg-black/[0.04] dark:bg-white/[0.05] px-2 py-1.5 text-[11px] leading-snug whitespace-pre-wrap break-words text-gray-600 dark:text-gray-400">
-          {argsString}
-        </pre>
-      )}
+      <ApprovalPreview toolName={toolName} args={args} />
       {expired ? (
         <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
           Expired — this action never ran. Ask again if it&apos;s still wanted.
