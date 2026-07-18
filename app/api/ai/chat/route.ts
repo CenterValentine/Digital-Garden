@@ -90,6 +90,7 @@ import {
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
 import {
   resolvePrimaryRoute,
@@ -505,8 +506,15 @@ export async function POST(request: Request) {
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
       const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      // Repair dangling tool calls BEFORE conversion (S4 smoke finding):
+      // an approval that never executed (network error, user typed past
+      // it) leaves tool_use without tool_result — Anthropic 400s on every
+      // later send, poisoning the conversation. Moved-past pre-output
+      // parts become honest error results; the live last message is
+      // untouched (that's the resume path).
+      const repairedMessages = repairDanglingToolCalls(messages);
       const resolvedMessages = resolveAttachmentsForModel(
-        messages,
+        repairedMessages,
         providerId,
         audioCapable,
       );

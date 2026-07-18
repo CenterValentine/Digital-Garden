@@ -209,6 +209,12 @@ interface ChatMessageProps {
    */
   onToolApprovalResponse?: (opts: { id: string; approved: boolean }) => void;
   /**
+   * False when this message is no longer the conversation's last — a
+   * pending approval that far back can never execute (S4 smoke finding);
+   * the card renders as expired instead of actionable.
+   */
+  approvalActionable?: boolean;
+  /**
    * Regenerate an assistant message (Session 5a). When provided,
    * assistant messages show a hover refresh that re-runs the model.
    */
@@ -239,6 +245,7 @@ export const ChatMessage = memo(function ChatMessage({
   onRevertEdit,
   revertableToolIds,
   onToolApprovalResponse,
+  approvalActionable = true,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -646,7 +653,10 @@ export const ChatMessage = memo(function ChatMessage({
                   toolName={toolPart.toolName}
                   args={toolPart.input}
                   approvalId={toolPart.approvalId}
-                  onRespond={onToolApprovalResponse}
+                  onRespond={
+                    approvalActionable ? onToolApprovalResponse : undefined
+                  }
+                  expired={!approvalActionable}
                 />
               );
             }
@@ -1464,11 +1474,14 @@ function ToolApprovalCard({
   args,
   approvalId,
   onRespond,
+  expired = false,
 }: {
   toolName: string;
   args: unknown;
   approvalId: string;
   onRespond?: (opts: { id: string; approved: boolean }) => void;
+  /** Stale pause (message superseded) — render status, not buttons. */
+  expired?: boolean;
 }) {
   const [responded, setResponded] = useState<"approved" | "rejected" | null>(
     null,
@@ -1503,7 +1516,11 @@ function ToolApprovalCard({
           {argsString}
         </pre>
       )}
-      {responded === null ? (
+      {expired ? (
+        <div className="px-3 pb-2 text-[11px] text-gray-500 dark:text-gray-400">
+          Expired — this action never ran. Ask again if it&apos;s still wanted.
+        </div>
+      ) : responded === null ? (
         <div className="flex items-center gap-2 px-3 pb-2">
           <button
             type="button"
