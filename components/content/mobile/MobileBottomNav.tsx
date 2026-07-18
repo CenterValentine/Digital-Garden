@@ -5,16 +5,15 @@ import { useMobileUiStore } from "@/state/mobile-ui-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useSearchStore } from "@/state/search-store";
+import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
 /**
  * MobileBottomNav — the phone content-IDE tab bar.
  *
  * Four thumb-reachable tabs. Files/Search open the left drawer on the matching
  * view (reusing the real left-panel + search stores); Panel toggles the right
- * drawer (outline / backlinks / AI). "New" currently routes into the Files
- * drawer, where the tree's create affordance lives — a direct create action is
- * a fast follow (the tree's create flow does optimistic nodes + navigation we
- * don't want to duplicate here).
+ * drawer (outline / backlinks / AI); New starts the tree's inline note-create
+ * via the `dg:create-node` window event (no duplicated creation logic).
  *
  * `env(safe-area-inset-bottom)` padding keeps the tabs above the iOS home
  * indicator. Each tab is >= 56px tall to satisfy touch-target guidance.
@@ -40,10 +39,26 @@ export function MobileBottomNav() {
     setOpenDrawer("left");
   };
 
+  // "New" creates a note directly via the tree's own inline-create flow (window
+  // event → LeftSidebar's createTrigger), rather than duplicating its optimistic
+  // node + rename + navigation logic. The drawer opens so the new row and its
+  // name field are visible; warm-up runs synchronously here — inside the tap's
+  // user-activation window — so iOS raises the keyboard for the rename input
+  // that mounts a few frames later.
+  const createNote = () => {
+    warmUpMobileKeyboard();
+    setMode("full");
+    setActiveView("files");
+    setOpenDrawer("left");
+    window.dispatchEvent(
+      new CustomEvent("dg:create-node", { detail: { type: "note" } }),
+    );
+  };
+
   const tabs = [
     { key: "files", label: "Files", Icon: Files, onClick: openFilesDrawer, active: openDrawer === "left" },
     { key: "search", label: "Search", Icon: Search, onClick: openSearchDrawer, active: false },
-    { key: "new", label: "New", Icon: Plus, onClick: openFilesDrawer, active: false },
+    { key: "new", label: "New", Icon: Plus, onClick: createNote, active: false },
     { key: "panel", label: "Panel", Icon: PanelRight, onClick: () => toggleDrawer("right"), active: openDrawer === "right" },
   ] as const;
 

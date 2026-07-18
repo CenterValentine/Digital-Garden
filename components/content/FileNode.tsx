@@ -45,6 +45,7 @@ import {
   User,
   Users,
 } from "lucide-react";
+import { useLongPress } from "@/components/common/useLongPress";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
@@ -371,6 +372,25 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   };
 
   // Handle context menu (right-click)
+  // Touch has no usable `contextmenu` event (iOS long-press raises the native
+  // callout instead), so a long press re-dispatches a synthetic contextmenu at
+  // the touch point — the same trick FileTree uses for its keyboard-driven
+  // create menu. It bubbles into handleContextMenu below, so the menu payload
+  // and all 33 actions stay in one place. Pairs with `touch-callout-none` on
+  // the row so Apple's callout doesn't cover our menu.
+  const longPressHandlers = useLongPress((x, y) => {
+    const target = document.elementFromPoint(x, y);
+    if (!target) return;
+    target.dispatchEvent(
+      new MouseEvent("contextmenu", {
+        bubbles: true,
+        cancelable: true,
+        clientX: x,
+        clientY: y,
+      }),
+    );
+  });
+
   const handleContextMenu = (e: React.MouseEvent) => {
     // Modifier key = pass through to browser's native context menu
     if (e.altKey || e.ctrlKey || e.shiftKey || e.metaKey) return;
@@ -532,6 +552,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       ref={dragHandle}
       style={style}
       className={`
+        touch-callout-none
         flex items-center gap-2 px-2 py-1 cursor-pointer
         transition-colors duration-150
         ${getBackgroundStyle()}
@@ -540,6 +561,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       onClick={handleClick}
       onDoubleClick={handleDoubleClick}
       onContextMenu={handleContextMenu}
+      {...longPressHandlers}
       onDragStart={() => {
         // Record the dragged node so out-of-tree drop targets (the chat
         // composer) can attach it as context. People nodes are synthetic

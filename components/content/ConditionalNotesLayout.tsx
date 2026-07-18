@@ -21,6 +21,8 @@ import NotesNavBar from "@/components/client/nav/NotesNavBar";
 import { ExtensionGlobalDialogs } from "@/lib/extensions/ExtensionGlobalDialogs";
 import { AuthSessionSync } from "./AuthSessionSync";
 import { useIsMobile } from "@/components/common/useIsMobile";
+import { useIsPhone, useIsLandscape } from "@/components/common/useViewport";
+import { useMobileUiStore } from "@/state/mobile-ui-store";
 
 interface ConditionalNotesLayoutProps {
   children: React.ReactNode;
@@ -35,7 +37,20 @@ export function ConditionalNotesLayout({
   glass0,
 }: ConditionalNotesLayoutProps) {
   const pathname = usePathname();
-  const isMobile = useIsMobile();
+  // Engage the single-pane mobile layout for narrow viewports (responsive
+  // desktop windows) AND for phones in any orientation — a landscape phone is
+  // ~844px wide, so the width-only check alone would drop it into the desktop
+  // 3-pane layout. Tablets (shorter side >= 768) stay on desktop.
+  // Both hooks must run unconditionally (rules-of-hooks) — no `||` short-circuit.
+  const isMobileWidth = useIsMobile();
+  const isPhone = useIsPhone();
+  const isMobile = isMobileWidth || isPhone;
+  const isLandscape = useIsLandscape();
+  const focusMode = useMobileUiStore((s) => s.focusMode);
+  const chromePeek = useMobileUiStore((s) => s.chromePeek);
+  // The 56px top nav auto-hides on mobile in focus mode or when a phone is
+  // landscape (reclaiming vertical space); the grab handle peeks it back.
+  const navHidden = isMobile && (focusMode || (isPhone && isLandscape)) && !chromePeek;
   const isFullscreen = pathname?.includes("/fullscreen");
   const isFocusMode = pathname?.includes("/content/focus/");
 
@@ -77,13 +92,16 @@ export function ConditionalNotesLayout({
       <Suspense fallback={null}>
         <AuthSessionSync />
       </Suspense>
-      {/* Notes-specific navbar */}
-      <NotesNavBar />
+      {/* Notes-specific navbar — auto-hides on mobile focus / landscape phone. */}
+      {!navHidden && <NotesNavBar />}
 
-      {/* Main content area */}
+      {/* Main content area. When the nav is hidden the shell reclaims its 56px
+          so the document owns the full dynamic viewport. */}
       <div
         data-notes-layout
-        className="fixed top-[56px] left-0 right-0 h-[calc(100dvh-56px)] flex flex-col overflow-hidden"
+        className={`fixed left-0 right-0 flex flex-col overflow-hidden ${
+          navHidden ? "top-0 h-dvh" : "top-[56px] h-[calc(100dvh-56px)]"
+        }`}
       >
         <DndWrapper>
           {isMobile ? (

@@ -485,6 +485,43 @@ nav[class*="fixed"] {
 }
 
 /* TipTap Editor Styles */
+/* ────────────────────────────────────────────────────────────────────────
+ * touch-callout-none — for surfaces that implement long-press as "right
+ * click" (see components/common/useLongPress.ts, used by the file tree).
+ *
+ * Without this, an iOS long-press raises Apple's own callout / text selection
+ * on top of our context menu — the same collision the editor's BubbleMenu hit.
+ * Safe here because tree rows are labels, not editable text. Deliberately NOT
+ * applied to .ProseMirror, where that callout carries Cut/Copy/Paste.
+ *
+ * user-select is suppressed only on coarse pointers so desktop text selection
+ * is untouched, and re-enabled on inputs so inline rename still works.
+ * ──────────────────────────────────────────────────────────────────────── */
+.touch-callout-none {
+  -webkit-touch-callout: none;
+}
+
+/* Reclaim vertical space on touch devices: the note title header ships desktop
+ * padding (pt-6 pb-4 ≈ 40px) + a drop shadow that eats precious space above the
+ * fold on phones. Shrink it on coarse pointers; the title itself is unchanged. */
+@media (pointer: coarse) {
+  .doc-title-header {
+    padding-top: 0.5rem;
+    padding-bottom: 0.375rem;
+  }
+}
+
+@media (pointer: coarse) {
+  .touch-callout-none {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .touch-callout-none input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+}
+
 .ProseMirror {
   outline: none;
   color: #1a1a1a;
