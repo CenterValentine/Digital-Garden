@@ -192,8 +192,12 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial, initialActiveContextId, initialTargetFolder } =
-    useConversationBinding({
+  const {
+    loadingInitial,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+  } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -221,12 +225,22 @@ export function ChatPanel({
     id: string;
     title: string | null;
   } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
   useEffect(() => {
     setTargetFolder(initialTargetFolder);
-  }, [initialTargetFolder]);
+    setTargetInherited(initialTargetInherited);
+  }, [initialTargetFolder, initialTargetInherited]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
-      setTargetFolder(next);
+      // Explicit pick overrides inheritance; clearing an override falls
+      // back to the location-inferred target (chats serve their location).
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        setTargetFolder(initialTargetInherited ? initialTargetFolder : null);
+        setTargetInherited(initialTargetInherited);
+      }
       if (!conversationId) return;
       void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
         method: "PATCH",
@@ -253,7 +267,7 @@ export function ChatPanel({
         body: JSON.stringify({ activeContextId: id }),
       }).catch(() => {});
     },
-    [conversationId],
+    [conversationId, initialTargetFolder, initialTargetInherited],
   );
 
   // ─── Stage 2: wrap handleSend for transient auto-promote ───
@@ -556,6 +570,7 @@ export function ChatPanel({
           <HeaderTitle providerId={providerId} modelId={modelId} />
           <TargetFolderChip
             target={targetFolder}
+            inherited={targetInherited}
             disabled={!conversationId}
             onChange={handleTargetChange}
           />

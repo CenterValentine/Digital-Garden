@@ -380,9 +380,17 @@ export async function POST(request: Request) {
             ownerId: session.user.id,
             deletedAt: null,
           },
-          select: { targetFolderId: true },
+          select: {
+            targetFolderId: true,
+            // Location inference: chats serve their location — the chat
+            // node's parent folder is the target unless explicitly set.
+            archivedToContentNode: { select: { parentId: true } },
+          },
         });
-        targetFolderId = conv?.targetFolderId ?? undefined;
+        targetFolderId =
+          conv?.targetFolderId ??
+          conv?.archivedToContentNode?.parentId ??
+          undefined;
       }
 
       const toolCtx = {

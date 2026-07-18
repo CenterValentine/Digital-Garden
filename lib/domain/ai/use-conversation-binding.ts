@@ -122,6 +122,8 @@ interface UseConversationBindingResult {
   initialActiveContextId: string | null;
   /** Target folder seed (AI v3 core S3) — {id, title} or null when untargeted. */
   initialTargetFolder: { id: string; title: string | null } | null;
+  /** True when the seed came from the chat's location, not an explicit pick. */
+  initialTargetInherited: boolean;
 }
 
 export function useConversationBinding({
@@ -158,6 +160,7 @@ export function useConversationBinding({
     id: string;
     title: string | null;
   } | null>(null);
+  const [initialTargetInherited, setInitialTargetInherited] = useState(false);
   const triedAutoTitleRef = useRef<string | null>(null);
   const setActiveModelSelection = useAIChatStore(
     (s) => s.setActiveModelSelection,
@@ -172,6 +175,7 @@ export function useConversationBinding({
       setConversationTitle(null);
       setInitialActiveContextId(null);
       setInitialTargetFolder(null);
+      setInitialTargetInherited(false);
       return;
     }
     // Stage 2 — transient promote: when the caller just created this
@@ -237,16 +241,25 @@ export function useConversationBinding({
             activeContextId?: string | null;
             targetFolderId?: string | null;
             targetFolderTitle?: string | null;
+            inferredTargetFolder?: { id: string; title: string | null } | null;
           };
         })?.data;
         const stored = data?.messages ?? [];
         setConversationTitle(data?.title ?? null);
         setInitialActiveContextId(data?.activeContextId ?? null);
-        setInitialTargetFolder(
-          data?.targetFolderId
-            ? { id: data.targetFolderId, title: data.targetFolderTitle ?? null }
-            : null,
-        );
+        if (data?.targetFolderId) {
+          setInitialTargetFolder({
+            id: data.targetFolderId,
+            title: data.targetFolderTitle ?? null,
+          });
+          setInitialTargetInherited(false);
+        } else if (data?.inferredTargetFolder) {
+          setInitialTargetFolder(data.inferredTargetFolder);
+          setInitialTargetInherited(true);
+        } else {
+          setInitialTargetFolder(null);
+          setInitialTargetInherited(false);
+        }
 
         clientLogger.info({
           layer: "ui",
@@ -509,5 +522,6 @@ export function useConversationBinding({
     conversationTitle,
     initialActiveContextId,
     initialTargetFolder,
+    initialTargetInherited,
   };
 }

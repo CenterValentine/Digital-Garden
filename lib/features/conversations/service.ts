@@ -118,13 +118,23 @@ export async function getConversation(
       },
       associations: true,
       targetFolder: { select: { title: true } },
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
     },
   });
 
   if (!row) throw new ConversationNotFoundError(conversationId);
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder:
+      !row.targetFolderId && chatParent
+        ? { id: chatParent.id, title: chatParent.title }
+        : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -190,6 +200,9 @@ export async function createConversation(
     include: {
       messages: true,
       associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
     },
   });
 
@@ -210,8 +223,15 @@ export async function createConversation(
     at: new Date().toISOString(),
   });
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder:
+      !row.targetFolderId && chatParent
+        ? { id: chatParent.id, title: chatParent.title }
+        : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };
@@ -246,7 +266,13 @@ async function promoteContentNodeToConversation(
       ownerId: userId,
       archivedToContentNodeId: fromId,
     },
-    include: { messages: true, associations: true },
+    include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
   });
 
   if (existing) {
@@ -289,7 +315,13 @@ async function promoteContentNodeToConversation(
     }
     const reread = await prisma.conversation.findUniqueOrThrow({
       where: { id: existing.id },
-      include: { messages: true, associations: true },
+      include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
     });
     // Re-pinned an existing promoted chat — surface as a create so any
     // sidebar bound to these content nodes refreshes its tab list.
@@ -299,8 +331,13 @@ async function promoteContentNodeToConversation(
       contentNodeIds: reread.associations.map((a) => a.contentNodeId),
       at: new Date().toISOString(),
     });
+    const rereadParent = reread.archivedToContentNode?.parent ?? null;
     return {
       ...toSummary(reread),
+      inferredTargetFolder:
+        !reread.targetFolderId && rereadParent
+          ? { id: rereadParent.id, title: rereadParent.title }
+          : null,
       messages: reread.messages.map(toMessageView),
       associations: reread.associations.map(toAssociationView),
     };
@@ -378,7 +415,13 @@ async function promoteContentNodeToConversation(
           }
         : undefined,
     },
-    include: { messages: true, associations: true },
+    include: {
+      messages: true,
+      associations: true,
+      archivedToContentNode: {
+        select: { parent: { select: { id: true, title: true } } },
+      },
+    },
   });
 
   logger.info({
@@ -400,8 +443,15 @@ async function promoteContentNodeToConversation(
     at: new Date().toISOString(),
   });
 
+  const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
+    // Chats serve their location: parent folder is the target unless the
+    // user set an explicit one (explicit wins; inference fills the gap).
+    inferredTargetFolder:
+      !row.targetFolderId && chatParent
+        ? { id: chatParent.id, title: chatParent.title }
+        : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
   };

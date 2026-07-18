@@ -51,12 +51,19 @@ function flattenFolders(
 export function TargetFolderChip({
   target,
   disabled = false,
+  inherited = false,
   onChange,
 }: {
   /** Current target — null renders the untargeted state. */
   target: { id: string; title: string | null } | null;
   /** Disabled until the chat is bound to a Conversation entity. */
   disabled?: boolean;
+  /**
+   * True when the target is inferred from the chat's location (its parent
+   * folder) rather than explicitly picked — chats serve their location;
+   * picking here becomes an override.
+   */
+  inherited?: boolean;
   onChange: (target: { id: string; title: string | null } | null) => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -129,13 +136,16 @@ export function TargetFolderChip({
         title={
           disabled
             ? "Save the chat to set a target folder"
-            : "Target folder — new pages and documents from this chat land here"
+            : inherited
+              ? "Inherited from this chat's folder — click to override"
+              : "Target folder — new pages and documents from this chat land here"
         }
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",
           target
             ? "border-emerald-500/30 bg-emerald-500/[0.07] text-emerald-700 dark:text-emerald-300"
             : "border-black/10 dark:border-white/15 text-gray-500 dark:text-gray-400",
+          inherited && "border-dashed",
           disabled
             ? "opacity-50 cursor-default"
             : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer",
@@ -189,7 +199,8 @@ export function TargetFolderChip({
               onClick={() => select(null)}
               className="flex w-full items-center gap-1.5 border-t border-black/5 dark:border-white/10 px-3 py-1.5 text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]"
             >
-              <X className="h-3 w-3" /> Clear target
+              <X className="h-3 w-3" />
+              {inherited ? "Clear" : "Clear target"}
             </button>
           )}
         </div>

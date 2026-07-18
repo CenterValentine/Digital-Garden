@@ -21,10 +21,16 @@ const DEFAULT_MAX_CONTENT_CHARS = 40_000;
 
 const ACCEPTED_CONTENT_TYPES = ["text/html", "application/xhtml", "text/plain"];
 
-export async function serverFetchAcquire(
-  request: AcquireRequest,
-): Promise<AcquiredContent> {
-  const response = await fetch(request.url, {
+/**
+ * Statuses that anti-bot layers emit intermittently for legitimate pages
+ * (GitHub has been observed returning 404 under burst). One retry after a
+ * short pause resolves most of them; a real 404 just 404s again.
+ */
+const RETRYABLE_STATUSES = new Set([404, 429, 500, 502, 503]);
+const RETRY_DELAY_MS = 1200;
+
+async function fetchOnce(url: string): Promise<Response> {
+  return fetch(url, {
     signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     headers: {
       accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.1",
@@ -33,6 +39,16 @@ export async function serverFetchAcquire(
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) DigitalGarden/1.0 (reader)",
     },
   });
+}
+
+export async function serverFetchAcquire(
+  request: AcquireRequest,
+): Promise<AcquiredContent> {
+  let response = await fetchOnce(request.url);
+  if (!response.ok && RETRYABLE_STATUSES.has(response.status)) {
+    await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+    response = await fetchOnce(request.url);
+  }
 
   if (!response.ok) {
     throw new Error(`fetch failed with status ${response.status}`);

@@ -267,6 +267,7 @@ function ChatViewerInner({
     conversationTitle,
     initialActiveContextId,
     initialTargetFolder,
+    initialTargetInherited,
   } = useConversationBinding({
       conversationId: conversationId ?? null,
       messages,
@@ -291,12 +292,20 @@ function ChatViewerInner({
     id: string;
     title: string | null;
   } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
   useEffect(() => {
     setTargetFolder(initialTargetFolder);
-  }, [initialTargetFolder]);
+    setTargetInherited(initialTargetInherited);
+  }, [initialTargetFolder, initialTargetInherited]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
-      setTargetFolder(next);
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        setTargetFolder(initialTargetInherited ? initialTargetFolder : null);
+        setTargetInherited(initialTargetInherited);
+      }
       if (!conversationId) return;
       void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
         method: "PATCH",
@@ -663,6 +672,7 @@ function ChatViewerInner({
         <div className="flex flex-wrap items-center gap-2">
           <TargetFolderChip
             target={targetFolder}
+            inherited={targetInherited}
             disabled={!conversationId}
             onChange={handleTargetChange}
           />
