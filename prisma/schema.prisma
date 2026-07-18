@@ -1689,9 +1689,37 @@ model Tenant {
   publicPaths         PublicPath[]
   publicItems         PublicItem[]
   publicPathRedirects PublicPathRedirect[]
+  sitePages           SitePage[]
   primaryForUsers     User[]               @relation("PrimaryTenantOfUser")
 
   @@index([ownerId])
+}
+
+/// A composed, owner-governed page of a tenant's public site (Work/Results,
+/// Field Notes, etc.). Identity + nav live in columns so the nav and page list
+/// are queryable; `config` holds the section/item composition + presentation
+/// overrides. See lib/domain/page-layout/schema.ts for the config shape.
+model SitePage {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @db.Uuid
+  slug       String   @db.VarChar(120) // "work", "notes", "" = home
+  title      String   @db.VarChar(255)
+  kind       String   @db.VarChar(60) // page chrome/renderer: "record" | "index" | "prose"
+  navLabel   String?  @db.VarChar(120) // null = not in nav
+  navOrder   Int      @default(0)
+  visibility String   @default("draft") // draft | published
+  config     Json     @default("{}")
+  // Pending composer edits. null = no unpublished changes. "Publish changes"
+  // copies draftConfig -> config and clears this. Draft preview reads
+  // draftConfig ?? config (owner-only, via ?preview=draft).
+  draftConfig Json?
+  createdAt  DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @db.Timestamptz(6)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, visibility, navOrder])
 }
 
 model TenantHost {

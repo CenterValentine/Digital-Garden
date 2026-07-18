@@ -194,6 +194,24 @@ const SitesIcon = () => (
   </svg>
 );
 
+const SitePagesIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <path d="M3 9h18" />
+    <path d="M9 21V9" />
+  </svg>
+);
+
 const TrashIcon = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -264,6 +282,11 @@ const navItems: NavItem[] = [
     href: "/settings/sites",
     label: "Sites",
     icon: <SitesIcon />,
+  },
+  {
+    href: "/settings/site-pages",
+    label: "Site Pages",
+    icon: <SitePagesIcon />,
   },
   {
     href: "/settings/account",

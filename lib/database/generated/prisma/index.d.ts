@@ -323,6 +323,14 @@ export type CalendarEventAttendee = $Result.DefaultSelection<Prisma.$CalendarEve
  */
 export type Tenant = $Result.DefaultSelection<Prisma.$TenantPayload>
 /**
+ * Model SitePage
+ * A composed, owner-governed page of a tenant's public site (Work/Results,
+ * Field Notes, etc.). Identity + nav live in columns so the nav and page list
+ * are queryable; `config` holds the section/item composition + presentation
+ * overrides. See lib/domain/page-layout/schema.ts for the config shape.
+ */
+export type SitePage = $Result.DefaultSelection<Prisma.$SitePagePayload>
+/**
  * Model TenantHost
  * 
  */
@@ -1520,6 +1528,16 @@ export class PrismaClient<
   get tenant(): Prisma.TenantDelegate<ExtArgs, ClientOptions>;
 
   /**
+   * `prisma.sitePage`: Exposes CRUD operations for the **SitePage** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more SitePages
+    * const sitePages = await prisma.sitePage.findMany()
+    * ```
+    */
+  get sitePage(): Prisma.SitePageDelegate<ExtArgs, ClientOptions>;
+
+  /**
    * `prisma.tenantHost`: Exposes CRUD operations for the **TenantHost** model.
     * Example usage:
     * ```ts
@@ -2153,6 +2171,7 @@ export namespace Prisma {
     CalendarEvent: 'CalendarEvent',
     CalendarEventAttendee: 'CalendarEventAttendee',
     Tenant: 'Tenant',
+    SitePage: 'SitePage',
     TenantHost: 'TenantHost',
     PublicPath: 'PublicPath',
     Series: 'Series',
@@ -2182,7 +2201,7 @@ export namespace Prisma {
       omit: GlobalOmitOptions
     }
     meta: {
-      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload"
+      modelProps: "contentNode" | "periodicNoteIndex" | "flashcardDeck" | "flashcard" | "flashcardReviewAttempt" | "notePayload" | "filePayload" | "htmlPayload" | "codePayload" | "contentHistory" | "contentPath" | "contentLink" | "contentTag" | "trashBin" | "storageProviderConfig" | "user" | "contentWorkspace" | "contentWorkspaceItem" | "category" | "tag" | "viewGrant" | "collaborationDocument" | "collaborationPresence" | "peopleGroup" | "person" | "peopleFileTreeMount" | "personMention" | "session" | "browserExtensionToken" | "browserExtensionInstall" | "bookmarkSyncConnection" | "bookmarkSyncConnectionInstall" | "bookmarkSyncLink" | "webResource" | "webResourceContentLink" | "webResourceViewState" | "account" | "auditLog" | "folderPayload" | "externalPayload" | "chatPayload" | "conversation" | "chatContext" | "conversationMessage" | "conversationAssociation" | "aIConnection" | "aIFeatureRoute" | "visualizationPayload" | "dataPayload" | "hopePayload" | "workflowPayload" | "reusableCategory" | "savedBlock" | "contentTemplate" | "snippet" | "pageTemplate" | "calendarConnection" | "calendarSource" | "calendarEvent" | "calendarEventAttendee" | "tenant" | "sitePage" | "tenantHost" | "publicPath" | "series" | "publicItem" | "publicItemRevision" | "publicPathRedirect" | "previewToken" | "blogPostPayload" | "projectPayload" | "profileSectionPayload" | "caseStudyPayload" | "bookmarkPayload" | "pagePayload" | "mediaItemPayload"
       txIsolationLevel: Prisma.TransactionIsolationLevel
     }
     model: {
@@ -6700,6 +6719,80 @@ export namespace Prisma {
           }
         }
       }
+      SitePage: {
+        payload: Prisma.$SitePagePayload<ExtArgs>
+        fields: Prisma.SitePageFieldRefs
+        operations: {
+          findUnique: {
+            args: Prisma.SitePageFindUniqueArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload> | null
+          }
+          findUniqueOrThrow: {
+            args: Prisma.SitePageFindUniqueOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          findFirst: {
+            args: Prisma.SitePageFindFirstArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload> | null
+          }
+          findFirstOrThrow: {
+            args: Prisma.SitePageFindFirstOrThrowArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          findMany: {
+            args: Prisma.SitePageFindManyArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>[]
+          }
+          create: {
+            args: Prisma.SitePageCreateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          createMany: {
+            args: Prisma.SitePageCreateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          createManyAndReturn: {
+            args: Prisma.SitePageCreateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>[]
+          }
+          delete: {
+            args: Prisma.SitePageDeleteArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          update: {
+            args: Prisma.SitePageUpdateArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          deleteMany: {
+            args: Prisma.SitePageDeleteManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateMany: {
+            args: Prisma.SitePageUpdateManyArgs<ExtArgs>
+            result: BatchPayload
+          }
+          updateManyAndReturn: {
+            args: Prisma.SitePageUpdateManyAndReturnArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>[]
+          }
+          upsert: {
+            args: Prisma.SitePageUpsertArgs<ExtArgs>
+            result: $Utils.PayloadToResult<Prisma.$SitePagePayload>
+          }
+          aggregate: {
+            args: Prisma.SitePageAggregateArgs<ExtArgs>
+            result: $Utils.Optional<AggregateSitePage>
+          }
+          groupBy: {
+            args: Prisma.SitePageGroupByArgs<ExtArgs>
+            result: $Utils.Optional<SitePageGroupByOutputType>[]
+          }
+          count: {
+            args: Prisma.SitePageCountArgs<ExtArgs>
+            result: $Utils.Optional<SitePageCountAggregateOutputType> | number
+          }
+        }
+      }
       TenantHost: {
         payload: Prisma.$TenantHostPayload<ExtArgs>
         fields: Prisma.TenantHostFieldRefs
@@ -7905,6 +7998,7 @@ export namespace Prisma {
     calendarEvent?: CalendarEventOmit
     calendarEventAttendee?: CalendarEventAttendeeOmit
     tenant?: TenantOmit
+    sitePage?: SitePageOmit
     tenantHost?: TenantHostOmit
     publicPath?: PublicPathOmit
     series?: SeriesOmit
@@ -9392,6 +9486,7 @@ export namespace Prisma {
     publicPaths: number
     publicItems: number
     publicPathRedirects: number
+    sitePages: number
     primaryForUsers: number
   }
 
@@ -9400,6 +9495,7 @@ export namespace Prisma {
     publicPaths?: boolean | TenantCountOutputTypeCountPublicPathsArgs
     publicItems?: boolean | TenantCountOutputTypeCountPublicItemsArgs
     publicPathRedirects?: boolean | TenantCountOutputTypeCountPublicPathRedirectsArgs
+    sitePages?: boolean | TenantCountOutputTypeCountSitePagesArgs
     primaryForUsers?: boolean | TenantCountOutputTypeCountPrimaryForUsersArgs
   }
 
@@ -9440,6 +9536,13 @@ export namespace Prisma {
    */
   export type TenantCountOutputTypeCountPublicPathRedirectsArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     where?: PublicPathRedirectWhereInput
+  }
+
+  /**
+   * TenantCountOutputType without action
+   */
+  export type TenantCountOutputTypeCountSitePagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SitePageWhereInput
   }
 
   /**
@@ -82717,6 +82820,7 @@ export namespace Prisma {
     publicPaths?: boolean | Tenant$publicPathsArgs<ExtArgs>
     publicItems?: boolean | Tenant$publicItemsArgs<ExtArgs>
     publicPathRedirects?: boolean | Tenant$publicPathRedirectsArgs<ExtArgs>
+    sitePages?: boolean | Tenant$sitePagesArgs<ExtArgs>
     primaryForUsers?: boolean | Tenant$primaryForUsersArgs<ExtArgs>
     _count?: boolean | TenantCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["tenant"]>
@@ -82763,6 +82867,7 @@ export namespace Prisma {
     publicPaths?: boolean | Tenant$publicPathsArgs<ExtArgs>
     publicItems?: boolean | Tenant$publicItemsArgs<ExtArgs>
     publicPathRedirects?: boolean | Tenant$publicPathRedirectsArgs<ExtArgs>
+    sitePages?: boolean | Tenant$sitePagesArgs<ExtArgs>
     primaryForUsers?: boolean | Tenant$primaryForUsersArgs<ExtArgs>
     _count?: boolean | TenantCountOutputTypeDefaultArgs<ExtArgs>
   }
@@ -82781,6 +82886,7 @@ export namespace Prisma {
       publicPaths: Prisma.$PublicPathPayload<ExtArgs>[]
       publicItems: Prisma.$PublicItemPayload<ExtArgs>[]
       publicPathRedirects: Prisma.$PublicPathRedirectPayload<ExtArgs>[]
+      sitePages: Prisma.$SitePagePayload<ExtArgs>[]
       primaryForUsers: Prisma.$UserPayload<ExtArgs>[]
     }
     scalars: $Extensions.GetPayloadResult<{
@@ -83191,6 +83297,7 @@ export namespace Prisma {
     publicPaths<T extends Tenant$publicPathsArgs<ExtArgs> = {}>(args?: Subset<T, Tenant$publicPathsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublicPathPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     publicItems<T extends Tenant$publicItemsArgs<ExtArgs> = {}>(args?: Subset<T, Tenant$publicItemsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublicItemPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     publicPathRedirects<T extends Tenant$publicPathRedirectsArgs<ExtArgs> = {}>(args?: Subset<T, Tenant$publicPathRedirectsArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$PublicPathRedirectPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+    sitePages<T extends Tenant$sitePagesArgs<ExtArgs> = {}>(args?: Subset<T, Tenant$sitePagesArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     primaryForUsers<T extends Tenant$primaryForUsersArgs<ExtArgs> = {}>(args?: Subset<T, Tenant$primaryForUsersArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
     /**
      * Attaches callbacks for the resolution and/or rejection of the Promise.
@@ -83721,6 +83828,30 @@ export namespace Prisma {
   }
 
   /**
+   * Tenant.sitePages
+   */
+  export type Tenant$sitePagesArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    where?: SitePageWhereInput
+    orderBy?: SitePageOrderByWithRelationInput | SitePageOrderByWithRelationInput[]
+    cursor?: SitePageWhereUniqueInput
+    take?: number
+    skip?: number
+    distinct?: SitePageScalarFieldEnum | SitePageScalarFieldEnum[]
+  }
+
+  /**
    * Tenant.primaryForUsers
    */
   export type Tenant$primaryForUsersArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
@@ -83760,6 +83891,1181 @@ export namespace Prisma {
      * Choose, which related nodes to fetch as well
      */
     include?: TenantInclude<ExtArgs> | null
+  }
+
+
+  /**
+   * Model SitePage
+   */
+
+  export type AggregateSitePage = {
+    _count: SitePageCountAggregateOutputType | null
+    _avg: SitePageAvgAggregateOutputType | null
+    _sum: SitePageSumAggregateOutputType | null
+    _min: SitePageMinAggregateOutputType | null
+    _max: SitePageMaxAggregateOutputType | null
+  }
+
+  export type SitePageAvgAggregateOutputType = {
+    navOrder: number | null
+  }
+
+  export type SitePageSumAggregateOutputType = {
+    navOrder: number | null
+  }
+
+  export type SitePageMinAggregateOutputType = {
+    id: string | null
+    tenantId: string | null
+    slug: string | null
+    title: string | null
+    kind: string | null
+    navLabel: string | null
+    navOrder: number | null
+    visibility: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SitePageMaxAggregateOutputType = {
+    id: string | null
+    tenantId: string | null
+    slug: string | null
+    title: string | null
+    kind: string | null
+    navLabel: string | null
+    navOrder: number | null
+    visibility: string | null
+    createdAt: Date | null
+    updatedAt: Date | null
+  }
+
+  export type SitePageCountAggregateOutputType = {
+    id: number
+    tenantId: number
+    slug: number
+    title: number
+    kind: number
+    navLabel: number
+    navOrder: number
+    visibility: number
+    config: number
+    draftConfig: number
+    createdAt: number
+    updatedAt: number
+    _all: number
+  }
+
+
+  export type SitePageAvgAggregateInputType = {
+    navOrder?: true
+  }
+
+  export type SitePageSumAggregateInputType = {
+    navOrder?: true
+  }
+
+  export type SitePageMinAggregateInputType = {
+    id?: true
+    tenantId?: true
+    slug?: true
+    title?: true
+    kind?: true
+    navLabel?: true
+    navOrder?: true
+    visibility?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SitePageMaxAggregateInputType = {
+    id?: true
+    tenantId?: true
+    slug?: true
+    title?: true
+    kind?: true
+    navLabel?: true
+    navOrder?: true
+    visibility?: true
+    createdAt?: true
+    updatedAt?: true
+  }
+
+  export type SitePageCountAggregateInputType = {
+    id?: true
+    tenantId?: true
+    slug?: true
+    title?: true
+    kind?: true
+    navLabel?: true
+    navOrder?: true
+    visibility?: true
+    config?: true
+    draftConfig?: true
+    createdAt?: true
+    updatedAt?: true
+    _all?: true
+  }
+
+  export type SitePageAggregateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SitePage to aggregate.
+     */
+    where?: SitePageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SitePages to fetch.
+     */
+    orderBy?: SitePageOrderByWithRelationInput | SitePageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the start position
+     */
+    cursor?: SitePageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SitePages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SitePages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Count returned SitePages
+    **/
+    _count?: true | SitePageCountAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to average
+    **/
+    _avg?: SitePageAvgAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to sum
+    **/
+    _sum?: SitePageSumAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the minimum value
+    **/
+    _min?: SitePageMinAggregateInputType
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/aggregations Aggregation Docs}
+     * 
+     * Select which fields to find the maximum value
+    **/
+    _max?: SitePageMaxAggregateInputType
+  }
+
+  export type GetSitePageAggregateType<T extends SitePageAggregateArgs> = {
+        [P in keyof T & keyof AggregateSitePage]: P extends '_count' | 'count'
+      ? T[P] extends true
+        ? number
+        : GetScalarType<T[P], AggregateSitePage[P]>
+      : GetScalarType<T[P], AggregateSitePage[P]>
+  }
+
+
+
+
+  export type SitePageGroupByArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    where?: SitePageWhereInput
+    orderBy?: SitePageOrderByWithAggregationInput | SitePageOrderByWithAggregationInput[]
+    by: SitePageScalarFieldEnum[] | SitePageScalarFieldEnum
+    having?: SitePageScalarWhereWithAggregatesInput
+    take?: number
+    skip?: number
+    _count?: SitePageCountAggregateInputType | true
+    _avg?: SitePageAvgAggregateInputType
+    _sum?: SitePageSumAggregateInputType
+    _min?: SitePageMinAggregateInputType
+    _max?: SitePageMaxAggregateInputType
+  }
+
+  export type SitePageGroupByOutputType = {
+    id: string
+    tenantId: string
+    slug: string
+    title: string
+    kind: string
+    navLabel: string | null
+    navOrder: number
+    visibility: string
+    config: JsonValue
+    draftConfig: JsonValue | null
+    createdAt: Date
+    updatedAt: Date
+    _count: SitePageCountAggregateOutputType | null
+    _avg: SitePageAvgAggregateOutputType | null
+    _sum: SitePageSumAggregateOutputType | null
+    _min: SitePageMinAggregateOutputType | null
+    _max: SitePageMaxAggregateOutputType | null
+  }
+
+  type GetSitePageGroupByPayload<T extends SitePageGroupByArgs> = Prisma.PrismaPromise<
+    Array<
+      PickEnumerable<SitePageGroupByOutputType, T['by']> &
+        {
+          [P in ((keyof T) & (keyof SitePageGroupByOutputType))]: P extends '_count'
+            ? T[P] extends boolean
+              ? number
+              : GetScalarType<T[P], SitePageGroupByOutputType[P]>
+            : GetScalarType<T[P], SitePageGroupByOutputType[P]>
+        }
+      >
+    >
+
+
+  export type SitePageSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    tenantId?: boolean
+    slug?: boolean
+    title?: boolean
+    kind?: boolean
+    navLabel?: boolean
+    navOrder?: boolean
+    visibility?: boolean
+    config?: boolean
+    draftConfig?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sitePage"]>
+
+  export type SitePageSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    tenantId?: boolean
+    slug?: boolean
+    title?: boolean
+    kind?: boolean
+    navLabel?: boolean
+    navOrder?: boolean
+    visibility?: boolean
+    config?: boolean
+    draftConfig?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sitePage"]>
+
+  export type SitePageSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
+    id?: boolean
+    tenantId?: boolean
+    slug?: boolean
+    title?: boolean
+    kind?: boolean
+    navLabel?: boolean
+    navOrder?: boolean
+    visibility?: boolean
+    config?: boolean
+    draftConfig?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }, ExtArgs["result"]["sitePage"]>
+
+  export type SitePageSelectScalar = {
+    id?: boolean
+    tenantId?: boolean
+    slug?: boolean
+    title?: boolean
+    kind?: boolean
+    navLabel?: boolean
+    navOrder?: boolean
+    visibility?: boolean
+    config?: boolean
+    draftConfig?: boolean
+    createdAt?: boolean
+    updatedAt?: boolean
+  }
+
+  export type SitePageOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "tenantId" | "slug" | "title" | "kind" | "navLabel" | "navOrder" | "visibility" | "config" | "draftConfig" | "createdAt" | "updatedAt", ExtArgs["result"]["sitePage"]>
+  export type SitePageInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }
+  export type SitePageIncludeCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }
+  export type SitePageIncludeUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    tenant?: boolean | TenantDefaultArgs<ExtArgs>
+  }
+
+  export type $SitePagePayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    name: "SitePage"
+    objects: {
+      tenant: Prisma.$TenantPayload<ExtArgs>
+    }
+    scalars: $Extensions.GetPayloadResult<{
+      id: string
+      tenantId: string
+      slug: string
+      title: string
+      kind: string
+      navLabel: string | null
+      navOrder: number
+      visibility: string
+      config: Prisma.JsonValue
+      draftConfig: Prisma.JsonValue | null
+      createdAt: Date
+      updatedAt: Date
+    }, ExtArgs["result"]["sitePage"]>
+    composites: {}
+  }
+
+  type SitePageGetPayload<S extends boolean | null | undefined | SitePageDefaultArgs> = $Result.GetResult<Prisma.$SitePagePayload, S>
+
+  type SitePageCountArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> =
+    Omit<SitePageFindManyArgs, 'select' | 'include' | 'distinct' | 'omit'> & {
+      select?: SitePageCountAggregateInputType | true
+    }
+
+  export interface SitePageDelegate<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> {
+    [K: symbol]: { types: Prisma.TypeMap<ExtArgs>['model']['SitePage'], meta: { name: 'SitePage' } }
+    /**
+     * Find zero or one SitePage that matches the filter.
+     * @param {SitePageFindUniqueArgs} args - Arguments to find a SitePage
+     * @example
+     * // Get one SitePage
+     * const sitePage = await prisma.sitePage.findUnique({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUnique<T extends SitePageFindUniqueArgs>(args: SelectSubset<T, SitePageFindUniqueArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findUnique", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find one SitePage that matches the filter or throw an error with `error.code='P2025'`
+     * if no matches were found.
+     * @param {SitePageFindUniqueOrThrowArgs} args - Arguments to find a SitePage
+     * @example
+     * // Get one SitePage
+     * const sitePage = await prisma.sitePage.findUniqueOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findUniqueOrThrow<T extends SitePageFindUniqueOrThrowArgs>(args: SelectSubset<T, SitePageFindUniqueOrThrowArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SitePage that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageFindFirstArgs} args - Arguments to find a SitePage
+     * @example
+     * // Get one SitePage
+     * const sitePage = await prisma.sitePage.findFirst({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirst<T extends SitePageFindFirstArgs>(args?: SelectSubset<T, SitePageFindFirstArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findFirst", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find the first SitePage that matches the filter or
+     * throw `PrismaKnownClientError` with `P2025` code if no matches were found.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageFindFirstOrThrowArgs} args - Arguments to find a SitePage
+     * @example
+     * // Get one SitePage
+     * const sitePage = await prisma.sitePage.findFirstOrThrow({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     */
+    findFirstOrThrow<T extends SitePageFindFirstOrThrowArgs>(args?: SelectSubset<T, SitePageFindFirstOrThrowArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findFirstOrThrow", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Find zero or more SitePages that matches the filter.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageFindManyArgs} args - Arguments to filter and select certain fields only.
+     * @example
+     * // Get all SitePages
+     * const sitePages = await prisma.sitePage.findMany()
+     * 
+     * // Get first 10 SitePages
+     * const sitePages = await prisma.sitePage.findMany({ take: 10 })
+     * 
+     * // Only select the `id`
+     * const sitePageWithIdOnly = await prisma.sitePage.findMany({ select: { id: true } })
+     * 
+     */
+    findMany<T extends SitePageFindManyArgs>(args?: SelectSubset<T, SitePageFindManyArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "findMany", GlobalOmitOptions>>
+
+    /**
+     * Create a SitePage.
+     * @param {SitePageCreateArgs} args - Arguments to create a SitePage.
+     * @example
+     * // Create one SitePage
+     * const SitePage = await prisma.sitePage.create({
+     *   data: {
+     *     // ... data to create a SitePage
+     *   }
+     * })
+     * 
+     */
+    create<T extends SitePageCreateArgs>(args: SelectSubset<T, SitePageCreateArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "create", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Create many SitePages.
+     * @param {SitePageCreateManyArgs} args - Arguments to create many SitePages.
+     * @example
+     * // Create many SitePages
+     * const sitePage = await prisma.sitePage.createMany({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     *     
+     */
+    createMany<T extends SitePageCreateManyArgs>(args?: SelectSubset<T, SitePageCreateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Create many SitePages and returns the data saved in the database.
+     * @param {SitePageCreateManyAndReturnArgs} args - Arguments to create many SitePages.
+     * @example
+     * // Create many SitePages
+     * const sitePage = await prisma.sitePage.createManyAndReturn({
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Create many SitePages and only return the `id`
+     * const sitePageWithIdOnly = await prisma.sitePage.createManyAndReturn({
+     *   select: { id: true },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    createManyAndReturn<T extends SitePageCreateManyAndReturnArgs>(args?: SelectSubset<T, SitePageCreateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "createManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Delete a SitePage.
+     * @param {SitePageDeleteArgs} args - Arguments to delete one SitePage.
+     * @example
+     * // Delete one SitePage
+     * const SitePage = await prisma.sitePage.delete({
+     *   where: {
+     *     // ... filter to delete one SitePage
+     *   }
+     * })
+     * 
+     */
+    delete<T extends SitePageDeleteArgs>(args: SelectSubset<T, SitePageDeleteArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "delete", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Update one SitePage.
+     * @param {SitePageUpdateArgs} args - Arguments to update one SitePage.
+     * @example
+     * // Update one SitePage
+     * const sitePage = await prisma.sitePage.update({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    update<T extends SitePageUpdateArgs>(args: SelectSubset<T, SitePageUpdateArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "update", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+    /**
+     * Delete zero or more SitePages.
+     * @param {SitePageDeleteManyArgs} args - Arguments to filter SitePages to delete.
+     * @example
+     * // Delete a few SitePages
+     * const { count } = await prisma.sitePage.deleteMany({
+     *   where: {
+     *     // ... provide filter here
+     *   }
+     * })
+     * 
+     */
+    deleteMany<T extends SitePageDeleteManyArgs>(args?: SelectSubset<T, SitePageDeleteManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SitePages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageUpdateManyArgs} args - Arguments to update one or more rows.
+     * @example
+     * // Update many SitePages
+     * const sitePage = await prisma.sitePage.updateMany({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: {
+     *     // ... provide data here
+     *   }
+     * })
+     * 
+     */
+    updateMany<T extends SitePageUpdateManyArgs>(args: SelectSubset<T, SitePageUpdateManyArgs<ExtArgs>>): Prisma.PrismaPromise<BatchPayload>
+
+    /**
+     * Update zero or more SitePages and returns the data updated in the database.
+     * @param {SitePageUpdateManyAndReturnArgs} args - Arguments to update many SitePages.
+     * @example
+     * // Update many SitePages
+     * const sitePage = await prisma.sitePage.updateManyAndReturn({
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * 
+     * // Update zero or more SitePages and only return the `id`
+     * const sitePageWithIdOnly = await prisma.sitePage.updateManyAndReturn({
+     *   select: { id: true },
+     *   where: {
+     *     // ... provide filter here
+     *   },
+     *   data: [
+     *     // ... provide data here
+     *   ]
+     * })
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * 
+     */
+    updateManyAndReturn<T extends SitePageUpdateManyAndReturnArgs>(args: SelectSubset<T, SitePageUpdateManyAndReturnArgs<ExtArgs>>): Prisma.PrismaPromise<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "updateManyAndReturn", GlobalOmitOptions>>
+
+    /**
+     * Create or update one SitePage.
+     * @param {SitePageUpsertArgs} args - Arguments to update or create a SitePage.
+     * @example
+     * // Update or create a SitePage
+     * const sitePage = await prisma.sitePage.upsert({
+     *   create: {
+     *     // ... data to create a SitePage
+     *   },
+     *   update: {
+     *     // ... in case it already exists, update
+     *   },
+     *   where: {
+     *     // ... the filter for the SitePage we want to update
+     *   }
+     * })
+     */
+    upsert<T extends SitePageUpsertArgs>(args: SelectSubset<T, SitePageUpsertArgs<ExtArgs>>): Prisma__SitePageClient<$Result.GetResult<Prisma.$SitePagePayload<ExtArgs>, T, "upsert", GlobalOmitOptions>, never, ExtArgs, GlobalOmitOptions>
+
+
+    /**
+     * Count the number of SitePages.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageCountArgs} args - Arguments to filter SitePages to count.
+     * @example
+     * // Count the number of SitePages
+     * const count = await prisma.sitePage.count({
+     *   where: {
+     *     // ... the filter for the SitePages we want to count
+     *   }
+     * })
+    **/
+    count<T extends SitePageCountArgs>(
+      args?: Subset<T, SitePageCountArgs>,
+    ): Prisma.PrismaPromise<
+      T extends $Utils.Record<'select', any>
+        ? T['select'] extends true
+          ? number
+          : GetScalarType<T['select'], SitePageCountAggregateOutputType>
+        : number
+    >
+
+    /**
+     * Allows you to perform aggregations operations on a SitePage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageAggregateArgs} args - Select which aggregations you would like to apply and on what fields.
+     * @example
+     * // Ordered by age ascending
+     * // Where email contains prisma.io
+     * // Limited to the 10 users
+     * const aggregations = await prisma.user.aggregate({
+     *   _avg: {
+     *     age: true,
+     *   },
+     *   where: {
+     *     email: {
+     *       contains: "prisma.io",
+     *     },
+     *   },
+     *   orderBy: {
+     *     age: "asc",
+     *   },
+     *   take: 10,
+     * })
+    **/
+    aggregate<T extends SitePageAggregateArgs>(args: Subset<T, SitePageAggregateArgs>): Prisma.PrismaPromise<GetSitePageAggregateType<T>>
+
+    /**
+     * Group by SitePage.
+     * Note, that providing `undefined` is treated as the value not being there.
+     * Read more here: https://pris.ly/d/null-undefined
+     * @param {SitePageGroupByArgs} args - Group by arguments.
+     * @example
+     * // Group by city, order by createdAt, get count
+     * const result = await prisma.user.groupBy({
+     *   by: ['city', 'createdAt'],
+     *   orderBy: {
+     *     createdAt: true
+     *   },
+     *   _count: {
+     *     _all: true
+     *   },
+     * })
+     * 
+    **/
+    groupBy<
+      T extends SitePageGroupByArgs,
+      HasSelectOrTake extends Or<
+        Extends<'skip', Keys<T>>,
+        Extends<'take', Keys<T>>
+      >,
+      OrderByArg extends True extends HasSelectOrTake
+        ? { orderBy: SitePageGroupByArgs['orderBy'] }
+        : { orderBy?: SitePageGroupByArgs['orderBy'] },
+      OrderFields extends ExcludeUnderscoreKeys<Keys<MaybeTupleToUnion<T['orderBy']>>>,
+      ByFields extends MaybeTupleToUnion<T['by']>,
+      ByValid extends Has<ByFields, OrderFields>,
+      HavingFields extends GetHavingFields<T['having']>,
+      HavingValid extends Has<ByFields, HavingFields>,
+      ByEmpty extends T['by'] extends never[] ? True : False,
+      InputErrors extends ByEmpty extends True
+      ? `Error: "by" must not be empty.`
+      : HavingValid extends False
+      ? {
+          [P in HavingFields]: P extends ByFields
+            ? never
+            : P extends string
+            ? `Error: Field "${P}" used in "having" needs to be provided in "by".`
+            : [
+                Error,
+                'Field ',
+                P,
+                ` in "having" needs to be provided in "by"`,
+              ]
+        }[HavingFields]
+      : 'take' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "take", you also need to provide "orderBy"'
+      : 'skip' extends Keys<T>
+      ? 'orderBy' extends Keys<T>
+        ? ByValid extends True
+          ? {}
+          : {
+              [P in OrderFields]: P extends ByFields
+                ? never
+                : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+            }[OrderFields]
+        : 'Error: If you provide "skip", you also need to provide "orderBy"'
+      : ByValid extends True
+      ? {}
+      : {
+          [P in OrderFields]: P extends ByFields
+            ? never
+            : `Error: Field "${P}" in "orderBy" needs to be provided in "by"`
+        }[OrderFields]
+    >(args: SubsetIntersection<T, SitePageGroupByArgs, OrderByArg> & InputErrors): {} extends InputErrors ? GetSitePageGroupByPayload<T> : Prisma.PrismaPromise<InputErrors>
+  /**
+   * Fields of the SitePage model
+   */
+  readonly fields: SitePageFieldRefs;
+  }
+
+  /**
+   * The delegate class that acts as a "Promise-like" for SitePage.
+   * Why is this prefixed with `Prisma__`?
+   * Because we want to prevent naming conflicts as mentioned in
+   * https://github.com/prisma/prisma-client-js/issues/707
+   */
+  export interface Prisma__SitePageClient<T, Null = never, ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs, GlobalOmitOptions = {}> extends Prisma.PrismaPromise<T> {
+    readonly [Symbol.toStringTag]: "PrismaPromise"
+    tenant<T extends TenantDefaultArgs<ExtArgs> = {}>(args?: Subset<T, TenantDefaultArgs<ExtArgs>>): Prisma__TenantClient<$Result.GetResult<Prisma.$TenantPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
+    /**
+     * Attaches callbacks for the resolution and/or rejection of the Promise.
+     * @param onfulfilled The callback to execute when the Promise is resolved.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of which ever callback is executed.
+     */
+    then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): $Utils.JsPromise<TResult1 | TResult2>
+    /**
+     * Attaches a callback for only the rejection of the Promise.
+     * @param onrejected The callback to execute when the Promise is rejected.
+     * @returns A Promise for the completion of the callback.
+     */
+    catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): $Utils.JsPromise<T | TResult>
+    /**
+     * Attaches a callback that is invoked when the Promise is settled (fulfilled or rejected). The
+     * resolved value cannot be modified from the callback.
+     * @param onfinally The callback to execute when the Promise is settled (fulfilled or rejected).
+     * @returns A Promise for the completion of the callback.
+     */
+    finally(onfinally?: (() => void) | undefined | null): $Utils.JsPromise<T>
+  }
+
+
+
+
+  /**
+   * Fields of the SitePage model
+   */
+  interface SitePageFieldRefs {
+    readonly id: FieldRef<"SitePage", 'String'>
+    readonly tenantId: FieldRef<"SitePage", 'String'>
+    readonly slug: FieldRef<"SitePage", 'String'>
+    readonly title: FieldRef<"SitePage", 'String'>
+    readonly kind: FieldRef<"SitePage", 'String'>
+    readonly navLabel: FieldRef<"SitePage", 'String'>
+    readonly navOrder: FieldRef<"SitePage", 'Int'>
+    readonly visibility: FieldRef<"SitePage", 'String'>
+    readonly config: FieldRef<"SitePage", 'Json'>
+    readonly draftConfig: FieldRef<"SitePage", 'Json'>
+    readonly createdAt: FieldRef<"SitePage", 'DateTime'>
+    readonly updatedAt: FieldRef<"SitePage", 'DateTime'>
+  }
+    
+
+  // Custom InputTypes
+  /**
+   * SitePage findUnique
+   */
+  export type SitePageFindUniqueArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter, which SitePage to fetch.
+     */
+    where: SitePageWhereUniqueInput
+  }
+
+  /**
+   * SitePage findUniqueOrThrow
+   */
+  export type SitePageFindUniqueOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter, which SitePage to fetch.
+     */
+    where: SitePageWhereUniqueInput
+  }
+
+  /**
+   * SitePage findFirst
+   */
+  export type SitePageFindFirstArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter, which SitePage to fetch.
+     */
+    where?: SitePageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SitePages to fetch.
+     */
+    orderBy?: SitePageOrderByWithRelationInput | SitePageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SitePages.
+     */
+    cursor?: SitePageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SitePages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SitePages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SitePages.
+     */
+    distinct?: SitePageScalarFieldEnum | SitePageScalarFieldEnum[]
+  }
+
+  /**
+   * SitePage findFirstOrThrow
+   */
+  export type SitePageFindFirstOrThrowArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter, which SitePage to fetch.
+     */
+    where?: SitePageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SitePages to fetch.
+     */
+    orderBy?: SitePageOrderByWithRelationInput | SitePageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for searching for SitePages.
+     */
+    cursor?: SitePageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SitePages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SitePages.
+     */
+    skip?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/distinct Distinct Docs}
+     * 
+     * Filter by unique combinations of SitePages.
+     */
+    distinct?: SitePageScalarFieldEnum | SitePageScalarFieldEnum[]
+  }
+
+  /**
+   * SitePage findMany
+   */
+  export type SitePageFindManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter, which SitePages to fetch.
+     */
+    where?: SitePageWhereInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/sorting Sorting Docs}
+     * 
+     * Determine the order of SitePages to fetch.
+     */
+    orderBy?: SitePageOrderByWithRelationInput | SitePageOrderByWithRelationInput[]
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination#cursor-based-pagination Cursor Docs}
+     * 
+     * Sets the position for listing SitePages.
+     */
+    cursor?: SitePageWhereUniqueInput
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Take `±n` SitePages from the position of the cursor.
+     */
+    take?: number
+    /**
+     * {@link https://www.prisma.io/docs/concepts/components/prisma-client/pagination Pagination Docs}
+     * 
+     * Skip the first `n` SitePages.
+     */
+    skip?: number
+    distinct?: SitePageScalarFieldEnum | SitePageScalarFieldEnum[]
+  }
+
+  /**
+   * SitePage create
+   */
+  export type SitePageCreateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * The data needed to create a SitePage.
+     */
+    data: XOR<SitePageCreateInput, SitePageUncheckedCreateInput>
+  }
+
+  /**
+   * SitePage createMany
+   */
+  export type SitePageCreateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to create many SitePages.
+     */
+    data: SitePageCreateManyInput | SitePageCreateManyInput[]
+    skipDuplicates?: boolean
+  }
+
+  /**
+   * SitePage createManyAndReturn
+   */
+  export type SitePageCreateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelectCreateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * The data used to create many SitePages.
+     */
+    data: SitePageCreateManyInput | SitePageCreateManyInput[]
+    skipDuplicates?: boolean
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageIncludeCreateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SitePage update
+   */
+  export type SitePageUpdateArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * The data needed to update a SitePage.
+     */
+    data: XOR<SitePageUpdateInput, SitePageUncheckedUpdateInput>
+    /**
+     * Choose, which SitePage to update.
+     */
+    where: SitePageWhereUniqueInput
+  }
+
+  /**
+   * SitePage updateMany
+   */
+  export type SitePageUpdateManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * The data used to update SitePages.
+     */
+    data: XOR<SitePageUpdateManyMutationInput, SitePageUncheckedUpdateManyInput>
+    /**
+     * Filter which SitePages to update
+     */
+    where?: SitePageWhereInput
+    /**
+     * Limit how many SitePages to update.
+     */
+    limit?: number
+  }
+
+  /**
+   * SitePage updateManyAndReturn
+   */
+  export type SitePageUpdateManyAndReturnArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelectUpdateManyAndReturn<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * The data used to update SitePages.
+     */
+    data: XOR<SitePageUpdateManyMutationInput, SitePageUncheckedUpdateManyInput>
+    /**
+     * Filter which SitePages to update
+     */
+    where?: SitePageWhereInput
+    /**
+     * Limit how many SitePages to update.
+     */
+    limit?: number
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageIncludeUpdateManyAndReturn<ExtArgs> | null
+  }
+
+  /**
+   * SitePage upsert
+   */
+  export type SitePageUpsertArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * The filter to search for the SitePage to update in case it exists.
+     */
+    where: SitePageWhereUniqueInput
+    /**
+     * In case the SitePage found by the `where` argument doesn't exist, create a new SitePage with this data.
+     */
+    create: XOR<SitePageCreateInput, SitePageUncheckedCreateInput>
+    /**
+     * In case the SitePage was found with the provided `where` argument, update it with this data.
+     */
+    update: XOR<SitePageUpdateInput, SitePageUncheckedUpdateInput>
+  }
+
+  /**
+   * SitePage delete
+   */
+  export type SitePageDeleteArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
+    /**
+     * Filter which SitePage to delete.
+     */
+    where: SitePageWhereUniqueInput
+  }
+
+  /**
+   * SitePage deleteMany
+   */
+  export type SitePageDeleteManyArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Filter which SitePages to delete
+     */
+    where?: SitePageWhereInput
+    /**
+     * Limit how many SitePages to delete.
+     */
+    limit?: number
+  }
+
+  /**
+   * SitePage without action
+   */
+  export type SitePageDefaultArgs<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
+    /**
+     * Select specific fields to fetch from the SitePage
+     */
+    select?: SitePageSelect<ExtArgs> | null
+    /**
+     * Omit specific fields from the SitePage
+     */
+    omit?: SitePageOmit<ExtArgs> | null
+    /**
+     * Choose, which related nodes to fetch as well
+     */
+    include?: SitePageInclude<ExtArgs> | null
   }
 
 
@@ -101170,6 +102476,24 @@ export namespace Prisma {
   export type TenantScalarFieldEnum = (typeof TenantScalarFieldEnum)[keyof typeof TenantScalarFieldEnum]
 
 
+  export const SitePageScalarFieldEnum: {
+    id: 'id',
+    tenantId: 'tenantId',
+    slug: 'slug',
+    title: 'title',
+    kind: 'kind',
+    navLabel: 'navLabel',
+    navOrder: 'navOrder',
+    visibility: 'visibility',
+    config: 'config',
+    draftConfig: 'draftConfig',
+    createdAt: 'createdAt',
+    updatedAt: 'updatedAt'
+  };
+
+  export type SitePageScalarFieldEnum = (typeof SitePageScalarFieldEnum)[keyof typeof SitePageScalarFieldEnum]
+
+
   export const TenantHostScalarFieldEnum: {
     host: 'host',
     tenantId: 'tenantId',
@@ -107602,6 +108926,7 @@ export namespace Prisma {
     publicPaths?: PublicPathListRelationFilter
     publicItems?: PublicItemListRelationFilter
     publicPathRedirects?: PublicPathRedirectListRelationFilter
+    sitePages?: SitePageListRelationFilter
     primaryForUsers?: UserListRelationFilter
   }
 
@@ -107619,6 +108944,7 @@ export namespace Prisma {
     publicPaths?: PublicPathOrderByRelationAggregateInput
     publicItems?: PublicItemOrderByRelationAggregateInput
     publicPathRedirects?: PublicPathRedirectOrderByRelationAggregateInput
+    sitePages?: SitePageOrderByRelationAggregateInput
     primaryForUsers?: UserOrderByRelationAggregateInput
   }
 
@@ -107639,6 +108965,7 @@ export namespace Prisma {
     publicPaths?: PublicPathListRelationFilter
     publicItems?: PublicItemListRelationFilter
     publicPathRedirects?: PublicPathRedirectListRelationFilter
+    sitePages?: SitePageListRelationFilter
     primaryForUsers?: UserListRelationFilter
   }, "id" | "slug">
 
@@ -107668,6 +108995,99 @@ export namespace Prisma {
     homeTemplate?: StringNullableWithAggregatesFilter<"Tenant"> | string | null
     createdAt?: DateTimeWithAggregatesFilter<"Tenant"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Tenant"> | Date | string
+  }
+
+  export type SitePageWhereInput = {
+    AND?: SitePageWhereInput | SitePageWhereInput[]
+    OR?: SitePageWhereInput[]
+    NOT?: SitePageWhereInput | SitePageWhereInput[]
+    id?: UuidFilter<"SitePage"> | string
+    tenantId?: UuidFilter<"SitePage"> | string
+    slug?: StringFilter<"SitePage"> | string
+    title?: StringFilter<"SitePage"> | string
+    kind?: StringFilter<"SitePage"> | string
+    navLabel?: StringNullableFilter<"SitePage"> | string | null
+    navOrder?: IntFilter<"SitePage"> | number
+    visibility?: StringFilter<"SitePage"> | string
+    config?: JsonFilter<"SitePage">
+    draftConfig?: JsonNullableFilter<"SitePage">
+    createdAt?: DateTimeFilter<"SitePage"> | Date | string
+    updatedAt?: DateTimeFilter<"SitePage"> | Date | string
+    tenant?: XOR<TenantScalarRelationFilter, TenantWhereInput>
+  }
+
+  export type SitePageOrderByWithRelationInput = {
+    id?: SortOrder
+    tenantId?: SortOrder
+    slug?: SortOrder
+    title?: SortOrder
+    kind?: SortOrder
+    navLabel?: SortOrderInput | SortOrder
+    navOrder?: SortOrder
+    visibility?: SortOrder
+    config?: SortOrder
+    draftConfig?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    tenant?: TenantOrderByWithRelationInput
+  }
+
+  export type SitePageWhereUniqueInput = Prisma.AtLeast<{
+    id?: string
+    tenantId_slug?: SitePageTenantIdSlugCompoundUniqueInput
+    AND?: SitePageWhereInput | SitePageWhereInput[]
+    OR?: SitePageWhereInput[]
+    NOT?: SitePageWhereInput | SitePageWhereInput[]
+    tenantId?: UuidFilter<"SitePage"> | string
+    slug?: StringFilter<"SitePage"> | string
+    title?: StringFilter<"SitePage"> | string
+    kind?: StringFilter<"SitePage"> | string
+    navLabel?: StringNullableFilter<"SitePage"> | string | null
+    navOrder?: IntFilter<"SitePage"> | number
+    visibility?: StringFilter<"SitePage"> | string
+    config?: JsonFilter<"SitePage">
+    draftConfig?: JsonNullableFilter<"SitePage">
+    createdAt?: DateTimeFilter<"SitePage"> | Date | string
+    updatedAt?: DateTimeFilter<"SitePage"> | Date | string
+    tenant?: XOR<TenantScalarRelationFilter, TenantWhereInput>
+  }, "id" | "tenantId_slug">
+
+  export type SitePageOrderByWithAggregationInput = {
+    id?: SortOrder
+    tenantId?: SortOrder
+    slug?: SortOrder
+    title?: SortOrder
+    kind?: SortOrder
+    navLabel?: SortOrderInput | SortOrder
+    navOrder?: SortOrder
+    visibility?: SortOrder
+    config?: SortOrder
+    draftConfig?: SortOrderInput | SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+    _count?: SitePageCountOrderByAggregateInput
+    _avg?: SitePageAvgOrderByAggregateInput
+    _max?: SitePageMaxOrderByAggregateInput
+    _min?: SitePageMinOrderByAggregateInput
+    _sum?: SitePageSumOrderByAggregateInput
+  }
+
+  export type SitePageScalarWhereWithAggregatesInput = {
+    AND?: SitePageScalarWhereWithAggregatesInput | SitePageScalarWhereWithAggregatesInput[]
+    OR?: SitePageScalarWhereWithAggregatesInput[]
+    NOT?: SitePageScalarWhereWithAggregatesInput | SitePageScalarWhereWithAggregatesInput[]
+    id?: UuidWithAggregatesFilter<"SitePage"> | string
+    tenantId?: UuidWithAggregatesFilter<"SitePage"> | string
+    slug?: StringWithAggregatesFilter<"SitePage"> | string
+    title?: StringWithAggregatesFilter<"SitePage"> | string
+    kind?: StringWithAggregatesFilter<"SitePage"> | string
+    navLabel?: StringNullableWithAggregatesFilter<"SitePage"> | string | null
+    navOrder?: IntWithAggregatesFilter<"SitePage"> | number
+    visibility?: StringWithAggregatesFilter<"SitePage"> | string
+    config?: JsonWithAggregatesFilter<"SitePage">
+    draftConfig?: JsonNullableWithAggregatesFilter<"SitePage">
+    createdAt?: DateTimeWithAggregatesFilter<"SitePage"> | Date | string
+    updatedAt?: DateTimeWithAggregatesFilter<"SitePage"> | Date | string
   }
 
   export type TenantHostWhereInput = {
@@ -115026,6 +116446,7 @@ export namespace Prisma {
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -115042,6 +116463,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -115058,6 +116480,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -115074,6 +116497,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -115105,6 +116529,110 @@ export namespace Prisma {
     displayName?: StringFieldUpdateOperationsInput | string
     isPersonal?: BoolFieldUpdateOperationsInput | boolean
     homeTemplate?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageCreateInput = {
+    id?: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    tenant: TenantCreateNestedOneWithoutSitePagesInput
+  }
+
+  export type SitePageUncheckedCreateInput = {
+    id?: string
+    tenantId: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SitePageUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    tenant?: TenantUpdateOneRequiredWithoutSitePagesNestedInput
+  }
+
+  export type SitePageUncheckedUpdateInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tenantId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageCreateManyInput = {
+    id?: string
+    tenantId: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SitePageUpdateManyMutationInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageUncheckedUpdateManyInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    tenantId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
@@ -120704,6 +122232,12 @@ export namespace Prisma {
     none?: TenantHostWhereInput
   }
 
+  export type SitePageListRelationFilter = {
+    every?: SitePageWhereInput
+    some?: SitePageWhereInput
+    none?: SitePageWhereInput
+  }
+
   export type UserListRelationFilter = {
     every?: UserWhereInput
     some?: UserWhereInput
@@ -120711,6 +122245,10 @@ export namespace Prisma {
   }
 
   export type TenantHostOrderByRelationAggregateInput = {
+    _count?: SortOrder
+  }
+
+  export type SitePageOrderByRelationAggregateInput = {
     _count?: SortOrder
   }
 
@@ -120754,6 +122292,60 @@ export namespace Prisma {
   export type TenantScalarRelationFilter = {
     is?: TenantWhereInput
     isNot?: TenantWhereInput
+  }
+
+  export type SitePageTenantIdSlugCompoundUniqueInput = {
+    tenantId: string
+    slug: string
+  }
+
+  export type SitePageCountOrderByAggregateInput = {
+    id?: SortOrder
+    tenantId?: SortOrder
+    slug?: SortOrder
+    title?: SortOrder
+    kind?: SortOrder
+    navLabel?: SortOrder
+    navOrder?: SortOrder
+    visibility?: SortOrder
+    config?: SortOrder
+    draftConfig?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SitePageAvgOrderByAggregateInput = {
+    navOrder?: SortOrder
+  }
+
+  export type SitePageMaxOrderByAggregateInput = {
+    id?: SortOrder
+    tenantId?: SortOrder
+    slug?: SortOrder
+    title?: SortOrder
+    kind?: SortOrder
+    navLabel?: SortOrder
+    navOrder?: SortOrder
+    visibility?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SitePageMinOrderByAggregateInput = {
+    id?: SortOrder
+    tenantId?: SortOrder
+    slug?: SortOrder
+    title?: SortOrder
+    kind?: SortOrder
+    navLabel?: SortOrder
+    navOrder?: SortOrder
+    visibility?: SortOrder
+    createdAt?: SortOrder
+    updatedAt?: SortOrder
+  }
+
+  export type SitePageSumOrderByAggregateInput = {
+    navOrder?: SortOrder
   }
 
   export type TenantHostCountOrderByAggregateInput = {
@@ -128177,6 +129769,13 @@ export namespace Prisma {
     connect?: PublicPathRedirectWhereUniqueInput | PublicPathRedirectWhereUniqueInput[]
   }
 
+  export type SitePageCreateNestedManyWithoutTenantInput = {
+    create?: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput> | SitePageCreateWithoutTenantInput[] | SitePageUncheckedCreateWithoutTenantInput[]
+    connectOrCreate?: SitePageCreateOrConnectWithoutTenantInput | SitePageCreateOrConnectWithoutTenantInput[]
+    createMany?: SitePageCreateManyTenantInputEnvelope
+    connect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+  }
+
   export type UserCreateNestedManyWithoutPrimaryTenantInput = {
     create?: XOR<UserCreateWithoutPrimaryTenantInput, UserUncheckedCreateWithoutPrimaryTenantInput> | UserCreateWithoutPrimaryTenantInput[] | UserUncheckedCreateWithoutPrimaryTenantInput[]
     connectOrCreate?: UserCreateOrConnectWithoutPrimaryTenantInput | UserCreateOrConnectWithoutPrimaryTenantInput[]
@@ -128210,6 +129809,13 @@ export namespace Prisma {
     connectOrCreate?: PublicPathRedirectCreateOrConnectWithoutTenantInput | PublicPathRedirectCreateOrConnectWithoutTenantInput[]
     createMany?: PublicPathRedirectCreateManyTenantInputEnvelope
     connect?: PublicPathRedirectWhereUniqueInput | PublicPathRedirectWhereUniqueInput[]
+  }
+
+  export type SitePageUncheckedCreateNestedManyWithoutTenantInput = {
+    create?: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput> | SitePageCreateWithoutTenantInput[] | SitePageUncheckedCreateWithoutTenantInput[]
+    connectOrCreate?: SitePageCreateOrConnectWithoutTenantInput | SitePageCreateOrConnectWithoutTenantInput[]
+    createMany?: SitePageCreateManyTenantInputEnvelope
+    connect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
   }
 
   export type UserUncheckedCreateNestedManyWithoutPrimaryTenantInput = {
@@ -128283,6 +129889,20 @@ export namespace Prisma {
     deleteMany?: PublicPathRedirectScalarWhereInput | PublicPathRedirectScalarWhereInput[]
   }
 
+  export type SitePageUpdateManyWithoutTenantNestedInput = {
+    create?: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput> | SitePageCreateWithoutTenantInput[] | SitePageUncheckedCreateWithoutTenantInput[]
+    connectOrCreate?: SitePageCreateOrConnectWithoutTenantInput | SitePageCreateOrConnectWithoutTenantInput[]
+    upsert?: SitePageUpsertWithWhereUniqueWithoutTenantInput | SitePageUpsertWithWhereUniqueWithoutTenantInput[]
+    createMany?: SitePageCreateManyTenantInputEnvelope
+    set?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    disconnect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    delete?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    connect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    update?: SitePageUpdateWithWhereUniqueWithoutTenantInput | SitePageUpdateWithWhereUniqueWithoutTenantInput[]
+    updateMany?: SitePageUpdateManyWithWhereWithoutTenantInput | SitePageUpdateManyWithWhereWithoutTenantInput[]
+    deleteMany?: SitePageScalarWhereInput | SitePageScalarWhereInput[]
+  }
+
   export type UserUpdateManyWithoutPrimaryTenantNestedInput = {
     create?: XOR<UserCreateWithoutPrimaryTenantInput, UserUncheckedCreateWithoutPrimaryTenantInput> | UserCreateWithoutPrimaryTenantInput[] | UserUncheckedCreateWithoutPrimaryTenantInput[]
     connectOrCreate?: UserCreateOrConnectWithoutPrimaryTenantInput | UserCreateOrConnectWithoutPrimaryTenantInput[]
@@ -128353,6 +129973,20 @@ export namespace Prisma {
     deleteMany?: PublicPathRedirectScalarWhereInput | PublicPathRedirectScalarWhereInput[]
   }
 
+  export type SitePageUncheckedUpdateManyWithoutTenantNestedInput = {
+    create?: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput> | SitePageCreateWithoutTenantInput[] | SitePageUncheckedCreateWithoutTenantInput[]
+    connectOrCreate?: SitePageCreateOrConnectWithoutTenantInput | SitePageCreateOrConnectWithoutTenantInput[]
+    upsert?: SitePageUpsertWithWhereUniqueWithoutTenantInput | SitePageUpsertWithWhereUniqueWithoutTenantInput[]
+    createMany?: SitePageCreateManyTenantInputEnvelope
+    set?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    disconnect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    delete?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    connect?: SitePageWhereUniqueInput | SitePageWhereUniqueInput[]
+    update?: SitePageUpdateWithWhereUniqueWithoutTenantInput | SitePageUpdateWithWhereUniqueWithoutTenantInput[]
+    updateMany?: SitePageUpdateManyWithWhereWithoutTenantInput | SitePageUpdateManyWithWhereWithoutTenantInput[]
+    deleteMany?: SitePageScalarWhereInput | SitePageScalarWhereInput[]
+  }
+
   export type UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput = {
     create?: XOR<UserCreateWithoutPrimaryTenantInput, UserUncheckedCreateWithoutPrimaryTenantInput> | UserCreateWithoutPrimaryTenantInput[] | UserUncheckedCreateWithoutPrimaryTenantInput[]
     connectOrCreate?: UserCreateOrConnectWithoutPrimaryTenantInput | UserCreateOrConnectWithoutPrimaryTenantInput[]
@@ -128365,6 +129999,20 @@ export namespace Prisma {
     update?: UserUpdateWithWhereUniqueWithoutPrimaryTenantInput | UserUpdateWithWhereUniqueWithoutPrimaryTenantInput[]
     updateMany?: UserUpdateManyWithWhereWithoutPrimaryTenantInput | UserUpdateManyWithWhereWithoutPrimaryTenantInput[]
     deleteMany?: UserScalarWhereInput | UserScalarWhereInput[]
+  }
+
+  export type TenantCreateNestedOneWithoutSitePagesInput = {
+    create?: XOR<TenantCreateWithoutSitePagesInput, TenantUncheckedCreateWithoutSitePagesInput>
+    connectOrCreate?: TenantCreateOrConnectWithoutSitePagesInput
+    connect?: TenantWhereUniqueInput
+  }
+
+  export type TenantUpdateOneRequiredWithoutSitePagesNestedInput = {
+    create?: XOR<TenantCreateWithoutSitePagesInput, TenantUncheckedCreateWithoutSitePagesInput>
+    connectOrCreate?: TenantCreateOrConnectWithoutSitePagesInput
+    upsert?: TenantUpsertWithoutSitePagesInput
+    connect?: TenantWhereUniqueInput
+    update?: XOR<XOR<TenantUpdateToOneWithWhereWithoutSitePagesInput, TenantUpdateWithoutSitePagesInput>, TenantUncheckedUpdateWithoutSitePagesInput>
   }
 
   export type TenantCreateNestedOneWithoutHostsInput = {
@@ -141240,6 +142888,7 @@ export namespace Prisma {
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
   }
 
   export type TenantUncheckedCreateWithoutPrimaryForUsersInput = {
@@ -141255,6 +142904,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
   }
 
   export type TenantCreateOrConnectWithoutPrimaryForUsersInput = {
@@ -141274,6 +142924,7 @@ export namespace Prisma {
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -141289,6 +142940,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -142640,6 +144292,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
   }
 
   export type TenantUncheckedUpdateWithoutPrimaryForUsersInput = {
@@ -142655,6 +144308,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
   }
 
   export type TenantUpsertWithWhereUniqueWithoutOwnerInput = {
@@ -161992,6 +163646,44 @@ export namespace Prisma {
     skipDuplicates?: boolean
   }
 
+  export type SitePageCreateWithoutTenantInput = {
+    id?: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SitePageUncheckedCreateWithoutTenantInput = {
+    id?: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
+  export type SitePageCreateOrConnectWithoutTenantInput = {
+    where: SitePageWhereUniqueInput
+    create: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput>
+  }
+
+  export type SitePageCreateManyTenantInputEnvelope = {
+    data: SitePageCreateManyTenantInput | SitePageCreateManyTenantInput[]
+    skipDuplicates?: boolean
+  }
+
   export type UserCreateWithoutPrimaryTenantInput = {
     id?: string
     username: string
@@ -162345,6 +164037,40 @@ export namespace Prisma {
     data: XOR<PublicPathRedirectUpdateManyMutationInput, PublicPathRedirectUncheckedUpdateManyWithoutTenantInput>
   }
 
+  export type SitePageUpsertWithWhereUniqueWithoutTenantInput = {
+    where: SitePageWhereUniqueInput
+    update: XOR<SitePageUpdateWithoutTenantInput, SitePageUncheckedUpdateWithoutTenantInput>
+    create: XOR<SitePageCreateWithoutTenantInput, SitePageUncheckedCreateWithoutTenantInput>
+  }
+
+  export type SitePageUpdateWithWhereUniqueWithoutTenantInput = {
+    where: SitePageWhereUniqueInput
+    data: XOR<SitePageUpdateWithoutTenantInput, SitePageUncheckedUpdateWithoutTenantInput>
+  }
+
+  export type SitePageUpdateManyWithWhereWithoutTenantInput = {
+    where: SitePageScalarWhereInput
+    data: XOR<SitePageUpdateManyMutationInput, SitePageUncheckedUpdateManyWithoutTenantInput>
+  }
+
+  export type SitePageScalarWhereInput = {
+    AND?: SitePageScalarWhereInput | SitePageScalarWhereInput[]
+    OR?: SitePageScalarWhereInput[]
+    NOT?: SitePageScalarWhereInput | SitePageScalarWhereInput[]
+    id?: UuidFilter<"SitePage"> | string
+    tenantId?: UuidFilter<"SitePage"> | string
+    slug?: StringFilter<"SitePage"> | string
+    title?: StringFilter<"SitePage"> | string
+    kind?: StringFilter<"SitePage"> | string
+    navLabel?: StringNullableFilter<"SitePage"> | string | null
+    navOrder?: IntFilter<"SitePage"> | number
+    visibility?: StringFilter<"SitePage"> | string
+    config?: JsonFilter<"SitePage">
+    draftConfig?: JsonNullableFilter<"SitePage">
+    createdAt?: DateTimeFilter<"SitePage"> | Date | string
+    updatedAt?: DateTimeFilter<"SitePage"> | Date | string
+  }
+
   export type UserUpsertWithWhereUniqueWithoutPrimaryTenantInput = {
     where: UserWhereUniqueInput
     update: XOR<UserUpdateWithoutPrimaryTenantInput, UserUncheckedUpdateWithoutPrimaryTenantInput>
@@ -162382,6 +164108,86 @@ export namespace Prisma {
     primaryTenantId?: UuidNullableFilter<"User"> | string | null
   }
 
+  export type TenantCreateWithoutSitePagesInput = {
+    id?: string
+    slug: string
+    displayName: string
+    isPersonal?: boolean
+    homeTemplate?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    owner: UserCreateNestedOneWithoutOwnedTenantsInput
+    hosts?: TenantHostCreateNestedManyWithoutTenantInput
+    publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
+    publicItems?: PublicItemCreateNestedManyWithoutTenantInput
+    publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
+  }
+
+  export type TenantUncheckedCreateWithoutSitePagesInput = {
+    id?: string
+    ownerId: string
+    slug: string
+    displayName: string
+    isPersonal?: boolean
+    homeTemplate?: string | null
+    createdAt?: Date | string
+    updatedAt?: Date | string
+    hosts?: TenantHostUncheckedCreateNestedManyWithoutTenantInput
+    publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
+    publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
+    publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
+  }
+
+  export type TenantCreateOrConnectWithoutSitePagesInput = {
+    where: TenantWhereUniqueInput
+    create: XOR<TenantCreateWithoutSitePagesInput, TenantUncheckedCreateWithoutSitePagesInput>
+  }
+
+  export type TenantUpsertWithoutSitePagesInput = {
+    update: XOR<TenantUpdateWithoutSitePagesInput, TenantUncheckedUpdateWithoutSitePagesInput>
+    create: XOR<TenantCreateWithoutSitePagesInput, TenantUncheckedCreateWithoutSitePagesInput>
+    where?: TenantWhereInput
+  }
+
+  export type TenantUpdateToOneWithWhereWithoutSitePagesInput = {
+    where?: TenantWhereInput
+    data: XOR<TenantUpdateWithoutSitePagesInput, TenantUncheckedUpdateWithoutSitePagesInput>
+  }
+
+  export type TenantUpdateWithoutSitePagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    isPersonal?: BoolFieldUpdateOperationsInput | boolean
+    homeTemplate?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    owner?: UserUpdateOneRequiredWithoutOwnedTenantsNestedInput
+    hosts?: TenantHostUpdateManyWithoutTenantNestedInput
+    publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
+    publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
+    publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
+  }
+
+  export type TenantUncheckedUpdateWithoutSitePagesInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    ownerId?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    displayName?: StringFieldUpdateOperationsInput | string
+    isPersonal?: BoolFieldUpdateOperationsInput | boolean
+    homeTemplate?: NullableStringFieldUpdateOperationsInput | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    hosts?: TenantHostUncheckedUpdateManyWithoutTenantNestedInput
+    publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
+    publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
+    publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
+  }
+
   export type TenantCreateWithoutHostsInput = {
     id?: string
     slug: string
@@ -162394,6 +164200,7 @@ export namespace Prisma {
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -162409,6 +164216,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -162440,6 +164248,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -162455,6 +164264,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -162603,6 +164413,7 @@ export namespace Prisma {
     hosts?: TenantHostCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -162618,6 +164429,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -162981,6 +164793,7 @@ export namespace Prisma {
     hosts?: TenantHostUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -162996,6 +164809,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -163603,6 +165417,7 @@ export namespace Prisma {
     hosts?: TenantHostCreateNestedManyWithoutTenantInput
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -163618,6 +165433,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedCreateNestedManyWithoutTenantInput
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicPathRedirects?: PublicPathRedirectUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -164330,6 +166146,7 @@ export namespace Prisma {
     hosts?: TenantHostUpdateManyWithoutTenantNestedInput
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -164345,6 +166162,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedUpdateManyWithoutTenantNestedInput
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -165781,6 +167599,7 @@ export namespace Prisma {
     hosts?: TenantHostCreateNestedManyWithoutTenantInput
     publicPaths?: PublicPathCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -165796,6 +167615,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedCreateNestedManyWithoutTenantInput
     publicPaths?: PublicPathUncheckedCreateNestedManyWithoutTenantInput
     publicItems?: PublicItemUncheckedCreateNestedManyWithoutTenantInput
+    sitePages?: SitePageUncheckedCreateNestedManyWithoutTenantInput
     primaryForUsers?: UserUncheckedCreateNestedManyWithoutPrimaryTenantInput
   }
 
@@ -166078,6 +167898,7 @@ export namespace Prisma {
     hosts?: TenantHostUpdateManyWithoutTenantNestedInput
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -166093,6 +167914,7 @@ export namespace Prisma {
     hosts?: TenantHostUncheckedUpdateManyWithoutTenantNestedInput
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -171893,6 +173715,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -171908,6 +173731,7 @@ export namespace Prisma {
     publicPaths?: PublicPathUncheckedUpdateManyWithoutTenantNestedInput
     publicItems?: PublicItemUncheckedUpdateManyWithoutTenantNestedInput
     publicPathRedirects?: PublicPathRedirectUncheckedUpdateManyWithoutTenantNestedInput
+    sitePages?: SitePageUncheckedUpdateManyWithoutTenantNestedInput
     primaryForUsers?: UserUncheckedUpdateManyWithoutPrimaryTenantNestedInput
   }
 
@@ -174324,6 +176148,20 @@ export namespace Prisma {
     updatedAt?: Date | string
   }
 
+  export type SitePageCreateManyTenantInput = {
+    id?: string
+    slug: string
+    title: string
+    kind: string
+    navLabel?: string | null
+    navOrder?: number
+    visibility?: string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: Date | string
+    updatedAt?: Date | string
+  }
+
   export type UserCreateManyPrimaryTenantInput = {
     id?: string
     username: string
@@ -174537,6 +176375,48 @@ export namespace Prisma {
     toPublicItemId?: NullableStringFieldUpdateOperationsInput | string | null
     isActive?: BoolFieldUpdateOperationsInput | boolean
     expiresAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageUpdateWithoutTenantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageUncheckedUpdateWithoutTenantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
+    createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+  }
+
+  export type SitePageUncheckedUpdateManyWithoutTenantInput = {
+    id?: StringFieldUpdateOperationsInput | string
+    slug?: StringFieldUpdateOperationsInput | string
+    title?: StringFieldUpdateOperationsInput | string
+    kind?: StringFieldUpdateOperationsInput | string
+    navLabel?: NullableStringFieldUpdateOperationsInput | string | null
+    navOrder?: IntFieldUpdateOperationsInput | number
+    visibility?: StringFieldUpdateOperationsInput | string
+    config?: JsonNullValueInput | InputJsonValue
+    draftConfig?: NullableJsonNullValueInput | InputJsonValue
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
   }
