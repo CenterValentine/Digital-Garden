@@ -19,6 +19,7 @@
 import { useEffect } from "react";
 import { PersonalHeader } from "./PersonalHeader";
 import { FIELD_NOTES_MARKUP } from "./field-notes-markup";
+import type { GardenData } from "@/lib/domain/page-layout/resolved";
 import "./field-notes.css";
 
 // Order is load-bearing: carousel stub + theme → garden-plants → garden/day-night
@@ -39,19 +40,28 @@ const FN_SCRIPTS = [
 
 interface FieldNotesWindow {
   __fnBooted?: boolean;
+  CATS?: GardenData;
 }
 
-export function FieldNotesPage() {
+export function FieldNotesPage({ cats }: { cats?: GardenData }) {
   useEffect(() => {
     const w = window as Window & FieldNotesWindow;
     // Boot exactly once per load — survives StrictMode's double-invoke.
     if (w.__fnBooted) return;
     w.__fnBooted = true;
 
+    // Composer S2: when the server resolved garden data from a `blog` SitePage
+    // config, publish it as `window.CATS` before the engine boots and skip the
+    // static garden-data.js. No config → static default, engine untouched.
+    const scripts = cats
+      ? FN_SCRIPTS.filter((src) => !src.includes("garden-data.js"))
+      : FN_SCRIPTS;
+    if (cats) w.CATS = cats;
+
     const loadNext = (i: number) => {
-      if (i >= FN_SCRIPTS.length) return;
+      if (i >= scripts.length) return;
       const s = document.createElement("script");
-      s.src = FN_SCRIPTS[i];
+      s.src = scripts[i];
       s.async = false;
       const advance = () => loadNext(i + 1);
       s.onload = advance;
@@ -59,7 +69,7 @@ export function FieldNotesPage() {
       document.body.appendChild(s);
     };
     loadNext(0);
-  }, []);
+  }, [cats]);
 
   return (
     <div className="personal-home public-route fn-page">

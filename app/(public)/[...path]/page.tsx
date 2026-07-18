@@ -1,6 +1,7 @@
 import { notFound, permanentRedirect, redirect as nextRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
 import { withPageTrace } from "@/lib/core/logger";
+import { getCurrentSession } from "@/lib/infrastructure/auth";
 import {
   getCurrentTenant,
   resolvePublicItem,
@@ -12,21 +13,33 @@ interface Params {
   path: string[];
 }
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
 export default async function PublicCatchAll({
   params,
+  searchParams,
 }: {
   params: Promise<Params>;
+  searchParams: SearchParams;
 }) {
   const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
+  // Composer draft preview. Reading searchParams makes preview requests
+  // dynamic (bypassing the 60s ISR) — published traffic without the param
+  // keeps the cached path.
+  const wantsDraft = (await searchParams).preview === "draft";
 
   return withPageTrace(
     { route: "/(public)/[...path]", attrs: { path: fullPath } },
-    () => renderPublic(fullPath, segments),
+    () => renderPublic(fullPath, segments, wantsDraft),
   );
 }
 
-async function renderPublic(fullPath: string, segments: string[]) {
+async function renderPublic(
+  fullPath: string,
+  segments: string[],
+  wantsDraft: boolean,
+) {
   // Tenant resolution: header (multi-tenant) → SITE_OWNER_ID fallback
   // (legacy single-tenant). When neither resolves the public surface
   // is unconfigured for this host → show nothing.
@@ -42,6 +55,16 @@ async function renderPublic(fullPath: string, segments: string[]) {
   //    `tenant.isPersonal && slug === "david"` gate in app/page.tsx.
   if (tenant.isPersonal && tenant.slug === "david") {
     const joined = segments.join("/");
+
+    // Draft preview is owner-only: same-host iframe/tab shares the session
+    // cookie, so a plain session check suffices. Non-owners silently get the
+    // published view rather than an error.
+    let draft = false;
+    if (wantsDraft) {
+      const session = await getCurrentSession();
+      draft = session?.user.id === tenant.ownerId;
+    }
+
     if (joined === "about") {
       const { AboutPage } = await import(
         "../../../components/personal/AboutPage"
@@ -49,10 +72,12 @@ async function renderPublic(fullPath: string, segments: string[]) {
       return <AboutPage />;
     }
     if (joined === "results") {
-      const { WorkResultsPage } = await import(
-        "../../../components/personal/WorkResultsPage"
-      );
-      return <WorkResultsPage />;
+      const [{ WorkResultsPage }, { fetchWorkData }] = await Promise.all([
+        import("../../../components/personal/WorkResultsPage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const data = await fetchWorkData(tenant.tenantId, { draft });
+      return <WorkResultsPage data={data ?? undefined} />;
     }
     if (joined === "resume") {
       const { ResumePage } = await import(
@@ -73,10 +98,12 @@ async function renderPublic(fullPath: string, segments: string[]) {
       return <HobbyPage />;
     }
     if (joined === "blog") {
-      const { FieldNotesPage } = await import(
-        "../../../components/personal/FieldNotesPage"
-      );
-      return <FieldNotesPage />;
+      const [{ FieldNotesPage }, { fetchGardenData }] = await Promise.all([
+        import("../../../components/personal/FieldNotesPage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const cats = await fetchGardenData(tenant.tenantId, { draft });
+      return <FieldNotesPage cats={cats ?? undefined} />;
     }
   }
 
