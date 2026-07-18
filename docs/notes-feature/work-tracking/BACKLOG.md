@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-16
+last_updated: 2026-07-18
 ---
 
 # Sprint Backlog
@@ -7,6 +7,28 @@ last_updated: 2026-07-16
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## AI v3 Core Followups (2026-07-18, branch `worktree-ai-v3-core`, PR #114)
+
+S1–S6 built; Anthropic + OpenAI flagship runs passed. Deferred by design (owner-requested UX first, engineering polish second):
+
+- [ ] **Mid-run document review disruption** (owner: "the biggest disruption") — reviewing a created artifact mid-playbook navigates away and backtracks the chat. Fix family: review-without-leaving (side pane, peek overlay, or split view). Pairs with the item below.
+- [ ] **Note-card right-click "Open in pane"** (owner request) — open an AI-created note in a secondary pane instead of displacing the current view.
+- [ ] **Markdown ↔ TipTap source-view toggle** in the editor toolbar (owner request) — view/edit a note's markdown source alongside rich text.
+- [ ] **Model-selection stickiness** — blank-chat and delete-connection-without-replacement flip the active model selection unexpectedly.
+- [ ] **File-tree live refresh** — AI-created nodes should appear without a flash-reload (owner backlogged mid-S5).
+- [ ] **Canvas live-refresh after AI `update_workflow`** — same family as file-tree refresh; today the tool result instructs a manual reopen, and a stale canvas save can overwrite the AI's update.
+- [ ] **Resumable-stream store (live re-attach)** — no-lost-work already ships (server `consumeStream` + idempotent persistence); live re-attach to an in-flight stream needs Redis-class infra (Upstash via Vercel Marketplace, or Redis on the Coolify homeserver).
+- [ ] **S4c playbook progressive-disclosure registry** — playbooks currently invoked by @-mentioning the note; the registry adds discovery + per-phase disclosure.
+- [ ] **Regen sweep for pre-fix degraded notes** — notes generated before the @tiptap/html server twins landed hold literal `##`/`**` text; content is intact, needs re-render through markdownToTiptap.
+- [ ] **Conversation title strategy for quick URL chats** — page title vs first-message summary (deferred S3-time call).
+- [ ] **Context-discipline near-term set** (approved with the plan, not yet built): JIT retrieval, validated compaction, extraction subagents, cache-aware layout upgrades, tokens-per-phase eval.
+- [ ] **Kimi/Moonshot catch-up** — P0 native search + gateway + explicit BYOK keys (umbrella post-V3 queue).
+- [ ] **Acquisition explainer session** for the owner (umbrella post-V3 queue).
+
+Completed en route (recorded here so nobody re-plans them): approval-card per-tool previews (486544c), citation-split bubble coalescing (65ae4e7), new-chat auto-targeting + move-follows (0a31ca0), connection-editor instant persistence + fieldset grammar (6fd3dcb/1ea57ee/88b1341).
 
 ---
 
