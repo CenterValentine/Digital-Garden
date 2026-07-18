@@ -18,6 +18,10 @@ import {
   findOrCreatePageNode,
 } from "@/lib/domain/ai/acquisition";
 import { addAutoAssociation } from "@/lib/features/conversations";
+import {
+  createDocxDocument,
+  findOrCreateFolder,
+} from "@/lib/domain/ai/documents";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
@@ -159,6 +163,107 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         };
       },
     }),
+    create_folder: tool({
+      description:
+        "Find or create a folder by name. Use for playbook standing rules like 'place outputs in a folder named after the company under job-search/'. " +
+        "Pass parentId to nest; omit it to use this conversation's target folder. Returns the folder id for use as parentId in createNote/create_docx. " +
+        "Find-or-create: an existing folder with the same name under the same parent is reused, never duplicated.",
+      inputSchema: z.object({
+        name: z.string().min(1).max(255).describe("Folder name"),
+        parentId: z
+          .string()
+          .optional()
+          .describe(
+            "Parent folder id. Omit to use the conversation's target folder.",
+          ),
+      }),
+      execute: async ({ name, parentId }) => {
+        const parent = parentId ?? ctx.targetFolderId ?? null;
+        if (parentId) {
+          const owned = await prisma.contentNode.findFirst({
+            where: {
+              id: parentId,
+              ownerId: ctx.userId,
+              contentType: "folder",
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (!owned) {
+            return `Parent folder ${parentId} was not found. Use create_folder without parentId, or searchNotes to locate the right folder.`;
+          }
+        }
+        try {
+          const folderId = await findOrCreateFolder(ctx.userId, name, parent);
+          return { folderId, name };
+        } catch (error) {
+          return `Could not create the folder: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
+    create_docx: tool({
+      // Document creation is a mutating action — same HITL gate as
+      // createNote (AI v3 core S4b / A4).
+      needsApproval: true,
+      description:
+        "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
+        "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. " +
+        "By default the file lands in this conversation's target folder; pass parentId to override (e.g. a folder id from create_folder).",
+      inputSchema: z.object({
+        title: z.string().min(1).max(200).describe("Document title (also the file name)"),
+        markdown: z
+          .string()
+          .min(1)
+          .describe("Full document body as markdown"),
+        parentId: z
+          .string()
+          .optional()
+          .describe(
+            "Destination folder id. Omit to use the conversation's target folder.",
+          ),
+      }),
+      execute: async ({ title, markdown, parentId }) => {
+        const destination = parentId ?? ctx.targetFolderId;
+        if (!destination) {
+          return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
+        }
+        const owned = await prisma.contentNode.findFirst({
+          where: {
+            id: destination,
+            ownerId: ctx.userId,
+            contentType: "folder",
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!owned) {
+          return `Destination folder ${destination} was not found or is not a folder.`;
+        }
+        try {
+          const result = await createDocxDocument(ctx.userId, {
+            title,
+            markdown,
+            parentFolderId: destination,
+          });
+          if (ctx.conversationId) {
+            void addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              result.contentNodeId,
+              "tool-call",
+            ).catch(() => null);
+          }
+          return {
+            __docPayload: true,
+            contentNodeId: result.contentNodeId,
+            fileName: result.fileName,
+            parentFolderId: destination,
+          };
+        } catch (error) {
+          return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
     searchNotes: tool({
       description:
         "Search the user's notes by title or content. Returns matching note titles and excerpts.",
@@ -289,6 +394,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             select: { id: true },
           });
           if (candidate) resolvedParentId = candidate.id;
+        }
+        // Conversation target folder (S4b): chats serve their location —
+        // the target (explicit or location-inferred) outranks the raw
+        // chat-parent fallback below.
+        if (!resolvedParentId && ctx.targetFolderId) {
+          resolvedParentId = ctx.targetFolderId;
         }
         if (!resolvedParentId && ctx.chatContentId) {
           const chatNode = await prisma.contentNode.findFirst({

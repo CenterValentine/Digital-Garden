@@ -21,6 +21,8 @@ import {
 export const BASE_TOOL_IDS = [
   "search_web",
   "read_page",
+  "create_folder",
+  "create_docx",
   "searchNotes",
   "getCurrentNote",
   "createNote",
@@ -59,6 +61,16 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Read Web Page",
     description:
       "Fetch and read a public web page's main content with source provenance (Acquisition Service)",
+  },
+  create_folder: {
+    name: "Create Folder",
+    description:
+      "Find or create a folder (playbook destinations like job-search/{Company})",
+  },
+  create_docx: {
+    name: "Create Word Document",
+    description:
+      "Generate a .docx from markdown and file it in the target folder (approval-gated)",
   },
   searchNotes: {
     name: "Search Notes",
