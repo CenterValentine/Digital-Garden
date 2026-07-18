@@ -44,6 +44,7 @@ import {
 } from "@/components/content/ai/ModelPicker";
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
+import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 
 /** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
 const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -76,20 +77,46 @@ const COMMAND_HINTS: Record<string, string> = {
  */
 const chatBodyResolvers = new Map<string, () => Record<string, unknown>>();
 
+/**
+ * Turn-start body snapshots (2026-07-18 smoke #2): a resume must run with
+ * the body that STARTED the turn. Live state can flip mid-run — the
+ * per-conversation model memory re-seeds the active selection from
+ * message stamps on (re)load, which switched a Sonnet-4 run to the
+ * unavailable claude-sonnet-3-5 between the send and its approval
+ * resume. Every real user send (carries providerId) is snapshotted here;
+ * internal sends replay the snapshot, falling back to the live resolver
+ * only when no turn has been sent yet in this chat instance.
+ */
+const lastSentBodies = new Map<string, Record<string, unknown>>();
+
 const chatTransport = new DefaultChatTransport({
   api: "/api/ai/chat",
-  prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => ({
-    // Replicates the SDK's default payload shape, plus the resolver
-    // baseline so internal sends carry the same context as user sends.
-    body: {
-      ...(id ? (chatBodyResolvers.get(id)?.() ?? {}) : {}),
-      ...(body ?? {}),
-      id,
-      messages,
-      trigger,
-      messageId,
-    },
-  }),
+  prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => {
+    const perCall =
+      body && typeof body === "object"
+        ? (body as Record<string, unknown>)
+        : undefined;
+    if (id && perCall && "providerId" in perCall) {
+      lastSentBodies.set(id, perCall);
+    }
+    const baseline = id
+      ? (lastSentBodies.get(id) ?? chatBodyResolvers.get(id)?.() ?? {})
+      : {};
+    // Replicates the SDK's default payload shape; per-call body wins over
+    // the baseline so explicit sends behave exactly as before.
+    return {
+      body: {
+        ...baseline,
+        ...(perCall ?? {}),
+        id,
+        // Payload diet: strip provider ciphertext (encryptedContent) from
+        // prior tool results — multi-MB otherwise, which kills the POST.
+        messages: compactToolOutputs(messages),
+        trigger,
+        messageId,
+      },
+    };
+  },
 });
 
 /**
@@ -645,6 +672,7 @@ export function useConversationEngine({
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
+      lastSentBodies.delete(conversationKey);
     };
   }, [
     conversationKey,

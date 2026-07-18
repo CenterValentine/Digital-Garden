@@ -91,6 +91,7 @@ import { addAutoAssociation, appendMessage } from "@/lib/features/conversations"
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
 import {
   resolvePrimaryRoute,
@@ -512,7 +513,11 @@ export async function POST(request: Request) {
       // later send, poisoning the conversation. Moved-past pre-output
       // parts become honest error results; the live last message is
       // untouched (that's the resume path).
-      const repairedMessages = repairDanglingToolCalls(messages);
+      // Payload diet server-side too (defense in depth — other surfaces
+      // and previously-persisted conversations still carry ciphertext).
+      const repairedMessages = compactToolOutputs(
+        repairDanglingToolCalls(messages),
+      );
       const resolvedMessages = resolveAttachmentsForModel(
         repairedMessages,
         providerId,
