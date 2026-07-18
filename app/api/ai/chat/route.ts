@@ -360,13 +360,23 @@ export async function POST(request: Request) {
       // The system prompt states the default; get_workflow/update_workflow/
       // run_workflow resolve to it when called with no arguments.
       let openWorkflowTitle: string | undefined;
+      let openContentLocationId: string | undefined;
       if (contentId) {
         const node = await prisma.contentNode.findFirst({
           where: { id: contentId, ownerId: session.user.id },
-          select: { contentType: true, title: true },
+          select: { contentType: true, title: true, parentId: true },
         });
         isChatContent = node?.contentType === "chat";
         if (node?.contentType === "workflow") openWorkflowTitle = node.title;
+        // Location inference fallback (v3 ship fix, 2026-07-18): "chats
+        // serve their location" must hold for sidebar chats too — they
+        // have no archived chat node for the inference below, which left
+        // their tools untargeted (files landed at the vault root). A
+        // folder is its own location; anything else locates to its parent.
+        openContentLocationId =
+          node?.contentType === "folder"
+            ? contentId
+            : (node?.parentId ?? undefined);
       }
       // Workflows are not documents: keep document-editor tools (and the
       // "you are viewing a document" prompt section) off when one is open —
@@ -449,6 +459,9 @@ export async function POST(request: Request) {
           conv?.archivedToContentNode?.parentId ??
           undefined;
       }
+      // Final fallback: the open content's folder (sidebar chats and
+      // transient chats have no chat node to infer from).
+      if (!targetFolderId) targetFolderId = openContentLocationId;
 
       const toolCtx = {
         userId: session.user.id,

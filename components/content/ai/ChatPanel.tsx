@@ -227,10 +227,81 @@ export function ChatPanel({
     title: string | null;
   } | null>(null);
   const [targetInherited, setTargetInherited] = useState(false);
+
+  // Location fallback (v3 ship fix, 2026-07-18): the service can only
+  // infer location for content-bound (full-page) conversations — sidebar
+  // chats have no archived chat node, and just-created conversations skip
+  // the initial load entirely, so new chats showed BLANK targets. "Chats
+  // serve their location": derive it from the open content — a folder is
+  // its own location, anything else locates to its parent. Keyed on
+  // contentId, so moving the chat/content re-derives it naturally.
+  const [locationFallback, setLocationFallback] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
   useEffect(() => {
-    setTargetFolder(initialTargetFolder);
-    setTargetInherited(initialTargetInherited);
-  }, [initialTargetFolder, initialTargetInherited]);
+    setLocationFallback(null);
+    if (!contentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/content/content/${encodeURIComponent(contentId)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as {
+          data?: {
+            contentType?: string;
+            title?: string | null;
+            parentId?: string | null;
+          };
+        };
+        const node = body?.data;
+        if (!node || cancelled) return;
+        if (node.contentType === "folder") {
+          setLocationFallback({ id: contentId, title: node.title ?? null });
+          return;
+        }
+        if (!node.parentId) return;
+        const parentRes = await fetch(
+          `/api/content/content/${encodeURIComponent(node.parentId)}`,
+          { credentials: "include" },
+        );
+        if (!parentRes.ok || cancelled) return;
+        const parentBody = (await parentRes.json()) as {
+          data?: { title?: string | null };
+        };
+        if (cancelled) return;
+        setLocationFallback({
+          id: node.parentId,
+          title: parentBody?.data?.title ?? null,
+        });
+      } catch {
+        // Best-effort — an unresolved location just leaves the chip
+        // untargeted; the server route has its own fallback for tools.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const effectiveLocation = initialTargetLocation ?? locationFallback;
+  useEffect(() => {
+    if (initialTargetFolder) {
+      setTargetFolder(initialTargetFolder);
+      setTargetInherited(initialTargetInherited);
+    } else if (effectiveLocation) {
+      // No explicit target: inherit the chat's location instead of
+      // rendering blank.
+      setTargetFolder(effectiveLocation);
+      setTargetInherited(true);
+    } else {
+      setTargetFolder(null);
+      setTargetInherited(false);
+    }
+  }, [initialTargetFolder, initialTargetInherited, effectiveLocation]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
       // Explicit pick overrides inheritance; clearing an override falls
@@ -240,8 +311,8 @@ export function ChatPanel({
         setTargetInherited(false);
       } else {
         // Clearing returns to the chat's location when it has one.
-        setTargetFolder(initialTargetLocation);
-        setTargetInherited(Boolean(initialTargetLocation));
+        setTargetFolder(effectiveLocation);
+        setTargetInherited(Boolean(effectiveLocation));
       }
       if (!conversationId) return;
       void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
@@ -251,7 +322,7 @@ export function ChatPanel({
         body: JSON.stringify({ targetFolderId: next?.id ?? null }),
       }).catch(() => {});
     },
-    [conversationId, initialTargetLocation],
+    [conversationId, effectiveLocation],
   );
 
   // Change handler: update local state immediately (drives the engine body)
@@ -573,7 +644,7 @@ export function ChatPanel({
           <TargetFolderChip
             target={targetFolder}
             inherited={targetInherited}
-            location={initialTargetLocation}
+            location={effectiveLocation}
             disabled={!conversationId}
             onChange={handleTargetChange}
           />
