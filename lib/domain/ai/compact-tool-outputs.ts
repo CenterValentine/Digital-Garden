@@ -1,66 +1,44 @@
 /**
- * Tool-output payload diet (AI v3 core S4 — found by playbook smoke #3,
- * 2026-07-18). Client-safe: no server deps.
+ * Tool-output payload diet (AI v3 core S4 — smoke #3 found the MB-scale
+ * ciphertext; smoke #5 found that merely stripping `encryptedContent`
+ * fails the provider tool's OUTPUT SCHEMA on the next send ("expected
+ * string, received undefined")). Client-safe: no server deps.
  *
- * Provider-executed web search results carry `encryptedContent` blobs
- * (Anthropic's citation-grounding payload) of several KB PER RESULT. Ten
- * results per search, several searches per turn → the conversation's
- * subsequent sends haul megabytes of opaque ciphertext on every request,
- * killing the POST ("network error") and torching TPM budgets. This is
- * context discipline's tool-result TTL arriving early, forced by reality.
+ * Strategy: provider-executed search results in PAST assistant messages
+ * are removed entirely — tool part and results together, so tool_use/
+ * tool_result pairing stays intact by absence. The model's own written
+ * synthesis of the results (the text parts that follow) carries the
+ * knowledge forward; fresh searches re-ground fresh claims. The LAST
+ * message is never touched — that is the live continuation/approval path.
  *
- * Trade-off, made deliberately: dropping encryptedContent forfeits the
- * provider's ability to re-ground follow-up citations from prior searches.
- * The model's own text summary of the results survives in the transcript,
- * and fresh searches re-ground fresh claims. Titles/URLs/dates are kept so
- * provenance never degrades.
+ * Wins: no schema validation target, no ciphertext re-upload, and the
+ * biggest token reduction of all (whole result arrays gone from history).
  */
 
 import type { UIMessage } from "ai";
 
-/** Max provider-executed search results retained per tool call. */
-const MAX_SEARCH_RESULTS = 5;
-
-function compactOutputItem(item: unknown): unknown {
-  if (!item || typeof item !== "object") return item;
-  const record = item as Record<string, unknown>;
-  if (typeof record.encryptedContent !== "string") return item;
-  const { encryptedContent: _dropped, ...rest } = record;
-  return rest;
-}
-
-function compactPart(part: unknown): unknown {
-  if (!part || typeof part !== "object") return part;
+function isProviderSearchPart(part: unknown): boolean {
+  if (!part || typeof part !== "object") return false;
   const record = part as Record<string, unknown>;
   const type = typeof record.type === "string" ? record.type : "";
-  if (!type.startsWith("tool-") && type !== "dynamic-tool") return part;
-  const output = record.output;
-  if (!Array.isArray(output)) return part;
-  const hasEncrypted = output.some(
-    (item) =>
-      item &&
-      typeof item === "object" &&
-      typeof (item as Record<string, unknown>).encryptedContent === "string",
-  );
-  if (!hasEncrypted) return part;
-  return {
-    ...record,
-    output: output.slice(0, MAX_SEARCH_RESULTS).map(compactOutputItem),
-  };
+  if (!type.startsWith("tool-") && type !== "dynamic-tool") return false;
+  if (record.providerExecuted !== true) return false;
+  return Array.isArray(record.output);
 }
 
 /**
- * Strip heavyweight provider ciphertext from tool outputs in an outgoing
- * message array. Pure — returns new objects only where changes occurred.
+ * Remove provider-executed search tool parts from all but the final
+ * message. Pure — returns new objects only where changes occurred.
  */
 export function compactToolOutputs(messages: UIMessage[]): UIMessage[] {
-  return messages.map((message) => {
-    if (message.role !== "assistant") return message;
+  return messages.map((message, index) => {
+    if (message.role !== "assistant" || index === messages.length - 1) {
+      return message;
+    }
     const parts = message.parts as unknown[];
-    const compacted = parts.map(compactPart);
-    const changed = compacted.some((p, i) => p !== parts[i]);
-    return changed
-      ? ({ ...message, parts: compacted } as unknown as UIMessage)
-      : message;
+    const kept = parts.filter((p) => !isProviderSearchPart(p));
+    return kept.length === parts.length
+      ? message
+      : ({ ...message, parts: kept } as unknown as UIMessage);
   });
 }
