@@ -11,6 +11,15 @@
 // server logger here without breaking the client bundle (node:async_hooks).
 // Migrates to client-safe logger in Phase 5.
 import { generateJSON, generateHTML } from "@tiptap/core";
+// Server-safe twins (zeed-dom backed): @tiptap/core's generateJSON/HTML
+// require a real `window`; in Node (AI tool execution: createNote,
+// create_docx) they throw "no window object" and content silently
+// degraded to plain paragraphs — users saw literal ## / ** markdown in
+// generated notes (AI v3 S4 smoke finding, fixed 2026-07-18).
+import {
+  generateJSON as generateJSONServer,
+  generateHTML as generateHTMLServer,
+} from "@tiptap/html";
 import type { JSONContent, Extensions } from "@tiptap/core";
 import { marked } from "marked";
 import { extractSearchTextFromTipTap } from "./search-text";
@@ -45,8 +54,12 @@ export function markdownToTiptap(markdown: string): JSONContent {
     // `generateJSON` expects HTML input, not raw markdown.
     const html = marked.parse(markdown, { async: false, gfm: true }) as string;
 
-    // Step 2: Convert HTML → TipTap JSON via registered extensions
-    const json = generateJSON(html, extensions);
+    // Step 2: Convert HTML → TipTap JSON via registered extensions.
+    // Native-DOM path in the browser (faster); zeed-dom path in Node.
+    const json =
+      typeof window === "undefined"
+        ? generateJSONServer(html, extensions)
+        : generateJSON(html, extensions);
     return json;
   } catch (error) {
     console.error("Failed to convert markdown to TipTap:", error);
@@ -107,12 +120,12 @@ function serializeToMarkdown(
   json: JSONContent,
   extensions: Extensions
 ): string {
-  // generateHTML internally uses browser DOM APIs (document.createElement etc.).
-  // Guard so server-side callers (API routes) don't crash with "window is not defined".
-  if (typeof window === "undefined") {
-    return extractPlainText(json);
-  }
-  const html = generateHTML(json, extensions);
+  // Server path uses the zeed-dom-backed @tiptap/html twin — the old
+  // plain-text early return is gone (it lost ALL formatting server-side).
+  const html =
+    typeof window === "undefined"
+      ? generateHTMLServer(json, extensions)
+      : generateHTML(json, extensions);
   return htmlToMarkdown(html);
 }
 
