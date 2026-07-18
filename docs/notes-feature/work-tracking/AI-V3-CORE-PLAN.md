@@ -256,6 +256,7 @@ Earned across six playbook smokes (2026-07-17/18), each entry a shipped fix:
 | Rate-limit patience must exceed the window | Retry-after hints are optimistic under rolling TPM; 5 retries ≈ 31s vs a 60s window |
 | Straight-faced routing | Never substitute vendors under a picked label; MODEL_UNAVAILABLE with remedies beats a silent gpt-4o bill |
 | Server-side tool execution has no `window` | `markdownToTiptap` degrades to plain paragraphs in Node (open followup: server-safe generateJSON) |
+| Citation-split text parts (65ae4e7) | Native-search answers stream as MANY text parts — one per cited span — so bubble-per-part rendered fragment walls (lone "." / bare "- " bubbles). Render-side coalescing in ChatMessage merges text runs across invisible parts (source-url/source-document/step-start); join with "" reconstructs the original markdown. Provider-agnostic safety net — verify OpenAI/Google fragment shapes ride it during the reruns. |
 
 ## Open items (core-relevant)
 
