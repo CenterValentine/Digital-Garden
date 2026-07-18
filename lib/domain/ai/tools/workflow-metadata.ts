@@ -13,6 +13,7 @@ export const WORKFLOW_TOOL_IDS = [
   "get_workflow",
   "propose_workflow",
   "update_workflow",
+  "push_workflow_to_n8n",
   "run_workflow",
 ] as const;
 
@@ -46,6 +47,11 @@ export const WORKFLOW_TOOL_METADATA: Record<
     name: "Update Workflow",
     description:
       "Rewrite the open (or a named) workflow's graph — you approve each change; builder-parity validation",
+  },
+  push_workflow_to_n8n: {
+    name: "Push to n8n",
+    description:
+      "Compile a workflow to n8n and activate it on your n8n instance — you approve each push; runs then execute on n8n",
   },
   run_workflow: {
     name: "Run Workflow",

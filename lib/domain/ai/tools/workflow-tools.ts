@@ -27,6 +27,7 @@ import {
   dispatchWorkflowFromContent,
   isDispatchFailure,
 } from "@/extensions/workflows/server/dispatch";
+import { pushWorkflowToN8n } from "@/extensions/workflows/server/engines/n8n/push";
 import type { ToolExecuteContext } from "./types";
 
 /** Render schema/structural issues in a model-repairable form. */
@@ -438,6 +439,46 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           title: name,
           parentId: resolvedParentId,
         });
+      },
+    }),
+
+    push_workflow_to_n8n: tool({
+      // Outward-facing: creates/updates AND activates a workflow on the
+      // user's external n8n instance and flips the engine — approval-gated.
+      needsApproval: true,
+      description:
+        "Compile a Trellis workflow's graph to n8n and push it to the user's n8n instance (create or update + activate), switching that workflow's execution engine to n8n. " +
+        "Authoring stays in the Trellis graph model — author/edit with propose_workflow or update_workflow FIRST, then push. Re-pushing after an update syncs the same n8n workflow (idempotent). " +
+        "Every node type compiles: n8n orchestrates, and step nodes call back into the app to execute; gates/delays/branches become native n8n nodes. " +
+        "With no id/name it pushes the workflow the user has OPEN. Use only when the user asks for n8n — Trellis's built-in engine is the default. After pushing, runs still start via run_workflow (same door), they just execute on n8n.",
+      inputSchema: z.object({
+        workflowNodeId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("Workflow content node id. Omit to push the open workflow."),
+        name: z
+          .string()
+          .optional()
+          .describe("Title to resolve when there is no id and the target is not the open workflow."),
+      }),
+      execute: async ({ workflowNodeId, name }) => {
+        const resolved = await resolveWorkflowNode(ctx, workflowNodeId, name);
+        if (typeof resolved === "string") return resolved;
+        try {
+          const result = await pushWorkflowToN8n(ctx.userId, resolved.id);
+          if (ctx.conversationId) {
+            await addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              resolved.id,
+              "tool-call",
+            );
+          }
+          return `Pushed "${resolved.title}" to n8n and activated it (n8n workflow id: ${result.workflowId}). View it there: ${result.n8nUrl} — share that link with the user. The workflow's engine is now n8n; future runs (run_workflow or the Run button) execute on n8n. Edits made here need a re-push to reach n8n.`;
+        } catch (error) {
+          return `Push to n8n failed: ${error instanceof Error ? error.message : "unknown error"}. Relay this to the user — it is usually configuration (n8n connection or callback URL), not the graph.`;
+        }
       },
     }),
 
