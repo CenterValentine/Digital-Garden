@@ -74,6 +74,14 @@ You have tools to read and edit the currently open document.
 `;
 }
 
+// ─── Open workflow (Trellis canvas) ──────────────────────────────────────
+
+function workflowSection(title: string): string {
+  return `\
+## Active Workflow ("${title}")
+The user has this Trellis workflow open on the canvas. DEFAULT ASSUMPTION: workflow requests in this chat are about THIS workflow — call get_workflow with no arguments to read its graph, then update_workflow to modify it (a blank workflow is just its trigger; build it out in place). Create a separate NEW workflow with propose_workflow ONLY when the user explicitly asks for another one.`;
+}
+
 // ─── Chat content (full-page chat node) ──────────────────────────────────
 
 function chatContentSection(contentId: string): string {
@@ -95,6 +103,12 @@ export interface SystemPromptContext {
   hasWebSearch: boolean;
   /** True when phase_checkpoint is attached (AI v3 S4d playbook runtime). */
   hasCheckpointTool: boolean;
+  /**
+   * Title of the Trellis workflow the user has open (AI v3 S6). When set,
+   * the prompt states the default: workflow requests are about THIS
+   * workflow (update it), not a new one.
+   */
+  openWorkflowTitle: string | undefined;
   editableContentId: string | undefined;
   isChatContent: boolean;
   chatContentId: string | undefined;
@@ -133,6 +147,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   }
   if (ctx.hasImageTools) sections.push(IMAGE_SECTION);
   if (ctx.hasFlashcardTools) sections.push(flashcardSection(ctx.autoPronounceDefault));
+  if (ctx.openWorkflowTitle) sections.push(workflowSection(ctx.openWorkflowTitle));
   if (ctx.editableContentId) sections.push(editorSection(ctx.editableContentId));
   if (ctx.isChatContent && ctx.chatContentId) sections.push(chatContentSection(ctx.chatContentId));
   if (ctx.userContextSection) sections.push(ctx.userContextSection);

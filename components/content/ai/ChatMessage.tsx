@@ -1987,7 +1987,11 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
   // non-self payloads (a different note got created or updated), the
   // click navigates to that content as before.
   const selectedContentId = useContentStore((s) => s.selectedContentId);
-  const isSelfEdit = selectedContentId === payload.contentId;
+  // Self-edit only applies to the chat's own sidecar NOTES. A workflow
+  // payload matching the open content means the AI updated the workflow
+  // the user is looking at — that's not a notes-panel affair (S6).
+  const isSelfEdit =
+    selectedContentId === payload.contentId && (payload.noun ?? "note") === "note";
 
   const handleClick = useCallback(() => {
     if (isSelfEdit) {

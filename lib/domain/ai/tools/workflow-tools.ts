@@ -46,12 +46,118 @@ function formatGraphIssues(
   );
 }
 
+/**
+ * Resolve which workflow a tool call refers to. Priority: explicit id >
+ * title match > the workflow the user has OPEN (ctx.contentId is the open
+ * content node for any non-chat type — set by the chat route). Returns an
+ * error string (model-repairable) when nothing resolves.
+ */
+async function resolveWorkflowNode(
+  ctx: ToolExecuteContext,
+  workflowNodeId: string | undefined,
+  name: string | undefined,
+): Promise<
+  | {
+      id: string;
+      title: string;
+      enabled: boolean;
+      definition: unknown;
+    }
+  | string
+> {
+  if (workflowNodeId) {
+    const node = await prisma.contentNode.findFirst({
+      where: {
+        id: workflowNodeId,
+        ownerId: ctx.userId,
+        contentType: "workflow",
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        workflowPayload: { select: { enabled: true, definition: true } },
+      },
+    });
+    if (!node?.workflowPayload) {
+      return `No workflow with id ${workflowNodeId}. Call list_workflows to see what exists.`;
+    }
+    return {
+      id: node.id,
+      title: node.title,
+      enabled: node.workflowPayload.enabled,
+      definition: node.workflowPayload.definition,
+    };
+  }
+  if (name) {
+    const matches = await prisma.contentNode.findMany({
+      where: {
+        ownerId: ctx.userId,
+        contentType: "workflow",
+        deletedAt: null,
+        title: { contains: name, mode: "insensitive" },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 5,
+      select: {
+        id: true,
+        title: true,
+        workflowPayload: { select: { enabled: true, definition: true } },
+      },
+    });
+    if (matches.length === 0) {
+      return `No workflow found matching "${name}". Call list_workflows to see what exists.`;
+    }
+    if (matches.length > 1) {
+      return (
+        `Multiple workflows match "${name}" — re-call with the intended workflowNodeId:\n` +
+        matches.map((m) => `- "${m.title}" (id: ${m.id})`).join("\n")
+      );
+    }
+    const only = matches[0];
+    if (!only.workflowPayload) {
+      return `Workflow "${only.title}" has no graph payload.`;
+    }
+    return {
+      id: only.id,
+      title: only.title,
+      enabled: only.workflowPayload.enabled,
+      definition: only.workflowPayload.definition,
+    };
+  }
+  // Neither id nor name: fall back to the workflow the user has open.
+  if (ctx.contentId) {
+    const open = await prisma.contentNode.findFirst({
+      where: {
+        id: ctx.contentId,
+        ownerId: ctx.userId,
+        contentType: "workflow",
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        title: true,
+        workflowPayload: { select: { enabled: true, definition: true } },
+      },
+    });
+    if (open?.workflowPayload) {
+      return {
+        id: open.id,
+        title: open.title,
+        enabled: open.workflowPayload.enabled,
+        definition: open.workflowPayload.definition,
+      };
+    }
+  }
+  return "No workflow specified and none is open. Provide workflowNodeId or name (see list_workflows).";
+}
+
 export function createWorkflowTools(ctx: ToolExecuteContext) {
   return {
     get_workflow_node_catalog: tool({
       description:
         "Get the authoritative Trellis workflow authoring reference: the exact graph envelope shape, interpolation syntax, and every available node type with its config field keys and outputs. " +
-        "ALWAYS call this before authoring a graph for propose_workflow — node type ids and config keys must match this catalog exactly, and it is cheaper to read it than to repair a rejected graph.",
+        "ALWAYS call this before authoring a graph for propose_workflow or update_workflow — node type ids and config keys must match this catalog exactly, and it is cheaper to read it than to repair a rejected graph.",
       inputSchema: z.object({}),
       execute: async () => renderNodeCatalogForAI(),
     }),
@@ -108,6 +214,119 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       },
     }),
 
+    get_workflow: tool({
+      description:
+        "Read a Trellis workflow's full graph (nodes, edges, configs) plus its validation status. " +
+        "With NO arguments it reads the workflow the user has OPEN — when the user says 'this workflow', call it with no arguments. " +
+        "ALWAYS read a workflow before modifying it with update_workflow.",
+      inputSchema: z.object({
+        workflowNodeId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("Workflow content node id. Omit to read the open workflow."),
+        name: z
+          .string()
+          .optional()
+          .describe(
+            "Title to resolve when there is no id and the target is not the open workflow.",
+          ),
+      }),
+      execute: async ({ workflowNodeId, name }) => {
+        const resolved = await resolveWorkflowNode(ctx, workflowNodeId, name);
+        if (typeof resolved === "string") return resolved;
+        const parsed = workflowGraphSchema.safeParse(resolved.definition);
+        if (!parsed.success) {
+          return `Workflow "${resolved.title}" (id: ${resolved.id}) has an unreadable graph: ${parsed.error.issues[0]?.message ?? "schema error"}. Author a full replacement via update_workflow.`;
+        }
+        const structural = validateGraph(parsed.data);
+        const status = structural.valid
+          ? "valid"
+          : `INVALID —\n${structural.issues
+              .slice(0, 5)
+              .map((issue) => `- ${issue.message}`)
+              .join("\n")}`;
+        return `Workflow "${resolved.title}" (id: ${resolved.id}) — ${resolved.enabled ? "enabled" : "disabled"}, validation: ${status}\nGraph:\n${JSON.stringify(parsed.data, null, 1)}`;
+      },
+    }),
+
+    update_workflow: tool({
+      // Rewriting an automation is as consequential as creating one —
+      // approval-gated; the card shows the replacement graph JSON.
+      needsApproval: true,
+      description:
+        "Replace an existing Trellis workflow's graph with a new version you author — extend it, rewire it, or fix it. " +
+        "With no id/name it targets the workflow the user has OPEN: this is the DEFAULT for 'build (on) this workflow' requests, including a blank workflow that only has its trigger yet. " +
+        "ALWAYS call get_workflow first and author the replacement as a modification of what is there (keep existing node ids stable where possible). " +
+        "Supply the COMPLETE graph, not a diff. Validation matches the visual builder; an invalid graph changes nothing.",
+      inputSchema: z.object({
+        workflowNodeId: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("Workflow content node id. Omit to target the open workflow."),
+        name: z
+          .string()
+          .optional()
+          .describe("Title to resolve when there is no id and the target is not the open workflow."),
+        graph: z
+          .record(z.string(), z.unknown())
+          .describe(
+            "The COMPLETE replacement graph per get_workflow_node_catalog: { version, engine, entryNodeId, nodes, edges }.",
+          ),
+        newName: z
+          .string()
+          .min(1)
+          .max(255)
+          .optional()
+          .describe("Optional rename. Omit to keep the current title."),
+      }),
+      execute: async ({ workflowNodeId, name, graph, newName }) => {
+        const resolved = await resolveWorkflowNode(ctx, workflowNodeId, name);
+        if (typeof resolved === "string") return resolved;
+        const parsed = workflowGraphSchema.safeParse(graph);
+        if (!parsed.success) {
+          return formatGraphIssues(
+            parsed.error.issues.map((issue) => ({
+              message: `${issue.path.join(".") || "graph"}: ${issue.message}`,
+            })),
+          );
+        }
+        const structural = validateGraph(parsed.data);
+        if (!structural.valid) {
+          return formatGraphIssues(structural.issues);
+        }
+
+        await prisma.workflowPayload.update({
+          where: { contentId: resolved.id },
+          data: { definition: parsed.data as unknown as Prisma.InputJsonValue },
+        });
+        // Touch the node so updatedAt reflects the change (list ordering,
+        // sync consumers) and apply the optional rename in the same write.
+        await prisma.contentNode.update({
+          where: { id: resolved.id },
+          data: { title: newName ?? resolved.title },
+        });
+
+        if (ctx.conversationId) {
+          await addAutoAssociation(
+            ctx.userId,
+            ctx.conversationId,
+            resolved.id,
+            "tool-call",
+          );
+        }
+        return JSON.stringify({
+          __notePayload: true,
+          kind: "updated",
+          noun: "workflow",
+          contentId: resolved.id,
+          title: newName ?? resolved.title,
+          note: "The canvas does NOT live-refresh: if the user has this workflow open they must reopen it to load the new graph before manual edits — saving a stale canvas would overwrite this change. Relay that in one short line.",
+        });
+      },
+    }),
+
     propose_workflow: tool({
       // Creating an automation is a mutating action with ongoing behavior
       // (its trigger may fire on future page captures) — approval-gated
@@ -117,6 +336,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       needsApproval: true,
       description:
         "Create a NEW Trellis workflow from a graph you author. Call get_workflow_node_catalog FIRST and follow it exactly. " +
+        "If a workflow is OPEN in this chat, prefer update_workflow — the default assumption is that workflow requests are about the open workflow; only create a separate NEW one when the user explicitly wants that or nothing is open. " +
         "Validation runs the same checks as the visual builder (envelope schema, node types, per-node config fields, edge structure); an invalid graph is rejected with repairable issues and nothing is created. " +
         "After creation, tell the user to click the card to review the workflow on the canvas before running it. " +
         "Check list_workflows first when the user might already have a similar workflow.",
@@ -226,7 +446,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
       // writes, exports) — approval-gated so the user sanctions each start.
       needsApproval: true,
       description:
-        "Start a run of an EXISTING Trellis workflow. Identify it by workflowNodeId (from list_workflows or a workflow you just created) or by exact-enough name. " +
+        "Start a run of an EXISTING Trellis workflow. With no id/name it runs the workflow the user has OPEN ('run this workflow'). Otherwise identify it by workflowNodeId (from list_workflows or a workflow you just created) or by exact-enough name. " +
         "The run executes server-side; supervision gates inside the workflow pause it for the user's approval in their inbox and on the run detail page. " +
         "Optional `input` is passed to the run and is readable in node configs as {{input.path}}.",
       inputSchema: z.object({
@@ -234,50 +454,23 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           .string()
           .uuid()
           .optional()
-          .describe("The workflow content node id (preferred)."),
+          .describe("The workflow content node id. Omit to run the open workflow."),
         name: z
           .string()
           .optional()
-          .describe("Title to resolve when the id is unknown."),
+          .describe("Title to resolve when there is no id and the target is not the open workflow."),
         input: z
           .record(z.string(), z.unknown())
           .optional()
           .describe("Optional run input, available as {{input.path}}."),
       }),
       execute: async ({ workflowNodeId, name, input }) => {
-        let nodeId = workflowNodeId ?? null;
-        if (!nodeId && name) {
-          const matches = await prisma.contentNode.findMany({
-            where: {
-              ownerId: ctx.userId,
-              contentType: "workflow",
-              deletedAt: null,
-              title: { contains: name, mode: "insensitive" },
-            },
-            orderBy: { updatedAt: "desc" },
-            take: 5,
-            select: { id: true, title: true },
-          });
-          if (matches.length === 0) {
-            return `No workflow found matching "${name}". Call list_workflows to see what exists.`;
-          }
-          if (matches.length > 1) {
-            return (
-              `Multiple workflows match "${name}" — re-call run_workflow with the intended workflowNodeId:\n` +
-              matches
-                .map((m) => `- "${m.title}" (id: ${m.id})`)
-                .join("\n")
-            );
-          }
-          nodeId = matches[0].id;
-        }
-        if (!nodeId) {
-          return "Provide workflowNodeId or name to identify the workflow.";
-        }
+        const resolved = await resolveWorkflowNode(ctx, workflowNodeId, name);
+        if (typeof resolved === "string") return resolved;
 
         const result = await dispatchWorkflowFromContent(
           ctx.userId,
-          nodeId,
+          resolved.id,
           input ?? {},
         );
         if (isDispatchFailure(result)) {
@@ -288,7 +481,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           await addAutoAssociation(
             ctx.userId,
             ctx.conversationId,
-            nodeId,
+            resolved.id,
             "tool-call",
           );
         }

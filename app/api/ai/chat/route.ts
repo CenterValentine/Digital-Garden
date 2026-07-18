@@ -354,15 +354,29 @@ export async function POST(request: Request) {
       // document" context so the model doesn't try to "read" the chat as
       // a document (which confuses it and ignores actual attachments).
       let isChatContent = false;
+      // Open workflow (AI v3 core S6): when the open content is a Trellis
+      // workflow, the chat's DEFAULT subject is THAT workflow (owner rule,
+      // 2026-07-18 — "chats serve their location" applied to workflows).
+      // The system prompt states the default; get_workflow/update_workflow/
+      // run_workflow resolve to it when called with no arguments.
+      let openWorkflowTitle: string | undefined;
       if (contentId) {
         const node = await prisma.contentNode.findFirst({
           where: { id: contentId, ownerId: session.user.id },
-          select: { contentType: true },
+          select: { contentType: true, title: true },
         });
         isChatContent = node?.contentType === "chat";
+        if (node?.contentType === "workflow") openWorkflowTitle = node.title;
       }
+      // Workflows are not documents: keep document-editor tools (and the
+      // "you are viewing a document" prompt section) off when one is open —
+      // apply_diff/read_first_chunk operate on NotePayload and would only
+      // confuse the model. ctx.contentId still carries the open workflow id
+      // for the workflow tools' open-target resolution.
       const editableContentId =
-        contentId && !isChatContent ? contentId : undefined;
+        contentId && !isChatContent && !openWorkflowTitle
+          ? contentId
+          : undefined;
 
       // Create tools bound to the authenticated user, then filter by
       // per-tool `enabled` in settings. Tools default to enabled; only
@@ -438,7 +452,11 @@ export async function POST(request: Request) {
 
       const toolCtx = {
         userId: session.user.id,
-        contentId: editableContentId,
+        // Editor tools read this as "the document being edited"; workflow
+        // tools read it as "the open workflow" (they verify contentType
+        // themselves). editableContentId is deliberately undefined when a
+        // workflow is open, so thread the raw contentId through for it.
+        contentId: editableContentId ?? (openWorkflowTitle ? contentId : undefined),
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the
@@ -690,6 +708,7 @@ export async function POST(request: Request) {
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
+          openWorkflowTitle,
           editableContentId,
           isChatContent,
           chatContentId: isChatContent ? contentId : undefined,

@@ -10,7 +10,9 @@
 export const WORKFLOW_TOOL_IDS = [
   "get_workflow_node_catalog",
   "list_workflows",
+  "get_workflow",
   "propose_workflow",
+  "update_workflow",
   "run_workflow",
 ] as const;
 
@@ -30,10 +32,20 @@ export const WORKFLOW_TOOL_METADATA: Record<
     name: "List Workflows",
     description: "List your Trellis workflows with trigger and step counts",
   },
+  get_workflow: {
+    name: "Read Workflow",
+    description:
+      "Read a workflow's graph and validation status — defaults to the workflow you have open",
+  },
   propose_workflow: {
     name: "Build Workflow",
     description:
       "Author a new Trellis workflow graph — you approve it in the chat, then review it on the canvas",
+  },
+  update_workflow: {
+    name: "Update Workflow",
+    description:
+      "Rewrite the open (or a named) workflow's graph — you approve each change; builder-parity validation",
   },
   run_workflow: {
     name: "Run Workflow",
