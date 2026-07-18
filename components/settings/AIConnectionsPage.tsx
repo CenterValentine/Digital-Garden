@@ -384,6 +384,54 @@ function ConnectionForm({
   );
   const [saving, setSaving] = useState(false);
 
+  // Per-field commits (owner rule 2026-07-18): within a fieldset the
+  // persistence grammar is all-or-nothing. The model list auto-saves, so
+  // identity/credential fields get explicit per-field ✓ commits and the
+  // dialog-level Save disappears in EDIT mode. Create mode keeps its
+  // single "Add connection" — nothing exists server-side until then.
+  const savedFieldsRef = useRef({
+    label: existing?.label ?? template?.name ?? "",
+    baseURL: existing?.baseURL ?? "",
+  });
+  const persistField = useCallback(
+    async (patch: Record<string, unknown>, after?: () => void) => {
+      if (!isEdit || !editingId) return;
+      try {
+        const res = await fetch(`/api/ai/connections/${editingId}`, {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        });
+        if (!res.ok) throw new Error(String(res.status));
+        after?.();
+        toast.success("Saved");
+      } catch {
+        toast.error("Couldn't save — try again");
+      }
+    },
+    [isEdit, editingId],
+  );
+  const labelDirty = isEdit && label.trim() !== savedFieldsRef.current.label;
+  const keyDirty = isEdit && apiKey.trim().length > 0;
+  const baseURLDirty =
+    isEdit && baseURL.trim() !== savedFieldsRef.current.baseURL;
+  const commitLabel = useCallback(() => {
+    const v = label.trim();
+    void persistField({ label: v }, () => {
+      savedFieldsRef.current.label = v;
+    });
+  }, [label, persistField]);
+  const commitKey = useCallback(() => {
+    void persistField({ apiKey: apiKey.trim() }, () => setApiKey(""));
+  }, [apiKey, persistField]);
+  const commitBaseURL = useCallback(() => {
+    const v = baseURL.trim();
+    void persistField({ baseURL: v || null }, () => {
+      savedFieldsRef.current.baseURL = v;
+    });
+  }, [baseURL, persistField]);
+
   const baseURLLocked = useMemo(
     () => Boolean(template?.baseURLLocked && !isEdit && template?.kind === "direct"),
     [template, isEdit],
@@ -470,34 +518,79 @@ function ConnectionForm({
       </div>
 
       <Field label="Label">
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
-        />
+        <div className="relative">
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && labelDirty) commitLabel();
+            }}
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
+          />
+          {labelDirty && (
+            <button
+              type="button"
+              onClick={commitLabel}
+              aria-label="Save label"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </Field>
 
       <Field label={isEdit ? "API key (leave blank to keep current)" : "API key"} hint={template?.apiKeyHint}>
-        <input
-          type="password"
-          autoComplete="off"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
-          className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
-        />
+        <div className="relative">
+          <input
+            type="password"
+            autoComplete="off"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && keyDirty) commitKey();
+            }}
+            placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+          />
+          {keyDirty && (
+            <button
+              type="button"
+              onClick={commitKey}
+              aria-label="Save API key"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+            >
+              <Check className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </Field>
 
       {!baseURLLocked && (
         <Field label="Base URL" hint="OpenAI-compatible endpoint URL. Leave blank for built-in providers.">
-          <input
-            type="text"
-            value={baseURL}
-            onChange={(e) => setBaseURL(e.target.value)}
-            placeholder="https://api.example.com/v1"
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={baseURL}
+              onChange={(e) => setBaseURL(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && baseURLDirty) commitBaseURL();
+              }}
+              placeholder="https://api.example.com/v1"
+              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+            />
+            {baseURLDirty && (
+              <button
+                type="button"
+                onClick={commitBaseURL}
+                aria-label="Save base URL"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 hover:bg-emerald-600 text-white p-1 transition-colors"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
         </Field>
       )}
 
@@ -505,7 +598,11 @@ function ConnectionForm({
         <Field label="Adapter" hint="Which AI SDK adapter handles this endpoint.">
           <select
             value={adapterKind}
-            onChange={(e) => setAdapterKind(e.target.value as AdapterKind)}
+            onChange={(e) => {
+              const v = e.target.value as AdapterKind;
+              setAdapterKind(v);
+              if (isEdit) void persistField({ adapterKind: v });
+            }}
             className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
           >
             <option value="openai-compat">OpenAI-compatible (most third-party endpoints)</option>
@@ -529,17 +626,23 @@ function ConnectionForm({
       />
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button variant="ghost" onClick={onDone} disabled={saving}>
-          Cancel
-        </Button>
-        <Button onClick={handleSave} disabled={saving}>
-          {saving ? "Saving…" : (
-            <>
-              <Check className="h-4 w-4 mr-1.5" />
-              {isEdit ? "Save" : "Add connection"}
-            </>
-          )}
-        </Button>
+        {isEdit ? (
+          <Button onClick={onDone}>Done</Button>
+        ) : (
+          <>
+            <Button variant="ghost" onClick={onDone} disabled={saving}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={saving}>
+              {saving ? "Saving…" : (
+                <>
+                  <Check className="h-4 w-4 mr-1.5" />
+                  Add connection
+                </>
+              )}
+            </Button>
+          </>
+        )}
       </div>
     </div>
   );
