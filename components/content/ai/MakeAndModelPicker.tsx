@@ -61,6 +61,46 @@ interface ConnSummary {
  * server's BYOK_REQUIRED and shows the right CTA, so a borderline
  * "available" model that actually fails on send won't be a dead end.
  */
+/**
+ * Recency heuristic for model ordering (owner request 2026-07-17): newer
+ * models float, older sink — WITHOUT stored release dates. Signals, in
+ * priority order:
+ *   1. availability (sorted upstream of this comparator)
+ *   2. the largest version-like numeric token in the id/name
+ *      ("claude-sonnet-4-5" → 4.5, "gpt-4o" → 4, "gemini-2.5-pro" → 2.5)
+ *   3. an 8-digit date stamp when present ("…-20250514")
+ * Imperfect by design (an "o4" and a "4o" tie on version and fall to the
+ * date/name tiebreak) — good enough to keep 3.5-era models at the bottom
+ * until Connection model lists carry real created timestamps.
+ */
+function modelVersionScore(text: string): number {
+  let best = 0;
+  for (const m of text.toLowerCase().matchAll(/(\d+(?:[.-]\d+)?)/g)) {
+    const v = parseFloat(m[1].replace("-", "."));
+    // Skip date-like and context-size tokens; versions live below 100.
+    if (v > 0 && v < 100) best = Math.max(best, v);
+  }
+  return best;
+}
+
+function modelDateScore(text: string): number {
+  const m = text.match(/20\d{6}/);
+  return m ? parseInt(m[0], 10) : 0;
+}
+
+function compareModelRecency(
+  a: { id: string; name: string },
+  b: { id: string; name: string },
+): number {
+  const at = `${a.id} ${a.name}`;
+  const bt = `${b.id} ${b.name}`;
+  const version = modelVersionScore(bt) - modelVersionScore(at);
+  if (version !== 0) return version;
+  const date = modelDateScore(bt) - modelDateScore(at);
+  if (date !== 0) return date;
+  return a.name.localeCompare(b.name);
+}
+
 function isModelAvailable(
   providerId: string,
   modelId: string,
@@ -205,12 +245,12 @@ export function MakeAndModelPicker({
         // unknown for dynamic providers, but the picker only reads
         // name/id/costTier so coarse defaults are fine.
         models: Array.from(bareIds)
-          .sort((a, b) => a.localeCompare(b))
           .map((id) => ({
             id,
             name: id,
             costTier: "medium" as const,
-          })),
+          }))
+          .sort(compareModelRecency),
       }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [connections]);
@@ -281,17 +321,25 @@ export function MakeAndModelPicker({
               costTier: "medium" as const,
             }))
         : [];
+      const merged = [
+        ...p.models.map((m) => ({
+          id: m.id,
+          name: m.name,
+          costTier: m.costTier,
+        })),
+        ...userModelEntries,
+      ].sort((a, b) => {
+        // Available models float above unavailable (greyed) ones; within
+        // each band, newer floats and older sinks.
+        const availA = isModelAvailable(p.id, a.id, connections) ? 1 : 0;
+        const availB = isModelAvailable(p.id, b.id, connections) ? 1 : 0;
+        if (availA !== availB) return availB - availA;
+        return compareModelRecency(a, b);
+      });
       return {
         id: p.id,
         name: p.name,
-        models: [
-          ...p.models.map((m) => ({
-            id: m.id,
-            name: m.name,
-            costTier: m.costTier,
-          })),
-          ...userModelEntries,
-        ],
+        models: merged,
       };
     });
     return [...fromCatalog, ...dynamicProviders];
