@@ -204,7 +204,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             __checkpoint: true,
             phase,
             recorded: false,
-            note: "Checkpoint acknowledged (no target folder set, so no Run Ledger was written). Wait for the user's verdict before continuing.",
+            note: "Checkpoint approved (no target folder set, so no Run Ledger was written). Continue IMMEDIATELY with the next phase — or give a completion summary if this was the final one.",
           };
         }
         try {
@@ -228,6 +228,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             phase,
             recorded: true,
             ledgerNodeId: ledger.contentNodeId,
+            nextAction:
+              "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
         } catch (error) {
           return {

@@ -1525,15 +1525,31 @@ function PhaseCheckpointCard({
     next?: string;
   };
 
-  const respond = (approved: boolean, reason?: string) => {
+  // Verdict channels (SDK constraint discovered 2026-07-18): approval
+  // responses for client-executed tools are DROPPED from model messages —
+  // only denial reasons reach the model (as execution-denied results). So
+  // both feedback verdicts ride the denial channel with framing prefixes;
+  // the model re-runs or adjusts, then checkpoints again (which also gives
+  // tweaked phases a fresh ledger entry).
+  const respond = (
+    kind: "approve" | "revise" | "tweaks",
+    feedbackText?: string,
+  ) => {
     if (verdict || !onRespond) return;
-    onRespond({ id: approvalId, approved, reason });
+    if (kind === "approve") {
+      onRespond({ id: approvalId, approved: true });
+      setVerdict("Approved — continuing…");
+      return;
+    }
+    const framed =
+      kind === "revise"
+        ? `REVISE THIS PHASE — redo it incorporating this feedback, then call phase_checkpoint again: ${feedbackText}`
+        : `APPROVED WITH TWEAKS — apply these changes to this phase's output, then call phase_checkpoint again: ${feedbackText}`;
+    onRespond({ id: approvalId, approved: false, reason: framed });
     setVerdict(
-      approved
-        ? reason
-          ? "Approved with tweaks — continuing…"
-          : "Approved — continuing…"
-        : "Revision requested — redoing the phase…",
+      kind === "revise"
+        ? "Revision requested — redoing the phase…"
+        : "Tweaks sent — applying, then re-checkpointing…",
     );
   };
 
@@ -1585,7 +1601,7 @@ function PhaseCheckpointCard({
               <>
                 <button
                   type="button"
-                  onClick={() => respond(true)}
+                  onClick={() => respond("approve")}
                   disabled={!onRespond}
                   className="inline-flex items-center gap-1 rounded-md bg-emerald-600/90 hover:bg-emerald-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
                 >
@@ -1612,9 +1628,7 @@ function PhaseCheckpointCard({
               <>
                 <button
                   type="button"
-                  onClick={() =>
-                    respond(mode === "tweaks", feedback.trim() || undefined)
-                  }
+                  onClick={() => respond(mode, feedback.trim())}
                   disabled={!onRespond || feedback.trim().length === 0}
                   className="inline-flex items-center gap-1 rounded-md bg-indigo-600/90 hover:bg-indigo-600 disabled:opacity-50 text-white px-2.5 py-1 text-[11px] font-medium transition-colors"
                 >
