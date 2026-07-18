@@ -12,7 +12,7 @@ last_updated: 2026-07-18
 
 ## AI v3 Core Followups (2026-07-18, branch `worktree-ai-v3-core`, PR #114)
 
-S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6, and 12 below are now scheduled in `AI-V3.1-PLAN.md` (R1–R4, 2026-07-18; item 12 extended to DeepSeek); the memory-bank/JIT-retrieval thread is deferred to AI V4 (design discussion captured in that plan's final section).** Deferred by design (owner-requested UX first, engineering polish second):
+S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6, 9, 11, and 12 below are now scheduled in `AI-V3.1-PLAN.md` (R1–R6, 2026-07-18; item 12 extended to DeepSeek; item 11's JIT-retrieval piece stays with V4 memory); the memory-bank/JIT-retrieval thread is deferred to AI V4 (design discussion captured in that plan's final section).** Deferred by design (owner-requested UX first, engineering polish second):
 
 - [ ] **Mid-run document review disruption** (owner: "the biggest disruption") — reviewing a created artifact mid-playbook navigates away and backtracks the chat. Fix family: review-without-leaving (side pane, peek overlay, or split view). Pairs with the item below.
 - [ ] **Note-card right-click "Open in pane"** (owner request) — open an AI-created note in a secondary pane instead of displacing the current view.
@@ -24,7 +24,7 @@ S1–S6 built; Anthropic + OpenAI flagship runs passed. **Items 1, 2, 4, 5, 6, a
 - [ ] **S4c playbook progressive-disclosure registry** — playbooks currently invoked by @-mentioning the note; the registry adds discovery + per-phase disclosure.
 - [ ] **Regen sweep for pre-fix degraded notes** — notes generated before the @tiptap/html server twins landed hold literal `##`/`**` text; content is intact, needs re-render through markdownToTiptap.
 - [ ] **Conversation title strategy for quick URL chats** — page title vs first-message summary (deferred S3-time call).
-- [ ] **Context-discipline near-term set** (approved with the plan, not yet built): JIT retrieval, validated compaction, extraction subagents, cache-aware layout upgrades, tokens-per-phase eval.
+- [ ] **Context-discipline near-term set** (approved with the plan, not yet built): validated compaction, extraction subagents, cache-aware layout upgrades, tokens-per-phase eval (→ 3.1 R5); JIT retrieval stays with the V4 memory investigation.
 - [ ] **Kimi/Moonshot + DeepSeek catch-up** — native search (Kimi; DeepSeek has none — straight-faced non-attachment) + gateway parity + BYOK adapters (→ 3.1 R4).
 - [ ] **Acquisition explainer session** for the owner (umbrella post-V3 queue).
 

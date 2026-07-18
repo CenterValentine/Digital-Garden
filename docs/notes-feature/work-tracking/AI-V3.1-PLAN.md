@@ -1,4 +1,4 @@
-# AI v3.1 — Chat UX Polish + Vendor Catch-up (mid-run review, freshness, stickiness, Kimi/DeepSeek)
+# AI v3.1 — Chat UX Polish + Vendor Catch-up + Context Discipline (R1–R6)
 
 Successor round to AI v3 core (shipped, PR #114 / merge `9f15281`;
 plan: `AI-V3-CORE-PLAN.md`). Scope set by the owner 2026-07-18:
@@ -96,6 +96,57 @@ DeepSeek.
   DeepSeek completes the same run with `read_page`-grounded research and
   an honest no-native-search notice; both selectable via BYOK connection
   AND gateway, with correct Suggested-sort placement.
+
+## R5 — Context-discipline near-term set (owner addition, minus JIT)
+
+The "near" commitments approved with the v3 plan, now scheduled — EXCEPT
+JIT retrieval, which is deliberately carved out: it depends on where
+memory artifacts live, and that substrate decision belongs to the V4
+memory investigation (see final section). Build order is measurement
+first:
+
+- **Tokens-per-phase eval**: extend the S5 token meter into per-phase
+  accounting (checkpoint boundaries delimit phases) — a small table per
+  run in the debug panel + a line per phase in the Run Ledger. This is
+  the yardstick the rest of the set is judged by.
+- **Extraction subagents**: for oversized tool results (read_page near
+  the 16k cap), a cheap-model sub-call extracts task-relevant facts
+  before the result enters context; raw text never rides the main
+  thread. Provider-agnostic via feature routing; falls back to today's
+  truncation when no cheap route exists.
+- **Validated compaction**: when history compaction summarizes older
+  turns, the summary is validated against what it replaces (claim-check
+  pass) before substitution — compaction that fails validation keeps the
+  originals. Applies to the message-history layer only (artifact-layer
+  compaction is V4).
+- **Cache-aware layout upgrades**: extend the byte-stable-prompt work
+  (date-only stability shipped in v3) — audit section ordering, tool
+  definition stability, and pruning placement so provider prompt caches
+  hit across a session; verify with provider cache-hit metrics where
+  exposed.
+- **Gate:** a jobhunt-mini run shows per-phase token numbers; an
+  oversized page read enters context as an extract; a forced compaction
+  passes validation or visibly declines; cache-hit rate measurably
+  improves across a 3-phase run.
+
+## R6 — Regen sweep: pre-fix degraded notes (owner addition)
+
+Notes generated before the @tiptap/html server twins (4247ca9) hold
+literal `##`/`**` markdown as plain paragraphs. Content is intact — the
+degraded text IS the source markdown — so regeneration is lossless.
+
+- One-off script in `scripts/` (not an auto-migration): conservative
+  detection (AI-created NotePayloads whose tiptapJson is paragraph-only
+  AND whose text matches markdown structure markers), **dry-run listing
+  first**, then rewrite via the now-server-safe `markdownToTiptap` +
+  refreshed `searchText`/metadata. Run Ledger notes regen perfectly from
+  their stored `ledgerMarkdown` metadata regardless of heuristics.
+- Collaboration caution: notes with live Y.js state must go through the
+  content-safety path (or be skipped and reported) — never rewrite
+  NotePayload under an active collab doc silently.
+- **Gate:** dry-run report reviewed by owner; post-run, previously
+  degraded notes render structured; a spot-checked unaffected note is
+  byte-identical.
 
 ## Verification conventions
 
