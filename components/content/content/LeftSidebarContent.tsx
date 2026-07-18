@@ -27,6 +27,7 @@ import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { clientLogger } from "@/lib/core/logger/client";
+import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
 interface TreeApiResponse {
   success: boolean;
@@ -579,6 +580,10 @@ export function LeftSidebarContent({
       };
 
       setTreeData(insertTempNode(treeData));
+      // iOS: raise the keyboard now, inside the tap's user-activation window —
+      // the rename input mounts asynchronously and its autoFocus alone can't
+      // summon the keyboard (see lib/core/mobile-keyboard.ts).
+      warmUpMobileKeyboard();
       setCreatingItem({
         type: "note",
         parentId,
@@ -789,6 +794,11 @@ export function LeftSidebarContent({
       // (the server computes the final slot from current children).
       // Sequential keeps the contract simple and yields stable order.
       const failures: Array<{ id: string; message: string }> = [];
+      // A detached reference that's still embedded in a note will re-nest
+      // under it on the next tree fetch (embed-graph ownership). Capture the
+      // server's flag so the snap-back happens visibly after a beat, with an
+      // explanation — not silently on some later refresh.
+      let snapBackTo: { id: string; title: string } | null = null;
       for (let i = 0; i < dragged.length; i++) {
         const { id, node } = dragged[i];
         const pos = positions.get(id);
@@ -832,6 +842,13 @@ export function LeftSidebarContent({
             id,
             message: result.error?.message ?? `HTTP ${response.status}`,
           });
+        } else {
+          const moved = (
+            result as {
+              data?: { stillReferencedBy?: { id: string; title: string } | null };
+            }
+          ).data;
+          if (moved?.stillReferencedBy) snapBackTo = moved.stillReferencedBy;
         }
       }
 
@@ -860,6 +877,21 @@ export function LeftSidebarContent({
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         window.dispatchEvent(new CustomEvent("dg:people-refresh"));
+      }
+
+      if (snapBackTo) {
+        const owner = snapBackTo;
+        // Let the drop land visibly, then snap back with the reason. The
+        // refetched tree re-nests via the embed-graph ownership fallback.
+        setTimeout(() => {
+          void fetchTree();
+          // No "remove the embed to move it freely" advice here: removing
+          // the LAST embed garbage-collects the media to trash (see
+          // syncImageReferences ref-counting), which isn't "freeing" it.
+          toast.warning("Unable to move referenced content", {
+            description: `This content is still embedded in "${owner.title}".`,
+          });
+        }, 2500);
       }
     } catch (err) {
       clientLogger.error({
@@ -2310,6 +2342,11 @@ export function LeftSidebarContent({
     // Update tree with temporary node
     const newTreeData = insertTempNode(treeData);
     setTreeData(newTreeData);
+
+    // iOS: raise the keyboard now, inside the tap's user-activation window —
+    // the rename input mounts asynchronously and its autoFocus alone can't
+    // summon the keyboard (see lib/core/mobile-keyboard.ts).
+    warmUpMobileKeyboard();
 
     // Set creating state to track the temporary node
     setCreatingItem({

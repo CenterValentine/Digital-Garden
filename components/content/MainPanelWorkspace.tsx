@@ -13,6 +13,7 @@ import {
   type WorkspaceLayoutMode,
   type WorkspacePaneId,
 } from "@/state/content-store";
+import { useMobileUiStore } from "@/state/mobile-ui-store";
 import { MainPanelNavigation } from "./MainPanelNavigation";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
@@ -57,6 +58,10 @@ function WorkspacePane({
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const focusPane = useContentStore((state) => state.focusPane);
+  // Hide the per-pane tab strip in the mobile focus toggle (the grab handle
+  // brings it back). Route focus already runs single-tab, so this mainly
+  // affects the in-place toggle.
+  const mobileFocus = useMobileUiStore((state) => state.focusMode);
   const pathname = usePathname();
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const isDropTarget = Boolean(draggedTabId) && layoutMode !== "single";
@@ -84,7 +89,7 @@ function WorkspacePane({
         });
       }}
     >
-      {!isEmbedMode && (
+      {!isEmbedMode && !mobileFocus && (
         <MainPanelHeader
           paneId={paneId}
           draggedTabId={draggedTabId}
@@ -427,7 +432,10 @@ export function MainPanelWorkspace({
   const restoreWorkspace = useContentStore((state) => state.restoreWorkspace);
   const setSelectedContentId = useContentStore((state) => state.setSelectedContentId);
   const shellControllers = useExtensionShellControllers();
-  const isFocusMode = pathname?.includes("/content/focus/");
+  // Route focus (/content/focus/) OR the in-place mobile focus toggle both hide
+  // the workspace bar + shell controllers below.
+  const mobileFocus = useMobileUiStore((state) => state.focusMode);
+  const isFocusMode = (pathname?.includes("/content/focus/") ?? false) || mobileFocus;
   const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
