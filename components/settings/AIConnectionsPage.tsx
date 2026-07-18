@@ -10,6 +10,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { compareModelsBySuggested } from "@/lib/domain/ai/model-popularity";
 import { Plus, Trash2, Edit3, AlertCircle, Check, X, KeyRound, ExternalLink, HelpCircle, Sparkles, Search, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/glass/button";
@@ -623,7 +624,12 @@ function ModelEditor({
   // Filter + sort for the fetched list panel. Filter is plain substring
   // match against id + display name; sort cycles asc/desc on id.
   const [fetchedFilter, setFetchedFilter] = useState("");
-  const [fetchedSort, setFetchedSort] = useState<"asc" | "desc">("asc");
+  // "suggested" (default): flagship vendors/families float, recency
+  // breaks ties — a 300-model gateway list starts with the models the
+  // user most likely wants, not "alibaba/…". A→Z / Z→A remain for lookup.
+  const [fetchedSort, setFetchedSort] = useState<"suggested" | "asc" | "desc">(
+    "suggested",
+  );
   // Capability type filter (null = all). Lets the user narrow a gateway's huge
   // model list to just image-capable (or vision, reasoning, …) models so they
   // can tell at a glance which to add for image generation.
@@ -658,11 +664,12 @@ function ModelEditor({
       }
       return true;
     });
-    filtered.sort((a, b) =>
-      fetchedSort === "asc"
+    filtered.sort((a, b) => {
+      if (fetchedSort === "suggested") return compareModelsBySuggested(a, b);
+      return fetchedSort === "asc"
         ? a.id.localeCompare(b.id)
-        : b.id.localeCompare(a.id),
-    );
+        : b.id.localeCompare(a.id);
+    });
     return filtered;
   }, [fetchedModels, fetchedFilter, fetchedSort, capabilityFilter]);
 
@@ -694,7 +701,7 @@ function ModelEditor({
     setSelectedFetched(new Set());
     setFetchedFilter("");
     setCapabilityFilter(null);
-    setFetchedSort("asc");
+    setFetchedSort("suggested");
   }, []);
 
   const addModel = useCallback(() => {
@@ -759,7 +766,7 @@ function ModelEditor({
       setSelectedFetched(new Set());
       setFetchedFilter("");
       setCapabilityFilter(null);
-      setFetchedSort("asc");
+      setFetchedSort("suggested");
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Network error");
       setFetchedModels(null);
@@ -914,14 +921,26 @@ function ModelEditor({
               <button
                 type="button"
                 onClick={() =>
-                  setFetchedSort((s) => (s === "asc" ? "desc" : "asc"))
+                  setFetchedSort((s) =>
+                    s === "suggested" ? "asc" : s === "asc" ? "desc" : "suggested",
+                  )
                 }
-                aria-label={`Sort ${fetchedSort === "asc" ? "ascending" : "descending"}`}
-                title={`Sorted ${fetchedSort === "asc" ? "A → Z" : "Z → A"} (click to flip)`}
+                aria-label={`Sort: ${fetchedSort}`}
+                title={
+                  fetchedSort === "suggested"
+                    ? "Sorted by Suggested (flagship vendors + newest first) — click for A → Z"
+                    : fetchedSort === "asc"
+                      ? "Sorted A → Z — click for Z → A"
+                      : "Sorted Z → A — click for Suggested"
+                }
                 className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors"
               >
                 <ArrowUpDown className="h-3 w-3" />
-                {fetchedSort === "asc" ? "A→Z" : "Z→A"}
+                {fetchedSort === "suggested"
+                  ? "Suggested"
+                  : fetchedSort === "asc"
+                    ? "A→Z"
+                    : "Z→A"}
               </button>
               <button
                 type="button"
