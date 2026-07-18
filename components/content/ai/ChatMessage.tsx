@@ -88,6 +88,8 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
 interface NotePayload {
   __notePayload: true;
   kind: "created" | "updated";
+  /** What was created — defaults to "note"; propose_workflow sends "workflow" (S6). */
+  noun?: string;
   contentId: string;
   title: string;
   parentId?: string | null;
@@ -2003,13 +2005,14 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
   }, [isSelfEdit, payload.contentId]);
 
   const verb = payload.kind === "updated" ? "Updated" : "Created";
+  const noun = payload.noun ?? "note";
   const wordCount =
     typeof payload.wordCount === "number" && payload.wordCount > 0
       ? ` · ${payload.wordCount.toLocaleString()} word${payload.wordCount === 1 ? "" : "s"}`
       : "";
   const subline = isSelfEdit
     ? `${verb} this chat's notes${wordCount} · click to view`
-    : `${verb} note${wordCount} · click to open`;
+    : `${verb} ${noun}${wordCount} · click to open`;
   const tooltipText = isSelfEdit
     ? "View the updated notes for this chat"
     : `Open "${payload.title}"`;

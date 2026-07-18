@@ -109,6 +109,7 @@ import { buildSystemPrompt } from "@/lib/domain/ai/system-prompt";
 import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
+import { createWorkflowTools } from "@/lib/domain/ai/tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -449,6 +450,8 @@ export async function POST(request: Request) {
       const allTools = {
         ...createBaseTools(toolCtx),
         ...createFlashcardTools(toolCtx),
+        // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
+        ...createWorkflowTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<

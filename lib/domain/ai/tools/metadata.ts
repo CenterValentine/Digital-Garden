@@ -16,6 +16,11 @@ import {
   FLASHCARD_TOOL_METADATA as _FLASHCARD_TOOL_METADATA,
   type FlashcardToolId as _FlashcardToolId,
 } from "./flashcard-metadata";
+import {
+  WORKFLOW_TOOL_IDS as _WORKFLOW_TOOL_IDS,
+  WORKFLOW_TOOL_METADATA as _WORKFLOW_TOOL_METADATA,
+  type WorkflowToolId as _WorkflowToolId,
+} from "./workflow-metadata";
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
@@ -125,11 +130,17 @@ export const FLASHCARD_TOOL_IDS = _FLASHCARD_TOOL_IDS;
 export const FLASHCARD_TOOL_METADATA = _FLASHCARD_TOOL_METADATA;
 export type FlashcardToolId = _FlashcardToolId;
 
-/** All tool IDs (base + editor + flashcards) for settings UI */
+// Re-export workflow tool metadata for unified access (AI v3 core S6)
+export const WORKFLOW_TOOL_IDS = _WORKFLOW_TOOL_IDS;
+export const WORKFLOW_TOOL_METADATA = _WORKFLOW_TOOL_METADATA;
+export type WorkflowToolId = _WorkflowToolId;
+
+/** All tool IDs (base + editor + flashcards + workflows) for settings UI */
 export const ALL_TOOL_IDS = [
   ...BASE_TOOL_IDS,
   ..._EDITOR_TOOL_IDS,
   ..._FLASHCARD_TOOL_IDS,
+  ..._WORKFLOW_TOOL_IDS,
 ] as const;
 
 /** All tool metadata combined */
@@ -140,4 +151,5 @@ export const ALL_TOOL_METADATA: Record<
   ...BASE_TOOL_METADATA,
   ..._EDITOR_TOOL_METADATA,
   ..._FLASHCARD_TOOL_METADATA,
+  ..._WORKFLOW_TOOL_METADATA,
 };
