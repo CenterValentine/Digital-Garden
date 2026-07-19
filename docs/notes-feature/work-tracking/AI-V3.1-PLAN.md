@@ -117,6 +117,19 @@ DeepSeek.
   DeepSeek completes the same run with `read_page`-grounded research and
   an honest no-native-search notice; both selectable via BYOK connection
   AND gateway, with correct Suggested-sort placement.
+- **BUILT (1241291, 2026-07-18) — with one verified scope change**: Kimi
+  native search is NOT wirable through the current AI SDK path
+  (Moonshot's `$web_search` is a `builtin_function` the OpenAI-compat
+  adapter can't serialize; no official Moonshot provider package exists)
+  — so BOTH vendors ship with straight-faced search_web non-attachment;
+  Kimi's gate criterion downgrades to the DeepSeek criterion
+  (read_page-grounded + honest notice). Follow-up if Kimi search
+  matters: raw request-body injection. DeepSeek adapter pinned to
+  @ai-sdk/deepseek ^2.0.50 (provider-spec-3 generation; ALL 3.x builds
+  are spec-4 and reject this ai install — version majors are NOT aligned
+  across the @ai-sdk family). Suggested-sort priors + family boosts for
+  both already existed from v3. **Gate pending owner smoke** (BYOK keys
+  needed for both vendors).
 
 ## R5 — Context-discipline near-term set (owner addition, minus JIT)
 
