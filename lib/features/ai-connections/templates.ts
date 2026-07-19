@@ -193,6 +193,45 @@ const VERCEL_GATEWAY: ConnectionTemplate = {
   supportsModelFetch: true,
 };
 
+// Cost-effective vendor catch-up (AI v3.1 R4, owner addition 2026-07-18).
+// Neither vendor exposes an AI-SDK-expressible native web search (Moonshot's
+// $web_search is a builtin_function the OpenAI-compat adapter can't
+// serialize; DeepSeek has none) — search_web deliberately does NOT attach
+// for either (straight-faced), read_page works fully.
+
+const DEEPSEEK: ConnectionTemplate = {
+  id: "deepseek",
+  name: "DeepSeek",
+  kind: "direct",
+  adapterKind: "deepseek",
+  defaultBaseURL: null, // official @ai-sdk/deepseek uses its own default
+  baseURLLocked: true,
+  defaultModels: [
+    { id: "deepseek-chat", name: "DeepSeek Chat (V3)", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
+    { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)", contextWindow: 128_000, capabilities: ["text", "streaming"] },
+  ],
+  apiKeyHint: "Starts with `sk-` — get one from platform.deepseek.com",
+  apiKeyDocsURL: "https://platform.deepseek.com/api_keys",
+  supportsModelFetch: true,
+};
+
+const MOONSHOT: ConnectionTemplate = {
+  id: "moonshot",
+  name: "Moonshot (Kimi)",
+  kind: "direct",
+  adapterKind: "openai-compat",
+  defaultBaseURL: "https://api.moonshot.ai/v1",
+  baseURLLocked: false, // .cn endpoint for mainland accounts
+  defaultModels: [
+    { id: "kimi-k2-turbo-preview", name: "Kimi K2 Turbo", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
+    { id: "kimi-latest", name: "Kimi (latest)", contextWindow: 131_072, capabilities: ["text", "vision", "tools", "streaming"] },
+    { id: "moonshot-v1-128k", name: "Moonshot v1 128k", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
+  ],
+  apiKeyHint: "Get one from platform.moonshot.ai (use api.moonshot.cn as base URL for mainland accounts)",
+  apiKeyDocsURL: "https://platform.moonshot.ai/console/api-keys",
+  supportsModelFetch: true,
+};
+
 const FIREWORKS: ConnectionTemplate = {
   id: "fireworks",
   name: "Fireworks",
@@ -262,6 +301,8 @@ export const CONNECTION_TEMPLATES: ConnectionTemplate[] = [
   XAI,
   MISTRAL,
   GROQ,
+  DEEPSEEK,
+  MOONSHOT,
   VERCEL_GATEWAY,
   FIREWORKS,
   TOGETHER,

@@ -89,6 +89,12 @@ export async function resolveChatModelFromConnection(
       const { createGroq } = await import("@ai-sdk/groq");
       return createGroq({ apiKey: connection.apiKey })(modelId);
     }
+    case "deepseek": {
+      // Official provider (v3.1 R4) — first-class reasoning support for
+      // deepseek-reasoner, unlike the generic openai-compat path.
+      const { createDeepSeek } = await import("@ai-sdk/deepseek");
+      return createDeepSeek({ apiKey: connection.apiKey })(modelId);
+    }
     case "vercel-gateway": {
       // Vercel AI Gateway BYOK: user supplies their own Gateway key.
       const { createGateway } = await import("@ai-sdk/gateway");

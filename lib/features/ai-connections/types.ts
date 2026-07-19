@@ -101,5 +101,6 @@ export type AdapterKind =
   | "xai"
   | "mistral"
   | "groq"
+  | "deepseek"
   | "vercel-gateway"
   | "openai-compat";
