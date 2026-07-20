@@ -31,8 +31,9 @@ import {
   emptyDirectoryIndex,
   emptyGardenCategories,
 } from "./defaults";
-import { SectionCard } from "./SectionCard";
+import { SectionCard, type PickerTarget } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
+import { ContentPicker } from "./ContentPicker";
 
 type TenantRow = { id: string; slug: string; displayName: string; isPersonal: boolean };
 type PageListRow = {
@@ -76,6 +77,10 @@ export function SitePagesComposer() {
   const [working, setWorking] = useState<WorkingPage | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showJson, setShowJson] = useState(false);
+  /** Which section (and category) the content picker is connecting, if open. */
+  const [picker, setPicker] = useState<
+    (PickerTarget & { sectionIndex: number }) | null
+  >(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newDraft, setNewDraft] = useState({ slug: "", title: "", kind: "record" as PageKind });
 
@@ -296,6 +301,21 @@ export function SitePagesComposer() {
       return { ...prev, config: { sections } };
     });
 
+  /** Apply a picker choice back onto the section that opened it. */
+  const applyPick = (
+    apply: (section: PageSection, target: PickerTarget) => PageSection,
+  ) => {
+    if (!picker) return;
+    const { sectionIndex, ...target } = picker;
+    mutate((prev) => {
+      const sections = prev.config.sections.slice();
+      const section = sections[sectionIndex];
+      if (!section) return prev;
+      sections[sectionIndex] = apply(section, target as PickerTarget);
+      return { ...prev, config: { sections } };
+    });
+  };
+
   const saveLabel =
     saveState === "saving"
       ? "Saving draft…"
@@ -507,6 +527,7 @@ export function SitePagesComposer() {
                     return { ...prev, config: { sections } };
                   })
                 }
+                onConnect={(target) => setPicker({ ...target, sectionIndex: i })}
               />
             ))}
 
@@ -557,6 +578,67 @@ export function SitePagesComposer() {
           config={working.config}
           onApply={(next) => mutate((p) => ({ ...p, config: next }))}
           onClose={() => setShowJson(false)}
+        />
+      )}
+
+      {picker && working && (
+        <ContentPicker
+          tenantId={tenantId}
+          mode={picker.mode}
+          sectionLabel={(() => {
+            const s = working.config.sections[picker.sectionIndex];
+            if (!s) return "this section";
+            if (s.type === "recordList") return s.label;
+            if (s.type === "gardenCategories" && picker.mode === "gardenCategory")
+              return s.categories[picker.categoryIndex]?.label ?? "this category";
+            return "this section";
+          })()}
+          onBindDirectory={(ref, dir) =>
+            applyPick((section, target) => {
+              if (section.type === "recordList") {
+                return { ...section, bind: ref };
+              }
+              if (section.type === "directoryIndex") {
+                // Append the directory as a listed entry, title seeded from it.
+                return {
+                  ...section,
+                  entries: [
+                    ...section.entries,
+                    { bind: ref, title: dir.title, subtitle: undefined },
+                  ],
+                };
+              }
+              if (section.type === "gardenCategories" && target.mode === "gardenCategory") {
+                const categories = section.categories.slice();
+                const cat = categories[target.categoryIndex];
+                if (cat) categories[target.categoryIndex] = { ...cat, bind: ref };
+                return { ...section, categories };
+              }
+              return section;
+            })
+          }
+          onAddItem={(ref, title) =>
+            applyPick((section, target) => {
+              if (section.type === "recordList") {
+                // Bound row: title/date inherit from the publication at resolve
+                // time, so we store only the ref (S5 adds field overrides).
+                return { ...section, items: [...section.items, { ref, status: "done" }] };
+              }
+              if (section.type === "gardenCategories" && target.mode === "gardenCategory") {
+                const categories = section.categories.slice();
+                const cat = categories[target.categoryIndex];
+                if (cat) {
+                  categories[target.categoryIndex] = {
+                    ...cat,
+                    items: [...cat.items, { ref, title }],
+                  };
+                }
+                return { ...section, categories };
+              }
+              return section;
+            })
+          }
+          onClose={() => setPicker(null)}
         />
       )}
     </div>

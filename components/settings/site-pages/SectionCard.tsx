@@ -18,16 +18,34 @@ import type {
 } from "@/lib/domain/page-layout/schema";
 import { SECTION_TYPE_LABELS } from "./defaults";
 
+/** What the composer should open the content picker for. */
+export type PickerTarget =
+  | { mode: "recordList" }
+  | { mode: "directoryIndex" }
+  | { mode: "gardenCategory"; categoryIndex: number };
+
 const inputCls =
   "rounded-md border border-white/10 bg-white/5 px-2 py-1 text-sm min-w-0";
 const monoChip =
   "inline-flex items-center rounded-full border border-white/15 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-white/50";
+const connectCls =
+  "rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10";
 
-function SourceChip({ bind }: { bind?: string }) {
+function SourceChip({ bind, onUnbind }: { bind?: string; onUnbind?: () => void }) {
   if (!bind) return null;
   return (
-    <span className="inline-flex items-center rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-400">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-400">
       auto · {bind.replace("publicPath:", "")}
+      {onUnbind && (
+        <button
+          type="button"
+          aria-label="Disconnect directory"
+          className="text-emerald-400/60 hover:text-rose-400"
+          onClick={onUnbind}
+        >
+          ✕
+        </button>
+      )}
     </span>
   );
 }
@@ -35,9 +53,11 @@ function SourceChip({ bind }: { bind?: string }) {
 function RecordListBody({
   section,
   onChange,
+  onConnect,
 }: {
   section: RecordListSection;
   onChange: (next: RecordListSection) => void;
+  onConnect: (target: PickerTarget) => void;
 }) {
   return (
     <div className="space-y-2">
@@ -64,7 +84,10 @@ function RecordListBody({
           <option value="date-asc">oldest first</option>
           <option value="manual">manual order</option>
         </select>
-        <SourceChip bind={section.bind} />
+        <SourceChip
+          bind={section.bind}
+          onUnbind={() => onChange({ ...section, bind: undefined })}
+        />
       </div>
 
       <ul className="divide-y divide-white/5 rounded-md border border-white/5">
@@ -100,25 +123,36 @@ function RecordListBody({
           </li>
         ))}
         {section.items.length === 0 && !section.bind && (
-          <li className="px-3 py-4 text-center text-xs text-white/35">
-            No rows yet — add one below, or connect a directory (picker arrives
-            with the next sprint).
+          <li className="px-3 py-5 text-center text-xs text-white/35">
+            This section has no content yet. Connect a published directory and
+            its posts fill in automatically — or add rows by hand.
+          </li>
+        )}
+        {section.bind && (
+          <li className="px-3 py-2 text-center text-[11px] text-emerald-400/70">
+            Published posts from {section.bind.replace("publicPath:", "")} appear
+            here automatically.
           </li>
         )}
       </ul>
 
-      <button
-        type="button"
-        className="rounded-md border border-dashed border-white/20 px-3 py-1.5 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-        onClick={() =>
-          onChange({
-            ...section,
-            items: [...section.items, { title: "New row", status: "done" }],
-          })
-        }
-      >
-        + Add manual row
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" className={connectCls} onClick={() => onConnect({ mode: "recordList" })}>
+          ⚡ Connect content…
+        </button>
+        <button
+          type="button"
+          className="rounded-md border border-dashed border-white/20 px-3 py-1.5 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
+          onClick={() =>
+            onChange({
+              ...section,
+              items: [...section.items, { title: "New row", status: "done" }],
+            })
+          }
+        >
+          + Add manual row
+        </button>
+      </div>
     </div>
   );
 }
@@ -126,9 +160,11 @@ function RecordListBody({
 function DirectoryIndexBody({
   section,
   onChange,
+  onConnect,
 }: {
   section: DirectoryIndexSection;
   onChange: (next: DirectoryIndexSection) => void;
+  onConnect: (target: PickerTarget) => void;
 }) {
   return (
     <ul className="space-y-2">
@@ -169,9 +205,18 @@ function DirectoryIndexBody({
       ))}
       {section.entries.length === 0 && (
         <li className="rounded-md border border-white/5 px-3 py-4 text-center text-xs text-white/35">
-          No directories yet — the content picker (next sprint) adds them.
+          No directories yet — connect one to list it here.
         </li>
       )}
+      <li>
+        <button
+          type="button"
+          className={connectCls}
+          onClick={() => onConnect({ mode: "directoryIndex" })}
+        >
+          ⚡ Connect a directory…
+        </button>
+      </li>
     </ul>
   );
 }
@@ -179,9 +224,11 @@ function DirectoryIndexBody({
 function GardenCategoriesBody({
   section,
   onChange,
+  onConnect,
 }: {
   section: GardenCategoriesSection;
   onChange: (next: GardenCategoriesSection) => void;
+  onConnect: (target: PickerTarget) => void;
 }) {
   return (
     <ul className="space-y-2">
@@ -211,8 +258,22 @@ function GardenCategoriesBody({
                 onChange({ ...section, categories });
               }}
             />
-            <SourceChip bind={cat.bind} />
+            <SourceChip
+              bind={cat.bind}
+              onUnbind={() => {
+                const categories = section.categories.slice();
+                categories[i] = { ...cat, bind: undefined };
+                onChange({ ...section, categories });
+              }}
+            />
             <span className={monoChip}>{cat.items.length} authored</span>
+            <button
+              type="button"
+              className="rounded-md border border-dashed border-amber-600/60 px-2 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
+              onClick={() => onConnect({ mode: "gardenCategory", categoryIndex: i })}
+            >
+              ⚡ Connect
+            </button>
             <button
               type="button"
               aria-label="Remove category"
@@ -267,6 +328,7 @@ export function SectionCard({
   onChange,
   onRemove,
   onMove,
+  onConnect,
 }: {
   section: PageSection;
   index: number;
@@ -274,6 +336,7 @@ export function SectionCard({
   onChange: (next: PageSection) => void;
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
+  onConnect: (target: PickerTarget) => void;
 }) {
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -309,13 +372,13 @@ export function SectionCard({
       </div>
 
       {section.type === "recordList" && (
-        <RecordListBody section={section} onChange={onChange} />
+        <RecordListBody section={section} onChange={onChange} onConnect={onConnect} />
       )}
       {section.type === "directoryIndex" && (
-        <DirectoryIndexBody section={section} onChange={onChange} />
+        <DirectoryIndexBody section={section} onChange={onChange} onConnect={onConnect} />
       )}
       {section.type === "gardenCategories" && (
-        <GardenCategoriesBody section={section} onChange={onChange} />
+        <GardenCategoriesBody section={section} onChange={onChange} onConnect={onConnect} />
       )}
     </section>
   );
