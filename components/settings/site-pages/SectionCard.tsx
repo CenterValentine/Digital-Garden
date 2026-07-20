@@ -10,6 +10,7 @@
  * as read-only chips here until then.
  */
 
+import { useState } from "react";
 import type {
   PageSection,
   RecordListSection,
@@ -17,6 +18,11 @@ import type {
   GardenCategoriesSection,
 } from "@/lib/domain/page-layout/schema";
 import { SECTION_TYPE_LABELS } from "./defaults";
+import { Emphasis } from "@/components/common/Emphasis";
+import { RecordRowEditor, GardenItemEditor, type InheritedValues } from "./RowEditor";
+
+/** Resolves a `publicItem:<slug>` ref to the values it inherits. */
+export type InheritedLookup = (ref: string | undefined) => InheritedValues | undefined;
 
 /** What the composer should open the content picker for. */
 export type PickerTarget =
@@ -58,11 +64,14 @@ function RecordListBody({
   section,
   onChange,
   onConnect,
+  inheritedFor,
 }: {
   section: RecordListSection;
   onChange: (next: RecordListSection) => void;
   onConnect: (target: PickerTarget) => void;
+  inheritedFor: InheritedLookup;
 }) {
+  const [openRow, setOpenRow] = useState<number | null>(null);
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
@@ -95,37 +104,64 @@ function RecordListBody({
       </div>
 
       <ul className="divide-y divide-white/5 rounded-md border border-white/5">
-        {section.items.map((item, i) => (
-          <li key={i} className="flex items-center gap-3 px-3 py-2">
-            <input
-              className={`${inputCls} flex-1 font-serif`}
-              value={item.title ?? ""}
-              placeholder={item.ref ? "(title inherited from publication)" : "Row title"}
-              onChange={(e) => {
-                const items = section.items.slice();
-                items[i] = { ...item, title: e.target.value || undefined };
-                onChange({ ...section, items });
-              }}
-            />
-            <span className="hidden font-mono text-[11px] text-white/40 sm:inline">
-              {item.type ?? ""} {item.year ? `· ${item.year}` : ""}
-            </span>
-            <span className={monoChip}>
-              {item.ref ? item.ref.replace("publicItem:", "item: ") : "manual"}
-            </span>
-            <button
-              type="button"
-              aria-label="Remove row"
-              className="text-white/30 hover:text-rose-400"
-              onClick={() => {
-                const items = section.items.filter((_, j) => j !== i);
-                onChange({ ...section, items });
-              }}
-            >
-              ✕
-            </button>
-          </li>
-        ))}
+        {section.items.map((item, i) => {
+          const inherited = inheritedFor(item.ref);
+          const shownTitle = item.title ?? inherited?.title ?? "(untitled)";
+          const open = openRow === i;
+          return (
+            <li key={i} className={item.hidden ? "opacity-45" : undefined}>
+              <div className="flex items-center gap-3 px-3 py-2">
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() => setOpenRow(open ? null : i)}
+                  className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                >
+                  <span className="w-3 text-white/35">{open ? "▾" : "▸"}</span>
+                  <span className="min-w-0 flex-1 truncate font-serif text-sm [&_em]:not-italic [&_em]:text-amber-400 [&_strong]:text-amber-400">
+                    <Emphasis text={shownTitle} />
+                  </span>
+                </button>
+                <span className="hidden font-mono text-[11px] text-white/40 sm:inline">
+                  {item.type ?? ""} {item.year ? `· ${item.year}` : ""}
+                </span>
+                {item.ref ? (
+                  <span
+                    className="inline-flex items-center rounded-full border border-emerald-500/30 px-2 py-0.5 text-[10px] text-emerald-400/80"
+                    title={`Connected to the published page ${item.ref.replace("publicItem:", "")}`}
+                  >
+                    connected
+                  </span>
+                ) : (
+                  <span className={monoChip}>manual</span>
+                )}
+                <button
+                  type="button"
+                  aria-label="Remove row"
+                  className="text-white/30 hover:text-rose-400"
+                  onClick={() => {
+                    const items = section.items.filter((_, j) => j !== i);
+                    onChange({ ...section, items });
+                    setOpenRow(null);
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              {open && (
+                <RecordRowEditor
+                  item={item}
+                  inherited={inherited}
+                  onChange={(next) => {
+                    const items = section.items.slice();
+                    items[i] = next;
+                    onChange({ ...section, items });
+                  }}
+                />
+              )}
+            </li>
+          );
+        })}
         {section.items.length === 0 && !section.bind && (
           <li className="px-3 py-5 text-center text-xs text-white/35">
             Nothing in this section yet. Connect content to pull in published
@@ -229,11 +265,14 @@ function GardenCategoriesBody({
   section,
   onChange,
   onConnect,
+  inheritedFor,
 }: {
   section: GardenCategoriesSection;
   onChange: (next: GardenCategoriesSection) => void;
   onConnect: (target: PickerTarget) => void;
+  inheritedFor: InheritedLookup;
 }) {
+  const [openItem, setOpenItem] = useState<string | null>(null);
   return (
     <ul className="space-y-2">
       {section.categories.map((cat, i) => (
@@ -292,6 +331,65 @@ function GardenCategoriesBody({
               ✕
             </button>
           </div>
+
+          {cat.items.length > 0 && (
+            <ul className="mt-2 divide-y divide-white/5 rounded-md border border-white/5">
+              {cat.items.map((it, k) => {
+                const key = `${i}:${k}`;
+                const inherited = inheritedFor(it.ref);
+                const open = openItem === key;
+                return (
+                  <li key={k} className={it.hidden ? "opacity-45" : undefined}>
+                    <div className="flex items-center gap-2 px-3 py-1.5">
+                      <button
+                        type="button"
+                        aria-expanded={open}
+                        onClick={() => setOpenItem(open ? null : key)}
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+                      >
+                        <span className="w-3 text-white/35">{open ? "▾" : "▸"}</span>
+                        <span className="min-w-0 flex-1 truncate text-[13px]">
+                          {it.title ?? inherited?.title ?? "(untitled)"}
+                        </span>
+                      </button>
+                      <span className={monoChip}>
+                        {(it.sub?.length ?? 0)} rungs
+                      </span>
+                      <button
+                        type="button"
+                        aria-label="Remove item"
+                        className="text-white/30 hover:text-rose-400"
+                        onClick={() => {
+                          const categories = section.categories.slice();
+                          categories[i] = {
+                            ...cat,
+                            items: cat.items.filter((_, j) => j !== k),
+                          };
+                          onChange({ ...section, categories });
+                          setOpenItem(null);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {open && (
+                      <GardenItemEditor
+                        item={it}
+                        inherited={inherited}
+                        onChange={(next) => {
+                          const categories = section.categories.slice();
+                          const items = cat.items.slice();
+                          items[k] = next;
+                          categories[i] = { ...cat, items };
+                          onChange({ ...section, categories });
+                        }}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </li>
       ))}
       {section.categories.length === 0 && (
@@ -333,6 +431,7 @@ export function SectionCard({
   onRemove,
   onMove,
   onConnect,
+  inheritedFor,
 }: {
   section: PageSection;
   index: number;
@@ -341,6 +440,7 @@ export function SectionCard({
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   onConnect: (target: PickerTarget) => void;
+  inheritedFor: InheritedLookup;
 }) {
   return (
     <section className="rounded-lg border border-white/10 bg-white/[0.03] p-4">
@@ -376,13 +476,23 @@ export function SectionCard({
       </div>
 
       {section.type === "recordList" && (
-        <RecordListBody section={section} onChange={onChange} onConnect={onConnect} />
+        <RecordListBody
+          section={section}
+          onChange={onChange}
+          onConnect={onConnect}
+          inheritedFor={inheritedFor}
+        />
       )}
       {section.type === "directoryIndex" && (
         <DirectoryIndexBody section={section} onChange={onChange} onConnect={onConnect} />
       )}
       {section.type === "gardenCategories" && (
-        <GardenCategoriesBody section={section} onChange={onChange} onConnect={onConnect} />
+        <GardenCategoriesBody
+          section={section}
+          onChange={onChange}
+          onConnect={onConnect}
+          inheritedFor={inheritedFor}
+        />
       )}
     </section>
   );

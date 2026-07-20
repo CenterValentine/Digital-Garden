@@ -20,29 +20,10 @@ import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { PersonalHeader } from "./PersonalHeader";
 import type { WorkData, ResolvedRecordEntry } from "@/lib/domain/page-layout/resolved";
+// Shared with the composer's editing preview so authoring and the live page
+// can never drift apart.
+import { Emphasis } from "@/components/common/Emphasis";
 import "./personal-pages.css";
-
-/**
- * Parse an emphasis string into JSX. `**bold**` → third font tier (<strong>),
- * `*italic*` → accent font (<em>), everything else → primary serif. Kept tiny
- * and dependency-free; the same grammar the composer's tier buttons emit.
- */
-function Emphasis({ text }: { text: string }) {
-  const parts: React.ReactNode[] = [];
-  const re = /(\*\*[^*]+\*\*|\*[^*]+\*)/g;
-  let last = 0;
-  let key = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) parts.push(text.slice(last, m.index));
-    const tok = m[0];
-    if (tok.startsWith("**")) parts.push(<strong key={key++}>{tok.slice(2, -2)}</strong>);
-    else parts.push(<em key={key++}>{tok.slice(1, -1)}</em>);
-    last = m.index + tok.length;
-  }
-  if (last < text.length) parts.push(text.slice(last));
-  return <>{parts}</>;
-}
 
 // Design-time fallback — the exact copy shipped before DB wiring, expressed in
 // the resolved WorkData shape so the DB path is a drop-in replacement.

@@ -34,6 +34,8 @@ import {
 import { SectionCard, type PickerTarget } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
 import { ContentPicker } from "./ContentPicker";
+import type { InheritedValues } from "./RowEditor";
+import type { ContentIndexDirectory } from "@/app/api/site-pages/content-index/route";
 
 type TenantRow = { id: string; slug: string; displayName: string; isPersonal: boolean };
 type PageListRow = {
@@ -81,6 +83,10 @@ export function SitePagesComposer() {
   const [picker, setPicker] = useState<
     (PickerTarget & { sectionIndex: number }) | null
   >(null);
+  /** Published-item values by ref, for showing inherited fields on bound rows. */
+  const [inheritedIndex, setInheritedIndex] = useState<Map<string, InheritedValues>>(
+    () => new Map(),
+  );
   const [showNewForm, setShowNewForm] = useState(false);
   const [newDraft, setNewDraft] = useState({ slug: "", title: "", kind: "record" as PageKind });
 
@@ -101,6 +107,37 @@ export function SitePagesComposer() {
     setPages(data.pages);
     return data.pages;
   }, []);
+
+  // Load the content index once per tenant so connected rows can show their
+  // inherited title/date/blurb. Best-effort — a failure just means bound rows
+  // show their ref rather than the published title.
+  const loadInherited = useCallback(async (tid: string) => {
+    try {
+      const res = await fetch(
+        `/api/site-pages/content-index?tenantId=${encodeURIComponent(tid)}`,
+      );
+      if (!res.ok) return;
+      const data = (await res.json()) as { directories: ContentIndexDirectory[] };
+      const map = new Map<string, InheritedValues>();
+      for (const dir of data.directories) {
+        for (const it of dir.items) {
+          map.set(it.ref, {
+            title: it.title,
+            date: it.firstPublishedAt?.slice(0, 10),
+            blurb: it.excerpt ?? undefined,
+          });
+        }
+      }
+      setInheritedIndex(map);
+    } catch {
+      /* non-fatal */
+    }
+  }, []);
+
+  const inheritedFor = useCallback(
+    (ref: string | undefined) => (ref ? inheritedIndex.get(ref) : undefined),
+    [inheritedIndex],
+  );
 
   const selectPage = useCallback(
     async (slug: string, tid?: string) => {
@@ -158,6 +195,7 @@ export function SitePagesComposer() {
           "";
         setTenantId(preferred);
         if (preferred) {
+          void loadInherited(preferred);
           const list = await loadPages(preferred);
           if (list.length > 0) void selectPage(list[0].slug, preferred);
         }
@@ -167,7 +205,7 @@ export function SitePagesComposer() {
         });
       }
     })();
-  }, [loadPages, selectPage]);
+  }, [loadPages, loadInherited, selectPage]);
 
   const saveNow = useCallback(async () => {
     const w = workingRef.current;
@@ -339,6 +377,7 @@ export function SitePagesComposer() {
             const tid = e.target.value;
             setTenantId(tid);
             setWorking(null);
+            void loadInherited(tid);
             void loadPages(tid).then((list) => {
               if (list.length > 0) void selectPage(list[0].slug, tid);
             });
@@ -528,6 +567,7 @@ export function SitePagesComposer() {
                   })
                 }
                 onConnect={(target) => setPicker({ ...target, sectionIndex: i })}
+                inheritedFor={inheritedFor}
               />
             ))}
 
