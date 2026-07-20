@@ -874,7 +874,12 @@ async function showTreePanelInActiveTab() {
   }
 }
 
-async function openContentInActiveTab(contentId, contentKind = "external", runId) {
+async function openContentInActiveTab(
+  contentId,
+  contentKind = "external",
+  runId,
+  corner
+) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     throw new Error("No active tab is available");
@@ -887,6 +892,7 @@ async function openContentInActiveTab(contentId, contentKind = "external", runId
         contentId,
         contentKind,
         runId, // workflow panels: deep-link the embed viewer to this run
+        corner, // side-panel pop-out: which page corner to open in
       },
     });
     return { openedInOverlay: true, tabId: tab.id };
@@ -1889,6 +1895,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // sidePanel.open() must run before any await or the user-gesture context
+  // that authorized it (launcher click → this message) is lost. Handle it
+  // synchronously, outside the async IIFE below.
+  if (message.type === "open-side-panel") {
+    const tabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = tabId != null ? { tabId } : { windowId };
+    chrome.sidePanel
+      .open(target)
+      .then(() => sendResponse({ ok: true, data: true }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open side panel",
+        })
+      );
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
@@ -1983,7 +2008,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         data: await openContentInActiveTab(
           message.payload?.contentId,
           message.payload?.contentKind || "external",
-          message.payload?.runId
+          message.payload?.runId,
+          message.payload?.corner
         ),
       });
       return;

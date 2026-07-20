@@ -13,6 +13,7 @@ import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
 import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
+import { RecentsPanel } from "./RecentsPanel";
 import { InboxLeftPanel } from "@/components/client/inbox/InboxLeftPanel";
 import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
@@ -298,6 +299,8 @@ export function LeftSidebar() {
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
         {activeView === "inbox" && <InboxLeftPanel />}
+
+        {activeView === "recents" && <RecentsPanel />}
 
         {ExtensionPanel && createElement(ExtensionPanel)}
 

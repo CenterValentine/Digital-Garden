@@ -1014,6 +1014,11 @@ function overlayStyles() {
       cursor: grab; touch-action: none;
     }
     .dg-panel-collapsed[data-open="true"] { display: inline-flex; pointer-events: auto; }
+    /* Freeze affordance — clickable in both open and collapsed states */
+    .dg-floating-panel[data-frozen="true"] .dg-freeze-toggle { color: #7cc7ff; opacity: 1; }
+    .dg-chip-freeze { font-style: normal; margin: 0 2px; opacity: 0.5; cursor: pointer; }
+    .dg-chip-freeze:hover { opacity: 0.9; }
+    .dg-panel-collapsed[data-frozen="true"] .dg-chip-freeze { opacity: 1; color: #7cc7ff; }
     .dg-panel-banner { padding: 10px 12px; margin: 0 14px; border-radius: 14px; background: rgba(216,176,92,0.12); color: #f2e2b6; font-size: 12px; line-height: 1.45; }
 
     /* ── Target / embed UI ── */
@@ -1218,6 +1223,7 @@ function scheduleTabPersist(state) {
         width: panel.width,
         height: panel.height,
         opacity: panel.opacity,
+        frozen: panel.frozen === true,
       }));
     runtimeMessage({ type: "save-tab-panels", payload: { panels } }).catch(
       () => {}
@@ -1241,8 +1247,10 @@ async function restoreTabStickyPanels(state) {
     if (!descriptor?.contentId || state.openPanels.has(descriptor.contentId)) {
       continue;
     }
-    // Skip panels opened on a different hostname — they belong to another site.
-    if (descriptor.host && descriptor.host !== currentHost) {
+    // Skip panels opened on a different hostname — they belong to another
+    // site. Exception: FROZEN panels follow the user everywhere (open or
+    // collapsed) until closed or unfrozen.
+    if (!descriptor.frozen && descriptor.host && descriptor.host !== currentHost) {
       continue;
     }
     const item = { id: descriptor.contentId, title: descriptor.title || null };
@@ -1259,6 +1267,7 @@ async function restoreTabStickyPanels(state) {
       height: descriptor.height ?? null,
       opacity: descriptor.opacity ?? 1,
       embeddedSelector: null, // page changed — no element to anchor to
+      frozen: descriptor.frozen === true,
       metadata: {},
     };
     createContentPanel(state, item, descriptor.kind || "note", persisted);
@@ -2521,6 +2530,19 @@ function makePanelDraggable(state, panel) {
   });
 }
 
+// Frozen panels: visual sync + toggle. Frozen = restored on every page in
+// this tab (open or collapsed) regardless of hostname, until closed/unfrozen.
+function syncPanelFrozenVisual(panel) {
+  panel.container.dataset.frozen = panel.frozen ? "true" : "false";
+  panel.collapsedChip.dataset.frozen = panel.frozen ? "true" : "false";
+}
+
+function togglePanelFrozen(state, panel) {
+  panel.frozen = panel.frozen !== true;
+  syncPanelFrozenVisual(panel);
+  scheduleTabPersist(state);
+}
+
 function createContentPanel(state, item, kind, persisted = null) {
   const existing = state.openPanels.get(item.id);
   if (existing) {
@@ -2544,6 +2566,7 @@ function createContentPanel(state, item, kind, persisted = null) {
         <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
+        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Freeze — keep this panel open on every page">❆</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -2554,7 +2577,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const collapsedChip = document.createElement("button");
   collapsedChip.className = "dg-panel-collapsed";
   collapsedChip.type = "button";
-  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><strong>Open</strong>`;
+  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Freeze — keep this panel open on every page">❆</em><strong>Open</strong>`;
 
   state.panelsMount.appendChild(container);
   state.panelsMount.appendChild(collapsedChip);
@@ -2580,6 +2603,9 @@ function createContentPanel(state, item, kind, persisted = null) {
     opacity: persisted?.opacity ?? 1,
     embeddedSelector: persisted?.embeddedSelector || null,
     embeddedPlacement: persisted?.embeddedPlacement || "after",
+    // Frozen panels survive cross-hostname navigation (restored on ANY page,
+    // open or collapsed) until the user closes or unfreezes them.
+    frozen: persisted?.frozen === true,
     metadata: persisted?.metadata || {},
     currentContent: null,
     autosaveTimer: null,
@@ -2591,6 +2617,7 @@ function createContentPanel(state, item, kind, persisted = null) {
 
   state.openPanels.set(item.id, panel);
   scheduleTabPersist(state); // remember this note for in-tab navigation
+  syncPanelFrozenVisual(panel);
   makePanelDraggable(state, panel);
   wirePanelDirectEditor(state, panel);
   applyPanelGeometry(state, panel);
@@ -2668,6 +2695,11 @@ function createContentPanel(state, item, kind, persisted = null) {
       return;
     }
 
+    if (action === "freeze") {
+      togglePanelFrozen(state, panel);
+      return;
+    }
+
     if (action === "collapse") {
       closePanel(state, panel.contentId, "collapsed");
       return;
@@ -2677,6 +2709,14 @@ function createContentPanel(state, item, kind, persisted = null) {
       closePanel(state, panel.contentId, "closed");
     }
   });
+
+  // Freeze glyph on the collapsed chip — toggles without reopening the panel.
+  collapsedChip
+    .querySelector(".dg-chip-freeze")
+    ?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePanelFrozen(state, panel);
+    });
 
   collapsedChip.addEventListener("click", () => {
     if (Date.now() < panel.suppressChipClickUntil) return;
@@ -2836,15 +2876,54 @@ function beginEmbedTargeting(state, panel) {
   document.body.style.cursor = "crosshair";
 }
 
-async function openAssociatedContent(state, contentId, contentKind, runId) {
+// Corner placement for panels popped out of the side panel. The side panel
+// shows four quadrants during a tab drag; whichever the user drops on maps to
+// a corner of the page here. Sized to leave a comfortable margin so the panel
+// never sits flush against the viewport edge.
+function geometryForCorner(corner) {
+  const margin = 24;
+  const width = Math.min(460, Math.round(window.innerWidth * 0.42));
+  const height = Math.min(
+    Math.round(window.innerHeight * 0.62),
+    Math.max(320, Math.round(window.innerHeight * 0.5))
+  );
+  const left = margin;
+  const right = Math.max(margin, window.innerWidth - width - margin);
+  const top = margin;
+  const bottom = Math.max(margin, window.innerHeight - height - margin);
+  const positions = {
+    "top-left": { x: left, y: top },
+    "top-right": { x: right, y: top },
+    "bottom-left": { x: left, y: bottom },
+    "bottom-right": { x: right, y: bottom },
+  };
+  const position = positions[corner] || positions["top-right"];
+  return {
+    state: "open",
+    layoutMode: "floating",
+    dockSide: "right",
+    positionX: position.x,
+    positionY: position.y,
+    width,
+    height,
+    opacity: 1,
+    embeddedSelector: null,
+    metadata: {},
+  };
+}
+
+async function openAssociatedContent(state, contentId, contentKind, runId, corner) {
   // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
   const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
   // Workflow run deep-link: consumed once by openEmbedForPanel, which appends
   // ?run= so the embed viewer lands directly on that run's detail.
   state.pendingRunDeepLink = runId ? { contentId, runId } : null;
   const context = state.resourceContext;
-  const persisted =
-    context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
+  // An explicit corner (popped out of the side panel) wins over any persisted
+  // geometry — the user just told us where they want it.
+  const persisted = corner
+    ? geometryForCorner(corner)
+    : context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
   const source =
     (context?.associations || []).find((entry) => entry.content.id === contentId)?.content ||
     (context?.externalContents || []).find((entry) => entry.id === contentId) ||
@@ -3131,7 +3210,8 @@ function wireRootEvents(state) {
             state,
             message.payload?.contentId,
             message.payload?.contentKind || "external",
-            message.payload?.runId
+            message.payload?.runId,
+            message.payload?.corner
           );
           sendResponse?.({ ok: true });
         } catch (error) {
@@ -3208,13 +3288,23 @@ function wireRootEvents(state) {
 
   // ── Floating launcher button ───────────────────────────────────────────────
 
-  state.launcherBtn.addEventListener("click", () => {
+  state.launcherBtn.addEventListener("click", (event) => {
     if (Date.now() < state.suppressMainButtonClickUntil) return;
-    if (state.panelOpen) {
-      closeSnapPanel(state);
-    } else {
-      void openSnapPanel(state);
+    // Decision #11 (BROWSER-REACH B1): the launch-handle opens the side panel.
+    // Alt/Shift-click keeps the legacy in-page overlay reachable while the
+    // panel absorbs its flows session by session.
+    if (event.altKey || event.shiftKey) {
+      if (state.panelOpen) {
+        closeSnapPanel(state);
+      } else {
+        void openSnapPanel(state);
+      }
+      return;
     }
+    chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
+      // Older Chromium without sidePanel support falls back to the overlay.
+      if (chrome.runtime.lastError) void openSnapPanel(state);
+    });
   });
 
   let launcherDrag = null;

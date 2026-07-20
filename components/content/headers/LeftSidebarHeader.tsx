@@ -12,6 +12,7 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
 import { Inbox, PanelLeftClose, PanelLeft } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { renderExtensionIcon } from "@/lib/extensions";
 import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
 import { useNotificationsStore } from "@/state/notifications-store";
@@ -64,17 +65,21 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
+  const pathname = usePathname();
+  const isPanelEmbed = pathname?.startsWith("/embed/panel") ?? false;
   const extensionNavItems = useExtensionHeaderNavItems();
   const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   // Daily Notes is type "action" with id "open-periodic-note", Publishing is type "view" with view "publishing-view"
   const subAffordanceIds = new Set(["open-periodic-note", "publishing-view"]);
 
-  // True whenever the user is anywhere in the files section (files, search, or a sub-affordance view).
-  // Drives: container background, folder tab active state, and sub-row visibility — all from one source.
+  // True whenever the user is anywhere in the files section (files, search,
+  // recents, or a sub-affordance view). Drives: container background, folder
+  // tab active state, and sub-row visibility — all from one source.
   const showFilesSection =
     activeView === "files" ||
     activeView === "search" ||
+    activeView === "recents" ||
     subAffordanceIds.has(activeView);
 
   const headerExtensionItems = extensionNavItems.filter(({ item }) => {
@@ -200,21 +205,24 @@ export function LeftSidebarHeader({
           </button>
         </div>
 
-        {/* Panel collapse toggle */}
-        <div className="flex shrink-0 items-center gap-1">
-          <button
-            onClick={toggleMode}
-            className={`rounded p-1 transition-colors ${tabInactive}`}
-            title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
-            type="button"
-          >
-            {mode === "full" ? (
-              <PanelLeftClose className="h-4 w-4" />
-            ) : (
-              <PanelLeft className="h-4 w-4" />
-            )}
-          </button>
-        </div>
+        {/* Panel collapse toggle — hidden in the side-panel embed, which has
+            its own tree collapse bar (BROWSER-REACH B1) */}
+        {!isPanelEmbed && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={toggleMode}
+              className={`rounded p-1 transition-colors ${tabInactive}`}
+              title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
+              type="button"
+            >
+              {mode === "full" ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeft className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sub-affordance row — visible for any view in the files section */}
@@ -246,6 +254,28 @@ export function LeftSidebarHeader({
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </button>
+
+          {/* Recents — Obsidian-style recently-viewed list (navigation history) */}
+          <button
+            onClick={() => {
+              setActiveView(activeView === "recents" ? "files" : "recents");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded p-0.5 transition-colors ${
+              activeView === "recents" ? subActive : subInactive
+            }`}
+            title="Recents"
+            type="button"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           </button>

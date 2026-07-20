@@ -38,6 +38,14 @@ await Promise.all([
     outfile: path.join(outDir, "popup.js"),
   }),
 
+  // Side panel — IIFE (extension page hosting the /embed/panel iframe)
+  esbuild.build({
+    ...sharedOptions,
+    format: "iife",
+    entryPoints: [path.join(srcDir, "panel/index.js")],
+    outfile: path.join(outDir, "panel.js"),
+  }),
+
   // Overlay content script — IIFE (content scripts share scope, must not leak top-level vars)
   esbuild.build({
     ...sharedOptions,

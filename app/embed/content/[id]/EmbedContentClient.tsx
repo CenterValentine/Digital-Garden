@@ -89,7 +89,12 @@ export function EmbedContentClient({
     return unsub;
   }, []);
 
-  // Listen for `open` messages from the parent overlay
+  // Listen for `open` messages from the parent overlay.
+  // NOTE (C2): origin cannot be allowlisted here — the overlay runs in the
+  // host page's context, so legitimate messages arrive from ANY site the
+  // user browses. Hardening this path needs a handshake nonce minted by the
+  // extension and echoed in messages (BROWSER-REACH B2/B3), not an origin
+  // check. The panel path (/embed/panel) IS strictly origin-validated.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
       if (!event.data || typeof event.data !== "object") return;
