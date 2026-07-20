@@ -17,7 +17,7 @@ import NavBar from "@/components/client/nav/NavBar";
 import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
 import { ThemeProvider, THEME_SCRIPT } from "@/lib/features/theme";
-import { DevWorktreeBanner } from "@/lib/features/dev-banner";
+import { DevWorktreeBanner, withDevWorktreeTitle } from "@/lib/features/dev-banner";
 
 const geistSans = localFont({
   src: "../public/fonts/liberation-sans-regular.ttf",
@@ -76,7 +76,10 @@ const caveat = Caveat({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+// Base metadata for every route. Exported through `generateMetadata` (not a
+// static `metadata` const) so the title can be prefixed with the worktree/branch
+// in dev — Next forbids exporting both from one segment.
+const baseMetadata: Metadata = {
   title: {
     default: "Digital Garden",
     template: "%s · Digital Garden",
@@ -124,6 +127,16 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  // Identical to baseMetadata in production; in dev the title gains a
+  // `[worktree/branch]` prefix so tabs from different checkouts are
+  // distinguishable. See lib/features/dev-banner/title.ts.
+  return {
+    ...baseMetadata,
+    title: await withDevWorktreeTitle(baseMetadata.title),
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#ffffff",

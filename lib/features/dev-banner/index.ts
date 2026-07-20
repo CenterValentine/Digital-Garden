@@ -5,3 +5,4 @@
 export { DevWorktreeBanner } from "./DevWorktreeBanner";
 export { composeWorktreeLabel, getWorktreeIdentity } from "./identity";
 export type { WorktreeIdentity } from "./identity";
+export { withDevWorktreeTitle } from "./title";
