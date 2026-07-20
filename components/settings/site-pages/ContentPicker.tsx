@@ -5,12 +5,15 @@
  *
  * Grouped list + search over the tenant's published content. Two targets, both
  * first-class:
- *   • Bind directory → sets `bind: "publicPath:/path"` on the section, so its
- *     posts flow in automatically (and new posts appear without reopening this).
- *   • Add row → appends `{ ref: "publicItem:<slug>" }`, a bound row whose
- *     display fields you can override.
+ *   • "Add all + keep in sync" → sets `bind: "publicPath:/path"` on the
+ *     section, so the Path's posts flow in automatically and newly published
+ *     ones appear without reopening this.
+ *   • "Add this one" → appends `{ ref: "publicItem:<slug>" }`, a single row
+ *     whose display fields you can override.
  *
- * Which actions are offered depends on the calling section type (see `mode`).
+ * Copy note: the user-facing noun is "Path", matching the publishing UI. The
+ * buttons name the OUTCOME rather than the mechanism ("bind") — the ongoing
+ * sync is the thing that distinguishes the two actions.
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -85,13 +88,15 @@ export function ContentPicker({
 
   return (
     <>
+      {/* Scrim and panel start below NotesNavBar (56px, matching the settings
+          layout's `fixed top-[56px]`) so the app nav stays visible and usable. */}
       <div
-        className="fixed inset-0 z-40 bg-black/55"
+        className="fixed inset-x-0 bottom-0 top-[56px] z-40 bg-black/55"
         onClick={onClose}
         aria-hidden="true"
       />
       <aside
-        className="fixed right-0 top-0 z-50 flex h-full w-[min(430px,92vw)] flex-col border-l border-white/15 bg-[var(--background,#101418)] shadow-2xl"
+        className="fixed bottom-0 right-0 top-[56px] z-40 flex w-[min(430px,92vw)] flex-col border-l border-white/15 bg-[var(--background,#101418)] shadow-2xl"
         role="dialog"
         aria-modal="true"
         aria-label="Connect content"
@@ -101,8 +106,10 @@ export function ContentPicker({
             <div>
               <h2 className="text-sm font-semibold">Connect content</h2>
               <p className="mt-1 text-xs text-white/50">
-                Bind <b className="text-white/70">{sectionLabel}</b> to published
-                content. Directories stay live — new posts appear automatically.
+                Choose what appears in{" "}
+                <b className="text-white/70">{sectionLabel}</b>. Add a whole Path
+                and it keeps itself up to date — anything you publish there shows
+                up here automatically.
               </p>
             </div>
             <button
@@ -117,7 +124,7 @@ export function ContentPicker({
           <input
             autoFocus
             className="mt-3 w-full rounded-md border border-white/10 bg-white/5 px-3 py-2 text-sm"
-            placeholder="Search directories and publications…"
+            placeholder="Search paths and pages…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -132,6 +139,12 @@ export function ContentPicker({
               {query
                 ? "Nothing matches that search."
                 : "No published content yet. Publish a note first, then connect it here."}
+            </p>
+          )}
+
+          {filtered && filtered.length > 0 && (
+            <p className="mb-2 font-mono text-[10px] uppercase tracking-wider text-white/40">
+              Published paths
             </p>
           )}
 
@@ -180,14 +193,15 @@ export function ContentPicker({
                     {canBind && (
                       <button
                         type="button"
-                        className="rounded-md border border-amber-600/60 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-amber-400 hover:bg-amber-500/10"
+                        title={`Show every published page in ${d.path} here, and keep it updated as you publish more`}
+                        className="whitespace-nowrap rounded-md border border-amber-600/60 px-2.5 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
                         onClick={() => {
                           onBindDirectory(d.ref, d);
-                          toast.success(`Bound to ${d.path}`);
+                          toast.success(`${d.title} added — new pages will appear automatically`);
                           onClose();
                         }}
                       >
-                        Bind
+                        Add all + keep in sync
                       </button>
                     )}
                   </div>
@@ -211,14 +225,15 @@ export function ContentPicker({
                           {canAddItem && (
                             <button
                               type="button"
-                              className="rounded-md border border-white/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-white/60 hover:border-amber-600/60 hover:text-amber-400"
+                              title="Add just this page as one row"
+                              className="whitespace-nowrap rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/60 hover:border-amber-600/60 hover:text-amber-400"
                               onClick={() => {
                                 onAddItem(it.ref, it.title);
                                 toast.success(`Added ${it.title}`);
                                 onClose();
                               }}
                             >
-                              Add row
+                              Add this one
                             </button>
                           )}
                         </li>

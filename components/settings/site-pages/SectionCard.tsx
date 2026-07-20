@@ -33,13 +33,17 @@ const connectCls =
 
 function SourceChip({ bind, onUnbind }: { bind?: string; onUnbind?: () => void }) {
   if (!bind) return null;
+  const path = bind.replace("publicPath:", "");
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-emerald-400">
-      auto · {bind.replace("publicPath:", "")}
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-400"
+      title={`Every published page in ${path} appears here, and new ones are added automatically`}
+    >
+      ↻ Keeping in sync with <span className="font-mono">{path}</span>
       {onUnbind && (
         <button
           type="button"
-          aria-label="Disconnect directory"
+          aria-label={`Stop syncing with ${path}`}
           className="text-emerald-400/60 hover:text-rose-400"
           onClick={onUnbind}
         >
@@ -124,14 +128,14 @@ function RecordListBody({
         ))}
         {section.items.length === 0 && !section.bind && (
           <li className="px-3 py-5 text-center text-xs text-white/35">
-            This section has no content yet. Connect a published directory and
-            its posts fill in automatically — or add rows by hand.
+            Nothing in this section yet. Connect content to pull in published
+            pages — or add rows by hand.
           </li>
         )}
         {section.bind && (
           <li className="px-3 py-2 text-center text-[11px] text-emerald-400/70">
-            Published posts from {section.bind.replace("publicPath:", "")} appear
-            here automatically.
+            Published pages from {section.bind.replace("publicPath:", "")} show up
+            here on their own — you don&apos;t need to add them.
           </li>
         )}
       </ul>
@@ -214,7 +218,7 @@ function DirectoryIndexBody({
           className={connectCls}
           onClick={() => onConnect({ mode: "directoryIndex" })}
         >
-          ⚡ Connect a directory…
+          ⚡ Connect content…
         </button>
       </li>
     </ul>

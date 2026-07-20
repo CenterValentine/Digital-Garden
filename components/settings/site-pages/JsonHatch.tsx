@@ -43,7 +43,7 @@ export function JsonHatch({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+      className="fixed inset-x-0 bottom-0 top-[56px] z-40 flex items-center justify-center bg-black/60 p-6"
       role="dialog"
       aria-modal="true"
       aria-label="Edit config as JSON"
