@@ -5,6 +5,9 @@ import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
+import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
+import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
+import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -321,6 +324,19 @@ export function PanelShellClient({
         <MultiConversationSidebar contentId={selectedContentId} />
       </div>
       </DndWrapper>
+
+      {/* Global context menu — the app mounts this in ResizablePanels, which
+          the panel doesn't use. Without it, right-click fell through to the
+          browser's native menu. It portals to document.body at z-120 (above
+          #embed-root's 100) and menu-positioning flips/shifts against
+          window.innerWidth/Height — inside the iframe that IS the panel
+          viewport, so it stays in bounds at panel width for free. */}
+      <ContextMenu
+        actionProviders={{
+          "file-tree": fileTreeActionProvider,
+          "main-editor": editorActionProvider,
+        }}
+      />
     </div>
   );
 }

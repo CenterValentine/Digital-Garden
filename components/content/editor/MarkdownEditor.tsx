@@ -226,7 +226,9 @@ export function MarkdownEditor({
 }: MarkdownEditorProps) {
   const openMenu = useContextMenuStore((s) => s.openMenu);
   const pathname = usePathname();
-  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+  // Only the single-content overlay embed lacks the context-menu portal; the
+  // side panel mounts it in its own shell, so it gets the app's real menu.
+  const isEmbedMode = pathname?.startsWith("/embed/content") ?? false;
 
   // Pre-load template/snippet data so right-click context menu has categories ready
   useEffect(() => {
