@@ -15,6 +15,7 @@ import {
 } from "@/state/content-store";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
 import { MainPanelNavigation } from "./MainPanelNavigation";
+import { PanelOverlayCornerTargets } from "./PanelOverlayCornerTargets";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
@@ -443,6 +444,7 @@ export function MainPanelWorkspace({
   // The side-panel embed (/embed/panel) is a full mini-DG shell and needs
   // the tab strip + workspace navigation (BROWSER-REACH B1).
   const isEmbedMode = pathname?.startsWith("/embed/content") ?? false;
+  const isPanelEmbedSurfacePath = pathname?.startsWith("/embed/panel") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -690,7 +692,15 @@ export function MainPanelWorkspace({
       ) : null}
       <div key={layoutMode} className="relative flex-1 min-h-0">
         {paneLayout}
-        {layoutMode !== "quad" && (
+        {/* Side panel: pane-placement previews are meaningless at single-pane
+            panel width, so the drag offers page corners instead — the panel
+            can't be dragged onto, so it shows a miniature of the page. */}
+        {isPanelEmbedSurfacePath ? (
+          <PanelOverlayCornerTargets
+            draggedTabId={draggedTabId}
+            onDrop={resetDragState}
+          />
+        ) : layoutMode !== "quad" ? (
           <WorkspaceReshapeTargets
             layoutMode={layoutMode}
             draggedTabId={draggedTabId}
@@ -701,7 +711,7 @@ export function MainPanelWorkspace({
             onTargetHover={setHoveredSinglePaneTargetId}
             onTargetDrop={handleTabDrop}
           />
-        )}
+        ) : null}
       </div>
       {!isFocusMode
         ? shellControllers.map((Controller) =>

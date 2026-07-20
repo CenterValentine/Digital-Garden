@@ -122,6 +122,34 @@ window.addEventListener("message", (event) => {
       postPageContext(pendingPageContext);
       pendingPageContext = null;
     }
+    return;
+  }
+
+  // Pop-out: the panel asks for content to open as an overlay on the page.
+  // A drag can't cross from this document into the page, so the panel offers
+  // four quadrants instead and tells us which corner the user chose.
+  if (data.type === "open-overlay" && data.payload?.contentId) {
+    chrome.runtime.sendMessage(
+      {
+        type: "open-content-in-active-tab",
+        payload: {
+          contentId: data.payload.contentId,
+          contentKind: data.payload.contentKind || "embed",
+          corner: data.payload.corner,
+        },
+      },
+      () => {
+        // Overlay unavailable on this page (restricted URL, no content
+        // script) — surface it in the context bar rather than failing mute.
+        if (chrome.runtime.lastError) {
+          const previous = titleEl.textContent;
+          titleEl.textContent = "Can't open an overlay on this page";
+          setTimeout(() => {
+            titleEl.textContent = previous;
+          }, 2600);
+        }
+      }
+    );
   }
 });
 

@@ -874,7 +874,12 @@ async function showTreePanelInActiveTab() {
   }
 }
 
-async function openContentInActiveTab(contentId, contentKind = "external", runId) {
+async function openContentInActiveTab(
+  contentId,
+  contentKind = "external",
+  runId,
+  corner
+) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     throw new Error("No active tab is available");
@@ -887,6 +892,7 @@ async function openContentInActiveTab(contentId, contentKind = "external", runId
         contentId,
         contentKind,
         runId, // workflow panels: deep-link the embed viewer to this run
+        corner, // side-panel pop-out: which page corner to open in
       },
     });
     return { openedInOverlay: true, tabId: tab.id };
@@ -2002,7 +2008,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         data: await openContentInActiveTab(
           message.payload?.contentId,
           message.payload?.contentKind || "external",
-          message.payload?.runId
+          message.payload?.runId,
+          message.payload?.corner
         ),
       });
       return;

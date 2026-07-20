@@ -9,6 +9,10 @@ import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import type { ContextMenuActionProvider } from "@/components/content/context-menu/types";
+import {
+  requestOverlayOpen,
+  OVERLAY_CORNERS,
+} from "@/lib/domain/browser-extension/panel-bridge";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -31,7 +35,59 @@ const PANEL_HIDDEN_ACTION_IDS = new Set([
   "open-in-pane",
 ]);
 
+/**
+ * Panel-only "Open as overlay": project a tree item onto the page. Added as
+ * its own section right after the first so it sits near the top of a menu
+ * that's already tall at panel width.
+ */
+function withOverlayAction(
+  sections: ReturnType<ContextMenuActionProvider>,
+  contentIds: string[]
+): ReturnType<ContextMenuActionProvider> {
+  if (contentIds.length === 0) return sections;
+  const label =
+    contentIds.length > 1
+      ? `Open ${contentIds.length} as overlays`
+      : "Open as overlay";
+  const overlaySection = {
+    actions: [
+      {
+        id: "open-as-overlay",
+        label,
+        sectionLabel: "PAGE",
+        onClick: () => {
+          // Stagger corners so a multi-select doesn't stack every panel in
+          // the same spot.
+          contentIds.forEach((contentId, index) => {
+            requestOverlayOpen(contentId, {
+              corner: OVERLAY_CORNERS[index % OVERLAY_CORNERS.length],
+            });
+          });
+        },
+      },
+    ],
+  };
+  return [sections[0], overlaySection, ...sections.slice(1)].filter(Boolean);
+}
+
 const compactFileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
+  const context = ctx as unknown as {
+    selectedIds?: string[];
+    clickedId?: string | null;
+  };
+  const targetIds =
+    context.selectedIds && context.selectedIds.length > 0
+      ? context.selectedIds
+      : context.clickedId
+        ? [context.clickedId]
+        : [];
+  return withOverlayAction(
+    baseCompactSections(ctx),
+    targetIds
+  );
+};
+
+const baseCompactSections: ContextMenuActionProvider = (ctx) => {
   return fileTreeActionProvider(ctx)
     .map((section) => {
       const actions = section.actions.filter(

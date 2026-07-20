@@ -2876,15 +2876,54 @@ function beginEmbedTargeting(state, panel) {
   document.body.style.cursor = "crosshair";
 }
 
-async function openAssociatedContent(state, contentId, contentKind, runId) {
+// Corner placement for panels popped out of the side panel. The side panel
+// shows four quadrants during a tab drag; whichever the user drops on maps to
+// a corner of the page here. Sized to leave a comfortable margin so the panel
+// never sits flush against the viewport edge.
+function geometryForCorner(corner) {
+  const margin = 24;
+  const width = Math.min(460, Math.round(window.innerWidth * 0.42));
+  const height = Math.min(
+    Math.round(window.innerHeight * 0.62),
+    Math.max(320, Math.round(window.innerHeight * 0.5))
+  );
+  const left = margin;
+  const right = Math.max(margin, window.innerWidth - width - margin);
+  const top = margin;
+  const bottom = Math.max(margin, window.innerHeight - height - margin);
+  const positions = {
+    "top-left": { x: left, y: top },
+    "top-right": { x: right, y: top },
+    "bottom-left": { x: left, y: bottom },
+    "bottom-right": { x: right, y: bottom },
+  };
+  const position = positions[corner] || positions["top-right"];
+  return {
+    state: "open",
+    layoutMode: "floating",
+    dockSide: "right",
+    positionX: position.x,
+    positionY: position.y,
+    width,
+    height,
+    opacity: 1,
+    embeddedSelector: null,
+    metadata: {},
+  };
+}
+
+async function openAssociatedContent(state, contentId, contentKind, runId, corner) {
   // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
   const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
   // Workflow run deep-link: consumed once by openEmbedForPanel, which appends
   // ?run= so the embed viewer lands directly on that run's detail.
   state.pendingRunDeepLink = runId ? { contentId, runId } : null;
   const context = state.resourceContext;
-  const persisted =
-    context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
+  // An explicit corner (popped out of the side panel) wins over any persisted
+  // geometry — the user just told us where they want it.
+  const persisted = corner
+    ? geometryForCorner(corner)
+    : context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
   const source =
     (context?.associations || []).find((entry) => entry.content.id === contentId)?.content ||
     (context?.externalContents || []).find((entry) => entry.id === contentId) ||
@@ -3171,7 +3210,8 @@ function wireRootEvents(state) {
             state,
             message.payload?.contentId,
             message.payload?.contentKind || "external",
-            message.payload?.runId
+            message.payload?.runId,
+            message.payload?.corner
           );
           sendResponse?.({ ok: true });
         } catch (error) {
