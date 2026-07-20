@@ -378,6 +378,11 @@ export function MultiConversationSidebar({ contentId }: Props) {
     <div
       className="flex h-full flex-col"
       style={{ background: surfaceBackground }}
+      // useResolvedTheme has no `window` during SSR and returns "light", so
+      // the server paints the light gradient while the client paints dark.
+      // The client value is correct and wins on the next render; suppress the
+      // unavoidable first-paint attribute diff rather than warn on every mount.
+      suppressHydrationWarning
     >
       <div className="relative">
         <SidebarChatTabs

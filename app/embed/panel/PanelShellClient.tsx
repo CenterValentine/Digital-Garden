@@ -170,6 +170,10 @@ export function PanelShellClient() {
         ))}
       </div>
 
+      {/* DndWrapper spans BOTH views: the tree needs it for drag-and-drop, and
+          ChatInput's useDrop (drag a note onto the composer) throws
+          "Expected drag drop context" without a provider above it. */}
+      <DndWrapper>
       {/* Garden view: tree over tabbed workspace. Kept mounted when hidden. */}
       <div
         style={{
@@ -179,7 +183,7 @@ export function PanelShellClient() {
           flexDirection: "column",
         }}
       >
-        <DndWrapper>
+        <>
           {/* Slim collapse bar — reclaims the tree's space for notes. */}
           <button
             type="button"
@@ -256,7 +260,7 @@ export function PanelShellClient() {
           >
             <MainPanelWorkspace />
           </div>
-        </DndWrapper>
+        </>
       </div>
 
       {/* Chat view. Kept mounted when hidden so the conversation survives
@@ -277,6 +281,7 @@ export function PanelShellClient() {
             is active in the panel, so chats follow the Garden selection. */}
         <MultiConversationSidebar contentId={selectedContentId} />
       </div>
+      </DndWrapper>
     </div>
   );
 }

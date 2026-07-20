@@ -161,6 +161,23 @@ body:has(.embed-layout-page) {
   overflow: hidden !important;
 }
 
+/* Radix menus/popovers/selects portal to <body>, i.e. OUTSIDE #embed-root —
+ * which is fixed-positioned at z-index:100. Portalled content ships at z-50,
+ * so every dropdown opened inside an embed rendered *behind* the panel and
+ * looked like a dead click (side-panel workspace chooser, chat pickers).
+ * Raise portalled layers above the embed container. Scoped to embed
+ * documents so the main app's stacking is untouched. */
+body:has(.embed-layout-page) [data-radix-popper-content-wrapper] {
+  z-index: 200 !important;
+}
+
+body:has(.embed-layout-page) [data-radix-portal],
+body:has(.embed-layout-page) > [role="dialog"],
+body:has(.embed-layout-page) > [data-radix-menu-content],
+body:has(.embed-layout-page) > [data-sonner-toaster] {
+  z-index: 200 !important;
+}
+
 /* Hide default nav + remove padding for the platform marketing page (notetrellis.com) */
 body:has(.platform-home-page) .notes-route-hides-default-nav {
   display: none !important;
