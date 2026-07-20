@@ -1889,6 +1889,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // sidePanel.open() must run before any await or the user-gesture context
+  // that authorized it (launcher click → this message) is lost. Handle it
+  // synchronously, outside the async IIFE below.
+  if (message.type === "open-side-panel") {
+    const tabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = tabId != null ? { tabId } : { windowId };
+    chrome.sidePanel
+      .open(target)
+      .then(() => sendResponse({ ok: true, data: true }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open side panel",
+        })
+      );
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
