@@ -516,6 +516,15 @@ export function SitePagesComposer() {
                 onChange={(e) => mutate((p) => ({ ...p, navOrder: Number(e.target.value) || 0 }))}
               />
               <span className="flex-1" />
+              <a
+                href={`/${working.slug}?preview=draft`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-amber-400/80 hover:text-amber-300"
+                title="Open this page (with your unpublished draft) in a new tab"
+              >
+                Preview ↗
+              </a>
               <button
                 type="button"
                 className="text-xs text-white/40 underline decoration-dotted underline-offset-4 hover:text-white/70"
