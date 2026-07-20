@@ -220,6 +220,54 @@ degraded text IS the source markdown — so regeneration is lossless.
 Per repo standard: `pnpm typecheck → lint → build`, plus in-app browser
 smoke per session gate. Same-bundler local/CI parity rules apply.
 
+## Consolidated smoke script (R1–R6, one sitting)
+
+Dev server for this worktree: `pnpm exec next dev --port 3020` (3015 is
+hardcoded in `pnpm dev`; 3017–3019 belong to other worktrees — verify with
+`lsof -a -p <pid> -d cwd` before trusting a run).
+
+**Setup (else two sessions silently stay dormant):**
+- S1. Settings → AI → Features → route **`tool-result-extraction`** to a
+  cheap model (Haiku / DeepSeek chat). Unrouted = extraction OFF by design.
+- S2. *(R4 only)* Settings → AI → Connections → add **DeepSeek** and
+  **Moonshot (Kimi)** with BYOK keys.
+
+**A. R3 — stickiness (do first, needs fresh state)**
+1. Pick a model explicitly in the chat picker.
+2. Open a NEW chat → picker shows that model, not the settings default.
+3. Reload the page → still that model.
+4. *(optional)* Delete the connection serving it → send → expect an explicit
+   MODEL_UNAVAILABLE with remedies, never a silent switch.
+
+**B. R1 + R2 + R5 — one playbook run**
+5. Full-page chat inside a folder; confirm the target chip shows it.
+6. Run jobhunt-mini (@-mention the playbook note) against a job URL.
+7. **R2:** during research, notes/page nodes appear in the file tree AS
+   they're created — not at turn end.
+8. **R1:** at the first checkpoint, click the artifact card → opens in a
+   SPLIT PANE beside the chat; scroll position and draft survive.
+   Right-click another card → "Open in split pane" / "Open here".
+9. **R1 gate:** approve the checkpoint without re-scrolling.
+10. **R5:** click the header token meter → per-phase breakdown.
+11. **R5:** open the Run Ledger note → each phase carries "Tokens so far".
+12. **R5:** with extraction routed, a long page read logs
+    `acquisition:extracted` (source → extract chars) and the note reflects
+    purpose-filtered content.
+
+**C. R2 — canvas half**
+13. Open a workflow, make an edit, DON'T save → ask the AI to update that
+    workflow → approve → expect the amber banner (Reload / Keep editing).
+14. Repeat with a clean canvas → silent reload with the new graph.
+
+**D. R4 — vendors (needs S2)**
+15. DeepSeek connection → Fetch models populates; pick a DeepSeek model →
+    ask for current info → honest "no web search" + `read_page` still works.
+16. Moonshot connection (base URL prefilled `api.moonshot.ai/v1`) → same.
+
+**E. R6 — already verified**
+17. Open "David Valentine - Customer Success Manager Resume" → renders
+    headings/bullets (regenerated + verified 2026-07-20).
+
 ## Deferred to AI V4 — conversation memory bank (owner decision 2026-07-18)
 
 The v3.1 discussion, captured so V4 starts warm:
