@@ -131,13 +131,15 @@ DeepSeek.
   both already existed from v3. **Gate pending owner smoke** (BYOK keys
   needed for both vendors).
 
-## R5 — Context-discipline near-term set (owner addition, minus JIT)
+## R5 — Context-discipline near-term set (owner addition, minus JIT; re-cut 2026-07-19)
 
 The "near" commitments approved with the v3 plan, now scheduled — EXCEPT
-JIT retrieval, which is deliberately carved out: it depends on where
-memory artifacts live, and that substrate decision belongs to the V4
-memory investigation (see final section). Build order is measurement
-first:
+JIT retrieval (carved out to the V4 memory investigation) AND validated
+compaction (carved out to R5b below — the build recon showed NO history
+compaction exists to validate; that item is really "build compaction
+with validation", a hot-path project that belongs beside V4's
+artifact-compaction design, not under this gate). Build order is
+measurement first:
 
 - **Tokens-per-phase eval**: extend the S5 token meter into per-phase
   accounting (checkpoint boundaries delimit phases) — a small table per
@@ -148,20 +150,25 @@ first:
   before the result enters context; raw text never rides the main
   thread. Provider-agnostic via feature routing; falls back to today's
   truncation when no cheap route exists.
-- **Validated compaction**: when history compaction summarizes older
-  turns, the summary is validated against what it replaces (claim-check
-  pass) before substitution — compaction that fails validation keeps the
-  originals. Applies to the message-history layer only (artifact-layer
-  compaction is V4).
 - **Cache-aware layout upgrades**: extend the byte-stable-prompt work
   (date-only stability shipped in v3) — audit section ordering, tool
   definition stability, and pruning placement so provider prompt caches
   hit across a session; verify with provider cache-hit metrics where
   exposed.
 - **Gate:** a jobhunt-mini run shows per-phase token numbers; an
-  oversized page read enters context as an extract; a forced compaction
-  passes validation or visibly declines; cache-hit rate measurably
-  improves across a 3-phase run.
+  oversized page read enters context as an extract; the system prompt's
+  stable prefix survives a date rollover mid-session.
+
+## R5b — Validated compaction (DEFERRED toward V4; split from R5 2026-07-19)
+
+Recon finding: `compactToolOutputs` only strips provider-executed search
+ciphertext — no message-history summarization exists. This item is
+therefore net-new hot-path work: build history compaction WITH a
+claim-check validation pass (failed validation keeps the originals).
+Deliberately deferred beside the V4 memory investigation: message-layer
+and artifact-layer compaction are the same generational machinery
+applied to two layers — designing them together avoids building it
+twice.
 
 ## R6 — Regen sweep: pre-fix degraded notes (owner addition)
 

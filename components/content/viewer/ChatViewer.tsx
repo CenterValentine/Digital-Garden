@@ -13,6 +13,11 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
+
+/** Compact token formatting for the header meter (v3.1 R5). */
+function formatTokenCount(n: number): string {
+  return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+}
 import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
@@ -572,6 +577,46 @@ function ChatViewerInner({
     [messages],
   );
 
+  // Tokens-per-phase (v3.1 R5): phases are delimited by phase_checkpoint
+  // tool calls already in the stream — usage accumulates into the phase
+  // the checkpoint closes. Client-side only; the server-side twin stamps
+  // "tokens so far" into the Run Ledger at each checkpoint.
+  const [showPhaseTokens, setShowPhaseTokens] = useState(false);
+  const phaseTokens = useMemo(() => {
+    const phases: Array<{ name: string; tokens: number }> = [];
+    let bucket = 0;
+    for (const m of messages) {
+      bucket +=
+        (m as { metadata?: { usage?: { totalTokens?: number } } }).metadata
+          ?.usage?.totalTokens ?? 0;
+      if (m.role !== "assistant") continue;
+      for (const part of m.parts ?? []) {
+        const p = part as {
+          type?: string;
+          state?: string;
+          input?: { phase?: string };
+        };
+        if (
+          p.type === "tool-phase_checkpoint" &&
+          (p.state === "output-available" || p.state === "output-error")
+        ) {
+          phases.push({
+            name: p.input?.phase ?? `Phase ${phases.length + 1}`,
+            tokens: bucket,
+          });
+          bucket = 0;
+        }
+      }
+    }
+    if (bucket > 0) {
+      phases.push({
+        name: phases.length > 0 ? "Since last checkpoint" : "Run",
+        tokens: bucket,
+      });
+    }
+    return phases;
+  }, [messages]);
+
   // Inline rename (double-click the header title). A local override wins
   // over the loaded title so the change shows instantly; it routes through
   // the conversation PATCH (bound) or the content PATCH (legacy), both of
@@ -690,14 +735,46 @@ function ChatViewerInner({
                 {displayTitle}
               </h1>
             )}
-            <p className="text-xs text-gray-500">
-              {hasMessages
-                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}${
-                    runTokens > 0
-                      ? ` · ~${runTokens >= 1000 ? `${(runTokens / 1000).toFixed(1)}k` : runTokens} tokens`
-                      : ""
-                  }`
-                : "New conversation"}
+            <p className="relative text-xs text-gray-500">
+              {hasMessages ? (
+                <>
+                  {messages.length} message{messages.length !== 1 ? "s" : ""}
+                  {runTokens > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowPhaseTokens((v) => !v)}
+                      className="ml-1 rounded px-1 hover:bg-black/[0.05] dark:hover:bg-white/10 transition-colors"
+                      title={
+                        phaseTokens.length > 1
+                          ? "Per-phase token breakdown"
+                          : "Total token usage this conversation"
+                      }
+                    >
+                      · ~{formatTokenCount(runTokens)} tokens
+                      {phaseTokens.length > 1 ? " ▾" : ""}
+                    </button>
+                  )}
+                  {showPhaseTokens && phaseTokens.length > 1 && (
+                    <span className="absolute left-0 top-full z-20 mt-1 block min-w-[230px] rounded-lg border border-black/10 bg-white p-2 shadow-xl dark:border-white/10 dark:bg-zinc-900">
+                      {phaseTokens.map((ph, i) => (
+                        <span
+                          key={i}
+                          className="flex justify-between gap-3 py-0.5"
+                        >
+                          <span className="min-w-0 truncate text-gray-600 dark:text-gray-300">
+                            {ph.name}
+                          </span>
+                          <span className="shrink-0 tabular-nums text-gray-500">
+                            ~{formatTokenCount(ph.tokens)}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </>
+              ) : (
+                "New conversation"
+              )}
             </p>
           </div>
         </div>

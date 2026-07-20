@@ -29,6 +29,8 @@ export interface CheckpointEntry {
   artifacts?: string[];
   openQuestions?: string[];
   next?: string;
+  /** Route-accumulated token usage through this checkpoint (v3.1 R5). */
+  tokensSoFar?: number;
 }
 
 function renderEntry(entry: CheckpointEntry): string {
@@ -43,6 +45,9 @@ function renderEntry(entry: CheckpointEntry): string {
     for (const q of entry.openQuestions) lines.push(`- ${q}`);
   }
   if (entry.next) lines.push("", `**Next:** ${entry.next}`);
+  if (typeof entry.tokensSoFar === "number" && entry.tokensSoFar > 0) {
+    lines.push("", `**Tokens so far (this turn):** ~${entry.tokensSoFar.toLocaleString()}`);
+  }
   return lines.join("\n");
 }
 

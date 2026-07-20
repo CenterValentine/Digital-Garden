@@ -463,8 +463,13 @@ export async function POST(request: Request) {
       // transient chats have no chat node to infer from).
       if (!targetFolderId) targetFolderId = openContentLocationId;
 
+      // Per-request token accumulator (v3.1 R5): onStepFinish adds each
+      // step's usage; phase_checkpoint stamps the running total into the
+      // Run Ledger.
+      const runTokenCounter = { total: 0 };
       const toolCtx = {
         userId: session.user.id,
+        runTokens: runTokenCounter,
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -730,6 +735,10 @@ export async function POST(request: Request) {
           mentionedContext,
         }),
         onStepFinish: (step) => {
+          // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
+          runTokenCounter.total +=
+            (step as { usage?: { totalTokens?: number } }).usage
+              ?.totalTokens ?? 0;
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any
           // content-id-bearing args (per the CONTENT_ID_TOOL_ARGS

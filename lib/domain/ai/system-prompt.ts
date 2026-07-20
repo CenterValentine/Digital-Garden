@@ -120,18 +120,6 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const sections: string[] = [BASE_PROMPT];
 
-  // Date only (no time) so the prompt stays byte-stable within a day —
-  // preserves provider prompt-cache hits across a session (cache-aware
-  // layout, AI v3 core). Without this, models guess "today" from their
-  // training era and search queries carry years-stale dates.
-  sections.push(
-    `Current date: ${new Date().toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
-  );
   sections.push(
     "Tool discipline: if a tool result is empty or unhelpful, do NOT repeat the same or a near-identical call — vary the approach once at most, then answer with what you have and state the limitation plainly.",
   );
@@ -150,6 +138,21 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.openWorkflowTitle) sections.push(workflowSection(ctx.openWorkflowTitle));
   if (ctx.editableContentId) sections.push(editorSection(ctx.editableContentId));
   if (ctx.isChatContent && ctx.chatContentId) sections.push(chatContentSection(ctx.chatContentId));
+
+  // Date only (no time) so the prompt stays byte-stable within a day —
+  // and placed LAST among the static sections (v3.1 R5 cache-aware
+  // layout): a date rollover mid-session now invalidates only this
+  // suffix, not every tool/feature section after it. Without the date,
+  // models guess "today" from their training era and search queries
+  // carry years-stale dates.
+  sections.push(
+    `Current date: ${new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
+  );
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
 
