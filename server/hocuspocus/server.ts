@@ -59,6 +59,20 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Sentinel thrown by sendJsonAndStop to halt Hocuspocus's onRequest pipeline
+ * after we've written a response ourselves.
+ *
+ * It is a named class rather than the previous `throw null` so surrounding
+ * try/catch blocks can tell "I already answered this request" apart from a
+ * genuine failure. A catch that swallowed the old null signal double-wrote
+ * the response and crashed the process with ERR_HTTP_HEADERS_SENT on every
+ * /readyz probe (2026-07-20). Any catch around a send MUST rethrow this.
+ */
+class ResponseHandled {
+  readonly handled = true;
+}
+
 function sendJsonAndStop(
   response: onRequestPayload["response"],
   status: number,
@@ -69,7 +83,7 @@ function sendJsonAndStop(
     "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(payload));
-  throw null;
+  throw new ResponseHandled();
 }
 
 async function handleHealthRequest(data: onRequestPayload) {
@@ -84,20 +98,27 @@ async function handleHealthRequest(data: onRequestPayload) {
   }
 
   if (url.pathname === "/readyz") {
+    // Scope the try to the DB probe ONLY — never wrap a sendJsonAndStop call,
+    // whose ResponseHandled sentinel must reach Hocuspocus uncaught.
+    let databaseError: unknown = null;
     try {
       await prisma.$queryRaw`SELECT 1`;
+    } catch (error) {
+      databaseError = error;
+    }
+    if (!databaseError) {
       sendJsonAndStop(data.response, 200, {
         ok: true,
         service: "digital-garden-hocuspocus",
         database: "ready",
         uptimeMs: Date.now() - startedAt,
       });
-    } catch (error) {
+    } else {
       sendJsonAndStop(data.response, 503, {
         ok: false,
         service: "digital-garden-hocuspocus",
         database: "unavailable",
-        error: getErrorMessage(error),
+        error: getErrorMessage(databaseError),
       });
     }
   }

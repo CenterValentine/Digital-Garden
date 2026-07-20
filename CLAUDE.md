@@ -293,7 +293,9 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 ### Collaboration Architecture
 
-**Transport:** Hocuspocus server hosted on Google Cloud Run (not local). Do not check port 1234 or suggest `pnpm dev:collab` for production testing.
+**Transport:** Hocuspocus runs on Google Cloud Run in **production**. **Local dev now REQUIRES a local Hocuspocus** (`pnpm dev:collab`, ws://localhost:1234) — the dev database moved to local Docker Postgres, and the hosted server authorizes documents against Neon, so it cannot see locally-created content (symptom: "Live collaboration authentication could not be completed" on every note). Run `pnpm dev:collab` **from the same checkout as the dev server** (it loads that directory's `.env.local` and TipTap schema), and set `NEXT_PUBLIC_HOCUSPOCUS_URL=ws://localhost:1234` — never `0.0.0.0` (a bind address; browsers can't connect to it).
+
+**Deploying Hocuspocus:** `gcloud builds submit --config cloudbuild.hocuspocus.yaml .` ships **the current working directory**. With multiple worktrees at different commits, always deploy from a checkout at `origin/main` — verify with `git rev-list --count HEAD..origin/main` returning `0` first. Note `uptimeMs` from `/readyz` measures time since the last cold start (`min-instances=0`), **not** time since deploy — never infer staleness from it; use `gcloud builds list` instead.
 
 **Y.js document storage:** `CollaborationDocument` Prisma table stores binary `ydocState`. On load, the server bootstraps from TipTap JSON if no Y.js state exists. Presence (awareness) state is persisted to Postgres to handle Vercel serverless split.
 

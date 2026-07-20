@@ -424,6 +424,15 @@ export function MarkdownEditor({
       runtimeConnectionState === "disconnectedButDirty" ||
       runtimeEditPolicy?.reason === "offline-local-durable" ||
       runtimeEditPolicy?.reason === "degraded-local-fallback");
+  // Read via ref inside the editor's onUpdate. This flag flips on TRANSIENT
+  // connection states (the very first keystroke while disconnected flips
+  // disconnectedButDirty) — keeping it in the useEditor deps recreated the
+  // whole editor mid-keystroke, stealing the caret on every edit whenever
+  // collaboration couldn't connect (2026-07-20 incident).
+  const shouldSkipRestAutosaveRef = useRef(shouldSkipRestAutosaveForCollaboration);
+  useEffect(() => {
+    shouldSkipRestAutosaveRef.current = shouldSkipRestAutosaveForCollaboration;
+  }, [shouldSkipRestAutosaveForCollaboration]);
 
   useEffect(() => {
     if (!collaborationState) {
@@ -661,7 +670,7 @@ export function MarkdownEditor({
         clearTimeout(saveTimeoutRef.current);
       }
 
-      if (collaborationState?.provider || shouldSkipRestAutosaveForCollaboration) {
+      if (collaborationState?.provider || shouldSkipRestAutosaveRef.current) {
         return;
       }
 
@@ -768,7 +777,13 @@ export function MarkdownEditor({
         }, autoSaveDelay);
       }
     },
-  }, [editorMode, effectiveEditable, shouldSkipRestAutosaveForCollaboration]);
+    // Recreate the editor ONLY when the collaboration provider's presence
+    // changes (editorMode encodes it) — that transition genuinely requires a
+    // new editor instance. Everything else is handled without recreation:
+    // editability via the setEditable effect below, autosave skipping via
+    // shouldSkipRestAutosaveRef. Recreating on those transient flags is what
+    // turned every connection blip into a stolen caret.
+  }, [editorMode]);
 
   useEffect(() => {
     if (!editor) return;
