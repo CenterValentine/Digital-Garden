@@ -18,9 +18,13 @@
  * Safety:
  *   - Dry run is the default; `--apply` is the only way to write.
  *   - Notes with live collaboration state (CollaborationDocument.ydocState)
- *     are SKIPPED and reported: rewriting NotePayload under an active Y.js
- *     doc would be silently overwritten by the CRDT (or clobber it).
- *     Fix those by opening the note and re-saving through the editor.
+ *     are SKIPPED and reported: for those the Y.js doc — not NotePayload —
+ *     is what the editor renders, so a payload rewrite is invisible at
+ *     best, and at worst diverges the two (the failure mode behind the
+ *     daily-notes template-overlay bug). Re-saving does NOT fix them
+ *     either: nothing in the save path re-parses markdown. They need
+ *     manual reformatting, or a payload+ydocState reset performed while
+ *     the note is closed everywhere.
  *   - Detection is conservative: the doc must be paragraph-only AND its
  *     text must carry a LINE-START markdown structure marker. Run Ledger
  *     notes take a fast path — their `metadata.ledgerMarkdown` is the
@@ -248,8 +252,14 @@ async function main() {
     }
   }
   if (skippedCollab.length > 0) {
+    // NOTE: re-saving in the editor does NOT fix these — nothing in the
+    // save path re-parses markdown, so the literal `##` text just round
+    // trips through the Y.doc. They need either manual reformatting in
+    // the editor, or a reset pass (regenerate the payload AND clear
+    // CollaborationDocument.ydocState with the note closed everywhere,
+    // so the next open re-bootstraps from the fixed payload).
     console.log(
-      `\n  Skipped — open these in the editor and re-save to regenerate:`,
+      `\n  Skipped — live Y.js doc is the source of truth for these.\n  Fix by reformatting in the editor, or by a payload+ydocState reset while the note is CLOSED:`,
     );
     for (const s of skippedCollab) {
       console.log(`  • ${s.title}  [${s.contentId}]`);
