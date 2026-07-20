@@ -196,6 +196,24 @@ degraded text IS the source markdown — so regeneration is lossless.
 - **Gate:** dry-run report reviewed by owner; post-run, previously
   degraded notes render structured; a spot-checked unaffected note is
   byte-identical.
+- **BUILT (af4dca6, 2026-07-20)** — `pnpm notes:regen` (dry-run default,
+  `--apply` writes, plus `--limit/--id/--verbose`). Dry run projects each
+  candidate through the conversion in memory and prints the node types it
+  would produce, so the report proves the fix before any write.
+  **First dry run: 57 payloads → 4 degraded** (the v3 smoke playbook
+  artifacts: Resume, 2× Company Profile, Fit Analysis — all would gain
+  heading/bulletList/orderedList structure), **3 skipped** for live
+  collaboration state. **Apply pending owner review of the report.**
+- **tsx footgun documented** (cost ~30min, worth knowing): scripts cannot
+  import `lib/domain/editor/extensions-server` — `code-block-lowlight`'s
+  own source default-imports `code-block`, which is `undefined` under
+  tsx's CJS transform. Separately, bare `@tiptap/html` resolves to the
+  BROWSER build under tsx (Next gets the server build via the package's
+  `import.node` export condition) — scripts must use `@tiptap/html/server`
+  explicitly. App code is correct on both counts; this is resolution
+  difference, not a bug. Workaround for any future script needing
+  markdown→TipTap: local twin over `getCollaborationServerExtensions()`
+  (CI-guaranteed to cover every Node/Mark, loads cleanly in tsx).
 
 ## Verification conventions
 
