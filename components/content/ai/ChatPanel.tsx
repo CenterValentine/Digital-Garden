@@ -14,6 +14,7 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
@@ -81,6 +82,32 @@ interface ChatPanelProps {
    * behavior) — messages live in memory only and disappear on reload.
    */
   onTransientPromoted?: (newConversationId: string) => void;
+}
+
+/**
+ * Browser side panel only: the last target folder the user picked there.
+ * App chats derive their target from the content they're rooted to, but a
+ * browser chat has no such root — remembering the pick is what keeps it
+ * placeful across pages and sessions (BROWSER-REACH decision #7).
+ */
+const PANEL_TARGET_KEY = "dg-panel-target-folder";
+
+function readRememberedPanelTarget(): {
+  id: string;
+  title: string | null;
+} | null {
+  try {
+    const raw = localStorage.getItem(PANEL_TARGET_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { id?: unknown; title?: unknown };
+    if (typeof parsed?.id !== "string") return null;
+    return {
+      id: parsed.id,
+      title: typeof parsed.title === "string" ? parsed.title : null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function ChatPanel({
@@ -222,6 +249,10 @@ export function ChatPanel({
 
   // Target folder (AI v3 core S3): seed from the bound conversation; user
   // changes persist via PATCH (owner+is-folder validated server-side).
+  // Browser side panel gets target persistence the app doesn't need.
+  const chatPathname = usePathname();
+  const isPanelEmbed = chatPathname?.startsWith("/embed/panel") ?? false;
+
   const [targetFolder, setTargetFolder] = useState<{
     id: string;
     title: string | null;
@@ -297,13 +328,36 @@ export function ChatPanel({
       // rendering blank.
       setTargetFolder(effectiveLocation);
       setTargetInherited(true);
+    } else if (isPanelEmbed) {
+      // Browser panel: no conversation and nothing to inherit from, so fall
+      // back to the last target the user picked here. Browser chats aren't
+      // rooted in content the way app chats are — the panel's remembered
+      // target is what makes them placeful.
+      const remembered = readRememberedPanelTarget();
+      setTargetFolder(remembered);
+      setTargetInherited(false);
     } else {
       setTargetFolder(null);
       setTargetInherited(false);
     }
-  }, [initialTargetFolder, initialTargetInherited, effectiveLocation]);
+  }, [initialTargetFolder, initialTargetInherited, effectiveLocation, isPanelEmbed]);
   const handleTargetChange = useCallback(
     (next: { id: string; title: string | null } | null) => {
+      // Browser panel only: remember the pick so the next chat opened in the
+      // side panel starts already targeted. The app's own chats keep deriving
+      // their target from the content they're rooted to.
+      if (isPanelEmbed) {
+        try {
+          if (next) {
+            localStorage.setItem(PANEL_TARGET_KEY, JSON.stringify(next));
+          } else {
+            localStorage.removeItem(PANEL_TARGET_KEY);
+          }
+        } catch {
+          // Storage unavailable in a partitioned iframe — selection still
+          // applies for this session.
+        }
+      }
       // Explicit pick overrides inheritance; clearing an override falls
       // back to the location-inferred target (chats serve their location).
       if (next) {
@@ -322,7 +376,7 @@ export function ChatPanel({
         body: JSON.stringify({ targetFolderId: next?.id ?? null }),
       }).catch(() => {});
     },
-    [conversationId, effectiveLocation],
+    [conversationId, effectiveLocation, isPanelEmbed],
   );
 
   // Change handler: update local state immediately (drives the engine body)
@@ -365,9 +419,15 @@ export function ChatPanel({
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(
-              contentId ? { snapshotContentNodeIds: [contentId] } : {},
-            ),
+            body: JSON.stringify({
+              ...(contentId ? { snapshotContentNodeIds: [contentId] } : {}),
+              // Carry a target chosen before the conversation existed
+              // (the chip is now usable in transient chats) so the very
+              // first turn already files its outputs in the right place.
+              ...(targetFolder && !targetInherited
+                ? { targetFolderId: targetFolder.id }
+                : {}),
+            }),
           });
           if (!res.ok) throw new Error("Couldn't save the chat");
           const body = (await res.json()) as { data?: { id?: string } };
@@ -397,7 +457,17 @@ export function ChatPanel({
       return;
     }
     handleSend();
-  }, [conversationId, onTransientPromoted, contentId, input, handleSend]);
+    // targetFolder/targetInherited are real deps: a stale closure would create
+    // the conversation without a target the user picked before sending.
+  }, [
+    conversationId,
+    onTransientPromoted,
+    contentId,
+    input,
+    handleSend,
+    targetFolder,
+    targetInherited,
+  ]);
 
   // Resend the queued transient first message once conversationId catches up.
   useEffect(() => {
@@ -645,7 +715,10 @@ export function ChatPanel({
             target={targetFolder}
             inherited={targetInherited}
             location={effectiveLocation}
-            disabled={!conversationId}
+            // Selectable before the conversation exists: the pick is held in
+            // local state, carried into the POST that creates the conversation,
+            // and (in the browser panel) remembered for the next chat.
+            disabled={false}
             onChange={handleTargetChange}
           />
         </div>
