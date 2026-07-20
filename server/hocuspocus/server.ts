@@ -60,19 +60,23 @@ function getErrorMessage(error: unknown) {
 }
 
 /**
- * Sentinel thrown by sendJsonAndStop to halt Hocuspocus's onRequest pipeline
- * after we've written a response ourselves.
+ * Writes a response and halts Hocuspocus's onRequest pipeline.
  *
- * It is a named class rather than the previous `throw null` so surrounding
- * try/catch blocks can tell "I already answered this request" apart from a
- * genuine failure. A catch that swallowed the old null signal double-wrote
- * the response and crashed the process with ERR_HTTP_HEADERS_SENT on every
- * /readyz probe (2026-07-20). Any catch around a send MUST rethrow this.
+ * `throw null` is REQUIRED here, not a shortcut. Hocuspocus's requestHandler
+ * does:
+ *
+ *     catch (error) { if (error) { throw error; } }   // Server.ts
+ *
+ * i.e. a *falsy* throw means "a hook already answered this request, stop the
+ * chain", and anything truthy is rethrown and crashes the process. Replacing
+ * this with a named sentinel class looked safer but was rethrown on every
+ * probe — do not "improve" it again.
+ *
+ * The companion rule: never wrap a call to this in a try that also handles
+ * real failures, or that catch will swallow the stop-signal and double-write
+ * the response (ERR_HTTP_HEADERS_SENT). Scope such trys to the fallible work
+ * itself — see /readyz below.
  */
-class ResponseHandled {
-  readonly handled = true;
-}
-
 function sendJsonAndStop(
   response: onRequestPayload["response"],
   status: number,
@@ -83,7 +87,7 @@ function sendJsonAndStop(
     "Cache-Control": "no-store",
   });
   response.end(JSON.stringify(payload));
-  throw new ResponseHandled();
+  throw null;
 }
 
 async function handleHealthRequest(data: onRequestPayload) {
@@ -99,7 +103,7 @@ async function handleHealthRequest(data: onRequestPayload) {
 
   if (url.pathname === "/readyz") {
     // Scope the try to the DB probe ONLY — never wrap a sendJsonAndStop call,
-    // whose ResponseHandled sentinel must reach Hocuspocus uncaught.
+    // whose null stop-signal must reach Hocuspocus uncaught.
     let databaseError: unknown = null;
     try {
       await prisma.$queryRaw`SELECT 1`;
