@@ -1,17 +1,11 @@
 /**
- * Shared client-side defaults for the Site Pages composer — starter configs
- * per page kind and empty-section factories for "+ Add section".
- *
- * Client-safe: imports types only from the page-layout schema (zod, no Prisma).
+ * Shared client-side defaults for the Site Pages composer (v1.1 unified model).
+ * A page is a list of sections; a section is a list of items; an item is a
+ * single page, a directory, or manual. Page `kind` decides rendering, not the
+ * section shape — so there's one section factory, not three.
  */
 
-import type {
-  SitePageConfig,
-  PageSection,
-  RecordListSection,
-  DirectoryIndexSection,
-  GardenCategoriesSection,
-} from "@/lib/domain/page-layout/schema";
+import type { SitePageConfig, ListSection } from "@/lib/domain/page-layout/schema";
 
 export type PageKind = "record" | "index" | "prose" | "garden";
 
@@ -19,27 +13,21 @@ export const KINDS: PageKind[] = ["record", "index", "prose", "garden"];
 
 export const KIND_LABELS: Record<PageKind, string> = {
   record: "Record ledger",
-  index: "Directory index",
+  index: "Simple list",
   prose: "Prose",
   garden: "Garden",
 };
 
-export const SECTION_TYPE_LABELS: Record<PageSection["type"], string> = {
-  recordList: "record list",
-  directoryIndex: "directory index",
-  gardenCategories: "garden categories",
+/** Short helper text shown under the kind selector. */
+export const KIND_HELP: Record<PageKind, string> = {
+  record: "A ledger of rows (projects, writing, roles) with an expandable drawer.",
+  index: "A plain list of pages and directories.",
+  prose: "Freeform — sections render as simple blocks.",
+  garden: "The Field Notes garden — sections become leaves, items become veins.",
 };
 
-export function emptyRecordList(): RecordListSection {
-  return { type: "recordList", label: "— New section", sort: "date-desc", items: [] };
-}
-
-export function emptyDirectoryIndex(): DirectoryIndexSection {
-  return { type: "directoryIndex", entries: [] };
-}
-
-export function emptyGardenCategories(): GardenCategoriesSection {
-  return { type: "gardenCategories", categories: [] };
+export function emptySection(): ListSection {
+  return { label: "— New section", sort: "date-desc", items: [] };
 }
 
 /** Starter config shown when creating a page of the given kind. */
@@ -49,7 +37,6 @@ export function starterConfig(kind: PageKind): SitePageConfig {
       return {
         sections: [
           {
-            type: "recordList",
             label: "— Projects",
             sort: "date-desc",
             items: [
@@ -66,39 +53,15 @@ export function starterConfig(kind: PageKind): SitePageConfig {
           },
         ],
       };
-    case "index":
-      return {
-        sections: [
-          {
-            type: "directoryIndex",
-            entries: [
-              {
-                bind: "publicPath:/blog",
-                title: "Writing",
-                subtitle: "Essays and notes.",
-              },
-            ],
-          },
-        ],
-      };
     case "garden":
       return {
         sections: [
-          {
-            type: "gardenCategories",
-            categories: [
-              {
-                key: "writing",
-                label: "Writing",
-                title: "Writing",
-                intro: "Essays and notes.",
-                kind: "shoot",
-                bind: "publicPath:/blog",
-                items: [],
-              },
-            ],
-          },
+          { label: "Writing", intro: "Essays and notes.", sort: "date-desc", items: [] },
         ],
+      };
+    case "index":
+      return {
+        sections: [{ label: "", sort: "date-desc", items: [] }],
       };
     case "prose":
       return { sections: [] };

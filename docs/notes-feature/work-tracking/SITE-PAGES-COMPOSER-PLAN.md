@@ -91,6 +91,41 @@ Owner directive (2026-07-18): begin Home as soon as V1 lands. Pre-scoped so V2 s
 4. **Résumé page (growth rings)** — candidate third surface; rings data → recordList-style config with date ranges. Decide at V2 kickoff.
 5. **Nav consumption** — PersonalHeader reads `navLabel`/`navOrder` from published SitePages instead of hardcoded links.
 
+## v1.1 — Model simplification (owner feedback 2026-07-20, after v1 smoke)
+
+Owner found the model leaking through the UI. Two decisions locked:
+
+**A. One publish lifecycle.** The `visibility` dropdown was inert (the live
+route ignored it) and "published" meant two things. Collapse to: a page is
+**Draft** or **Live**; publishing makes it live AND pushes content; when live +
+edited a "Publish changes" appears; nav membership becomes a separate "Show in
+menu" toggle. The live personal routes must honor Draft (owner-only preview,
+hidden/404 for the public).
+
+**B. One "list" builder.** Drop the section-type picker (record / directory
+index / garden categories were internal renderer shapes). A section is a
+**list**; each item is either a **single published page** or a **directory**
+(inferred from the ref prefix), side by side, mixed. `bind` moves from the
+section onto the item (a directory is just `ref: publicPath:/x` that expands at
+render). "Record" → "list item". Garden: each section *is* a category.
+
+Sprints (each committed):
+- **M1 schema** — unified `listSection` + `listItem` (ref = publicItem|publicPath);
+  drop the discriminated union; `migrateLegacyConfig()` in parseConfig maps old
+  recordList/directoryIndex/gardenCategories shapes forward so existing rows
+  survive.
+- **M2 resolver** — expand directory items inline; build WorkData/GardenData
+  from unified sections (single item → one row; directory item → its published
+  pages).
+- **M3 renderers** — confirm WorkResultsPage/garden consume the resolved shape
+  unchanged (work is resolver-side); tidy any assumptions.
+- **M4 composer** — one list builder: Add section → Add item (picker offers
+  single page OR directory), mixed; relabel; garden section = category; drop the
+  three type buttons + directoryIndex UI.
+- **M5 lifecycle** — Draft/Live status + Publish changes + "Show in menu"
+  toggle; live route honors visibility.
+- **M6 gate** — full build + browser smoke.
+
 ## Risks / notes
 
 - **Parallel-session clobbering** — this worktree has other active sessions; commit per-sprint, never leave the wiring uncommitted (bitten twice).

@@ -18,8 +18,11 @@ import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import {
   sitePageConfig,
+  isLegacyConfig,
+  migrateLegacyConfig,
   type SitePageConfig,
-  type PageSection,
+  type ListSection,
+  type ListItem,
 } from "@/lib/domain/page-layout/schema";
 import {
   KINDS,
@@ -27,11 +30,9 @@ import {
   type PageKind,
   starterConfig,
   slugToSegment,
-  emptyRecordList,
-  emptyDirectoryIndex,
-  emptyGardenCategories,
+  emptySection,
 } from "./defaults";
-import { SectionCard, type PickerTarget } from "./SectionCard";
+import { SectionCard } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
 import { ContentPicker } from "./ContentPicker";
 import { PreviewPane } from "./PreviewPane";
@@ -81,9 +82,7 @@ export function SitePagesComposer() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showJson, setShowJson] = useState(false);
   /** Which section (and category) the content picker is connecting, if open. */
-  const [picker, setPicker] = useState<
-    (PickerTarget & { sectionIndex: number }) | null
-  >(null);
+  const [picker, setPicker] = useState<{ sectionIndex: number } | null>(null);
   /** Published-item values by ref, for showing inherited fields on bound rows. */
   const [inheritedIndex, setInheritedIndex] = useState<Map<string, InheritedValues>>(
     () => new Map(),
@@ -157,8 +156,11 @@ export function SitePagesComposer() {
             | null;
         };
         if (!data.page) return;
-        const raw = data.page.draftConfig ?? data.page.config;
-        const parsed = sitePageConfig.safeParse(raw ?? {});
+        const stored = data.page.draftConfig ?? data.page.config;
+        // Migrate pre-v1.1 configs on the way in — a direct parse would silently
+        // strip the old section `type`/`bind`. First edit re-saves the new shape.
+        const raw = isLegacyConfig(stored) ? migrateLegacyConfig(stored) : (stored ?? {});
+        const parsed = sitePageConfig.safeParse(raw);
         setWorking({
           slug: data.page.slug,
           title: data.page.title,
@@ -337,27 +339,38 @@ export function SitePagesComposer() {
     saveTimer.current = setTimeout(() => void saveNow(), 400);
   }, [newDraft, pages.length, saveNow]);
 
-  const setSection = (index: number, next: PageSection) =>
+  const setSection = (index: number, next: ListSection) =>
     mutate((prev) => {
       const sections = prev.config.sections.slice();
       sections[index] = next;
       return { ...prev, config: { sections } };
     });
 
-  /** Apply a picker choice back onto the section that opened it. */
-  const applyPick = (
-    apply: (section: PageSection, target: PickerTarget) => PageSection,
-  ) => {
+  /** Append an item to the section the picker was opened for. */
+  const addItemToPickerSection = (item: ListItem) => {
     if (!picker) return;
-    const { sectionIndex, ...target } = picker;
+    const { sectionIndex } = picker;
     mutate((prev) => {
       const sections = prev.config.sections.slice();
       const section = sections[sectionIndex];
       if (!section) return prev;
-      sections[sectionIndex] = apply(section, target as PickerTarget);
+      sections[sectionIndex] = { ...section, items: [...section.items, item] };
       return { ...prev, config: { sections } };
     });
   };
+
+  /** Append a manual item to a section (the "+ Add manual row" button). */
+  const addManualItem = (sectionIndex: number) =>
+    mutate((prev) => {
+      const sections = prev.config.sections.slice();
+      const section = sections[sectionIndex];
+      if (!section) return prev;
+      sections[sectionIndex] = {
+        ...section,
+        items: [...section.items, { title: "New row", status: "done" }],
+      };
+      return { ...prev, config: { sections } };
+    });
 
   const saveLabel =
     saveState === "saving"
@@ -564,6 +577,7 @@ export function SitePagesComposer() {
                 section={section}
                 index={i}
                 total={working.config.sections.length}
+                pageKind={working.kind}
                 onChange={(next) => setSection(i, next)}
                 onRemove={() =>
                   mutate((prev) => ({
@@ -580,49 +594,24 @@ export function SitePagesComposer() {
                     return { ...prev, config: { sections } };
                   })
                 }
-                onConnect={(target) => setPicker({ ...target, sectionIndex: i })}
+                onConnect={() => setPicker({ sectionIndex: i })}
+                onAddManual={() => addManualItem(i)}
                 inheritedFor={inheritedFor}
               />
             ))}
 
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="rounded-md border border-dashed border-white/20 px-3 py-2 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-                onClick={() =>
-                  mutate((p) => ({
-                    ...p,
-                    config: { sections: [...p.config.sections, emptyRecordList()] },
-                  }))
-                }
-              >
-                + Record list
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-dashed border-white/20 px-3 py-2 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-                onClick={() =>
-                  mutate((p) => ({
-                    ...p,
-                    config: { sections: [...p.config.sections, emptyDirectoryIndex()] },
-                  }))
-                }
-              >
-                + Directory index
-              </button>
-              <button
-                type="button"
-                className="rounded-md border border-dashed border-white/20 px-3 py-2 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-                onClick={() =>
-                  mutate((p) => ({
-                    ...p,
-                    config: { sections: [...p.config.sections, emptyGardenCategories()] },
-                  }))
-                }
-              >
-                + Garden categories
-              </button>
-            </div>
+            <button
+              type="button"
+              className="rounded-md border border-dashed border-white/20 px-4 py-2.5 text-sm text-white/50 hover:border-amber-500/50 hover:text-amber-400"
+              onClick={() =>
+                mutate((p) => ({
+                  ...p,
+                  config: { sections: [...p.config.sections, emptySection()] },
+                }))
+              }
+            >
+              + Add {working.kind === "garden" ? "category" : "section"}
+            </button>
           </>
         )}
       </main>
@@ -649,60 +638,13 @@ export function SitePagesComposer() {
       {picker && working && (
         <ContentPicker
           tenantId={tenantId}
-          mode={picker.mode}
-          sectionLabel={(() => {
-            const s = working.config.sections[picker.sectionIndex];
-            if (!s) return "this section";
-            if (s.type === "recordList") return s.label;
-            if (s.type === "gardenCategories" && picker.mode === "gardenCategory")
-              return s.categories[picker.categoryIndex]?.label ?? "this category";
-            return "this section";
-          })()}
-          onBindDirectory={(ref, dir) =>
-            applyPick((section, target) => {
-              if (section.type === "recordList") {
-                return { ...section, bind: ref };
-              }
-              if (section.type === "directoryIndex") {
-                // Append the directory as a listed entry, title seeded from it.
-                return {
-                  ...section,
-                  entries: [
-                    ...section.entries,
-                    { bind: ref, title: dir.title, subtitle: undefined },
-                  ],
-                };
-              }
-              if (section.type === "gardenCategories" && target.mode === "gardenCategory") {
-                const categories = section.categories.slice();
-                const cat = categories[target.categoryIndex];
-                if (cat) categories[target.categoryIndex] = { ...cat, bind: ref };
-                return { ...section, categories };
-              }
-              return section;
-            })
+          sectionLabel={
+            working.config.sections[picker.sectionIndex]?.label || "this section"
           }
-          onAddItem={(ref, title) =>
-            applyPick((section, target) => {
-              if (section.type === "recordList") {
-                // Bound row: title/date inherit from the publication at resolve
-                // time, so we store only the ref (S5 adds field overrides).
-                return { ...section, items: [...section.items, { ref, status: "done" }] };
-              }
-              if (section.type === "gardenCategories" && target.mode === "gardenCategory") {
-                const categories = section.categories.slice();
-                const cat = categories[target.categoryIndex];
-                if (cat) {
-                  categories[target.categoryIndex] = {
-                    ...cat,
-                    items: [...cat.items, { ref, title }],
-                  };
-                }
-                return { ...section, categories };
-              }
-              return section;
-            })
-          }
+          // A directory becomes a directory item (expands at render); a single
+          // page becomes a connected row whose fields inherit until overridden.
+          onBindDirectory={(ref) => addItemToPickerSection({ ref, status: "done" })}
+          onAddItem={(ref) => addItemToPickerSection({ ref, status: "done" })}
           onClose={() => setPicker(null)}
         />
       )}

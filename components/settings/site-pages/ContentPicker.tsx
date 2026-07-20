@@ -22,22 +22,18 @@ import type {
   ContentIndexDirectory,
 } from "@/app/api/site-pages/content-index/route";
 
-export type PickerMode = "recordList" | "directoryIndex" | "gardenCategory";
-
 export function ContentPicker({
   tenantId,
-  mode,
   sectionLabel,
   onBindDirectory,
   onAddItem,
   onClose,
 }: {
   tenantId: string;
-  mode: PickerMode;
   sectionLabel: string;
-  /** Called with a `publicPath:/x` ref. */
+  /** Add a whole directory as an item (ref = publicPath:/x). */
   onBindDirectory: (ref: string, dir: ContentIndexDirectory) => void;
-  /** Called with a `publicItem:slug` ref. */
+  /** Add a single published page as an item (ref = publicItem:slug). */
   onAddItem: (ref: string, title: string) => void;
   onClose: () => void;
 }) {
@@ -82,9 +78,6 @@ export function ContentPicker({
       })
       .filter((d): d is ContentIndexDirectory => d !== null);
   }, [dirs, query]);
-
-  const canBind = mode !== "directoryIndex" ? true : true; // all modes bind
-  const canAddItem = mode === "recordList" || mode === "gardenCategory";
 
   return (
     <>
@@ -190,20 +183,18 @@ export function ContentPicker({
                     <span className="font-mono text-[10px] text-white/45">
                       {d.publishedCount} published
                     </span>
-                    {canBind && (
-                      <button
-                        type="button"
-                        title={`Show every published page in ${d.path} here, and keep it updated as you publish more`}
-                        className="whitespace-nowrap rounded-md border border-amber-600/60 px-2.5 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
-                        onClick={() => {
-                          onBindDirectory(d.ref, d);
-                          toast.success(`${d.title} added — new pages will appear automatically`);
-                          onClose();
-                        }}
-                      >
-                        Add all + keep in sync
-                      </button>
-                    )}
+                    <button
+                      type="button"
+                      title={`Show every published page in ${d.path} here, and keep it updated as you publish more`}
+                      className="whitespace-nowrap rounded-md border border-amber-600/60 px-2.5 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
+                      onClick={() => {
+                        onBindDirectory(d.ref, d);
+                        toast.success(`${d.title} added — new pages will appear automatically`);
+                        onClose();
+                      }}
+                    >
+                      Add all + keep in sync
+                    </button>
                   </div>
 
                   {open && d.items.length > 0 && (
@@ -222,20 +213,18 @@ export function ContentPicker({
                                 : ""}
                             </span>
                           </span>
-                          {canAddItem && (
-                            <button
-                              type="button"
-                              title="Add just this page as one row"
-                              className="whitespace-nowrap rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/60 hover:border-amber-600/60 hover:text-amber-400"
-                              onClick={() => {
-                                onAddItem(it.ref, it.title);
-                                toast.success(`Added ${it.title}`);
-                                onClose();
-                              }}
-                            >
-                              Add this one
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            title="Add just this page as one row"
+                            className="whitespace-nowrap rounded-md border border-white/15 px-2.5 py-1 text-[11px] text-white/60 hover:border-amber-600/60 hover:text-amber-400"
+                            onClick={() => {
+                              onAddItem(it.ref, it.title);
+                              toast.success(`Added ${it.title}`);
+                              onClose();
+                            }}
+                          >
+                            Add this one
+                          </button>
                         </li>
                       ))}
                     </ul>
