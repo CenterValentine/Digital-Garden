@@ -34,6 +34,7 @@ import {
 import { SectionCard, type PickerTarget } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
 import { ContentPicker } from "./ContentPicker";
+import { PreviewPane } from "./PreviewPane";
 import type { InheritedValues } from "./RowEditor";
 import type { ContentIndexDirectory } from "@/app/api/site-pages/content-index/route";
 
@@ -87,6 +88,8 @@ export function SitePagesComposer() {
   const [inheritedIndex, setInheritedIndex] = useState<Map<string, InheritedValues>>(
     () => new Map(),
   );
+  /** Bumped after each successful draft save to remount the preview iframe. */
+  const [previewKey, setPreviewKey] = useState(0);
   const [showNewForm, setShowNewForm] = useState(false);
   const [newDraft, setNewDraft] = useState({ slug: "", title: "", kind: "record" as PageKind });
 
@@ -235,6 +238,7 @@ export function SitePagesComposer() {
       setWorking((prev) =>
         prev && prev.slug === w.slug ? { ...prev, persisted: true, hasDraft: true } : prev,
       );
+      setPreviewKey((k) => k + 1); // draft persisted → refresh the preview iframe
       void loadPages(t);
     } catch (err) {
       setSaveState("error");
@@ -276,6 +280,7 @@ export function SitePagesComposer() {
       }
       const data = (await res.json()) as { published: boolean };
       setWorking((prev) => (prev ? { ...prev, hasDraft: false } : prev));
+      setPreviewKey((k) => k + 1); // published config now == draft; refresh
       toast.success(data.published ? "Published to the live page" : "Nothing to publish");
     } catch (err) {
       toast.error("Publish failed", {
@@ -366,7 +371,7 @@ export function SitePagesComposer() {
             : "";
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[230px_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_minmax(360px,38%)]">
       {/* ── Pages rail ─────────────────────────────────────────── */}
       <nav className="space-y-2">
         <select
@@ -612,6 +617,17 @@ export function SitePagesComposer() {
           </>
         )}
       </main>
+
+      {/* ── Live preview (xl and up) ───────────────────────────── */}
+      {working && (
+        <div className="hidden xl:block">
+          <PreviewPane
+            slug={working.slug}
+            refreshKey={previewKey}
+            hasDraft={working.hasDraft}
+          />
+        </div>
+      )}
 
       {showJson && working && (
         <JsonHatch
