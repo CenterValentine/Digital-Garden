@@ -8,6 +8,7 @@ import { MultiConversationSidebar } from "@/components/content/ai/MultiConversat
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
+import type { ContextMenuActionProvider } from "@/components/content/context-menu/types";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -16,6 +17,41 @@ import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embe
 import { createElement } from "react";
 
 const TREE_COLLAPSED_KEY = "dg-panel-tree-collapsed";
+
+/**
+ * The full file-tree menu is nearly as tall as the panel itself. Trim the
+ * actions that don't apply here: clipboard operations (the panel isn't where
+ * you shuffle files around) and "Open In Pane" (the panel is single-pane by
+ * necessity, so it offers a choice that can't be honored).
+ */
+const PANEL_HIDDEN_ACTION_IDS = new Set([
+  "copy",
+  "cut",
+  "paste",
+  "open-in-pane",
+]);
+
+const compactFileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
+  return fileTreeActionProvider(ctx)
+    .map((section) => {
+      const actions = section.actions.filter(
+        (action) => !PANEL_HIDDEN_ACTION_IDS.has(action.id)
+      );
+      // An item-level heading rides on the first action of its group; if that
+      // action is dropped, hand the heading to the next survivor so the rest
+      // of the group isn't orphaned.
+      const orphanedLabel = section.actions.find(
+        (action) =>
+          PANEL_HIDDEN_ACTION_IDS.has(action.id) && action.sectionLabel
+      )?.sectionLabel;
+      if (orphanedLabel && actions.length > 0 && !actions[0].sectionLabel) {
+        actions[0] = { ...actions[0], sectionLabel: orphanedLabel };
+      }
+      return { ...section, actions };
+    })
+    // Drop sections emptied by the filter so no stray heading remains.
+    .filter((section) => section.actions.length > 0);
+};
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
 function subscribeToColorScheme(onChange: () => void) {
@@ -333,7 +369,7 @@ export function PanelShellClient({
           viewport, so it stays in bounds at panel width for free. */}
       <ContextMenu
         actionProviders={{
-          "file-tree": fileTreeActionProvider,
+          "file-tree": compactFileTreeActionProvider,
           "main-editor": editorActionProvider,
         }}
       />
