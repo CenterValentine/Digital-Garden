@@ -4130,6 +4130,7 @@ function startQuickCaptureMode() {
   const prevCursor = document.body.style.cursor;
   document.body.style.cursor = "crosshair";
   let currentTarget = null;
+  let finished = false;
 
   const PICKABLE = new Set([
     "article", "section", "main", "aside", "header", "footer", "nav",
@@ -4150,6 +4151,10 @@ function startQuickCaptureMode() {
   function findTarget(el) {
     let cur = el;
     while (cur && cur !== document.body) {
+      // Never pick our own UI (banner/tooltip/toast) or the overlay host
+      if (cur === banner || cur === tooltip || cur === toast || cur.id === DG_OVERLAY_ROOT_ID) {
+        return null;
+      }
       const tag = cur.tagName?.toLowerCase();
       if (PICKABLE.has(tag)) {
         const rect = cur.getBoundingClientRect();
@@ -4210,13 +4215,21 @@ function startQuickCaptureMode() {
   }
 
   function cleanup() {
+    if (finished) return;
+    finished = true;
+    window.__dgQuickCaptureCancel = null;
     if (currentTarget) { currentTarget.classList.remove("dg-qc-highlight"); currentTarget = null; }
     document.body.style.cursor = prevCursor;
     document.removeEventListener("mouseover", onMouseOver, true);
     document.removeEventListener("mousemove", onMouseMove, true);
     document.removeEventListener("click", onClick, true);
     window.removeEventListener("keydown", onKeyDown, true);
-    setTimeout(() => { style.remove(); banner.remove(); tooltip.remove(); toast.remove(); focusTrap.remove(); root.remove(); }, 350);
+    window.removeEventListener("keyup", onKeyDown, true);
+    document.removeEventListener("contextmenu", onContextMenu, true);
+    window.removeEventListener("blur", onWindowBlur);
+    setTimeout(() => { style.remove(); banner.remove(); tooltip.remove(); focusTrap.remove(); root.remove(); }, 350);
+    // Toast outlives cleanup so the "Copied" confirmation stays readable
+    setTimeout(() => toast.remove(), 2600);
   }
 
   function onMouseOver(e) {
@@ -4263,52 +4276,620 @@ function startQuickCaptureMode() {
     if (e.key === "Escape") { e.preventDefault(); e.stopImmediatePropagation(); cleanup(); }
   }
 
+  function onContextMenu(e) {
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    cleanup();
+  }
+
+  function onWindowBlur() {
+    // Focus slipped into an iframe — steal it back so ESC keeps landing here
+    setTimeout(() => {
+      if (!finished) focusTrap.focus({ preventScroll: true });
+    }, 0);
+  }
+
+  // Published for the document_start ESC guard in page-bridge.js (same
+  // isolated world), which beats page scripts to the keydown capture chain.
+  window.__dgQuickCaptureCancel = cleanup;
+
   document.addEventListener("mouseover", onMouseOver, true);
   document.addEventListener("mousemove", onMouseMove, true);
   document.addEventListener("click", onClick, true);
   window.addEventListener("keydown", onKeyDown, true);
+  window.addEventListener("keyup", onKeyDown, true);
+  document.addEventListener("contextmenu", onContextMenu, true);
+  window.addEventListener("blur", onWindowBlur);
 }
 
-// ─── Read aloud (TTS) playback ─────────────────────────────────
-// The background service worker has no DOM and can't play audio, so it hands us
-// either the synthesized bytes (cloud) or the raw text (Web Speech fallback) to
-// play here in the page context.
-let dgTtsAudio = null;
+// ─── Read aloud (TTS) queue + player ───────────────────────────
+// The background service worker has no DOM and can't play audio, so it streams
+// synthesized bytes (cloud, HD) or raw text (Web Speech fallback) here to play
+// in the page context. This module keeps a SESSION QUEUE of every read and
+// renders a floating transport — prev / play-pause / next, a speed control, a
+// seek scrubber (cloud only), and an expandable list with per-item delete —
+// inside its own shadow root so the page's CSS can neither reach into it nor be
+// disturbed by it. One player is created lazily and reused.
+//
+// Ordering model. `items` is an array in ARRIVAL order: index 0 is the oldest
+// (the bottom of the visual stack), the last is the newest (the top). The list
+// is only *rendered* reversed (newest on top); playback advances index+1, so
+// pressing play on the bottom item reads the whole stack back-to-back.
+//   • Each item remembers its audio for the session, so stepping back and
+//     replaying never re-synthesizes or re-fetches.
+//   • A new arrival never interrupts active playback (back-to-back is the
+//     point) — it appends, and the forward advance reaches it. It auto-STARTS
+//     only when the player is idle (queue finished / nothing playing), which is
+//     "resume again when new audio is added". An explicit pause blocks barge-in.
+//
+// Cloud vs Web Speech capability gap: an <audio> element exposes duration /
+// currentTime / playbackRate / seek, so cloud items get a scrubber and free
+// speed changes. SpeechSynthesis can pause/resume but cannot seek and cannot
+// retarget rate mid-utterance — so its scrubber is hidden and a speed change
+// re-speaks it from the top.
 
-function dgStopTts() {
-  if (dgTtsAudio) {
-    dgTtsAudio.pause();
-    dgTtsAudio.src = "";
-    dgTtsAudio = null;
+const DG_TTS_RATES = [0.75, 1, 1.25, 1.5, 2];
+const DG_TTS_QUEUE_CAP = 20; // session-memory bound; oldest non-playing item evicted past this
+const DG_TTS_PLAYER_ID = "dg-tts-player-host";
+const DG_TTS_ICON_PLAY =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>';
+const DG_TTS_ICON_PAUSE =
+  '<svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+const DG_TTS_ICON_PREV =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>';
+const DG_TTS_ICON_NEXT =
+  '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg>';
+const DG_TTS_ICON_LIST =
+  '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z"/></svg>';
+const DG_TTS_ICON_TRASH =
+  '<svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" aria-hidden="true"><path d="M9 3l-1 1H4v2h16V4h-4l-1-1H9zM5 7l1 13a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2l1-13H5z"/></svg>';
+
+const ttsq = {
+  host: null,
+  shadow: null,
+  ui: null, // cached element refs, populated in ttsPlayerMount
+  items: [], // arrival order: { id, engine, label, mimeType, base64, text, duration }
+  currentId: null, // id of the item loaded in the transport
+  audio: null, // HTMLAudioElement for the current cloud item
+  utt: null, // current SpeechSynthesisUtterance (kept so handlers can be detached on stop)
+  rate: 1, // persists across reads so the chosen speed sticks
+  playing: false, // audio actively producing sound (not paused, not ended)
+  userPaused: false, // an explicit pause — blocks new arrivals from barging in
+  loading: false, // transient bar spinner while the first read synthesizes
+  expanded: false, // queue list open/closed
+  seq: 0, // monotonic id source
+};
+
+function dgTtsLabel(str) {
+  const s = (str || "").replace(/\s+/g, " ").trim();
+  if (!s) return "Reading…";
+  return s.length > 60 ? `${s.slice(0, 60)}…` : s;
+}
+
+function dgFmtTime(s) {
+  if (!Number.isFinite(s) || s <= 0) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, "0")}`;
+}
+
+// Labels are page/selection text → escape before it touches innerHTML so a page
+// can't inject markup into our shadow DOM.
+function dgEscapeHtml(value) {
+  return String(value == null ? "" : value).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+}
+
+function ttsItemById(id) {
+  return ttsq.items.find((i) => i.id === id) || null;
+}
+
+function ttsIndexOfCurrent() {
+  return ttsq.items.findIndex((i) => i.id === ttsq.currentId);
+}
+
+function ttsPlayerStyles() {
+  // `all: initial` on :host severs page-property inheritance into the shadow
+  // tree so hostile page CSS can't bleed in; children re-declare what they need.
+  return `
+    :host { all: initial; }
+    .dgp-wrap {
+      position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%) translateY(8px);
+      z-index: 2147483646; display: none; flex-direction: column; align-items: stretch; gap: 8px;
+      width: max-content; max-width: min(94vw, 520px); opacity: 0; color: #fff;
+      font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      letter-spacing: normal; text-transform: none;
+      transition: opacity .16s ease, transform .16s ease;
+    }
+    .dgp-wrap[data-visible="true"] { display: flex; opacity: 1; transform: translateX(-50%) translateY(0); }
+    .dgp-bar {
+      display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px;
+      background: rgba(17,17,20,0.88); border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .dgp-btn {
+      appearance: none; -webkit-appearance: none; border: none; margin: 0; cursor: pointer; flex: none;
+      display: inline-flex; align-items: center; justify-content: center; color: #fff;
+      background: rgba(255,255,255,0.1); border-radius: 999px; padding: 0;
+      transition: background .12s ease, opacity .12s ease;
+    }
+    .dgp-btn:hover { background: rgba(255,255,255,0.2); }
+    .dgp-btn:disabled { opacity: .35; cursor: default; }
+    .dgp-play { width: 32px; height: 32px; }
+    .dgp-prev, .dgp-next { width: 26px; height: 26px; }
+    .dgp-spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); border-top-color: #fff; animation: dgp-spin .7s linear infinite; }
+    @keyframes dgp-spin { to { transform: rotate(360deg); } }
+    .dgp-mid { display: flex; flex-direction: column; gap: 4px; min-width: 130px; max-width: 260px; }
+    .dgp-label { display: flex; align-items: center; gap: 6px; }
+    .dgp-engine { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); }
+    .dgp-engine[data-engine="webspeech"] { background: rgba(251,191,36,0.2); color: #fcd34d; }
+    .dgp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,0.9); }
+    .dgp-seek { display: none; align-items: center; gap: 8px; }
+    .dgp-seek[data-seekable="true"] { display: flex; }
+    .dgp-range { flex: 1; height: 3px; min-width: 70px; cursor: pointer; accent-color: #fff; }
+    .dgp-time { flex: none; font-variant-numeric: tabular-nums; font-size: 10px; color: rgba(255,255,255,0.5); }
+    .dgp-rate { height: 26px; min-width: 42px; padding: 0 8px; font-size: 12px; font-weight: 600; }
+    .dgp-toggle { height: 26px; min-width: 40px; padding: 0 8px; font-size: 12px; font-weight: 600; gap: 4px; }
+    .dgp-close { width: 26px; height: 26px; font-size: 17px; line-height: 1; }
+    .dgp-queue {
+      display: none; flex-direction: column; overflow: hidden; border-radius: 14px;
+      background: rgba(17,17,20,0.92); border: 1px solid rgba(255,255,255,0.1);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+      backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    }
+    .dgp-wrap[data-open="true"] .dgp-queue { display: flex; }
+    .dgp-queue-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: rgba(255,255,255,0.55); border-bottom: 1px solid rgba(255,255,255,0.08); }
+    .dgp-clear { appearance: none; border: none; background: none; color: rgba(255,255,255,0.55); cursor: pointer; font: inherit; font-size: 11px; text-transform: none; letter-spacing: normal; }
+    .dgp-clear:hover { color: #fff; }
+    .dgp-list { max-height: 240px; overflow-y: auto; padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+    .dgp-row { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 8px; cursor: pointer; }
+    .dgp-row:hover { background: rgba(255,255,255,0.07); }
+    .dgp-row[data-current="true"] { background: rgba(255,255,255,0.12); }
+    .dgp-row-icon { flex: none; width: 16px; height: 16px; display: inline-flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.55); }
+    .dgp-row[data-current="true"] .dgp-row-icon { color: #4ade80; }
+    .dgp-row-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,0.9); font-size: 12px; }
+    .dgp-row-badge { flex: none; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; border-radius: 999px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
+    .dgp-row-badge[data-engine="webspeech"] { background: rgba(251,191,36,0.18); color: #fcd34d; }
+    .dgp-row-del { flex: none; width: 22px; height: 22px; border-radius: 6px; color: rgba(255,255,255,0.5); background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .dgp-row-del:hover { color: #f87171; background: rgba(248,113,113,0.14); }
+    .dgp-empty { padding: 14px 12px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.4); }
+  `;
+}
+
+function ttsPlayerMount() {
+  if (ttsq.host) return ttsq;
+  const host = document.createElement("div");
+  host.id = DG_TTS_PLAYER_ID;
+  const shadow = host.attachShadow({ mode: "open" });
+  shadow.innerHTML = `
+    <style>${ttsPlayerStyles()}</style>
+    <div class="dgp-wrap" role="region" aria-label="Read aloud player" data-visible="false" data-open="false">
+      <div class="dgp-queue">
+        <div class="dgp-queue-head"><span>Read-aloud queue</span><button class="dgp-clear" type="button" aria-label="Clear queue">Clear all</button></div>
+        <div class="dgp-list"></div>
+      </div>
+      <div class="dgp-bar">
+        <button class="dgp-btn dgp-prev" type="button" aria-label="Previous">${DG_TTS_ICON_PREV}</button>
+        <button class="dgp-btn dgp-play" type="button" aria-label="Play">${DG_TTS_ICON_PLAY}</button>
+        <button class="dgp-btn dgp-next" type="button" aria-label="Next">${DG_TTS_ICON_NEXT}</button>
+        <div class="dgp-mid">
+          <div class="dgp-label"><span class="dgp-engine" data-engine="cloud">HD</span><span class="dgp-title">Reading…</span></div>
+          <div class="dgp-seek" data-seekable="false"><input class="dgp-range" type="range" min="0" max="100" value="0" step="0.1" aria-label="Seek" /><span class="dgp-time">0:00 / 0:00</span></div>
+        </div>
+        <button class="dgp-btn dgp-rate" type="button" aria-label="Playback speed">1×</button>
+        <button class="dgp-btn dgp-toggle" type="button" aria-label="Toggle queue">${DG_TTS_ICON_LIST}<span>0</span></button>
+        <button class="dgp-btn dgp-close" type="button" aria-label="Hide player">×</button>
+      </div>
+    </div>
+  `;
+  (document.documentElement || document.body).appendChild(host);
+
+  const q = (sel) => shadow.querySelector(sel);
+  ttsq.host = host;
+  ttsq.shadow = shadow;
+  ttsq.ui = {
+    wrap: q(".dgp-wrap"),
+    prevBtn: q(".dgp-prev"),
+    playBtn: q(".dgp-play"),
+    nextBtn: q(".dgp-next"),
+    rateBtn: q(".dgp-rate"),
+    toggleBtn: q(".dgp-toggle"),
+    closeBtn: q(".dgp-close"),
+    clearBtn: q(".dgp-clear"),
+    title: q(".dgp-title"),
+    engine: q(".dgp-engine"),
+    seek: q(".dgp-seek"),
+    range: q(".dgp-range"),
+    time: q(".dgp-time"),
+    list: q(".dgp-list"),
+  };
+
+  ttsq.ui.prevBtn.addEventListener("click", ttsGoPrev);
+  ttsq.ui.nextBtn.addEventListener("click", ttsGoNext);
+  ttsq.ui.playBtn.addEventListener("click", ttsTogglePlay);
+  ttsq.ui.rateBtn.addEventListener("click", ttsCycleRate);
+  ttsq.ui.closeBtn.addEventListener("click", ttsHidePlayer);
+  ttsq.ui.clearBtn.addEventListener("click", ttsClearAll);
+  ttsq.ui.toggleBtn.addEventListener("click", () => {
+    ttsq.expanded = !ttsq.expanded;
+    ttsRender();
+  });
+  ttsq.ui.range.addEventListener("input", () => {
+    if (ttsq.audio) ttsq.audio.currentTime = Number(ttsq.ui.range.value);
+  });
+  ttsq.ui.list.addEventListener("click", (e) => {
+    const del = e.target.closest("[data-del]");
+    if (del) {
+      e.stopPropagation();
+      ttsDeleteItem(Number(del.getAttribute("data-del")));
+      return;
+    }
+    const row = e.target.closest("[data-id]");
+    if (row) ttsPlayItem(Number(row.getAttribute("data-id")));
+  });
+
+  return ttsq;
+}
+
+function ttsRender() {
+  if (!ttsq.ui) return;
+  const cur = ttsItemById(ttsq.currentId);
+  const idx = ttsIndexOfCurrent();
+
+  // Transport play button / label
+  if (ttsq.loading) {
+    ttsq.ui.playBtn.innerHTML = '<span class="dgp-spinner"></span>';
+    ttsq.ui.playBtn.disabled = true;
+    ttsq.ui.title.textContent = "Loading…";
+  } else {
+    ttsq.ui.playBtn.innerHTML = ttsq.playing ? DG_TTS_ICON_PAUSE : DG_TTS_ICON_PLAY;
+    ttsq.ui.playBtn.setAttribute("aria-label", ttsq.playing ? "Pause" : "Play");
+    ttsq.ui.playBtn.disabled = ttsq.items.length === 0;
+    ttsq.ui.title.textContent = cur ? cur.label : ttsq.items.length ? "Ready" : "Reading…";
+  }
+  ttsq.ui.engine.textContent = cur && cur.engine === "webspeech" ? "Offline" : "HD";
+  ttsq.ui.engine.setAttribute("data-engine", cur ? cur.engine : "cloud");
+
+  // Seek is meaningful only for a live cloud <audio> with a known duration
+  const seekable = !!(
+    cur &&
+    cur.engine === "cloud" &&
+    ttsq.audio &&
+    Number.isFinite(ttsq.audio.duration) &&
+    ttsq.audio.duration > 0
+  );
+  ttsq.ui.seek.setAttribute("data-seekable", seekable ? "true" : "false");
+
+  // Prev = older (index-1), Next = newer (index+1)
+  ttsq.ui.prevBtn.disabled = !(idx > 0);
+  ttsq.ui.nextBtn.disabled = !(idx >= 0 && idx < ttsq.items.length - 1);
+
+  ttsq.ui.rateBtn.textContent = `${ttsq.rate}×`;
+  ttsq.ui.toggleBtn.innerHTML = `${DG_TTS_ICON_LIST}<span>${ttsq.items.length}</span>`;
+  ttsq.ui.wrap.setAttribute("data-open", ttsq.expanded && ttsq.items.length ? "true" : "false");
+
+  // Queue list, newest on top
+  if (!ttsq.items.length) {
+    ttsq.ui.list.innerHTML = '<div class="dgp-empty">Queue is empty</div>';
+    return;
+  }
+  let html = "";
+  for (let i = ttsq.items.length - 1; i >= 0; i--) {
+    const it = ttsq.items[i];
+    const isCur = it.id === ttsq.currentId;
+    const icon = isCur && ttsq.playing ? DG_TTS_ICON_PAUSE : DG_TTS_ICON_PLAY;
+    html +=
+      `<div class="dgp-row" data-id="${it.id}" data-current="${isCur}">` +
+      `<span class="dgp-row-icon">${icon}</span>` +
+      `<span class="dgp-row-badge" data-engine="${it.engine || "cloud"}">${it.engine === "webspeech" ? "Off" : "HD"}</span>` +
+      `<span class="dgp-row-title">${dgEscapeHtml(it.label)}</span>` +
+      `<button class="dgp-row-del" type="button" data-del="${it.id}" aria-label="Delete from queue">${DG_TTS_ICON_TRASH}</button>` +
+      `</div>`;
+  }
+  ttsq.ui.list.innerHTML = html;
+}
+
+function ttsUpdateTime() {
+  if (!ttsq.ui || !ttsq.audio) return;
+  const cur = ttsq.audio.currentTime || 0;
+  const dur = Number.isFinite(ttsq.audio.duration) ? ttsq.audio.duration : 0;
+  ttsq.ui.range.value = String(Math.min(cur, dur || cur));
+  ttsq.ui.time.textContent = `${dgFmtTime(cur)} / ${dgFmtTime(dur)}`;
+}
+
+function ttsNotifyPlaying() {
+  chrome.runtime.sendMessage({ type: "dg-tts-playing" }).catch(() => {});
+}
+
+function ttsNotifyEnded() {
+  chrome.runtime.sendMessage({ type: "dg-tts-ended" }).catch(() => {});
+}
+
+// Stop the current item WITHOUT advancing or reporting end. Handlers are
+// detached first so the pause/cancel doesn't re-enter the advance logic.
+function ttsStopCurrent() {
+  if (ttsq.audio) {
+    ttsq.audio.onplay =
+      ttsq.audio.onpause =
+      ttsq.audio.onended =
+      ttsq.audio.onerror =
+      ttsq.audio.onloadedmetadata =
+      ttsq.audio.ontimeupdate =
+        null;
+    try {
+      ttsq.audio.pause();
+    } catch (_e) {
+      void _e;
+    }
+    ttsq.audio.src = "";
+    ttsq.audio = null;
+  }
+  if (ttsq.utt) {
+    ttsq.utt.onstart = ttsq.utt.onend = ttsq.utt.onerror = ttsq.utt.onpause = ttsq.utt.onresume = null;
+    ttsq.utt = null;
   }
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
+  ttsq.playing = false;
+}
+
+function ttsSpeakWebSpeech(item) {
+  if (!("speechSynthesis" in window) || !item || !item.text) {
+    ttsOnItemEnded();
+    return;
+  }
+  const synth = window.speechSynthesis;
+  synth.cancel();
+  const utt = new SpeechSynthesisUtterance(item.text);
+  utt.rate = ttsq.rate;
+  utt.onstart = () => {
+    ttsq.playing = true;
+    ttsq.userPaused = false;
+    ttsRender();
+    ttsNotifyPlaying();
+  };
+  utt.onresume = () => {
+    ttsq.playing = true;
+    ttsRender();
+    ttsNotifyPlaying();
+  };
+  utt.onpause = () => {
+    ttsq.playing = false;
+    ttsRender();
+  };
+  utt.onend = ttsOnItemEnded;
+  utt.onerror = ttsOnItemEnded;
+  ttsq.utt = utt;
+  synth.speak(utt);
+}
+
+function ttsPlayItem(id) {
+  const item = ttsItemById(id);
+  if (!item) return;
+  ttsStopCurrent();
+  ttsq.currentId = id;
+  ttsq.userPaused = false;
+  ttsq.loading = false;
+
+  if (item.engine === "cloud") {
+    const audio = new Audio(`data:${item.mimeType || "audio/mpeg"};base64,${item.base64}`);
+    audio.playbackRate = ttsq.rate;
+    ttsq.audio = audio;
+    audio.onloadedmetadata = () => {
+      if (Number.isFinite(audio.duration) && audio.duration > 0) {
+        item.duration = audio.duration;
+        ttsq.ui.range.max = String(audio.duration);
+      }
+      ttsRender();
+      ttsUpdateTime();
+    };
+    audio.ontimeupdate = ttsUpdateTime;
+    audio.onplay = () => {
+      ttsq.playing = true;
+      ttsq.userPaused = false;
+      ttsRender();
+      ttsNotifyPlaying();
+    };
+    audio.onpause = () => {
+      if (audio.ended) return; // 'ended' handles finish; ignore its trailing pause
+      ttsq.playing = false;
+      ttsRender();
+    };
+    audio.onended = ttsOnItemEnded;
+    audio.onerror = ttsOnItemEnded;
+    audio.play().catch((error) => {
+      console.warn("[DG Overlay] TTS playback failed", error);
+      ttsq.playing = false;
+      ttsRender();
+    });
+  } else {
+    ttsSpeakWebSpeech(item);
+  }
+  ttsRender();
+}
+
+// Natural end of one item → advance to the next NEWER item (back-to-back). If
+// the current item is already the newest, go idle but stay visible for replay.
+function ttsOnItemEnded() {
+  const idx = ttsIndexOfCurrent();
+  const next = idx >= 0 ? ttsq.items[idx + 1] : null;
+  if (next) {
+    ttsPlayItem(next.id);
+    return;
+  }
+  ttsStopCurrent();
+  ttsq.playing = false;
+  ttsq.userPaused = false;
+  ttsNotifyEnded();
+  ttsRender();
+}
+
+function ttsTogglePlay() {
+  const item = ttsItemById(ttsq.currentId) || ttsq.items[0]; // default: oldest → reads the whole stack
+  if (!item) return;
+  if (ttsq.currentId !== item.id) {
+    ttsPlayItem(item.id);
+    return;
+  }
+  if (item.engine === "cloud") {
+    if (ttsq.audio && !ttsq.audio.ended) {
+      if (ttsq.audio.paused) {
+        ttsq.userPaused = false;
+        ttsq.audio.play().catch(() => {});
+      } else {
+        ttsq.userPaused = true;
+        ttsq.audio.pause();
+      }
+    } else {
+      ttsPlayItem(item.id); // fresh or finished → (re)load and play
+    }
+  } else if ("speechSynthesis" in window) {
+    const synth = window.speechSynthesis;
+    if (synth.paused) {
+      ttsq.userPaused = false;
+      synth.resume();
+    } else if (synth.speaking) {
+      ttsq.userPaused = true;
+      synth.pause();
+    } else {
+      ttsPlayItem(item.id); // re-speak
+    }
+  }
+}
+
+function ttsGoPrev() {
+  const i = ttsIndexOfCurrent();
+  if (i > 0) ttsPlayItem(ttsq.items[i - 1].id);
+}
+
+function ttsGoNext() {
+  const i = ttsIndexOfCurrent();
+  if (i >= 0 && i < ttsq.items.length - 1) ttsPlayItem(ttsq.items[i + 1].id);
+}
+
+function ttsCycleRate() {
+  const i = DG_TTS_RATES.indexOf(ttsq.rate);
+  ttsq.rate = DG_TTS_RATES[(i + 1) % DG_TTS_RATES.length];
+  if (ttsq.audio) {
+    ttsq.audio.playbackRate = ttsq.rate; // free — retimes the buffer, no re-fetch
+  } else if (ttsq.utt && "speechSynthesis" in window && window.speechSynthesis.speaking) {
+    const cur = ttsItemById(ttsq.currentId);
+    if (cur) ttsSpeakWebSpeech(cur); // rate is locked at speak() time → re-speak
+  }
+  ttsRender();
+}
+
+function ttsDeleteItem(id) {
+  const idx = ttsq.items.findIndex((i) => i.id === id);
+  if (idx < 0) return;
+  const wasCurrent = id === ttsq.currentId;
+  const wasPlaying = wasCurrent && ttsq.playing;
+  ttsq.items.splice(idx, 1);
+  if (wasCurrent) {
+    ttsStopCurrent();
+    // Successor: the item that shifted into idx (next newer), else the previous.
+    const successor = ttsq.items[idx] || ttsq.items[idx - 1] || null;
+    ttsq.currentId = successor ? successor.id : null;
+    if (successor && wasPlaying) {
+      ttsPlayItem(successor.id); // keep the back-to-back run going
+      return;
+    }
+  }
+  if (!ttsq.items.length) ttsNotifyEnded();
+  ttsRender();
+}
+
+function ttsClearAll() {
+  ttsStopCurrent();
+  ttsq.items = [];
+  ttsq.currentId = null;
+  ttsq.userPaused = false;
+  ttsq.expanded = false;
+  ttsNotifyEnded();
+  ttsHidePlayer();
+}
+
+function ttsHidePlayer() {
+  ttsStopCurrent();
+  ttsq.userPaused = false;
+  ttsq.loading = false;
+  ttsNotifyEnded();
+  if (ttsq.ui) ttsq.ui.wrap.setAttribute("data-visible", "false");
+  ttsRender();
+}
+
+// Transient bar spinner while the very first read synthesizes. Skipped when
+// something is already playing — a spinner must not disturb active playback.
+function ttsShowLoading(label) {
+  ttsPlayerMount();
+  if (ttsq.playing) return;
+  ttsq.loading = true;
+  ttsq.pendingLabel = label;
+  ttsq.ui.wrap.setAttribute("data-visible", "true");
+  ttsRender();
+}
+
+function ttsAddReadyItem(item) {
+  ttsPlayerMount();
+  ttsq.loading = false;
+  item.id = ++ttsq.seq;
+  item.duration = 0;
+  ttsq.items.push(item);
+  // Session-memory bound: evict the oldest item that isn't the one playing.
+  while (ttsq.items.length > DG_TTS_QUEUE_CAP) {
+    const victim = ttsq.items[0].id === ttsq.currentId ? 1 : 0;
+    ttsq.items.splice(victim, 1);
+  }
+  ttsq.ui.wrap.setAttribute("data-visible", "true");
+
+  if (ttsq.playing) {
+    ttsRender(); // already reading — forward advance will reach this arrival
+    return;
+  }
+  if (ttsq.userPaused) {
+    ttsRender(); // respect an explicit pause; don't barge in
+    return;
+  }
+  ttsPlayItem(item.id); // idle → auto-play the new arrival
 }
 
 chrome.runtime.onMessage.addListener((message) => {
   if (!message || typeof message.type !== "string") return;
 
-  if (message.type === "dg-tts-play") {
-    dgStopTts();
-    const src = `data:${message.mimeType || "audio/mpeg"};base64,${message.audioBase64}`;
-    dgTtsAudio = new Audio(src);
-    dgTtsAudio.addEventListener("ended", () => {
-      dgTtsAudio = null;
-    });
-    dgTtsAudio.play().catch((error) => {
-      console.warn("[DG Overlay] TTS playback failed", error);
+  if (message.type === "dg-tts-loading") {
+    ttsShowLoading(dgTtsLabel(message.preview));
+  } else if (message.type === "dg-tts-play") {
+    ttsAddReadyItem({
+      engine: "cloud",
+      label: dgTtsLabel(message.preview),
+      mimeType: message.mimeType || "audio/mpeg",
+      base64: message.audioBase64,
+      text: "",
     });
   } else if (message.type === "dg-tts-fallback") {
-    dgStopTts();
-    try {
-      const utterance = new SpeechSynthesisUtterance(message.text || "");
-      window.speechSynthesis.speak(utterance);
-    } catch (error) {
-      console.warn("[DG Overlay] Web Speech fallback failed", error);
-    }
+    ttsAddReadyItem({
+      engine: "webspeech",
+      label: dgTtsLabel(message.text),
+      base64: null,
+      text: message.text || "",
+    });
   } else if (message.type === "dg-tts-stop") {
-    dgStopTts();
+    // Manual "Stop reading" from the native menu → pause; keep the session
+    // queue intact. The background already retired the menu item.
+    if (ttsq.audio && !ttsq.audio.paused) {
+      ttsq.userPaused = true;
+      ttsq.audio.pause();
+    } else if ("speechSynthesis" in window && window.speechSynthesis.speaking) {
+      ttsq.userPaused = true;
+      window.speechSynthesis.pause();
+    }
+    ttsq.playing = false;
+    ttsNotifyEnded();
+    ttsRender();
   }
 });
 

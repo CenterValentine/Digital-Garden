@@ -14,6 +14,7 @@ import { compareModelsBySuggested } from "@/lib/domain/ai/model-popularity";
 import { Plus, Trash2, Edit3, AlertCircle, AlertTriangle, Check, X, KeyRound, ExternalLink, HelpCircle, Sparkles, Search, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/glass/button";
+import { ToneChip, type Tone } from "@/components/client/ui/tone-chip";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { ProviderIcon } from "@/components/content/ai/ProviderIcon";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
@@ -93,11 +94,11 @@ export default function AIConnectionsPage({ embedded }: AIConnectionsPageProps =
       <header className="flex items-center justify-between">
         <div>
           {embedded ? (
-            <h2 className="text-lg font-semibold text-white">AI Connections</h2>
+            <h2 className="text-lg font-semibold text-foreground">AI Connections</h2>
           ) : (
-            <h1 className="text-2xl font-semibold text-white">AI Connections</h1>
+            <h1 className="text-2xl font-semibold text-foreground">AI Connections</h1>
           )}
-          <p className="mt-1 text-sm text-gray-400">
+          <p className="mt-1 text-sm text-muted-foreground">
             Each connection is a key + endpoint. Add one per provider you use; pick which routes through it in chat or feature settings.
           </p>
         </div>
@@ -170,7 +171,7 @@ function ConnectionList({
   glass0: ReturnType<typeof getSurfaceStyles>;
 }) {
   if (loading) {
-    return <div className="text-sm text-gray-500">Loading connections…</div>;
+    return <div className="text-sm text-muted-foreground">Loading connections…</div>;
   }
   if (connections.length === 0) {
     return (
@@ -178,9 +179,9 @@ function ConnectionList({
         className="rounded-xl border border-black/10 dark:border-white/10 p-8 text-center"
         style={{ background: glass0.background }}
       >
-        <KeyRound className="h-8 w-8 mx-auto text-gray-500 mb-3" />
-        <p className="text-sm text-gray-300 font-medium">No connections yet</p>
-        <p className="mt-1 text-xs text-gray-500 max-w-md mx-auto">
+        <KeyRound className="h-8 w-8 mx-auto text-muted-foreground mb-3" />
+        <p className="text-sm text-muted-foreground font-medium">No connections yet</p>
+        <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
           Add an API key for a built-in provider, a gateway like Vercel AI Gateway or Fireworks, or a custom endpoint to start chatting.
         </p>
       </div>
@@ -207,13 +208,13 @@ function ConnectionList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-white truncate">{c.label}</span>
+                <span className="text-sm font-medium text-foreground truncate">{c.label}</span>
                 <KindBadge kind={c.kind} />
                 {c.isPinned && (
-                  <span className="text-[10px] uppercase tracking-wider text-amber-400">Pinned</span>
+                  <span className="text-[10px] uppercase tracking-wider tone-text-muted">Pinned</span>
                 )}
               </div>
-              <div className="text-xs text-gray-500">
+              <div className="text-xs text-muted-foreground">
                 {c.models.length} model{c.models.length !== 1 ? "s" : ""}
                 {c.baseURL ? ` • ${truncate(c.baseURL, 40)}` : ""}
               </div>
@@ -222,7 +223,7 @@ function ConnectionList({
               <Edit3 className="h-3.5 w-3.5" />
             </Button>
             <Button variant="ghost" size="sm" onClick={() => onDelete(c)}>
-              <Trash2 className="h-3.5 w-3.5 text-red-400" />
+              <Trash2 className="h-3.5 w-3.5 tone-danger tone-text" />
             </Button>
           </div>
 
@@ -235,17 +236,13 @@ function ConnectionList({
 }
 
 function KindBadge({ kind }: { kind: ConnectionKind }) {
-  const map: Record<ConnectionKind, { label: string; cls: string }> = {
-    direct: { label: "Direct", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
-    gateway: { label: "Gateway", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
-    custom: { label: "Custom", cls: "bg-gray-500/15 text-gray-300 border-gray-500/30" },
+  const map: Record<ConnectionKind, { label: string; tone: Tone }> = {
+    direct: { label: "Direct", tone: "success" },
+    gateway: { label: "Gateway", tone: "info" },
+    custom: { label: "Custom", tone: "neutral" },
   };
-  const { label, cls } = map[kind];
-  return (
-    <span className={`rounded-full border px-1.5 py-0.5 text-[10px] uppercase tracking-wider ${cls}`}>
-      {label}
-    </span>
-  );
+  const { label, tone } = map[kind];
+  return <ToneChip tone={tone}>{label}</ToneChip>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -290,11 +287,11 @@ function TemplatePicker({
           style={{ background: glass0.background }}
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-full border border-black/15 dark:border-white/15">
-            <Plus className="h-4 w-4 text-gray-400" />
+            <Plus className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="text-left">
-            <div className="text-sm font-medium text-white">Custom endpoint</div>
-            <div className="text-xs text-gray-500">You fill in baseURL, adapter, and model list.</div>
+            <div className="text-sm font-medium text-foreground">Custom endpoint</div>
+            <div className="text-xs text-muted-foreground">You fill in baseURL, adapter, and model list.</div>
           </div>
         </button>
       </Section>
@@ -305,8 +302,8 @@ function TemplatePicker({
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-sm font-medium text-white">{title}</h2>
-      <p className="mt-0.5 mb-3 text-xs text-gray-500">{subtitle}</p>
+      <h2 className="text-sm font-medium text-foreground">{title}</h2>
+      <p className="mt-0.5 mb-3 text-xs text-muted-foreground">{subtitle}</p>
       {children}
     </section>
   );
@@ -344,8 +341,8 @@ function TemplateCard({
         <ProviderIcon providerId={template.id} className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <div className="text-sm font-medium text-white truncate">{template.name}</div>
-        <div className="text-xs text-gray-500">
+        <div className="text-sm font-medium text-foreground truncate">{template.name}</div>
+        <div className="text-xs text-muted-foreground">
           {template.defaultModels.length} default model{template.defaultModels.length !== 1 ? "s" : ""}
         </div>
       </div>
@@ -523,7 +520,7 @@ function ConnectionForm({
           </div>
         )}
         <div>
-          <h2 className="text-lg font-medium text-white">
+          <h2 className="text-lg font-medium text-foreground">
             {isEdit ? "Edit connection" : template ? `Add ${template.name}` : "Add custom connection"}
           </h2>
           {template?.apiKeyDocsURL && (
@@ -531,7 +528,7 @@ function ConnectionForm({
               href={template.apiKeyDocsURL}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1 mt-0.5 text-xs text-blue-400 hover:text-blue-300"
+              className="inline-flex items-center gap-1 mt-0.5 text-xs tone-info tone-text hover:underline"
             >
               Get an API key
               <ExternalLink className="h-3 w-3" />
@@ -549,7 +546,7 @@ function ConnectionForm({
             onKeyDown={(e) => {
               if (e.key === "Enter" && labelDirty) commitLabel();
             }}
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-3 py-2 pr-10 text-sm text-foreground focus:outline-none focus:border-ring"
           />
           {labelDirty && (
             <button
@@ -575,7 +572,7 @@ function ConnectionForm({
               if (e.key === "Enter" && keyDirty) commitKey();
             }}
             placeholder={isEdit ? "•••• keep current ••••" : "Paste key here"}
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-3 py-2 pr-10 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
           />
           {keyDirty && (
             <button
@@ -601,7 +598,7 @@ function ConnectionForm({
                 if (e.key === "Enter" && baseURLDirty) commitBaseURL();
               }}
               placeholder="https://api.example.com/v1"
-              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 pr-10 text-sm text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-3 py-2 pr-10 text-sm text-foreground font-mono focus:outline-none focus:border-ring"
             />
             {baseURLDirty && (
               <button
@@ -626,7 +623,7 @@ function ConnectionForm({
               setAdapterKind(v);
               if (isEdit) void persistField({ adapterKind: v });
             }}
-            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30"
+            className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-3 py-2 text-sm text-foreground focus:outline-none focus:border-ring"
           >
             <option value="openai-compat">OpenAI-compatible (most third-party endpoints)</option>
             <option value="anthropic">Anthropic</option>
@@ -674,9 +671,9 @@ function ConnectionForm({
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-xs font-medium text-gray-300 mb-1">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground mb-1">{label}</div>
       {children}
-      {hint && <div className="mt-1 text-[11px] text-gray-500">{hint}</div>}
+      {hint && <div className="mt-1 text-[11px] text-muted-foreground">{hint}</div>}
     </label>
   );
 }
@@ -1041,13 +1038,13 @@ function ModelEditor({
         )}
         {/* ─── Fetch-from-API affordance ─── */}
         {supportsFetch && (
-          <div className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-surface-secondary px-3 py-1.5" data-tone="warning">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-white flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-amber-300/80" />
+              <div className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 tone-text-muted" />
                 Fetch live model list
               </div>
-              <div className="text-[10px] text-gray-500 truncate">
+              <div className="text-[10px] text-muted-foreground truncate">
                 {canFetchModels
                   ? "Calls the upstream's /v1/models endpoint with this Connection's key."
                   : "Save the Connection first — fetch needs the encrypted key on the server."}
@@ -1066,7 +1063,7 @@ function ModelEditor({
 
         {/* Fetch error banner */}
         {fetchError && (
-          <div className="flex items-start gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+          <div className="flex items-start gap-2 rounded-lg tone-danger tone-panel border px-3 py-2 text-xs tone-danger tone-text">
             <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               <div className="font-medium">Fetch failed</div>
@@ -1075,7 +1072,7 @@ function ModelEditor({
             <button
               type="button"
               onClick={() => setFetchError(null)}
-              className="text-red-400/70 hover:text-red-300 shrink-0"
+              className="tone-danger tone-text-muted tone-hover shrink-0"
               aria-label="Dismiss"
             >
               <X className="h-3 w-3" />
@@ -1087,14 +1084,14 @@ function ModelEditor({
             upstream's live model list. Filter + sort + select-all on
             current view. Selection defaults to empty; user opts in. */}
         {fetchedModels !== null && (
-          <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04]">
+          <div className="rounded-lg border tone-border tone-panel" data-tone="warning">
             {/* Header row: counts + close */}
-            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-amber-500/10">
-              <div className="text-[11px] font-medium text-amber-200 uppercase tracking-wide">
+            <div className="flex items-center justify-between gap-2 px-3 py-2 border-b tone-border">
+              <div className="text-[11px] font-medium tone-text uppercase tracking-wide">
                 {fetchedModels.length} models from upstream ·{" "}
                 {models.length} in connection
                 {fetchedFilter && (
-                  <span className="ml-1.5 text-amber-300/70 normal-case">
+                  <span className="ml-1.5 tone-text-muted normal-case">
                     · {visibleFetched.length} match
                     {visibleFetched.length === 1 ? "" : "es"}
                   </span>
@@ -1104,23 +1101,23 @@ function ModelEditor({
                 type="button"
                 onClick={closeFetchedPanel}
                 aria-label="Close fetch panel"
-                className="text-amber-400/70 hover:text-amber-300"
+                className="tone-text-muted"
               >
                 <X className="h-3 w-3" />
               </button>
             </div>
 
             {/* Toolbar: filter + sort toggle + select-all-on-view */}
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-amber-500/10">
+            <div className="flex items-center gap-2 px-3 py-2 border-b tone-border">
               <div className="relative flex-1 min-w-0">
-                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-amber-400/60 pointer-events-none" />
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 tone-text-muted pointer-events-none" />
                 <input
                   type="text"
                   value={fetchedFilter}
                   onChange={(e) => setFetchedFilter(e.target.value)}
                   placeholder="Filter by id or name…"
                   aria-label="Filter fetched models"
-                  className="w-full rounded-md border border-amber-500/20 bg-black/30 pl-6 pr-2 py-1 text-xs text-amber-100 placeholder:text-amber-300/40 focus:outline-none focus:border-amber-500/40"
+                  className="w-full rounded-md border tone-border bg-surface-input pl-6 pr-2 py-1 text-xs tone-text placeholder:tone-text-muted focus:outline-none tone-focus"
                 />
               </div>
               <button
@@ -1151,7 +1148,7 @@ function ModelEditor({
                 type="button"
                 onClick={toggleAllVisible}
                 disabled={visibleFetched.length === 0}
-                className="rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-md border tone-border bg-surface-secondary px-2 py-1 text-[10px] uppercase tracking-wide tone-text-muted tone-hover-fill transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {allVisiblePresent ? "Remove view" : "Add view"}
               </button>
@@ -1159,14 +1156,14 @@ function ModelEditor({
 
             {/* Capability type filter — narrows the list to image/vision/etc. */}
             {availableCapabilities.length > 0 && (
-              <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b border-amber-500/10">
+              <div className="flex flex-wrap items-center gap-1.5 px-3 py-1.5 border-b tone-border">
                 <button
                   type="button"
                   onClick={() => setCapabilityFilter(null)}
                   className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
                     capabilityFilter === null
-                      ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
-                      : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                      ? "tone-selected border"
+                      : "border tone-border tone-text-muted tone-hover-fill"
                   }`}
                 >
                   All
@@ -1180,8 +1177,8 @@ function ModelEditor({
                     }
                     className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
                       capabilityFilter === cap
-                        ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
-                        : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                        ? "tone-selected border"
+                        : "border tone-border tone-text-muted tone-hover-fill"
                     }`}
                   >
                     {prettyCap(cap)}
@@ -1193,7 +1190,7 @@ function ModelEditor({
             {/* List body */}
             <div className="max-h-72 overflow-y-auto" role="listbox" aria-multiselectable="true">
               {visibleFetched.length === 0 ? (
-                <div className="px-3 py-6 text-center text-xs text-amber-300/60">
+                <div className="px-3 py-6 text-center text-xs tone-text-muted">
                   No models match &quot;{fetchedFilter}&quot;.
                 </div>
               ) : (
@@ -1214,7 +1211,7 @@ function ModelEditor({
                         className={`relative h-4 w-7 shrink-0 rounded-full transition-colors cursor-pointer ${
                           checked
                             ? "bg-emerald-500/80"
-                            : "bg-black/30 border border-white/15"
+                            : "bg-surface-input border border-white/15"
                         }`}
                       >
                         <span
@@ -1224,11 +1221,11 @@ function ModelEditor({
                         />
                       </button>
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono text-amber-200 truncate">
+                        <div className="font-mono tone-text truncate">
                           {item.id}
                         </div>
                         {item.name !== item.id && (
-                          <div className="text-[10px] text-gray-400 truncate">
+                          <div className="text-[10px] text-muted-foreground truncate">
                             {item.name}
                           </div>
                         )}
@@ -1238,16 +1235,17 @@ function ModelEditor({
                       {caps.length > 0 && (
                         <span className="flex shrink-0 flex-wrap items-center gap-1">
                           {caps.map((cap) => (
-                            <span
+                            // Image stays loud: picking image-gen models out
+                            // of a long gateway list is the whole reason this
+                            // browser exists.
+                            <ToneChip
                               key={cap}
-                              className={`rounded px-1 py-px text-[9px] uppercase tracking-wide ${
-                                cap === "image"
-                                  ? "bg-emerald-500/20 text-emerald-300 border border-emerald-400/30"
-                                  : "bg-black/5 dark:bg-white/5 text-gray-400"
-                              }`}
+                              tone={cap === "image" ? "success" : "neutral"}
+                              emphasis={cap === "image" ? "loud" : "quiet"}
+                              className="rounded px-1 py-px text-[9px] tracking-wide"
                             >
                               {prettyCap(cap)}
-                            </span>
+                            </ToneChip>
                           ))}
                         </span>
                       )}
@@ -1270,7 +1268,7 @@ function ModelEditor({
         )}
 
         {models.length === 0 && (
-          <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          <div className="flex items-center gap-2 rounded-lg border tone-border tone-panel px-3 py-2 text-xs tone-text-muted" data-tone="warning">
             <AlertCircle className="h-3.5 w-3.5" />
             No models yet. Add at least one to use this connection.
           </div>
@@ -1301,7 +1299,7 @@ function ModelEditor({
           return (
             <div
               key={m.id}
-              className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5"
+              className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-surface-secondary px-3 py-1.5"
             >
               {flag && (
                 <span
@@ -1313,17 +1311,17 @@ function ModelEditor({
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-white truncate">
+                <div className="text-xs font-medium text-foreground truncate">
                   {m.name}
                 </div>
-                <div className="text-[10px] text-gray-500 font-mono truncate">
+                <div className="text-[10px] text-muted-foreground font-mono truncate">
                   {m.id}
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => removeModel(m.id)}
-                className="text-gray-500 hover:text-red-400 transition-colors"
+                className="text-muted-foreground hover:text-destructive transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>
@@ -1337,7 +1335,7 @@ function ModelEditor({
               value={newId}
               onChange={(e) => setNewId(e.target.value)}
               placeholder="Model ID (e.g. claude-sonnet-4)"
-              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-2 py-1.5 pr-7 text-xs text-white font-mono focus:outline-none focus:border-black/30 dark:border-white/30"
+              className="w-full rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-2 py-1.5 pr-7 text-xs text-foreground font-mono focus:outline-none focus:border-ring"
             />
             {suggestions.length > 0 && (
               <button
@@ -1347,8 +1345,8 @@ function ModelEditor({
                 title="Popular model IDs"
                 className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex h-5 w-5 items-center justify-center rounded transition-colors ${
                   pickerOpen
-                    ? "text-amber-300 bg-amber-500/10"
-                    : "text-gray-500 hover:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5"
+                    ? "tone-selected"
+                    : "text-muted-foreground hover:text-foreground hover:bg-black/5 dark:hover:bg-white/5"
                 }`}
               >
                 <HelpCircle className="h-3.5 w-3.5" />
@@ -1360,7 +1358,7 @@ function ModelEditor({
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="Display name"
-            className="flex-1 rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-black/30 dark:border-white/30"
+            className="flex-1 rounded-lg border border-black/10 dark:border-white/10 bg-surface-input px-2 py-1.5 text-xs text-foreground focus:outline-none focus:border-ring"
           />
           <Button variant="ghost" size="sm" onClick={addModel}>
             <Plus className="h-3.5 w-3.5" />
@@ -1419,18 +1417,19 @@ function ModelSuggestionPicker({
       ref={ref}
       role="dialog"
       aria-label="Popular model IDs"
-      className="absolute bottom-full left-0 right-0 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-black/10 dark:border-white/10 bg-[#1a1a1a] shadow-2xl z-50"
+      className="absolute bottom-full left-0 right-0 mb-1.5 max-h-72 overflow-y-auto rounded-lg border border-black/10 dark:border-white/10 bg-popover text-popover-foreground shadow-2xl z-50"
+      data-tone="warning"
     >
-      <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 bg-[#1a1a1a]/95 backdrop-blur-sm px-3 py-2">
-        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-gray-400">
-          <Sparkles className="h-3 w-3 text-amber-300/70" />
+      <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-black/5 dark:border-white/5 bg-popover/95 backdrop-blur-sm px-3 py-2">
+        <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground">
+          <Sparkles className="h-3 w-3 tone-text-muted" />
           <span>Popular IDs · {ADAPTER_SCOPE_LABEL[adapterKind]}</span>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close suggestions"
-          className="text-gray-500 hover:text-gray-300 transition-colors"
+          className="text-muted-foreground hover:text-foreground transition-colors"
         >
           <X className="h-3 w-3" />
         </button>
@@ -1445,16 +1444,16 @@ function ModelSuggestionPicker({
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <code className="text-xs font-mono text-amber-200 truncate">
+                <code className="text-xs font-mono tone-text truncate">
                   {s.id}
                 </code>
                 {s.tag && (
-                  <span className="text-[9px] uppercase tracking-wide text-amber-400/80 bg-amber-500/10 px-1 py-px rounded">
+                  <span className="text-[9px] uppercase tracking-wide tone-selected px-1 py-px rounded">
                     {s.tag}
                   </span>
                 )}
               </div>
-              <div className="text-[11px] text-gray-400 truncate">{s.name}</div>
+              <div className="text-[11px] text-muted-foreground truncate">{s.name}</div>
             </div>
           </button>
         ))}

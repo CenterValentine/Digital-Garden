@@ -77,22 +77,22 @@ export function ConnectionUsageCard({
   }, [report, loading, load]);
 
   return (
-    <div className="mt-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/10">
+    <div className="mt-2 rounded-lg border border-black/10 dark:border-white/10 bg-surface-secondary tone-warning">
       <button
         type="button"
         onClick={handleToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-muted-foreground hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg"
       >
         {open ? (
-          <ChevronDown className="h-3 w-3 text-gray-500 shrink-0" />
+          <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
         ) : (
-          <ChevronRight className="h-3 w-3 text-gray-500 shrink-0" />
+          <ChevronRight className="h-3 w-3 text-muted-foreground shrink-0" />
         )}
-        <Gauge className="h-3 w-3 text-amber-300/80 shrink-0" />
+        <Gauge className="h-3 w-3 tone-text-muted shrink-0" />
         <span className="font-medium">Usage</span>
         {report && (
-          <span className="text-gray-500 ml-1.5">
+          <span className="text-muted-foreground ml-1.5">
             ·{" "}
             {report.totals.cost
               ? formatMoney(report.totals.cost.amount)
@@ -100,7 +100,7 @@ export function ConnectionUsageCard({
           </span>
         )}
         {report && (
-          <span className="ml-auto text-[10px] uppercase tracking-wide text-gray-500">
+          <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground">
             {sourceLabel(report.source)}
           </span>
         )}
@@ -109,14 +109,14 @@ export function ConnectionUsageCard({
       {open && (
         <div className="border-t border-black/5 dark:border-white/5 px-3 py-3 space-y-3">
           {loading && (
-            <div className="flex items-center gap-2 text-xs text-gray-400">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
               Loading usage…
             </div>
           )}
 
           {error && (
-            <div className="flex items-start gap-2 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <div className="flex items-start gap-2 rounded-md tone-danger tone-panel border px-3 py-2 text-xs tone-text">
               <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0 break-words">{error}</div>
             </div>
@@ -127,23 +127,23 @@ export function ConnectionUsageCard({
               {/* Totals + refresh */}
               <div className="flex items-start justify-between gap-2">
                 <div className="space-y-0.5">
-                  <div className="text-[11px] uppercase tracking-wide text-gray-500">
+                  <div className="text-[11px] uppercase tracking-wide text-muted-foreground">
                     {periodLabel(report.period)}
                   </div>
-                  <div className="text-sm text-white">
+                  <div className="text-sm text-foreground">
                     {report.totals.cost ? (
                       <span className="font-semibold">
                         {formatMoney(report.totals.cost.amount)}
                       </span>
                     ) : (
-                      <span className="text-gray-400">no cost data</span>
+                      <span className="text-muted-foreground">no cost data</span>
                     )}
-                    <span className="text-gray-500 ml-2">
+                    <span className="text-muted-foreground ml-2">
                       · {report.totals.requests} turn
                       {report.totals.requests === 1 ? "" : "s"}
                     </span>
                     {report.totals.tokens?.total !== undefined && (
-                      <span className="text-gray-500 ml-2">
+                      <span className="text-muted-foreground ml-2">
                         · {formatTokens(report.totals.tokens.total)} tokens
                       </span>
                     )}
@@ -168,7 +168,7 @@ export function ConnectionUsageCard({
               {/* Per-underlying-provider for gateways */}
               {report.byUnderlyingProvider && report.byUnderlyingProvider.length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     By underlying provider
                   </div>
                   <div className="space-y-0.5">
@@ -182,11 +182,11 @@ export function ConnectionUsageCard({
                           className="h-3 w-3 shrink-0"
                         />
                         <span className="flex-1 capitalize">{p.providerId}</span>
-                        <span className="text-gray-500">
+                        <span className="text-muted-foreground">
                           {p.requests} turn{p.requests === 1 ? "" : "s"}
                         </span>
                         {p.cost && (
-                          <span className="font-medium text-amber-200/80 ml-2">
+                          <span className="font-medium tone-text ml-2">
                             {formatMoney(p.cost.amount)}
                           </span>
                         )}
@@ -199,7 +199,7 @@ export function ConnectionUsageCard({
               {/* Per-model breakdown */}
               {report.byModel.length > 0 && (
                 <div className="space-y-1">
-                  <div className="text-[10px] uppercase tracking-wide text-gray-500">
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground">
                     By model
                   </div>
                   <div className="space-y-0.5 max-h-48 overflow-y-auto pr-1">
@@ -208,19 +208,19 @@ export function ConnectionUsageCard({
                         key={m.modelId}
                         className="flex items-center gap-2 text-xs px-2 py-1 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                       >
-                        <code className="text-amber-200/90 font-mono truncate flex-1">
+                        <code className="tone-text font-mono truncate flex-1">
                           {m.modelId}
                         </code>
-                        <span className="text-gray-500 shrink-0">
+                        <span className="text-muted-foreground shrink-0">
                           {m.requests}
                         </span>
                         {m.tokens?.total !== undefined && (
-                          <span className="text-gray-500 shrink-0">
+                          <span className="text-muted-foreground shrink-0">
                             · {formatTokens(m.tokens.total)} tok
                           </span>
                         )}
                         {m.cost && (
-                          <span className="font-medium text-amber-200/80 shrink-0 ml-1">
+                          <span className="font-medium tone-text shrink-0 ml-1">
                             {formatMoney(m.cost.amount)}
                           </span>
                         )}
@@ -231,14 +231,14 @@ export function ConnectionUsageCard({
               )}
 
               {report.byModel.length === 0 && !error && (
-                <div className="text-xs text-gray-500 italic">
+                <div className="text-xs text-muted-foreground italic">
                   No turns recorded in this period yet.
                 </div>
               )}
 
               {/* Adapter note */}
               {report.note && (
-                <div className="text-[11px] text-gray-500 italic leading-relaxed">
+                <div className="text-[11px] text-muted-foreground italic leading-relaxed">
                   {report.note}
                 </div>
               )}
@@ -255,24 +255,21 @@ function BudgetBar({ budget }: { budget: NonNullable<UsageReport["budget"]> }) {
     budget.limit.amount > 0
       ? Math.min(100, (budget.used.amount / budget.limit.amount) * 100)
       : 0;
-  const tone =
-    pct >= 90
-      ? { bar: "bg-red-500", text: "text-red-300" }
-      : pct >= 70
-        ? { bar: "bg-amber-500", text: "text-amber-300" }
-        : { bar: "bg-emerald-500", text: "text-emerald-300" };
+  // One tone drives both the readout and the bar: --tone is set once on
+  // the wrapper and inherits down, so the two can't drift out of sync.
+  const tone = pct >= 90 ? "tone-danger" : pct >= 70 ? "tone-warning" : "tone-success";
   return (
-    <div className="space-y-1">
+    <div className={`space-y-1 ${tone}`}>
       <div className="flex items-center justify-between text-[11px]">
-        <span className="text-gray-400">Budget</span>
-        <span className={tone.text}>
+        <span className="text-muted-foreground">Budget</span>
+        <span className="tone-text">
           {formatMoney(budget.used.amount)} / {formatMoney(budget.limit.amount)}{" "}
           ({Math.round(pct)}%)
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
         <div
-          className={`h-full ${tone.bar} transition-all duration-300`}
+          className="h-full tone-fill transition-all duration-300"
           style={{ width: `${pct}%` }}
         />
       </div>

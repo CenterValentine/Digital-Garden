@@ -1,0 +1,21 @@
+{
+  "//": "Reduce file-watcher + search-index memory. Worktrees are opened in their own VS Code windows, so the main window does not need to watch/index them.",
+  "files.watcherExclude": {
+    "**/.claude/worktrees/**": true,
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/.git/objects/**": true,
+    "**/dist/**": true,
+    "**/.turbo/**": true
+  },
+  "search.exclude": {
+    "**/.claude/worktrees/**": true,
+    "**/.next/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/pnpm-lock.yaml": true
+  },
+  "files.exclude": {
+    "**/.next": true
+  }
+}

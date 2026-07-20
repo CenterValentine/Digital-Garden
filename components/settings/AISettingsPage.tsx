@@ -461,7 +461,7 @@ function ToolConfigRow({
               {toolId}
             </code>
             {callsAi && (
-              <span className="rounded bg-amber-500/20 px-1.5 py-px text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
+              <span className="rounded tone-warning tone-surface border px-1.5 py-px text-[10px] font-medium uppercase tracking-wide ">
                 Calls AI
               </span>
             )}

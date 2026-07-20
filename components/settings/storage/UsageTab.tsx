@@ -93,7 +93,7 @@ export function StorageUsageTab() {
                 <h4 className="text-sm font-semibold text-yellow-400">
                   Storage Almost Full
                 </h4>
-                <p className="text-sm text-gray-300 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   You&apos;re using {percentUsed.toFixed(0)}% of your storage quota.
                   Upgrade to increase your limit.
                 </p>
@@ -163,7 +163,7 @@ export function StorageUsageTab() {
             <div className="text-sm text-muted-foreground mt-1">Total Files</div>
           </div>
           <div>
-            <div className="text-3xl font-bold text-blue-400">42</div>
+            <div className="text-3xl font-bold tone-info tone-text">42</div>
             <div className="text-sm text-muted-foreground mt-1">Folders</div>
           </div>
         </div>
@@ -206,7 +206,7 @@ export function StorageUsageTab() {
         </Link>
 
         <div
-          className="mt-4 p-4 rounded-lg border border-blue-500/30 bg-blue-500/10"
+          className="mt-4 p-4 rounded-lg border tone-info tone-panel"
           style={{
             backdropFilter: glass0.backdropFilter,
           }}
@@ -222,15 +222,15 @@ export function StorageUsageTab() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="text-blue-400 flex-shrink-0 mt-0.5"
+              className="tone-info tone-text flex-shrink-0 mt-0.5"
             >
               <circle cx="12" cy="12" r="10" />
               <path d="M12 16v-4" />
               <path d="M12 8h.01" />
             </svg>
             <div>
-              <h4 className="text-sm font-semibold text-blue-400">Your Data, Your Control</h4>
-              <p className="text-sm text-gray-300 mt-1">
+              <h4 className="text-sm font-semibold tone-info tone-text">Your Data, Your Control</h4>
+              <p className="text-sm text-muted-foreground mt-1">
                 Your data remains yours. You can export and migrate at any time.{" "}
                 <Link
                   href="/docs/data-export"

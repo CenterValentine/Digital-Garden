@@ -135,7 +135,7 @@ export function StorageProvidersTab() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="text-gray-400">Loading storage providers...</div>
+        <div className="text-muted-foreground">Loading storage providers...</div>
       </div>
     );
   }
@@ -160,11 +160,11 @@ export function StorageProvidersTab() {
                 <h3 className="text-lg font-semibold">
                   {defaultProvider.displayName}
                 </h3>
-                <span className="px-2 py-1 text-xs rounded-full bg-green-500/20 text-green-400 border border-green-500/30">
+                <span className="px-2 py-1 text-xs rounded-full tone-success tone-surface border">
                   Default
                 </span>
                 {defaultProvider.isActive && (
-                  <span className="px-2 py-1 text-xs rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  <span className="px-2 py-1 text-xs rounded-full tone-info tone-surface border">
                     Active
                   </span>
                 )}
@@ -176,28 +176,28 @@ export function StorageProvidersTab() {
               <div className="mt-4 space-y-2 text-sm">
                 {defaultProvider.config?.bucket && (
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Bucket:</span>
-                    <code className="text-gray-300">{defaultProvider.config.bucket}</code>
+                    <span className="text-muted-foreground">Bucket:</span>
+                    <code className="text-muted-foreground">{defaultProvider.config.bucket}</code>
                   </div>
                 )}
                 {defaultProvider.config?.region && (
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Region:</span>
-                    <code className="text-gray-300">{defaultProvider.config.region}</code>
+                    <span className="text-muted-foreground">Region:</span>
+                    <code className="text-muted-foreground">{defaultProvider.config.region}</code>
                   </div>
                 )}
                 {defaultProvider.config?.endpoint && (
                   <div className="flex justify-between">
-                    <span className="text-gray-400">Endpoint:</span>
-                    <code className="text-gray-300 text-xs">{maskSensitiveValue(defaultProvider.config.endpoint, 15)}</code>
+                    <span className="text-muted-foreground">Endpoint:</span>
+                    <code className="text-muted-foreground text-xs">{maskSensitiveValue(defaultProvider.config.endpoint, 15)}</code>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <span className="text-gray-400">Provider:</span>
-                  <code className="text-gray-300 uppercase">{defaultProvider.provider}</code>
+                  <span className="text-muted-foreground">Provider:</span>
+                  <code className="text-muted-foreground uppercase">{defaultProvider.provider}</code>
                 </div>
                 {!defaultProvider.config && (
-                  <p className="text-xs text-gray-500 italic mt-2">
+                  <p className="text-xs text-muted-foreground italic mt-2">
                     Configuration details hidden for security
                   </p>
                 )}
@@ -217,7 +217,7 @@ export function StorageProvidersTab() {
       {/* Other Providers */}
       {otherProviders.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-400">Other Providers</h3>
+          <h3 className="text-sm font-medium text-muted-foreground">Other Providers</h3>
           {otherProviders.map((provider) => (
             <div
               key={provider.id}
@@ -232,7 +232,7 @@ export function StorageProvidersTab() {
                   <div className="flex items-center gap-3">
                     <h4 className="font-medium">{provider.displayName}</h4>
                     {!provider.isActive && (
-                      <span className="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      <span className="px-2 py-1 text-xs rounded-full bg-gray-500/20 text-muted-foreground border border-gray-500/30">
                         Inactive
                       </span>
                     )}
@@ -250,7 +250,7 @@ export function StorageProvidersTab() {
                   </button>
                   <button
                     onClick={() => handleDeleteProvider(provider.id)}
-                    className="px-3 py-1 text-xs rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 transition-colors"
+                    className="px-3 py-1 text-xs rounded-lg tone-danger tone-surface border tone-hover-fill transition-colors"
                   >
                     Delete
                   </button>
@@ -333,7 +333,7 @@ export function StorageProvidersTab() {
                     strokeWidth="2"
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    className="text-gray-400"
+                    className="text-muted-foreground"
                   >
                     <path d="m9 18 6-6-6-6" />
                   </svg>
@@ -344,7 +344,7 @@ export function StorageProvidersTab() {
 
           <button
             onClick={() => setShowAddProvider(false)}
-            className="mt-4 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            className="mt-4 px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
           >
             Cancel
           </button>
@@ -379,11 +379,11 @@ export function StorageProvidersTab() {
             <h4 className="text-sm font-semibold text-yellow-400">
               Warning: Changing Storage Provider
             </h4>
-            <p className="text-sm text-gray-300 mt-2">
+            <p className="text-sm text-muted-foreground mt-2">
               Changing your default provider only affects <strong>new uploads</strong>.
               Existing files remain in their current provider.
             </p>
-            <p className="text-sm text-gray-300 mt-2 font-semibold">
+            <p className="text-sm text-muted-foreground mt-2 font-semibold">
               Manual migration is not currently supported. Switching is final.
             </p>
           </div>
@@ -423,7 +423,7 @@ export function StorageProvidersTab() {
                   You are about to change your default storage provider.
                 </p>
 
-                <ul className="mt-4 space-y-2 text-sm text-gray-300">
+                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
                   <li className="flex gap-2">
                     <span>•</span>
                     <span>New uploads will go to the new provider</span>

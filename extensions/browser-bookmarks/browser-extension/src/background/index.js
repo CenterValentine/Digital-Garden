@@ -1690,12 +1690,65 @@ async function sendTtsFallback(tabId, text) {
     .catch(() => {});
 }
 
+// Immediate feedback: the player pops into a loading/spinner state the moment a
+// read starts, before the (network-bound) cloud synthesis returns. `preview` is
+// a short slice of the selection used only as the player's label.
+async function sendTtsLoading(tabId, preview) {
+  await chrome.tabs
+    .sendMessage(tabId, { type: "dg-tts-loading", preview })
+    .catch(() => {});
+}
+
+// "Stop reading" menu item — exists only while something is (probably) playing.
+// The overlay reports natural completion via the "dg-tts-ended" message; the
+// menu click itself is the manual stop. Created/removed via callbacks that
+// swallow lastError because both calls are idempotent by design (double-create
+// after an SW restart, double-remove after a race are both fine).
+const TTS_STOP_MENU_ID = "dg-tts-stop";
+
+function createTtsStopMenu() {
+  chrome.contextMenus.create(
+    {
+      id: TTS_STOP_MENU_ID,
+      title: "Stop reading",
+      contexts: ["page", "selection", "action"],
+    },
+    () => void chrome.runtime.lastError
+  );
+}
+
+function removeTtsStopMenu() {
+  chrome.contextMenus.remove(TTS_STOP_MENU_ID, () => void chrome.runtime.lastError);
+}
+
+// Playback lives in whichever tab the read started from, and the SW may have
+// been evicted since (losing any in-memory tab id) — so stop is a broadcast.
+// sendMessage rejects for tabs without our content script; ignore those.
+async function stopReadAloudEverywhere() {
+  removeTtsStopMenu();
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs.map((tab) =>
+      tab.id != null
+        ? chrome.tabs.sendMessage(tab.id, { type: "dg-tts-stop" }).catch(() => {})
+        : Promise.resolve()
+    )
+  );
+}
+
 // Read the highlighted selection aloud. Cloud (HD, BYOK) is preferred; offline
 // or any cloud failure degrades to the page's Web Speech engine — so the user
 // always hears something. Mirrors the in-app fallback policy.
 async function readAloudSelection(tabId, selectionText) {
   const text = (selectionText || "").trim();
   if (!text || tabId == null) return;
+  const preview = text.slice(0, 80);
+
+  // Offer the stop control for every playback path (cloud + fallback). If
+  // playback never actually starts, the item lingers until clicked once —
+  // acceptable, and self-healing since the click removes it.
+  createTtsStopMenu();
+  await sendTtsLoading(tabId, preview);
 
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     await sendTtsFallback(tabId, text);
@@ -1707,6 +1760,7 @@ async function readAloudSelection(tabId, selectionText) {
       type: "dg-tts-play",
       audioBase64: base64,
       mimeType,
+      preview,
     });
   } catch (error) {
     console.warn(
@@ -1900,6 +1954,9 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
     }
     if (info.menuItemId === "dg-run-workflow-selection") {
       await dispatchWorkflowAutoRoute(info.selectionText);
+    }
+    if (info.menuItemId === TTS_STOP_MENU_ID) {
+      await stopReadAloudEverywhere();
     }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);
@@ -2683,6 +2740,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "get-extension-context") {
       sendResponse({ ok: true, data: await getExtensionContext() });
+      return;
+    }
+    // The overlay player drives the "Stop reading" menu's lifecycle: it fires
+    // dg-tts-playing whenever an item starts/resumes (each back-to-back item
+    // re-asserts it) and dg-tts-ended on pause / idle / empty queue. create and
+    // remove are idempotent (they swallow lastError), so repeats are harmless.
+    if (message.type === "dg-tts-playing") {
+      createTtsStopMenu();
+      sendResponse({ ok: true, data: true });
+      return;
+    }
+    if (message.type === "dg-tts-ended") {
+      removeTtsStopMenu();
+      sendResponse({ ok: true, data: true });
       return;
     }
     if (message.type === "save-config") {

@@ -168,7 +168,7 @@ export function TrashSettings() {
                   type="button"
                   variant="ghost"
                   size="sm"
-                  className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
+                  className="text-muted-foreground hover:text-red-600 dark:hover:text-destructive"
                   onClick={() => setConfirmPurgeId(item.id)}
                   title="Delete permanently now"
                 >

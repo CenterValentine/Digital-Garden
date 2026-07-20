@@ -115,7 +115,7 @@ export function StorageBackupsTab() {
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-gray-400"
+                      className="text-muted-foreground"
                     >
                       <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
                     </svg>
@@ -224,7 +224,7 @@ export function StorageBackupsTab() {
 
           {/* Info Alert */}
           <div
-            className="border border-blue-500/30 rounded-lg p-6 bg-blue-500/10"
+            className="tone-info tone-panel border rounded-lg p-6"
             style={{
               backdropFilter: glass0.backdropFilter,
             }}
@@ -240,15 +240,15 @@ export function StorageBackupsTab() {
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-blue-400 flex-shrink-0 mt-0.5"
+                className="tone-info tone-text flex-shrink-0 mt-0.5"
               >
                 <circle cx="12" cy="12" r="10" />
                 <path d="M12 16v-4" />
                 <path d="M12 8h.01" />
               </svg>
               <div>
-                <h4 className="text-sm font-semibold text-blue-400">Backup Cost</h4>
-                <p className="text-sm text-gray-300 mt-1">
+                <h4 className="text-sm font-semibold tone-info tone-text">Backup Cost</h4>
+                <p className="text-sm text-muted-foreground mt-1">
                   Backups using bucket versioning add approximately <strong>10-20%</strong> to storage costs (not 100%).
                   Old versions are automatically moved to cheaper archive tiers.
                 </p>

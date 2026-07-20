@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-03
+last_updated: 2026-08-04
 ---
 
 # Sprint Backlog
@@ -241,6 +241,35 @@ Deferred by design from Plan 1 (see `WORKFLOWS-FOUNDATION-PLAN.md` session logs)
 - [ ] **Run-state reconciliation sweeper** — engine-vs-table status drift safety net (cron comparing engineRunId state for stale `running` runs); the step-section try/catch pattern covers the known path, a sweeper covers unknown ones.
 - [ ] **Workflows Playwright specs** — stub per repo convention; blocked on the shared e2e auth fixture.
 - [ ] **`WorkflowRunEvent` retention/pruning** — not needed at current scale; revisit with usage.
+
+## Tone system + dark re-base followups (2026-07-18, branch `chore/minor-changes`)
+
+Shipped: `--tone-*` scale + `.tone-surface`/`.tone-panel`/`.tone-text` in `app/globals.css`, [ToneChip](../../../components/client/ui/tone-chip.tsx), all 17 `components/settings/` files migrated off hardcoded colors, `Switch` track fix, and a dark-theme re-base (`--background` `#465E73`→`#2E3F4F`, `--muted-foreground` dark `#7A9A9A`→`#B3B29E`, light `#717182`→`#67677A`, new `--switch-track`). Verified 0/72 measured samples below WCAG AA in both themes.
+
+**No baseline regeneration needed.** Full suite run 2026-07-18 against this branch: 148 passed / 48 failed / 146 skipped, and **zero failures attributable to the token change**. Breakdown of the 48: 43 were `page.goto` 30s timeouts from cold-compiling `/test/publishing-fixtures/[block]` routes on a fresh `next dev` (environmental — warm the server or use `PLAYWRIGHT_AUTOSTART`), 2 were a pre-existing strict-mode locator bug, 1 was date-dependent drift. Config honors `PLAYWRIGHT_BASE_URL`, so port 3015 is not required.
+
+- [ ] **Fix `tests/e2e/dark-mode/home.spec.ts:18`** — `getByRole("link", {name: /sign in/i})` matches 3 elements (header, hero CTA, footer) → strict-mode violation. Pre-existing, unrelated to the tone work. Scope it, e.g. `page.locator("header").getByRole(...)`.
+- [ ] **Un-pin the `daily-summary` editor fixture from the current date** — [periodic-summary.ts](../../../lib/domain/editor/extensions/blocks/periodic-summary.ts) calls `new Date()`, so the block's height drifts (baseline 184px, now 207px) and the snapshot rots over time. Freeze the clock in the fixture route.
+- [ ] **⚠ Smoke-test authenticated dark surfaces — the coverage gap is the real risk.** The suite reported no regressions *because it does not cover the surfaces this change touches*: the visually-tested public routes (`sign-in` has 0 token classes and 6 hardcoded `text-white` literals) don't consume `--background`/`--foreground` at all. Every token changed here lives in the authenticated shell, which is exactly the stubbed/auth-blocked gap. Green CI is **not** evidence of safety. Check editor, file tree, panels, settings, publishing preview, embed/iframe.
+- [ ] **Auth fixture** (already tracked below) would have caught this — it's now the highest-value test-infra item, since the dark re-base is app-wide and unverifiable without it.
+- [ ] **Migrate remaining tinted-chip call sites** — ~78 files outside settings still hand-roll `bg-x-500/15 text-x-300 border-x-500/30`, and ~93 use unconditional `text-white`. Now mechanical: swap to `ToneChip` / `tone-*` classes. Do opportunistically as files are touched.
+- [ ] **Audit `--card` vs glass surfaces in dark** — `--card` (`#1F3334`) and `--surface-glass-0-bg` (`rgba(0,0,0,0.3)`) now stack on a darker page; check nested cards still read as distinct layers.
+- [ ] **Consider a lint rule / audit script** for dark-first literals, in the spirit of `publishing:audit:themes` — flag `text-*-300` and `bg-black/NN` without a paired `dark:` variant.
+
+## Folder Studio — folders as agentic hubs (2026-07-12)
+
+Direction approved; full phased plan in [FOLDER-STUDIO-PLAN.md](FOLDER-STUDIO-PLAN.md) (design stubs linked in its frontmatter). 9 phases, each a small PR; extension `enabledByDefault: false` until Phase 3.
+
+- [ ] **Phase 0** — `extensions/studio/` scaffold + frozen contracts (`StudioToolDefinition`, `SourceSelection`, `SourceContentResolver`, `GenerationRun`)
+- [ ] **Phase 1** — stubbed sidebar Studio tab + Context tab (in-app design round, real tree data)
+- [ ] **Phase 2** — `AgenticMetadata` sidecar + Context editor + sectioned generator (staleness hash, vision pass for images)
+- [ ] **Phase 3** — folder chat + tri-state source picker (BFS defaults, token budget, GEN hash-lock, cap tooltip)
+- [ ] **Phase 4** — first tools: report, flashcards entry (**+ pronunciation-default-off fix, card cap removal**), Mermaid mind map, glossary, compare
+- [ ] **Phase 5** — GenerationRun infra (WorkflowRun vs interim table decision) + inbox notifications
+- [ ] **Phase 6** — audio overview (single-voice), slides (pptx → OnlyOffice), infographic (HTML/SVG + diffusion modes)
+- [ ] **Phase 7** — practice shelf: quiz, teach-it-back, oral exam (TTS+STT), FSRS study plan
+- [ ] **Phase 8** — Option A studio folder view + polish; revisit Option C
+- Related-but-separate: **web-search tooling plan** (provider-native search tools; only the `SourceContentResolver` external stub lands in this plan)
 
 ---
 

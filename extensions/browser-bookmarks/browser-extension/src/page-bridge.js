@@ -2,6 +2,23 @@ const APP_SOURCE = "dg-browser-bookmarks-app";
 const EXTENSION_SOURCE = "dg-browser-bookmarks-extension";
 const PRESENCE_NODE_ID = "dg-browser-bookmarks-extension-presence";
 
+// ── Quick Capture ESC guard ──────────────────────────────────────────────────
+// Registered at document_start so this listener sits ahead of every page
+// script (and most other extensions) in the capture chain. The overlay content
+// script shares this isolated world and publishes its cancel function on
+// window.__dgQuickCaptureCancel while picker mode is active. keyup doubles as
+// a fallback for pages/extensions that swallow keydown.
+const dgQuickCaptureEscGuard = (event) => {
+  if (event.key !== "Escape") return;
+  const cancel = window.__dgQuickCaptureCancel;
+  if (typeof cancel !== "function") return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  cancel();
+};
+window.addEventListener("keydown", dgQuickCaptureEscGuard, true);
+window.addEventListener("keyup", dgQuickCaptureEscGuard, true);
+
 function detectBrowser() {
   const ua = navigator.userAgent;
   if (ua.includes("Vivaldi")) {

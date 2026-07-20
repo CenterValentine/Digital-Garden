@@ -216,11 +216,11 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                   <Globe className="h-3 w-3 text-black/30 dark:text-white/30 shrink-0" />
                   <span className="font-mono text-sm truncate">{h.host}</span>
                   {h.verifiedAt ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-300 text-xs px-2 py-0.5 shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full tone-success tone-surface border text-xs px-2 py-0.5 shrink-0">
                       <Check className="h-3 w-3" /> Verified
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-300 text-xs px-2 py-0.5 shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-full tone-warning tone-surface border text-xs px-2 py-0.5 shrink-0">
                       Pending
                     </span>
                   )}
@@ -236,7 +236,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                       type="button"
                       onClick={() => void handleVerify(h.host)}
                       disabled={verifyingHost === h.host}
-                      className="text-xs text-sky-300 hover:text-sky-200 px-2 py-1 rounded hover:bg-sky-500/10 disabled:opacity-40 flex items-center gap-1"
+                      className="text-xs tone-info tone-text-muted tone-hover px-2 py-1 rounded tone-hover-fill disabled:opacity-40 flex items-center gap-1"
                     >
                       {verifyingHost === h.host ? (
                         <Loader2 className="h-3 w-3 animate-spin" />
@@ -249,7 +249,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
                   <button
                     type="button"
                     onClick={() => void handleRemove(h.host)}
-                    className="text-black/40 dark:text-white/40 hover:text-rose-400 p-1 rounded"
+                    className="text-black/40 dark:text-white/40 hover:text-destructive p-1 rounded"
                     aria-label="Remove hostname"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
@@ -315,7 +315,7 @@ export function HostManagement({ tenantId, tenantSlug }: HostManagementProps) {
             <button
               type="submit"
               disabled={isAdding || !newHost.trim()}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-sky-500/20 text-sky-300 hover:bg-sky-500/30 disabled:opacity-40"
+              className="px-3 py-1.5 rounded-md text-xs font-medium tone-info tone-selected tone-hover-fill disabled:opacity-40"
             >
               {isAdding ? "Adding…" : "Add hostname"}
             </button>
