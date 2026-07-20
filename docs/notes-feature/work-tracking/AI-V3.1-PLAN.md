@@ -158,6 +158,14 @@ measurement first:
 - **Gate:** a jobhunt-mini run shows per-phase token numbers; an
   oversized page read enters context as an extract; the system prompt's
   stable prefix survives a date rollover mid-session.
+- **BUILT (4d1687a, 2026-07-19)** — route onStepFinish → toolCtx.runTokens
+  → ledger "tokens so far" stamps + expandable per-phase meter in the
+  ChatViewer header (checkpoint-delimited, client-computed);
+  `tool-result-extraction` feature route + extract-relevant subagent
+  (purpose-threaded, >6k trigger, full text stays on the garden page
+  node, soft-fail to truncation); date section moved to the static-
+  section tail. **Gate pending owner smoke** (extraction needs the
+  feature routed to a cheap model in Settings → AI).
 
 ## R5b — Validated compaction (DEFERRED toward V4; split from R5 2026-07-19)
 
