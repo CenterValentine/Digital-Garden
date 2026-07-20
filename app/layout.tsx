@@ -10,6 +10,7 @@ import NavBar from "@/components/client/nav/NavBar";
 import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
 import { ThemeProvider, THEME_SCRIPT } from "@/lib/features/theme";
+import { DevWorktreeBanner } from "@/lib/features/dev-banner";
 
 const geistSans = localFont({
   src: "../public/fonts/liberation-sans-regular.ttf",
@@ -165,6 +166,9 @@ export default async function RootLayout({
             closeButton
           />
         </ThemeProvider>
+        {/* Dev-only: names the worktree/branch this localhost is serving.
+            Renders nothing outside `next dev`. */}
+        <DevWorktreeBanner />
       </body>
     </html>
   );
