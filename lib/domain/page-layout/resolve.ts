@@ -45,8 +45,11 @@ function parseConfig(raw: unknown) {
 }
 
 /**
- * `draft: true` reads pending composer edits (`draftConfig ?? config`). Callers
- * are responsible for authorization — only the tenant owner may pass draft.
+ * `draft: true` is OWNER PREVIEW — reads pending composer edits
+ * (`draftConfig ?? config`) and bypasses the Draft/Live gate. Callers must
+ * authorize it (only the tenant owner). For everyone else (`draft` falsy) a
+ * page that isn't Live (`visibility !== "published"`) resolves to `null`, so
+ * the public sees the page's built-in design default instead.
  */
 export interface ResolveOptions {
   draft?: boolean;
@@ -57,7 +60,10 @@ async function loadPage(tenantId: string, slug: string, opts?: ResolveOptions) {
     where: { tenantId_slug: { tenantId, slug } },
   });
   if (!page) return null;
-  const raw = opts?.draft ? (page.draftConfig ?? page.config) : page.config;
+  const preview = opts?.draft === true;
+  // Draft pages are invisible to the public — fall back to the design default.
+  if (!preview && page.visibility !== "published") return null;
+  const raw = preview ? (page.draftConfig ?? page.config) : page.config;
   return { page, config: parseConfig(raw) };
 }
 

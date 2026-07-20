@@ -260,15 +260,58 @@ export function SitePagesComposer() {
     [saveNow],
   );
 
-  const publish = useCallback(async () => {
+  /** Immediately persist a metadata patch (visibility, nav) as a draft PUT. */
+  const applyAndSave = useCallback(
+    async (patch: Partial<WorkingPage>): Promise<boolean> => {
+      const w = workingRef.current;
+      const t = tenantRef.current;
+      if (!w || !t) return false;
+      const next = { ...w, ...patch };
+      setWorking((prev) => (prev && prev.slug === w.slug ? next : prev));
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      setSaveState("saving");
+      try {
+        const seg = slugToSegment(next.slug);
+        const res = await fetch(`/api/site-pages/${encodeURIComponent(seg)}`, {
+          method: "PUT",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            tenantId: t,
+            title: next.title.trim() || "Untitled",
+            kind: next.kind,
+            navLabel: next.navLabel.trim() || null,
+            navOrder: next.navOrder,
+            visibility: next.visibility,
+            config: next.config,
+          }),
+        });
+        if (!res.ok) {
+          const err = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(err?.error ?? `HTTP ${res.status}`);
+        }
+        setSaveState("saved");
+        setWorking((prev) =>
+          prev && prev.slug === next.slug ? { ...prev, persisted: true, hasDraft: true } : prev,
+        );
+        setPreviewKey((k) => k + 1);
+        void loadPages(t);
+        return true;
+      } catch (err) {
+        setSaveState("error");
+        toast.error("Save failed", {
+          description: err instanceof Error ? err.message : "Please try again",
+        });
+        return false;
+      }
+    },
+    [loadPages],
+  );
+
+  /** Promote draftConfig → config on the server (content publish). */
+  const postPublish = useCallback(async () => {
     const w = workingRef.current;
     const t = tenantRef.current;
     if (!w || !t) return;
-    // Flush any pending edits first so the publish includes them.
-    if (saveTimer.current) {
-      clearTimeout(saveTimer.current);
-      await saveNow();
-    }
     try {
       const seg = slugToSegment(w.slug);
       const res = await fetch(`/api/site-pages/${encodeURIComponent(seg)}/publish`, {
@@ -280,16 +323,39 @@ export function SitePagesComposer() {
         const err = (await res.json().catch(() => null)) as { error?: string } | null;
         throw new Error(err?.error ?? `HTTP ${res.status}`);
       }
-      const data = (await res.json()) as { published: boolean };
       setWorking((prev) => (prev ? { ...prev, hasDraft: false } : prev));
-      setPreviewKey((k) => k + 1); // published config now == draft; refresh
-      toast.success(data.published ? "Published to the live page" : "Nothing to publish");
+      setPreviewKey((k) => k + 1);
     } catch (err) {
       toast.error("Publish failed", {
         description: err instanceof Error ? err.message : "Please try again",
       });
     }
-  }, [saveNow]);
+  }, []);
+
+  /** Draft → Live: make the page live AND push its current content. */
+  const goLive = useCallback(async () => {
+    if (await applyAndSave({ visibility: "published" })) {
+      await postPublish();
+      toast.success("Page is live");
+    }
+  }, [applyAndSave, postPublish]);
+
+  /** Live: push pending edits to the live page. */
+  const publishChanges = useCallback(async () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      await saveNow();
+    }
+    await postPublish();
+    toast.success("Changes published");
+  }, [saveNow, postPublish]);
+
+  /** Live → Draft: hide the page (content is kept). */
+  const unpublish = useCallback(async () => {
+    if (await applyAndSave({ visibility: "draft" })) {
+      toast.success("Unpublished — the page now shows its default");
+    }
+  }, [applyAndSave]);
 
   const removePage = useCallback(async () => {
     const w = workingRef.current;
@@ -500,34 +566,25 @@ export function SitePagesComposer() {
               <span className="inline-flex items-center rounded-full border border-amber-600/50 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-400">
                 {KIND_LABELS[working.kind]}
               </span>
-              <select
-                aria-label="Visibility"
-                className={inputCls}
-                value={working.visibility}
-                onChange={(e) =>
-                  mutate((p) => ({
-                    ...p,
-                    visibility: e.target.value === "published" ? "published" : "draft",
-                  }))
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+                  working.visibility === "published"
+                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
+                    : "border-white/20 text-white/50"
+                }`}
+                title={
+                  working.visibility === "published"
+                    ? "This page is live to the public"
+                    : "This page is a draft — the public sees its built-in default"
                 }
               >
-                <option value="draft">draft (hidden)</option>
-                <option value="published">published</option>
-              </select>
-              <input
-                aria-label="Nav label"
-                className={`${inputCls} w-28`}
-                placeholder="Nav label"
-                value={working.navLabel}
-                onChange={(e) => mutate((p) => ({ ...p, navLabel: e.target.value }))}
-              />
-              <input
-                aria-label="Nav order"
-                type="number"
-                className={`${inputCls} w-16`}
-                value={working.navOrder}
-                onChange={(e) => mutate((p) => ({ ...p, navOrder: Number(e.target.value) || 0 }))}
-              />
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    working.visibility === "published" ? "bg-emerald-400" : "bg-white/40"
+                  }`}
+                />
+                {working.visibility === "published" ? "Live" : "Draft"}
+              </span>
               <span className="flex-1" />
               <a
                 href={`/${working.slug}?preview=draft`}
@@ -554,21 +611,81 @@ export function SitePagesComposer() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3">
-              <Button type="button" disabled={!working.hasDraft} onClick={() => void publish()}>
-                Publish changes
-              </Button>
-              <span
-                className={`text-xs ${
-                  saveState === "error"
-                    ? "text-rose-400"
-                    : working.hasDraft
-                      ? "text-amber-400"
-                      : "text-white/40"
-                }`}
-              >
-                {saveLabel}
-              </span>
+            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-3" style={cardStyle}>
+              {working.visibility === "draft" ? (
+                <>
+                  <Button type="button" onClick={() => void goLive()}>
+                    Publish — make live
+                  </Button>
+                  <span className="text-xs text-white/40">
+                    Draft: only you can see it (via Preview). Publishing shows it to everyone.
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    disabled={!working.hasDraft}
+                    onClick={() => void publishChanges()}
+                  >
+                    Publish changes
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => void unpublish()}
+                    className="text-xs text-white/40 underline decoration-dotted underline-offset-4 hover:text-rose-400"
+                  >
+                    Unpublish
+                  </button>
+                  <span
+                    className={`text-xs ${
+                      saveState === "error"
+                        ? "text-rose-400"
+                        : working.hasDraft
+                          ? "text-amber-400"
+                          : "text-white/40"
+                    }`}
+                  >
+                    {working.hasDraft ? "Unpublished changes" : saveLabel}
+                  </span>
+                </>
+              )}
+
+              <span className="flex-1" />
+
+              {/* Show in menu */}
+              <label className="flex items-center gap-2 text-xs text-white/60">
+                <input
+                  type="checkbox"
+                  checked={working.navLabel.trim() !== ""}
+                  onChange={(e) =>
+                    mutate((p) => ({
+                      ...p,
+                      navLabel: e.target.checked ? p.navLabel.trim() || p.title : "",
+                    }))
+                  }
+                />
+                Show in site menu
+              </label>
+              {working.navLabel.trim() !== "" && (
+                <>
+                  <input
+                    aria-label="Menu label"
+                    className={`${inputCls} w-28`}
+                    placeholder="Menu label"
+                    value={working.navLabel}
+                    onChange={(e) => mutate((p) => ({ ...p, navLabel: e.target.value }))}
+                  />
+                  <input
+                    aria-label="Menu order"
+                    type="number"
+                    title="Order in the menu"
+                    className={`${inputCls} w-14`}
+                    value={working.navOrder}
+                    onChange={(e) => mutate((p) => ({ ...p, navOrder: Number(e.target.value) || 0 }))}
+                  />
+                </>
+              )}
             </div>
 
             {working.config.sections.map((section, i) => (
