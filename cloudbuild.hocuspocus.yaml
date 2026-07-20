@@ -51,5 +51,14 @@ images:
 
 substitutions:
   _SERVICE_NAME: digital-garden-hocuspocus
-  _REGION: us-central1
+  # PINNED to us-west1 — the region the app actually connects to
+  # (NEXT_PUBLIC_HOCUSPOCUS_URL → …-uw.a.run.app).
+  #
+  # This said us-central1 until 2026-07-20, while the client pointed at
+  # us-west1. Two identically-named services existed in both regions, so every
+  # deploy shipped correctly to a service nothing talked to, and the serving
+  # revision sat untouched from 2026-04-16 — three redeploys "succeeded" while
+  # the live crash never changed. The us-central1 service has been deleted;
+  # do not reintroduce a second region without repointing the client.
+  _REGION: us-west1
   _IMAGE: us-west1-docker.pkg.dev/digital-garden-482805/digital-garden-containers/digital-garden-hocuspocus
