@@ -1,17 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 import { createElement } from "react";
 
 const TREE_COLLAPSED_KEY = "dg-panel-tree-collapsed";
+const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
+
+function subscribeToColorScheme(onChange: () => void) {
+  const query = window.matchMedia(COLOR_SCHEME_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function getSystemPrefersDark() {
+  return window.matchMedia(COLOR_SCHEME_QUERY).matches;
+}
 
 /**
  * Mini-DG shell for the extension side panel (BROWSER-REACH B1).
@@ -38,7 +50,11 @@ interface PanelPageContext {
 
 type PanelView = "garden" | "chat";
 
-export function PanelShellClient() {
+export function PanelShellClient({
+  themePreference = "system",
+}: {
+  themePreference?: "light" | "dark" | "system";
+}) {
   const [view, setView] = useState<PanelView>("garden");
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
@@ -50,6 +66,28 @@ export function PanelShellClient() {
   // bar (back/forward, pane layout) is suppressed in the panel.
   const shellNavigationControls = useExtensionShellNavigationControls();
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+
+  // Server-resolved preference; "system" defers to the iframe's own media
+  // query, subscribed through useSyncExternalStore so it stays SSR-safe and
+  // needs no setState-in-effect.
+  const systemPrefersDark = useSyncExternalStore(
+    subscribeToColorScheme,
+    getSystemPrefersDark,
+    () => false
+  );
+  const isDark =
+    themePreference === "system" ? systemPrefersDark : themePreference === "dark";
+
+  // Two consumers read the theme from different places: Tailwind's `dark:`
+  // variants need a `.dark` ancestor class, while JS-computed styles (the chat
+  // gradient) read useResolvedTheme → the settings store, which is empty in the
+  // partitioned iframe. The class is applied in render below; seed the store here.
+  useEffect(() => {
+    useSettingsStore.setState((state) => ({
+      ui: { ...state.ui, theme: isDark ? "dark" : "light" },
+    }));
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
 
   // The panel has no room for the right sidebar; keep it collapsed.
   useEffect(() => {
@@ -118,6 +156,7 @@ export function PanelShellClient() {
 
   return (
     <div
+      className={isDark ? "dark" : undefined}
       style={{
         flex: 1,
         minHeight: 0,
