@@ -1,4 +1,5 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy } from "../url-strategy.js";
+import { extractContent } from "../extraction/index.js";
 
 const DG_OVERLAY_ROOT_ID = "dg-browser-overlay-root";
 const DG_OVERLAY_APP_ROUTE = "/content/";
@@ -4284,6 +4285,20 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       text = document.body?.innerText || document.body?.textContent || "";
     } catch (_) {}
     sendResponse({ text: text.slice(0, 100000) });
+    return; // responded synchronously
+  }
+
+  // Scoped extraction for the side-panel chat (B2). Returns the shared
+  // ExtractedPage envelope for selection / viewport / full-page.
+  if (message?.type === "dg-extract-content") {
+    try {
+      sendResponse({ ok: true, data: extractContent(message.scope) });
+    } catch (error) {
+      sendResponse({
+        ok: false,
+        error: error instanceof Error ? error.message : "Extraction failed",
+      });
+    }
     return; // responded synchronously
   }
 });
