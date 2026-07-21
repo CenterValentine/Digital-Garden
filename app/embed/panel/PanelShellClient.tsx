@@ -151,7 +151,14 @@ export function PanelShellClient({
 }: {
   themePreference?: "light" | "dark" | "system";
 }) {
-  const [view, setView] = useState<PanelView>("garden");
+  // Initial view: "chat" when opened via "Ask AI about this page" (the host
+  // appends ?view=chat), else the Garden. Read once at mount.
+  const [view, setView] = useState<PanelView>(() => {
+    if (typeof window === "undefined") return "garden";
+    return new URLSearchParams(window.location.search).get("view") === "chat"
+      ? "chat"
+      : "garden";
+  });
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
   // Page-context capture results flow into the store; the context bar now

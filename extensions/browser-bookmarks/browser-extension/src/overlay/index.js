@@ -1060,7 +1060,14 @@ function overlayStyles() {
 function createOverlayApp(state) {
   const host = document.createElement("div");
   host.id = DG_OVERLAY_ROOT_ID;
-  const shadow = host.attachShadow({ mode: "open" });
+  // CLOSED shadow root: the embed iframe (and its ?_t= session token) live in
+  // here. An open root lets any page script reach host.shadowRoot → the iframe
+  // → read its src (leaking the token) and postMessage spoofed control frames
+  // to the embed, which can't origin-validate them (same-page overlay). Closed
+  // removes that access path entirely — a stronger, simpler guarantee than an
+  // in-band handshake nonce. All overlay code uses the held `state.shadow`
+  // reference, so closing changes nothing internally.
+  const shadow = host.attachShadow({ mode: "closed" });
   document.documentElement.appendChild(host);
 
   shadow.innerHTML = `

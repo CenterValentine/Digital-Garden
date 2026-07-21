@@ -281,6 +281,17 @@ async function boot() {
 
   const panelUrl = new URL(`${baseUrl}/embed/panel`);
   if (sessionToken) panelUrl.searchParams.set("_t", sessionToken);
+  // Opened via "Ask AI about this page" (context menu / shortcut) — land on
+  // the Chat view. One-shot: consumed here so a later manual open is neutral.
+  try {
+    const { dgPanelView } = await chrome.storage.session.get("dgPanelView");
+    if (dgPanelView === "chat") {
+      panelUrl.searchParams.set("view", "chat");
+      await chrome.storage.session.remove("dgPanelView");
+    }
+  } catch {
+    // Session storage unavailable — default view is fine.
+  }
   // Hidden until the `load` listener swaps it in — no stacked states.
   frame.style.display = "none";
   frame.src = panelUrl.toString();

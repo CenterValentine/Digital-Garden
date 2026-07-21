@@ -17,6 +17,14 @@
   "side_panel": {
     "default_path": "panel.html"
   },
+  "commands": {
+    "open-ai-chat": {
+      "suggested_key": {
+        "default": "Alt+Shift+A"
+      },
+      "description": "Ask the Digital Garden AI about this page"
+    }
+  },
   "host_permissions": ["<all_urls>"],
   "icons": {
     "16": "icons/icon-16.png",

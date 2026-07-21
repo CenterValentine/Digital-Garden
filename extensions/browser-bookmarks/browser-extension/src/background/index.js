@@ -1752,6 +1752,11 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Run workflow on selection",
     contexts: ["selection"],
   });
+  chrome.contextMenus.create({
+    id: "dg-open-ai-chat",
+    title: "Ask AI about this page",
+    contexts: ["page", "selection", "action"],
+  });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
   chrome.alarms.create(WORKFLOW_BADGE_ALARM, { periodInMinutes: 1 });
@@ -1759,7 +1764,32 @@ chrome.runtime.onInstalled.addListener(async () => {
   await exchangeEmbedSession();
 });
 
-chrome.contextMenus.onClicked.addListener(async (info) => {
+// Open the side panel on the Chat view for `tab`. Synchronous and awaits
+// nothing before sidePanel.open() so the user-gesture context (context-menu
+// click, keyboard command) is preserved — Chrome rejects sidePanel.open once
+// the gesture has been consumed by an await.
+function openAiChatPanel(tab) {
+  chrome.storage.session.set({ dgPanelView: "chat" }).catch(() => {});
+  const target =
+    tab?.id != null
+      ? { tabId: tab.id }
+      : tab?.windowId != null
+        ? { windowId: tab.windowId }
+        : null;
+  if (!target) return;
+  chrome.sidePanel.open(target).catch(() => {});
+}
+
+chrome.commands.onCommand.addListener((command, tab) => {
+  if (command === "open-ai-chat") openAiChatPanel(tab);
+});
+
+chrome.contextMenus.onClicked.addListener(async (info, tab) => {
+  // Gesture-sensitive: handle before the async try below touches any await.
+  if (info.menuItemId === "dg-open-ai-chat") {
+    openAiChatPanel(tab);
+    return;
+  }
   try {
     if (info.menuItemId === "dg-save-page") {
       await quickSaveCurrentTab({});
