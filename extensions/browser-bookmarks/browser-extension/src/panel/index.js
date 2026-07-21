@@ -183,12 +183,15 @@ window.addEventListener("message", (event) => {
         });
         postToEmbed("screenshot", { dataUrl });
       } catch (error) {
-        postToEmbed("screenshot-error", {
-          message:
-            error instanceof Error
-              ? error.message
-              : "Couldn't screenshot this page",
-        });
+        const raw = error instanceof Error ? error.message : "";
+        // captureVisibleTab needs the <all_urls> host permission. The manifest
+        // now requests it, but Chrome only applies a widened permission after
+        // the extension is reloaded AND the user accepts the prompt — so give
+        // that instruction instead of Chrome's raw permission string.
+        const message = /permission|all_urls|activeTab/i.test(raw)
+          ? "Screenshots need updated permissions. Open chrome://extensions, reload this extension, and accept the access prompt — then try again."
+          : raw || "Couldn't screenshot this page";
+        postToEmbed("screenshot-error", { message });
       }
     })();
     return;

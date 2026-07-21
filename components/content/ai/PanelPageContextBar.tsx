@@ -14,6 +14,14 @@
  */
 
 import { useEffect } from "react";
+import {
+  Highlighter,
+  Monitor,
+  FileText,
+  Camera,
+  Loader2,
+  X,
+} from "lucide-react";
 import { usePanelPageContextStore } from "@/state/panel-page-context-store";
 import {
   isPanelEmbedSurface,
@@ -23,10 +31,14 @@ import {
 } from "@/lib/domain/browser-extension/panel-bridge";
 import type { PageContextScope } from "@/lib/domain/browser-extension/page-context";
 
-const SCOPES: Array<{ id: PageContextScope; label: string; hint: string }> = [
-  { id: "selection", label: "Selection", hint: "Your highlighted text" },
-  { id: "viewport", label: "Screen", hint: "What's visible now" },
-  { id: "full", label: "Page", hint: "The whole article" },
+const SCOPES: Array<{
+  id: PageContextScope;
+  hint: string;
+  Icon: typeof Highlighter;
+}> = [
+  { id: "selection", hint: "Add your highlighted text", Icon: Highlighter },
+  { id: "viewport", hint: "Add what's visible on screen", Icon: Monitor },
+  { id: "full", hint: "Add the whole page", Icon: FileText },
 ];
 
 export function PanelPageContextBar({
@@ -90,22 +102,25 @@ export function PanelPageContextBar({
         <span className="text-gray-500 dark:text-gray-400">Add page:</span>
         {SCOPES.map((s) => {
           const active = attached && pageContext?.scope === s.id;
+          const loading = busy && scope === s.id;
+          const Icon = loading ? Loader2 : s.Icon;
           return (
             <button
               key={s.id}
               type="button"
               title={s.hint}
+              aria-label={s.hint}
               disabled={busy}
               aria-pressed={active}
               onClick={() => capture(s.id)}
               className={
-                "rounded-md border px-2 py-0.5 text-[11px] transition-colors " +
+                "inline-flex items-center justify-center rounded-md border p-1 transition-colors " +
                 (active
                   ? "border-gold-primary bg-gold-primary text-black"
                   : "border-black/10 dark:border-white/15 text-gray-600 dark:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/5")
               }
             >
-              {busy && scope === s.id ? "…" : s.label}
+              <Icon className={"h-3.5 w-3.5" + (loading ? " animate-spin" : "")} />
             </button>
           );
         })}
@@ -115,9 +130,14 @@ export function PanelPageContextBar({
             onClick={captureScreenshot}
             disabled={screenshotBusy}
             title="Attach a screenshot of the visible page"
-            className="rounded-md border border-black/10 dark:border-white/15 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
+            aria-label="Attach a screenshot of the visible page"
+            className="inline-flex items-center justify-center rounded-md border border-black/10 dark:border-white/15 p-1 text-gray-600 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
           >
-            {screenshotBusy ? "…" : "📷 Shot"}
+            {screenshotBusy ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Camera className="h-3.5 w-3.5" />
+            )}
           </button>
         )}
         {attached && (
@@ -125,9 +145,10 @@ export function PanelPageContextBar({
             type="button"
             onClick={clear}
             title="Stop sending this page to the chat"
-            className="ml-auto text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-sm leading-none"
+            aria-label="Stop sending this page to the chat"
+            className="ml-auto inline-flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
           >
-            ✕
+            <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
