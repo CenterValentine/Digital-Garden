@@ -31,6 +31,7 @@ import {
   starterConfig,
   slugToSegment,
   emptySection,
+  routeInfo,
 } from "./defaults";
 import { SectionCard } from "./SectionCard";
 import { JsonHatch } from "./JsonHatch";
@@ -508,7 +509,7 @@ export function SitePagesComposer() {
             />
             <input
               className={`${inputCls} w-full font-mono`}
-              placeholder="slug (empty = home)"
+              placeholder="URL slug — e.g. results"
               value={newDraft.slug}
               onChange={(e) => setNewDraft((d) => ({ ...d, slug: e.target.value }))}
             />
@@ -523,6 +524,15 @@ export function SitePagesComposer() {
                 </option>
               ))}
             </select>
+            {(() => {
+              const r = routeInfo(newDraft.slug, newDraft.kind);
+              return (
+                <p className={`text-[11px] ${r.status === "wired" ? "text-emerald-400" : "text-amber-400/80"}`}>
+                  {r.status === "wired" ? "→ " : "⚠ "}
+                  {r.note}
+                </p>
+              );
+            })()}
             <div className="flex gap-2">
               <Button type="button" onClick={createPage}>
                 Create
@@ -566,6 +576,21 @@ export function SitePagesComposer() {
               <span className="inline-flex items-center rounded-full border border-amber-600/50 bg-amber-500/10 px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider text-amber-400">
                 {KIND_LABELS[working.kind]}
               </span>
+              {(() => {
+                const r = routeInfo(working.slug, working.kind);
+                const tone =
+                  r.status === "wired"
+                    ? "text-emerald-400"
+                    : r.status === "home"
+                      ? "text-white/40"
+                      : "text-amber-400";
+                return (
+                  <span className={`text-[11px] ${tone}`} title={r.note}>
+                    {r.status === "wired" ? "→ " : "⚠ "}
+                    {r.note}
+                  </span>
+                );
+              })()}
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
                   working.visibility === "published"

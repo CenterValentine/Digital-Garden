@@ -72,3 +72,42 @@ export function starterConfig(kind: PageKind): SitePageConfig {
 export function slugToSegment(slug: string): string {
   return slug.trim() === "" ? "home" : slug.trim();
 }
+
+/**
+ * The personal-site routes that actually render a composed page today, and the
+ * page kind each expects. Used to tell the author whether a slug is wired.
+ * (Generic per-tenant routing is future work.)
+ */
+const PERSONAL_ROUTES: Record<string, { kind: PageKind; label: string }> = {
+  results: { kind: "record", label: "Results / Work" },
+  blog: { kind: "garden", label: "Field Notes" },
+};
+
+export type RouteStatus = "wired" | "wrong-kind" | "home" | "unwired";
+
+/** What URL a (slug, kind) drives on the personal site, and whether it renders. */
+export function routeInfo(
+  slug: string,
+  kind: PageKind,
+): { url: string; status: RouteStatus; note: string } {
+  const s = slug.trim();
+  if (s === "") {
+    return {
+      url: "/",
+      status: "home",
+      note: "Home renders the garden — a record/list page here won't show. Give it a slug like “results”.",
+    };
+  }
+  const known = PERSONAL_ROUTES[s];
+  if (known) {
+    if (known.kind !== kind) {
+      return { url: `/${s}`, status: "wrong-kind", note: `/${s} (${known.label}) expects a “${known.kind}” page — this is “${kind}”.` };
+    }
+    return { url: `/${s}`, status: "wired", note: `Renders at davidvalentine.org/${s}` };
+  }
+  return {
+    url: `/${s}`,
+    status: "unwired",
+    note: `No /${s} route on your site yet — this won't render until that page exists.`,
+  };
+}
