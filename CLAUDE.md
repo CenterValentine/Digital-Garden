@@ -487,9 +487,9 @@ const glass0 = getSurfaceStyles("glass-0");
 - For unused parameters/vars that must remain (kept-for-signature, caught errors), prefix with `_` — eslint is configured to ignore `_`-prefixed identifiers via `argsIgnorePattern`/`varsIgnorePattern`/`caughtErrorsIgnorePattern`. **Do NOT** add bare `// eslint-disable` for unused-vars; rename instead.
 - **Next.js 16 middleware is `proxy.ts`, not `middleware.ts`** — this repo renames it per Next.js 16 conventions. The function export is named `proxy`. Do not create `middleware.ts`; the build will fail if both files coexist.
 
-### Before opening a PR — `pnpm preflight`
+### Before a PR that changes `schema.prisma` — have the migration ready
 
-Run `pnpm preflight` before every PR. It mirrors the CI gates locally in one shot — `prisma generate` → typecheck → lint → collab schema → extensions → publishing schema/defaults → migration drift — and prints a PASS/FAIL summary so CI never surprises you. The **migration-drift** check (the one that catches "table added to `schema.prisma` but no migration written") needs a one-time local shadow DB; the script prints the exact `CREATE DATABASE` + `SHADOW_DATABASE_URL` setup if it's missing, then runs drift on every subsequent call. Green preflight = safe to open the PR.
+The only pre-PR concern beyond the normal gates is **migrations**: a PR that adds/changes a model in `schema.prisma` must ship the matching migration file, or the CI `drift` check fails. A PR with no schema changes has nothing to do here. Since `prisma/` is human-owned, the agent surfaces the ready migration (canonical SQL via `prisma migrate diff` + exact create-and-commit steps) when prepping such a PR. `pnpm preflight` (optional) runs the CI gates locally — including the drift check when `SHADOW_DATABASE_URL` points at a local shadow DB — and prints a PASS/FAIL summary; use it before a PR when you want the confirmation, not as a required step.
 
 ### Quality Gates — before declaring a task done
 
