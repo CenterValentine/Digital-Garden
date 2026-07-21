@@ -30,7 +30,10 @@ import {
 } from "@/lib/domain/flashcards";
 import type { ToolExecuteContext } from "./types";
 
-const CARD_BATCH_LIMIT = 10;
+// Raised from 10 for studio-path generation (folder → deck): the proposal
+// approval flow is the safety valve, not the batch size. Image/sound caps
+// below stay low — those run real generation calls at propose time.
+const CARD_BATCH_LIMIT = 40;
 // Identification-image cards are capped lower than text cards: each one runs a
 // real image-generation call at propose time (latency + cost).
 const IMAGE_CARD_LIMIT = 5;

@@ -16,8 +16,15 @@ export const peopleExtensionManifest: ExtensionManifest = {
       label: "People",
       title: "People",
       iconName: "Users",
-      order: 20,
+      order: 10,
     },
   ],
   surfaces: ["left-sidebar", "content-viewer"],
+  settings: {
+    path: "/settings/extensions/people",
+    label: "People",
+    title: "People",
+    description: "Browse people records, groups, and mounted content.",
+    order: 20,
+  },
 };

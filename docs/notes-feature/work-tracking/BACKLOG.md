@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-06-03
+last_updated: 2026-07-16
 ---
 
 # Sprint Backlog
@@ -7,6 +7,97 @@ last_updated: 2026-06-03
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
+
+Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
+
+- [ ] **Richer n8n run step view** — n8n run input carries no `graph`, so `RunGraphSteps` renders nothing (graceful). A per-engine step renderer (n8n node names from callbacks) is now unblocked, still deferred.
+- [ ] **Chooser pre-flight "not pushed" badge for n8n workflows** — read `metadata.webhookPath` (n8n spoke now in-tree); today the dispatch toast surfaces the clean ENGINE_ERROR instead.
+- [ ] **Per-user extension-disabled parity in bearer routes** — extension enable/disable state is client-side only; the chooser's empty state covers today. Revisit if server-side per-user extension settings land.
+- [ ] **Bottom-sheet chooser <768px** — N/A for the Chrome toolbar popup (desktop-only surface); mobile runs through the app's WorkflowsPanel. Recorded so nobody re-plans it.
+- [ ] **System notifications channel** — deliberately dropped in design (no `notifications` permission); revisit only on user demand.
+
+---
+
+## Folder Studio Followups (2026-07-16, branch `worktree-folder-studio`)
+
+Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the build:
+
+- [ ] **Option A — Studio as a folder view** (plan Phase 8 first half) — second mount of the existing StudioTab surfaces inside `FolderViewContainer`; registry-driven, no new logic. Deferred to land the working feature first; revisit Option C ("expand" tab) with usage evidence.
+- [ ] **Browser smoke + Playwright activation** — all studio surfaces are auth-gated; blocked on the shared e2e auth fixture (same blocker as workflows/flashcards specs). Manual smoke checklist in the PR body.
+- [ ] **Image sources vision pass** (plan Phase 2 item) — images currently resolve empty ("NO TEXT" flag flows honestly); wire a vision-model description pass + decide the `enableOCR` fallback flip.
+- [ ] **Custom report variants from ChatContext presets** — the variant-resolver contract supports it (`variants` as async resolver); wire `ChatContext` list → report tile flyout.
+- [ ] **Infographic diffusion mode** — the `image` variant of the infographic tool fails gracefully today; wire through `lib/domain/ai/image/` when prioritized.
+- [ ] **Per-conversation source-selection overrides** — v1 persists selection per (owner, folder) in `StudioSourceSelection`; the plan's original shape was per-conversation via `ConversationAssociation`. Add an override layer if folder-level proves too coarse.
+- [ ] **Study plan → daily notes** — plan wanted the FSRS study plan written into daily notes; v1 creates a folder note. Needs periodic-notes resolve integration.
+- [ ] **Wiki-links in generated artifacts render as literal `[[Title]]` text** — `markdownToTiptap` doesn't produce wikiLink nodes; add a post-conversion pass (or extend the converter) so generated Sources sections are real links.
+- [ ] **Schema drift debt (shared Neon dev DB)** — `AgenticMetadata`, `StudioSourceSelection`, `StudioGenerationRun` were created via targeted SQL because `prisma db push` wanted to drop another worktree's `ServiceToken` table; the auto-context V1 columns (`AgenticMetadata.contextDirty` + `summaryHash` + index) were added the same way. Before prod deploy: create proper migrations (`migrate dev --create-only`) and reconcile drift per `DATABASE-CHANGE-CHECKLIST.md`.
+- [x] ~~Auto-context: per-user daily spend ceiling~~ — SHIPPED 2026-07-16: `StudioContextSpend` (owner, UTC day, generationCalls) + `studio.dailyCallCap` setting (default 200, slider in Studio settings). Engine gate stack pre-checks and stops drains mid-way (`budgetExhausted`/`budgetStopped`); explicit right-click refresh 409s with a clear message; manual per-node Generate deliberately uncounted. Soft ceiling (concurrent drains may overshoot one per-run cap).
+- [ ] **Auto-context: budget surfacing in UI** — the ceiling is enforced + logged; consider a "budget used today" readout in Studio settings and a `budget-exhausted` variant of the aiContextStatus banner.
+- [x] ~~Auto-context: incremental roll-up patching (mechanism D)~~ — SHIPPED in V1.1 as anchored patching, used only when single-delta is PROVEN via hash substitution (see context-refresh.ts).
+- [ ] **Auto-context: dirty hooks for duplicate + upload finalize** — duplicate and file-upload finalize create children without flagging the parent's roll-up; on-access staleness (uncovered-node discovery) papers over it, but the bits should be set at the source like create/move/delete.
+- [x] ~~Auto-context: per-folder opt-out~~ — SHIPPED broader in V1.1 as per-NODE `contextOptOut` (toolbar eye toggle + Context panel checkbox); folders shield their subtree.
+- [ ] **Auto-context: SourcePicker opted-out badge** — SourceRow already carries `optedOut` (hard-excluded from defaults + assembly); the picker should render a small privacy badge so users see why a row can't be included.
+- [ ] **Auto-context: settle window configurability** — fixed at 10 min (SETTLE_MINUTES). Expose in Studio settings only if real usage wants it.
+
+## References-as-children Followups (2026-07-16)
+
+- [ ] **Folder main-panel views still list note-owned references** — ListView/Grid/Kanban query by parentId + `includeReferencedContent`, so a reference shown under its note in the TREE also appears in the folder view listing. Decide: filter note-owned references out of folder views (they're reachable via the note) or keep as a flat inventory.
+- [ ] **Drag-attached references don't parentId-cascade with the note** — the move route's reference cascade follows the ContentLink embed graph; a reference attached by drag (not embedded) keeps its old storage parentId when the note moves folders. Display is correct (ownedByNoteId), but storage home drifts. Extend the cascade to also cover `ownedByNoteId`-children.
+- [ ] **Reference ordering under a note** — displayOrder is folder-scoped, so sibling references under a note sort by their folder order; fine for small counts, revisit if per-note ordering matters.
+- [ ] **Referenced-content visual treatment under notes** — consider a subtle badge/dimming for reference rows now that they nest (they read like normal children today).
+- [ ] **Auto-context banner on Studio tab** — v1 surfaces the once-per-session unconfigured banner via the Context tab GET only; the Studio tab's compose/runs 409 toasts cover explicit actions. Consider a shared status probe if users miss it.
+- [ ] **Audio overview TTS voice override** — Studio inherits the global AI speech voice by design (inherit-with-override pattern); add the per-studio override field only if requested.
+- [ ] **Two-host audio + video overview** — postponed per plan Non-goals (Gemini multi-speaker TTS is the gap-filler candidate); video tile ships as a stub.
+- [ ] **Mobile bottom-nav chat routing** — decision of record (Phase 3): the bottom-nav AI icon keeps opening the GLOBAL chat; folder-scoped chat is reached via the Studio tab's button. Revisit only with usage evidence.
+
+---
+
+## Workflows Foundation Followups (2026-07-12, branch `feature/workflows-foundation`)
+
+Deferred by design from Plan 1 (see `WORKFLOWS-FOUNDATION-PLAN.md` session logs):
+
+- [x] ~~Soak: real BYOK AI + approve-path DOCX artifact~~ — **verified live by user 2026-07-12** ("Unknown application dossier.docx" produced end-to-end). Residual soak lesson folded into Plan 2 S5: URL-only dispatch vs JS-rendered job boards yields empty research; gate framing must adapt (no "0% fit" scored card on empty data).
+- [x] ~~Trigger nodes for Trellis~~ — **SHIPPED 2026-07-13**: `execution: "trigger"` class, exactly-one-entry validation, 8 types. WIRED: Manual (Run form), Page Capture (URL-pattern routing in the capture route), Called (sub-workflows). STUBBED FIRING (nodes+config real, automatic firing deferred): Content Event, Schedule, Periodic Note, Calendar Event, Inbox/Activity Event (targets real notification kinds). Remaining trigger-firing work below.
+- [ ] **Trigger firing wiring (the deferred half)** — automatic dispatch when a source event occurs. Per type: **Schedule** → `app/api/cron/` scan of schedule-triggered workflows (has cron infra). **Periodic Note** → hook `periodic-notes/resolve` post-create. **Content Event** → ContentNode create/update lifecycle hook. **Calendar Event** → calendar poll + lead-time queue. **Inbox/Activity Event** → hook `publishEvent()` to find + dispatch workflows whose `trigger-activity-event.kind` matches (events feature still maturing — wire when stable). Each finds matching workflow nodes and calls `dispatchWorkflowFromContent`. Loop-guard needed for activity triggers (workflow.* kinds already excluded from the targetable list).
+- [ ] **edit-content node (user-requested 2026-07-13)** — a step that edits an existing note's TipTap JSON (distinct from store-content which creates). Position strategies: append/prepend (easy), under-heading (Nth or by-text), after/replace-regex-match, after-keyword. **Idempotency is the hazard**: support a "managed region" mode (invisible marker pair, like periodic-summary blocks / the `<!-- tag:... -->` format) that the node REPLACES on re-run instead of appending — makes note-editing re-runnable and reversible. Operate structurally on the doc tree, never string-splice.
+- [ ] **"Open in chat" gate action** — conversation seeded from run output per AI-chat conventions; server side already accepts `conversationId` in the resume payload and links it. This is the doctor-the-resume loop's missing UI half.
+- [ ] **Inbox → run detail deep link** — notification renderers have no click-through; needs a navigate-to-extension-view affordance (open Workflows panel + select run).
+- [ ] **Dedicated `workflow-research` feature id** — AI steps currently reuse the "chat" feature's routing; add a registry entry if workflow AI should have its own model choice/fallbacks.
+- [ ] **Plan 3 (n8n spoke) — demoted by the 2026-07-12 builder pivot**: PAT auth, HTTP callback transport, `n8n-nodes-digital-garden`, engines settings panel. Only if the external-integration long tail outgrows the builder's `http-request` node. SUL licensing gate documented in the plan's licensing appendix.
+- [ ] **Run-state reconciliation sweeper** — engine-vs-table status drift safety net (cron comparing engineRunId state for stale `running` runs); the step-section try/catch pattern covers the known path, a sweeper covers unknown ones.
+- [ ] **Workflows Playwright specs** — stub per repo convention; blocked on the shared e2e auth fixture.
+- [ ] **`WorkflowRunEvent` retention/pruning** — not needed at current scale; revisit with usage.
+
+---
+
+## Connections / Notifications / DM Followups (2026-07-10)
+
+Deferred by design from the connections-inbox feature (branch `worktree-connections-inbox`); the architecture has explicit seams for each:
+
+- [ ] **SSE/pub-sub transport upgrade** — replace `createPollingTransport()` (`lib/features/notifications/transport.ts`) when real-time latency matters; callers depend only on the `NotificationTransport` interface. Needs a pub/sub backing (Redis/Upstash) or the Cloud Run service — serverless SSE alone still polls the DB server-side.
+- [ ] **Partial unique index on `NotificationRecipient(userId, collapseKey)`** — closes the coalescing race (two concurrent DM sends can create two unread rows). Needs raw SQL migration (`WHERE readAt IS NULL AND archivedAt IS NULL`); harmless dupes at current scale.
+- [ ] **Signup-time invite resolver** — invites to not-yet-registered emails never resolve today; on account creation, match `ConnectionInvite.inviteeIdentifier` and backfill `inviteeUserId` + publish the notification.
+- [ ] **Activate inbox Playwright stubs** (`tests/e2e/inbox/inbox.spec.ts`) — blocked on the e2e auth fixture; `scripts/seed-smoke-users.ts` mints session tokens and is the building block.
+- [ ] **Shared-folder sharing events** — the original motivation for the event-log architecture: new kinds (`share.grant`, `share.revoke`) + `ViewGrant` integration, gated on connections via `areConnected()`.
+- [ ] **Email digest channel** — daily unread-summary email via the existing cron pattern + per-kind preferences already in settings.
+- [ ] **`Person.linkedUserId`** — link People-extension contacts to connected accounts (auto-materialize a Person card on connection accept).
+- [ ] **Migration-chain repair (pre-existing)** — `prisma migrate dev` fails shadow-DB replay at `20260608120000_backfill_tenancy_drift_columns` (P3006: `TenantHost` table missing). Unrelated to this feature; `migrate deploy` unaffected. Worth a `migrate resolve`/baseline pass.
+
+---
+
+## Settings Reorg Followups (2026-07-10, branch `feat/settings-reorg`)
+
+The settings surface was reorganized (grouped sidebar IA, extension settings consolidated under `/settings/extensions/[id]`, Preferences dissolved into Appearance + Editor & Files, hybrid instant/explicit save via `components/settings/ui/` primitives). Deferred items:
+
+- [ ] **Orphaned settings schema cleanup** — `settings.files`, `settings.search`, `settings.editor`, and `settings.ui.panelLayout` exist in the backend blob but the wired sources of truth are `upload-settings-store`, `search-store`, nothing, and `panel-store` respectively. Either migrate those stores into the blob (cross-device sync) or prune the dead schema sections. The reorg deliberately kept reads/writes on the wired paths.
+- [ ] **Auth fixture for settings visual coverage** — `tests/e2e/dark-mode/settings-routes.spec.ts` has skipped light+dark screenshot specs for all 19 settings routes; they activate once `tests/e2e/_fixtures/auth.ts` lands.
+- [ ] **Glass-button retirement in AI sub-pages** — `AIConnectionsPage`, `AIFeatureRoutingPage`, and `ConnectionUsageCard` still import `@/components/ui/glass/button` (~20 buttons; deliberately not blind-swapped). Migrate to `@/components/client/ui/button` with per-button variant review.
+- [ ] **Settings search** — a `Command`-based filter box in the settings sidebar (stretch goal from the reorg plan, skipped).
+- [ ] **Pre-existing Playwright failures (not from the reorg)** — signed-out home spec has a strict-mode violation (3 "Sign in" links match one locator); habit-tracker and daily-summary block snapshots are date-dependent and drift with the current month. Both fail on `main` too.
 
 ---
 

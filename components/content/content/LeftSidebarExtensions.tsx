@@ -1,7 +1,5 @@
 "use client";
 
-import { CheckCircle2, Loader2, Puzzle } from "lucide-react";
-import { useState } from "react";
 import Link from "next/link";
 import {
   renderExtensionIcon,
@@ -9,12 +7,14 @@ import {
 import {
   useAllExtensionManifests,
   useRenderExtensionSettingsDialog,
-  useSetExtensionEnabled,
 } from "@/lib/extensions/client-registry";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionsUiStore } from "@/state/extensions-ui-store";
-import { Switch } from "@/components/client/ui/switch";
+import {
+  ExtensionEnabledBadge,
+  ExtensionEnableToggle,
+} from "@/components/settings/extensions/ExtensionEnableControl";
 import {
   Dialog,
   DialogContent,
@@ -34,8 +34,6 @@ export function LeftSidebarExtensions() {
   const openExtensionDialog = useExtensionsUiStore((state) => state.openExtensionDialog);
   const closeExtensionDialog = useExtensionsUiStore((state) => state.closeExtensionDialog);
   const extensions = useAllExtensionManifests();
-  const setExtensionEnabled = useSetExtensionEnabled();
-  const [pendingToggleExtensionId, setPendingToggleExtensionId] = useState<string | null>(null);
   const activationOverrides = useExtensionActivationStore((state) => state.overrides);
   const isExtensionEnabled = (extensionId: string) =>
     activationOverrides[extensionId] ??
@@ -57,30 +55,21 @@ export function LeftSidebarExtensions() {
   const selectedPrimaryNavItem =
     dialogExtension?.navItems.find((item) => item.type !== "action") ?? null;
 
-  const handleToggleExtension = async (extensionId: string, enabled: boolean) => {
-    setPendingToggleExtensionId(extensionId);
-    await new Promise((resolve) => window.setTimeout(resolve, 150));
-    setExtensionEnabled(extensionId, enabled);
-    await new Promise((resolve) => window.setTimeout(resolve, 450));
-    setPendingToggleExtensionId((current) =>
-      current === extensionId ? null : current
-    );
-  };
-
   return (
     <>
-      <div className="flex h-full min-h-0 flex-col p-4">
-        <div className="mb-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <Puzzle className="h-5 w-5 text-gold-primary" />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Extensions</h3>
-          </div>
+      <div className="flex h-full min-h-0 flex-col">
+        {/* Header — inbox-navigator theme: tracked label + subheader, with
+            the divider line running beneath BOTH (2026-07-16). */}
+        <div className="shrink-0 border-b border-black/10 px-3 py-3 dark:border-white/10">
+          <p className="text-xs uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
+            Extensions
+          </p>
           <p className="mt-1 text-xs text-gray-600 dark:text-gray-400">
             {enabledCount} built-in extension{enabledCount === 1 ? "" : "s"}.
           </p>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 pr-2">
           <div className="grid auto-rows-[minmax(8.5rem,auto)] grid-cols-2 content-start gap-3">
             {extensions.map((extension) => {
               const isSelected = selectedExtension?.id === extension.id;
@@ -99,7 +88,8 @@ export function LeftSidebarExtensions() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-current/20 bg-current/10">
                     {renderExtensionIcon(extension.iconName, "h-6 w-6")}
                   </div>
-                  <span className="max-w-full truncate text-sm font-semibold">
+                  {/* Wrap before truncating — clamp only after two lines */}
+                  <span className="line-clamp-2 max-w-full break-words text-sm font-semibold leading-tight">
                     {extension.label}
                   </span>
                   <span className="text-[11px] text-gray-500 dark:text-gray-400">
@@ -131,16 +121,7 @@ export function LeftSidebarExtensions() {
                       <DialogTitle className="truncate text-xl font-semibold">
                         {dialogExtension.label}
                       </DialogTitle>
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] ${
-                          dialogExtensionEnabled
-                            ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:border-emerald-400/20 dark:bg-emerald-400/10 dark:text-emerald-200"
-                            : "border border-black/10 dark:border-white/10 bg-black/[0.04] dark:bg-white/5 text-gray-600 dark:text-gray-300"
-                        }`}
-                      >
-                        <CheckCircle2 className="h-3 w-3" />
-                        {dialogExtensionEnabled ? "Enabled" : "Disabled"}
-                      </span>
+                      <ExtensionEnabledBadge extensionId={dialogExtension.id} />
                     </div>
                     <DialogDescription className="mt-1 text-sm text-gray-600 dark:text-gray-400">
                       {dialogExtension.description ??
@@ -148,26 +129,7 @@ export function LeftSidebarExtensions() {
                     </DialogDescription>
                   </div>
                   <div className="mr-3 flex shrink-0 items-center self-center">
-                    {dialogExtension.canDisable ? (
-                      <div className="flex items-center gap-2 rounded-full border border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-white/[0.03] px-3 py-1.5">
-                        <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
-                          {pendingToggleExtensionId === dialogExtension.id
-                            ? "Updating..."
-                            : "Enabled"}
-                        </span>
-                        {pendingToggleExtensionId === dialogExtension.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin text-gray-700 dark:text-gray-300" />
-                        ) : null}
-                        <Switch
-                          checked={dialogExtensionEnabled}
-                          disabled={pendingToggleExtensionId === dialogExtension.id}
-                          onCheckedChange={(checked) =>
-                            void handleToggleExtension(dialogExtension.id, checked)
-                          }
-                          aria-label={`${dialogExtensionEnabled ? "Disable" : "Enable"} ${dialogExtension.label}`}
-                        />
-                      </div>
-                    ) : null}
+                    <ExtensionEnableToggle extensionId={dialogExtension.id} />
                     {selectedPrimaryNavItem && dialogExtensionEnabled ? (
                       <button
                         type="button"

@@ -179,7 +179,7 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
               follow-ups feature row above because the model lives there
               but the prompt's value belongs in user settings. */}
           <section
-            className="rounded-xl border border-white/10 p-4 space-y-3"
+            className="rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3"
             style={{ background: glass0.background }}
           >
             <div>
@@ -201,7 +201,7 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
               rows={3}
               maxLength={600}
               placeholder="What should the follow-up suggestions focus on?"
-              className="w-full resize-y rounded-md border border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-blue-400/40 focus:outline-none"
+              className="w-full resize-y rounded-md border border-black/10 dark:border-white/10 bg-black/20 px-3 py-2 text-sm text-white placeholder:text-gray-500 focus:border-blue-400/40 focus:outline-none"
             />
             <div className="flex items-center justify-between gap-3">
               <span className="text-[11px] text-gray-500">
@@ -274,7 +274,7 @@ function FeatureRow({
   );
 
   return (
-    <li className="rounded-xl border border-white/10 p-4 space-y-3" style={{ background: glass0.background }}>
+    <li className="rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3" style={{ background: glass0.background }}>
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
@@ -285,6 +285,14 @@ function FeatureRow({
             ))}
           </div>
           <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
+          {feature.settingsHref && (
+            <Link
+              href={feature.settingsHref.href}
+              className="mt-1 inline-block text-xs text-gold-primary underline underline-offset-2 hover:text-gold-primary/80"
+            >
+              {feature.settingsHref.label} →
+            </Link>
+          )}
         </div>
       </div>
 
@@ -303,7 +311,7 @@ function FeatureRow({
             const model = conn?.models.find((m) => m.id === entry.modelId);
             const label = conn && model ? `${conn.label} • ${model.name}` : "(connection or model missing)";
             return (
-              <li key={`${entry.connectionId}-${entry.modelId}-${i}`} className="flex items-center gap-2 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5">
+              <li key={`${entry.connectionId}-${entry.modelId}-${i}`} className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-2.5 py-1.5">
                 <span className="text-[10px] uppercase tracking-wider text-gray-500 w-14 shrink-0">
                   {i === 0 ? "Primary" : `Backup ${i}`}
                 </span>
@@ -378,7 +386,7 @@ function AddRouteRow({
       <select
         value={selected}
         onChange={(e) => setSelected(e.target.value)}
-        className="flex-1 rounded-lg border border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-white/30"
+        className="flex-1 rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-black/30 dark:border-white/30"
       >
         <option value="">Add a route…</option>
         {options.map((o) => (

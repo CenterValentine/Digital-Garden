@@ -31,6 +31,11 @@ import {
   SPEED_READER_OPEN_EVENT,
   type SpeedReaderOpenEventDetail,
 } from "@/extensions/speed-reader/events";
+import { LampDesk } from "lucide-react";
+import { STUDIO_EXTENSION_ID } from "@/extensions/studio/manifest";
+import { AiContextToggleButton } from "@/extensions/studio/components/AiContextToggleButton";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
+import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 
 /** Content types whose own text the toolbar "Listen" can narrate. */
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
@@ -149,6 +154,19 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
   const browserBookmarksEnabled = useIsExtensionEnabled(BROWSER_BOOKMARKS_EXTENSION_ID);
   const showSendToTab = browserBookmarksEnabled && !!sourceContentId;
 
+  // Folder Studio shortcut — folders only. Expands the right sidebar if
+  // collapsed and lands on the Studio tab (speed-reader button pattern).
+  const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+  const setRightPanelCollapsed = useRightPanelCollapseStore((s) => s.setCollapsed);
+  const setRightSidebarTab = useRightSidebarStateStore((s) => s.setActiveTab);
+  const showStudio =
+    studioEnabled && !!sourceContentId && activeContentType === "folder";
+  const openStudio = useCallback(() => {
+    if (!sourceContentId) return;
+    setRightPanelCollapsed(false);
+    setRightSidebarTab(sourceContentId, "studio");
+  }, [sourceContentId, setRightPanelCollapsed, setRightSidebarTab]);
+
   const openSpeedReader = useCallback(() => {
     if (!sourceContentId) return;
     window.dispatchEvent(
@@ -164,7 +182,8 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     !showPublishPill &&
     !canReadAloud &&
     !showSpeedRead &&
-    !showSendToTab
+    !showSendToTab &&
+    !showStudio
   ) {
     return null;
   }
@@ -177,6 +196,11 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
     >
       {showPublishPill && (
         <PublishStatusPill contentId={sourceContentId} />
+      )}
+      {/* AI-context privacy toggle — any content type; sits where the old
+          publishing eye lived so "eye = who can read this" stays intuitive */}
+      {studioEnabled && !!sourceContentId && (
+        <AiContextToggleButton contentId={sourceContentId} />
       )}
       {canReadAloud && (
         <ReadAloudButton
@@ -206,6 +230,17 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
           </button>
         );
       })}
+      {/* Folder Studio — folders only; opens the Studio sidebar tab */}
+      {showStudio && (
+        <button
+          onClick={openStudio}
+          className="flex shrink-0 items-center gap-1.5 rounded-md px-1.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          title="Open Folder Studio"
+          type="button"
+        >
+          <LampDesk className="h-4 w-4" />
+        </button>
+      )}
       {/* Speed Read — positioned before import/export (orders 75+) */}
       {showSpeedRead && (
         <button

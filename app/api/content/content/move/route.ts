@@ -7,6 +7,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";
@@ -50,6 +52,8 @@ export async function POST(request: NextRequest) {
               id: true,
               ownerId: true,
               parentId: true,
+              role: true,
+              ownedByNoteId: true,
               children: { select: { id: true } },
             },
           });
@@ -88,6 +92,18 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // References may re-home under a NOTE (display parentage via
+      // ownedByNoteId; storage parentId follows the note's folder). Primary
+      // content keeps the folder-only rule — deliberately not Notion.
+      // `undefined` = leave ownership unchanged; null = detach from note.
+      let ownerNoteUpdate: string | null | undefined = undefined;
+      let storageTargetParentId = targetParentId;
+
+      // Dropping a reference at ROOT detaches it from its note.
+      if (targetParentId === null && content.role === "referenced") {
+        ownerNoteUpdate = null;
+      }
+
       // Validate target parent
       if (targetParentId !== null && targetParentId !== undefined) {
         const targetParent = await prisma.contentNode.findUnique({
@@ -96,6 +112,7 @@ export async function POST(request: NextRequest) {
             id: true,
             ownerId: true,
             contentType: true,
+            parentId: true,
           },
         });
 
@@ -120,16 +137,31 @@ export async function POST(request: NextRequest) {
         }
 
         if (targetParent.contentType !== "folder") {
-          return NextResponse.json(
-            {
-              success: false,
-              error: {
-                code: "VALIDATION_ERROR",
-                message: "Cannot move content into a non-folder item",
+          const isReferenceToNote =
+            content.role === "referenced" &&
+            targetParent.contentType === "note";
+          if (!isReferenceToNote) {
+            return NextResponse.json(
+              {
+                success: false,
+                error: {
+                  code: "VALIDATION_ERROR",
+                  message: "Cannot move content into a non-folder item",
+                },
               },
-            },
-            { status: 400 }
-          );
+              { status: 400 }
+            );
+          }
+          // Re-home the reference under this note; its storage home is the
+          // note's folder so parentId invariants (paths, cascades, folder
+          // scans) stay intact.
+          ownerNoteUpdate = targetParent.id;
+          storageTargetParentId = targetParent.parentId;
+        } else if (content.role === "referenced") {
+          // Explicit drop into a folder detaches the reference from its
+          // note — it becomes folder-level referenced content, adjacent to
+          // primary content.
+          ownerNoteUpdate = null;
         }
 
         if (targetParentId === contentId) {
@@ -160,8 +192,12 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Determine the final parent
-      const finalParentId = targetParentId === undefined ? content.parentId : targetParentId;
+      // Determine the final parent (storage home — a reference dropped onto
+      // a note stores under the note's folder, displays under the note)
+      const finalParentId =
+        storageTargetParentId === undefined
+          ? content.parentId
+          : storageTargetParentId;
 
       const updated = await withSpan(
         { layer: "tree", name: "move" },
@@ -189,6 +225,37 @@ export async function POST(request: NextRequest) {
           return result;
         },
       );
+
+      // Apply the reference-ownership change decided above (re-home under a
+      // note, or detach on an explicit folder/root drop).
+      if (
+        ownerNoteUpdate !== undefined &&
+        ownerNoteUpdate !== content.ownedByNoteId
+      ) {
+        await prisma.contentNode.update({
+          where: { id: contentId },
+          data: { ownedByNoteId: ownerNoteUpdate },
+        });
+      }
+
+      // Detached reference that is STILL EMBEDDED in a live note: the tree's
+      // embed-graph ownership fallback will re-nest it under that note on the
+      // next fetch. Tell the client so it can snap back visibly (short delay
+      // + explanatory toast) instead of silently reverting on a later
+      // refresh. Non-embedded references detach freely — this stays null.
+      let stillReferencedBy: { id: string; title: string } | null = null;
+      if (ownerNoteUpdate === null) {
+        const liveEmbed = await prisma.contentLink.findFirst({
+          where: {
+            targetId: contentId,
+            linkType: { in: ["image-ref", "audio-ref"] },
+            source: { deletedAt: null },
+          },
+          orderBy: { createdAt: "asc" },
+          select: { source: { select: { id: true, title: true } } },
+        });
+        if (liveEmbed) stillReferencedBy = liveEmbed.source;
+      }
 
       // Update materialized path
       await updateMaterializedPath(contentId);
@@ -232,12 +299,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Folder Studio auto-context: a cross-parent move changes BOTH
+      // parents' roll-up inputs. Same-parent reorders don't — child order
+      // isn't part of the folder source hash.
+      if (finalParentId !== content.parentId) {
+        after(() => markContextDirty([content.parentId, finalParentId]));
+      }
+
       return NextResponse.json({
         success: true,
         data: {
           id: updated.id,
           parentId: updated.parentId,
           displayOrder: updated.displayOrder,
+          stillReferencedBy,
           message: "Content moved successfully",
         },
       });

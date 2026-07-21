@@ -23,13 +23,14 @@ import { prisma } from "@/lib/database/client";
 import { CONTENT_WITH_PAYLOADS } from "@/lib/domain/content";
 import { EmbedContentClient } from "./EmbedContentClient";
 import { EmbedViewerShell } from "./EmbedViewerShell";
+import { EmbedWorkflowClient } from "./EmbedWorkflowClient";
 import { EmbedFallback } from "./EmbedFallback";
 import { FileViewer } from "@/components/content/viewer/FileViewer";
 import { FolderViewer } from "@/components/content/viewer/FolderViewer";
 import { ExternalViewer } from "@/components/content/viewer/ExternalViewer";
 
 type Params = Promise<{ id: string }>;
-type SearchParams = Promise<{ _t?: string }>;
+type SearchParams = Promise<{ _t?: string; run?: string }>;
 
 export default async function EmbedContentPage({
   params,
@@ -140,6 +141,20 @@ export default async function EmbedContentPage({
               cached?: Record<string, unknown>;
             }) ?? {}
           }
+        />
+      </EmbedViewerShell>
+    );
+  }
+
+  // ── Workflow (deep supervise / tweak surface for the browser extension) ──────
+  if (contentType === "workflow") {
+    const { run } = await searchParams;
+    return (
+      <EmbedViewerShell>
+        <EmbedWorkflowClient
+          contentId={content.id}
+          slug={`content:${content.id}`}
+          initialRunId={run}
         />
       </EmbedViewerShell>
     );

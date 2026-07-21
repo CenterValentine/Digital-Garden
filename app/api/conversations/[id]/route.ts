@@ -59,6 +59,8 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       if (body.title !== undefined) patch.title = body.title;
       if (body.activeContextId !== undefined)
         patch.activeContextId = body.activeContextId;
+      if (body.targetFolderId !== undefined)
+        patch.targetFolderId = body.targetFolderId;
 
       const summary = await updateConversation(session.user.id, id, patch);
       return NextResponse.json({ success: true, data: summary });

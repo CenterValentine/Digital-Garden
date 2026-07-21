@@ -19,6 +19,11 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { queryTools } from "@/lib/domain/tools";
 import type { ToolDefinition, ContentType } from "@/lib/domain/tools";
 import { getExtensionManifestForView } from "@/lib/extensions";
+import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
+import {
+  STUDIO_EXTENSION_ID,
+  STUDIO_TAB_KEY,
+} from "@/extensions/studio/manifest";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
 /** Inline SVG paths keyed by tabKey (project pattern: inline SVG in headers) */
@@ -33,6 +38,12 @@ const TAB_SVG_PATHS: Record<string, string> = {
     "M8 2v4M16 2v4M3 10h18M5 6h14a2 2 0 012 2v11a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2z",
   publish:
     "M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9",
+  // Desk lamp (lucide LampDesk) — studio's study-room identity; the old
+  // sparkles glyph was overloaded across AI surfaces.
+  studio:
+    "M14 5l-3 3l2 7l8-8l-7-2Z M14 5l-3 3l-3-3l3-3l3 3Z M9.5 6.5L4 12l3 6 M3 22v-2c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v2H3Z",
+  context:
+    "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
 };
 
 /** Tab titles keyed by tabKey */
@@ -44,6 +55,8 @@ const TAB_TITLES: Record<string, string> = {
   properties: "Block Properties",
   extension: "Extension",
   publish: "Publish",
+  studio: "Studio",
+  context: "Context",
 };
 
 interface RightSidebarHeaderProps {
@@ -71,11 +84,16 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
       } as ToolDefinition)
     : null;
 
-  // Get visible tabs from registry, filtered by current content type
+  const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
+
+  // Get visible tabs from registry, filtered by current content type.
+  // The Studio tab disappears when the extension is disabled (registry-
+  // filter rule — same mechanism ContentToolbar uses for speed-reader).
+  // Context stays: its links/tags sub-tabs are core surfaces.
   const registryTabs = queryTools({
     surface: "sidebar-tab",
     contentType: (selectedContentType as ContentType) ?? undefined,
-  });
+  }).filter((tool) => studioEnabled || tool.tabKey !== STUDIO_TAB_KEY);
 
   const tabs = [...registryTabs];
   if (extensionTool) {

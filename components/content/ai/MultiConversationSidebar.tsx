@@ -28,6 +28,7 @@ import { useAIChatStore } from "@/state/ai-chat-store";
 import { useContentStore } from "@/state/content-store";
 import { useConversationCacheStore } from "@/state/conversation-cache-store";
 import { buildSurfaceBackground } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 
 interface Props {
@@ -50,6 +51,7 @@ export function MultiConversationSidebar({ contentId }: Props) {
     (s) => s.setActiveModelSelection,
   );
   const activeProviderId = sessionProviderId ?? defaultProviderId;
+  const resolvedTheme = useResolvedTheme();
 
   // ─── Cache store: tabs come from the shared store, kept in sync via
   // the SSE event bus (no more prop-drilled `onTitleChanged` reloads). ──
@@ -335,6 +337,7 @@ export function MultiConversationSidebar({ contentId }: Props) {
   const surfaceBackground = buildSurfaceBackground(
     activeProviderId ?? null,
     [(activeProviderId ?? "anthropic") as AIProviderId],
+    resolvedTheme,
   );
 
   // Tabs not yet known for this content → show a skeleton, NOT the empty
@@ -352,18 +355,18 @@ export function MultiConversationSidebar({ contentId }: Props) {
         aria-busy="true"
         aria-label="Loading conversations"
       >
-        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-white/10 px-3">
-          <div className="h-5 w-24 animate-pulse rounded bg-white/10" />
-          <div className="h-5 w-16 animate-pulse rounded bg-white/5" />
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-black/10 dark:border-white/10 px-3">
+          <div className="h-5 w-24 animate-pulse rounded bg-black/10 dark:bg-white/10" />
+          <div className="h-5 w-16 animate-pulse rounded bg-black/5 dark:bg-white/5" />
         </div>
         <div className="min-h-0 flex-1 space-y-3 p-4">
-          <div className="h-4 w-1/2 animate-pulse rounded bg-white/5" />
-          <div className="ml-auto h-16 w-3/4 animate-pulse rounded-lg bg-white/10" />
-          <div className="h-20 w-4/5 animate-pulse rounded-lg bg-white/5" />
-          <div className="ml-auto h-12 w-2/3 animate-pulse rounded-lg bg-white/10" />
+          <div className="h-4 w-1/2 animate-pulse rounded bg-black/5 dark:bg-white/5" />
+          <div className="ml-auto h-16 w-3/4 animate-pulse rounded-lg bg-black/10 dark:bg-white/10" />
+          <div className="h-20 w-4/5 animate-pulse rounded-lg bg-black/5 dark:bg-white/5" />
+          <div className="ml-auto h-12 w-2/3 animate-pulse rounded-lg bg-black/10 dark:bg-white/10" />
         </div>
-        <div className="h-12 shrink-0 border-t border-white/10 p-2">
-          <div className="h-8 w-full animate-pulse rounded-lg bg-white/5" />
+        <div className="h-12 shrink-0 border-t border-black/10 dark:border-white/10 p-2">
+          <div className="h-8 w-full animate-pulse rounded-lg bg-black/5 dark:bg-white/5" />
         </div>
       </div>
     );
@@ -375,6 +378,11 @@ export function MultiConversationSidebar({ contentId }: Props) {
     <div
       className="flex h-full flex-col"
       style={{ background: surfaceBackground }}
+      // useResolvedTheme has no `window` during SSR and returns "light", so
+      // the server paints the light gradient while the client paints dark.
+      // The client value is correct and wins on the next render; suppress the
+      // unavoidable first-paint attribute diff rather than warn on every mount.
+      suppressHydrationWarning
     >
       <div className="relative">
         <SidebarChatTabs
@@ -432,7 +440,9 @@ export function MultiConversationSidebar({ contentId }: Props) {
 
       {creatingNew && (
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-          <div className="text-xs text-gray-300">Creating chat…</div>
+          <div className="rounded-md bg-black/60 px-2.5 py-1 text-xs text-gray-100">
+            Creating chat…
+          </div>
         </div>
       )}
     </div>

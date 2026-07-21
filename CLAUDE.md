@@ -294,7 +294,9 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 ### Collaboration Architecture
 
-**Transport:** Hocuspocus server hosted on Google Cloud Run (not local). Do not check port 1234 or suggest `pnpm dev:collab` for production testing.
+**Transport:** Hocuspocus runs on Google Cloud Run in **production**. **Local dev now REQUIRES a local Hocuspocus** (`pnpm dev:collab`, ws://localhost:1234) — the dev database moved to local Docker Postgres, and the hosted server authorizes documents against Neon, so it cannot see locally-created content (symptom: "Live collaboration authentication could not be completed" on every note). Run `pnpm dev:collab` **from the same checkout as the dev server** (it loads that directory's `.env.local` and TipTap schema), and set `NEXT_PUBLIC_HOCUSPOCUS_URL=ws://localhost:1234` — never `0.0.0.0` (a bind address; browsers can't connect to it).
+
+**Deploying Hocuspocus:** `gcloud builds submit --config cloudbuild.hocuspocus.yaml .` ships **the current working directory**. With multiple worktrees at different commits, always deploy from a checkout at `origin/main` — verify with `git rev-list --count HEAD..origin/main` returning `0` first. Note `uptimeMs` from `/readyz` measures time since the last cold start (`min-instances=0`), **not** time since deploy — never infer staleness from it; use `gcloud builds list` instead.
 
 **Y.js document storage:** `CollaborationDocument` Prisma table stores binary `ydocState`. On load, the server bootstraps from TipTap JSON if no Y.js state exists. Presence (awareness) state is persisted to Postgres to handle Vercel serverless split.
 
@@ -541,9 +543,12 @@ Extensions are expensive: a new manifest, client runtime, optional server runtim
 ### Adding a New Extension Module (not exhaustive yet, do your own evaluation of scope and update this checklist as needed)
 
 1. Create `extensions/<name>/manifest.ts`, `client.tsx`, and (if needed) `server-runtime.ts`
-2. Register in `lib/extensions/installed.ts`
+2. Register in **both** extension lists — they are intentionally separate (installed.ts bundles client runtimes so it can't be imported from Server Components; manifests.ts is server-safe data). The **`pnpm extensions:check` gate** (in `build`) enforces they stay in sync, so a miss fails the build with a clear message rather than shipping silently:
+   - `lib/extensions/installed.ts` → `BUILT_IN_EXTENSIONS` (runtime: panels, content viewers, slash commands, `settingsDialog`).
+   - `lib/extensions/manifests.ts` → `ALL_EXTENSION_MANIFESTS` (server-safe manifest; drives `EXTENSION_IDS`, which the `/settings/extensions/[id]` route uses to validate ids). **Miss this and the extension's settings page 404s to the public site** even though its runtime works fine — the sidebar entry renders (it reads the runtime registry) but the route calls `notFound()`. (Bit the workflows extension, PR #103 → fixed 2026-07-14; the gate exists so it can't recur.) The gate also asserts each manifest's `iconName` resolves in `lib/extensions/icons.tsx` (an unmapped name silently renders the Puzzle fallback).
 3. Shell UI contributions go through runtime shell slots — do not import extension UI directly into shared components
 4. Content viewer: if the extension owns rendering for a specific content type, declare the matcher in `client.tsx`
+5. Settings body (optional): register a `settingsDialog` component in the runtime (`client.tsx`) to fill `/settings/extensions/<id>` and the Extensions dialog — one component, two mounts. Render `SettingSection` cards only; the shell provides the `SettingsPage` frame (title/toggle).
 
 ### Database Workflows
 

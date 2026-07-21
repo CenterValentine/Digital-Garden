@@ -14,14 +14,17 @@
 "use client";
 
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
+import { usePathname } from "next/navigation";
 import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
+import { TargetFolderChip } from "./TargetFolderChip";
 import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -81,6 +84,32 @@ interface ChatPanelProps {
   onTransientPromoted?: (newConversationId: string) => void;
 }
 
+/**
+ * Browser side panel only: the last target folder the user picked there.
+ * App chats derive their target from the content they're rooted to, but a
+ * browser chat has no such root — remembering the pick is what keeps it
+ * placeful across pages and sessions (BROWSER-REACH decision #7).
+ */
+const PANEL_TARGET_KEY = "dg-panel-target-folder";
+
+function readRememberedPanelTarget(): {
+  id: string;
+  title: string | null;
+} | null {
+  try {
+    const raw = localStorage.getItem(PANEL_TARGET_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { id?: unknown; title?: unknown };
+    if (typeof parsed?.id !== "string") return null;
+    return {
+      id: parsed.id,
+      title: typeof parsed.title === "string" ? parsed.title : null,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export function ChatPanel({
   contentId,
   conversationId,
@@ -136,6 +165,7 @@ export function ChatPanel({
     stop,
     error,
     setMessages,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -189,7 +219,13 @@ export function ChatPanel({
   // memory) — shared with the full-page ChatViewer via this hook so both
   // surfaces operate on the SAME Conversation store. `persistRef` is the
   // ref the engine's onFinish closes over; the hook populates it.
-  const { loadingInitial, initialActiveContextId } = useConversationBinding({
+  const {
+    loadingInitial,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+    initialTargetLocation,
+  } = useConversationBinding({
     conversationId: conversationId ?? null,
     messages,
     setMessages: setMessages as (messages: unknown) => void,
@@ -210,6 +246,138 @@ export function ChatPanel({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation; user
+  // changes persist via PATCH (owner+is-folder validated server-side).
+  // Browser side panel gets target persistence the app doesn't need.
+  const chatPathname = usePathname();
+  const isPanelEmbed = chatPathname?.startsWith("/embed/panel") ?? false;
+
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
+
+  // Location fallback (v3 ship fix, 2026-07-18): the service can only
+  // infer location for content-bound (full-page) conversations — sidebar
+  // chats have no archived chat node, and just-created conversations skip
+  // the initial load entirely, so new chats showed BLANK targets. "Chats
+  // serve their location": derive it from the open content — a folder is
+  // its own location, anything else locates to its parent. Keyed on
+  // contentId, so moving the chat/content re-derives it naturally.
+  const [locationFallback, setLocationFallback] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  useEffect(() => {
+    setLocationFallback(null);
+    if (!contentId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/content/content/${encodeURIComponent(contentId)}`,
+          { credentials: "include" },
+        );
+        if (!res.ok || cancelled) return;
+        const body = (await res.json()) as {
+          data?: {
+            contentType?: string;
+            title?: string | null;
+            parentId?: string | null;
+          };
+        };
+        const node = body?.data;
+        if (!node || cancelled) return;
+        if (node.contentType === "folder") {
+          setLocationFallback({ id: contentId, title: node.title ?? null });
+          return;
+        }
+        if (!node.parentId) return;
+        const parentRes = await fetch(
+          `/api/content/content/${encodeURIComponent(node.parentId)}`,
+          { credentials: "include" },
+        );
+        if (!parentRes.ok || cancelled) return;
+        const parentBody = (await parentRes.json()) as {
+          data?: { title?: string | null };
+        };
+        if (cancelled) return;
+        setLocationFallback({
+          id: node.parentId,
+          title: parentBody?.data?.title ?? null,
+        });
+      } catch {
+        // Best-effort — an unresolved location just leaves the chip
+        // untargeted; the server route has its own fallback for tools.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contentId]);
+
+  const effectiveLocation = initialTargetLocation ?? locationFallback;
+  useEffect(() => {
+    if (initialTargetFolder) {
+      setTargetFolder(initialTargetFolder);
+      setTargetInherited(initialTargetInherited);
+    } else if (effectiveLocation) {
+      // No explicit target: inherit the chat's location instead of
+      // rendering blank.
+      setTargetFolder(effectiveLocation);
+      setTargetInherited(true);
+    } else if (isPanelEmbed) {
+      // Browser panel: no conversation and nothing to inherit from, so fall
+      // back to the last target the user picked here. Browser chats aren't
+      // rooted in content the way app chats are — the panel's remembered
+      // target is what makes them placeful.
+      const remembered = readRememberedPanelTarget();
+      setTargetFolder(remembered);
+      setTargetInherited(false);
+    } else {
+      setTargetFolder(null);
+      setTargetInherited(false);
+    }
+  }, [initialTargetFolder, initialTargetInherited, effectiveLocation, isPanelEmbed]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      // Browser panel only: remember the pick so the next chat opened in the
+      // side panel starts already targeted. The app's own chats keep deriving
+      // their target from the content they're rooted to.
+      if (isPanelEmbed) {
+        try {
+          if (next) {
+            localStorage.setItem(PANEL_TARGET_KEY, JSON.stringify(next));
+          } else {
+            localStorage.removeItem(PANEL_TARGET_KEY);
+          }
+        } catch {
+          // Storage unavailable in a partitioned iframe — selection still
+          // applies for this session.
+        }
+      }
+      // Explicit pick overrides inheritance; clearing an override falls
+      // back to the location-inferred target (chats serve their location).
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(effectiveLocation);
+        setTargetInherited(Boolean(effectiveLocation));
+      }
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId, effectiveLocation, isPanelEmbed],
+  );
 
   // Change handler: update local state immediately (drives the engine body)
   // and, when bound, persist the choice to the conversation so reopening it
@@ -251,9 +419,15 @@ export function ChatPanel({
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(
-              contentId ? { snapshotContentNodeIds: [contentId] } : {},
-            ),
+            body: JSON.stringify({
+              ...(contentId ? { snapshotContentNodeIds: [contentId] } : {}),
+              // Carry a target chosen before the conversation existed
+              // (the chip is now usable in transient chats) so the very
+              // first turn already files its outputs in the right place.
+              ...(targetFolder && !targetInherited
+                ? { targetFolderId: targetFolder.id }
+                : {}),
+            }),
           });
           if (!res.ok) throw new Error("Couldn't save the chat");
           const body = (await res.json()) as { data?: { id?: string } };
@@ -283,7 +457,17 @@ export function ChatPanel({
       return;
     }
     handleSend();
-  }, [conversationId, onTransientPromoted, contentId, input, handleSend]);
+    // targetFolder/targetInherited are real deps: a stale closure would create
+    // the conversation without a target the user picked before sending.
+  }, [
+    conversationId,
+    onTransientPromoted,
+    contentId,
+    input,
+    handleSend,
+    targetFolder,
+    targetInherited,
+  ]);
 
   // Resend the queued transient first message once conversationId catches up.
   useEffect(() => {
@@ -525,13 +709,25 @@ export function ChatPanel({
           chats auto-save to the bound Conversation. Delete is protected
           by a two-step confirm. */}
       <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
-        <HeaderTitle providerId={providerId} modelId={modelId} />
+        <div className="flex min-w-0 items-center gap-2">
+          <HeaderTitle providerId={providerId} modelId={modelId} />
+          <TargetFolderChip
+            target={targetFolder}
+            inherited={targetInherited}
+            location={effectiveLocation}
+            // Selectable before the conversation exists: the pick is held in
+            // local state, carried into the POST that creates the conversation,
+            // and (in the browser panel) remembered for the next chat.
+            disabled={false}
+            onChange={handleTargetChange}
+          />
+        </div>
         <div className="flex items-center gap-1">
           {conversationId && (
             <button
               onClick={() => void handleOpenInPage()}
               title="Open in full view"
-              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-200 transition-colors"
+              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
             >
               <Maximize2 className="h-3.5 w-3.5" />
             </button>
@@ -587,6 +783,9 @@ export function ChatPanel({
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
                   onRevertEdit={revertEdit}
+                  onToolApprovalResponse={(opts) =>
+                    void addToolApprovalResponse(opts)
+                  }
                   revertableToolIds={revertableToolIds}
                 />
               );
@@ -600,7 +799,7 @@ export function ChatPanel({
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-2.5 py-1 text-[11px] text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+          className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-black/15 bg-white/90 text-gray-700 hover:bg-black/[0.06] dark:border-white/15 dark:bg-[#1a1a1a]/90 dark:text-gray-200 dark:hover:bg-white/10 px-2.5 py-1 text-[11px] shadow-lg backdrop-blur transition-colors"
         >
           <ChevronDown className="h-3 w-3" /> Jump to latest
         </button>
@@ -669,7 +868,7 @@ function HeaderTitle({
   providerId: string;
   modelId: string;
 }) {
-  const theme = getProviderTheme(providerId);
+  const theme = getProviderTheme(providerId, useResolvedTheme());
   const provider = useMemo(
     () => PROVIDER_CATALOG.find((p) => p.id === providerId),
     [providerId],
@@ -679,7 +878,7 @@ function HeaderTitle({
     [provider, modelId],
   );
   return (
-    <div className="flex items-center gap-2 text-sm text-gray-300 min-w-0">
+    <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 min-w-0">
       <span
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full"
         style={{
@@ -742,7 +941,7 @@ function DeleteWithConfirm({
           ? "Confirm delete (click again, auto-cancels in 3s)"
           : "Confirm clear (click again, auto-cancels in 3s)"
       }
-      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors"
+      className="inline-flex items-center gap-1 rounded px-1.5 py-1 text-[10px] font-medium bg-red-500/15 text-red-700 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30 hover:bg-red-500/25 dark:hover:bg-red-500/30 transition-colors"
     >
       <Trash2 className="h-3 w-3" />
       {destructive ? "Delete" : "Confirm"}
@@ -761,7 +960,7 @@ function LoadingMessages() {
     <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
       <div className="flex w-full max-w-[280px] flex-col gap-2 opacity-50 animate-pulse">
         <div className="ml-auto h-7 w-2/3 rounded-xl bg-blue-500/20" />
-        <div className="h-8 w-3/4 rounded-xl bg-white/10" />
+        <div className="h-8 w-3/4 rounded-xl bg-black/10 dark:bg-white/10" />
         <div className="ml-auto h-7 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
       <p className="text-[10px] uppercase tracking-wider text-gray-500">

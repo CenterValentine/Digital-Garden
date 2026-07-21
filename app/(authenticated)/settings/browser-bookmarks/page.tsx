@@ -1,5 +1,6 @@
-import BrowserBookmarksSettingsPage from "@/extensions/browser-bookmarks/settings/BrowserBookmarksSettingsPage";
+import { redirect } from "next/navigation";
 
-export default function SettingsBrowserBookmarksPage() {
-  return <BrowserBookmarksSettingsPage />;
+/** Legacy route — browser bookmarks settings moved to the Extensions group. */
+export default function LegacyBrowserBookmarksSettingsRoute() {
+  redirect("/settings/extensions/browser-bookmarks");
 }

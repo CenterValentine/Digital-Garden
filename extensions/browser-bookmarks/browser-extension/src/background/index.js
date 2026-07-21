@@ -428,8 +428,16 @@ async function updateTabBadge(tabId, url) {
       assoc = await fetchAndCacheUrlAssociation(url);
     }
     if (assoc?.hasNote || assoc?.hasExternal) {
-      await chrome.action.setBadgeText({ text: "●", tabId });
-      await chrome.action.setBadgeBackgroundColor({ color: "#c9a86c", tabId });
+      if (workflowBadgeState?.urgent) {
+        // A failed / needs-review workflow badge (global) must never be masked
+        // by the per-tab bookmark dot. Empty per-tab text falls back to the
+        // global badge; the dot returns on the next tab update once urgency
+        // clears.
+        await chrome.action.setBadgeText({ text: "", tabId });
+      } else {
+        await chrome.action.setBadgeText({ text: "●", tabId });
+        await chrome.action.setBadgeBackgroundColor({ color: "#c9a86c", tabId });
+      }
     } else {
       await chrome.action.setBadgeText({ text: "", tabId });
     }
@@ -609,6 +617,231 @@ async function getCurrentTabSyncState() {
   };
 }
 
+// ── Workflows (Trellis) ───────────────────────────────────────────────────────
+// Proxy-not-share: the extension only ever sees compact DTOs + a runId. Engine
+// routing (wdk vs n8n) happens server-side behind the one dispatch door.
+
+// Server caps captures at 100k chars; match it so we never ship dead weight.
+const WORKFLOW_PAGE_TEXT_CAP = 100_000;
+
+/**
+ * Ask the overlay content script for the RENDERED page text. URL-only runs
+ * against JS-rendered pages are the documented soak failure — text is the
+ * capture's real payload. Restricted pages (chrome://, web store) have no
+ * content script; degrade to URL-only rather than failing the dispatch.
+ */
+async function extractPageTextFromTab(tabId) {
+  try {
+    const response = await chrome.tabs.sendMessage(tabId, {
+      type: "dg-extract-page-text",
+    });
+    const text = typeof response?.text === "string" ? response.text : "";
+    return text.slice(0, WORKFLOW_PAGE_TEXT_CAP);
+  } catch {
+    return "";
+  }
+}
+
+/** Chooser feed: the user's workflows, page-matches sorted first. */
+async function listWorkflowsForActiveTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const pageUrl = tab?.url || "";
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows?pageUrl=${encodeURIComponent(pageUrl)}`
+  );
+  return { workflows: data.workflows || [], pageUrl };
+}
+
+/**
+ * Dispatch the chosen workflow against the active tab: extract rendered text,
+ * POST the capture, then ask the overlay to mount the live status pill. The
+ * pill is best-effort — on overlay-less pages the popup status line is the ack.
+ */
+async function dispatchWorkflowForActiveTab(payload) {
+  const workflowId =
+    typeof payload?.workflowId === "string" ? payload.workflowId : "";
+  if (!workflowId) throw new Error("No workflow selected");
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+
+  const pageText = await extractPageTextFromTab(tab.id);
+  const data = await apiFetch(
+    "/api/integrations/browser-extension/workflow-dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        workflowId,
+        input: {
+          pageUrl: tab.url || "",
+          pageTitle: tab.title || "",
+          ...(pageText ? { pageText } : {}),
+        },
+      }),
+    }
+  );
+
+  try {
+    await chrome.tabs.sendMessage(tab.id, {
+      type: "dg-workflow-run-started",
+      payload: {
+        runId: data.runId,
+        workflowTitle: payload?.workflowTitle || "Workflow",
+        workflowNodeId: workflowId, // pill [View] deep-opens this workflow
+      },
+    });
+  } catch {
+    // No overlay on this page — the popup's status line already acknowledged.
+  }
+  void refreshWorkflowBadge(); // a fresh run should show ambiently right away
+  return data;
+}
+
+/** Status poll target for the overlay pill (bearer read-only run detail). */
+async function getWorkflowRun(runId) {
+  if (typeof runId !== "string" || !runId) throw new Error("Missing runId");
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows/runs/${encodeURIComponent(runId)}`
+  );
+  // Piggyback: a pill poll observing a status TRANSITION is exactly when the
+  // ambient badge is stale — refresh it once per transition, not per poll.
+  const run = data.run;
+  if (run && lastBadgeRunStatus.get(run.id) !== run.status) {
+    lastBadgeRunStatus.set(run.id, run.status);
+    void refreshWorkflowBadge();
+  }
+  return run;
+}
+
+// ── Workflow ambient badge (global; most-urgent run wins) ────────────────────
+// Precedence (frozen in the plan): failed (red) → waiting/needs-review (amber)
+// → running/queued (blue) → recently succeeded (green, ~10s) → clear. The
+// bookmark feature's per-tab gold dot yields to URGENT states only (see
+// updateTabBadge) so a failure is never masked on a bookmarked tab.
+
+const WORKFLOW_BADGE_ALARM = "dg-workflow-badge";
+const WORKFLOW_SUCCESS_LINGER_MS = 10_000;
+const WORKFLOW_FAILURE_LINGER_MS = 30 * 60_000; // failures decay after 30 min
+
+/** null = no badge; else { text, color, urgent, transient } */
+let workflowBadgeState = null;
+let workflowBadgeInFlight = null;
+const lastBadgeRunStatus = new Map();
+
+function computeWorkflowBadge(runs, now = Date.now()) {
+  let waiting = false;
+  let active = false;
+  let recentFailure = false;
+  let recentSuccess = false;
+  for (const run of runs) {
+    if (run.status === "waiting") waiting = true;
+    if (run.status === "running" || run.status === "queued") active = true;
+    const finishedAt = run.finishedAt ? Date.parse(run.finishedAt) : NaN;
+    if (Number.isNaN(finishedAt)) continue;
+    if (run.status === "failed" && now - finishedAt < WORKFLOW_FAILURE_LINGER_MS) {
+      recentFailure = true;
+    }
+    if (run.status === "succeeded" && now - finishedAt < WORKFLOW_SUCCESS_LINGER_MS) {
+      recentSuccess = true;
+    }
+  }
+  if (recentFailure) return { text: "!", color: "#dc2626", urgent: true, transient: false };
+  if (waiting) return { text: "!", color: "#d97706", urgent: true, transient: false };
+  if (active) return { text: "●", color: "#2563eb", urgent: false, transient: false };
+  if (recentSuccess) return { text: "✓", color: "#059669", urgent: false, transient: true };
+  return null;
+}
+
+async function refreshWorkflowBadge() {
+  if (workflowBadgeInFlight) return workflowBadgeInFlight;
+  workflowBadgeInFlight = (async () => {
+    try {
+      const data = await apiFetch(
+        "/api/integrations/browser-extension/workflows/runs?limit=15"
+      );
+      workflowBadgeState = computeWorkflowBadge(data.runs || []);
+      if (workflowBadgeState) {
+        await chrome.action.setBadgeText({ text: workflowBadgeState.text });
+        await chrome.action.setBadgeBackgroundColor({
+          color: workflowBadgeState.color,
+        });
+        if (workflowBadgeState.transient) {
+          // Best-effort green decay (~10s). If MV3 kills the worker first,
+          // the 1-minute alarm clears it instead.
+          setTimeout(() => void refreshWorkflowBadge(), WORKFLOW_SUCCESS_LINGER_MS + 1000);
+        }
+      } else {
+        await chrome.action.setBadgeText({ text: "" });
+      }
+    } catch {
+      // Unpaired / offline — leave the badge alone; the next alarm retries.
+    } finally {
+      workflowBadgeInFlight = null;
+    }
+  })();
+  return workflowBadgeInFlight;
+}
+
+/** Popup feed: compact recent runs (needs-review pinned client-side). */
+async function listWorkflowRuns(limit = 6) {
+  const data = await apiFetch(
+    `/api/integrations/browser-extension/workflows/runs?limit=${limit}`
+  );
+  return { runs: data.runs || [] };
+}
+
+/**
+ * Context-menu path: NO chooser — the server auto-routes by the page URL
+ * against page-capture trigger patterns (first capture auto-creates a
+ * template workflow). `selectionText`, when present, becomes the capture
+ * text instead of the full page — "run a workflow on just this passage".
+ * Context menus have no UI for errors, so failures flash the badge red
+ * briefly rather than dying silently.
+ */
+async function dispatchWorkflowAutoRoute(selectionText) {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id) throw new Error("No active tab is available");
+  try {
+    const pageText =
+      typeof selectionText === "string" && selectionText.trim()
+        ? selectionText.slice(0, WORKFLOW_PAGE_TEXT_CAP)
+        : await extractPageTextFromTab(tab.id);
+    const data = await apiFetch(
+      "/api/integrations/browser-extension/workflow-dispatch",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          input: {
+            pageUrl: tab.url || "",
+            pageTitle: tab.title || "",
+            ...(pageText ? { pageText } : {}),
+          },
+        }),
+      }
+    );
+    try {
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "dg-workflow-run-started",
+        payload: {
+          runId: data.runId,
+          workflowTitle: "Workflow",
+          workflowNodeId: data.workflowNodeId || null,
+        },
+      });
+    } catch {
+      // Restricted page — the badge is the remaining ambient signal.
+    }
+    void refreshWorkflowBadge();
+    return data;
+  } catch (error) {
+    await chrome.action.setBadgeText({ text: "!" }).catch(() => {});
+    await chrome.action
+      .setBadgeBackgroundColor({ color: "#dc2626" })
+      .catch(() => {});
+    setTimeout(() => void refreshWorkflowBadge(), 5000);
+    throw error;
+  }
+}
+
 async function startQuickCaptureInActiveTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) throw new Error("No active tab is available");
@@ -641,7 +874,12 @@ async function showTreePanelInActiveTab() {
   }
 }
 
-async function openContentInActiveTab(contentId, contentKind = "external") {
+async function openContentInActiveTab(
+  contentId,
+  contentKind = "external",
+  runId,
+  corner
+) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id) {
     throw new Error("No active tab is available");
@@ -653,6 +891,8 @@ async function openContentInActiveTab(contentId, contentKind = "external") {
       payload: {
         contentId,
         contentKind,
+        runId, // workflow panels: deep-link the embed viewer to this run
+        corner, // side-panel pop-out: which page corner to open in
       },
     });
     return { openedInOverlay: true, tabId: tab.id };
@@ -1221,13 +1461,19 @@ async function plantEmbedCookie(appBaseUrl, { token, expiresAt, cookieName }) {
   const url = appBaseUrl.replace(/\/$/, "");
   const isSecure = url.startsWith("https://");
   const base = {
-    url,
+    url: `${url}/embed`,
     name: cookieName,
     value: token,
     httpOnly: true,
     secure: isSecure,
     expirationDate: new Date(expiresAt).getTime() / 1000,
-    path: "/",
+    // MUST stay scoped to /embed. Cookies are keyed by (name, domain, path) —
+    // at path "/" this short-lived token REPLACES the user's 7-day session
+    // cookie set by sign-in, logging them out of the app when it expires.
+    // Server-side embed cookie writers (proxy.ts, /embed/auth) enforce the
+    // same scoping; /api/* calls from the iframe use the X-Embed-Session
+    // header instead, so nothing outside /embed needs this cookie.
+    path: "/embed",
   };
 
   // Attempt 1: SameSite=None (required for cross-site iframe delivery).
@@ -1269,15 +1515,18 @@ async function plantEmbedCookie(appBaseUrl, { token, expiresAt, cookieName }) {
  * Uses chrome.storage.session to cache the session across service worker restarts
  * (MV3 workers wake frequently — this avoids a DB round-trip on each wake).
  */
-async function exchangeEmbedSession() {
+async function exchangeEmbedSession({ force = false } = {}) {
   const config = await getConfig();
   if (!config.appBaseUrl || !config.token) return null;
 
   try {
-    // Check session cache first
+    // Check session cache first. `force` skips it — the 20-min alarm must
+    // always mint a fresh session, because at that point the cached token has
+    // ~10 min left (> the 2-min buffer) and the NEXT alarm at 40 min lands
+    // after its 30-min expiry, leaving a dead-cookie window from minute 30-40.
     const cached = await chrome.storage.session.get(EMBED_SESSION_CACHE_KEY);
     const cachedSession = cached[EMBED_SESSION_CACHE_KEY];
-    if (cachedSession?.token && cachedSession?.expiresAt) {
+    if (!force && cachedSession?.token && cachedSession?.expiresAt) {
       const msRemaining = new Date(cachedSession.expiresAt).getTime() - Date.now();
       if (msRemaining > EMBED_SESSION_REFRESH_BUFFER_MS) {
         // Still valid — just re-plant the cookie (cheap: no DB, no API call)
@@ -1419,6 +1668,59 @@ async function readAloudSelection(tabId, selectionText) {
   }
 }
 
+const JOB_CAPTURE_TEXT_CAP = 60000;
+
+// "Research job posting" — captures the page's readable text and dispatches
+// the job-application workflow through the app (the extension never talks to
+// the workflow engine; the app is the hub).
+async function researchJobPosting() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab.url) {
+    throw new Error("No active tab to research");
+  }
+  let pageText = "";
+  try {
+    const [injection] = await chrome.scripting.executeScript({
+      target: { tabId: tab.id },
+      func: (cap) => (document.body?.innerText || "").slice(0, cap),
+      args: [JOB_CAPTURE_TEXT_CAP],
+    });
+    pageText = injection?.result || "";
+  } catch (error) {
+    // Restricted pages (chrome://, PDFs) — fall back to URL-only dispatch;
+    // the server fetches the page text itself.
+    console.warn("[DG Bookmarks] Page text capture failed:", error?.message);
+  }
+  const response = await apiFetch(
+    "/api/integrations/browser-extension/workflow-dispatch",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        slug: "job-application",
+        input: {
+          pageUrl: tab.url,
+          pageTitle: tab.title || "",
+          ...(pageText ? { pageText } : {}),
+        },
+      }),
+    },
+  );
+  console.info(
+    "[DG Bookmarks] Job research dispatched:",
+    response?.data?.runId,
+  );
+  if (tab.id) {
+    await chrome.action.setBadgeText({ text: "▶", tabId: tab.id });
+    await chrome.action.setBadgeBackgroundColor({
+      color: "#c9a86c",
+      tabId: tab.id,
+    });
+    setTimeout(() => {
+      chrome.action.setBadgeText({ text: "", tabId: tab.id }).catch(() => {});
+    }, 4000);
+  }
+}
+
 chrome.runtime.onInstalled.addListener(async () => {
   chrome.contextMenus.create({
     id: "dg-save-page",
@@ -1435,8 +1737,24 @@ chrome.runtime.onInstalled.addListener(async () => {
     title: "Read aloud with Digital Garden",
     contexts: ["selection"],
   });
+  chrome.contextMenus.create({
+    id: "dg-research-job",
+    title: "Research job posting in Digital Garden",
+    contexts: ["page", "action"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-run-workflow",
+    title: "Run workflow on this page",
+    contexts: ["page", "action"],
+  });
+  chrome.contextMenus.create({
+    id: "dg-run-workflow-selection",
+    title: "Run workflow on selection",
+    contexts: ["selection"],
+  });
   chrome.alarms.create("dg-pull-sync", { periodInMinutes: 5 });
   chrome.alarms.create("dg-embed-session-refresh", { periodInMinutes: 20 });
+  chrome.alarms.create(WORKFLOW_BADGE_ALARM, { periodInMinutes: 1 });
   // Plant the initial cookie so the iframe works right away after install/update
   await exchangeEmbedSession();
 });
@@ -1456,6 +1774,15 @@ chrome.contextMenus.onClicked.addListener(async (info) => {
       });
       await readAloudSelection(tab?.id, info.selectionText);
     }
+    if (info.menuItemId === "dg-research-job") {
+      await researchJobPosting();
+    }
+    if (info.menuItemId === "dg-run-workflow") {
+      await dispatchWorkflowAutoRoute();
+    }
+    if (info.menuItemId === "dg-run-workflow-selection") {
+      await dispatchWorkflowAutoRoute(info.selectionText);
+    }
   } catch (error) {
     console.error("[DG Bookmarks] Context menu failed", error);
   }
@@ -1468,9 +1795,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     });
   }
   if (alarm.name === "dg-embed-session-refresh") {
-    await exchangeEmbedSession().catch((error) => {
+    await exchangeEmbedSession({ force: true }).catch((error) => {
       console.error("[DG Bookmarks] Embed session refresh failed", error);
     });
+  }
+  if (alarm.name === WORKFLOW_BADGE_ALARM) {
+    await refreshWorkflowBadge();
   }
 });
 
@@ -1565,6 +1895,25 @@ chrome.tabs.onRemoved.addListener((tabId) => {
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  // sidePanel.open() must run before any await or the user-gesture context
+  // that authorized it (launcher click → this message) is lost. Handle it
+  // synchronously, outside the async IIFE below.
+  if (message.type === "open-side-panel") {
+    const tabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = tabId != null ? { tabId } : { windowId };
+    chrome.sidePanel
+      .open(target)
+      .then(() => sendResponse({ ok: true, data: true }))
+      .catch((error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open side panel",
+        })
+      );
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
@@ -1658,8 +2007,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         ok: true,
         data: await openContentInActiveTab(
           message.payload?.contentId,
-          message.payload?.contentKind || "external"
+          message.payload?.contentKind || "external",
+          message.payload?.runId,
+          message.payload?.corner
         ),
+      });
+      return;
+    }
+    if (message.type === "list-workflows") {
+      sendResponse({ ok: true, data: await listWorkflowsForActiveTab() });
+      return;
+    }
+    if (message.type === "dispatch-workflow") {
+      sendResponse({
+        ok: true,
+        data: await dispatchWorkflowForActiveTab(message.payload),
+      });
+      return;
+    }
+    if (message.type === "get-workflow-run") {
+      sendResponse({
+        ok: true,
+        data: await getWorkflowRun(message.payload?.runId),
+      });
+      return;
+    }
+    if (message.type === "list-workflow-runs") {
+      sendResponse({
+        ok: true,
+        data: await listWorkflowRuns(message.payload?.limit),
       });
       return;
     }

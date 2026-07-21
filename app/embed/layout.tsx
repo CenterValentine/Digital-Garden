@@ -129,7 +129,12 @@ export default async function EmbedLayout({
         inset: 0,
         display: "flex",
         flexDirection: "column",
-        background: "var(--surface-primary, #0d0d0d)",
+        // `--surface-primary` is not a token this app defines, so this always
+        // fell through to the hard-coded dark value — light-theme surfaces
+        // then composited their translucent backgrounds over near-black and
+        // came out muddy/low-contrast. `--background` is the real themed
+        // token and follows the resolved theme.
+        background: "var(--background, #0d0d0d)",
         overflow: "hidden",
         zIndex: 100,
       }}
@@ -140,7 +145,13 @@ export default async function EmbedLayout({
         intercepts anchor clicks to forward external links to the parent overlay.
         Must stay inline (no Script component) so it executes before hydration.
       */}
-      <script nonce={nonce} dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }} />
+      {/* suppressHydrationWarning: CSP nonce-hiding empties the attribute
+          before hydration compares it (see app/layout.tsx theme script). */}
+      <script
+        nonce={nonce}
+        suppressHydrationWarning
+        dangerouslySetInnerHTML={{ __html: EMBED_BRIDGE_SCRIPT }}
+      />
       {children}
     </div>
   );

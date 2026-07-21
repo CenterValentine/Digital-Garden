@@ -161,6 +161,7 @@ model ContentNode {
   peopleGroup                  PeopleGroup?              @relation("PeopleGroupContent", fields: [peopleGroupId], references: [id], onDelete: SetNull)
   archivedConversation         Conversation?             @relation("ConversationArchive")
   conversationAssociations     ConversationAssociation[] @relation("ConversationAssoc")
+  targetedByConversations      Conversation[]            @relation("ConversationTarget")
   person                       Person?                   @relation("PersonContent", fields: [personId], references: [id], onDelete: SetNull)
   peopleFileTreeMounts         PeopleFileTreeMount[]     @relation("ContentNodePeopleMounts")
   collaborationDocument        CollaborationDocument?
@@ -180,6 +181,10 @@ model ContentNode {
   bookmarkSyncRoots            BookmarkSyncConnection[]  @relation("BookmarkSyncRoot")
   webResourceLinks             WebResourceContentLink[]
   webResourceViewStates        WebResourceViewState[]
+  workflowRunArtifacts         WorkflowRunArtifact[]
+  agenticMetadata              AgenticMetadata?
+  studioSourceSelections       StudioSourceSelection[]
+  studioGenerationRuns         StudioGenerationRun[]     @relation("StudioRunFolder")
 
   @@unique([ownerId, slug])
   @@index([ownerId, deletedAt])
@@ -557,12 +562,30 @@ model User {
   ownedTenants            Tenant[]                 @relation("OwnedTenants")
 
   series                   Series[]
+  serviceTokens            ServiceToken[]
   browserExtensionTokens   BrowserExtensionToken[]
   browserExtensionInstalls BrowserExtensionInstall[]
   bookmarkSyncConnections  BookmarkSyncConnection[]
   webResources             WebResource[]
   webResourceContentLinks  WebResourceContentLink[]
   webResourceViewStates    WebResourceViewState[]
+  studioSourceSelections   StudioSourceSelection[]
+  studioGenerationRuns     StudioGenerationRun[]
+  studioContextSpend       StudioContextSpend[]
+
+  connectionInvitesSent     ConnectionInvite[]      @relation("ConnectionInvitesSent")
+  connectionInvitesReceived ConnectionInvite[]      @relation("ConnectionInvitesReceived")
+  connectionsAsA            UserConnection[]        @relation("ConnectionsAsA")
+  connectionsAsB            UserConnection[]        @relation("ConnectionsAsB")
+  blocksIssued              UserBlock[]             @relation("BlocksIssued")
+  blocksReceived            UserBlock[]             @relation("BlocksReceived")
+  activityEventsActed       ActivityEvent[]         @relation("ActivityEventsActed")
+  notificationInbox         NotificationRecipient[] @relation("NotificationInbox")
+  dmParticipations          DmParticipant[]         @relation("DmParticipations")
+  dmMessagesSent            DmMessage[]             @relation("DmMessagesSent")
+
+  workflowDefinitions WorkflowDefinition[]
+  workflowRuns        WorkflowRun[]
 
   @@index([email])
 }
@@ -807,6 +830,30 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+/// Personal Access Token for machine-to-machine callers of the workflow
+/// callback surface (Trellis Plan 3 — the n8n execution spoke posts run
+/// events/gates/artifacts back through PAT-authed routes). One "wide" token
+/// per user: blast radius is contained structurally because the guard
+/// (requireServiceTokenAuth) is imported only by /api/workflows/callback/*.
+/// Hashed at rest (sha256), shown once, revocable. Mirrors BrowserExtensionToken.
+model ServiceToken {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String    @db.Uuid
+  name        String    @db.VarChar(120)
+  tokenHash   String    @unique @db.Char(64)
+  tokenPrefix String    @db.VarChar(16)
+  scopes      String[]  @default(["workflows:callback"])
+  lastUsedAt  DateTime? @db.Timestamptz(6)
+  expiresAt   DateTime? @db.Timestamptz(6)
+  revokedAt   DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenPrefix])
 }
 
 model BrowserExtensionToken {
@@ -1139,6 +1186,11 @@ model Conversation {
   // context per conversation (ChatGPT-style). SetNull so deleting a
   // context doesn't cascade-delete the chat — it just clears the link.
   activeContextId         String?   @db.Uuid
+  // Target folder (AI v3 core S3, umbrella decision #7): the folder this
+  // conversation operates in — page-node creation, document-tool
+  // destinations, and grounding follow it. SetNull: deleting the folder
+  // orphans the target, never the chat.
+  targetFolderId          String?   @db.Uuid
   createdAt               DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt               DateTime  @updatedAt @db.Timestamptz(6)
   deletedAt               DateTime? @db.Timestamptz(6)
@@ -1146,11 +1198,14 @@ model Conversation {
   owner                 User                      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   archivedToContentNode ContentNode?              @relation("ConversationArchive", fields: [archivedToContentNodeId], references: [id], onDelete: SetNull)
   activeContext         ChatContext?              @relation("ConversationActiveContext", fields: [activeContextId], references: [id], onDelete: SetNull)
+  targetFolder          ContentNode?              @relation("ConversationTarget", fields: [targetFolderId], references: [id], onDelete: SetNull)
   messages              ConversationMessage[]
   associations          ConversationAssociation[]
+  workflowRuns          WorkflowRun[]
 
   @@index([ownerId, updatedAt])
   @@index([ownerId, deletedAt])
+  @@index([ownerId, targetFolderId])
 }
 
 /// User-authored custom-instruction presets ("chat contexts"). Each is a
@@ -1979,4 +2034,380 @@ model MediaItemPayload {
   mediaContentIds String[]            @db.Uuid
 
   publicItem PublicItem @relation(fields: [publicItemId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// Connections + Notifications + Direct Messages
+//
+// ActivityEvent is the canonical event log (string kinds, Zod-validated
+// payloads in lib/domain/notifications/kinds.ts). NotificationRecipient
+// is the per-user projection carrying read/archive state. DM content
+// lives outside the log (messages are content; the log is signal).
+// ============================================================
+
+enum ConnectionInviteStatus {
+  pending
+  accepted
+  declined // never exposed to the inviter; renders as "pending" until expiry
+  revoked
+  expired
+}
+
+model ConnectionInvite {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  inviterId         String                 @db.Uuid
+  // Email/username exactly as typed (lowercased). Kept even when unresolved
+  // so the sender's sent-list is identical for real and non-existent targets.
+  inviteeIdentifier String                 @db.VarChar(255)
+  // Secretly resolved server-side; NEVER exposed to the inviter. Stays null
+  // when the invite is suppressed (self, blocked, already connected, dupe)
+  // so a suppressed invite can never be listed or accepted by the target.
+  inviteeUserId     String?                @db.Uuid
+  status            ConnectionInviteStatus @default(pending)
+  message           String?                @db.VarChar(280)
+  expiresAt         DateTime               @db.Timestamptz(6)
+  respondedAt       DateTime?              @db.Timestamptz(6)
+  createdAt         DateTime               @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
+
+  inviter User  @relation("ConnectionInvitesSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User? @relation("ConnectionInvitesReceived", fields: [inviteeUserId], references: [id], onDelete: Cascade)
+
+  @@index([inviterId, status])
+  @@index([inviteeUserId, status])
+  @@index([status, expiresAt])
+}
+
+model UserConnection {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // Canonical pair ordering enforced in service: userAId < userBId.
+  userAId     String    @db.Uuid
+  userBId     String    @db.Uuid
+  connectedAt DateTime  @default(now()) @db.Timestamptz(6)
+  deletedAt   DateTime? @db.Timestamptz(6)
+  deletedById String?   @db.Uuid
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  userA User @relation("ConnectionsAsA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB User @relation("ConnectionsAsB", fields: [userBId], references: [id], onDelete: Cascade)
+
+  @@unique([userAId, userBId])
+  @@index([userAId, deletedAt])
+  @@index([userBId, deletedAt])
+}
+
+model UserBlock {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  blockerId     String   @db.Uuid
+  blockedUserId String   @db.Uuid
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  blocker User @relation("BlocksIssued", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedUserId])
+  @@index([blockedUserId])
+}
+
+enum ActivityActorType {
+  user
+  system
+  ai
+  extension
+}
+
+model ActivityEvent {
+  id          String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  kind        String            @db.VarChar(100)
+  actorType   ActivityActorType
+  // SetNull so the canonical log survives account deletion.
+  actorUserId String?           @db.Uuid
+  actorLabel  String?           @db.VarChar(120)
+  payload     Json
+  subjectType String?           @db.VarChar(50)
+  subjectId   String?           @db.Uuid
+  createdAt   DateTime          @default(now()) @db.Timestamptz(6)
+
+  actor      User?                   @relation("ActivityEventsActed", fields: [actorUserId], references: [id], onDelete: SetNull)
+  recipients NotificationRecipient[]
+
+  @@index([kind, createdAt])
+  @@index([subjectType, subjectId])
+  @@index([createdAt])
+}
+
+model NotificationRecipient {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String    @db.Uuid
+  userId      String    @db.Uuid
+  // Unread coalescing key (e.g. "dm:<threadId>") — service-enforced, no
+  // unique constraint; a rare race producing two rows is harmless.
+  collapseKey String?   @db.VarChar(120)
+  readAt      DateTime? @db.Timestamptz(6)
+  archivedAt  DateTime? @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
+
+  event ActivityEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User          @relation("NotificationInbox", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId, readAt])
+  @@index([userId, archivedAt, createdAt])
+  @@index([userId, collapseKey])
+}
+
+model DmThread {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  // "<minUserId>:<maxUserId>" for 1:1 threads; null reserved for future groups.
+  pairKey       String?   @unique @db.VarChar(80)
+  lastMessageAt DateTime? @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @db.Timestamptz(6)
+
+  participants DmParticipant[]
+  messages     DmMessage[]
+
+  @@index([lastMessageAt])
+}
+
+model DmParticipant {
+  threadId     String    @db.Uuid
+  userId       String    @db.Uuid
+  // Unread cursor — messages newer than this count as unread.
+  lastReadAt   DateTime? @db.Timestamptz(6)
+  // Viewing heartbeat — a fresh value suppresses dm.message notifications.
+  lastActiveAt DateTime? @db.Timestamptz(6)
+  archivedAt   DateTime? @db.Timestamptz(6)
+  // Per-user thread hide; cleared when a new message arrives.
+  deletedAt    DateTime? @db.Timestamptz(6)
+  joinedAt     DateTime  @default(now()) @db.Timestamptz(6)
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  user   User     @relation("DmParticipations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([userId, deletedAt])
+}
+
+model DmMessage {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  threadId  String    @db.Uuid
+  // SetNull so history survives account deletion ("deleted user").
+  senderId  String?   @db.Uuid
+  body      String    @db.Text
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  editedAt  DateTime? @db.Timestamptz(6)
+  // Soft delete → "message deleted" placeholder on both sides.
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  thread DmThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User?    @relation("DmMessagesSent", fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@index([threadId, createdAt])
+}
+
+model RateLimitCounter {
+  key         String   @db.VarChar(160)
+  windowStart DateTime @db.Timestamptz(6)
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+}
+
+// ============================================================
+// Workflows subsystem — engine-agnostic run tables (hub-and-spoke)
+// The app is the system of record; durable execution engines (WDK,
+// later n8n/Hatchet) are swappable adapters. Product UI reads ONLY
+// these tables, never an engine's API.
+// See docs/notes-feature/work-tracking/WORKFLOWS-FOUNDATION-PLAN.md
+// NOTE: distinct from WorkflowPayload (a ContentNode payload stub from
+// an earlier epoch) — these tables model executions, not content.
+// ============================================================
+
+enum WorkflowRunStatus {
+  queued
+  running
+  waiting
+  succeeded
+  failed
+  canceled
+}
+
+model WorkflowDefinition {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId     String   @db.Uuid
+  slug        String   @db.VarChar(120) // append-only versioning: behavior changes ship as a new slug (e.g. "job-application@2")
+  name        String   @db.VarChar(200)
+  engine      String   @db.VarChar(50) // adapter key in the engine registry: "wdk" | later "n8n" | ...
+  engineRef   String   @db.VarChar(200) // engine-side identity — WDK: code-manifest key; n8n: webhook id
+  inputSchema Json? // JSON Schema for dispatch payload validation
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  owner User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  runs  WorkflowRun[]
+
+  @@unique([ownerId, slug])
+}
+
+model WorkflowRun {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  definitionId   String            @db.Uuid
+  ownerId        String            @db.Uuid
+  status         WorkflowRunStatus @default(queued)
+  engine         String            @db.VarChar(50) // denormalized at dispatch — stays truthful if the definition later migrates engines
+  engineRunId    String?           @db.VarChar(200) // engine-side handle, debugging only — UI never reads through it
+  engineGateRef  String? // engine-native resume handle (e.g. n8n Wait resume URL); unused by WDK (deterministic tokens)
+  input          Json              @default("{}")
+  output         Json?
+  error          Json?
+  gateToken      String?           @db.VarChar(200) // non-null ⟺ status waiting; what inbox actions resume
+  conversationId String?           @db.Uuid
+  startedAt      DateTime?         @db.Timestamptz(6)
+  finishedAt     DateTime?         @db.Timestamptz(6)
+  createdAt      DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @db.Timestamptz(6)
+
+  owner        User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  definition   WorkflowDefinition    @relation(fields: [definitionId], references: [id], onDelete: Cascade)
+  conversation Conversation?         @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  events       WorkflowRunEvent[]
+  artifacts    WorkflowRunArtifact[]
+
+  @@index([ownerId, status])
+  @@index([definitionId, createdAt])
+}
+
+model WorkflowRunEvent {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId     String   @db.Uuid
+  seq       Int // monotonic per run — timeline order without clock trust
+  key       String?  @db.VarChar(200) // deterministic idempotency key — engines retry steps; double-fire must upsert, not duplicate
+  type      String   @db.VarChar(50) // "step.started" | "step.completed" | "gate.opened" | "gate.resumed" | "log" | "artifact.created"
+  stepName  String?  @db.VarChar(120)
+  payload   Json?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  run WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, seq])
+  @@unique([runId, key])
+}
+
+model WorkflowRunArtifact {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId         String   @db.Uuid
+  contentNodeId String   @db.Uuid
+  kind          String   @db.VarChar(50) // "document" | "note" | "file"
+  label         String   @db.VarChar(200)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  run     WorkflowRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  content ContentNode @relation(fields: [contentNodeId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+// ── Folder Studio: agentic metadata sidecar (plan → Phase 2) ─────────────
+// Per-node "Context" doc the AI maintains. Deliberately NOT collaborative:
+// REST last-write-wins, never registered in publishing/export/collab.
+model AgenticMetadata {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nodeId            String      @unique @db.Uuid
+  // Restricted TipTap fragments per section (existing node types only)
+  tiptapJson        Json
+  // Prompt-assembly form (searchText pattern) — what chat/tools actually read
+  derivedText       String      @default("")
+  // Per-section owner + provenance + pending role-strategy proposal
+  sectionsMeta      Json        @default("{}")
+  // Staleness: canonical hash of source content at generation time
+  sourceContentHash String?     @db.VarChar(64)
+  // Dirty bit: set on save/move/delete for the node + its ancestor chain,
+  // cleared when the refresh engine regenerates (or damps) the node. Makes
+  // "what needs work" an indexed query instead of a per-node hash scan.
+  contextDirty      Boolean     @default(false)
+  // Output hash of the AI-owned sections (summary+structure). Cascade
+  // damping: folders hash children's summaryHash, so an edit that doesn't
+  // change a child's summary never propagates upward.
+  summaryHash       String?     @db.VarChar(64)
+  // Privacy opt-out: AI context never reads this node (no auto-refresh, no
+  // manual Generate, excluded from folder roll-up inputs and from folder
+  // chat's default source selection). Folders shield their whole subtree.
+  contextOptOut     Boolean     @default(false)
+  model             String?     @db.VarChar(100)
+  generatedAt       DateTime?   @db.Timestamptz(6)
+  updatedAt         DateTime    @updatedAt @db.Timestamptz(6)
+  node              ContentNode @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  @@index([contextDirty])
+}
+
+// Folder Studio: per-folder source selection for grounded chat (Phase 3).
+// Per-folder (not per-conversation) by design in v1 — one curated source set
+// per folder; conversation-level overrides are a later refinement.
+model StudioSourceSelection {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String      @db.Uuid
+  folderId        String      @db.Uuid
+  // Leaf node ids explicitly included (folder tri-state derives client-side)
+  includedNodeIds Json        @default("[]")
+  excludedNodeIds Json        @default("[]")
+  tokenBudget     Int         @default(64000)
+  updatedAt       DateTime    @updatedAt @db.Timestamptz(6)
+  owner           User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder          ContentNode @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, folderId])
+}
+
+// Folder Studio: job-execution runs (Phase 5). INTERIM table — WorkflowRun
+// requires a WorkflowDefinition FK that studio runs don't have; this is
+// shaped to migrate into it if that coupling ever loosens. promptSnapshot +
+// model are the artifact's provenance record.
+model StudioGenerationRun {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String      @db.Uuid
+  folderId       String      @db.Uuid
+  toolId         String      @db.VarChar(50)
+  variantId      String?     @db.VarChar(50)
+  sourceNodeIds  Json        @default("[]")
+  status         String      @default("running") @db.VarChar(20) // GenerationRunStatus contract
+  stepIndex      Int         @default(0)
+  stepTotal      Int         @default(1)
+  stepLabel      String      @default("") @db.VarChar(200)
+  outputNodeId   String?     @db.Uuid
+  // bodyHash of the output at creation — the GEN lock releases when the
+  // node's live hash diverges (human edited => eligible as a source again)
+  outputBodyHash String?     @db.VarChar(64)
+  error          String?
+  promptSnapshot String      @default("")
+  model          String      @default("") @db.VarChar(100)
+  createdAt      DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime    @updatedAt @db.Timestamptz(6)
+  owner          User        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  folder         ContentNode @relation("StudioRunFolder", fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId, folderId, createdAt])
+  @@index([outputNodeId])
+}
+
+// Folder Studio auto-context: per-user daily spend counter (V1.1 follow-up).
+// One row per (owner, UTC day); `generationCalls` counts LLM requests made
+// by the refresh engine (packs + folder roll-ups — NOT the manual per-node
+// Generate button). The engine's gate stack refuses to start/continue a
+// drain once the user's dailyCallCap (Studio settings) is reached. Soft
+// ceiling: concurrent drains may overshoot by one per-run cap at most.
+model StudioContextSpend {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String   @db.Uuid
+  // UTC calendar day, "YYYY-MM-DD" — string keying keeps resets timezone-simple.
+  day             String   @db.VarChar(10)
+  generationCalls Int      @default(0)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, day])
 }

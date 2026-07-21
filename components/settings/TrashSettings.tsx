@@ -1,5 +1,5 @@
 /**
- * TrashSettings — Settings → Trash & Data.
+ * TrashSettings — Settings → Trash.
  *
  * Lists the user's soft-deleted chats + orphaned documents, each with the
  * days left before the daily cron auto-purges it (30-day retention).
@@ -9,8 +9,17 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { MessageSquare, FileText, RotateCcw, Trash2, Loader2 } from "lucide-react";
+import {
+  FileText,
+  Loader2,
+  MessageSquare,
+  RotateCcw,
+  Trash2,
+} from "lucide-react";
 import { toast } from "sonner";
+
+import { Button } from "@/components/client/ui/button";
+import { SettingsEmptyState, SettingsPage } from "@/components/settings/ui";
 
 interface TrashItem {
   kind: "chat" | "content";
@@ -90,42 +99,39 @@ export function TrashSettings() {
   );
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Trash &amp; Data</h1>
-        <p className="text-muted-foreground mt-2">
-          Deleted chats and documents are kept for {retentionDays} days, then
-          permanently removed (along with their attachments). Restore anything
-          before then, or delete it now.
-        </p>
-      </div>
-
+    <SettingsPage
+      title="Trash"
+      description={`Deleted chats and documents are kept for ${retentionDays} days, then permanently removed along with their attachments. Restore anything before then, or delete it now.`}
+    >
       {items === null ? (
-        <div className="flex items-center gap-2 text-sm text-gray-500">
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" />
           Loading…
         </div>
       ) : items.length === 0 ? (
-        <div className="rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] p-8 text-center text-sm text-gray-500">
-          Trash is empty.
-        </div>
+        <SettingsEmptyState
+          icon={<Trash2 />}
+          title="Trash is empty"
+          description="Deleted chats and documents will appear here."
+        />
       ) : (
-        <div className="divide-y divide-black/5 dark:divide-white/5 rounded-lg border border-black/10 dark:border-white/10 overflow-hidden">
+        <div className="divide-y divide-black/5 overflow-hidden rounded-xl border border-black/10 dark:divide-white/5 dark:border-white/10">
           {items.map((item) => (
             <div
               key={`${item.kind}:${item.id}`}
               className="flex items-center gap-3 px-4 py-3"
             >
               {item.kind === "chat" ? (
-                <MessageSquare className="h-4 w-4 shrink-0 text-gray-500" />
+                <MessageSquare className="h-4 w-4 shrink-0 text-muted-foreground" />
               ) : (
-                <FileText className="h-4 w-4 shrink-0 text-gray-500" />
+                <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
               )}
               <div className="min-w-0 flex-1">
                 <div className="truncate text-sm font-medium">
-                  {item.title || (item.kind === "chat" ? "Untitled chat" : "Untitled")}
+                  {item.title ||
+                    (item.kind === "chat" ? "Untitled chat" : "Untitled")}
                 </div>
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-muted-foreground">
                   {item.kind === "chat" ? "Chat" : item.contentType ?? "Document"}
                   {" · "}
                   {item.daysLeft === 0
@@ -134,39 +140,46 @@ export function TrashSettings() {
                 </div>
               </div>
 
-              <button
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
                 onClick={() => void restore(item)}
                 disabled={busyId === item.id}
                 title="Restore"
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-600 dark:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/10 transition-colors disabled:opacity-40"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
                 Restore
-              </button>
+              </Button>
 
               {confirmPurgeId === item.id ? (
-                <button
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
                   onClick={() => void purge(item)}
                   disabled={busyId === item.id}
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 transition-colors disabled:opacity-40"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Confirm
-                </button>
+                </Button>
               ) : (
-                <button
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400"
                   onClick={() => setConfirmPurgeId(item.id)}
                   title="Delete permanently now"
-                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-gray-500 hover:text-red-400 hover:bg-black/[0.04] dark:hover:bg-white/10 transition-colors"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete now
-                </button>
+                </Button>
               )}
             </div>
           ))}
         </div>
       )}
-    </div>
+    </SettingsPage>
   );
 }

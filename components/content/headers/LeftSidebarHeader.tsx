@@ -11,9 +11,11 @@ import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { LeftSidebarHeaderActions } from "./LeftSidebarHeaderActions";
-import { PanelLeftClose, PanelLeft } from "lucide-react";
+import { Inbox, PanelLeftClose, PanelLeft } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { renderExtensionIcon } from "@/lib/extensions";
 import { useExtensionHeaderNavItems } from "@/lib/extensions/client-registry";
+import { useNotificationsStore } from "@/state/notifications-store";
 
 interface LeftSidebarHeaderProps {
   onCreateFolder: () => void;
@@ -30,12 +32,13 @@ interface LeftSidebarHeaderProps {
   onCreateVisualizationExcalidraw?: () => void;
   onCreateVisualizationDiagramsNet?: () => void;
   onCreateChat?: () => void;
+  onCreateWorkflow?: () => void;
+  onCreateN8nWorkflow?: () => void;
   onCreateAiImage?: () => void;
   onAddPeopleTarget?: () => void;
   // Stub types disabled until implemented:
   // onCreateData?: () => void;
   // onCreateHope?: () => void;
-  // onCreateWorkflow?: () => void;
   isCreateDisabled?: boolean;
 }
 
@@ -53,6 +56,8 @@ export function LeftSidebarHeader({
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
   onCreateChat,
+  onCreateWorkflow,
+  onCreateN8nWorkflow,
   onCreateAiImage,
   onAddPeopleTarget,
   isCreateDisabled = false,
@@ -60,16 +65,21 @@ export function LeftSidebarHeader({
   const { isSearchOpen, toggleSearch } = useSearchStore();
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
+  const pathname = usePathname();
+  const isPanelEmbed = pathname?.startsWith("/embed/panel") ?? false;
   const extensionNavItems = useExtensionHeaderNavItems();
+  const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
   // Daily Notes is type "action" with id "open-periodic-note", Publishing is type "view" with view "publishing-view"
   const subAffordanceIds = new Set(["open-periodic-note", "publishing-view"]);
 
-  // True whenever the user is anywhere in the files section (files, search, or a sub-affordance view).
-  // Drives: container background, folder tab active state, and sub-row visibility — all from one source.
+  // True whenever the user is anywhere in the files section (files, search,
+  // recents, or a sub-affordance view). Drives: container background, folder
+  // tab active state, and sub-row visibility — all from one source.
   const showFilesSection =
     activeView === "files" ||
     activeView === "search" ||
+    activeView === "recents" ||
     subAffordanceIds.has(activeView);
 
   const headerExtensionItems = extensionNavItems.filter(({ item }) => {
@@ -122,26 +132,24 @@ export function LeftSidebarHeader({
             </svg>
           </button>
 
-          {/* Extensions tab */}
+          {/* Inbox tab — core view (notifications / messages / connections) */}
           <button
             onClick={() => {
-              setActiveView("extensions");
+              setActiveView("inbox");
               if (isSearchOpen) toggleSearch();
             }}
-            className={`rounded-md p-1.5 transition-colors ${
-              activeView === "extensions" ? tabActive : tabInactive
+            className={`relative rounded-md p-1.5 transition-colors ${
+              activeView === "inbox" ? tabActive : tabInactive
             }`}
-            title="Extensions"
+            title="Inbox"
             type="button"
           >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
-              />
-            </svg>
+            <Inbox className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-sky-500 px-1 text-[9px] font-semibold text-white">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Extension-registered top-level tabs (people, calendar, etc.) */}
@@ -173,23 +181,48 @@ export function LeftSidebarHeader({
               </button>
             );
           })}
-        </div>
 
-        {/* Panel collapse toggle */}
-        <div className="flex shrink-0 items-center gap-1">
+          {/* Extensions tab — deliberately LAST on the rail (2026-07-16) */}
           <button
-            onClick={toggleMode}
-            className={`rounded p-1 transition-colors ${tabInactive}`}
-            title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
+            onClick={() => {
+              setActiveView("extensions");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded-md p-1.5 transition-colors ${
+              activeView === "extensions" ? tabActive : tabInactive
+            }`}
+            title="Extensions"
             type="button"
           >
-            {mode === "full" ? (
-              <PanelLeftClose className="h-4 w-4" />
-            ) : (
-              <PanelLeft className="h-4 w-4" />
-            )}
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z"
+              />
+            </svg>
           </button>
         </div>
+
+        {/* Panel collapse toggle — hidden in the side-panel embed, which has
+            its own tree collapse bar (BROWSER-REACH B1) */}
+        {!isPanelEmbed && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              onClick={toggleMode}
+              className={`rounded p-1 transition-colors ${tabInactive}`}
+              title={mode === "full" ? "Collapse sidebar (Cmd+B)" : "Expand sidebar (Cmd+B)"}
+              type="button"
+            >
+              {mode === "full" ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeft className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sub-affordance row — visible for any view in the files section */}
@@ -221,6 +254,28 @@ export function LeftSidebarHeader({
                 strokeLinejoin="round"
                 strokeWidth={2}
                 d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              />
+            </svg>
+          </button>
+
+          {/* Recents — Obsidian-style recently-viewed list (navigation history) */}
+          <button
+            onClick={() => {
+              setActiveView(activeView === "recents" ? "files" : "recents");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded p-0.5 transition-colors ${
+              activeView === "recents" ? subActive : subInactive
+            }`}
+            title="Recents"
+            type="button"
+          >
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
           </button>
@@ -272,6 +327,8 @@ export function LeftSidebarHeader({
             onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
             onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
             onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
+            onCreateWorkflow={onCreateWorkflow ? () => onCreateWorkflow() : undefined}
+            onCreateN8nWorkflow={onCreateN8nWorkflow ? () => onCreateN8nWorkflow() : undefined}
             onCreateAiImage={onCreateAiImage ? () => onCreateAiImage() : undefined}
             onAddPeopleTarget={onAddPeopleTarget ? () => onAddPeopleTarget() : undefined}
             disabled={isCreateDisabled}

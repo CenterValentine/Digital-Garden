@@ -17,8 +17,15 @@ export const flashcardsExtensionManifest: ExtensionManifest = {
       label: "Flashcards",
       title: "Flashcards",
       iconName: "Layers",
-      order: 25,
+      order: 40,
     },
   ],
   surfaces: ["left-sidebar", "global-dialog"],
+  settings: {
+    path: "/settings/extensions/flashcards",
+    label: "Flashcards",
+    title: "Flashcards",
+    description: "Set default card labels, play order, and skill paths.",
+    order: 25,
+  },
 };

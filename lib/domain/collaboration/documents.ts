@@ -83,6 +83,76 @@ export async function loadCollaborationYDocState(
   return update;
 }
 
+/**
+ * Rebuild the CollaborationDocument Y.Doc from the note's CURRENT NotePayload.
+ *
+ * Use this after any write path that updates `NotePayload` WITHOUT going through
+ * the collaborative Y.Doc — the browser extension being the canonical example
+ * (`updateExtensionNoteContent` writes only NotePayload). Without this, a
+ * previously-stored, now-stale-but-non-empty `CollaborationDocument` wins during
+ * bootstrap (see `loadCollaborationYDocState`: a meaningful stored state is
+ * trusted over the payload), so the collaborative layer serves STALE content and
+ * masks the extension's edit. Re-seeding realigns the collaborative snapshot with
+ * the authoritative payload the user just wrote.
+ *
+ * Safety: this only rewrites the durable DB snapshot. It does not reach into a
+ * live Hocuspocus in-memory session — if one is connected it remains
+ * authoritative and re-persists on its next store. The dominant case (an
+ * extension-authored note that is NOT currently open in a live collab session)
+ * is fully corrected; the concurrent-live-session case is the inherent
+ * two-writers conflict and is out of scope here.
+ */
+export async function reseedCollaborationDocumentFromNote(
+  prisma: PrismaClient,
+  contentId: string
+): Promise<void> {
+  const documentName = getCollaborationDocumentName(contentId);
+  const content = await prisma.contentNode.findFirst({
+    where: {
+      id: contentId,
+      contentType: "note",
+      deletedAt: null,
+    },
+    include: {
+      notePayload: true,
+    },
+  });
+
+  if (!content?.notePayload) {
+    return;
+  }
+
+  const sanitizedContent = sanitizeTipTapJsonWithExtensions(
+    content.notePayload.tiptapJson as JSONContent,
+    getCollaborationServerExtensions()
+  ).json;
+
+  const ydoc = TiptapTransformer.toYdoc(
+    sanitizedContent,
+    "default",
+    getCollaborationServerExtensions()
+  );
+  const update = Y.encodeStateAsUpdate(ydoc);
+  ydoc.destroy();
+
+  await prisma.collaborationDocument.upsert({
+    where: { contentId },
+    update: {
+      documentName,
+      ownerId: content.ownerId,
+      ydocState: Buffer.from(update),
+      snapshotJson: sanitizedContent,
+    },
+    create: {
+      contentId,
+      ownerId: content.ownerId,
+      documentName,
+      ydocState: Buffer.from(update),
+      snapshotJson: sanitizedContent,
+    },
+  });
+}
+
 export async function storeCollaborationYDocState(
   prisma: PrismaClient,
   documentName: string,

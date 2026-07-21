@@ -24,7 +24,12 @@
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type UIMessage, type FileUIPart } from "ai";
+import {
+  DefaultChatTransport,
+  lastAssistantMessageIsCompleteWithApprovalResponses,
+  type UIMessage,
+  type FileUIPart,
+} from "ai";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -39,6 +44,7 @@ import {
 } from "@/components/content/ai/ModelPicker";
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
+import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 
 /** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
 const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -57,8 +63,60 @@ const COMMAND_HINTS: Record<string, string> = {
  * That keeps the transport pure and side-steps the React Compiler's
  * render-time ref-read prohibition.
  */
+/**
+ * Per-chat baseline request bodies (S4 smoke fix, 2026-07-18).
+ *
+ * The SDK fires INTERNAL requests through the transport WITHOUT the
+ * per-call `sendMessage(msg, { body })` enrichment — the approval
+ * auto-resume (`sendAutomaticallyWhen` → makeRequest) was the
+ * reproducible "network error": a naked resume ran under default
+ * provider resolution with no conversation binding, so the approved
+ * tool executed against the wrong vendor and nothing persisted. Each
+ * engine instance registers a resolver keyed by its useChat id; the
+ * transport merges it UNDER any per-call body (per-call wins).
+ */
+const chatBodyResolvers = new Map<string, () => Record<string, unknown>>();
+
+/**
+ * Turn-start body snapshots (2026-07-18 smoke #2): a resume must run with
+ * the body that STARTED the turn. Live state can flip mid-run — the
+ * per-conversation model memory re-seeds the active selection from
+ * message stamps on (re)load, which switched a Sonnet-4 run to the
+ * unavailable claude-sonnet-3-5 between the send and its approval
+ * resume. Every real user send (carries providerId) is snapshotted here;
+ * internal sends replay the snapshot, falling back to the live resolver
+ * only when no turn has been sent yet in this chat instance.
+ */
+const lastSentBodies = new Map<string, Record<string, unknown>>();
+
 const chatTransport = new DefaultChatTransport({
   api: "/api/ai/chat",
+  prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => {
+    const perCall =
+      body && typeof body === "object"
+        ? (body as Record<string, unknown>)
+        : undefined;
+    if (id && perCall && "providerId" in perCall) {
+      lastSentBodies.set(id, perCall);
+    }
+    const baseline = id
+      ? (lastSentBodies.get(id) ?? chatBodyResolvers.get(id)?.() ?? {})
+      : {};
+    // Replicates the SDK's default payload shape; per-call body wins over
+    // the baseline so explicit sends behave exactly as before.
+    return {
+      body: {
+        ...baseline,
+        ...(perCall ?? {}),
+        id,
+        // Payload diet: strip provider ciphertext (encryptedContent) from
+        // prior tool results — multi-MB otherwise, which kills the POST.
+        messages: compactToolOutputs(messages),
+        trigger,
+        messageId,
+      },
+    };
+  },
 });
 
 /**
@@ -147,6 +205,16 @@ export interface UseConversationEngineResult {
   stop: () => void;
   error: Error | undefined;
   setMessages: ReturnType<typeof useChat>["setMessages"];
+  /**
+   * Respond to a tool approval request (AI SDK v6 native HITL — AI v3 core
+   * S1). Tools flagged `needsApproval` pause the loop in
+   * `approval-requested` state; the chat surface renders an approval card
+   * whose Approve/Reject calls this. The loop resumes automatically once
+   * all pending approvals are answered.
+   */
+  addToolApprovalResponse: ReturnType<
+    typeof useChat
+  >["addToolApprovalResponse"];
   /** True while the model is processing (submitted or streaming). */
   isActive: boolean;
 
@@ -494,6 +562,11 @@ export function useConversationEngine({
     id: conversationKey,
     messages: initialMessages,
     experimental_throttle: 100,
+    // Resume the tool loop automatically once every pending needsApproval
+    // request on the last assistant message has been answered (AI v3 core
+    // S1). Without this, an approval response would sit in client state and
+    // never re-trigger the server.
+    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
     onError: (err) => {
       if (onError) {
         onError(err);
@@ -575,8 +648,40 @@ export function useConversationEngine({
     },
   });
 
-  const { messages, sendMessage, status, stop, error, setMessages, regenerate } =
-    chat;
+  const {
+    messages,
+    sendMessage,
+    status,
+    stop,
+    error,
+    setMessages,
+    regenerate,
+    addToolApprovalResponse,
+  } = chat;
+
+  // Keep the transport's baseline body for this chat current. Internal
+  // SDK sends (approval resume, regenerate) read it at request time.
+  useEffect(() => {
+    chatBodyResolvers.set(conversationKey, () => ({
+      contentId,
+      conversationId,
+      contextId: activeContextId ?? null,
+      providerId,
+      modelId,
+      mentionedContentIds: [] as string[],
+    }));
+    return () => {
+      chatBodyResolvers.delete(conversationKey);
+      lastSentBodies.delete(conversationKey);
+    };
+  }, [
+    conversationKey,
+    contentId,
+    conversationId,
+    activeContextId,
+    providerId,
+    modelId,
+  ]);
   const isActive = status === "streaming" || status === "submitted";
 
   // ── per-message provider + model stamping ──
@@ -732,6 +837,46 @@ export function useConversationEngine({
   const removeAttachment = useCallback((id: string) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
   }, []);
+
+  // ── Folder Studio tool invocation ──
+  // A studio tool tile stashes its composed prompt in sessionStorage before
+  // switching the sidebar to the chat tab; the engine consumes it exactly
+  // once as soon as it can send. Storage (not a CustomEvent) makes the
+  // hand-off survive the tab-mount race; removeItem-before-send makes it
+  // single-shot even under StrictMode double-effects.
+  useEffect(() => {
+    if (!contentId || status !== "ready") return;
+    let prompt: string | null = null;
+    try {
+      const key = `dg:studio-invoke:${contentId}`;
+      prompt = window.sessionStorage.getItem(key);
+      if (prompt) window.sessionStorage.removeItem(key);
+    } catch {
+      return; // storage unavailable — tile falls back to nothing sent
+    }
+    if (!prompt || !prompt.trim()) return;
+    sendMessage(
+      { parts: [{ type: "text", text: prompt }] },
+      {
+        body: {
+          contentId,
+          conversationId,
+          contextId: activeContextId ?? null,
+          providerId,
+          modelId,
+          mentionedContentIds: [],
+        },
+      },
+    );
+  }, [
+    contentId,
+    status,
+    sendMessage,
+    conversationId,
+    activeContextId,
+    providerId,
+    modelId,
+  ]);
 
   // ── send ──
   // `input` is already canonical `@[Title](id)` (the composer's
@@ -922,6 +1067,7 @@ export function useConversationEngine({
     stop,
     error,
     setMessages,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,

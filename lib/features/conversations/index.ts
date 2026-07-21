@@ -24,6 +24,7 @@ export type {
 export {
   ConversationNotFoundError,
   appendMessage,
+  updateMessageParts,
   createConversation,
   ensureConversationContentNode,
   findConversationIdByArchivedContent,

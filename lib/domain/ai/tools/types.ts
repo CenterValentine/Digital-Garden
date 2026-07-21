@@ -12,6 +12,18 @@ export interface ToolExecuteContext {
   /** The content node being edited — required for editor tools */
   contentId?: string;
   /**
+   * The bound Conversation entity id (sidebar multi-conv / full-page chat).
+   * AI v3 core S3: lets tools associate created/read content with the
+   * conversation (dual association — node + target folder).
+   */
+  conversationId?: string;
+  /**
+   * The conversation's target folder (AI v3 core S3, umbrella decision #7).
+   * read_page files page nodes here; document tools default their
+   * destination to it.
+   */
+  targetFolderId?: string;
+  /**
    * The chat content node id when this chat is being viewed as a full-page
    * ChatViewer (i.e. the chat IS the open content, not the editor). Set
    * even though `contentId` is intentionally undefined for editor tools.

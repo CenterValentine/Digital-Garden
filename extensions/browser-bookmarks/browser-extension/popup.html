@@ -61,6 +61,22 @@
           </svg>
           Quick Capture
         </button>
+
+        <!-- Workflows: run one against this page (Trellis or n8n engine) -->
+        <div class="workflow-section">
+          <button id="run-workflow-btn" class="btn-workflow" aria-expanded="false">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+              <path d="M2.5 1.5L10 6L2.5 10.5V1.5Z" fill="currentColor"/>
+            </svg>
+            Run Workflow
+            <span class="workflow-caret" aria-hidden="true">▾</span>
+          </button>
+          <div id="workflow-chooser" class="workflow-chooser" style="display:none;"></div>
+          <div id="workflow-runs" class="workflow-runs" style="display:none;">
+            <div class="workflow-runs-header">Recent runs</div>
+            <div id="workflow-runs-list"></div>
+          </div>
+        </div>
       </div>
 
       <!-- Footer -->

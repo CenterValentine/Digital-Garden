@@ -32,6 +32,8 @@ interface SettingsStore extends UserSettings {
   setCalendarSettings: (calendar: Partial<NonNullable<UserSettings["calendar"]>>) => Promise<void>;
   setPeriodicNotesSettings: (periodicNotes: Partial<NonNullable<UserSettings["periodicNotes"]>>) => Promise<void>;
   setFlashcardSettings: (flashcards: Partial<NonNullable<UserSettings["flashcards"]>>) => Promise<void>;
+  setNotificationsSettings: (notifications: Partial<NonNullable<UserSettings["notifications"]>>) => Promise<void>;
+  setStudioSettings: (studio: Partial<NonNullable<UserSettings["studio"]>>) => Promise<void>;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -99,6 +101,8 @@ export const useSettingsStore = create<SettingsStore>()(
           calendar: current.calendar,
           periodicNotes: current.periodicNotes,
           flashcards: current.flashcards,
+          notifications: current.notifications,
+          studio: current.studio,
         };
 
         set({ isSyncing: true, error: null });
@@ -232,6 +236,18 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.periodicNotes?.weekly,
               ...periodicNotes.weekly,
             },
+            monthly: {
+              ...state.periodicNotes?.monthly,
+              ...periodicNotes.monthly,
+            },
+            quarterly: {
+              ...state.periodicNotes?.quarterly,
+              ...periodicNotes.quarterly,
+            },
+            yearly: {
+              ...state.periodicNotes?.yearly,
+              ...periodicNotes.yearly,
+            },
           },
           hasPendingChanges: true,
         }));
@@ -243,6 +259,32 @@ export const useSettingsStore = create<SettingsStore>()(
           flashcards: {
             ...state.flashcards,
             ...flashcards,
+          },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setNotificationsSettings: async (notifications) => {
+        set((state) => ({
+          notifications: {
+            ...state.notifications,
+            ...notifications,
+            kinds: {
+              ...state.notifications?.kinds,
+              ...notifications.kinds,
+            },
+          },
+          hasPendingChanges: true,
+        }));
+        await get().saveToBackend();
+      },
+
+      setStudioSettings: async (studio) => {
+        set((state) => ({
+          studio: {
+            ...state.studio,
+            ...studio,
           },
           hasPendingChanges: true,
         }));

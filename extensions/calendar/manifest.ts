@@ -3,7 +3,9 @@ import { GOOGLE_CALENDAR_SCOPE } from "./server/types";
 
 export const CALENDAR_EXTENSION_ID = "calendar";
 export const CALENDAR_VIEW_KEY = "calendar";
-export const CALENDAR_SETTINGS_PATH = "/settings/calendar";
+export const CALENDAR_SETTINGS_PATH = "/settings/extensions/calendar";
+/** Legacy route — kept in OAuth redirect prefixes; the page now redirects. */
+const CALENDAR_LEGACY_SETTINGS_PATH = "/settings/calendar";
 
 export const calendarExtensionManifest: ExtensionManifest = {
   id: CALENDAR_EXTENSION_ID,
@@ -18,7 +20,7 @@ export const calendarExtensionManifest: ExtensionManifest = {
       label: "Calendar",
       title: "Calendar",
       iconName: "CalendarDays",
-      order: 30,
+      order: 20,
     },
   ],
   surfaces: ["left-sidebar", "main-workspace", "right-sidebar", "global-dialog"],
@@ -33,7 +35,7 @@ export const calendarExtensionManifest: ExtensionManifest = {
     google: {
       scopes: [GOOGLE_CALENDAR_SCOPE],
       scopeTokens: ["calendar"],
-      redirectPrefixes: [CALENDAR_SETTINGS_PATH],
+      redirectPrefixes: [CALENDAR_SETTINGS_PATH, CALENDAR_LEGACY_SETTINGS_PATH],
     },
   },
   slashCommands: ["create-calendar-event", "insert-calendar-view-block"],

@@ -12,6 +12,7 @@ import { createElement, useState, useEffect, useCallback, useMemo, useRef } from
 import { usePathname } from "next/navigation";
 import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
+import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
 import { ContentToolbar } from "../toolbar";
@@ -1856,6 +1857,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     selectedContentId,
     contentType,
   });
+
+  // Inbox core view — full-panel takeover in the primary pane
+  if (activeView === "inbox" && paneId === "top-left") {
+    return (
+      <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
+        <InboxMainWorkspace />
+      </ToolSurfaceProvider>
+    );
+  }
+
   if (ExtensionMainWorkspace && paneId === "top-left") {
     return (
       <ToolSurfaceProvider contentType={null} handlers={toolHandlers}>
@@ -2023,7 +2034,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       <div className="flex flex-col h-full">
         {/* Note title header with debug toggle */}
         {!isEmbedMode && (
-          <div className="flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
+          <div className="doc-title-header flex-none px-6 pt-6 pb-4 flex items-start justify-between shadow-[0_4px_8px_-2px_rgba(15,23,42,0.08),0_10px_24px_-6px_rgba(15,23,42,0.05)]">
             {isTitleEditing ? (
               <input
                 ref={titleInputRef}

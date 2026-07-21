@@ -1,3 +1,4 @@
+import { withWorkflow } from "workflow/next";
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
@@ -97,7 +98,15 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        // Embed routes are loaded inside the browser extension iframe
+        // Embed routes are loaded inside the browser extension iframe — both
+        // the in-page overlay (ancestor = any web page) and the side panel
+        // (ancestor = chrome-extension://<id>).
+        //
+        // CSP subtlety: `frame-ancestors *` matches ONLY network schemes
+        // (http/https/ws/wss) — custom schemes like chrome-extension:// must
+        // be listed explicitly or the side panel gets ERR_BLOCKED_BY_RESPONSE.
+        // When NEXT_PUBLIC_EMBED_EXTENSION_IDS is set, only those extension
+        // origins may frame embeds; unset (dev) allows any extension.
         source: "/embed/:path*",
         headers: [
           {
@@ -109,7 +118,14 @@ const nextConfig: NextConfig = {
               "img-src 'self' data: https: blob:",
               "connect-src 'self' http: https: wss: ws:",
               "frame-src https://embed.diagrams.net https://*.diagrams.net",
-              "frame-ancestors *",
+              `frame-ancestors * ${
+                process.env.NEXT_PUBLIC_EMBED_EXTENSION_IDS?.trim()
+                  ? process.env.NEXT_PUBLIC_EMBED_EXTENSION_IDS.split(",")
+                      .map((id) => `chrome-extension://${id.trim()}`)
+                      .filter((s) => s !== "chrome-extension://")
+                      .join(" ")
+                  : "chrome-extension:"
+              }`,
             ].join("; "),
           },
         ],
@@ -123,4 +139,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withWorkflow(nextConfig);

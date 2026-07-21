@@ -37,11 +37,15 @@ export async function GET(request: NextRequest) {
       const opts: ListConversationsOptions = {};
 
       const forIdsParam = url.searchParams.get("forContentNodeIds");
+      const targetFolderId = url.searchParams.get("targetFolderId");
       if (forIdsParam) {
         opts.forContentNodeIds = forIdsParam
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean);
+      }
+      if (targetFolderId) {
+        opts.targetFolderId = targetFolderId;
       }
 
       const cursor = url.searchParams.get("cursor");

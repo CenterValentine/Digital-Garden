@@ -6,6 +6,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/extensions/studio/server/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
@@ -793,6 +795,22 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (requestedContentType === "workflow") {
+      // User-authored workflow — seeded with the job-application starter
+      // graph; edited in the builder (workflows extension content viewer).
+      contentType = "workflow";
+      const { blankWorkflowGraph, WDK_INTERPRETER_ENGINE } = await import(
+        "@/extensions/workflows/graph/schema"
+      );
+      payloadData = {
+        workflowPayload: {
+          create: {
+            engine: WDK_INTERPRETER_ENGINE,
+            definition: blankWorkflowGraph() as unknown as Prisma.InputJsonValue,
+            enabled: true,
+          },
+        },
+      };
     } else {
       return NextResponse.json(
         {
@@ -865,6 +883,10 @@ export async function POST(request: NextRequest) {
         throw new Error("Created external content could not be reloaded");
       }
     }
+
+    // Folder Studio auto-context: a new child changes the parent's roll-up
+    // inputs. Root-level creates have no parent chain to flag (no-op).
+    after(() => markContextDirty([parentId || null]));
 
     // Format response
     const response: ContentDetailResponse = {

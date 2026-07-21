@@ -7,6 +7,7 @@
 "use client";
 
 import { createElement, useEffect, useState, useCallback, useRef, memo } from "react";
+import { usePathname } from "next/navigation";
 import type { ComponentType, RefObject } from "react";
 import {
   ChevronDown,
@@ -97,6 +98,7 @@ interface MainPanelNavigationProps {
 NavigationButtons.displayName = "NavigationButtons";
 
 export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
+  const pathname = usePathname();
   const layoutMode = useContentStore((state) => state.layoutMode);
   const paneContentId = useContentStore((state) => getPaneActiveContentId(state, paneId));
   const activeTabTitle = useContentStore((state) => {
@@ -245,6 +247,11 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
     LAYOUT_OPTIONS.find((option) => option.mode === layoutMode) ?? LAYOUT_OPTIONS[0];
   const CurrentLayoutIcon = currentLayout.icon;
 
+  // The side-panel embed is single-pane by necessity (panel width) — hide the
+  // pane-layout selector there while keeping the workspace chooser and the
+  // rest of the bar. Enforcement of the mode itself lives in PanelShellClient.
+  const isPanelEmbed = pathname?.startsWith("/embed/panel") ?? false;
+
   return (
     <>
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-2 py-1">
@@ -264,6 +271,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
               paneId,
             })
           )}
+          {!isPanelEmbed && (
           <div className="relative">
             <button
               ref={layoutButtonRef}
@@ -312,6 +320,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
               </div>
             )}
           </div>
+          )}
           {shellNavigationTrailingControls.map((Control) =>
             createElement(Control, {
               key: Control.displayName ?? Control.name,

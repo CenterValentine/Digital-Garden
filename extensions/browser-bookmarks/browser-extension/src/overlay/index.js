@@ -470,7 +470,16 @@ function openEmbedForPanel(state, panel) {
   panel.body.appendChild(iframe);
   state.iframePanel = panel;
 
-  if (state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
+  // Run deep-link (workflow panels): consume the one-shot marker and force a
+  // fresh src so ?run= reaches the embed viewer even if this content id is
+  // already loaded.
+  const pendingRunId =
+    state.pendingRunDeepLink && state.pendingRunDeepLink.contentId === panel.contentId
+      ? state.pendingRunDeepLink.runId
+      : null;
+  if (pendingRunId) state.pendingRunDeepLink = null;
+
+  if (!pendingRunId && state.iframeContentId === panel.contentId && iframe.getAttribute("src")) {
     // Already loaded — send a navigate message instead of reloading
     iframe.contentWindow?.postMessage({ type: "open", contentId: panel.contentId }, "*");
     iframe.setAttribute("data-active", "true");
@@ -502,9 +511,14 @@ function openEmbedForPanel(state, panel) {
       const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
       const targetPath = `/embed/content/${panel.contentId}`;
       const sessionToken = response.data?.token;
+      const runParam = pendingRunId
+        ? `run=${encodeURIComponent(pendingRunId)}`
+        : "";
       const iframeSrc = sessionToken
-        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}`
-        : targetUrl;
+        ? `${baseUrl}${targetPath}?_t=${encodeURIComponent(sessionToken)}${runParam ? `&${runParam}` : ""}`
+        : runParam
+          ? `${targetUrl}?${runParam}`
+          : targetUrl;
 
       iframe.setAttribute("src", iframeSrc);
     });
@@ -1000,6 +1014,11 @@ function overlayStyles() {
       cursor: grab; touch-action: none;
     }
     .dg-panel-collapsed[data-open="true"] { display: inline-flex; pointer-events: auto; }
+    /* Freeze affordance — clickable in both open and collapsed states */
+    .dg-floating-panel[data-frozen="true"] .dg-freeze-toggle { color: #7cc7ff; opacity: 1; }
+    .dg-chip-freeze { font-style: normal; margin: 0 2px; opacity: 0.5; cursor: pointer; }
+    .dg-chip-freeze:hover { opacity: 0.9; }
+    .dg-panel-collapsed[data-frozen="true"] .dg-chip-freeze { opacity: 1; color: #7cc7ff; }
     .dg-panel-banner { padding: 10px 12px; margin: 0 14px; border-radius: 14px; background: rgba(216,176,92,0.12); color: #f2e2b6; font-size: 12px; line-height: 1.45; }
 
     /* ── Target / embed UI ── */
@@ -1204,6 +1223,7 @@ function scheduleTabPersist(state) {
         width: panel.width,
         height: panel.height,
         opacity: panel.opacity,
+        frozen: panel.frozen === true,
       }));
     runtimeMessage({ type: "save-tab-panels", payload: { panels } }).catch(
       () => {}
@@ -1227,8 +1247,10 @@ async function restoreTabStickyPanels(state) {
     if (!descriptor?.contentId || state.openPanels.has(descriptor.contentId)) {
       continue;
     }
-    // Skip panels opened on a different hostname — they belong to another site.
-    if (descriptor.host && descriptor.host !== currentHost) {
+    // Skip panels opened on a different hostname — they belong to another
+    // site. Exception: FROZEN panels follow the user everywhere (open or
+    // collapsed) until closed or unfrozen.
+    if (!descriptor.frozen && descriptor.host && descriptor.host !== currentHost) {
       continue;
     }
     const item = { id: descriptor.contentId, title: descriptor.title || null };
@@ -1245,6 +1267,7 @@ async function restoreTabStickyPanels(state) {
       height: descriptor.height ?? null,
       opacity: descriptor.opacity ?? 1,
       embeddedSelector: null, // page changed — no element to anchor to
+      frozen: descriptor.frozen === true,
       metadata: {},
     };
     createContentPanel(state, item, descriptor.kind || "note", persisted);
@@ -2507,6 +2530,19 @@ function makePanelDraggable(state, panel) {
   });
 }
 
+// Frozen panels: visual sync + toggle. Frozen = restored on every page in
+// this tab (open or collapsed) regardless of hostname, until closed/unfrozen.
+function syncPanelFrozenVisual(panel) {
+  panel.container.dataset.frozen = panel.frozen ? "true" : "false";
+  panel.collapsedChip.dataset.frozen = panel.frozen ? "true" : "false";
+}
+
+function togglePanelFrozen(state, panel) {
+  panel.frozen = panel.frozen !== true;
+  syncPanelFrozenVisual(panel);
+  scheduleTabPersist(state);
+}
+
 function createContentPanel(state, item, kind, persisted = null) {
   const existing = state.openPanels.get(item.id);
   if (existing) {
@@ -2530,6 +2566,7 @@ function createContentPanel(state, item, kind, persisted = null) {
         <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
+        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Freeze — keep this panel open on every page">❆</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -2540,7 +2577,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const collapsedChip = document.createElement("button");
   collapsedChip.className = "dg-panel-collapsed";
   collapsedChip.type = "button";
-  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><strong>Open</strong>`;
+  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Freeze — keep this panel open on every page">❆</em><strong>Open</strong>`;
 
   state.panelsMount.appendChild(container);
   state.panelsMount.appendChild(collapsedChip);
@@ -2566,6 +2603,9 @@ function createContentPanel(state, item, kind, persisted = null) {
     opacity: persisted?.opacity ?? 1,
     embeddedSelector: persisted?.embeddedSelector || null,
     embeddedPlacement: persisted?.embeddedPlacement || "after",
+    // Frozen panels survive cross-hostname navigation (restored on ANY page,
+    // open or collapsed) until the user closes or unfreezes them.
+    frozen: persisted?.frozen === true,
     metadata: persisted?.metadata || {},
     currentContent: null,
     autosaveTimer: null,
@@ -2577,6 +2617,7 @@ function createContentPanel(state, item, kind, persisted = null) {
 
   state.openPanels.set(item.id, panel);
   scheduleTabPersist(state); // remember this note for in-tab navigation
+  syncPanelFrozenVisual(panel);
   makePanelDraggable(state, panel);
   wirePanelDirectEditor(state, panel);
   applyPanelGeometry(state, panel);
@@ -2654,6 +2695,11 @@ function createContentPanel(state, item, kind, persisted = null) {
       return;
     }
 
+    if (action === "freeze") {
+      togglePanelFrozen(state, panel);
+      return;
+    }
+
     if (action === "collapse") {
       closePanel(state, panel.contentId, "collapsed");
       return;
@@ -2663,6 +2709,14 @@ function createContentPanel(state, item, kind, persisted = null) {
       closePanel(state, panel.contentId, "closed");
     }
   });
+
+  // Freeze glyph on the collapsed chip — toggles without reopening the panel.
+  collapsedChip
+    .querySelector(".dg-chip-freeze")
+    ?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      togglePanelFrozen(state, panel);
+    });
 
   collapsedChip.addEventListener("click", () => {
     if (Date.now() < panel.suppressChipClickUntil) return;
@@ -2822,12 +2876,54 @@ function beginEmbedTargeting(state, panel) {
   document.body.style.cursor = "crosshair";
 }
 
-async function openAssociatedContent(state, contentId, contentKind) {
+// Corner placement for panels popped out of the side panel. The side panel
+// shows four quadrants during a tab drag; whichever the user drops on maps to
+// a corner of the page here. Sized to leave a comfortable margin so the panel
+// never sits flush against the viewport edge.
+function geometryForCorner(corner) {
+  const margin = 24;
+  const width = Math.min(460, Math.round(window.innerWidth * 0.42));
+  const height = Math.min(
+    Math.round(window.innerHeight * 0.62),
+    Math.max(320, Math.round(window.innerHeight * 0.5))
+  );
+  const left = margin;
+  const right = Math.max(margin, window.innerWidth - width - margin);
+  const top = margin;
+  const bottom = Math.max(margin, window.innerHeight - height - margin);
+  const positions = {
+    "top-left": { x: left, y: top },
+    "top-right": { x: right, y: top },
+    "bottom-left": { x: left, y: bottom },
+    "bottom-right": { x: right, y: bottom },
+  };
+  const position = positions[corner] || positions["top-right"];
+  return {
+    state: "open",
+    layoutMode: "floating",
+    dockSide: "right",
+    positionX: position.x,
+    positionY: position.y,
+    width,
+    height,
+    opacity: 1,
+    embeddedSelector: null,
+    metadata: {},
+  };
+}
+
+async function openAssociatedContent(state, contentId, contentKind, runId, corner) {
   // "embed" = any content type the embed shell can render (file, folder, visualization, etc.)
   const kind = contentKind === "external" ? "external" : contentKind === "note" ? "note" : "embed";
+  // Workflow run deep-link: consumed once by openEmbedForPanel, which appends
+  // ?run= so the embed viewer lands directly on that run's detail.
+  state.pendingRunDeepLink = runId ? { contentId, runId } : null;
   const context = state.resourceContext;
-  const persisted =
-    context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
+  // An explicit corner (popped out of the side panel) wins over any persisted
+  // geometry — the user just told us where they want it.
+  const persisted = corner
+    ? geometryForCorner(corner)
+    : context?.viewStates?.find((entry) => entry.contentId === contentId) || null;
   const source =
     (context?.associations || []).find((entry) => entry.content.id === contentId)?.content ||
     (context?.externalContents || []).find((entry) => entry.id === contentId) ||
@@ -3113,7 +3209,9 @@ function wireRootEvents(state) {
           await openAssociatedContent(
             state,
             message.payload?.contentId,
-            message.payload?.contentKind || "external"
+            message.payload?.contentKind || "external",
+            message.payload?.runId,
+            message.payload?.corner
           );
           sendResponse?.({ ok: true });
         } catch (error) {
@@ -3190,13 +3288,23 @@ function wireRootEvents(state) {
 
   // ── Floating launcher button ───────────────────────────────────────────────
 
-  state.launcherBtn.addEventListener("click", () => {
+  state.launcherBtn.addEventListener("click", (event) => {
     if (Date.now() < state.suppressMainButtonClickUntil) return;
-    if (state.panelOpen) {
-      closeSnapPanel(state);
-    } else {
-      void openSnapPanel(state);
+    // Decision #11 (BROWSER-REACH B1): the launch-handle opens the side panel.
+    // Alt/Shift-click keeps the legacy in-page overlay reachable while the
+    // panel absorbs its flows session by session.
+    if (event.altKey || event.shiftKey) {
+      if (state.panelOpen) {
+        closeSnapPanel(state);
+      } else {
+        void openSnapPanel(state);
+      }
+      return;
     }
+    chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
+      // Older Chromium without sidePanel support falls back to the overlay.
+      if (chrome.runtime.lastError) void openSnapPanel(state);
+    });
   });
 
   let launcherDrag = null;
@@ -4160,5 +4268,219 @@ chrome.runtime.onMessage.addListener((message) => {
     }
   } else if (message.type === "dg-tts-stop") {
     dgStopTts();
+  }
+});
+
+// ── Workflows: page-text extraction + dispatch status pill ───────────────────
+// Standalone (like TTS above): no dependency on the overlay panel state, so
+// dispatch acknowledgement works even before the user ever opens the overlay.
+
+chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  if (message?.type === "dg-extract-page-text") {
+    // Rendered text (innerText respects visibility), not raw HTML — this is
+    // what the workflow's capture note stores. Sync response.
+    let text = "";
+    try {
+      text = document.body?.innerText || document.body?.textContent || "";
+    } catch (_) {}
+    sendResponse({ text: text.slice(0, 100000) });
+    return; // responded synchronously
+  }
+});
+
+const DG_WF_TERMINAL = new Set(["succeeded", "failed", "canceled"]);
+const DG_WF_STATUS = {
+  queued: { label: "Queued…", color: "#9aa4b2" },
+  running: { label: "Running…", color: "#7cb1ff" },
+  waiting: { label: "Needs your review", color: "#ffd27a" },
+  succeeded: { label: "Completed", color: "#8fe0b3" },
+  failed: { label: "Failed", color: "#ff8a8a" },
+  canceled: { label: "Canceled", color: "#9aa4b2" },
+};
+const DG_WF_POLL_MS = 3000;
+const DG_WF_POLL_MAX = 200; // ~10 min — a stuck run shouldn't poll forever
+const DG_WF_LINGER_MS = 6000;
+
+let dgWfPill = null;
+let dgWfPollTimer = null;
+let dgWfLingerTimer = null;
+/** { runId, workflowNodeId } for the run the pill currently tracks. */
+let dgWfCurrent = null;
+
+function dgWfEnsurePill() {
+  if (dgWfPill && document.documentElement.contains(dgWfPill.root)) {
+    return dgWfPill;
+  }
+  const style = document.createElement("style");
+  style.textContent = `
+    #dg-wf-pill {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 2147483647;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(10, 14, 20, 0.95);
+      color: #e6e9ee;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12.5px;
+      font-weight: 600;
+      padding: 8px 12px;
+      border-radius: 18px;
+      border: 1px solid rgba(201, 168, 108, 0.35);
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.2s, transform 0.2s;
+    }
+    #dg-wf-pill.dg-wf-in { opacity: 1; transform: translateY(0); }
+    #dg-wf-pill .dg-wf-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #9aa4b2; flex: none;
+    }
+    #dg-wf-pill .dg-wf-dot[data-live="true"] { animation: dg-wf-pulse 1.4s ease-in-out infinite; }
+    @keyframes dg-wf-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
+    #dg-wf-pill .dg-wf-title { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #dg-wf-pill .dg-wf-status { font-weight: 500; color: inherit; }
+    #dg-wf-pill .dg-wf-engine {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+      padding: 1px 5px; border-radius: 8px;
+      border: 1px solid rgba(230,233,238,0.25); color: #b9c1cc; flex: none;
+    }
+    #dg-wf-pill .dg-wf-view {
+      all: unset; cursor: pointer; flex: none;
+      font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+      color: #e0c592; border: 1px solid rgba(201, 168, 108, 0.45);
+      border-radius: 10px; padding: 2px 8px;
+    }
+    #dg-wf-pill .dg-wf-view:hover { background: rgba(201, 168, 108, 0.15); color: #e9d3a8; }
+    #dg-wf-pill .dg-wf-close {
+      all: unset; cursor: pointer; color: #8b93a0; font-size: 13px;
+      line-height: 1; padding: 2px 3px; flex: none;
+    }
+    #dg-wf-pill .dg-wf-close:hover { color: #e6e9ee; }
+  `;
+  const root = document.createElement("div");
+  root.id = "dg-wf-pill";
+  root.innerHTML = `
+    <span class="dg-wf-dot"></span>
+    <span class="dg-wf-title"></span>
+    <span class="dg-wf-engine" style="display:none"></span>
+    <span class="dg-wf-status"></span>
+    <button class="dg-wf-view" style="display:none">View</button>
+    <button class="dg-wf-close" title="Dismiss" aria-label="Dismiss">✕</button>
+  `;
+  document.documentElement.appendChild(style);
+  document.documentElement.appendChild(root);
+  root.querySelector(".dg-wf-close").addEventListener("click", () => dgWfHide());
+  root.querySelector(".dg-wf-view").addEventListener("click", () => {
+    if (!dgWfCurrent?.workflowNodeId) return;
+    // Round-trip through the background's active-tab door (this tab) so the
+    // overlay opens the workflow panel deep-linked to this run's detail.
+    chrome.runtime.sendMessage({
+      type: "open-content-in-active-tab",
+      payload: {
+        contentId: dgWfCurrent.workflowNodeId,
+        contentKind: "workflow",
+        runId: dgWfCurrent.runId,
+      },
+    });
+  });
+  dgWfPill = {
+    root,
+    style,
+    dot: root.querySelector(".dg-wf-dot"),
+    title: root.querySelector(".dg-wf-title"),
+    engine: root.querySelector(".dg-wf-engine"),
+    status: root.querySelector(".dg-wf-status"),
+    view: root.querySelector(".dg-wf-view"),
+  };
+  return dgWfPill;
+}
+
+function dgWfHide() {
+  window.clearInterval(dgWfPollTimer);
+  window.clearTimeout(dgWfLingerTimer);
+  dgWfPollTimer = null;
+  dgWfCurrent = null;
+  if (!dgWfPill) return;
+  dgWfPill.root.classList.remove("dg-wf-in");
+  const pill = dgWfPill;
+  dgWfPill = null;
+  setTimeout(() => {
+    pill.root.remove();
+    pill.style.remove();
+  }, 250);
+}
+
+function dgWfRender(pill, run, fallbackTitle) {
+  const status = DG_WF_STATUS[run?.status] || DG_WF_STATUS.queued;
+  pill.title.textContent = run?.definition?.name || fallbackTitle;
+  pill.status.textContent = status.label;
+  pill.status.style.color = status.color;
+  pill.dot.style.background = status.color;
+  pill.dot.setAttribute(
+    "data-live",
+    run && !DG_WF_TERMINAL.has(run.status) ? "true" : "false"
+  );
+  const engine = run?.engine || "";
+  if (engine && engine !== "wdk") {
+    pill.engine.textContent = engine;
+    pill.engine.style.display = "";
+  } else {
+    pill.engine.style.display = "none";
+  }
+}
+
+/**
+ * The immediate acknowledgement: mount on dispatch, live-update by polling the
+ * run through the background (bearer read). Terminal states linger briefly;
+ * "waiting" (needs review) and "failed" stay until dismissed. A [View] action
+ * that opens the deep embed panel arrives with Phase 3.
+ */
+function dgWfShowRun(runId, workflowTitle, workflowNodeId) {
+  if (!runId) return;
+  dgWfHide();
+  dgWfCurrent = { runId, workflowNodeId: workflowNodeId || null };
+  const pill = dgWfEnsurePill();
+  pill.view.style.display = dgWfCurrent.workflowNodeId ? "" : "none";
+  dgWfRender(pill, null, workflowTitle || "Workflow");
+  requestAnimationFrame(() => pill.root.classList.add("dg-wf-in"));
+
+  let polls = 0;
+  const poll = () => {
+    polls += 1;
+    if (polls > DG_WF_POLL_MAX) {
+      dgWfHide();
+      return;
+    }
+    chrome.runtime.sendMessage(
+      { type: "get-workflow-run", payload: { runId } },
+      (response) => {
+        if (chrome.runtime.lastError || !response?.ok || !dgWfPill) return;
+        const run = response.data;
+        dgWfRender(dgWfPill, run, workflowTitle || "Workflow");
+        if (DG_WF_TERMINAL.has(run.status)) {
+          window.clearInterval(dgWfPollTimer);
+          dgWfPollTimer = null;
+          if (run.status === "succeeded" || run.status === "canceled") {
+            dgWfLingerTimer = window.setTimeout(() => dgWfHide(), DG_WF_LINGER_MS);
+          } // failed stays until dismissed
+        }
+      }
+    );
+  };
+  poll();
+  dgWfPollTimer = window.setInterval(poll, DG_WF_POLL_MS);
+}
+
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "dg-workflow-run-started") {
+    dgWfShowRun(
+      message.payload?.runId,
+      message.payload?.workflowTitle,
+      message.payload?.workflowNodeId
+    );
   }
 });

@@ -22,6 +22,7 @@ import { Plus, Sparkles, X, Pin } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { toast } from "sonner";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 
 export interface SidebarTabEntry {
   conversationId: string;
@@ -130,13 +131,13 @@ export function SidebarChatTabs({
           <div className="relative shrink-0">
             <button
               onClick={() => setOverflowOpen((v) => !v)}
-              className="rounded-full px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:text-gray-300 hover:bg-white/10 transition-colors"
+              className="rounded-full px-2 py-1 text-[11px] text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.06] dark:hover:bg-white/10 transition-colors"
               title={`${overflow.length} more`}
             >
               …
             </button>
             {overflowOpen && (
-              <div className="absolute top-full right-0 mt-1 min-w-[180px] rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl z-50 overflow-hidden">
+              <div className="absolute top-full right-0 mt-1 min-w-[180px] rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden">
                 {overflow.map((t) => (
                   <button
                     key={t.conversationId}
@@ -147,8 +148,8 @@ export function SidebarChatTabs({
                     className={cn(
                       "flex w-full items-center justify-between px-3 py-1.5 text-left text-xs transition-colors",
                       t.conversationId === activeConversationId
-                        ? "bg-white/10 text-white"
-                        : "text-gray-600 dark:text-gray-400 hover:bg-white/5 hover:text-gray-200",
+                        ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
+                        : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-gray-200",
                     )}
                   >
                     <span className="truncate">
@@ -209,8 +210,8 @@ function AddMenu({ onNew, onPick }: { onNew: () => void; onPick: () => void }) {
         aria-haspopup="menu"
         aria-expanded={open}
         className={cn(
-          "rounded-md p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-300 hover:bg-white/10 transition-colors",
-          open && "bg-white/10 text-gray-200",
+          "rounded-md p-1.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.06] dark:hover:bg-white/10 transition-colors",
+          open && "bg-black/[0.06] text-gray-700 dark:bg-white/10 dark:text-gray-200",
         )}
       >
         <Plus className="h-3.5 w-3.5" />
@@ -218,7 +219,7 @@ function AddMenu({ onNew, onPick }: { onNew: () => void; onPick: () => void }) {
       {open && (
         <div
           role="menu"
-          className="absolute top-full right-0 mt-1 min-w-[160px] rounded-lg border border-white/10 bg-[#1a1a1a] shadow-xl z-50 overflow-hidden py-1"
+          className="absolute top-full right-0 mt-1 min-w-[160px] rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden py-1"
         >
           <button
             role="menuitem"
@@ -226,7 +227,7 @@ function AddMenu({ onNew, onPick }: { onNew: () => void; onPick: () => void }) {
               setOpen(false);
               onNew();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-700 dark:hover:text-emerald-300 transition-colors"
           >
             <Sparkles className="h-3.5 w-3.5" />
             New chat
@@ -237,7 +238,7 @@ function AddMenu({ onNew, onPick }: { onNew: () => void; onPick: () => void }) {
               setOpen(false);
               onPick();
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-400 hover:bg-white/5 hover:text-gray-200 transition-colors"
+            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs text-gray-500 dark:text-gray-400 hover:bg-black/[0.04] dark:hover:bg-white/5 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
           >
             <Pin className="h-3.5 w-3.5" />
             Pin existing chat
@@ -261,7 +262,7 @@ function TabButton({
   onUnpin?: (conversationId: string) => void;
   onRename?: (conversationId: string, newTitle: string) => Promise<void> | void;
 }) {
-  const theme = getProviderTheme(tab.providerId);
+  const theme = getProviderTheme(tab.providerId, useResolvedTheme());
   const label = tabLabel(tab);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(label);
@@ -306,7 +307,7 @@ function TabButton({
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60",
         active
           ? "z-10"
-          : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-300 hover:bg-white/[0.04]",
+          : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.04]",
         editing ? "cursor-text" : "cursor-pointer",
       )}
       style={

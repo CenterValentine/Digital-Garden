@@ -252,12 +252,16 @@ const periodicNoteKindSettingsSchema = z.object({
   filenameFormat: z.string().min(1).max(120).optional(),
   templateId: z.string().uuid().nullable().optional(),
   autoCreateOnOpen: z.boolean().optional(),
+  nightOwlHour: z.number().int().min(0).max(4).optional(),
 });
 
 const periodicNotesSettingsSchema = z
   .object({
     daily: periodicNoteKindSettingsSchema.optional(),
     weekly: periodicNoteKindSettingsSchema.optional(),
+    monthly: periodicNoteKindSettingsSchema.optional(),
+    quarterly: periodicNoteKindSettingsSchema.optional(),
+    yearly: periodicNoteKindSettingsSchema.optional(),
   })
   .optional();
 
@@ -292,6 +296,39 @@ const flashcardsSettingsSchema = z
   })
   .optional();
 
+// Notification preferences. `kinds` maps notification kind (e.g.
+// "dm.message") -> enabled; absent keys mean enabled. Read server-side by
+// publishEvent() when projecting recipients, so a disabled kind stops new
+// notifications at the source rather than hiding them client-side.
+const notificationsSettingsSchema = z
+  .object({
+    kinds: z.record(z.string(), z.boolean()).optional(),
+    aiNotificationsEnabled: z.boolean().optional(),
+  })
+  .optional();
+
+// Folder Studio. autoContextMode gates the AI-context refresh engine:
+// "off" = manual Generate only; "on-access" = stale-while-revalidate when a
+// context-consuming surface is opened; "on-access-sweep" adds the nightly
+// cron drain. Artifact fields are user DEFAULTS — per-run choices in the
+// Studio tool tiles override them. Model routing is NOT here (Feature
+// Routing owns it); normalization lives in extensions/studio/settings.ts.
+const studioSettingsSchema = z
+  .object({
+    autoContextMode: z
+      .enum(["off", "on-access", "on-access-sweep"])
+      .optional(),
+    // Daily ceiling on auto-context LLM calls (packs + roll-ups). Manual
+    // per-node Generate is not counted — a human click rate-limits itself.
+    dailyCallCap: z.number().int().min(20).max(1000).optional(),
+    reportDefaultVariant: z.string().min(1).max(60).optional(),
+    quizQuestionCount: z.number().int().min(3).max(25).optional(),
+    audioOverviewLength: z.enum(["brief", "standard"]).optional(),
+    // Upper bound matches the slide-deck executor's schema cap (15).
+    slideCount: z.number().int().min(4).max(15).optional(),
+  })
+  .optional();
+
 // Complete Settings Schema
 export const userSettingsSchema = z.object({
   version: z.number().default(1),
@@ -306,6 +343,8 @@ export const userSettingsSchema = z.object({
   calendar: calendarSettingsSchema,
   periodicNotes: periodicNotesSettingsSchema,
   flashcards: flashcardsSettingsSchema,
+  notifications: notificationsSettingsSchema,
+  studio: studioSettingsSchema,
 });
 
 export type UserSettings = z.infer<typeof userSettingsSchema>;
@@ -536,6 +575,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
       filenameFormat: "YYYY-MM-DD",
       templateId: null,
       autoCreateOnOpen: false,
+      nightOwlHour: 0,
     },
     weekly: {
       enabled: false,
@@ -543,6 +583,31 @@ export const DEFAULT_SETTINGS: UserSettings = {
       filenameFormat: "GGGG-[W]WW",
       templateId: null,
       autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    monthly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY-MM",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    quarterly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY-[Q]Q",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
+    },
+    yearly: {
+      enabled: false,
+      folderId: null,
+      filenameFormat: "YYYY",
+      templateId: null,
+      autoCreateOnOpen: false,
+      nightOwlHour: 0,
     },
   },
   flashcards: {
@@ -552,5 +617,17 @@ export const DEFAULT_SETTINGS: UserSettings = {
     defaultBackLabel: "Answer",
     defaultReviewMode: "front_to_back",
     quickFireEnabled: false,
+  },
+  notifications: {
+    kinds: {},
+    aiNotificationsEnabled: true,
+  },
+  studio: {
+    autoContextMode: "on-access",
+    dailyCallCap: 200,
+    reportDefaultVariant: "study-guide",
+    quizQuestionCount: 8,
+    audioOverviewLength: "standard",
+    slideCount: 12,
   },
 };

@@ -70,11 +70,11 @@ export function ChatSuggestionMenu({
       className={cn(
         "absolute bottom-full left-0 right-0 mb-1 z-50",
         "max-h-48 overflow-y-auto rounded-lg",
-        "border border-black/10 dark:border-white/10 bg-[#1a1a1a] shadow-xl",
+        "border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl",
         "backdrop-blur-sm"
       )}
     >
-      <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-white/5">
+      <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-black/5 dark:border-white/5">
         {mode === "mention" ? "Mention a file" : "Commands"}
       </div>
       {items.map((item, i) => (
@@ -88,7 +88,7 @@ export function ChatSuggestionMenu({
           className={cn(
             "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
             i === selectedIndex
-              ? "bg-white/10 text-white"
+              ? "bg-black/[0.06] text-gray-900 dark:bg-white/10 dark:text-white"
               : "text-gray-600 dark:text-gray-400 hover:bg-black/[0.04] hover:text-gray-800 dark:hover:bg-white/5 dark:hover:text-gray-200"
           )}
         >

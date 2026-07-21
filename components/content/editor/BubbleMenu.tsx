@@ -49,6 +49,21 @@ import { extractReadableText } from "@/lib/domain/editor/tts/extract-readable-te
 const textFormattingBubbleMenuKey = new PluginKey("textFormattingBubbleMenu");
 
 /**
+ * Touch devices: place the menu BELOW the selection. iOS draws its native
+ * Cut/Copy/Paste callout directly ABOVE the selection — exactly where Floating
+ * UI's default 'top' placement puts this menu — leaving ours covered and
+ * unusable (observed on-device, 2026-07-16). Below the selection, both menus
+ * coexist. Desktop keeps the default 'top'.
+ *
+ * Read once at module level: pointer type doesn't change mid-session, and this
+ * component intentionally avoids hooks (see header comment re: TipTap plugin
+ * lifecycle).
+ */
+const IS_COARSE_POINTER =
+  typeof window !== "undefined" &&
+  window.matchMedia?.("(pointer: coarse)").matches === true;
+
+/**
  * Prevent focus theft — keeps editor selection alive when clicking toolbar buttons.
  * Only preventDefault is needed — this stops the browser from moving focus to the
  * clicked button. Do NOT use stopPropagation here: TipTap's BubbleMenu plugin
@@ -461,6 +476,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       pluginKey={textFormattingBubbleMenuKey}
       updateDelay={100}
       shouldShow={shouldShow}
+      options={IS_COARSE_POINTER ? { placement: "bottom" } : undefined}
       className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/80 p-2 shadow-lg backdrop-blur-md"
     >
       <div className="flex items-center gap-1">

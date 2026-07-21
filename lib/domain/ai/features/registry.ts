@@ -46,6 +46,16 @@ export interface FeatureSpec {
     presetId: string;
     modelId: string;
   };
+  /**
+   * Optional deep-link to the surface-owned settings page for this feature.
+   * Feature Routing owns MODEL choice; behavior/defaults (e.g. Studio
+   * artifact defaults) live with the owning extension — this link bridges
+   * the two so neither page duplicates the other's concern.
+   */
+  settingsHref?: {
+    label: string;
+    href: string;
+  };
 }
 
 export const FEATURE_REGISTRY: FeatureSpec[] = [
@@ -141,6 +151,37 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     defaultSuggestion: {
       presetId: "anthropic",
       modelId: "claude-haiku-3-5",
+    },
+  },
+  {
+    id: "studio-metadata",
+    label: "Studio Context Generation",
+    description:
+      "Generates the per-note Context doc (summary, structure, role proposal) that grounds Folder Studio chat and tools. Runs per node on demand; low-cost models preferred.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-3-5",
+    },
+    settingsHref: {
+      label: "Configure Studio defaults",
+      href: "/settings/extensions/studio",
+    },
+  },
+  {
+    id: "studio-generation",
+    label: "Studio Artifact Generation",
+    description:
+      "Powers Folder Studio background jobs (infographics, audio scripts, slide outlines). Artifact quality tracks model capability — prefer a strong model.",
+    requiredCapabilities: ["text"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-sonnet-4",
+    },
+    settingsHref: {
+      label: "Configure Studio defaults",
+      href: "/settings/extensions/studio",
     },
   },
 ];

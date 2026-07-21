@@ -140,6 +140,17 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = {
   themeColor: "#ffffff",
+  // width=device-width, initial-scale=1 — without this, mobile browsers assume
+  // a ~980px desktop canvas and shrink the whole app to fit. Zoom is left
+  // ENABLED (no maximumScale / userScalable:false) — pinch-to-zoom is a WCAG
+  // 1.4.4 accessibility requirement, and disabling it is a common a11y bug.
+  width: "device-width",
+  initialScale: 1,
+  // resizes-content: when the on-screen keyboard opens, shrink the layout
+  // viewport (and thus dvh units) instead of letting the keyboard overlay
+  // fixed content. This is what keeps the editor above the keyboard — it
+  // pairs with the shell's h-[calc(100dvh-56px)] container. Inert on desktop.
+  interactiveWidget: "resizes-content",
 };
 
 export default async function RootLayout({
@@ -166,10 +177,19 @@ export default async function RootLayout({
           hatch next-themes uses for this exact case.
           See lib/features/theme/script.ts.
         */}
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+        {/* suppressHydrationWarning: browsers wipe the nonce ATTRIBUTE once CSP
+            is active (nonce-hiding, readable only via the .nonce property), so
+            hydration always sees "" vs the SSR value. The script ran at parse
+            time — the diff is expected and harmless. */}
+        <script
+          nonce={nonce}
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }}
+        />
         <Head />
       </head>
-      <body className={`min-h-screen w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable} ${newsreader.variable} ${jetbrainsMono.variable} ${caveat.variable}`}>
+      <body className={`min-h-dvh w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable} ${newsreader.variable} ${jetbrainsMono.variable} ${caveat.variable}`}>
+
         {/* Initialize user settings on mount */}
         <SettingsInitializer />
         {/* Keep <html class="dark"> in sync as preference or OS scheme changes */}

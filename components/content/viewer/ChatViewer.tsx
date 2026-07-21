@@ -13,6 +13,7 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
+import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
@@ -30,6 +31,7 @@ import {
   buildSurfaceBackground,
   detectMixedProvider,
 } from "@/lib/design/system/ai-providers";
+import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import { extractChatOutline } from "@/lib/domain/ai/chat-outline";
 import { useOutlineStore } from "@/state/outline-store";
@@ -208,6 +210,7 @@ function ChatViewerInner({
     status,
     stop,
     error,
+    addToolApprovalResponse,
     isActive,
     input,
     setInput,
@@ -259,8 +262,14 @@ function ChatViewerInner({
 
   // Bound mode: load/persist/title against the Conversation store — the
   // SAME hook the sidebar ChatPanel uses, so the surfaces stay identical.
-  const { loadingInitial, conversationTitle, initialActiveContextId } =
-    useConversationBinding({
+  const {
+    loadingInitial,
+    conversationTitle,
+    initialActiveContextId,
+    initialTargetFolder,
+    initialTargetInherited,
+    initialTargetLocation,
+  } = useConversationBinding({
       conversationId: conversationId ?? null,
       messages,
       setMessages: setMessages as unknown as (messages: unknown) => void,
@@ -277,6 +286,38 @@ function ChatViewerInner({
   useEffect(() => {
     setActiveContextId(initialActiveContextId);
   }, [initialActiveContextId]);
+
+  // Target folder (AI v3 core S3): seed from the bound conversation;
+  // user changes persist via PATCH (validated server-side).
+  const [targetFolder, setTargetFolder] = useState<{
+    id: string;
+    title: string | null;
+  } | null>(null);
+  const [targetInherited, setTargetInherited] = useState(false);
+  useEffect(() => {
+    setTargetFolder(initialTargetFolder);
+    setTargetInherited(initialTargetInherited);
+  }, [initialTargetFolder, initialTargetInherited]);
+  const handleTargetChange = useCallback(
+    (next: { id: string; title: string | null } | null) => {
+      if (next) {
+        setTargetFolder(next);
+        setTargetInherited(false);
+      } else {
+        // Clearing returns to the chat's location when it has one.
+        setTargetFolder(initialTargetLocation);
+        setTargetInherited(Boolean(initialTargetLocation));
+      }
+      if (!conversationId) return;
+      void fetch(`/api/conversations/${encodeURIComponent(conversationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ targetFolderId: next?.id ?? null }),
+      }).catch(() => {});
+    },
+    [conversationId, initialTargetLocation],
+  );
 
   // Persist context changes to the conversation when bound; otherwise hold
   // in-session. Fire-and-forget.
@@ -502,6 +543,20 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
+  // Basic per-run cost meter (S5, catalog F39): sums the token usage the
+  // chat route stamps onto assistant message metadata. Client-side only —
+  // the data already rides the loaded messages.
+  const runTokens = useMemo(
+    () =>
+      messages.reduce((sum, m) => {
+        const usage = (
+          m as { metadata?: { usage?: { totalTokens?: number } } }
+        ).metadata?.usage;
+        return sum + (usage?.totalTokens ?? 0);
+      }, 0),
+    [messages],
+  );
+
   // Inline rename (double-click the header title). A local override wins
   // over the loaded title so the change shows instantly; it routes through
   // the conversation PATCH (bound) or the content PATCH (legacy), both of
@@ -510,6 +565,7 @@ function ChatViewerInner({
   const [renamingTitle, setRenamingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
   const titleInputRef = useRef<HTMLInputElement>(null);
+  const resolvedTheme = useResolvedTheme();
   const displayTitle = titleOverride ?? conversationTitle ?? title;
 
   const beginRenameTitle = useCallback(() => {
@@ -576,9 +632,11 @@ function ChatViewerInner({
       providerId: getMessageStamp(m.id, { providerId, modelId }).providerId,
     })),
   );
-  const surfaceBackground = buildSurfaceBackground(providerId, [
-    providerId as AIProviderId,
-  ]);
+  const surfaceBackground = buildSurfaceBackground(
+    providerId,
+    [providerId as AIProviderId],
+    resolvedTheme,
+  );
 
   return (
     <div
@@ -586,9 +644,9 @@ function ChatViewerInner({
       style={{ background: surfaceBackground }}
     >
       {/* Header */}
-      <div className="flex shrink-0 flex-col gap-2 border-b border-white/10 px-6 py-4">
+      <div className="flex shrink-0 flex-col gap-2 border-b border-black/10 dark:border-white/10 px-6 py-4">
         <div className="flex items-center gap-3">
-          <Bot className="h-5 w-5 text-green-400" />
+          <Bot className="h-5 w-5 text-green-600 dark:text-green-400" />
           <div className="min-w-0 flex-1">
             {renamingTitle ? (
               <input
@@ -606,11 +664,11 @@ function ChatViewerInner({
                   }
                 }}
                 onBlur={() => void commitRenameTitle()}
-                className="w-full bg-transparent text-lg font-semibold text-white outline-none border-b border-white/30 focus:border-white/60"
+                className="w-full bg-transparent text-lg font-semibold text-gray-900 dark:text-white outline-none border-b border-black/30 dark:border-white/30 focus:border-black/60 dark:focus:border-white/60"
               />
             ) : (
               <h1
-                className="text-lg font-semibold text-white truncate cursor-text"
+                className="text-lg font-semibold text-gray-900 dark:text-white truncate cursor-text"
                 onDoubleClick={beginRenameTitle}
                 title="Double-click to rename"
               >
@@ -619,7 +677,11 @@ function ChatViewerInner({
             )}
             <p className="text-xs text-gray-500">
               {hasMessages
-                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}`
+                ? `${messages.length} message${messages.length !== 1 ? "s" : ""}${
+                    runTokens > 0
+                      ? ` · ~${runTokens >= 1000 ? `${(runTokens / 1000).toFixed(1)}k` : runTokens} tokens`
+                      : ""
+                  }`
                 : "New conversation"}
             </p>
           </div>
@@ -627,9 +689,18 @@ function ChatViewerInner({
         {/* Reverse-view: which content this chat is pinned to. Renders
             nothing unless the chat is Conversation-backed with at least
             one association. */}
-        {conversationId && (
-          <AssociatedContentChips conversationId={conversationId} />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          <TargetFolderChip
+            target={targetFolder}
+            inherited={targetInherited}
+            location={initialTargetLocation}
+            disabled={!conversationId}
+            onChange={handleTargetChange}
+          />
+          {conversationId && (
+            <AssociatedContentChips conversationId={conversationId} />
+          )}
+        </div>
       </div>
 
       {/* Error banner — parsed + CTA for BYOK setup */}
@@ -659,6 +730,9 @@ function ChatViewerInner({
                     }
                     onEdit={(id, text) => void editMessage(id, text)}
                     onRegenerate={(id) => void regenerateMessage(id)}
+                    onToolApprovalResponse={(opts) =>
+                      void addToolApprovalResponse(opts)
+                    }
                     onBranch={
                       conversationId
                         ? (id) => void handleBranch(id)
@@ -678,7 +752,7 @@ function ChatViewerInner({
         <button
           type="button"
           onClick={scrollToBottom}
-          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/15 bg-[#1a1a1a]/90 px-3 py-1 text-xs text-gray-200 shadow-lg backdrop-blur transition-colors hover:bg-white/10"
+          className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full border border-black/15 bg-white/90 text-gray-700 hover:bg-black/[0.06] dark:border-white/15 dark:bg-[#1a1a1a]/90 dark:text-gray-200 dark:hover:bg-white/10 px-3 py-1 text-xs shadow-lg backdrop-blur transition-colors"
         >
           <ChevronDown className="h-3.5 w-3.5" /> Jump to latest
         </button>
@@ -735,9 +809,9 @@ function ChatViewerInner({
 function ChatViewerLoading({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col">
-      <div className="flex shrink-0 items-center gap-3 border-b border-white/10 px-6 py-4">
-        <Bot className="h-5 w-5 text-green-400" />
-        <h1 className="text-lg font-semibold text-white truncate">{title}</h1>
+      <div className="flex shrink-0 items-center gap-3 border-b border-black/10 dark:border-white/10 px-6 py-4">
+        <Bot className="h-5 w-5 text-green-600 dark:text-green-400" />
+        <h1 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{title}</h1>
       </div>
       <ChatLoadingBody />
     </div>
@@ -750,7 +824,7 @@ function ChatLoadingBody() {
     <div className="flex h-full flex-col items-center justify-center gap-3 px-4">
       <div className="flex w-full max-w-[420px] flex-col gap-2 opacity-50 animate-pulse">
         <div className="ml-auto h-8 w-2/3 rounded-xl bg-blue-500/20" />
-        <div className="h-10 w-3/4 rounded-xl bg-white/10" />
+        <div className="h-10 w-3/4 rounded-xl bg-black/10 dark:bg-white/10" />
         <div className="ml-auto h-8 w-1/2 rounded-xl bg-blue-500/20" />
       </div>
       <p className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -764,10 +838,10 @@ function ChatLoadingBody() {
 function EmptyState({ title }: { title: string }) {
   return (
     <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/5 border border-white/10 mb-4">
+      <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 mb-4">
         <Bot className="h-8 w-8 text-gray-500" />
       </div>
-      <h2 className="text-lg font-medium text-gray-300">{title}</h2>
+      <h2 className="text-lg font-medium text-gray-700 dark:text-gray-300">{title}</h2>
       <p className="mt-2 text-sm text-gray-500 max-w-sm">
         Start a conversation. Messages are automatically saved.
       </p>

@@ -70,7 +70,7 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
       <button
         type="button"
         onClick={() => setUserPref(!open)}
-        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[#4285F4] hover:bg-white/[0.04] transition-colors rounded-lg"
+        className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[#1967D2] dark:text-[#4285F4] hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 opacity-70" />
@@ -81,11 +81,11 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
         <span>{streaming ? "Thinking process…" : "Thinking process"}</span>
       </button>
       {open && (
-        <div className="space-y-2.5 px-3.5 pb-3 pt-1 text-xs leading-relaxed text-gray-300">
+        <div className="space-y-2.5 px-3.5 pb-3 pt-1 text-xs leading-relaxed text-gray-700 dark:text-gray-300">
           {sections.map((s, i) => (
             <div key={i}>
               {s.heading && (
-                <div className="mb-1 text-[11px] font-semibold text-[#4285F4]/90">
+                <div className="mb-1 text-[11px] font-semibold text-[#1967D2]/90 dark:text-[#4285F4]/90">
                   {s.heading}
                 </div>
               )}
@@ -101,7 +101,7 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
             </div>
           ))}
           {streaming && (
-            <div className="flex items-center gap-1.5 text-[11px] text-[#4285F4]/70">
+            <div className="flex items-center gap-1.5 text-[11px] text-[#1967D2]/80 dark:text-[#4285F4]/70">
               <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#4285F4]" />
               <span>continuing</span>
             </div>

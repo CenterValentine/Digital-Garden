@@ -1,81 +1,60 @@
 /**
  * Storage Settings Page
  *
- * Configure storage providers, backups, and view usage
- * Three tabs: Providers, Backups, Usage
+ * Configure storage providers, backups, and view usage.
+ * Providers is live; Backups and Usage are previews running on sample
+ * data until their backends land — each carries an explicit banner.
  */
 
 "use client";
 
-import { useState } from "react";
+import { FlaskConical } from "lucide-react";
+
+import { SettingsPage } from "@/components/settings/ui";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/client/ui/tabs";
 import { StorageProvidersTab } from "@/components/settings/storage/ProvidersTab";
 import { StorageBackupsTab } from "@/components/settings/storage/BackupsTab";
 import { StorageUsageTab } from "@/components/settings/storage/UsageTab";
 
-export default function StorageSettingsPage() {
-  const [activeTab, setActiveTab] = useState<"providers" | "backups" | "usage">("providers");
-
+function PreviewBanner() {
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div>
-        <h1 className="text-3xl font-bold">Storage Settings</h1>
-        <p className="text-muted-foreground mt-2">
-          Configure storage providers, manage backups, and monitor usage
-        </p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="border-b border-black/10 dark:border-white/10">
-        <div className="flex gap-6">
-          <button
-            onClick={() => setActiveTab("providers")}
-            className={`
-              pb-3 text-sm font-medium border-b-2 transition-colors
-              ${
-                activeTab === "providers"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
-              }
-            `}
-          >
-            Providers
-          </button>
-          <button
-            onClick={() => setActiveTab("backups")}
-            className={`
-              pb-3 text-sm font-medium border-b-2 transition-colors
-              ${
-                activeTab === "backups"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
-              }
-            `}
-          >
-            Backups
-          </button>
-          <button
-            onClick={() => setActiveTab("usage")}
-            className={`
-              pb-3 text-sm font-medium border-b-2 transition-colors
-              ${
-                activeTab === "usage"
-                  ? "border-primary text-primary"
-                  : "border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-300"
-              }
-            `}
-          >
-            Usage
-          </button>
-        </div>
-      </div>
-
-      {/* Tab Content */}
-      <div className="mt-6">
-        {activeTab === "providers" && <StorageProvidersTab />}
-        {activeTab === "backups" && <StorageBackupsTab />}
-        {activeTab === "usage" && <StorageUsageTab />}
-      </div>
+    <div className="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+      <FlaskConical className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      Preview — showing sample data. This surface isn&apos;t wired to your
+      account yet.
     </div>
+  );
+}
+
+export default function StorageSettingsPage() {
+  return (
+    <SettingsPage
+      title="Storage"
+      description="Storage providers, backups, and usage."
+    >
+      <Tabs defaultValue="providers">
+        <TabsList>
+          <TabsTrigger value="providers">Providers</TabsTrigger>
+          <TabsTrigger value="backups">Backups</TabsTrigger>
+          <TabsTrigger value="usage">Usage</TabsTrigger>
+        </TabsList>
+        <TabsContent value="providers" className="mt-4">
+          <StorageProvidersTab />
+        </TabsContent>
+        <TabsContent value="backups" className="mt-4">
+          <PreviewBanner />
+          <StorageBackupsTab />
+        </TabsContent>
+        <TabsContent value="usage" className="mt-4">
+          <PreviewBanner />
+          <StorageUsageTab />
+        </TabsContent>
+      </Tabs>
+    </SettingsPage>
   );
 }

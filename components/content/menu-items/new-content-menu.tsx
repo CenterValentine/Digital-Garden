@@ -13,12 +13,13 @@ import {
   Folder,
   FileText,
   FileSpreadsheet,
+  Presentation,
   FileType,
   FileCode,
   Code,
   Braces,
   ExternalLink,
-  MessageSquare,
+  MessagesSquare,
   BarChart3,
   Users,
   Table,
@@ -80,6 +81,7 @@ export interface NewContentCallbacks {
   onCreateData?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
+  onCreateN8nWorkflow?: (parentId: string | null) => void | Promise<void>;
   // AI category — initial entry is image generation; future entries
   // (audio, video, structured data) will share the same submenu.
   onCreateAiImage?: (parentId: string | null) => void | Promise<void>;
@@ -100,6 +102,18 @@ export function getNewContentMenuItems(
   const items: NewContentMenuItem[] = [];
   // Normalize parentId: undefined becomes null
   const normalizedParentId = parentId ?? null;
+
+  // Folder first — the organizing container.
+  if (callbacks.onCreateFolder) {
+    items.push({
+      id: "new-folder",
+      label: "Folder",
+      icon: <Folder className="h-4 w-4" />,
+      shortcut: "⇧A",
+      onClick: () => callbacks.onCreateFolder?.(normalizedParentId),
+      disabled: !callbacks.onCreateFolder,
+    });
+  }
 
   // Phase 1: Core content types
   if (callbacks.onCreateNote) {
@@ -183,14 +197,14 @@ export function getNewContentMenuItems(
 
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         submenu,
       });
     } else {
       items.push({
         id: "new-note",
-        label: "Note (Markdown)",
+        label: "Note",
         icon: <File className="h-4 w-4" />,
         shortcut: "A",
         onClick: () => callbacks.onCreateNote?.(normalizedParentId),
@@ -199,58 +213,38 @@ export function getNewContentMenuItems(
     }
   }
 
-  if (callbacks.onCreateFolder) {
-    items.push({
-      id: "new-folder",
-      label: "Folder",
-      icon: <Folder className="h-4 w-4" />,
-      shortcut: "⇧A",
-      onClick: () => callbacks.onCreateFolder?.(normalizedParentId),
-      disabled: !callbacks.onCreateFolder,
-    });
-  }
-
   // ── Most-used surfaces first ──
 
-  // Chat Conversation
+  // Chat
   items.push({
     id: "new-chat",
-    label: "Chat Conversation",
-    icon: <MessageSquare className="h-4 w-4" />,
+    label: "Chat",
+    icon: <MessagesSquare className="h-4 w-4" />,
     onClick: () => callbacks.onCreateChat?.(normalizedParentId),
     disabled: !callbacks.onCreateChat,
   });
 
-  // External Link (Bookmark)
+  // External Link
   if (callbacks.onCreateExternal) {
     items.push({
       id: "new-external",
-      label: "External Link (Bookmark)",
+      label: "External Link",
       icon: <ExternalLink className="h-4 w-4" />,
       onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
       disabled: !callbacks.onCreateExternal,
     });
   }
 
-  // File (Upload)
+  // File Upload
   if (callbacks.onCreateFile) {
     items.push({
       id: "new-file",
-      label: "File (Upload)",
+      label: "File Upload",
       icon: <FileText className="h-4 w-4" />,
       onClick: () => callbacks.onCreateFile?.(normalizedParentId),
       disabled: !callbacks.onCreateFile,
     });
   }
-
-  // Person / Group
-  items.push({
-    id: "add-people-target",
-    label: "Person / Group",
-    icon: <Users className="h-4 w-4" />,
-    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
-    disabled: !callbacks.onAddPeopleTarget,
-  });
 
   // Visualization (submenu — engines)
   items.push({
@@ -312,18 +306,10 @@ export function getNewContentMenuItems(
     });
   }
 
-  if (callbacks.onCreateHtml) {
-    items.push({
-      id: "new-html",
-      label: "HTML Document",
-      icon: <FileCode className="h-4 w-4" />,
-      onClick: () => callbacks.onCreateHtml?.(normalizedParentId),
-      disabled: !callbacks.onCreateHtml,
-    });
-  }
-
+  // Documents — structured file formats grouped in one submenu.
+  const documentChildren: NewContentMenuItem[] = [];
   if (callbacks.onCreateDocument) {
-    items.push({
+    documentChildren.push({
       id: "new-document",
       label: "Word Document (.docx)",
       icon: <FileType className="h-4 w-4" />,
@@ -331,9 +317,8 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateDocument,
     });
   }
-
   if (callbacks.onCreateSpreadsheet) {
-    items.push({
+    documentChildren.push({
       id: "new-spreadsheet",
       label: "Excel Spreadsheet (.xlsx)",
       icon: <FileSpreadsheet className="h-4 w-4" />,
@@ -341,9 +326,25 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateSpreadsheet,
     });
   }
-
+  // PowerPoint — stub, not implemented yet.
+  documentChildren.push({
+    id: "new-powerpoint",
+    label: "PowerPoint (.pptx)",
+    icon: <Presentation className="h-4 w-4" />,
+    onClick: () => undefined,
+    disabled: true,
+  });
+  if (callbacks.onCreateHtml) {
+    documentChildren.push({
+      id: "new-html",
+      label: "HTML Document",
+      icon: <FileCode className="h-4 w-4" />,
+      onClick: () => callbacks.onCreateHtml?.(normalizedParentId),
+      disabled: !callbacks.onCreateHtml,
+    });
+  }
   if (callbacks.onCreateJson) {
-    items.push({
+    documentChildren.push({
       id: "new-json",
       label: "JSON File (.json)",
       icon: <Braces className="h-4 w-4" />,
@@ -351,6 +352,53 @@ export function getNewContentMenuItems(
       disabled: !callbacks.onCreateJson,
     });
   }
+  if (documentChildren.length > 0) {
+    items.push({
+      id: "new-documents",
+      label: "Documents",
+      icon: <FileText className="h-4 w-4" />,
+      submenu: documentChildren,
+    });
+  }
+
+  // Workflow (submenu — one entry per workflow engine; Trellis is the
+  // native graph-interpreter type, future engines slot in beneath it).
+  items.push({
+    id: "new-workflow",
+    label: "Workflow",
+    icon: <GitBranch className="h-4 w-4" />,
+    submenu: [
+      {
+        id: "new-workflow-trellis",
+        label: "Trellis Flow",
+        icon: <GitBranch className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
+        disabled: !callbacks.onCreateWorkflow,
+      },
+      // n8n Flow only where the (heavier) create callback is wired — the header
+      // + menu. The file-tree context menu routes through the content-POST path
+      // and gets it once that path learns "n8n-workflow".
+      ...(callbacks.onCreateN8nWorkflow
+        ? [
+            {
+              id: "new-workflow-n8n",
+              label: "n8n Flow",
+              icon: <GitBranch className="h-4 w-4" />,
+              onClick: () => callbacks.onCreateN8nWorkflow?.(normalizedParentId),
+            },
+          ]
+        : []),
+    ],
+  });
+
+  // Person / Group — last of the active content types.
+  items.push({
+    id: "add-people-target",
+    label: "Person / Group",
+    icon: <Users className="h-4 w-4" />,
+    onClick: () => callbacks.onAddPeopleTarget?.(normalizedParentId),
+    disabled: !callbacks.onAddPeopleTarget,
+  });
 
   // Stubs — defined but not implemented yet.
 
@@ -367,14 +415,6 @@ export function getNewContentMenuItems(
     label: "Hope/Goal",
     icon: <Target className="h-4 w-4" />,
     onClick: () => callbacks.onCreateHope?.(normalizedParentId),
-    disabled: true,
-  });
-
-  items.push({
-    id: "new-workflow",
-    label: "Workflow (Automation)",
-    icon: <GitBranch className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateWorkflow?.(normalizedParentId),
     disabled: true,
   });
 

@@ -7,6 +7,14 @@
     {
       "path": "/api/cron/purge-trash",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/notifications-maintenance",
+      "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/studio-context-sweep",
+      "schedule": "0 6 * * *"
     }
   ]
 }

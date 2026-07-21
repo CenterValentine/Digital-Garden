@@ -8,6 +8,7 @@ import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getUserSettings } from "@/lib/features/settings";
 import { DEFAULT_EXPORT_BACKUP_SETTINGS } from "@/lib/domain/export";
 import type { ExportBackupSettings } from "@/lib/domain/export/types";
+import { SettingsPage } from "@/components/settings/ui";
 import { ExportSettingsClient } from "./ExportSettingsClient";
 
 export default async function ExportSettingsPage() {
@@ -15,18 +16,17 @@ export default async function ExportSettingsPage() {
   const settings = await getUserSettings(session.user.id);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold">Export & Backup</h1>
-        <p className="text-gray-400 mt-2">
-          Configure export formats and bulk export your Digital Garden
-        </p>
-      </div>
-
+    <SettingsPage
+      title="Export & Backup"
+      description="Export formats and bulk export for your Digital Garden."
+    >
       <ExportSettingsClient
-        initialSettings={(settings.exportBackup || DEFAULT_EXPORT_BACKUP_SETTINGS) as ExportBackupSettings}
+        initialSettings={
+          (settings.exportBackup ||
+            DEFAULT_EXPORT_BACKUP_SETTINGS) as ExportBackupSettings
+        }
         userId={session.user.id}
       />
-    </div>
+    </SettingsPage>
   );
 }

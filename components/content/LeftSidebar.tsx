@@ -13,6 +13,8 @@ import { LeftSidebarHeader } from "./headers/LeftSidebarHeader";
 import { LeftSidebarContent } from "./content/LeftSidebarContent";
 import { LeftSidebarCollapsed } from "./LeftSidebarCollapsed";
 import { LeftSidebarExtensions } from "./content/LeftSidebarExtensions";
+import { RecentsPanel } from "./RecentsPanel";
+import { InboxLeftPanel } from "@/components/client/inbox/InboxLeftPanel";
 import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { AiImageGenDialog } from "./ai/AiImageGenDialog";
@@ -46,11 +48,24 @@ export function LeftSidebar() {
   const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
-    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
+
+  // Decoupled create entry point for surfaces outside this tree (the mobile
+  // bottom nav's "New"). Mirrors the existing `dg:create-from-template` window
+  // event rather than lifting createTrigger into a store: same inline-create
+  // flow, optimistic node + rename, no duplicated creation logic.
+  useEffect(() => {
+    const handleCreateNode = (event: Event) => {
+      const detail = (event as CustomEvent<{ type?: "folder" | "note" }>).detail;
+      setCreateTrigger({ type: detail?.type ?? "note", timestamp: Date.now() });
+    };
+    window.addEventListener("dg:create-node", handleCreateNode);
+    return () => window.removeEventListener("dg:create-node", handleCreateNode);
+  }, []);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
@@ -148,6 +163,15 @@ export function LeftSidebar() {
   // Chat creation — now active (Sprint 34)
   const handleCreateChat = useCallback(() => {
     setCreateTrigger({ type: "chat", timestamp: Date.now() });
+  }, []);
+
+  // Workflow creation — active (workflows Builder + Interpreter)
+  const handleCreateWorkflow = useCallback(() => {
+    setCreateTrigger({ type: "workflow", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateN8nWorkflow = useCallback(() => {
+    setCreateTrigger({ type: "n8n-workflow", timestamp: Date.now() });
   }, []);
 
   // AI image generation — opens the modal dialog. parentId stays
@@ -253,6 +277,8 @@ export function LeftSidebar() {
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
+          onCreateN8nWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateN8nWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}
           onAddPeopleTarget={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleContact : () => handleAddPeopleTarget(null)}
           isCreateDisabled={activeView === PEOPLE_VIEW_KEY ? false : isCreateDisabled}
@@ -271,6 +297,10 @@ export function LeftSidebar() {
         )}
 
         {activeView === "extensions" && <LeftSidebarExtensions />}
+
+        {activeView === "inbox" && <InboxLeftPanel />}
+
+        {activeView === "recents" && <RecentsPanel />}
 
         {ExtensionPanel && createElement(ExtensionPanel)}
 

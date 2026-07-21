@@ -21,6 +21,7 @@ import type {
   ExtensionShellNavigationProps,
   ExtensionShellTabMenuSectionProps,
 } from "./types";
+import type { NotificationKindRenderer } from "@/lib/features/notifications/kind-renderer-types";
 
 function isClientExtensionEnabled(
   extensionId: string,
@@ -220,6 +221,20 @@ export function useExtensionClientEditorExtensions(): Extensions {
   return useEnabledExtensionRuntimes().flatMap(
     (runtime) => runtime.editorClientExtensions ?? []
   );
+}
+
+export function useExtensionNotificationKindRenderers(): Record<
+  string,
+  NotificationKindRenderer
+> {
+  const runtimes = useEnabledExtensionRuntimes();
+  return useMemo(() => {
+    const merged: Record<string, NotificationKindRenderer> = {};
+    for (const runtime of runtimes) {
+      Object.assign(merged, runtime.notificationKindRenderers ?? {});
+    }
+    return merged;
+  }, [runtimes]);
 }
 
 export function getExtensionClientEditorExtensions(): Extensions {

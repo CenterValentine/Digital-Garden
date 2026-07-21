@@ -77,12 +77,12 @@ export function ConnectionUsageCard({
   }, [report, loading, load]);
 
   return (
-    <div className="mt-2 rounded-lg border border-white/10 bg-black/10">
+    <div className="mt-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/10">
       <button
         type="button"
         onClick={handleToggle}
         aria-expanded={open}
-        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-300 hover:bg-white/5 transition-colors rounded-lg"
+        className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-colors rounded-lg"
       >
         {open ? (
           <ChevronDown className="h-3 w-3 text-gray-500 shrink-0" />
@@ -107,7 +107,7 @@ export function ConnectionUsageCard({
       </button>
 
       {open && (
-        <div className="border-t border-white/5 px-3 py-3 space-y-3">
+        <div className="border-t border-black/5 dark:border-white/5 px-3 py-3 space-y-3">
           {loading && (
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -175,7 +175,7 @@ export function ConnectionUsageCard({
                     {report.byUnderlyingProvider.map((p) => (
                       <div
                         key={p.providerId}
-                        className="flex items-center gap-2 text-xs px-2 py-1 rounded-md bg-white/[0.02]"
+                        className="flex items-center gap-2 text-xs px-2 py-1 rounded-md bg-black/[0.02] dark:bg-white/[0.02]"
                       >
                         <ProviderIcon
                           providerId={p.providerId}
@@ -206,7 +206,7 @@ export function ConnectionUsageCard({
                     {report.byModel.map((m) => (
                       <div
                         key={m.modelId}
-                        className="flex items-center gap-2 text-xs px-2 py-1 rounded-md hover:bg-white/[0.04]"
+                        className="flex items-center gap-2 text-xs px-2 py-1 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                       >
                         <code className="text-amber-200/90 font-mono truncate flex-1">
                           {m.modelId}
@@ -270,7 +270,7 @@ function BudgetBar({ budget }: { budget: NonNullable<UsageReport["budget"]> }) {
           ({Math.round(pct)}%)
         </span>
       </div>
-      <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+      <div className="h-1.5 rounded-full bg-black/5 dark:bg-white/5 overflow-hidden">
         <div
           className={`h-full ${tone.bar} transition-all duration-300`}
           style={{ width: `${pct}%` }}
