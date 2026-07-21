@@ -2,7 +2,14 @@ import type { Metadata, Viewport } from "next";
 import React from "react";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
-import { Source_Serif_4, Inter, Roboto } from "next/font/google";
+import {
+  Source_Serif_4,
+  Inter,
+  Roboto,
+  Newsreader,
+  JetBrains_Mono,
+  Caveat,
+} from "next/font/google";
 import "./globals.css";
 
 import Head from "./layout/head";
@@ -42,6 +49,30 @@ const geminiSans = Roboto({
   subsets: ["latin"],
   weight: ["400", "500", "700"],
   variable: "--font-gemini",
+  display: "swap",
+});
+
+// Personal site (davidvalentine.org) typography. Consumed by the
+// `.personal-home` token scope in globals.css and the (personal) page routes:
+// Newsreader → serif display + body, JetBrains Mono → labels/kickers,
+// Caveat → hand-written margin annotations.
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-caveat",
   display: "swap",
 });
 
@@ -157,7 +188,8 @@ export default async function RootLayout({
         />
         <Head />
       </head>
-      <body className={`min-h-dvh w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable}`}>
+      <body className={`min-h-dvh w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable} ${newsreader.variable} ${jetbrainsMono.variable} ${caveat.variable}`}>
+
         {/* Initialize user settings on mount */}
         <SettingsInitializer />
         {/* Keep <html class="dark"> in sync as preference or OS scheme changes */}

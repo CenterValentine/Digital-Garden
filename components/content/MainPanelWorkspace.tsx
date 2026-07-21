@@ -15,6 +15,7 @@ import {
 } from "@/state/content-store";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
 import { MainPanelNavigation } from "./MainPanelNavigation";
+import { PanelOverlayCornerTargets } from "./PanelOverlayCornerTargets";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
 import { MainPanelContent } from "./content/MainPanelContent";
 import { useExtensionShellControllers } from "@/lib/extensions/client-registry";
@@ -63,7 +64,10 @@ function WorkspacePane({
   // affects the in-place toggle.
   const mobileFocus = useMobileUiStore((state) => state.focusMode);
   const pathname = usePathname();
-  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+  // Chrome suppression applies to the single-content overlay embed only.
+  // The side-panel embed (/embed/panel) is a full mini-DG shell and needs
+  // the tab strip + workspace navigation (BROWSER-REACH B1).
+  const isEmbedMode = pathname?.startsWith("/embed/content") ?? false;
   const isDropTarget = Boolean(draggedTabId) && layoutMode !== "single";
 
   return (
@@ -436,7 +440,11 @@ export function MainPanelWorkspace({
   // the workspace bar + shell controllers below.
   const mobileFocus = useMobileUiStore((state) => state.focusMode);
   const isFocusMode = (pathname?.includes("/content/focus/") ?? false) || mobileFocus;
-  const isEmbedMode = pathname?.startsWith("/embed/") ?? false;
+  // Chrome suppression applies to the single-content overlay embed only.
+  // The side-panel embed (/embed/panel) is a full mini-DG shell and needs
+  // the tab strip + workspace navigation (BROWSER-REACH B1).
+  const isEmbedMode = pathname?.startsWith("/embed/content") ?? false;
+  const isPanelEmbedSurfacePath = pathname?.startsWith("/embed/panel") ?? false;
   const [draggedTabId, setDraggedTabId] = useState<string | null>(null);
   const [draggedFromPaneId, setDraggedFromPaneId] = useState<WorkspacePaneId | null>(null);
   const [hoveredSinglePaneTargetId, setHoveredSinglePaneTargetId] = useState<string | null>(null);
@@ -676,10 +684,23 @@ export function MainPanelWorkspace({
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
-      {!isFocusMode && !isEmbedMode ? <MainPanelNavigation paneId={activePaneId} /> : null}
+      {/* The side-panel embed hides the whole navigation bar (no back/forward,
+          no pane layout at panel width); the workspace chooser renders in the
+          panel shell above the file tree instead (BROWSER-REACH B1). */}
+      {!isFocusMode && !isEmbedMode && !(pathname?.startsWith("/embed/panel") ?? false) ? (
+        <MainPanelNavigation paneId={activePaneId} />
+      ) : null}
       <div key={layoutMode} className="relative flex-1 min-h-0">
         {paneLayout}
-        {layoutMode !== "quad" && (
+        {/* Side panel: pane-placement previews are meaningless at single-pane
+            panel width, so the drag offers page corners instead — the panel
+            can't be dragged onto, so it shows a miniature of the page. */}
+        {isPanelEmbedSurfacePath ? (
+          <PanelOverlayCornerTargets
+            draggedTabId={draggedTabId}
+            onDrop={resetDragState}
+          />
+        ) : layoutMode !== "quad" ? (
           <WorkspaceReshapeTargets
             layoutMode={layoutMode}
             draggedTabId={draggedTabId}
@@ -690,7 +711,7 @@ export function MainPanelWorkspace({
             onTargetHover={setHoveredSinglePaneTargetId}
             onTargetDrop={handleTabDrop}
           />
-        )}
+        ) : null}
       </div>
       {!isFocusMode
         ? shellControllers.map((Controller) =>

@@ -2,6 +2,8 @@
  * PublicPathListing — lists published items under a PublicPath.
  */
 
+import Link from "next/link";
+
 interface PublicItemCard {
   id: string;
   slug: string;
@@ -30,6 +32,14 @@ export function PublicPathListing({ publicPath }: Props) {
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-20">
+      <Link
+        href="/"
+        className="inline-flex items-center gap-2 text-[11px] uppercase tracking-widest rounded-full px-4 py-2 mb-12 transition-colors font-medium"
+        style={{ background: "rgba(227,164,74,0.18)", color: "#e3a44a", border: "1px solid rgba(227,164,74,0.45)" }}
+      >
+        ← Back to the garden
+      </Link>
+
       <header className="mb-12">
         <h1 className="text-3xl font-bold text-white mb-3">{publicPath.title}</h1>
         {publicPath.description && (

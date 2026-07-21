@@ -1,0 +1,5 @@
+(function(){  try{    var s=localStorage.getItem("notes:settings");    if(s){var d=JSON.parse(s),t=d&&d.state&&d.state.ui&&d.state.ui.theme;    if(t==="dark"||t==="light"){document.documentElement.setAttribute("data-theme",t);return;}}  }catch(e){}  document.documentElement.setAttribute("data-theme","light");})();
+
+;
+
+window.GardenCarousel={DEFAULT_PLANTS:[{key:"yarrow",label:"About",base:288,ground:"tree",beat:{kicker:"The Gardener",title:"About",line:"",cta:"About me"}},{key:"willow",label:"Work",base:256,ground:"tree",beat:{kicker:"The Fruit",title:"Work",line:"",cta:"My work"}},{key:"hawthorn",label:"Resume",base:240,ground:"tree",beat:{kicker:"The Record",title:"Resume",line:"",cta:"View resume"}},{key:"dandelion",label:"Notes",base:256,ground:"dandelion",beat:{kicker:"Field Notes",title:"Field Notes",line:"",cta:"Browse blog"}},{key:"maple",label:"Garden",base:240,ground:"tree",beat:{kicker:"My Garden",title:"Garden",line:"",cta:"See my garden"}}],create:function(){return{render:function(){},setActive:function(){},getActive:function(){return 0;},destroy:function(){}};}};

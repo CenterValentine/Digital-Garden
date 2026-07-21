@@ -224,6 +224,7 @@ First-party feature modules with clear ownership boundaries. Each extension live
 - Disabled extensions disappear through registry filters — never add direct conditionals in shared UI
 - Shell controls, dialogs, and settings don't mount when extension is disabled
 - New logic belongs inside `extensions/<name>/`, not in shared components
+- **Extensions are a heavyweight last resort** — before proposing a new one, exhaust templates from existing blocks, then new blocks. See [Before Adding an Extension Module](#before-adding-an-extension-module) for the gating ladder.
 
 **Client registry:** `lib/extensions/client-registry.tsx` — `useIsExtensionEnabled(id)`, `getExtensionClientEditorExtensions()`
 **Server registry:** `lib/extensions/server-registry.ts` — `getExtensionServerEditorExtensions()`
@@ -293,7 +294,9 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 ### Collaboration Architecture
 
-**Transport:** Hocuspocus server hosted on Google Cloud Run (not local). Do not check port 1234 or suggest `pnpm dev:collab` for production testing.
+**Transport:** Hocuspocus runs on Google Cloud Run in **production**. **Local dev now REQUIRES a local Hocuspocus** (`pnpm dev:collab`, ws://localhost:1234) — the dev database moved to local Docker Postgres, and the hosted server authorizes documents against Neon, so it cannot see locally-created content (symptom: "Live collaboration authentication could not be completed" on every note). Run `pnpm dev:collab` **from the same checkout as the dev server** (it loads that directory's `.env.local` and TipTap schema), and set `NEXT_PUBLIC_HOCUSPOCUS_URL=ws://localhost:1234` — never `0.0.0.0` (a bind address; browsers can't connect to it).
+
+**Deploying Hocuspocus:** `gcloud builds submit --config cloudbuild.hocuspocus.yaml .` ships **the current working directory**. With multiple worktrees at different commits, always deploy from a checkout at `origin/main` — verify with `git rev-list --count HEAD..origin/main` returning `0` first. Note `uptimeMs` from `/readyz` measures time since the last cold start (`min-instances=0`), **not** time since deploy — never infer staleness from it; use `gcloud builds list` instead.
 
 **Y.js document storage:** `CollaborationDocument` Prisma table stores binary `ydocState`. On load, the server bootstraps from TipTap JSON if no Y.js state exists. Presence (awareness) state is persisted to Postgres to handle Vercel serverless split.
 
@@ -518,7 +521,26 @@ These were all caught by enforcing the React Compiler rules during lint. Treat c
 5. Bump `TIPTAP_SCHEMA_VERSION` in `lib/domain/editor/schema-version.ts` (MINOR for new nodes, MAJOR for breaking changes)
 6. Run `pnpm collab:schema:check` to confirm CI passes
 
-### Adding a New Extension Module
+### Before Adding an Extension Module
+
+Extensions are expensive: a new manifest, client runtime, optional server runtime, components directory, state store, registry entry, and a new piece of cognitive surface every future contributor must learn. Before proposing one, work through these gates **in order** and stop at the cheapest one that fits:
+
+1. **Templates from existing blocks.** Can this feature be authored as a TipTap document composed of existing editor + publishing blocks (hero, columns, cards, callouts, accordions, tabs, etc.)? If yes, the "template" is just a documented composition pattern — no new code, no new schema, no new layer. Use Phase 2's item-as-home for paths (`PublicPath.homeItemId`) to land such templates as path roots.
+
+2. **A new block.** If existing blocks can't express the feature, ask whether **one new block** (registered in the publishing block registry with a `Server*` variant) closes the gap. New blocks inherit the editor pipeline, schema-versioning, collaboration sync, and rendering paths that already work — adding capability without adding a layer.
+
+3. **A new extension.** Only justified when the feature requires at least one of:
+   - **First-class typed data** that doesn't reduce to block composition (e.g., `flashcards` FSRS scheduling state, `periodic-notes` period math, the deferred `resume` extension's Position/Education/Skill entities)
+   - **Multiple shell-UI surfaces** (nav items + sidebar tabs + content viewers + dialogs) that need coordinated registration
+   - **Runtime contributions** that don't fit block-level granularity (slash commands, suggestion menus, background jobs, server-side cron handlers)
+
+**Worked example — Projects.** Project pages might initially feel like "they need an extension" because they have hero images, role/stack/dates, and a status. But all of that composes from existing blocks: a hero block for the cover, a callout for the role/stack/dates summary, a divider, then prose. The "Projects" path then uses item-as-home with a curated index. Result: a templated content pattern, zero new code, fully editable in the IDE. The instinct to extension-ize was wrong; the right answer was composition.
+
+**Worked counter-example — Resume.** Genuinely structured: Position has a date range, employer, role, achievements list; Education has institution, degree, dates; Skills are a controlled vocabulary. None of those reduce to "TipTap content blocks." Plus PDF rendering and import/export workflows. An extension is the right call.
+
+**Default bias: toward templates and blocks.** Prototype the template-version first. Promote to extension only after you've tried the cheaper path and found it genuinely insufficient — and document what specifically blocked the cheaper path so the next person doesn't re-litigate.
+
+### Adding a New Extension Module (not exhaustive yet, do your own evaluation of scope and update this checklist as needed)
 
 1. Create `extensions/<name>/manifest.ts`, `client.tsx`, and (if needed) `server-runtime.ts`
 2. Register in **both** extension lists — they are intentionally separate (installed.ts bundles client runtimes so it can't be imported from Server Components; manifests.ts is server-safe data). The **`pnpm extensions:check` gate** (in `build`) enforces they stay in sync, so a miss fails the build with a clear message rather than shipping silently:
@@ -530,11 +552,26 @@ These were all caught by enforcing the React Compiler rules during lint. Treat c
 
 ### Database Workflows
 
-**Development:** Edit `prisma/schema.prisma` → `npx prisma db push` → `npx prisma generate`
+**Migration-first.** Every schema change that ships gets a migration file, so the migration history and `schema.prisma` stay in lockstep and any environment can be built from migrations alone. The history was consolidated to a clean baseline in 2026-07 (`docs/notes-feature/guides/database/MIGRATION-BASELINE-SQUASH.md`); the `migration-drift` CI gate keeps it that way.
 
-**Production:** `npx prisma migrate dev --name name --create-only` → review SQL → `npx prisma migrate deploy`
+**Making a schema change:**
+1. Edit `prisma/schema.prisma`.
+2. Generate + apply the migration against local Docker Postgres — `migrate dev` needs a shadow DB, wired via `datasource.shadowDatabaseUrl` in `prisma.config.ts`:
 
-**Rules:** Use `db push` for dev (fast, no data loss). Never `migrate reset` in prod. Always `generate` after schema changes. Use `migrate resolve` to fix drift.
+   ```bash
+   SHADOW_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shadow \
+     npx prisma migrate dev --name <change>
+   ```
+
+   (Create the `shadow` database once: `docker exec digital-garden-postgres psql -U postgres -c 'CREATE DATABASE shadow;'`)
+3. Review the generated SQL, then commit `schema.prisma` **and** the new `prisma/migrations/<...>/` together in the same PR.
+4. `npx prisma generate` if the client didn't regenerate.
+
+**Production:** `npx prisma migrate deploy` is the ONLY way prod schema changes. No raw SQL, no `db push` against prod.
+
+**`db push`:** local throwaway spikes only. Anything you commit must first be captured as a migration (`migrate dev`) — a schema change without a matching migration fails the `migration-drift` CI gate (`.github/workflows/migration-drift.yml`), which replays the history into a shadow DB and asserts it reproduces `schema.prisma`.
+
+**Rules:** Never `migrate reset` in prod. Always `generate` after schema changes. Use `migrate resolve --applied <name>` to baseline a database that already has the tables (bookkeeping only — no DDL, no data touched).
 
 **Checklist:** `docs/notes-feature/guides/database/DATABASE-CHANGE-CHECKLIST.md` (mandatory for all schema changes)
 

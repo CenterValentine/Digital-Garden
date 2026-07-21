@@ -2,6 +2,8 @@
 
 import { createElement, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { usePathname } from "next/navigation";
+import { requestOverlayOpen } from "@/lib/domain/browser-extension/panel-bridge";
 import {
   ExternalLink,
   File,
@@ -289,6 +291,8 @@ export function MainPanelHeader({
   // one redundant content fetch per tab on every cold load.
   const workspaceStoreReady = useWorkspaceStore((state) => state.hasLoadedOnce);
   const shellTabMenuSections = useExtensionShellTabMenuSections();
+  const headerPathname = usePathname();
+  const isPanelEmbed = headerPathname?.startsWith("/embed/panel") ?? false;
 
   const [editingTabId, setEditingTabId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -580,7 +584,7 @@ export function MainPanelHeader({
                   }
                 }}
                 onContextMenu={(event) => {
-                  if (shellTabMenuSections.length === 0) return;
+                  if (shellTabMenuSections.length === 0 && !isPanelEmbed) return;
                   event.preventDefault();
                   setTabMenu({ tabId: tab.id, x: event.clientX, y: event.clientY });
                 }}
@@ -659,6 +663,25 @@ export function MainPanelHeader({
           style={{ left: tabMenu.x, top: tabMenu.y }}
           onClick={(event) => event.stopPropagation()}
         >
+          {/* Side panel only: project this tab onto the page. Drag-to-corner
+              gives precise placement; this is the one-click default. */}
+          {isPanelEmbed && tabMenuTab.contentId ? (
+            <>
+              <div className="px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                Page
+              </div>
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+                onClick={() => {
+                  requestOverlayOpen(tabMenuTab.contentId as string);
+                  setTabMenu(null);
+                }}
+              >
+                Open as overlay
+              </button>
+            </>
+          ) : null}
           {shellTabMenuSections.map((Section) =>
             createElement(Section, {
               key: Section.displayName ?? Section.name,

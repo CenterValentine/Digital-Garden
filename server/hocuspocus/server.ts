@@ -59,6 +59,24 @@ function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Writes a response and halts Hocuspocus's onRequest pipeline.
+ *
+ * `throw null` is REQUIRED here, not a shortcut. Hocuspocus's requestHandler
+ * does:
+ *
+ *     catch (error) { if (error) { throw error; } }   // Server.ts
+ *
+ * i.e. a *falsy* throw means "a hook already answered this request, stop the
+ * chain", and anything truthy is rethrown and crashes the process. Replacing
+ * this with a named sentinel class looked safer but was rethrown on every
+ * probe — do not "improve" it again.
+ *
+ * The companion rule: never wrap a call to this in a try that also handles
+ * real failures, or that catch will swallow the stop-signal and double-write
+ * the response (ERR_HTTP_HEADERS_SENT). Scope such trys to the fallible work
+ * itself — see /readyz below.
+ */
 function sendJsonAndStop(
   response: onRequestPayload["response"],
   status: number,
@@ -84,20 +102,27 @@ async function handleHealthRequest(data: onRequestPayload) {
   }
 
   if (url.pathname === "/readyz") {
+    // Scope the try to the DB probe ONLY — never wrap a sendJsonAndStop call,
+    // whose null stop-signal must reach Hocuspocus uncaught.
+    let databaseError: unknown = null;
     try {
       await prisma.$queryRaw`SELECT 1`;
+    } catch (error) {
+      databaseError = error;
+    }
+    if (!databaseError) {
       sendJsonAndStop(data.response, 200, {
         ok: true,
         service: "digital-garden-hocuspocus",
         database: "ready",
         uptimeMs: Date.now() - startedAt,
       });
-    } catch (error) {
+    } else {
       sendJsonAndStop(data.response, 503, {
         ok: false,
         service: "digital-garden-hocuspocus",
         database: "unavailable",
-        error: getErrorMessage(error),
+        error: getErrorMessage(databaseError),
       });
     }
   }

@@ -1,6 +1,7 @@
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect as nextRedirect } from "next/navigation";
 import { prisma } from "@/lib/database/client";
 import { withPageTrace } from "@/lib/core/logger";
+import { getCurrentSession } from "@/lib/infrastructure/auth";
 import {
   getCurrentTenant,
   resolvePublicItem,
@@ -12,21 +13,33 @@ interface Params {
   path: string[];
 }
 
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
 export default async function PublicCatchAll({
   params,
+  searchParams,
 }: {
   params: Promise<Params>;
+  searchParams: SearchParams;
 }) {
   const { path: segments } = await params;
   const fullPath = "/" + segments.join("/");
+  // Composer draft preview. Reading searchParams makes preview requests
+  // dynamic (bypassing the 60s ISR) — published traffic without the param
+  // keeps the cached path.
+  const wantsDraft = (await searchParams).preview === "draft";
 
   return withPageTrace(
     { route: "/(public)/[...path]", attrs: { path: fullPath } },
-    () => renderPublic(fullPath, segments),
+    () => renderPublic(fullPath, segments, wantsDraft),
   );
 }
 
-async function renderPublic(fullPath: string, segments: string[]) {
+async function renderPublic(
+  fullPath: string,
+  segments: string[],
+  wantsDraft: boolean,
+) {
   // Tenant resolution: header (multi-tenant) → SITE_OWNER_ID fallback
   // (legacy single-tenant). When neither resolves the public surface
   // is unconfigured for this host → show nothing.
@@ -35,6 +48,64 @@ async function renderPublic(fullPath: string, segments: string[]) {
     notFound();
   }
   const { tenant } = ctx;
+
+  // 0. Personal-site code-driven pages (davidvalentine.org only). These take
+  //    precedence over any DB-published path of the same slug — they are
+  //    hand-authored React surfaces, not publishing content. Mirrors the
+  //    `tenant.isPersonal && slug === "david"` gate in app/page.tsx.
+  if (tenant.isPersonal && tenant.slug === "david") {
+    const joined = segments.join("/");
+
+    // Draft preview is owner-only: same-host iframe/tab shares the session
+    // cookie, so a plain session check suffices. Non-owners silently get the
+    // published view rather than an error.
+    let draft = false;
+    if (wantsDraft) {
+      const session = await getCurrentSession();
+      draft = session?.user.id === tenant.ownerId;
+    }
+
+    if (joined === "about") {
+      const { AboutPage } = await import(
+        "../../../components/personal/AboutPage"
+      );
+      return <AboutPage />;
+    }
+    if (joined === "results") {
+      const [{ WorkResultsPage }, { fetchWorkData }] = await Promise.all([
+        import("../../../components/personal/WorkResultsPage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const data = await fetchWorkData(tenant.tenantId, { draft });
+      return <WorkResultsPage data={data ?? undefined} />;
+    }
+    if (joined === "resume") {
+      const { ResumePage } = await import(
+        "../../../components/personal/ResumePage"
+      );
+      return <ResumePage />;
+    }
+    if (joined === "garden") {
+      const { GardenConstructionPage } = await import(
+        "../../../components/personal/GardenConstructionPage"
+      );
+      return <GardenConstructionPage />;
+    }
+    if (joined === "hobby") {
+      const { HobbyPage } = await import(
+        "../../../components/personal/HobbyPage"
+      );
+      return <HobbyPage />;
+    }
+    if (joined === "blog") {
+      const [{ FieldNotesPage }, { fetchGardenData }] = await Promise.all([
+        import("../../../components/personal/FieldNotesPage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const cats = await fetchGardenData(tenant.tenantId, { draft });
+      return <FieldNotesPage cats={cats ?? undefined} />;
+    }
+  }
 
   // 1. Check redirects first. Redirects are tenant-scoped so two
   //    tenants could legitimately use the same /old-url. Using
@@ -89,6 +160,14 @@ async function renderPublic(fullPath: string, segments: string[]) {
       "../../../components/public/renderers/PublicPathListing"
     );
     return <PublicPathListing publicPath={publicPath} />;
+  }
+
+  // 4. Personal tenant: unbuilt routes gracefully redirect to the garden
+  //    home instead of 404ing. Real published paths are resolved above (steps
+  //    2–3); this only catches slugs with no content yet (e.g. /contact,
+  //    /writing) so they don't dead-end while those pages are in progress.
+  if (tenant.isPersonal) {
+    nextRedirect("/");
   }
 
   notFound();
