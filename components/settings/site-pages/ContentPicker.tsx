@@ -25,14 +25,18 @@ import type {
 export function ContentPicker({
   tenantId,
   sectionLabel,
-  onBindDirectory,
+  onAddDirectory,
   onAddItem,
   onClose,
 }: {
   tenantId: string;
   sectionLabel: string;
-  /** Add a whole directory as an item (ref = publicPath:/x). */
-  onBindDirectory: (ref: string, dir: ContentIndexDirectory) => void;
+  /**
+   * Add a whole directory. `keepInSync` true → a live directory item
+   * (publicPath, expands forever); false → a snapshot of its current pages
+   * (individual publicItem rows).
+   */
+  onAddDirectory: (dir: ContentIndexDirectory, keepInSync: boolean) => void;
   /** Add a single published page as an item (ref = publicItem:slug). */
   onAddItem: (ref: string, title: string) => void;
   onClose: () => void;
@@ -40,6 +44,9 @@ export function ContentPicker({
   const [dirs, setDirs] = useState<ContentIndexDirectory[] | null>(null);
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  // Per-directory "keep in sync" — defaults ON (absent = synced).
+  const [noSync, setNoSync] = useState<Set<string>>(new Set());
+  const isSync = (path: string) => !noSync.has(path);
 
   useEffect(() => {
     void (async () => {
@@ -183,17 +190,49 @@ export function ContentPicker({
                     <span className="font-mono text-[10px] text-white/45">
                       {d.publishedCount} published
                     </span>
+                    <label
+                      className="flex items-center gap-1.5 text-[11px] text-white/55"
+                      title={
+                        isSync(d.path)
+                          ? "New pages published to this path will appear automatically"
+                          : "Only the pages here right now — a fixed snapshot"
+                      }
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isSync(d.path)}
+                        onChange={(e) =>
+                          setNoSync((prev) => {
+                            const next = new Set(prev);
+                            if (e.target.checked) next.delete(d.path);
+                            else next.add(d.path);
+                            return next;
+                          })
+                        }
+                      />
+                      Keep in sync
+                    </label>
                     <button
                       type="button"
-                      title={`Show every published page in ${d.path} here, and keep it updated as you publish more`}
+                      title={
+                        isSync(d.path)
+                          ? `Add every page in ${d.path} and keep it updated as you publish more`
+                          : `Add the ${d.publishedCount} page(s) in ${d.path} as they are now`
+                      }
                       className="whitespace-nowrap rounded-md border border-amber-600/60 px-2.5 py-1 text-[11px] text-amber-400 hover:bg-amber-500/10"
                       onClick={() => {
-                        onBindDirectory(d.ref, d);
-                        toast.success(`${d.title} added — new pages will appear automatically`);
+                        const sync = isSync(d.path);
+                        onAddDirectory(d, sync);
+                        toast.success(
+                          sync
+                            ? `${d.title} added — new pages will appear automatically`
+                            : `Added ${d.publishedCount} page(s) from ${d.title} (won't auto-update)`,
+                        );
                         onClose();
                       }}
                     >
-                      Add all + keep in sync
+                      Add all
                     </button>
                   </div>
 

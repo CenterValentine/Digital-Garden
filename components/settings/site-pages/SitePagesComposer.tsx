@@ -783,9 +783,17 @@ export function SitePagesComposer() {
           sectionLabel={
             working.config.sections[picker.sectionIndex]?.label || "this section"
           }
-          // A directory becomes a directory item (expands at render); a single
-          // page becomes a connected row whose fields inherit until overridden.
-          onBindDirectory={(ref) => addItemToPickerSection({ ref, status: "done" })}
+          // Keep in sync → one directory item (expands at render, stays live).
+          // Snapshot → each current page pinned as its own connected item.
+          onAddDirectory={(dir, keepInSync) => {
+            if (keepInSync) {
+              addItemToPickerSection({ ref: dir.ref, status: "done" });
+            } else {
+              for (const it of dir.items) {
+                addItemToPickerSection({ ref: it.ref, status: "done" });
+              }
+            }
+          }}
           onAddItem={(ref) => addItemToPickerSection({ ref, status: "done" })}
           onClose={() => setPicker(null)}
         />
