@@ -552,11 +552,26 @@ Extensions are expensive: a new manifest, client runtime, optional server runtim
 
 ### Database Workflows
 
-**Development:** Edit `prisma/schema.prisma` → `npx prisma db push` → `npx prisma generate`
+**Migration-first.** Every schema change that ships gets a migration file, so the migration history and `schema.prisma` stay in lockstep and any environment can be built from migrations alone. The history was consolidated to a clean baseline in 2026-07 (`docs/notes-feature/guides/database/MIGRATION-BASELINE-SQUASH.md`); the `migration-drift` CI gate keeps it that way.
 
-**Production:** `npx prisma migrate dev --name name --create-only` → review SQL → `npx prisma migrate deploy`
+**Making a schema change:**
+1. Edit `prisma/schema.prisma`.
+2. Generate + apply the migration against local Docker Postgres — `migrate dev` needs a shadow DB, wired via `datasource.shadowDatabaseUrl` in `prisma.config.ts`:
 
-**Rules:** Use `db push` for dev (fast, no data loss). Never `migrate reset` in prod. Always `generate` after schema changes. Use `migrate resolve` to fix drift.
+   ```bash
+   SHADOW_DATABASE_URL=postgresql://postgres:postgres@localhost:5432/shadow \
+     npx prisma migrate dev --name <change>
+   ```
+
+   (Create the `shadow` database once: `docker exec digital-garden-postgres psql -U postgres -c 'CREATE DATABASE shadow;'`)
+3. Review the generated SQL, then commit `schema.prisma` **and** the new `prisma/migrations/<...>/` together in the same PR.
+4. `npx prisma generate` if the client didn't regenerate.
+
+**Production:** `npx prisma migrate deploy` is the ONLY way prod schema changes. No raw SQL, no `db push` against prod.
+
+**`db push`:** local throwaway spikes only. Anything you commit must first be captured as a migration (`migrate dev`) — a schema change without a matching migration fails the `migration-drift` CI gate (`.github/workflows/migration-drift.yml`), which replays the history into a shadow DB and asserts it reproduces `schema.prisma`.
+
+**Rules:** Never `migrate reset` in prod. Always `generate` after schema changes. Use `migrate resolve --applied <name>` to baseline a database that already has the tables (bookkeeping only — no DDL, no data touched).
 
 **Checklist:** `docs/notes-feature/guides/database/DATABASE-CHANGE-CHECKLIST.md` (mandatory for all schema changes)
 
