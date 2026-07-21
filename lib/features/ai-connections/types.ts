@@ -91,16 +91,24 @@ export interface UpdateConnectionPatch {
 export type ConnectionRow = PrismaAIConnection;
 
 /**
- * Adapter kinds the resolver knows how to construct.
- * Extending this requires a new branch in `resolveChatModel`.
+ * Adapter kinds the resolver knows how to construct — the SINGLE SOURCE
+ * OF TRUTH. `AdapterKind` is derived from this tuple, and runtime
+ * validators (e.g. the connections route) MUST import `ADAPTER_KINDS`
+ * rather than re-listing the values: a hand-maintained duplicate silently
+ * rejected `deepseek` on save even though the type included it
+ * (fixed 2026-07-21). Extending this requires a matching branch in
+ * `resolveChatModelFromConnection`.
  */
-export type AdapterKind =
-  | "anthropic"
-  | "openai"
-  | "google"
-  | "xai"
-  | "mistral"
-  | "groq"
-  | "deepseek"
-  | "vercel-gateway"
-  | "openai-compat";
+export const ADAPTER_KINDS = [
+  "anthropic",
+  "openai",
+  "google",
+  "xai",
+  "mistral",
+  "groq",
+  "deepseek",
+  "vercel-gateway",
+  "openai-compat",
+] as const;
+
+export type AdapterKind = (typeof ADAPTER_KINDS)[number];
