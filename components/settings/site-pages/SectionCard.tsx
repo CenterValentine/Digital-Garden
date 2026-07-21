@@ -201,8 +201,12 @@ export function SectionCard({
         />
       )}
 
-      {/* items */}
-      <ul className="divide-y divide-white/5 rounded-md border border-white/5">
+      {/* items — nested under the section to signal the parent/child relationship */}
+      <div className="ml-1.5 space-y-3 border-l-2 border-white/10 pl-4">
+        <span className="block font-mono text-[9px] uppercase tracking-[0.16em] text-white/30">
+          {pageKind === "garden" ? "Items in this category" : "Rows in this section"}
+        </span>
+        <ul className="divide-y divide-white/5 rounded-md border border-white/10 bg-black/15">
         {section.items.map((item, i) => {
           if (isDirectoryRef(item.ref)) {
             const dirRefs = expandDirectory(item.ref!);
@@ -275,23 +279,24 @@ export function SectionCard({
             Nothing here yet. Add published pages or a whole directory — or a manual row.
           </li>
         )}
-      </ul>
+        </ul>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="button"
-          className="rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10"
-          onClick={onConnect}
-        >
-          ⚡ Add published content…
-        </button>
-        <button
-          type="button"
-          className="rounded-md border border-dashed border-white/20 px-3 py-1.5 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
-          onClick={onAddManual}
-        >
-          + Add manual row
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10"
+            onClick={onConnect}
+          >
+            ⚡ Add published content…
+          </button>
+          <button
+            type="button"
+            className="rounded-md border border-dashed border-white/20 px-3 py-1.5 text-xs text-white/50 hover:border-amber-500/50 hover:text-amber-400"
+            onClick={onAddManual}
+          >
+            + Add manual row
+          </button>
+        </div>
       </div>
     </section>
   );
