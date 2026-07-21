@@ -129,8 +129,8 @@ export function PanelPageContextBar({
             type="button"
             onClick={captureScreenshot}
             disabled={screenshotBusy}
-            title="Attach a screenshot of the visible page"
-            aria-label="Attach a screenshot of the visible page"
+            title="Capture a snapshot of the visible page"
+            aria-label="Capture a snapshot of the visible page"
             className="inline-flex items-center justify-center rounded-md border border-black/10 dark:border-white/15 p-1 text-gray-600 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
           >
             {screenshotBusy ? (
