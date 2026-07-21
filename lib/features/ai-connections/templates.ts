@@ -222,12 +222,15 @@ const MOONSHOT: ConnectionTemplate = {
   adapterKind: "openai-compat",
   defaultBaseURL: "https://api.moonshot.ai/v1",
   baseURLLocked: false, // .cn endpoint for mainland accounts
+  // Moonshot's model ids are VOLATILE and account/tier-specific: the
+  // documented `kimi-latest` / `moonshot-v1-*` ids 404 with "model not
+  // found or permission denied" on accounts that only expose the current
+  // kimi-k2.x line. So ship a single current default and rely on "Fetch
+  // from API" for the account's real list (verified 2026-07-21).
   defaultModels: [
-    { id: "kimi-k2-turbo-preview", name: "Kimi K2 Turbo", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
-    { id: "kimi-latest", name: "Kimi (latest)", contextWindow: 131_072, capabilities: ["text", "vision", "tools", "streaming"] },
-    { id: "moonshot-v1-128k", name: "Moonshot v1 128k", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
+    { id: "kimi-k2.6", name: "Kimi K2.6", contextWindow: 262_144, capabilities: ["text", "tools", "streaming"] },
   ],
-  apiKeyHint: "Get one from platform.moonshot.ai (use api.moonshot.cn as base URL for mainland accounts)",
+  apiKeyHint: "Get one from platform.moonshot.ai (use api.moonshot.cn as base URL for mainland accounts). After saving, click Fetch from API for your account's exact models.",
   apiKeyDocsURL: "https://platform.moonshot.ai/console/api-keys",
   supportsModelFetch: true,
 };
