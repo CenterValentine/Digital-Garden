@@ -824,6 +824,15 @@ export const ChatMessage = memo(function ChatMessage({
 
             {isUser && onEdit && (
               <MessageActionButton
+                onClick={() => onEdit(message.id, messageText)}
+                disabled={actionsDisabled}
+                label="Re-run this message"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+              </MessageActionButton>
+            )}
+            {isUser && onEdit && (
+              <MessageActionButton
                 onClick={beginEdit}
                 disabled={actionsDisabled}
                 label="Edit & re-run"
@@ -1333,10 +1342,12 @@ function AssistantAvatar({
     timerRef.current = setTimeout(() => {
       const rect = anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
-      // Anchor to the right edge of the avatar, vertically centered.
+      // Anchor just below the avatar, aligned to its left — keeps the tooltip
+      // at the hover point instead of drifting off to the right in narrow
+      // surfaces like the browser side panel.
       setTooltipAnchor({
-        top: rect.top + rect.height / 2,
-        left: rect.right + 8, // 8px gap (matches the prior `ml-2`)
+        top: rect.bottom + 6,
+        left: rect.left,
       });
     }, 1000);
   }, []);
@@ -1379,7 +1390,6 @@ function AssistantAvatar({
               position: "fixed",
               top: tooltipAnchor.top,
               left: tooltipAnchor.left,
-              transform: "translateY(-50%)",
               zIndex: 9999,
             }}
             className="pointer-events-none whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl"
