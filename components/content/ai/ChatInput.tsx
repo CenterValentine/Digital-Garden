@@ -37,6 +37,7 @@ import type { ChatStatus } from "ai";
 import type { ChatAttachment } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
+import { PanelPageContextBar } from "./PanelPageContextBar";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -455,6 +456,10 @@ export function ChatInput({
       onSubmit={handleSubmit}
       className="border-t border-black/10 dark:border-white/10 bg-black/[0.03] dark:bg-black/20 p-2"
     >
+      {/* Browser side-panel only: attach the current page to the chat. Its own
+          element above the input, self-contained (store-driven, renders null
+          off-panel) so it stays out of the shared composer's CSS. */}
+      <PanelPageContextBar />
       <div
         ref={treeDropRef as unknown as React.Ref<HTMLDivElement>}
         className={cn(

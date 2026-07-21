@@ -10,8 +10,6 @@ import { fileTreeActionProvider } from "@/components/content/context-menu/file-t
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import type { ContextMenuActionProvider } from "@/components/content/context-menu/types";
 import { usePanelPageContextStore } from "@/state/panel-page-context-store";
-import type { PageContextScope } from "@/lib/domain/browser-extension/page-context";
-import { PanelPageContextBar } from "./PanelPageContextBar";
 import {
   requestOverlayOpen,
   OVERLAY_CORNERS,
@@ -156,23 +154,10 @@ export function PanelShellClient({
   const [view, setView] = useState<PanelView>("garden");
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
-  const [scope, setScope] = useState<PageContextScope>("full");
-  const [captureBusy, setCaptureBusy] = useState(false);
-  const [captureError, setCaptureError] = useState<string | null>(null);
-  const attachedContext = usePanelPageContextStore((s) => s.pageContext);
-  const attached = usePanelPageContextStore((s) => s.attached);
-  const clearAttached = usePanelPageContextStore((s) => s.clear);
-
-  // Ask the host to capture the current page at the chosen scope.
-  function requestCapture(nextScope: PageContextScope) {
-    setScope(nextScope);
-    setCaptureBusy(true);
-    setCaptureError(null);
-    window.parent.postMessage(
-      { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope: nextScope } },
-      "*"
-    );
-  }
+  // Page-context capture results flow into the store; the context bar now
+  // lives in the composer (PanelPageContextBar) and drives capture itself.
+  // This shell only relays the host's responses in via getState() (below),
+  // so the listener effect needs no store deps.
   const setRightCollapsed = useRightPanelCollapseStore((s) => s.setCollapsed);
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
@@ -260,7 +245,8 @@ export function PanelShellClient({
       // the next chat turn. The scope requested is echoed back on payload.
       if (data.type === "page-content" && typeof data.payload?.content === "string") {
         const p = data.payload;
-        usePanelPageContextStore.getState().setPageContext({
+        const store = usePanelPageContextStore.getState();
+        store.setPageContext({
           title: typeof p.title === "string" ? p.title : null,
           byline: typeof p.byline === "string" ? p.byline : null,
           siteName: typeof p.siteName === "string" ? p.siteName : null,
@@ -271,14 +257,15 @@ export function PanelShellClient({
           url: typeof p.url === "string" ? p.url : "",
           capturedAt: typeof p.capturedAt === "number" ? p.capturedAt : Date.now(),
         });
-        usePanelPageContextStore.getState().setAttached(true);
-        setCaptureBusy(false);
-        setCaptureError(null);
+        store.setAttached(true);
+        store.setBusy(false);
+        store.setError(null);
       }
 
       if (data.type === "page-content-error") {
-        setCaptureBusy(false);
-        setCaptureError(
+        const store = usePanelPageContextStore.getState();
+        store.setBusy(false);
+        store.setError(
           typeof data.payload?.message === "string"
             ? data.payload.message
             : "Couldn't read this page"
@@ -458,18 +445,9 @@ export function PanelShellClient({
         }}
         data-page-context-url={pageContext?.url ?? undefined}
       >
-        {/* Page-context bar (B2): pick a scope to attach what the user is
-            viewing to the chat. Attached context rides every turn until
-            detached; re-capture with a scope button to refresh. */}
-        <PanelPageContextBar
-          scope={scope}
-          busy={captureBusy}
-          error={captureError}
-          attached={attached}
-          attachedContext={attachedContext}
-          onCapture={requestCapture}
-          onDetach={clearAttached}
-        />
+        {/* Page-context bar now lives INSIDE the composer (ChatInput →
+            PanelPageContextBar), per owner direction — closer to where the
+            user types, and self-contained. */}
         {/* Full multi-conversation surface (tabs + picker + new chat), the
             same component the right sidebar mounts — a bare ChatPanel gave
             no way to open or start conversations. Bound to whatever content

@@ -52,3 +52,16 @@ export function requestOverlayOpen(
     "*"
   );
 }
+
+/**
+ * Ask the panel host to capture the current page at `scope`. The host relays
+ * to the active tab's content script and posts the result back, which the
+ * PanelShellClient listener writes to the page-context store.
+ */
+export function requestPageCapture(scope: string): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope } },
+    "*"
+  );
+}
