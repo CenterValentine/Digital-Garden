@@ -45,8 +45,6 @@ type PageListRow = {
   slug: string;
   title: string;
   kind: string;
-  navLabel: string | null;
-  navOrder: number;
   visibility: string;
 };
 
@@ -54,8 +52,6 @@ interface WorkingPage {
   slug: string;
   title: string;
   kind: PageKind;
-  navLabel: string;
-  navOrder: number;
   visibility: "draft" | "published";
   config: SitePageConfig;
   /** True once the row exists server-side (controls create-vs-update copy). */
@@ -181,8 +177,6 @@ export function SitePagesComposer() {
           slug: data.page.slug,
           title: data.page.title,
           kind: toKind(data.page.kind),
-          navLabel: data.page.navLabel ?? "",
-          navOrder: data.page.navOrder,
           visibility: data.page.visibility === "published" ? "published" : "draft",
           config: parsed.success ? parsed.data : { sections: [] },
           persisted: true,
@@ -242,8 +236,6 @@ export function SitePagesComposer() {
           tenantId: t,
           title: w.title.trim() || "Untitled",
           kind: w.kind,
-          navLabel: w.navLabel.trim() || null,
-          navOrder: w.navOrder,
           visibility: w.visibility,
           config: w.config,
         }),
@@ -295,8 +287,6 @@ export function SitePagesComposer() {
             tenantId: t,
             title: next.title.trim() || "Untitled",
             kind: next.kind,
-            navLabel: next.navLabel.trim() || null,
-            navOrder: next.navOrder,
             visibility: next.visibility,
             config: next.config,
           }),
@@ -409,8 +399,6 @@ export function SitePagesComposer() {
       slug,
       title,
       kind: newDraft.kind,
-      navLabel: "",
-      navOrder: pages.length + 1,
       visibility: "draft",
       config: starterConfig(newDraft.kind),
       persisted: false,
@@ -419,7 +407,7 @@ export function SitePagesComposer() {
     // First autosave creates the row server-side.
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => void saveNow(), 400);
-  }, [newDraft, pages.length, saveNow]);
+  }, [newDraft, saveNow]);
 
   const setSection = (index: number, next: ListSection) =>
     mutate((prev) => {
@@ -502,7 +490,9 @@ export function SitePagesComposer() {
                 <span className="block font-medium">{p.title}</span>
                 <span className="flex items-center justify-between font-mono text-[10px] text-white/40">
                   /{p.slug}
-                  <span>{p.navLabel ? `nav · ${p.navOrder}` : "hidden"}</span>
+                  {p.visibility === "published" && (
+                    <span className="text-emerald-400/70">live</span>
+                  )}
                 </span>
               </button>
             </li>
@@ -682,42 +672,6 @@ export function SitePagesComposer() {
                   <span className={`text-xs ${saveState === "error" ? "text-rose-400" : "text-white/40"}`}>
                     {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : ""}
                   </span>
-                </>
-              )}
-
-              <span className="flex-1" />
-
-              {/* Show in menu */}
-              <label className="flex items-center gap-2 text-xs text-white/60">
-                <input
-                  type="checkbox"
-                  checked={working.navLabel.trim() !== ""}
-                  onChange={(e) =>
-                    mutate((p) => ({
-                      ...p,
-                      navLabel: e.target.checked ? p.navLabel.trim() || p.title : "",
-                    }))
-                  }
-                />
-                Show in site menu
-              </label>
-              {working.navLabel.trim() !== "" && (
-                <>
-                  <input
-                    aria-label="Menu label"
-                    className={`${inputCls} w-28`}
-                    placeholder="Menu label"
-                    value={working.navLabel}
-                    onChange={(e) => mutate((p) => ({ ...p, navLabel: e.target.value }))}
-                  />
-                  <input
-                    aria-label="Menu order"
-                    type="number"
-                    title="Order in the menu"
-                    className={`${inputCls} w-14`}
-                    value={working.navOrder}
-                    onChange={(e) => mutate((p) => ({ ...p, navOrder: Number(e.target.value) || 0 }))}
-                  />
                 </>
               )}
             </div>
