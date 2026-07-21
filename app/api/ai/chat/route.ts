@@ -92,6 +92,8 @@ import {
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import { isAppSearchConfigured } from "@/lib/domain/ai/acquisition/search";
+import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
@@ -549,8 +551,16 @@ export async function POST(request: Request) {
         executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
-      if (nativeSearch && toolConfig["search_web"]?.enabled !== false) {
+      const searchEnabled = toolConfig["search_web"]?.enabled !== false;
+      if (nativeSearch && searchEnabled) {
+        // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+      } else if (!nativeSearch && searchEnabled && isAppSearchConfigured()) {
+        // "Dumb models" (DeepSeek, Kimi, Mistral, Groq, local, …): no
+        // native search, so attach the app-executed backend (v3.1) under
+        // the SAME tool name — every model can now search the live web.
+        (tools as Record<string, unknown>)["search_web"] =
+          createAppWebSearchTool();
       }
 
       const toolsActive = Object.keys(tools).length > 0;
