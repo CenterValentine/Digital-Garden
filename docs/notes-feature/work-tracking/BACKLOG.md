@@ -10,6 +10,14 @@ last_updated: 2026-07-16
 
 ---
 
+## AI model handling (surfaced during Browser Reach B2, 2026-07-21 — AI-core, do after browser core)
+
+- [ ] **Model-catalog "not found" false-availability** — the model picker marks a model available whenever a Connection advertises its id, but the provider can still 404 it on use (observed: `claude-haiku-3-5` → "Model 'anthropic/claude-haiku-3-5' not found", routed through the AI Gateway connection). `isModelAvailable` (`components/content/ai/MakeAndModelPicker.tsx`) trusts the connection's claimed model list; needs validation against what the provider/gateway actually serves, or a use-time fallback.
+- [ ] **Don't default to / allow selecting an unavailable model** — `useModelSelection` (`components/content/ai/ModelPicker.tsx:149`) falls back to a hardcoded `claude-sonnet-3-5` that may have no key; resolve an *available* default instead. Keep unavailable models greyed for discoverability but make them non-selectable (hard-disable), per owner.
+- [ ] **Gate `web_search` by model capability, not provider** — chat route (~L534) attaches `search_web` whenever the provider is a native-search vendor; models like Claude 3 Haiku don't support it and Anthropic 400s (`web_search_20250305 ... does not match expected tags`). Attach only for models that support the server tool.
+
+---
+
 ## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
 Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
