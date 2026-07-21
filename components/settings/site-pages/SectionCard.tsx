@@ -30,50 +30,93 @@ const monoChip =
 
 function DirectoryRow({
   path,
-  canSnapshot,
+  open,
+  onToggle,
+  includedTitles,
   onUnsync,
+  onReplace,
   onRemove,
 }: {
   path: string;
-  /** True when we know the directory's current pages (so we can snapshot). */
-  canSnapshot: boolean;
+  open: boolean;
+  onToggle: () => void;
+  /** Titles of the pages this directory currently includes (may be empty). */
+  includedTitles: string[];
   onUnsync: () => void;
+  onReplace: () => void;
   onRemove: () => void;
 }) {
+  const canSnapshot = includedTitles.length > 0;
   return (
-    <div className="flex items-center gap-2 px-3 py-2">
-      <span className="w-3" />
-      <span
-        className="inline-flex flex-1 items-center gap-1.5 text-[13px] text-emerald-400"
-        title={`Every published page in ${path} appears here, and new ones are added automatically`}
-      >
-        ↻ Keeping in sync with <span className="font-mono">{path}</span>
-      </span>
-      <label
-        className="flex items-center gap-1.5 text-[11px] text-white/55"
-        title={
-          canSnapshot
-            ? "On: new pages appear automatically. Turn off to freeze the current pages as a fixed list."
-            : "Sync info still loading…"
-        }
-      >
-        <input
-          type="checkbox"
-          checked
-          disabled={!canSnapshot}
-          onChange={onUnsync}
-        />
-        Keep in sync
-      </label>
-      <button
-        type="button"
-        aria-label={`Remove ${path}`}
-        className="text-white/30 hover:text-rose-400"
-        onClick={onRemove}
-      >
-        ✕
-      </button>
-    </div>
+    <>
+      <div className="flex items-center gap-3 px-3 py-2">
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        >
+          <span className="w-3 text-white/35">{open ? "▾" : "▸"}</span>
+          <span className="inline-flex min-w-0 items-center gap-1.5 truncate text-[13px] text-emerald-400">
+            ↻ Keeping in sync with <span className="font-mono">{path}</span>
+          </span>
+        </button>
+        <span className="hidden font-mono text-[10px] text-white/35 sm:inline">
+          whole directory · {includedTitles.length}
+        </span>
+        <button
+          type="button"
+          aria-label={`Remove ${path}`}
+          className="text-white/30 hover:text-rose-400"
+          onClick={onRemove}
+        >
+          ✕
+        </button>
+      </div>
+
+      {open && (
+        <div className="grid gap-3 border-t border-white/5 px-3 py-3">
+          <label
+            className="flex items-center gap-2 text-xs text-white/70"
+            title={
+              canSnapshot
+                ? "On: new pages appear automatically. Turn off to freeze the current pages as a fixed list you can edit individually."
+                : "No pages to freeze yet"
+            }
+          >
+            <input type="checkbox" checked disabled={!canSnapshot} onChange={onUnsync} />
+            Keep in sync — new pages published here appear automatically
+          </label>
+
+          <div>
+            <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+              Currently includes {includedTitles.length}
+            </span>
+            <ul className="mt-1 space-y-0.5 text-[13px] text-white/70">
+              {includedTitles.slice(0, 8).map((t, i) => (
+                <li key={i} className="truncate">• {t}</li>
+              ))}
+              {includedTitles.length > 8 && (
+                <li className="text-white/40">+{includedTitles.length - 8} more</li>
+              )}
+              {includedTitles.length === 0 && (
+                <li className="text-white/35">
+                  Nothing published to {path} yet — pages appear here as you publish them.
+                </li>
+              )}
+            </ul>
+          </div>
+
+          <button
+            type="button"
+            className="self-start rounded-md border border-dashed border-amber-600/60 px-3 py-1.5 text-xs text-amber-400 hover:bg-amber-500/10"
+            onClick={onReplace}
+          >
+            ⚡ Change directory…
+          </button>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -86,6 +129,7 @@ export function SectionCard({
   onRemove,
   onMove,
   onConnect,
+  onReplaceItem,
   onAddManual,
   inheritedFor,
   expandDirectory,
@@ -98,6 +142,8 @@ export function SectionCard({
   onRemove: () => void;
   onMove: (dir: -1 | 1) => void;
   onConnect: () => void;
+  /** Open the content picker to swap the item at this index. */
+  onReplaceItem: (itemIndex: number) => void;
   onAddManual: () => void;
   inheritedFor: InheritedLookup;
   /** Given a `publicPath:` ref, the directory's current page refs. */
@@ -160,13 +206,18 @@ export function SectionCard({
         {section.items.map((item, i) => {
           if (isDirectoryRef(item.ref)) {
             const dirRefs = expandDirectory(item.ref!);
+            const includedTitles = dirRefs.map(
+              (ref) => inheritedFor(ref)?.title ?? ref.replace("publicItem:", ""),
+            );
             return (
               <li key={i}>
                 <DirectoryRow
                   path={item.ref!.replace("publicPath:", "")}
-                  canSnapshot={dirRefs.length > 0}
+                  open={openRow === i}
+                  onToggle={() => setOpenRow(openRow === i ? null : i)}
+                  includedTitles={includedTitles}
                   onUnsync={() => {
-                    // Replace this directory item with its current pages, pinned.
+                    // Freeze: replace this directory item with its current pages, pinned.
                     const items = section.items.slice();
                     items.splice(
                       i,
@@ -174,7 +225,9 @@ export function SectionCard({
                       ...dirRefs.map((ref): ListItem => ({ ref, status: "done" })),
                     );
                     onChange({ ...section, items });
+                    setOpenRow(null);
                   }}
+                  onReplace={() => onReplaceItem(i)}
                   onRemove={() => removeItem(i)}
                 />
               </li>

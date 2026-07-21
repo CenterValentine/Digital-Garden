@@ -83,7 +83,9 @@ export function SitePagesComposer() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [showJson, setShowJson] = useState(false);
   /** Which section (and category) the content picker is connecting, if open. */
-  const [picker, setPicker] = useState<{ sectionIndex: number } | null>(null);
+  const [picker, setPicker] = useState<
+    { sectionIndex: number; replaceItemIndex?: number } | null
+  >(null);
   /** Published-item values by ref, for showing inherited fields on bound rows. */
   const [inheritedIndex, setInheritedIndex] = useState<Map<string, InheritedValues>>(
     () => new Map(),
@@ -426,15 +428,21 @@ export function SitePagesComposer() {
       return { ...prev, config: { sections } };
     });
 
-  /** Append an item to the section the picker was opened for. */
-  const addItemToPickerSection = (item: ListItem) => {
+  /**
+   * Apply the picker's choice to its section — appending, or REPLACING the item
+   * at `replaceItemIndex` (used when editing/swapping an existing directory).
+   */
+  const addItemsToPickerSection = (items: ListItem[]) => {
     if (!picker) return;
-    const { sectionIndex } = picker;
+    const { sectionIndex, replaceItemIndex } = picker;
     mutate((prev) => {
       const sections = prev.config.sections.slice();
       const section = sections[sectionIndex];
       if (!section) return prev;
-      sections[sectionIndex] = { ...section, items: [...section.items, item] };
+      const list = section.items.slice();
+      if (replaceItemIndex != null) list.splice(replaceItemIndex, 1, ...items);
+      else list.push(...items);
+      sections[sectionIndex] = { ...section, items: list };
       return { ...prev, config: { sections } };
     });
   };
@@ -451,17 +459,6 @@ export function SitePagesComposer() {
       };
       return { ...prev, config: { sections } };
     });
-
-  const saveLabel =
-    saveState === "saving"
-      ? "Saving draft…"
-      : saveState === "error"
-        ? "Save failed — retrying on next edit"
-        : working?.hasDraft
-          ? "Draft saved · unpublished changes"
-          : saveState === "saved"
-            ? "Draft saved"
-            : "";
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-[210px_minmax(0,1fr)] xl:grid-cols-[210px_minmax(0,1fr)_minmax(360px,38%)]">
@@ -578,7 +575,33 @@ export function SitePagesComposer() {
           </div>
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-4" style={cardStyle}>
+            <div className="relative flex flex-wrap items-center gap-3 rounded-lg border border-white/10 p-4" style={cardStyle}>
+              {/* Status floats on the top border of the container. */}
+              <div className="absolute -top-3 right-4 z-10 flex items-center gap-2 rounded-full border border-white/10 bg-[#161b22] px-3 py-1 font-mono text-[10px] uppercase tracking-wider shadow-md">
+                <span
+                  className={`flex items-center gap-1.5 ${
+                    working.visibility === "published" ? "text-emerald-400" : "text-white/55"
+                  }`}
+                  title={
+                    working.visibility === "published"
+                      ? "Live to the public"
+                      : "Draft — the public sees the built-in default"
+                  }
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      working.visibility === "published" ? "bg-emerald-400" : "bg-white/40"
+                    }`}
+                  />
+                  {working.visibility === "published" ? "Live" : "Draft"}
+                </span>
+                {working.hasDraft && (
+                  <span className="border-l border-white/10 pl-2 text-amber-400" title="You have edits that haven't been published yet">
+                    Unpublished edits
+                  </span>
+                )}
+              </div>
+
               <input
                 aria-label="Page title"
                 className={`${inputCls} text-base font-semibold`}
@@ -604,25 +627,6 @@ export function SitePagesComposer() {
                   </span>
                 );
               })()}
-              <span
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
-                  working.visibility === "published"
-                    ? "border-emerald-500/50 bg-emerald-500/10 text-emerald-400"
-                    : "border-white/20 text-white/50"
-                }`}
-                title={
-                  working.visibility === "published"
-                    ? "This page is live to the public"
-                    : "This page is a draft — the public sees its built-in default"
-                }
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    working.visibility === "published" ? "bg-emerald-400" : "bg-white/40"
-                  }`}
-                />
-                {working.visibility === "published" ? "Live" : "Draft"}
-              </span>
               <span className="flex-1" />
               <a
                 href={`/${working.slug}?preview=draft`}
@@ -675,16 +679,8 @@ export function SitePagesComposer() {
                   >
                     Unpublish
                   </button>
-                  <span
-                    className={`text-xs ${
-                      saveState === "error"
-                        ? "text-rose-400"
-                        : working.hasDraft
-                          ? "text-amber-400"
-                          : "text-white/40"
-                    }`}
-                  >
-                    {working.hasDraft ? "Unpublished changes" : saveLabel}
+                  <span className={`text-xs ${saveState === "error" ? "text-rose-400" : "text-white/40"}`}>
+                    {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : ""}
                   </span>
                 </>
               )}
@@ -750,6 +746,9 @@ export function SitePagesComposer() {
                   })
                 }
                 onConnect={() => setPicker({ sectionIndex: i })}
+                onReplaceItem={(itemIndex) =>
+                  setPicker({ sectionIndex: i, replaceItemIndex: itemIndex })
+                }
                 onAddManual={() => addManualItem(i)}
                 inheritedFor={inheritedFor}
                 expandDirectory={expandDirectory}
@@ -799,16 +798,14 @@ export function SitePagesComposer() {
           }
           // Keep in sync → one directory item (expands at render, stays live).
           // Snapshot → each current page pinned as its own connected item.
-          onAddDirectory={(dir, keepInSync) => {
-            if (keepInSync) {
-              addItemToPickerSection({ ref: dir.ref, status: "done" });
-            } else {
-              for (const it of dir.items) {
-                addItemToPickerSection({ ref: it.ref, status: "done" });
-              }
-            }
-          }}
-          onAddItem={(ref) => addItemToPickerSection({ ref, status: "done" })}
+          onAddDirectory={(dir, keepInSync) =>
+            addItemsToPickerSection(
+              keepInSync
+                ? [{ ref: dir.ref, status: "done" }]
+                : dir.items.map((it) => ({ ref: it.ref, status: "done" })),
+            )
+          }
+          onAddItem={(ref) => addItemsToPickerSection([{ ref, status: "done" }])}
           onClose={() => setPicker(null)}
         />
       )}
