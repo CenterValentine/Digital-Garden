@@ -2,14 +2,17 @@
 
 /**
  * Search Connections settings card (AI v3.1) — BYOK web-search backends
- * (Tavily/Brave) for "dumb models" without native search. Keys are sent to
- * the server, encrypted at rest, and never returned to the client.
+ * (Tavily/Brave) for "dumb models" without native search. Styled to match
+ * the AI Connections BYOK affordances (glass-0 cards, glass Button, Field
+ * wrapper, per-field ✓ commit for the credential). Keys are sent to the
+ * server, encrypted at rest, and never returned to the client.
  */
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Check, Trash2, Star, ExternalLink } from "lucide-react";
-import { SettingSection } from "@/components/settings/ui";
+import { Check, Trash2, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/glass/button";
+import { getSurfaceStyles } from "@/lib/design/system";
 import { SEARCH_BACKENDS_META } from "@/lib/domain/ai/acquisition/search/metadata";
 
 interface SearchConnectionView {
@@ -19,9 +22,30 @@ interface SearchConnectionView {
   isDefault: boolean;
 }
 
+const INPUT_CLS =
+  "w-full rounded-lg border border-black/10 dark:border-white/10 bg-black/30 px-3 py-2 text-sm text-white focus:outline-none focus:border-black/30 dark:border-white/30";
+
+function Field({
+  label,
+  hint,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label className="block">
+      <div className="mb-1 text-xs font-medium text-gray-300">{label}</div>
+      {children}
+      {hint && <div className="mt-1 text-[11px] text-gray-500">{hint}</div>}
+    </label>
+  );
+}
+
 export function SearchConnectionsCard() {
+  const glass0 = getSurfaceStyles("glass-0");
   const [rows, setRows] = useState<SearchConnectionView[]>([]);
-  const [loading, setLoading] = useState(true);
   const [provider, setProvider] = useState(SEARCH_BACKENDS_META[0]?.id ?? "");
   const [apiKey, setApiKey] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,8 +59,6 @@ export function SearchConnectionsCard() {
       setRows(body.data ?? []);
     } catch {
       /* leave empty */
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -45,9 +67,11 @@ export function SearchConnectionsCard() {
   }, [load]);
 
   const meta = SEARCH_BACKENDS_META.find((m) => m.id === provider);
+  const providerLabel = (id: string) =>
+    SEARCH_BACKENDS_META.find((m) => m.id === id)?.label ?? id;
 
   const save = useCallback(async () => {
-    if (!apiKey.trim()) return;
+    if (!apiKey.trim() || saving) return;
     setSaving(true);
     try {
       const res = await fetch("/api/ai/search-connections", {
@@ -59,14 +83,14 @@ export function SearchConnectionsCard() {
       const body = (await res.json()) as { success?: boolean; error?: string };
       if (!body.success) throw new Error(body.error ?? "Save failed");
       setApiKey("");
-      toast.success(`${meta?.label ?? provider} search key saved`);
+      toast.success(`${meta?.label ?? provider} key saved`);
       await load();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
     } finally {
       setSaving(false);
     }
-  }, [apiKey, provider, meta, load]);
+  }, [apiKey, provider, meta, saving, load]);
 
   const setDefault = useCallback(
     async (id: string) => {
@@ -93,54 +117,74 @@ export function SearchConnectionsCard() {
     [load],
   );
 
+  const isUpdate = rows.some((r) => r.provider === provider);
+
   return (
-    <SettingSection
-      title="Web Search"
-      description="Give models without built-in search (DeepSeek, Kimi, Mistral, local, …) live web access. The big-four providers use their own native search; everyone else uses the backend you configure here."
-    >
-      {!loading && rows.length > 0 && (
-        <div className="space-y-1.5">
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-semibold text-white">Web Search</h2>
+        <p className="mt-1 text-sm text-gray-400">
+          Give models without built-in search (DeepSeek, Kimi, Mistral,
+          local, …) live web access. The big-four providers use their own
+          native search; everyone else uses the backend you configure here.
+        </p>
+      </div>
+
+      {rows.length > 0 && (
+        <ul className="space-y-2">
           {rows.map((row) => (
-            <div
+            <li
               key={row.id}
-              className="flex items-center gap-2 rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 text-sm dark:border-white/10 dark:bg-white/[0.03]"
+              className="rounded-xl border border-white/10 p-3"
+              style={{ background: glass0.background }}
             >
-              <span className="font-medium text-gray-800 dark:text-gray-200">
-                {row.label}
-              </span>
-              {row.isDefault ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-300">
-                  <Check className="h-3 w-3" /> Active
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => void setDefault(row.id)}
-                  className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] text-gray-500 hover:bg-black/[0.05] dark:hover:bg-white/10"
-                  title="Make this the active backend"
+              <div className="flex items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium text-white">
+                      {row.label}
+                    </span>
+                    {row.isDefault && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-medium text-emerald-300">
+                        <Check className="h-3 w-3" /> Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {providerLabel(row.provider)}
+                  </div>
+                </div>
+                {!row.isDefault && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void setDefault(row.id)}
+                  >
+                    Set active
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void remove(row.id)}
                 >
-                  <Star className="h-3 w-3" /> Set active
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => void remove(row.id)}
-                className="ml-auto rounded p-1 text-gray-400 hover:bg-red-500/10 hover:text-red-500"
-                title="Remove"
-              >
-                <Trash2 className="h-3.5 w-3.5" />
-              </button>
-            </div>
+                  <Trash2 className="h-3.5 w-3.5 text-red-400" />
+                </Button>
+              </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
 
-      <div className="mt-3 space-y-2 rounded-lg border border-black/10 p-3 dark:border-white/10">
-        <div className="flex items-center gap-2">
+      <div
+        className="space-y-3 rounded-xl border border-white/10 p-4"
+        style={{ background: glass0.background }}
+      >
+        <Field label="Backend">
           <select
             value={provider}
             onChange={(e) => setProvider(e.target.value)}
-            className="rounded-md border border-black/15 bg-transparent px-2 py-1.5 text-sm dark:border-white/20"
+            className={INPUT_CLS}
           >
             {SEARCH_BACKENDS_META.map((m) => (
               <option key={m.id} value={m.id}>
@@ -148,36 +192,48 @@ export function SearchConnectionsCard() {
               </option>
             ))}
           </select>
-          {meta && (
-            <a
-              href={meta.apiKeyDocsURL}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-xs text-blue-500 hover:underline"
-            >
-              Get a key <ExternalLink className="h-3 w-3" />
-            </a>
-          )}
-        </div>
-        <input
-          type="password"
-          value={apiKey}
-          onChange={(e) => setApiKey(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") void save();
-          }}
-          placeholder={meta?.apiKeyHint ?? "API key"}
-          className="w-full rounded-md border border-black/15 bg-transparent px-2.5 py-1.5 text-sm dark:border-white/20"
-        />
-        <button
-          type="button"
-          onClick={() => void save()}
-          disabled={saving || !apiKey.trim()}
-          className="rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium text-gray-800 hover:bg-black/5 disabled:opacity-40 dark:border-white/20 dark:text-gray-100 dark:hover:bg-white/10"
+        </Field>
+
+        <Field
+          label={isUpdate ? "API key (replaces the saved one)" : "API key"}
+          hint={meta?.apiKeyHint}
         >
-          {rows.some((r) => r.provider === provider) ? "Update key" : "Add backend"}
-        </button>
+          <div className="relative">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && apiKey.trim()) void save();
+              }}
+              placeholder={meta ? `${meta.label} key` : "API key"}
+              className={`${INPUT_CLS} pr-10`}
+            />
+            {apiKey.trim() && (
+              <button
+                type="button"
+                onClick={() => void save()}
+                disabled={saving}
+                aria-label={isUpdate ? "Save key" : "Add backend"}
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md bg-emerald-600/90 p-1 text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+              >
+                <Check className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </Field>
+
+        {meta && (
+          <a
+            href={meta.apiKeyDocsURL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-blue-400 hover:underline"
+          >
+            Get a {meta.label} key <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
       </div>
-    </SettingSection>
+    </div>
   );
 }

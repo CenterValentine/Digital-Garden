@@ -174,7 +174,9 @@ export default function AISettingsPage() {
         <AIFeatureRoutingPage embedded />
       </section>
 
-      <SearchConnectionsCard />
+      <section className="space-y-1">
+        <SearchConnectionsCard />
+      </section>
 
       <SettingSection
         title="Generation"
