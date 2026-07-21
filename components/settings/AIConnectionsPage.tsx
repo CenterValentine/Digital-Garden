@@ -1423,6 +1423,10 @@ const POPULAR_MODEL_IDS_BY_ADAPTER: Record<
     { id: "llama-3.3-70b-versatile", name: "Llama 3.3 70B Versatile" },
     { id: "mixtral-8x7b-32768", name: "Mixtral 8x7B (32k)" },
   ],
+  deepseek: [
+    { id: "deepseek-chat", name: "DeepSeek Chat (V3)" },
+    { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)", tag: "reasoning" },
+  ],
 };
 
 /** Short label describing the scope of universality for each adapter. */
@@ -1435,6 +1439,7 @@ const ADAPTER_SCOPE_LABEL: Record<AdapterKind, string> = {
   xai: "xAI direct",
   mistral: "Mistral direct",
   groq: "Groq direct",
+  deepseek: "DeepSeek direct",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

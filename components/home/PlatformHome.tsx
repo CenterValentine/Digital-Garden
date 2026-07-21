@@ -6,41 +6,40 @@
  * the platform's own marketing/sign-up entry point, not someone's published
  * site. Bundle-isolated from PersonalHome / DefaultTenantIndex so visitors
  * to the platform domain don't download any tenant-data fetching code.
+ *
+ * Future surface for: feature pitch, screenshots, pricing tiers, customer
+ * logos. V1 keeps it minimal — hero + sign-up CTA + a glance at the value
+ * prop. Adding sections here doesn't touch any other home route.
  */
 
 import Link from "next/link";
-import { PlatformHeader, PlatformFooter } from "@/components/home/platform-chrome";
 
 export function PlatformHome() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white relative overflow-hidden">
-      {/* Sentinel — CSS :has() selector suppresses the root NavBar for this page only */}
-      <div className="platform-home-page" aria-hidden="true" style={{ display: "none" }} />
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <header className="border-b border-white/5">
+        <div className="max-w-5xl mx-auto px-6 py-5 flex items-center justify-between">
+          <Link href="/" className="text-base font-semibold tracking-tight">
+            NoteTrellis
+          </Link>
+          <nav className="flex items-center gap-6 text-sm text-white/60">
+            <Link
+              href="/sign-in"
+              className="hover:text-white/90 transition-colors"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/sign-up"
+              className="px-3 py-1.5 rounded-md bg-white text-black hover:bg-white/90 transition-colors"
+            >
+              Create account
+            </Link>
+          </nav>
+        </div>
+      </header>
 
-      {/* Background: subtle dot grid */}
-      <div
-        className="absolute inset-0 pointer-events-none"
-        aria-hidden="true"
-        style={{
-          backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px)",
-          backgroundSize: "28px 28px",
-        }}
-      />
-      {/* Background: soft emerald radial glow anchored to top-center */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[600px] pointer-events-none"
-        aria-hidden="true"
-        style={{
-          background:
-            "radial-gradient(ellipse 70% 55% at 50% 0%, rgba(16, 185, 129, 0.11) 0%, transparent 72%)",
-        }}
-      />
-
-      <PlatformHeader />
-
-      {/* Plain wrapper, not <main> — the root layout already provides the
-          single <main> landmark; a second one is an a11y violation. */}
-      <div className="relative max-w-3xl mx-auto px-6 py-24">
+      <main className="max-w-3xl mx-auto px-6 py-24">
         <section className="mb-24">
           <h1 className="text-5xl md:text-6xl font-bold tracking-tight mb-6">
             A trellis for your{" "}
@@ -64,16 +63,10 @@ export function PlatformHome() {
             >
               Sign in
             </Link>
-            <Link
-              href="/features"
-              className="px-2 py-3 text-sm text-white/55 hover:text-white/90 transition-colors"
-            >
-              See all features →
-            </Link>
           </div>
         </section>
 
-        <section id="features" className="grid md:grid-cols-3 gap-6 mb-24">
+        <section className="grid md:grid-cols-3 gap-6 mb-24">
           <FeatureCard
             title="Write once, publish anywhere"
             body="Author in a powerful IDE-style editor. Publish to your own domain, a subpath, or a NoteTrellis subdomain — your choice."
@@ -88,8 +81,10 @@ export function PlatformHome() {
           />
         </section>
 
-        <section id="notes-system" className="border-t border-white/5 pt-16 mb-24">
-          <h2 className="text-2xl font-semibold mb-3">How sites work</h2>
+        <section className="border-t border-white/5 pt-16">
+          <h2 className="text-2xl font-semibold mb-3">
+            How sites work
+          </h2>
           <p className="text-white/50 mb-8 max-w-2xl">
             Every NoteTrellis account starts with one site. Each site can have
             its own custom hostname, its own published items, and its own URL
@@ -106,31 +101,37 @@ export function PlatformHome() {
             <li className="flex gap-3">
               <span className="text-emerald-400 mt-0.5">→</span>
               <span>
-                <code className="font-mono text-white/90">yourname.notetrellis.com</code>{" "}
+                <code className="font-mono text-white/90">
+                  yourname.notetrellis.com
+                </code>{" "}
                 — a free subdomain we provision instantly.
               </span>
             </li>
             <li className="flex gap-3">
               <span className="text-emerald-400 mt-0.5">→</span>
               <span>
-                <code className="font-mono text-white/90">notetrellis.com/u/yourname</code>{" "}
-                — a permanent fallback URL that works even before DNS is configured.
+                <code className="font-mono text-white/90">
+                  notetrellis.com/u/yourname
+                </code>{" "}
+                — a permanent fallback URL that works even before DNS is
+                configured.
               </span>
             </li>
           </ul>
         </section>
+      </main>
 
-        <section id="about" className="border-t border-white/5 pt-16">
-          <h2 className="text-2xl font-semibold mb-3">About NoteTrellis</h2>
-          <p className="text-white/50 max-w-2xl">
-            NoteTrellis is a digital garden platform built for writers, researchers,
-            and knowledge workers who think in networks, not documents. Every note
-            is a node. Every link is a branch. Your garden grows with you.
-          </p>
-        </section>
-      </div>
-
-      <PlatformFooter />
+      <footer className="border-t border-white/5 mt-12">
+        <div className="max-w-5xl mx-auto px-6 py-8 flex items-center justify-between text-xs text-white/30">
+          <span>NoteTrellis</span>
+          <Link
+            href="/sign-in"
+            className="hover:text-white/60 transition-colors"
+          >
+            Sign in
+          </Link>
+        </div>
+      </footer>
     </div>
   );
 }

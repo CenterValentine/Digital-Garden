@@ -319,11 +319,25 @@ export function useConversationBinding({
         }>).filter((m) => m.providerId && m.modelId);
         const lastStamp = stamped[stamped.length - 1];
         if (lastStamp?.providerId && lastStamp?.modelId) {
+          // Existing conversation: its own stamp wins (per-conversation
+          // memory).
           setActiveModelSelection(lastStamp.providerId, lastStamp.modelId);
         } else {
-          const ai = useSettingsStore.getState().ai;
-          if (ai?.providerId && ai?.modelId) {
-            setActiveModelSelection(ai.providerId, ai.modelId);
+          // No stamps (blank/new chat): the user's persisted last
+          // EXPLICIT pick outranks the settings default (v3.1 R3 — this
+          // fallback previously flipped blank chats to configuration).
+          const { lastExplicitProviderId, lastExplicitModelId } =
+            useAIChatStore.getState();
+          if (lastExplicitProviderId && lastExplicitModelId) {
+            setActiveModelSelection(
+              lastExplicitProviderId,
+              lastExplicitModelId,
+            );
+          } else {
+            const ai = useSettingsStore.getState().ai;
+            if (ai?.providerId && ai?.modelId) {
+              setActiveModelSelection(ai.providerId, ai.modelId);
+            }
           }
         }
 
