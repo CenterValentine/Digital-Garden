@@ -473,8 +473,13 @@ export function PanelShellClient({
         {/* Full multi-conversation surface (tabs + picker + new chat), the
             same component the right sidebar mounts — a bare ChatPanel gave
             no way to open or start conversations. Bound to whatever content
-            is active in the panel, so chats follow the Garden selection. */}
-        <MultiConversationSidebar contentId={selectedContentId} />
+            is active in the panel, so chats follow the Garden selection.
+            Wrapped in flex:1/min-height:0 so it takes the space LEFT of the
+            context bar — its own `h-full` would otherwise claim the full
+            parent height and push the composer off the bottom. */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+          <MultiConversationSidebar contentId={selectedContentId} />
+        </div>
       </div>
       </DndWrapper>
 
