@@ -540,7 +540,7 @@ export const ChatMessage = memo(function ChatMessage({
               </button>
               <button
                 onClick={commitEdit}
-                className="rounded-md px-2 py-1 text-[11px] font-medium text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors"
+                className="rounded-md px-2 py-1 text-[11px] font-medium text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 hover:bg-emerald-500/25 transition-colors"
                 title="Save & re-run (⌘/Ctrl+Enter)"
               >
                 Save &amp; submit

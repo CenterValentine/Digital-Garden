@@ -1016,6 +1016,8 @@ export function useConversationEngine({
       providerId,
       modelId,
       mentionedContentIds: [] as string[],
+      // Edited/regenerated turns keep the attached page context too (B2).
+      pageContext: getAttachedPageContext(),
     }),
     [contentId, conversationId, providerId, modelId],
   );
