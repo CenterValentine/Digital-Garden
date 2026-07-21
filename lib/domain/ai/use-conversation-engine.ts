@@ -985,6 +985,10 @@ export function useConversationEngine({
           providerId,
           modelId,
           mentionedContentIds: ids,
+          // Attached side-panel page context (B2). Null outside the panel.
+          // Lives on the explicit send body because that becomes the
+          // snapshotted per-call body — the resolver is only a fallback.
+          pageContext: getAttachedPageContext(),
         },
       },
     );
