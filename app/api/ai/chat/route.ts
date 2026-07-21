@@ -26,6 +26,7 @@ import type { UIMessage } from "ai";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
+import { renderPageContextSection } from "@/lib/domain/browser-extension/page-context";
 import {
   resolveChatModel,
   resolveChatModelFromConnection,
@@ -664,6 +665,38 @@ export async function POST(request: Request) {
         }
       }
 
+      // Side-panel page context (B2): the extension captured what the user is
+      // viewing. Untrusted — renderPageContextSection frames it as data, not
+      // instructions. Validated defensively (client-supplied) and capped.
+      let pageContextSection = "";
+      const rawPageContext = body.pageContext;
+      if (
+        rawPageContext &&
+        typeof rawPageContext === "object" &&
+        typeof rawPageContext.content === "string" &&
+        rawPageContext.content.trim()
+      ) {
+        pageContextSection = renderPageContextSection({
+          title:
+            typeof rawPageContext.title === "string" ? rawPageContext.title : null,
+          byline: null,
+          siteName:
+            typeof rawPageContext.siteName === "string"
+              ? rawPageContext.siteName
+              : null,
+          excerpt: null,
+          content: rawPageContext.content.slice(0, 100_000),
+          quality: "raw",
+          scope:
+            rawPageContext.scope === "selection" ||
+            rawPageContext.scope === "viewport"
+              ? rawPageContext.scope
+              : "full",
+          url: typeof rawPageContext.url === "string" ? rawPageContext.url : "",
+          capturedAt: 0,
+        });
+      }
+
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
       // with the captured trace_id even after ALS scope exits.
@@ -728,6 +761,7 @@ export async function POST(request: Request) {
           autoPronounceDefault,
           userContextSection,
           mentionedContext,
+          pageContextSection,
         }),
         onStepFinish: (step) => {
           // Tool-call auto-association interceptor (Session 4b).

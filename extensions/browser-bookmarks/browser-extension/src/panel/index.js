@@ -53,6 +53,15 @@ function showState(el) {
 
 // ── Page context (active tab → context bar + iframe) ─────────────────────────
 
+/** Post a versioned host→embed message to the exact app origin. */
+function postToEmbed(type, payload) {
+  if (!frameReady || !appOrigin) return;
+  frame.contentWindow?.postMessage(
+    { v: 1, source: "dg-panel-host", type, payload },
+    appOrigin
+  );
+}
+
 function postPageContext(context) {
   if (!frameReady || !appOrigin) {
     pendingPageContext = context;
@@ -122,6 +131,38 @@ window.addEventListener("message", (event) => {
       postPageContext(pendingPageContext);
       pendingPageContext = null;
     }
+    return;
+  }
+
+  // Capture: the embed asks for the current page's content at a scope. Only
+  // the content script can read the page, so relay there and post the result
+  // back. The active tab is authoritative here (the panel host tracks it).
+  if (data.type === "capture-page") {
+    const scope = data.payload?.scope || "full";
+    void (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true,
+        });
+        if (!tab?.id) throw new Error("No active tab");
+        const response = await chrome.tabs.sendMessage(tab.id, {
+          type: "dg-extract-content",
+          scope,
+        });
+        if (!response?.ok) throw new Error(response?.error || "Extraction failed");
+        postToEmbed("page-content", {
+          ...response.data,
+          capturedAt: Date.now(),
+        });
+      } catch (error) {
+        postToEmbed("page-content-error", {
+          scope,
+          message:
+            error instanceof Error ? error.message : "Couldn't read this page",
+        });
+      }
+    })();
     return;
   }
 

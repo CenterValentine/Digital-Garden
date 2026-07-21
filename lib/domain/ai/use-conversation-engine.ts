@@ -45,6 +45,7 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
+import { getAttachedPageContext } from "@/state/panel-page-context-store";
 
 /** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
 const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
@@ -669,6 +670,10 @@ export function useConversationEngine({
       providerId,
       modelId,
       mentionedContentIds: [] as string[],
+      // Side-panel page context (B2). Null everywhere but the browser panel,
+      // where the shell attaches what the extension captured. Read at send
+      // time so the freshest capture rides the turn.
+      pageContext: getAttachedPageContext(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);

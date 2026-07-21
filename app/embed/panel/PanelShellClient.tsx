@@ -9,6 +9,9 @@ import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import type { ContextMenuActionProvider } from "@/components/content/context-menu/types";
+import { usePanelPageContextStore } from "@/state/panel-page-context-store";
+import type { PageContextScope } from "@/lib/domain/browser-extension/page-context";
+import { PanelPageContextBar } from "./PanelPageContextBar";
 import {
   requestOverlayOpen,
   OVERLAY_CORNERS,
@@ -153,6 +156,23 @@ export function PanelShellClient({
   const [view, setView] = useState<PanelView>("garden");
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
+  const [scope, setScope] = useState<PageContextScope>("full");
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+  const attachedContext = usePanelPageContextStore((s) => s.pageContext);
+  const attached = usePanelPageContextStore((s) => s.attached);
+  const clearAttached = usePanelPageContextStore((s) => s.clear);
+
+  // Ask the host to capture the current page at the chosen scope.
+  function requestCapture(nextScope: PageContextScope) {
+    setScope(nextScope);
+    setCaptureBusy(true);
+    setCaptureError(null);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope: nextScope } },
+      "*"
+    );
+  }
   const setRightCollapsed = useRightPanelCollapseStore((s) => s.setCollapsed);
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
@@ -234,6 +254,35 @@ export function PanelShellClient({
             ? String(data.payload.faviconUrl)
             : undefined,
         });
+      }
+
+      // Captured page content (B2). Store it and mark attached so it rides
+      // the next chat turn. The scope requested is echoed back on payload.
+      if (data.type === "page-content" && typeof data.payload?.content === "string") {
+        const p = data.payload;
+        usePanelPageContextStore.getState().setPageContext({
+          title: typeof p.title === "string" ? p.title : null,
+          byline: typeof p.byline === "string" ? p.byline : null,
+          siteName: typeof p.siteName === "string" ? p.siteName : null,
+          excerpt: typeof p.excerpt === "string" ? p.excerpt : null,
+          content: p.content,
+          quality: p.quality === "readable" || p.quality === "empty" ? p.quality : "raw",
+          scope: p.scope === "selection" || p.scope === "viewport" ? p.scope : "full",
+          url: typeof p.url === "string" ? p.url : "",
+          capturedAt: typeof p.capturedAt === "number" ? p.capturedAt : Date.now(),
+        });
+        usePanelPageContextStore.getState().setAttached(true);
+        setCaptureBusy(false);
+        setCaptureError(null);
+      }
+
+      if (data.type === "page-content-error") {
+        setCaptureBusy(false);
+        setCaptureError(
+          typeof data.payload?.message === "string"
+            ? data.payload.message
+            : "Couldn't read this page"
+        );
       }
     }
     window.addEventListener("message", handleMessage);
@@ -409,6 +458,18 @@ export function PanelShellClient({
         }}
         data-page-context-url={pageContext?.url ?? undefined}
       >
+        {/* Page-context bar (B2): pick a scope to attach what the user is
+            viewing to the chat. Attached context rides every turn until
+            detached; re-capture with a scope button to refresh. */}
+        <PanelPageContextBar
+          scope={scope}
+          busy={captureBusy}
+          error={captureError}
+          attached={attached}
+          attachedContext={attachedContext}
+          onCapture={requestCapture}
+          onDetach={clearAttached}
+        />
         {/* Full multi-conversation surface (tabs + picker + new chat), the
             same component the right sidebar mounts — a bare ChatPanel gave
             no way to open or start conversations. Bound to whatever content
