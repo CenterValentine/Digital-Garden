@@ -192,13 +192,26 @@ export function SectionCard({
       </div>
 
       {pageKind === "garden" && (
-        <input
-          aria-label="Category intro"
-          className={`${inputCls} mb-3 w-full`}
-          value={section.intro ?? ""}
-          placeholder="Category intro line (optional)"
-          onChange={(e) => onChange({ ...section, intro: e.target.value || undefined })}
-        />
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input
+            aria-label="Category intro"
+            className={`${inputCls} min-w-0 flex-1`}
+            value={section.intro ?? ""}
+            placeholder="Category intro line (optional)"
+            onChange={(e) => onChange({ ...section, intro: e.target.value || undefined })}
+          />
+          <label className="font-mono text-[10px] uppercase tracking-wider text-white/40">Grows</label>
+          <select
+            aria-label="Leaf growth direction"
+            className={inputCls}
+            value={section.growth ?? "shoot"}
+            title="Shoot: the leaf grows upward. Root: it grows downward (résumé, about, now, contact)."
+            onChange={(e) => onChange({ ...section, growth: e.target.value as "shoot" | "root" })}
+          >
+            <option value="shoot">↑ shoot</option>
+            <option value="root">↓ root</option>
+          </select>
+        </div>
       )}
 
       {/* items — nested under the section to signal the parent/child relationship */}
