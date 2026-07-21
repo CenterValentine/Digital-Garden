@@ -33,6 +33,7 @@ import {
 } from "@/lib/domain/ai/providers/registry";
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 
 /**
  * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
@@ -317,6 +318,15 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
+      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
+      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
+      // temperature but 1 with a 4xx. Clamp before it reaches the
+      // middleware AND the streamText call — both send temperature.
+      const effectiveTemperature = resolveModelTemperature(
+        activeModelId,
+        temperature,
+      );
+
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
         {
@@ -343,7 +353,10 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
-            defaultSettingsMiddleware({ temperature, maxTokens }),
+            defaultSettingsMiddleware({
+              temperature: effectiveTemperature,
+              maxTokens,
+            }),
             rateLimitRetryMiddleware(),
           ]);
         },
@@ -697,7 +710,7 @@ export async function POST(request: Request) {
         mentionedContext,
         providerId,
         modelId,
-        temperature,
+        temperature: effectiveTemperature,
         maxTokens,
       });
 
