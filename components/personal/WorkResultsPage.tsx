@@ -235,7 +235,7 @@ function LedgerRow({ entry }: { entry: ResolvedRecordEntry }) {
         <span className={`lr-status ${entry.status}`}>{entry.statusLabel}</span>
       </span>
       <div className="lr-drawer">
-        <p className="ld-blurb">{entry.blurb}</p>
+        {entry.blurb && <p className="ld-blurb">{entry.blurb}</p>}
         {entry.facts && (
           <div className="ld-inner">
             {entry.facts.map(([k, v]) => (
@@ -245,6 +245,22 @@ function LedgerRow({ entry }: { entry: ResolvedRecordEntry }) {
               </div>
             ))}
           </div>
+        )}
+        {entry.href && (
+          <Link
+            href={entry.href}
+            className="ld-link"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: "inline-block",
+              marginTop: entry.blurb || entry.facts ? "0.9rem" : "0.2rem",
+              color: "var(--accent-warm, #e3a44a)",
+              fontSize: "0.82rem",
+              letterSpacing: "0.02em",
+            }}
+          >
+            Read the full page →
+          </Link>
         )}
       </div>
     </div>
