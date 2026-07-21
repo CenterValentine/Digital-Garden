@@ -88,6 +88,18 @@ export function markdownToTiptap(markdown: string): JSONContent {
   return markdownToTiptapResult(markdown).json;
 }
 
+/*
+ * Collaboration-write guard (v3.2 T1). This converter is PURE — it does
+ * not know or care whether the target note is collab-enabled. Callers
+ * that WRITE the result to a NotePayload MUST respect the R6 lesson: for
+ * a note with a live CollaborationDocument, the Y.js doc is authoritative,
+ * so overwriting NotePayload.tiptapJson is invisible at best and diverges
+ * the two stores at worst (the daily-notes template-overlay failure). The
+ * regen sweep (scripts/regen-degraded-notes.ts) already skips collab-live
+ * notes; any new write path that converts markdown must do the same, or
+ * route the change through the collaboration content-safety layer.
+ */
+
 /**
  * Best-effort degraded document: one paragraph per blank-line-separated
  * block, so at least line/paragraph structure survives when the real

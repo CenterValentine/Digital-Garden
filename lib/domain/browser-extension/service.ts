@@ -2,7 +2,7 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
-import { markdownToTiptap, tiptapToMarkdown } from "@/lib/domain/content/markdown";
+import { markdownToTiptapResult, tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
@@ -1041,14 +1041,21 @@ export async function updateExtensionNoteContent(
     });
   }
 
+  const markdownResult = input.markdown
+    ? markdownToTiptapResult(input.markdown)
+    : null;
   const parsedJson: JSONContent = input.html
     ? generateJSON(input.html, getServerExtensions())
-    : input.markdown
-      ? markdownToTiptap(input.markdown)
+    : markdownResult
+      ? markdownResult.json
       : (input.tiptapJson as JSONContent);
   const json = sanitizeTipTapJsonWithExtensions(parsedJson, getServerExtensions()).json;
   const searchText = extractSearchTextFromTipTap(json);
   const wordCount = searchText.split(/\s+/).filter(Boolean).length;
+  // Degradation flag (v3.2 T1) — consistent with the AI note tools.
+  const degradedMeta = markdownResult?.degraded
+    ? { markdownDegraded: true, degradedReason: markdownResult.reason }
+    : {};
 
   await prisma.notePayload.upsert({
     where: { contentId },
@@ -1059,6 +1066,7 @@ export async function updateExtensionNoteContent(
         wordCount,
         characterCount: searchText.length,
         readingTime: Math.ceil(wordCount / 200),
+        ...degradedMeta,
       },
     },
     create: {
@@ -1069,6 +1077,7 @@ export async function updateExtensionNoteContent(
         wordCount,
         characterCount: searchText.length,
         readingTime: Math.ceil(wordCount / 200),
+        ...degradedMeta,
       },
     },
   });

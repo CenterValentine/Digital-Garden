@@ -2067,6 +2067,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 >
                   {noteTitle}
                 </h1>
+                {(contentData?.metadata as { markdownDegraded?: boolean } | undefined)
+                  ?.markdownDegraded && (
+                  <span
+                    className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-300/80 bg-amber-50 px-2 py-1 text-xs font-medium text-amber-800"
+                    title="Some markdown couldn't be converted to rich text — content is preserved as plain paragraphs. Run `pnpm notes:regen` to restore formatting."
+                  >
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    Formatting degraded
+                  </span>
+                )}
                 {contentType === "page-template" && templateWarningText ? (
                   <TooltipProvider delayDuration={150}>
                     <Tooltip>
