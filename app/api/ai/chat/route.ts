@@ -86,6 +86,7 @@ function buildProviderOptions(
 import {
   getConnectionWithKey,
   listConnections,
+  lookupTemplate,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
@@ -739,6 +740,19 @@ export async function POST(request: Request) {
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
+          // Runtime identity (v3.1): what this turn is ACTUALLY served by,
+          // from live routing — so the model self-identifies from ground
+          // truth. Prefer the connection's preset template name (matches
+          // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
+          // id.
+          runtimeProviderName:
+            (activeConnection?.presetId
+              ? lookupTemplate(activeConnection.presetId)?.name
+              : undefined) ??
+            lookupTemplate(providerId)?.name ??
+            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+            providerId,
+          runtimeModelId: activeModelId,
           openWorkflowTitle,
           editableContentId,
           isChatContent,
