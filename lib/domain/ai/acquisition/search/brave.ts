@@ -23,10 +23,9 @@ export const braveProvider: AppSearchProvider = {
   id: "brave",
   label: "Brave Search",
   apiKeyDocsURL: "https://brave.com/search/api/",
-  isConfigured: () => Boolean(process.env.BRAVE_SEARCH_API_KEY),
+  apiKeyHint: "Subscription token from brave.com/search/api",
   async search(query, opts) {
-    const apiKey = process.env.BRAVE_SEARCH_API_KEY;
-    if (!apiKey) throw new Error("BRAVE_SEARCH_API_KEY is not set.");
+    const apiKey = opts.apiKey;
     const url = new URL("https://api.search.brave.com/res/v1/web/search");
     url.searchParams.set("q", query);
     url.searchParams.set("count", String(opts?.maxResults ?? 5));

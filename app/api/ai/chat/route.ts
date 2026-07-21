@@ -92,7 +92,7 @@ import {
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
-import { isAppSearchConfigured } from "@/lib/domain/ai/acquisition/search";
+import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
 import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
@@ -555,12 +555,16 @@ export async function POST(request: Request) {
       if (nativeSearch && searchEnabled) {
         // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
-      } else if (!nativeSearch && searchEnabled && isAppSearchConfigured()) {
+      } else if (
+        !nativeSearch &&
+        searchEnabled &&
+        (await userHasSearchConnection(session.user.id))
+      ) {
         // "Dumb models" (DeepSeek, Kimi, Mistral, Groq, local, …): no
         // native search, so attach the app-executed backend (v3.1) under
-        // the SAME tool name — every model can now search the live web.
+        // the SAME tool name — using the user's BYOK search connection.
         (tools as Record<string, unknown>)["search_web"] =
-          createAppWebSearchTool();
+          createAppWebSearchTool(session.user.id);
       }
 
       const toolsActive = Object.keys(tools).length > 0;

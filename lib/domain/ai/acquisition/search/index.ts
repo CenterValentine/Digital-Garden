@@ -1,19 +1,18 @@
 /**
  * App-executed web search (AI v3.1) — barrel.
  *
- * `appWebSearch()` runs a query through the active backend; the chat route
- * attaches the `search_web` tool (see createAppWebSearchTool) for models
- * whose provider has no native search, so every model can search.
+ * `appWebSearch()` runs a query through a specific backend with the user's
+ * BYOK key (resolved from a SearchConnection). The chat route attaches the
+ * `search_web` tool for models whose provider has no native search.
  */
 
 export type { AppSearchProvider, AppSearchResult } from "./types";
 export {
-  SEARCH_PROVIDERS,
-  getActiveSearchProvider,
-  isAppSearchConfigured,
+  SEARCH_PROVIDER_IMPLS,
+  getSearchProviderImpl,
 } from "./registry";
 
-import { getActiveSearchProvider } from "./registry";
+import { getSearchProviderImpl } from "./registry";
 import type { AppSearchResult } from "./types";
 
 export interface AppWebSearchOutcome {
@@ -22,18 +21,26 @@ export interface AppWebSearchOutcome {
 }
 
 /**
- * Run a web search through the active backend. Throws when no backend is
- * configured (callers gate on `isAppSearchConfigured()` first) or when the
- * backend errors — never masks a failure as empty results.
+ * Run a web search through a named backend with a resolved BYOK key.
+ * Throws on unknown backend or backend error — never masks a failure.
  */
 export async function appWebSearch(
   query: string,
-  opts?: { maxResults?: number; signal?: AbortSignal },
+  opts: {
+    providerId: string;
+    apiKey: string;
+    maxResults?: number;
+    signal?: AbortSignal;
+  },
 ): Promise<AppWebSearchOutcome> {
-  const provider = getActiveSearchProvider();
-  if (!provider) {
-    throw new Error("No web-search backend is configured.");
+  const impl = getSearchProviderImpl(opts.providerId);
+  if (!impl) {
+    throw new Error(`Unknown search backend "${opts.providerId}".`);
   }
-  const results = await provider.search(query, opts);
-  return { provider: provider.id, results };
+  const results = await impl.search(query, {
+    apiKey: opts.apiKey,
+    maxResults: opts.maxResults,
+    signal: opts.signal,
+  });
+  return { provider: impl.id, results };
 }

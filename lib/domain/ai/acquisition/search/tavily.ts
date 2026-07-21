@@ -20,10 +20,9 @@ export const tavilyProvider: AppSearchProvider = {
   id: "tavily",
   label: "Tavily",
   apiKeyDocsURL: "https://app.tavily.com/home",
-  isConfigured: () => Boolean(process.env.TAVILY_API_KEY),
+  apiKeyHint: "Starts with `tvly-` — free tier at app.tavily.com",
   async search(query, opts) {
-    const apiKey = process.env.TAVILY_API_KEY;
-    if (!apiKey) throw new Error("TAVILY_API_KEY is not set.");
+    const apiKey = opts.apiKey;
     const res = await fetch("https://api.tavily.com/search", {
       method: "POST",
       headers: { "content-type": "application/json" },

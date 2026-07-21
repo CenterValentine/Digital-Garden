@@ -12,11 +12,12 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { appWebSearch } from "./index";
+import { resolveDefaultSearchBackend } from "./resolve";
 
 /** Hard cap on results returned to the model per call (context budget). */
 const MAX_RESULTS = 6;
 
-export function createAppWebSearchTool() {
+export function createAppWebSearchTool(userId: string) {
   return tool({
     description:
       "Search the live web and return cited results (title, URL, snippet). " +
@@ -31,8 +32,14 @@ export function createAppWebSearchTool() {
         .describe("The search query — concise keywords work best."),
     }),
     execute: async ({ query }) => {
+      const backend = await resolveDefaultSearchBackend(userId);
+      if (!backend) {
+        return "Web search isn't configured. Ask the user to add a search API key in Settings → AI → Search.";
+      }
       try {
         const { results, provider } = await appWebSearch(query, {
+          providerId: backend.provider,
+          apiKey: backend.apiKey,
           maxResults: MAX_RESULTS,
         });
         if (results.length === 0) {

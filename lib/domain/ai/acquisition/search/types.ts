@@ -21,21 +21,22 @@ export interface AppSearchResult {
 }
 
 export interface AppSearchProvider {
-  /** Stable id, e.g. "tavily" — also the value of APP_SEARCH_PROVIDER. */
+  /** Stable id, e.g. "tavily" — matches SearchConnection.provider. */
   id: string;
   /** Human label for settings/UI. */
   label: string;
   /** URL where the user gets an API key (for settings hints). */
   apiKeyDocsURL: string;
-  /** True when this backend's credentials are present in the environment. */
-  isConfigured(): boolean;
+  /** Hint shown under the key field in settings. */
+  apiKeyHint: string;
   /**
-   * Run a search. Implementations must throw on transport/auth errors so
-   * the tool surfaces them honestly — never return an empty array to mask
-   * a failure.
+   * Run a search with the user's BYOK key (resolved from SearchConnection,
+   * NOT env). Implementations must throw on transport/auth errors so the
+   * tool surfaces them honestly — never return an empty array to mask a
+   * failure.
    */
   search(
     query: string,
-    opts?: { maxResults?: number; signal?: AbortSignal },
+    opts: { apiKey: string; maxResults?: number; signal?: AbortSignal },
   ): Promise<AppSearchResult[]>;
 }
