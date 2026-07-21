@@ -1036,7 +1036,12 @@ export function useConversationEngine({
       // the new text as a fresh turn. Stamp it with the active selection.
       pendingStampRef.current = { providerId, modelId };
       setMessages(messages.slice(0, idx));
-      void sendMessage({ text }, { body: reRunBody() });
+      // Use the { parts } shape the working sends use — { text } was
+      // inconsistent and the likely cause of edit-resend silently no-op'ing.
+      void sendMessage(
+        { parts: [{ type: "text", text }] },
+        { body: reRunBody() }
+      );
     },
     [messages, setMessages, sendMessage, reRunBody, providerId, modelId, truncateRef],
   );
