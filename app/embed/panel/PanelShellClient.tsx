@@ -271,6 +271,23 @@ export function PanelShellClient({
             : "Couldn't read this page"
         );
       }
+
+      // Screenshot arrived — hand it to the composer via the store; the
+      // context bar converts it to a File and attaches it.
+      if (data.type === "screenshot" && typeof data.payload?.dataUrl === "string") {
+        const store = usePanelPageContextStore.getState();
+        store.setPendingScreenshot(data.payload.dataUrl);
+        store.setScreenshotBusy(false);
+      }
+      if (data.type === "screenshot-error") {
+        const store = usePanelPageContextStore.getState();
+        store.setScreenshotBusy(false);
+        store.setError(
+          typeof data.payload?.message === "string"
+            ? data.payload.message
+            : "Couldn't screenshot this page"
+        );
+      }
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);

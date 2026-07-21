@@ -13,10 +13,13 @@
  * rides every chat turn until detached (see the engine's body resolver).
  */
 
+import { useEffect } from "react";
 import { usePanelPageContextStore } from "@/state/panel-page-context-store";
 import {
   isPanelEmbedSurface,
   requestPageCapture,
+  requestScreenshot,
+  dataUrlToFile,
 } from "@/lib/domain/browser-extension/panel-bridge";
 import type { PageContextScope } from "@/lib/domain/browser-extension/page-context";
 
@@ -26,16 +29,41 @@ const SCOPES: Array<{ id: PageContextScope; label: string; hint: string }> = [
   { id: "full", label: "Page", hint: "The whole article" },
 ];
 
-export function PanelPageContextBar() {
+export function PanelPageContextBar({
+  onAddFiles,
+  supportsImages = true,
+}: {
+  /** ChatInput's addAttachmentFiles — used to attach a captured screenshot. */
+  onAddFiles?: (files: File[]) => void;
+  /** Whether the active model can accept image attachments. */
+  supportsImages?: boolean;
+}) {
   const pageContext = usePanelPageContextStore((s) => s.pageContext);
   const attached = usePanelPageContextStore((s) => s.attached);
   const busy = usePanelPageContextStore((s) => s.busy);
   const error = usePanelPageContextStore((s) => s.error);
   const scope = usePanelPageContextStore((s) => s.scope);
+  const screenshotBusy = usePanelPageContextStore((s) => s.screenshotBusy);
+  const pendingScreenshot = usePanelPageContextStore((s) => s.pendingScreenshot);
   const setBusy = usePanelPageContextStore((s) => s.setBusy);
   const setError = usePanelPageContextStore((s) => s.setError);
   const setScope = usePanelPageContextStore((s) => s.setScope);
+  const setScreenshotBusy = usePanelPageContextStore((s) => s.setScreenshotBusy);
+  const setPendingScreenshot = usePanelPageContextStore(
+    (s) => s.setPendingScreenshot
+  );
   const clear = usePanelPageContextStore((s) => s.clear);
+
+  // A newly-captured screenshot → File → composer attachment, then clear it.
+  useEffect(() => {
+    if (!pendingScreenshot) return;
+    const file = dataUrlToFile(
+      pendingScreenshot,
+      `screenshot-${Date.now()}.jpg`
+    );
+    if (file) onAddFiles?.([file]);
+    setPendingScreenshot(null);
+  }, [pendingScreenshot, onAddFiles, setPendingScreenshot]);
 
   // Only exists in the side panel; a no-op elsewhere keeps ChatInput generic.
   if (!isPanelEmbedSurface()) return null;
@@ -45,6 +73,12 @@ export function PanelPageContextBar() {
     setBusy(true);
     setError(null);
     requestPageCapture(next);
+  }
+
+  function captureScreenshot() {
+    setScreenshotBusy(true);
+    setError(null);
+    requestScreenshot();
   }
 
   const charCount = pageContext?.content?.length ?? 0;
@@ -75,6 +109,17 @@ export function PanelPageContextBar() {
             </button>
           );
         })}
+        {onAddFiles && supportsImages && (
+          <button
+            type="button"
+            onClick={captureScreenshot}
+            disabled={screenshotBusy}
+            title="Attach a screenshot of the visible page"
+            className="rounded-md border border-black/10 dark:border-white/15 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-300 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/5"
+          >
+            {screenshotBusy ? "…" : "📷 Shot"}
+          </button>
+        )}
         {attached && (
           <button
             type="button"

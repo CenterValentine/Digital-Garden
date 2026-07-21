@@ -28,11 +28,17 @@ interface PanelPageContextState {
   error: string | null;
   /** Scope of the in-flight or last capture. */
   scope: PageContextScope;
+  /** A screenshot just arrived (data URL) and needs adding to the composer. */
+  pendingScreenshot: string | null;
+  /** A screenshot capture is in flight. */
+  screenshotBusy: boolean;
   setPageContext: (ctx: PanelPageContext | null) => void;
   setAttached: (attached: boolean) => void;
   setBusy: (busy: boolean) => void;
   setError: (error: string | null) => void;
   setScope: (scope: PageContextScope) => void;
+  setPendingScreenshot: (dataUrl: string | null) => void;
+  setScreenshotBusy: (busy: boolean) => void;
   clear: () => void;
 }
 
@@ -42,11 +48,15 @@ export const usePanelPageContextStore = create<PanelPageContextState>((set) => (
   busy: false,
   error: null,
   scope: "full",
+  pendingScreenshot: null,
+  screenshotBusy: false,
   setPageContext: (pageContext) => set({ pageContext }),
   setAttached: (attached) => set({ attached }),
   setBusy: (busy) => set({ busy }),
   setError: (error) => set({ error }),
   setScope: (scope) => set({ scope }),
+  setPendingScreenshot: (pendingScreenshot) => set({ pendingScreenshot }),
+  setScreenshotBusy: (screenshotBusy) => set({ screenshotBusy }),
   clear: () => set({ pageContext: null, attached: false, error: null }),
 }));
 

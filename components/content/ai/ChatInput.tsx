@@ -458,8 +458,12 @@ export function ChatInput({
     >
       {/* Browser side-panel only: attach the current page to the chat. Its own
           element above the input, self-contained (store-driven, renders null
-          off-panel) so it stays out of the shared composer's CSS. */}
-      <PanelPageContextBar />
+          off-panel) so it stays out of the shared composer's CSS. onAddFiles
+          lets its screenshot button ride the normal attachment path. */}
+      <PanelPageContextBar
+        onAddFiles={onAddFiles}
+        supportsImages={supportsImages}
+      />
       <div
         ref={treeDropRef as unknown as React.Ref<HTMLDivElement>}
         className={cn(

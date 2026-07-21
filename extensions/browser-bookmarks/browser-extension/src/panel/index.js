@@ -166,6 +166,34 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Screenshot: capture the visible area of the active tab for the chat's
+  // vision input. captureVisibleTab must run from an extension context (this
+  // host page), targeting the active tab's window.
+  if (data.type === "capture-screenshot") {
+    void (async () => {
+      try {
+        const [tab] = await chrome.tabs.query({
+          active: true,
+          lastFocusedWindow: true,
+        });
+        if (tab?.windowId == null) throw new Error("No active tab");
+        const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: "jpeg",
+          quality: 70,
+        });
+        postToEmbed("screenshot", { dataUrl });
+      } catch (error) {
+        postToEmbed("screenshot-error", {
+          message:
+            error instanceof Error
+              ? error.message
+              : "Couldn't screenshot this page",
+        });
+      }
+    })();
+    return;
+  }
+
   // Pop-out: the panel asks for content to open as an overlay on the page.
   // A drag can't cross from this document into the page, so the panel offers
   // four quadrants instead and tells us which corner the user chose.

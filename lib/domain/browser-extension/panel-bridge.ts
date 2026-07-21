@@ -65,3 +65,27 @@ export function requestPageCapture(scope: string): void {
     "*"
   );
 }
+
+/** Ask the panel host to screenshot the visible area of the active tab. */
+export function requestScreenshot(): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "capture-screenshot" },
+    "*"
+  );
+}
+
+/** Decode a data: URL into a File for the chat's attachment path. */
+export function dataUrlToFile(dataUrl: string, filename: string): File | null {
+  try {
+    const [meta, b64] = dataUrl.split(",");
+    if (!b64) return null;
+    const mime = /:(.*?);/.exec(meta)?.[1] ?? "image/jpeg";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], filename, { type: mime });
+  } catch {
+    return null;
+  }
+}
