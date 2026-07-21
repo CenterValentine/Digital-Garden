@@ -30,9 +30,14 @@ const monoChip =
 
 function DirectoryRow({
   path,
+  canSnapshot,
+  onUnsync,
   onRemove,
 }: {
   path: string;
+  /** True when we know the directory's current pages (so we can snapshot). */
+  canSnapshot: boolean;
+  onUnsync: () => void;
   onRemove: () => void;
 }) {
   return (
@@ -44,10 +49,25 @@ function DirectoryRow({
       >
         ↻ Keeping in sync with <span className="font-mono">{path}</span>
       </span>
-      <span className="hidden font-mono text-[10px] text-white/35 sm:inline">whole directory</span>
+      <label
+        className="flex items-center gap-1.5 text-[11px] text-white/55"
+        title={
+          canSnapshot
+            ? "On: new pages appear automatically. Turn off to freeze the current pages as a fixed list."
+            : "Sync info still loading…"
+        }
+      >
+        <input
+          type="checkbox"
+          checked
+          disabled={!canSnapshot}
+          onChange={onUnsync}
+        />
+        Keep in sync
+      </label>
       <button
         type="button"
-        aria-label={`Stop syncing with ${path}`}
+        aria-label={`Remove ${path}`}
         className="text-white/30 hover:text-rose-400"
         onClick={onRemove}
       >
@@ -68,6 +88,7 @@ export function SectionCard({
   onConnect,
   onAddManual,
   inheritedFor,
+  expandDirectory,
 }: {
   section: ListSection;
   index: number;
@@ -79,6 +100,8 @@ export function SectionCard({
   onConnect: () => void;
   onAddManual: () => void;
   inheritedFor: InheritedLookup;
+  /** Given a `publicPath:` ref, the directory's current page refs. */
+  expandDirectory: (pathRef: string) => string[];
 }) {
   const [openRow, setOpenRow] = useState<number | null>(null);
 
@@ -136,9 +159,24 @@ export function SectionCard({
       <ul className="divide-y divide-white/5 rounded-md border border-white/5">
         {section.items.map((item, i) => {
           if (isDirectoryRef(item.ref)) {
+            const dirRefs = expandDirectory(item.ref!);
             return (
               <li key={i}>
-                <DirectoryRow path={item.ref!.replace("publicPath:", "")} onRemove={() => removeItem(i)} />
+                <DirectoryRow
+                  path={item.ref!.replace("publicPath:", "")}
+                  canSnapshot={dirRefs.length > 0}
+                  onUnsync={() => {
+                    // Replace this directory item with its current pages, pinned.
+                    const items = section.items.slice();
+                    items.splice(
+                      i,
+                      1,
+                      ...dirRefs.map((ref): ListItem => ({ ref, status: "done" })),
+                    );
+                    onChange({ ...section, items });
+                  }}
+                  onRemove={() => removeItem(i)}
+                />
               </li>
             );
           }

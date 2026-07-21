@@ -88,6 +88,10 @@ export function SitePagesComposer() {
   const [inheritedIndex, setInheritedIndex] = useState<Map<string, InheritedValues>>(
     () => new Map(),
   );
+  /** Directories by publicPath ref → their current page refs, for un-syncing. */
+  const [directoryRefs, setDirectoryRefs] = useState<Map<string, string[]>>(
+    () => new Map(),
+  );
   /** Bumped after each successful draft save to remount the preview iframe. */
   const [previewKey, setPreviewKey] = useState(0);
   const [showNewForm, setShowNewForm] = useState(false);
@@ -122,7 +126,9 @@ export function SitePagesComposer() {
       if (!res.ok) return;
       const data = (await res.json()) as { directories: ContentIndexDirectory[] };
       const map = new Map<string, InheritedValues>();
+      const dirMap = new Map<string, string[]>();
       for (const dir of data.directories) {
+        dirMap.set(dir.ref, dir.items.map((it) => it.ref));
         for (const it of dir.items) {
           map.set(it.ref, {
             title: it.title,
@@ -132,6 +138,7 @@ export function SitePagesComposer() {
         }
       }
       setInheritedIndex(map);
+      setDirectoryRefs(dirMap);
     } catch {
       /* non-fatal */
     }
@@ -140,6 +147,12 @@ export function SitePagesComposer() {
   const inheritedFor = useCallback(
     (ref: string | undefined) => (ref ? inheritedIndex.get(ref) : undefined),
     [inheritedIndex],
+  );
+
+  /** The current page refs inside a directory ref (empty if unknown). */
+  const expandDirectory = useCallback(
+    (pathRef: string): string[] => directoryRefs.get(pathRef) ?? [],
+    [directoryRefs],
   );
 
   const selectPage = useCallback(
@@ -739,6 +752,7 @@ export function SitePagesComposer() {
                 onConnect={() => setPicker({ sectionIndex: i })}
                 onAddManual={() => addManualItem(i)}
                 inheritedFor={inheritedFor}
+                expandDirectory={expandDirectory}
               />
             ))}
 
