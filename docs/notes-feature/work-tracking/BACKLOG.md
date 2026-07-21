@@ -30,6 +30,7 @@ S1–S6 built and MERGED (PR #114 / `9f15281`); Anthropic + OpenAI flagship runs
 - [ ] **Acquisition explainer session** for the owner (umbrella post-V3 queue).
 
 Completed en route (recorded here so nobody re-plans them): approval-card per-tool previews (486544c), citation-split bubble coalescing (65ae4e7), new-chat auto-targeting + move-follows (0a31ca0), connection-editor instant persistence + fieldset grammar (6fd3dcb/1ea57ee/88b1341).
+- **Universal web search for non-native providers (2026-07-21)** — modular app-executed `search_web` backend (Tavily default + Brave; swappable via APP_SEARCH_PROVIDER; add a backend = one file + one registry line) attaches for "dumb models" (DeepSeek, Kimi, Mistral, Groq, local) that lack native search; big four keep native. Dissolves R4's straight-faced non-attachment. Needs TAVILY_API_KEY (or BRAVE_SEARCH_API_KEY) in env. Followups: settings-UI backend picker + per-connection key (today: env-driven); SearXNG/Serper backends (interface ready).
 
 ---
 
