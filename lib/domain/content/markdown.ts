@@ -39,47 +39,74 @@ import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupporte
  * @param markdown - Markdown string
  * @returns TipTap JSON content
  */
-export function markdownToTiptap(markdown: string): JSONContent {
-  if (!markdown) {
-    return {
-      type: "doc",
-      content: [],
-    };
-  }
+/**
+ * Result of a markdown → TipTap conversion (v3.2 T1 hardening).
+ *
+ * `degraded` is the load-bearing field: when the structured pipeline
+ * fails, we NO LONGER silently return raw markdown as one plain paragraph
+ * (the root of the R6 degraded-note bug). Instead we preserve the content
+ * as a paragraph-per-block best-effort AND flag `degraded: true` so the
+ * caller can mark the note (metadata + badge) and the regen sweep can find
+ * it. Callers that don't care read `.json`; the thin `markdownToTiptap`
+ * wrapper keeps the old signature.
+ */
+export interface MarkdownConversionResult {
+  json: JSONContent;
+  degraded: boolean;
+  reason?: string;
+}
 
+export function markdownToTiptapResult(
+  markdown: string,
+): MarkdownConversionResult {
+  if (!markdown) {
+    return { json: { type: "doc", content: [] }, degraded: false };
+  }
   try {
     const extensions = getServerExtensions();
-
-    // Step 1: Convert markdown → HTML via `marked`
-    // `generateJSON` expects HTML input, not raw markdown.
+    // marked → HTML, then HTML → TipTap JSON via the registered
+    // extensions (native DOM in the browser, zeed-dom in Node).
     const html = marked.parse(markdown, { async: false, gfm: true }) as string;
-
-    // Step 2: Convert HTML → TipTap JSON via registered extensions.
-    // Native-DOM path in the browser (faster); zeed-dom path in Node.
     const json =
       typeof window === "undefined"
         ? generateJSONServer(html, extensions)
         : generateJSON(html, extensions);
-    return json;
+    return { json, degraded: false };
   } catch (error) {
-    console.error("Failed to convert markdown to TipTap:", error);
-
-    // Fallback: wrap in paragraph
+    console.error("markdown → TipTap conversion failed (degraded):", error);
     return {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: markdown,
-            },
-          ],
-        },
-      ],
+      json: paragraphSplit(markdown),
+      degraded: true,
+      reason:
+        error instanceof Error ? error.message : "markdown conversion failed",
     };
   }
+}
+
+/** Backward-compatible thin wrapper — returns just the document. */
+export function markdownToTiptap(markdown: string): JSONContent {
+  return markdownToTiptapResult(markdown).json;
+}
+
+/**
+ * Best-effort degraded document: one paragraph per blank-line-separated
+ * block, so at least line/paragraph structure survives when the real
+ * pipeline can't run. Never a single raw blob.
+ */
+function paragraphSplit(source: string): JSONContent {
+  const blocks = source
+    .split(/\n\s*\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    type: "doc",
+    content: blocks.length
+      ? blocks.map((block) => ({
+          type: "paragraph",
+          content: [{ type: "text", text: block }],
+        }))
+      : [{ type: "paragraph" }],
+  };
 }
 
 // ============================================================

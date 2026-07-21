@@ -62,11 +62,13 @@ export { syncContentTags } from "./tag-sync";
 // Markdown conversion
 export {
   markdownToTiptap,
+  markdownToTiptapResult,
   tiptapToMarkdown,
   importMarkdownFile,
   exportAsMarkdown,
   validateMarkdown,
 } from "./markdown";
+export type { MarkdownConversionResult } from "./markdown";
 
 // Constants
 export { CONTENT_WITH_PAYLOADS, CONTENT_TREE_SELECT } from "./types";
