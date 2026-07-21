@@ -301,7 +301,7 @@ export async function fetchGardenData(
       label: section.label,
       title: section.label,
       intro: section.intro ?? "",
-      kind: "shoot",
+      kind: section.growth ?? "shoot",
       items: await resolveGardenItems(tenantId, section),
     };
   }

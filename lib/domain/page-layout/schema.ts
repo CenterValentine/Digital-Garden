@@ -80,6 +80,9 @@ const listSection = z.object({
   label: z.string().default(""),
   intro: z.string().optional(),
   sort: sortMode.default("date-desc"),
+  // Garden only: does this category's leaf grow up (shoot) or down (root)?
+  // Drives the `gl--root` engine class. Absent → "shoot". Ignored by other kinds.
+  growth: z.enum(["shoot", "root"]).optional(),
   items: z.array(listItem).default([]),
 });
 
