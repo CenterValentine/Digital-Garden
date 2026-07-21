@@ -487,6 +487,10 @@ const glass0 = getSurfaceStyles("glass-0");
 - For unused parameters/vars that must remain (kept-for-signature, caught errors), prefix with `_` — eslint is configured to ignore `_`-prefixed identifiers via `argsIgnorePattern`/`varsIgnorePattern`/`caughtErrorsIgnorePattern`. **Do NOT** add bare `// eslint-disable` for unused-vars; rename instead.
 - **Next.js 16 middleware is `proxy.ts`, not `middleware.ts`** — this repo renames it per Next.js 16 conventions. The function export is named `proxy`. Do not create `middleware.ts`; the build will fail if both files coexist.
 
+### Before opening a PR — `pnpm preflight`
+
+Run `pnpm preflight` before every PR. It mirrors the CI gates locally in one shot — `prisma generate` → typecheck → lint → collab schema → extensions → publishing schema/defaults → migration drift — and prints a PASS/FAIL summary so CI never surprises you. The **migration-drift** check (the one that catches "table added to `schema.prisma` but no migration written") needs a one-time local shadow DB; the script prints the exact `CREATE DATABASE` + `SHADOW_DATABASE_URL` setup if it's missing, then runs drift on every subsequent call. Green preflight = safe to open the PR.
+
 ### Quality Gates — before declaring a task done
 
 The workflow is `typecheck → lint → build`. Each gates the next:

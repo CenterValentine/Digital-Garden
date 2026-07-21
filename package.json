@@ -23,6 +23,7 @@
     "publishing:audit:themes": "tsx scripts/audit-publishing-themes.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:target": "tsx scripts/check-db-target.ts",
+    "preflight": "bash scripts/preflight.sh",
     "notes:regen": "tsx scripts/regen-degraded-notes.ts",
     "db:local:up": "docker compose up -d postgres",
     "db:local:down": "docker compose down",
