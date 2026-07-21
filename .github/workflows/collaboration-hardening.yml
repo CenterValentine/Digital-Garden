@@ -37,6 +37,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # The Prisma client is a gitignored build artifact — typecheck needs
+      # it generated first, else new models (SearchConnection, SitePage, …)
+      # are missing from the client type and tsc fails. Mirrors quality.yml.
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
       - name: Typecheck
         run: pnpm typecheck
 

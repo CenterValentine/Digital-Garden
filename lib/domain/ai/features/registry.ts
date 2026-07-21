@@ -118,6 +118,22 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
+    // Extraction subagent (v3.1 R5, context discipline): condenses
+    // oversized tool results (web page reads) with a cheap model BEFORE
+    // they enter chat context. Unrouted = graceful skip (raw truncation,
+    // today's behavior).
+    id: "tool-result-extraction",
+    label: "Tool Result Extraction",
+    description:
+      "Cheap-model pass that extracts the task-relevant parts of oversized web page reads before they enter chat context. Leave unrouted to keep plain truncation.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-3-5",
+    },
+  },
+  {
     id: "follow-ups",
     label: "Suggested Follow-ups",
     description:

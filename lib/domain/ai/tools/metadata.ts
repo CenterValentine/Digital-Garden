@@ -61,7 +61,7 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   search_web: {
     name: "Web Search",
     description:
-      "Search the web with cited results using the active provider's native search (Anthropic, OpenAI, Google, xAI)",
+      "Search the web with cited results — the active provider's native search (Anthropic, OpenAI, Google, xAI), or an app-run backend (Tavily/Brave) for every other model when configured",
   },
   read_page: {
     name: "Read Web Page",

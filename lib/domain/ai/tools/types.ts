@@ -24,6 +24,14 @@ export interface ToolExecuteContext {
    */
   targetFolderId?: string;
   /**
+   * Mutable per-request token accumulator (v3.1 R5 tokens-per-phase).
+   * The route's onStepFinish adds each step's usage; phase_checkpoint
+   * reads it at execute time to stamp "tokens so far" into the Run
+   * Ledger. Scoped to ONE streamText call — the ledger's per-phase
+   * deltas come from subtracting successive checkpoint stamps.
+   */
+  runTokens?: { total: number };
+  /**
    * The chat content node id when this chat is being viewed as a full-page
    * ChatViewer (i.e. the chat IS the open content, not the editor). Set
    * even though `contentId` is intentionally undefined for editor tools.

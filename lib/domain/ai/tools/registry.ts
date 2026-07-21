@@ -17,6 +17,7 @@ import {
   createAcquisitionBudget,
   findOrCreatePageNode,
 } from "@/lib/domain/ai/acquisition";
+import { extractRelevant } from "@/lib/domain/ai/acquisition/extract-relevant";
 import { addAutoAssociation } from "@/lib/features/conversations";
 import {
   createDocxDocument,
@@ -104,8 +105,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .url()
           .describe("Absolute http(s) URL of the page to read"),
+        purpose: z
+          .string()
+          .max(300)
+          .optional()
+          .describe(
+            "What you need from this page (one sentence). ALWAYS provide it — long pages are condensed by an extraction pass that keeps only content matching this purpose.",
+          ),
       }),
-      execute: async ({ url }) => {
+      execute: async ({ url, purpose }) => {
         const result = await acquire(
           { url },
           { userId: ctx.userId, budget: acquisitionBudget },
@@ -148,6 +156,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ).catch(() => null);
           }
         }
+        // Extraction subagent (v3.1 R5): oversized reads are condensed by
+        // a cheap model BEFORE entering context — the garden page node
+        // above already cached the FULL text, so nothing is lost, only
+        // the in-context copy shrinks. Soft-fails to the plain truncated
+        // text when the extraction feature is unrouted or errors.
+        let contentForContext = c.content;
+        let aiExtracted = false;
+        if (c.content.length > 6_000) {
+          const extract = await extractRelevant({
+            userId: ctx.userId,
+            content: c.content,
+            purpose:
+              purpose ?? "the information most relevant to the user's current request",
+            title: c.title,
+          });
+          if (extract) {
+            contentForContext = extract;
+            aiExtracted = true;
+          }
+        }
         return {
           url: c.url,
           canonicalUrl: c.canonicalUrl,
@@ -155,12 +183,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           siteName: c.siteName,
           publishedAt: c.publishedAt,
           retrievedAt: c.retrievedAt,
-          extraction: c.extraction,
+          extraction: aiExtracted ? "ai-extracted" : c.extraction,
           truncated: c.truncated,
+          ...(aiExtracted
+            ? {
+                extractionNote: `Condensed from ${c.content.length.toLocaleString()} chars to match purpose: "${purpose ?? "general"}". The full page text is cached on the garden page node.`,
+              }
+            : {}),
           gardenNodeId,
           // Field name carries the trust label on purpose — structural
           // reinforcement of the never-instructions rule above.
-          untrustedWebContent: c.content,
+          untrustedWebContent: contentForContext,
         };
       },
     }),
@@ -214,6 +247,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             artifacts,
             openQuestions,
             next,
+            // Tokens-per-phase eval (v3.1 R5): route-accumulated usage
+            // through this step — the ledger becomes the per-run cost
+            // record ("tokens so far" at each checkpoint = per-phase
+            // deltas by subtraction).
+            tokensSoFar: ctx.runTokens?.total,
           });
           if (ctx.conversationId) {
             void addAutoAssociation(

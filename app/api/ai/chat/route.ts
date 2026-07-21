@@ -33,6 +33,7 @@ import {
 } from "@/lib/domain/ai/providers/registry";
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 
 /**
  * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
@@ -85,11 +86,14 @@ function buildProviderOptions(
 import {
   getConnectionWithKey,
   listConnections,
+  lookupTemplate,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
 import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
+import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
+import { createAppWebSearchTool } from "@/lib/domain/ai/acquisition/search/tool";
 import { repairDanglingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { extractContentIdsFromToolCall } from "@/lib/domain/ai/tools/content-id-args";
@@ -317,6 +321,15 @@ export async function POST(request: Request) {
           ? "gateway"
           : "direct";
 
+      // Fixed-temperature models (v3.1 R4): reasoning/thinking models
+      // (OpenAI o-series, Moonshot Kimi thinking line) reject any
+      // temperature but 1 with a 4xx. Clamp before it reaches the
+      // middleware AND the streamText call — both send temperature.
+      const effectiveTemperature = resolveModelTemperature(
+        activeModelId,
+        temperature,
+      );
+
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
         {
@@ -343,7 +356,10 @@ export async function POST(request: Request) {
                 apiKey,
               });
           return applyMiddleware(model, [
-            defaultSettingsMiddleware({ temperature, maxTokens }),
+            defaultSettingsMiddleware({
+              temperature: effectiveTemperature,
+              maxTokens,
+            }),
             rateLimitRetryMiddleware(),
           ]);
         },
@@ -463,8 +479,13 @@ export async function POST(request: Request) {
       // transient chats have no chat node to infer from).
       if (!targetFolderId) targetFolderId = openContentLocationId;
 
+      // Per-request token accumulator (v3.1 R5): onStepFinish adds each
+      // step's usage; phase_checkpoint stamps the running total into the
+      // Run Ledger.
+      const runTokenCounter = { total: 0 };
       const toolCtx = {
         userId: session.user.id,
+        runTokens: runTokenCounter,
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -530,8 +551,20 @@ export async function POST(request: Request) {
         executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
           ? resolveNativeWebSearchTool(executedProviderId)
           : null;
-      if (nativeSearch && toolConfig["search_web"]?.enabled !== false) {
+      const searchEnabled = toolConfig["search_web"]?.enabled !== false;
+      if (nativeSearch && searchEnabled) {
+        // Big-four: provider-native search (integrated, well-cited).
         (tools as Record<string, unknown>)["search_web"] = nativeSearch;
+      } else if (
+        !nativeSearch &&
+        searchEnabled &&
+        (await userHasSearchConnection(session.user.id))
+      ) {
+        // "Dumb models" (DeepSeek, Kimi, Mistral, Groq, local, …): no
+        // native search, so attach the app-executed backend (v3.1) under
+        // the SAME tool name — using the user's BYOK search connection.
+        (tools as Record<string, unknown>)["search_web"] =
+          createAppWebSearchTool(session.user.id);
       }
 
       const toolsActive = Object.keys(tools).length > 0;
@@ -692,7 +725,7 @@ export async function POST(request: Request) {
         mentionedContext,
         providerId,
         modelId,
-        temperature,
+        temperature: effectiveTemperature,
         maxTokens,
       });
 
@@ -721,6 +754,19 @@ export async function POST(request: Request) {
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
+          // Runtime identity (v3.1): what this turn is ACTUALLY served by,
+          // from live routing — so the model self-identifies from ground
+          // truth. Prefer the connection's preset template name (matches
+          // the picker: "Moonshot (Kimi)"), then the catalog, then the raw
+          // id.
+          runtimeProviderName:
+            (activeConnection?.presetId
+              ? lookupTemplate(activeConnection.presetId)?.name
+              : undefined) ??
+            lookupTemplate(providerId)?.name ??
+            PROVIDER_CATALOG.find((p) => p.id === providerId)?.name ??
+            providerId,
+          runtimeModelId: activeModelId,
           openWorkflowTitle,
           editableContentId,
           isChatContent,
@@ -730,6 +776,10 @@ export async function POST(request: Request) {
           mentionedContext,
         }),
         onStepFinish: (step) => {
+          // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
+          runTokenCounter.total +=
+            (step as { usage?: { totalTokens?: number } }).usage
+              ?.totalTokens ?? 0;
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any
           // content-id-bearing args (per the CONTENT_ID_TOOL_ARGS

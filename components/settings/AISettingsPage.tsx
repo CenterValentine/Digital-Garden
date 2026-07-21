@@ -33,6 +33,7 @@ import { useEffect, useState } from "react";
 import { Wrench } from "lucide-react";
 
 import AIConnectionsPage from "@/components/settings/AIConnectionsPage";
+import { SearchConnectionsCard } from "@/components/settings/SearchConnectionsCard";
 import AIFeatureRoutingPage from "@/components/settings/AIFeatureRoutingPage";
 import { Checkbox } from "@/components/client/ui/checkbox";
 import { Input } from "@/components/client/ui/input";
@@ -171,6 +172,10 @@ export default function AISettingsPage() {
 
       <section className="space-y-1">
         <AIFeatureRoutingPage embedded />
+      </section>
+
+      <section className="space-y-1">
+        <SearchConnectionsCard />
       </section>
 
       <SettingSection

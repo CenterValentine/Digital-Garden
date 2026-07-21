@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/infrastructure/auth";
 import {
   createConnection,
   listConnections,
+  ADAPTER_KINDS,
   type CreateConnectionInput,
   type ConnectionKind,
   type AdapterKind,
@@ -20,10 +21,9 @@ import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 const ROUTE_PATH = "/api/ai/connections";
 
 const KINDS: ConnectionKind[] = ["direct", "gateway", "custom"];
-const ADAPTERS: AdapterKind[] = [
-  "anthropic", "openai", "google", "xai", "mistral", "groq",
-  "vercel-gateway", "openai-compat",
-];
+// Derived from the single source of truth (types.ts) — never hand-list
+// adapter kinds here; a stale duplicate silently rejected `deepseek`.
+const ADAPTERS: readonly AdapterKind[] = ADAPTER_KINDS;
 
 export async function GET(request: NextRequest) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {

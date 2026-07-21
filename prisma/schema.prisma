@@ -523,6 +523,7 @@ model User {
   defaultFlashcardDeckId String? @db.Uuid
   accounts             Account[]
   aiConnections        AIConnection[]
+  searchConnections    SearchConnection[]
   aiFeatureRoutes      AIFeatureRoute[]
   auditTargets         AuditLog[]              @relation("AuditTargets")
   adminActions         AuditLog[]              @relation("AdminActions")
@@ -1350,6 +1351,22 @@ model AIConnection {
   @@index([ownerId, isPinned, pinOrder])
   @@index([ownerId, deletedAt])
 }
+
+model SearchConnection {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId      String   @db.Uuid
+  provider     String   @db.VarChar(50)   // "tavily" | "brave" | …
+  label        String   @db.VarChar(120)
+  encryptedKey String
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+  owner        User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, provider])
+  @@index([ownerId, isDefault])
+}
+
 
 // =============================================================================
 // Feature Routing — Session 3.6.

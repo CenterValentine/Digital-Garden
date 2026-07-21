@@ -6,6 +6,7 @@
  * `./templates.ts` ships the built-in presets the settings UI uses.
  */
 
+export { ADAPTER_KINDS } from "./types";
 export type {
   AdapterKind,
   ConnectionKind,

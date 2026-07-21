@@ -89,24 +89,36 @@ export async function resolveChatModelFromConnection(
       const { createGroq } = await import("@ai-sdk/groq");
       return createGroq({ apiKey: connection.apiKey })(modelId);
     }
+    case "deepseek": {
+      // Official provider (v3.1 R4) — first-class reasoning support for
+      // deepseek-reasoner, unlike the generic openai-compat path.
+      const { createDeepSeek } = await import("@ai-sdk/deepseek");
+      return createDeepSeek({ apiKey: connection.apiKey })(modelId);
+    }
     case "vercel-gateway": {
       // Vercel AI Gateway BYOK: user supplies their own Gateway key.
       const { createGateway } = await import("@ai-sdk/gateway");
       return createGateway({ apiKey: connection.apiKey })(modelId);
     }
     case "openai-compat": {
-      // Generic OpenAI-compatible endpoint — Fireworks, Together,
-      // OpenRouter, Ollama, etc. baseURL is required.
+      // Generic OpenAI-compatible endpoint — Moonshot (Kimi), Fireworks,
+      // Together, OpenRouter, Ollama, etc. baseURL is required.
       if (!connection.baseURL) {
         throw new Error(
           `Connection ${connection.id} uses openai-compat but has no baseURL configured.`,
         );
       }
       const { createOpenAI } = await import("@ai-sdk/openai");
+      // `.chat(...)` forces the /chat/completions endpoint. The default
+      // callable `provider(modelId)` targets OpenAI's newer /responses
+      // API, which third-party OpenAI-compatible servers (Moonshot et al.)
+      // don't implement — the call 404s with "AI_APICallError: Not Found".
+      // Only OpenAI itself serves /responses, so the dedicated "openai"
+      // branch above keeps the default; compat endpoints must use chat.
       return createOpenAI({
         apiKey: connection.apiKey,
         baseURL: connection.baseURL,
-      })(modelId);
+      }).chat(modelId);
     }
     default:
       throw new Error(`Unknown adapter kind: ${adapter}`);
