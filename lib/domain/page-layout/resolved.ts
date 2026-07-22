@@ -82,3 +82,18 @@ export interface GardenCategory {
 
 /** The full `window.CATS` object, keyed by category. */
 export type GardenData = Record<string, GardenCategory>;
+
+// ── Prose (About narrative) ──────────────────────────────────────────────────
+// The editable body sections of a prose page. Hero / intro / CTAs stay code.
+
+export interface ProseSection {
+  kicker: string; // emphasis string — the `sec-kicker`
+  heading: string; // emphasis string — the h2, e.g. "Structure in *motion.*"
+  paragraphs: string[]; // emphasis strings, each a <p>
+  aside?: string; // margin pull-quote; newlines render as <br>
+}
+
+/** What AboutPage renders for its editable body (hero/intro/CTAs stay code). */
+export interface ProseData {
+  sections: ProseSection[];
+}

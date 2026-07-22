@@ -66,10 +66,12 @@ async function renderPublic(
     }
 
     if (joined === "about") {
-      const { AboutPage } = await import(
-        "../../../components/personal/AboutPage"
-      );
-      return <AboutPage />;
+      const [{ AboutPage }, { fetchProseData }] = await Promise.all([
+        import("../../../components/personal/AboutPage"),
+        import("@/lib/domain/page-layout/resolve"),
+      ]);
+      const data = await fetchProseData(tenant.tenantId, "about", { draft });
+      return <AboutPage data={data ?? undefined} />;
     }
     if (joined === "results") {
       const [{ WorkResultsPage }, { fetchWorkData }] = await Promise.all([

@@ -78,7 +78,7 @@
 .personal-home .sec h2 em { font-style:italic; color:var(--accent-warm); font-weight:500; }
 .personal-home .sec p { font-family:var(--serif); font-size:18.5px; line-height:1.72; color:var(--text-soft); max-width:50ch; }
 .personal-home .sec p + p { margin-top:18px; }
-.personal-home .sec p b { color:var(--text); font-weight:600; }
+.personal-home .sec p b, .personal-home .sec p strong { color:var(--text); font-weight:600; }
 
 .personal-home .sec-note .note-text { font-family:var(--hand); font-size:18px; font-weight:500; color:var(--accent-warm); line-height:1.4; transform:rotate(-1.2deg); display:block; }
 .personal-home .sec-note .note-arrow { font-family:var(--hand); font-size:15px; color:color-mix(in srgb,var(--accent-warm) 65%,transparent); display:block; margin-top:4px; }

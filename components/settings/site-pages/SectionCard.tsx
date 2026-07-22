@@ -171,7 +171,13 @@ export function SectionCard({
           aria-label={`${sectionNoun} heading`}
           className={`${inputCls} font-mono`}
           value={section.label}
-          placeholder={pageKind === "garden" ? "Category name" : "— Section heading"}
+          placeholder={
+            pageKind === "garden"
+              ? "Category name"
+              : pageKind === "prose"
+                ? "Section kicker (e.g. The work)"
+                : "— Section heading"
+          }
           onChange={(e) => onChange({ ...section, label: e.target.value })}
         />
         <label className="ml-1 font-mono text-[10px] uppercase tracking-wider text-white/40">Order</label>
@@ -214,10 +220,34 @@ export function SectionCard({
         </div>
       )}
 
+      {pageKind === "prose" && (
+        <div className="mb-3 grid gap-2">
+          <input
+            aria-label="Section heading"
+            className={`${inputCls} w-full font-serif`}
+            value={section.heading ?? ""}
+            placeholder="Heading — wrap a word in *stars* for accent (e.g. Structure in *motion.*)"
+            onChange={(e) => onChange({ ...section, heading: e.target.value || undefined })}
+          />
+          <textarea
+            aria-label="Margin note"
+            className={`${inputCls} w-full`}
+            rows={2}
+            value={section.aside ?? ""}
+            placeholder="Margin pull-quote (optional) — one line per row"
+            onChange={(e) => onChange({ ...section, aside: e.target.value || undefined })}
+          />
+        </div>
+      )}
+
       {/* items — nested under the section to signal the parent/child relationship */}
       <div className="ml-1.5 space-y-3 border-l-2 border-white/10 pl-4">
         <span className="block font-mono text-[9px] uppercase tracking-[0.16em] text-white/30">
-          {pageKind === "garden" ? "Items in this category" : "Rows in this section"}
+          {pageKind === "garden"
+            ? "Items in this category"
+            : pageKind === "prose"
+              ? "Paragraphs in this section"
+              : "Rows in this section"}
         </span>
         <ul className="divide-y divide-white/5 rounded-md border border-white/10 bg-black/15">
         {section.items.map((item, i) => {
@@ -251,7 +281,10 @@ export function SectionCard({
             );
           }
           const inherited = inheritedFor(item.ref);
-          const shownTitle = item.title ?? inherited?.title ?? "(untitled)";
+          const shownTitle =
+            pageKind === "prose"
+              ? (item.blurb?.slice(0, 80) || "(empty paragraph)")
+              : (item.title ?? inherited?.title ?? "(untitled)");
           const open = openRow === i;
           return (
             <li key={i} className={item.hidden ? "opacity-45" : undefined}>

@@ -9,9 +9,27 @@
  * tree during CSR; client components bypass that serialization step entirely).
  */
 
+import { Fragment } from "react";
 import Link from "next/link";
 import { PersonalHeader } from "./PersonalHeader";
+import { Emphasis } from "@/components/common/Emphasis";
+import type { ProseData } from "@/lib/domain/page-layout/resolved";
+import { DEFAULT_ABOUT_DATA } from "@/lib/domain/page-layout/about-default";
 import "./personal-pages.css";
+
+/** Render a pull-quote string, turning newlines into <br>. */
+function AsideLines({ text }: { text: string }) {
+  return (
+    <>
+      {text.split("\n").map((line, i) => (
+        <Fragment key={i}>
+          {i > 0 && <br />}
+          {line}
+        </Fragment>
+      ))}
+    </>
+  );
+}
 
 /** Sinusoidal vine with leaf/bud nodes — drawn between sections. */
 function VineDivider({ marginTop }: { marginTop?: number }) {
@@ -37,7 +55,8 @@ function VineDivider({ marginTop }: { marginTop?: number }) {
   );
 }
 
-export function AboutPage() {
+export function AboutPage({ data }: { data?: ProseData }) {
+  const sections = (data ?? DEFAULT_ABOUT_DATA).sections;
   return (
     <div className="personal-home public-route personal-page">
       <PersonalHeader crumb="about" />
@@ -70,106 +89,33 @@ export function AboutPage() {
           and the connective tissue that helps teams move with less friction.
         </p>
 
-        <VineDivider marginTop={52} />
-
-        <div className="sec">
-          <div className="sec-content">
-            <span className="sec-kicker">The work</span>
-            <h2>
-              Structure in <em>motion.</em>
-            </h2>
-            <p>
-              I&apos;m drawn to the space where{" "}
-              <b>system design meets human coordination</b> — where the question
-              is not just what to build, but how the work itself should move.
-            </p>
-            <p>
-              At Doxy.me, that meant helping scale customer and revenue
-              operations through rapid growth: support systems, Intercom
-              automation, billing workflows, lifecycle messaging, usage-based
-              revenue, help-center architecture, and cross-functional process
-              design.
-            </p>
-            <p>
-              The thread through all of it is the same:{" "}
-              <b>the map has to match the territory</b>, or the system
-              eventually becomes fiction.
-            </p>
-          </div>
-          <aside className="sec-note" aria-hidden="true">
-            <span className="note-text">
-              every system is a theory
-              <br />
-              until the work
-              <br />
-              runs through it
-            </span>
-          </aside>
-        </div>
-
-        <VineDivider />
-
-        <div className="sec">
-          <div className="sec-content">
-            <span className="sec-kicker">Outside work</span>
-            <h2>
-              Actual <em>dirt.</em>
-            </h2>
-            <p>
-              I garden in the desert Southwest, where alkaline soil, intense
-              heat, and scarce water make{" "}
-              <b>every assumption visible.</b>
-            </p>
-            <p>
-              What started as a hobby has become a discipline in constraints:
-              shade, timing, amendment, irrigation, observation, and patience.
-            </p>
-            <p>
-              That instinct follows me back into my work. Good systems are{" "}
-              <b>grown as much as they are designed.</b>
-            </p>
-          </div>
-          <aside className="sec-note" aria-hidden="true">
-            <span className="note-text">
-              constraints are the design,
-              <br />
-              not the excuse
-            </span>
-          </aside>
-        </div>
-
-        <VineDivider />
-
-        <div className="sec">
-          <div className="sec-content">
-            <span className="sec-kicker">Right now</span>
-            <h2>
-              Building the <em>garden.</em>
-            </h2>
-            <p>
-              I&apos;m building davidvalentine.org as a{" "}
-              <b>digital garden</b>: a living record of projects, notes,
-              experiments, career artifacts, and things I&apos;m learning.
-            </p>
-            <p>
-              It is part portfolio, part workshop, part memory system —
-              organized less like a filing cabinet and more like a landscape:
-              roots, paths, branches, seasons, and the occasional useful weed.
-            </p>
-            <p>
-              For the professional trail, start with the{" "}
-              <b>résumé</b>. For the thinking behind it, browse the{" "}
-              <b>field notes</b>. To wander, enter the garden.
-            </p>
-          </div>
-          <aside className="sec-note" aria-hidden="true">
-            <span className="note-text">
-              gardens grow by relation,
-              <br />
-              not by hierarchy
-            </span>
-          </aside>
-        </div>
+        {sections.map((s, i) => (
+          <Fragment key={i}>
+            <VineDivider marginTop={i === 0 ? 52 : undefined} />
+            <div className="sec">
+              <div className="sec-content">
+                <span className="sec-kicker">
+                  <Emphasis text={s.kicker} />
+                </span>
+                <h2>
+                  <Emphasis text={s.heading} />
+                </h2>
+                {s.paragraphs.map((p, j) => (
+                  <p key={j}>
+                    <Emphasis text={p} />
+                  </p>
+                ))}
+              </div>
+              {s.aside && (
+                <aside className="sec-note" aria-hidden="true">
+                  <span className="note-text">
+                    <AsideLines text={s.aside} />
+                  </span>
+                </aside>
+              )}
+            </div>
+          </Fragment>
+        ))}
 
         <div className="ab-ctas">
           <Link className="ab-cta pri" href="/resume">
