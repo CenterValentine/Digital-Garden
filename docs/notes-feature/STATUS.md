@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-20
+last_updated: 2026-07-22
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,17 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 22, 2026**: AI v3.2 T3 — playbook registry + progressive disclosure, P1–P4 + P5-mark built (branch `feature/ai-v3.2-t3-playbooks`, worktree `ai-v32-t3`; plan: `work-tracking/AI-V3.2-T3-PLAYBOOKS-PLAN.md`; resource-discipline reference: `guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md`)
+
+- **Framework-agnostic playbook model**: a playbook is just a note (`metadata.playbook` flag + `##` phases + `[[wiki-link]]` references) with a pluggable import-adapter interface for future frameworks (SKILL.md-shaped now; fabric/MCP-prompts backlogged, not built).
+- **Registry + picker**: `GET /api/content/playbooks`, merged into the composer's `/` command list — selecting a playbook attaches it (chip in composer) instead of inserting text. Active phase is DERIVED from resolved `phase_checkpoint` calls in the message history, not manually tracked — survives reload for free.
+- **Progressive-disclosure injection (the gate)**: `app/api/ai/chat/route.ts` injects standing rules + the ACTIVE PHASE ONLY (never the whole playbook) plus a "Linked extensions" manifest (title-resolved `[[refs]]`, sub-playbooks tagged) that the model traces on demand via `read_note` — never preloaded.
+- **Hand-authoring (primary use case)**: "Mark as Playbook" in the editor context menu (inline description input) → `POST /api/content/playbooks/mark`.
+- **Resource discipline formalized**: durable principles doc (termination/effort/context/decomposition mechanisms + maintained state table) governs this and future AI-agent builds; enforced budgets + sub-agent isolation deferred to T4.
+- **Smoke-tested**: pure parser/renderer logic verified (wiki-link preservation, phase clamping, sub-playbook tagging); live route boot-check caught and fixed a 401-vs-500 auth bug on both new endpoints. Full authenticated browser click-through NOT done — no auth fixture in this repo yet (documented gap); manual smoke test recommended before merge.
+- **Deferred**: SKILL.md import adapter (P5-import) — backlogged per the plan's own sequencing (append-only, no cost to defer).
+- ⚠ Branches from `origin/main` before AI v3.2 T2 (PR #125, lossless markdown) merged — `lib/domain/ai/playbooks/render.ts` is a scoped temporary renderer (preserves `[[links]]`, not full markdown fidelity); revisit once T2 lands.
 
 **July 20, 2026**: ✅ Browser Reach B1 — the side panel is a mini-DG shell (PR #115; plan: `work-tracking/BROWSER-REACH-PLAN.md`)
 

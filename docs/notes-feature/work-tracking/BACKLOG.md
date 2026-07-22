@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-21
+last_updated: 2026-07-22
 ---
 
 # Sprint Backlog
@@ -40,7 +40,7 @@ S1–S6 built and MERGED (PR #114 / `9f15281`); Anthropic + OpenAI flagship runs
 - [x] **File-tree live refresh** — BUILT 3.1 R2 (`d84e945`): refresh dispatches on tool-output arrival mid-stream, not at turn end. *Smoke pending.*
 - [x] **Canvas live-refresh after AI `update_workflow`** — BUILT 3.1 R2 (`d84e945`): builder listens for `dg:workflow-refresh`; clean canvas reloads, dirty canvas gets a non-destructive banner. *Smoke pending.*
 - [ ] **[→ 3.2 T4] Resumable-stream store (live re-attach)** — no-lost-work already ships (server `consumeStream` + idempotent persistence); live re-attach to an in-flight stream needs Redis-class infra (Upstash via Vercel Marketplace, or Redis on the Coolify homeserver).
-- [ ] **[→ 3.2 T3] S4c playbook progressive-disclosure registry** — playbooks currently invoked by @-mentioning the note; the registry adds discovery + per-phase disclosure.
+- [~] **[→ 3.2 T3] S4c playbook progressive-disclosure registry** — P1–P4 + P5-mark BUILT (branch `feature/ai-v3.2-t3-playbooks`, gates green, smoke-tested; not yet merged/PR'd). See `AI-V3.2-T3-PLAYBOOKS-PLAN.md` and the new "AI v3.2 T3 followups" section below for what's deferred.
 - [ ] **[→ 3.2 T1] HARDEN the markdown ↔ TipTap translation layer (owner directive 2026-07-20 — "I don't like this patching approach")** — markdown content will keep arriving (AI tools, imports, pastes, publishing), so translation correctness must be a hardened, tested seam rather than a series of repair scripts. Scope when taken up: ONE canonical translation entry point (server + client parity), round-trip test coverage (markdown → TipTap → markdown) over the real node/mark set, explicit failure behavior instead of a silent paragraph fallback, and collab-aware repair semantics (Y.doc is authoritative for collab notes — payload rewrites are invisible/divergent). `scripts/regen-degraded-notes.ts` (R6) is the SALVAGE tool for already-degraded content and should be folded in as the backfill arm of that work, not extended piecemeal.
 - [~] **Regen sweep for pre-fix degraded notes** — TOOL BUILT 3.1 R6 (`af4dca6`, `pnpm notes:regen`). Dry run: 57 payloads → 4 degraded + 3 collab-skipped. **1 of 4 applied** (Resume, verified). Remaining: 3 non-collab notes unapplied by choice; the 3 collab-live notes need the hardening work above, not a patch.
 - [ ] **[→ 3.2 T5] Conversation title strategy for quick URL chats** — page title vs first-message summary (deferred S3-time call).
@@ -50,6 +50,19 @@ S1–S6 built and MERGED (PR #114 / `9f15281`); Anthropic + OpenAI flagship runs
 
 Completed en route (recorded here so nobody re-plans them): approval-card per-tool previews (486544c), citation-split bubble coalescing (65ae4e7), new-chat auto-targeting + move-follows (0a31ca0), connection-editor instant persistence + fieldset grammar (6fd3dcb/1ea57ee/88b1341).
 - **Universal web search for non-native providers (2026-07-21)** — modular app-executed `search_web` backend (Tavily default + Brave; swappable via APP_SEARCH_PROVIDER; add a backend = one file + one registry line) attaches for "dumb models" (DeepSeek, Kimi, Mistral, Groq, local) that lack native search; big four keep native. Dissolves R4's straight-faced non-attachment. Needs TAVILY_API_KEY (or BRAVE_SEARCH_API_KEY) in env. Followups: settings-UI backend picker + per-connection key (today: env-driven); SearXNG/Serper backends (interface ready).
+
+---
+
+## AI v3.2 T3 Followups (2026-07-22, branch `feature/ai-v3.2-t3-playbooks`, worktree `ai-v32-t3`)
+
+P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection) + P5-mark (hand-author "Mark as Playbook") BUILT, gates green, not yet merged. Deferred by the plan's own sequencing (`AI-V3.2-T3-PLAYBOOKS-PLAN.md` §5):
+
+- [ ] **SKILL.md import adapter (P5-import)** — paste/upload a `SKILL.md` → `detectAdapter → parse` → create a marked playbook note. Adapter interface already specified (`AI-V3.2-T3-PLAYBOOKS-PLAN.md` §2); append-only, safe to build anytime.
+- [ ] **Backlog import adapters** (same interface, do NOT build ad hoc — batch with the next major AI version): fabric patterns (trivial, pure markdown), MCP prompt templates (ties to the MCP epic), Claude Code commands/CLAUDE.md, OpenAI GPTs (weakest fit, likely never).
+- [ ] **Upgrade `renderPlaybookSection` to the T2 lossless serializer** once AI v3.2 T2 (PR #125, `lib/domain/content/markdown-serialize.ts`) merges — the local renderer (`lib/domain/ai/playbooks/render.ts`) preserves `[[wiki-links]]` correctly but not full markdown fidelity (bold/italic/tables render minimally). Not a correctness bug, just a fidelity upgrade once the dependency exists.
+- [ ] **"Unmark as Playbook"** — the context-menu action only marks; no UI path to clear `metadata.playbook` yet. Low priority (metadata edit via any generic note-metadata surface works today).
+- [ ] **Full authenticated browser smoke test** — automated verification was pure-logic + live-route-boot only (no auth fixture in this repo; documented gap — same one blocking 5 stubbed dark-mode e2e tests). Owner should manually verify: mark a note → `/playbook` attach → token meter shows only the active phase → checkpoint approval advances the phase → a `[[reference]]` gets traced via `read_note` → a sub-playbook reference is tagged in the manifest.
+- [ ] **[T4] Resource governance** (see `guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md` §4 state table) — enforced token/step budgets (decrement + stop), sub-agent isolation for sub-playbooks (isolate context, return conclusion + artifact pointer), per-run compaction, self-critique/no-progress loop guards, difficulty-based effort allocation. Each is its own subsystem; deliberately kept out of T3 to protect the gate.
 
 ---
 

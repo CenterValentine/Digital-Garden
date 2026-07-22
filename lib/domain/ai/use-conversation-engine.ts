@@ -305,7 +305,16 @@ export interface UseConversationEngineResult {
   // ── suggestions ──
   mentionResults: SuggestionItem[];
   handleMentionSearch: (query: string) => void;
+  /** Tool-hint commands + playbook attach entries for the `/` menu. */
   commandItems: SuggestionItem[];
+
+  // ── playbooks (AI v3.2 T3) ──
+  /** The playbook attached to this conversation, or null. */
+  activePlaybook: ActivePlaybook | null;
+  /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
+  attachPlaybook: (item: SuggestionItem) => void;
+  /** Detach the active playbook (dismiss the composer chip). */
+  detachPlaybook: () => void;
 
   // ── suggested follow-ups (Session 7) ──
   /** 2-3 chip suggestions generated after the last assistant turn. */
@@ -377,6 +386,22 @@ export interface ChatAttachment {
   error?: string;
 }
 
+/** Playbook summary shape returned by GET /api/content/playbooks. */
+interface PlaybookCommandSource {
+  id: string;
+  title: string;
+  description: string;
+  phaseCount: number;
+}
+
+/** The playbook currently attached to the composer (AI v3.2 T3). */
+export interface ActivePlaybook {
+  id: string;
+  title: string;
+  /** Phases completed so far — derived from resolved phase_checkpoint calls. */
+  phaseIndex: number;
+  phaseCount: number;
+}
 
 export function useConversationEngine({
   conversationKey,
@@ -539,14 +564,64 @@ export function useConversationEngine({
     }, 150);
   }, []);
 
-  // ── / command items (static) ──
+  // ── playbooks (AI v3.2 T3) ──
+  // Fetched once per mount for the /playbook command entry. A handful of
+  // playbooks per user is the expected scale — no search-as-you-type needed,
+  // the existing "/" substring filter (below) already narrows the list.
+  const [playbooks, setPlaybooks] = useState<PlaybookCommandSource[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/content/playbooks", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const items = data?.data?.playbooks;
+        if (Array.isArray(items)) setPlaybooks(items);
+      })
+      .catch(() => {
+        /* best-effort — the picker just shows no playbooks */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── / command items (tool hints + playbooks) ──
   const commandItems = useMemo<SuggestionItem[]>(() => {
-    return BASE_TOOL_IDS.map((id) => ({
+    const playbookItems: SuggestionItem[] = playbooks.map((p) => ({
+      id: p.id,
+      label: p.title,
+      description:
+        p.description ||
+        `Playbook · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+      contentType: "playbook",
+    }));
+    const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({
       id,
       label: BASE_TOOL_METADATA[id].name,
       description: BASE_TOOL_METADATA[id].description,
       insertText: COMMAND_HINTS[id] ?? BASE_TOOL_METADATA[id].name,
     }));
+    return [...playbookItems, ...toolItems];
+  }, [playbooks]);
+
+  // ── active playbook state (AI v3.2 T3) ──
+  // Attached via the /playbook command (ChatInput routes "contentType ===
+  // playbook" selections here instead of inserting text). The derived
+  // phase-index memo lives below, after `messages` is available from `chat`.
+  const [activePlaybookId, setActivePlaybookId] = useState<string | null>(null);
+  const [activePlaybookTitle, setActivePlaybookTitle] = useState<string | null>(
+    null,
+  );
+
+  const attachPlaybook = useCallback((item: SuggestionItem) => {
+    setActivePlaybookId(item.id);
+    setActivePlaybookTitle(item.label);
+  }, []);
+
+  const detachPlaybook = useCallback(() => {
+    setActivePlaybookId(null);
+    setActivePlaybookTitle(null);
   }, []);
 
   // ── suggested follow-ups (Session 7) ──
@@ -684,6 +759,41 @@ export function useConversationEngine({
     addToolApprovalResponse,
   } = chat;
 
+  // ── active playbook: derived phase index (AI v3.2 T3) ──
+  // Phase index is DERIVED from the message history, not manually
+  // incremented — the count of phase_checkpoint tool calls that have
+  // resolved so far this conversation, mirroring ChatViewer's phaseTokens
+  // bucketing. That keeps it correct across reloads/regenerate with no
+  // separate state to desync.
+  const resolvedPhaseIndex = useMemo(() => {
+    let count = 0;
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      for (const part of m.parts ?? []) {
+        const p = part as { type?: string; state?: string };
+        if (
+          p.type === "tool-phase_checkpoint" &&
+          (p.state === "output-available" || p.state === "output-error")
+        ) {
+          count++;
+        }
+      }
+    }
+    return count;
+  }, [messages]);
+
+  const activePlaybook = useMemo<ActivePlaybook | null>(() => {
+    if (!activePlaybookId) return null;
+    const phaseCount =
+      playbooks.find((p) => p.id === activePlaybookId)?.phaseCount ?? 0;
+    return {
+      id: activePlaybookId,
+      title: activePlaybookTitle ?? "",
+      phaseIndex: resolvedPhaseIndex,
+      phaseCount,
+    };
+  }, [activePlaybookId, activePlaybookTitle, playbooks, resolvedPhaseIndex]);
+
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
   // can run for minutes, and the file tree stayed stale the whole time.
@@ -716,6 +826,11 @@ export function useConversationEngine({
       // where the shell attaches what the extension captured. Read at send
       // time so the freshest capture rides the turn.
       pageContext: getAttachedPageContext(),
+      // Attached playbook (AI v3.2 T3) — read at request time so approval
+      // resumes / internal sends carry the same binding as the turn that
+      // started them.
+      playbookId: activePlaybookId,
+      activePhaseIndex: resolvedPhaseIndex,
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -728,6 +843,8 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    activePlaybookId,
+    resolvedPhaseIndex,
   ]);
   const isActive = status === "streaming" || status === "submitted";
 
@@ -1031,6 +1148,9 @@ export function useConversationEngine({
           // Lives on the explicit send body because that becomes the
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
+          // Attached playbook (AI v3.2 T3).
+          playbookId: activePlaybookId,
+          activePhaseIndex: resolvedPhaseIndex,
         },
       },
     );
@@ -1047,6 +1167,8 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    activePlaybookId,
+    resolvedPhaseIndex,
   ]);
 
   // ── edit / regenerate (Session 5a) ──
@@ -1060,8 +1182,11 @@ export function useConversationEngine({
       mentionedContentIds: [] as string[],
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
+      // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
+      playbookId: activePlaybookId,
+      activePhaseIndex: resolvedPhaseIndex,
     }),
-    [contentId, conversationId, providerId, modelId],
+    [contentId, conversationId, providerId, modelId, activePlaybookId, resolvedPhaseIndex],
   );
 
   const editMessage = useCallback(
@@ -1142,6 +1267,9 @@ export function useConversationEngine({
     mentionResults,
     handleMentionSearch,
     commandItems,
+    activePlaybook,
+    attachPlaybook,
+    detachPlaybook,
     followUps,
     clearFollowUps,
     scrollRef,

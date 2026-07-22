@@ -60,18 +60,32 @@ alongside the rich-text editor.
 - **Gate:** round-trip a formatted note through source view with no
   content loss; a source edit reflects in rich-text on toggle-back.
 
-## T3 — S4c playbook progressive-disclosure registry
+## T3 — S4c playbook progressive-disclosure registry ✅ BUILT (P1–P4 + P5-mark)
 
 Deferred from v3 S4. Playbooks are invoked today by @-mentioning the note;
 the registry adds discovery + per-phase disclosure.
 
+Built on `feature/ai-v3.2-t3-playbooks` (worktree `ai-v32-t3`), branched before
+T2 merged — see that plan's note on the temporary `render.ts` renderer. Full
+design + build log: `AI-V3.2-T3-PLAYBOOKS-PLAN.md`. Resource-management
+principles this build follows (and future AI-agent work should too):
+`guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md`.
+
 - A registry of known playbooks (surface: a picker / slash affordance in
-  chat) so users find procedures without knowing the note name.
+  chat) so users find procedures without knowing the note name. — BUILT:
+  `/playbook` merges into the existing `/` command list; attaches (chip),
+  doesn't insert text.
 - Progressive disclosure: expose a phase's detail only when the run
   reaches it, keeping the model's context proportional to the active
-  phase (ties into the R5 context-discipline work).
+  phase (ties into the R5 context-discipline work). — BUILT: standing
+  rules + active phase only, injected at `app/api/ai/chat/route.ts`;
+  `[[wiki-link]]` extensions traced on demand via `read_note`, sub-playbooks
+  tagged explicitly.
 - **Gate:** a user starts a playbook from the registry (no @-mention);
-  phase detail loads per-phase, verifiable in the token meter.
+  phase detail loads per-phase, verifiable in the token meter. — MET.
+- Deferred: SKILL.md import adapter, unmark affordance, T2-serializer upgrade,
+  T4 resource governance (enforced budgets, sub-agent isolation). See
+  BACKLOG.md "AI v3.2 T3 Followups."
 
 ## T4 — Resumable-stream store (live re-attach)
 

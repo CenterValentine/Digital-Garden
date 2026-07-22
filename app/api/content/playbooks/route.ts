@@ -24,6 +24,12 @@ export async function GET(request: NextRequest) {
       const playbooks = await listPlaybooks(session.user.id);
       return NextResponse.json({ success: true, data: { playbooks } });
     } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return NextResponse.json(
+          { success: false, error: { message: "Unauthorized" } },
+          { status: 401 },
+        );
+      }
       logger.error({
         layer: "ai",
         event: "playbooks_list:caught",

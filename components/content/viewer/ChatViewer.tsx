@@ -233,6 +233,9 @@ function ChatViewerInner({
     mentionResults,
     handleMentionSearch,
     commandItems,
+    activePlaybook,
+    attachPlaybook,
+    detachPlaybook,
     followUps,
     clearFollowUps,
     scrollRef,
@@ -871,6 +874,9 @@ function ChatViewerInner({
         onMentionSearch={handleMentionSearch}
         mentionResults={mentionResults}
         commandItems={commandItems}
+        onAttachPlaybook={attachPlaybook}
+        activePlaybook={activePlaybook}
+        onDetachPlaybook={detachPlaybook}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
         onRemoveAttachment={removeAttachment}

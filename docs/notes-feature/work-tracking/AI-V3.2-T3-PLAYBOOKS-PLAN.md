@@ -86,51 +86,79 @@ AI version.
 `lib/domain/ai/playbooks/registry.ts` + `GET /api/content/playbooks`. Typecheck
 clean (Prisma JSON-path query on `metadata.playbook = true`).
 
-### P3 — `/playbook` picker + attach + client phase tracking
-- **Composer command:** extend `commandItems`/command handling so `/playbook <q>`
-  fetches `GET /api/content/playbooks` and lists them (name + description) in
-  `ChatSuggestionMenu`. Integration points from recon:
-  `use-conversation-engine.ts` (`commandItems` ~543, `handleSelect` in
-  `ChatInput.tsx` ~285 — extend the existing `"mention"`-style attach branch,
-  NOT the text-insert branch).
-- **Attach:** on select, set client state `{ activePlaybookId, activePlaybookTitle,
-  activePhaseIndex: 0 }` and show a small **playbook chip** in the composer
-  (dismissable). Do NOT reuse `@`-mentions (people).
-- **Phase tracking (client):** `activePhaseIndex` starts 0; **+1 when a
-  `phase_checkpoint` is approved** (the checkpoint UI already exists — increment
-  there). Send `{ playbookId, activePhaseIndex }` in the request body
-  (`use-conversation-engine.ts` send, ~1023-1034).
-- **Fallback if the slash integration is fiddly:** a footer **PlaybookPicker chip**
-  (clone `ChatContextPicker.tsx`, mount in `ChatPanel.tsx` `footerLeading` ~846).
-  Same body plumbing. Pick this if `/playbook` costs >~1 build cycle.
+### P3 — `/playbook` picker + attach + client phase tracking ✅ BUILT
+- **Composer command:** `/playbook` merges into the SAME `commandItems` list as
+  the tool-hint commands (`use-conversation-engine.ts`) — playbooks fetched once
+  from `GET /api/content/playbooks` on mount, tagged `contentType: "playbook"`.
+  The existing substring filter on label/description already narrows by name, so
+  no second-level query syntax was needed. `ChatInput.tsx`'s `handleSelect`
+  branches on `contentType === "playbook"` → calls `onAttachPlaybook` instead of
+  inserting text (the trigger text is still deleted, same as any command). The
+  slash integration was NOT fiddly — the footer-chip fallback was not needed.
+- **Attach:** `attachPlaybook`/`detachPlaybook` in the engine set
+  `activePlaybookId`/`activePlaybookTitle`; a small dismissable indigo chip
+  renders above the composer (mirrors the attachment-chips row).
+- **Phase tracking (client) — DEVIATION from plan:** rather than manually
+  incrementing on approval (which needs threading a callback through
+  `ChatMessage.tsx` → `PhaseCheckpointCard`), `activePhaseIndex` is **derived** —
+  a `useMemo` counting resolved (`output-available`/`output-error`)
+  `tool-phase_checkpoint` parts in `messages`, mirroring `ChatViewer.tsx`'s
+  existing `phaseTokens` bucketing exactly. No new state to desync, survives
+  reload for free. Threaded into `handleSend`, the transport's baseline
+  `chatBodyResolvers` (so approval-resumes carry it), and `reRunBody`.
 
-### P4 — Progressive-disclosure injection (the load-bearing edit)
-- **`app/api/ai/chat/route.ts`** (~601-654): if `body.playbookId`, fetch that note
-  (`notePayload: { tiptapJson, metadata }`), `parsePlaybook`, clamp
-  `activePhaseIndex` to `[0, phases.length-1]`, and build a **`playbookContext`**
-  string = standing rules + the active phase (rendered to markdown **preserving
-  `[[links]]`** — use the export `MarkdownConverter` (`case "wikiLink"`), NOT the
-  crude converter) + a **"Linked extensions"** manifest listing the phase's
-  `[[refs]]` (title → note id via a title lookup) with an instruction to
-  `read_note` them on demand. Inject as its own section (distinct from generic
-  `mentionedContext`), so eviction can "never drop playbook."
-- **Sub-playbook awareness (§ sub-playbooks):** when a `[[ref]]` is itself
-  `metadata.playbook` (`isPlaybookMetadata` from P2), tag it in the manifest as a
-  **sub-playbook — has its own directives; follow them**, not a passive doc.
-- **System prompt** (`system-prompt.ts` ~152 checkpoint paragraph + a new
-  `playbookContext` slot ~182): tell the model "only the current phase is loaded;
-  advance with `phase_checkpoint`; trace `[[extensions]]` via `read_note`; treat
-  each phase's **`Done when:`** line as its stop condition — finish the phase when
-  satisfied, then checkpoint."
+### P4 — Progressive-disclosure injection (the load-bearing edit) ✅ BUILT
+- **`app/api/ai/chat/route.ts`**: reads `body.playbookId`/`body.activePhaseIndex`,
+  fetches the note (`notePayload: { tiptapJson, metadata }`, ownership-scoped),
+  guards with `isPlaybookMetadata`, `parsePlaybook`s it, clamps the phase index to
+  `[0, phases.length-1]`, and builds a **`playbookContext`** string = standing
+  rules + the active phase + a **"Linked extensions"** manifest (title-resolved
+  `[[refs]]`, since wikiLink nodes carry no id) with a `read_note`-on-demand
+  instruction. Injected as its own `buildSystemPrompt` field, separate from
+  `mentionedContext`.
+- **Renderer — DEVIATION from plan:** the plan called for the export
+  `MarkdownConverter`'s wikiLink case; that lives in
+  `lib/domain/content/markdown-serialize.ts` (AI v3.2 T2, PR #125), which is
+  **NOT merged** — this worktree branched before it landed. Built a small local
+  one-way renderer instead: `lib/domain/ai/playbooks/render.ts`
+  (`renderPlaybookSection`) — plain text preserving `[[Target]]`/`[[Target|Display]]`
+  verbatim plus basic block structure (headings/lists/quotes/code). Scoped
+  correctly: this is read-only model context, not a round-trip surface, so full
+  markdown fidelity wasn't required — traceable links were. **Follow-up once
+  #125 merges:** consider upgrading to `tiptapToMarkdownRich` for richer
+  formatting; not required for correctness today.
+- **Sub-playbook awareness:** a `[[ref]]` whose target is itself
+  `isPlaybookMetadata` is tagged in the manifest as
+  **"SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once
+  read."**
+- **System prompt** (`system-prompt.ts`): checkpoint paragraph now instructs
+  `Done when:` as a phase's stop condition, JIT-only `[[extension]]` tracing,
+  sub-playbook hand-off semantics, and that outputs default to the run's target
+  folder. New `playbookContext` field placed after `mentionedContext` (stable
+  within a phase — cache-friendly — so it sits with the other trusted sections,
+  not at the very end with untrusted page content).
+- **Sub-playbook output routing — confirmed already true, no code needed:**
+  `ctx.targetFolderId` (route.ts) is already threaded into `create_folder`/
+  `createNote`/`create_docx`, so sub-playbook-authored artifacts land in the same
+  run folder as everything else, by construction.
 - **Token meter:** unchanged — it already reports per-phase tokens; the shrunk
   context is the visible proof. **Gate met here.**
 
 ### P5 — Hand-author mark action + minimal SKILL.md import
-- **Mark as Playbook (hand-author, PRIMARY):** a note action (context menu /
-  command) → prompt for a one-line description → PATCH `metadata` via
-  `withPlaybookMetadata`. The note's `##` sections are already phases. This is
-  what makes P3's picker have content and satisfies the owner's first use case.
-- **Import (future-proofing):** an "Import Skill" affordance (paste a `SKILL.md`,
+- **Mark as Playbook (hand-author, PRIMARY) ✅ BUILT — integration point
+  DEVIATION:** not a new toolbar tool (`MainPanelContent.tsx` is large/sensitive;
+  wiring a toolbar icon + dialog was disproportionate to a secondary piece).
+  Instead added to the existing editor right-click menu
+  (`components/content/context-menu/editor-actions.tsx`), using
+  `ContextMenuAction.inlineInput` (an existing mechanism — inline text field +
+  submit, no new dialog component) to capture the one-line description.
+  `POST /api/content/playbooks/mark` (new, small, direct
+  `notePayload.metadata` update via `withPlaybookMetadata` — deliberately NOT
+  routed through the generic `PATCH /api/content/content/[id]`, which carries
+  anti-overwrite/If-Match guards built for full-document saves, not sidecar
+  metadata flags). No "unmark" affordance yet — fast-follow if needed.
+- **Import (future-proofing) — NOT built this pass (see §6 sequencing):** an
+  "Import Skill" affordance (paste a `SKILL.md`,
   or upload `.md`) → `detectAdapter → parse` → create a marked playbook note.
   Adapter-based (§2), so fabric/MCP land later as append-only adapters.
 

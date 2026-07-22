@@ -23,6 +23,7 @@
 
 import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import type { UIMessage } from "ai";
+import type { JSONContent } from "@tiptap/core";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -122,6 +123,9 @@ import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
+import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
+import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -685,6 +689,103 @@ export async function POST(request: Request) {
         }
       }
 
+      // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
+      // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
+      // references in that phase surface as a manifest the model traces on
+      // demand via read_note; sub-playbooks (a linked note that is itself
+      // marked as a playbook) are called out so the model follows their own
+      // directives rather than treating them as passive reading.
+      let playbookContext = "";
+      const playbookId: string | null =
+        typeof body.playbookId === "string" ? body.playbookId : null;
+      if (playbookId) {
+        try {
+          const playbookNode = await prisma.contentNode.findFirst({
+            where: {
+              id: playbookId,
+              ownerId: session.user.id,
+              contentType: "note",
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          if (
+            playbookNode?.notePayload &&
+            isPlaybookMetadata(playbookNode.notePayload.metadata)
+          ) {
+            const parsed = parsePlaybook(
+              playbookNode.notePayload.tiptapJson as JSONContent,
+            );
+            if (parsed.phases.length > 0) {
+              const rawIndex =
+                typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
+              const phaseIndex = Math.min(
+                Math.max(rawIndex, 0),
+                parsed.phases.length - 1,
+              );
+              const phase = parsed.phases[phaseIndex];
+
+              // Reference manifest: title-resolve every [[link]] in the
+              // standing rules + active phase (wiki-links carry no id — see
+              // lib/domain/editor/extensions/wiki-link.ts).
+              const allRefs = [
+                ...parsed.standingRules.references,
+                ...phase.references,
+              ];
+              let refsManifest = "";
+              if (allRefs.length > 0) {
+                const uniqueTitles = Array.from(
+                  new Set(allRefs.map((r) => r.targetTitle)),
+                );
+                const refNodes = await prisma.contentNode.findMany({
+                  where: {
+                    ownerId: session.user.id,
+                    title: { in: uniqueTitles },
+                    deletedAt: null,
+                  },
+                  select: {
+                    title: true,
+                    notePayload: { select: { metadata: true } },
+                  },
+                });
+                const byTitle = new Map(refNodes.map((n) => [n.title, n]));
+                const lines = uniqueTitles.map((title) => {
+                  const found = byTitle.get(title);
+                  if (!found) return `- [[${title}]] — not found`;
+                  const isSub = isPlaybookMetadata(found.notePayload?.metadata);
+                  return isSub
+                    ? `- [[${title}]] — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+                    : `- [[${title}]]`;
+                });
+                refsManifest = `\n\n**Linked extensions** (read via read_note when needed — not preloaded):\n${lines.join("\n")}`;
+              }
+
+              const standingText = renderPlaybookSection(
+                parsed.standingRules.content,
+              );
+              const phaseText = renderPlaybookSection(phase.content);
+              playbookContext =
+                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
+                `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
+                (standingText
+                  ? `**Standing rules (always apply):**\n${standingText}\n\n`
+                  : "") +
+                `**Current phase:**\n${phaseText}${refsManifest}`;
+            }
+          }
+        } catch (playbookError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:injection_failed",
+            summary: "playbook context injection failed — continuing without it",
+            error: playbookError,
+          });
+        }
+      }
+
       // Resolve the selected custom-instruction context, if any. Sent by
       // the composer's context picker. Ownership-gated; a missing/foreign/
       // deleted id degrades to the base system prompt (returns null).
@@ -756,6 +857,7 @@ export async function POST(request: Request) {
       await spanPayload(streamSpan, "chat_input", {
         messages: modelMessages,
         mentionedContext,
+        playbookContext,
         providerId,
         modelId,
         temperature: effectiveTemperature,
@@ -807,6 +909,7 @@ export async function POST(request: Request) {
           autoPronounceDefault,
           userContextSection,
           mentionedContext,
+          playbookContext,
           pageContextSection,
         }),
         onStepFinish: (step) => {
