@@ -536,7 +536,10 @@ export function PanelShellClient({
               scrollable ancestor competing with it. */}
           <div
             style={{
-              flexBasis: "42%",
+              // Grow to share the column (was a fixed 42%, which starved the
+              // virtualized tree to ~5 rows). minHeight floors it when open;
+              // the tree scrolls internally within whatever height it gets.
+              flex: 1,
               minHeight: treeCollapsed ? 0 : 120,
               display: treeCollapsed ? "none" : "flex",
               flexDirection: "column",
@@ -565,7 +568,33 @@ export function PanelShellClient({
                 )}
               </div>
             )}
-            <LeftSidebar />
+            {/* LeftSidebar's root is `h-full` (height:100%), which cannot
+                resolve against a flex-basis:0 parent, so the virtualized tree
+                sized to its own content (a circular 564px) instead of the
+                available space. This relative box IS bounded (flex:1 shares the
+                Files section); the absolutely-positioned inner fills it with a
+                DEFINITE height that h-full resolves against → the tree gets a
+                real height and scrolls. overflow:hidden guarantees nothing can
+                spill into the workspace below even mid-measure. */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <LeftSidebar />
+              </div>
+            </div>
           </div>
           {/* Quick access — Associated Content ported from the overlay. Same
               disclosure design as Files (rotating chevron, CSS-var styling). */}

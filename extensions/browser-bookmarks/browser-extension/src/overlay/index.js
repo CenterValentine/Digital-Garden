@@ -2538,11 +2538,27 @@ function makePanelDraggable(state, panel) {
   });
 }
 
-// Frozen panels: visual sync + toggle. Frozen = restored on every page in
-// this tab (open or collapsed) regardless of hostname, until closed/unfrozen.
+// Frozen panels ("Pin" in the UI): visual sync + toggle. Frozen = restored on
+// every page in this tab (open or collapsed) regardless of hostname, until
+// closed/unpinned.
+//
+// Association/workspace independence: panels are keyed by their own contentId
+// in state.openPanels and are never torn down when the underlying selection
+// changes — refreshOverlayResourceState() re-renders the associations popover
+// and reloads panel data but keeps panels open. So an overlay already survives
+// switching the active association/workspace; pinning additionally makes it
+// survive full-page navigations across different hostnames.
 function syncPanelFrozenVisual(panel) {
-  panel.container.dataset.frozen = panel.frozen ? "true" : "false";
-  panel.collapsedChip.dataset.frozen = panel.frozen ? "true" : "false";
+  const frozen = panel.frozen === true;
+  panel.container.dataset.frozen = frozen ? "true" : "false";
+  panel.collapsedChip.dataset.frozen = frozen ? "true" : "false";
+  // Tooltip reflects state so the pin reads as a toggle, not a one-way action.
+  const btn = panel.container.querySelector(".dg-freeze-toggle");
+  if (btn) {
+    btn.title = frozen
+      ? "Pinned to every page — click to unpin"
+      : "Pin to keep this panel on every page you visit";
+  }
 }
 
 function togglePanelFrozen(state, panel) {
@@ -2550,6 +2566,11 @@ function togglePanelFrozen(state, panel) {
   syncPanelFrozenVisual(panel);
   scheduleTabPersist(state);
 }
+
+// Inline SVG toolbar icons (currentColor so they inherit button + frozen state
+// styling). Replaces the earlier text-glyph / emoji affordances.
+const ICON_TREE = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12h-8"/><path d="M21 6H8"/><path d="M21 18h-8"/><path d="M3 6v4c0 1.1.9 2 2 2h3"/><path d="M3 10v6c0 1.1.9 2 2 2h3"/></svg>`;
+const ICON_PIN = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>`;
 
 function createContentPanel(state, item, kind, persisted = null) {
   const existing = state.openPanels.get(item.id);
@@ -2571,10 +2592,10 @@ function createContentPanel(state, item, kind, persisted = null) {
       </div>
       <div class="dg-toolbar-actions">
         <span class="dg-panel-ready" style="font-size:11px;color:rgba(255,255,255,0.46)"></span>
-        <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
+        <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree" aria-label="Browse file tree">${ICON_TREE}</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
-        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Freeze — keep this panel open on every page">❆</button>
+        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Pin to keep this panel on every page you visit" aria-label="Pin to every page">${ICON_PIN}</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -2585,7 +2606,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const collapsedChip = document.createElement("button");
   collapsedChip.className = "dg-panel-collapsed";
   collapsedChip.type = "button";
-  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Freeze — keep this panel open on every page">❆</em><strong>Open</strong>`;
+  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Pinned to every page">${ICON_PIN}</em><strong>Open</strong>`;
 
   state.panelsMount.appendChild(container);
   state.panelsMount.appendChild(collapsedChip);
@@ -3352,6 +3373,18 @@ function wireRootEvents(state) {
 
   // ── Edge tab (docked mode) — drag to reposition along edge, click to open ───
 
+  // The edge tab is the primary handle most users click. It should open the
+  // extension SIDE PANEL (the new persistent workspace), not the legacy in-page
+  // snap tree. Mirrors the floating launcher button (open-side-panel message);
+  // falls back to the old snap panel only if the panel can't be opened. Called
+  // from live user-gesture handlers (pointerup/keydown) so sidePanel.open()'s
+  // gesture requirement is satisfied when the background handles the message.
+  function openSidePanelFromEdge(state) {
+    chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
+      if (chrome.runtime.lastError) void openSnapPanel(state);
+    });
+  }
+
   let edgeTabDrag = null;
   state.edgeTab.addEventListener("pointerdown", (event) => {
     if (state.snap === "floating") return;
@@ -3374,7 +3407,7 @@ function wireRootEvents(state) {
       const wasMoved = edgeTabDrag?.moved ?? false;
       edgeTabDrag = null;
       if (!wasMoved) {
-        void openSnapPanel(state);
+        openSidePanelFromEdge(state);
       } else {
         void saveDomainMemory(window.location.hostname, { snap: state.snap, edgeTabOffset: state.edgeTabOffset }, "etld1");
       }
@@ -3385,7 +3418,7 @@ function wireRootEvents(state) {
   state.edgeTab.addEventListener("keydown", (event) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      void openSnapPanel(state);
+      openSidePanelFromEdge(state);
     }
   });
 
