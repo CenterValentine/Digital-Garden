@@ -95,6 +95,12 @@ export const Callout = Node.create<CalloutOptions>({
     return [
       {
         tag: "div[data-callout-type]",
+        // Parse content ONLY from the inner content div, so the title-chrome
+        // div (rendered by renderHTML) is not absorbed as an extra paragraph.
+        // Falls back to the whole element for callout HTML that predates the
+        // content-div structure. Makes generateHTML→generateJSON symmetric.
+        contentElement: (element: HTMLElement) =>
+          element.querySelector("div.callout-content") ?? element,
       },
     ];
   },

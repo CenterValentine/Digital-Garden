@@ -34,6 +34,7 @@ import { marked } from "marked";
 import TurndownService from "turndown";
 import { gfm } from "turndown-plugin-gfm";
 import { serializeUnknownBlock, restoreDgBlocks, DG_BLOCK_PREFIX } from "./markdown-fences";
+import { getBlockCodec, applyBlockReTags } from "./markdown-block-codecs";
 
 /**
  * The TipTap HTML (de)serialization pair. Injectable so the CI gate can supply a
@@ -182,8 +183,26 @@ function serializeBlock(
   extensions: Extensions,
   bridge: HtmlBridge,
 ): string {
-  // Custom / data blocks go straight to the fence — their HTML may be a lossy
-  // placeholder, and base64 keeps them opaque-and-safe rather than editable HTML.
+  // North-star codec (custom-block pretty syntax, e.g. callout → "> [!note]").
+  // Tried first for any block type that registers one; used only if it
+  // round-trips, else falls through to the fence.
+  const codec = getBlockCodec(typeof block.type === "string" ? block.type : undefined);
+  if (codec) {
+    try {
+      const canonical = canonicalBlock(block, extensions, bridge);
+      if (canonical) {
+        const md = codec.toMarkdown(block, (nodes) =>
+          tiptapToMarkdownRich({ type: "doc", content: nodes }, extensions, bridge),
+        );
+        if (md && roundTripsTo(md, canonical, extensions, bridge)) return md;
+      }
+    } catch {
+      /* fall through to fence */
+    }
+  }
+
+  // Custom / data blocks (no working codec) go straight to the fence — their
+  // HTML may be a lossy placeholder, and base64 keeps them opaque-and-safe.
   if (typeof block.type !== "string" || !CANDIDATE_PRETTY_TYPES.has(block.type)) {
     return serializeUnknownBlock(block);
   }
@@ -305,8 +324,8 @@ export function markdownToTiptapRich(
   extensions: Extensions,
   bridge: HtmlBridge = defaultBridge,
 ): JSONContent {
-  const html = reTagTaskLists(
-    marked.parse(markdown, { async: false, gfm: true }) as string,
+  const html = applyBlockReTags(
+    reTagTaskLists(marked.parse(markdown, { async: false, gfm: true }) as string),
   );
   const json = bridge.toJson(html, extensions);
   normalizeCodeBlocks(json);

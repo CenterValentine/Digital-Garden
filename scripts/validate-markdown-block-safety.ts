@@ -131,6 +131,15 @@ for (const [name, block] of [
   else fail(`excalidraw expected fence, got ${tier(r.md)}`);
 }
 
+// ── 2c. Custom-block codecs (north star: pretty syntax, not a fence) ─────────
+console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──");
+{
+  const r = lossless(doc({ type: "callout", attrs: { type: "warning", title: "Heads up" }, content: [p([t("body")])] }));
+  if (!r.ok) fail("callout codec — LOSSY");
+  else if (r.md.includes("DGBLOCKv1:") || !r.md.includes("> [!")) fail(`callout codec — expected "> [!" markdown, got ${r.md.slice(0, 40)}`);
+  else pass("callout → > [!warning] markdown");
+}
+
 // ── 3. Schema-driven attr sweep ──────────────────────────────────────────────
 console.log("\n  ── schema-driven attr sweep (no attr silently dropped) ──");
 const schema = getSchema(ext);
