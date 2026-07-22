@@ -178,12 +178,21 @@ self-verifying** serializer. Owner-approved after the empirical audit
   node types), (5) blockId de-dupe.
 - **Dead code removed:** `html-to-markdown.ts` (crude regex serializer) deleted;
   `markdown-fences.ts` trimmed to the fence primitives.
-- **Deferred prettiness (safe fences today, HTML tier later):** configured
-  standard nodes (image width/align, text alignment, underline/highlight) fence
-  now; the "Tier 2 HTML fallback" (emit `<img width>`/`<u>` as inline HTML,
-  lossless via TipTap `parseHTML`, gate-selected) would un-fence them.
-  Per-block `> [!note]` etc. for CUSTOM blocks is the later north star. All
-  optional prettiness on a proven-lossless floor.
+- **Tier-2 HTML fallback (2026-07-22) ✅ BUILT.** `serializeBlock` is now a
+  self-verified 3-tier ladder: Tier 1 pretty markdown → **Tier 2 the node's own
+  HTML** → Tier 3 base64 fence. Configured standard nodes markdown can't express
+  (image width/align, text alignment, underline/highlight, link attrs) now
+  serialize as legible inline HTML — lossless via TipTap's `parseHTML`, marked
+  passes it through — instead of base64. Strict prettiness upgrade: nodes that
+  used to fence (images, underline, alignment) render as HTML; data-bearing
+  blocks (Excalidraw/Mermaid) whose HTML can't carry their payload still fence.
+  Note: this app's image node has extra attrs (`wrap/size/source/…`) so even a
+  *plain* image goes Tier-2 HTML (a top-level image can't round-trip through
+  `![]()` — marked paragraph-wraps it) — which is still a win over the old base64.
+  Gate proves image+width/underline → HTML, Excalidraw → fence.
+- **North star (later):** per-block `> [!note]` etc. for CUSTOM blocks (registry
+  `toMarkdown`/`fromMarkdown`), enforced by the same gate; fence fallback keeps
+  it always lossless.
 
 ### T2 paste affordances (2026-07-22) ✅ BUILT
 
