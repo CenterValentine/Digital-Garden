@@ -73,6 +73,16 @@ P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection)
 
 ---
 
+## Browser Reach B3-A — workspaces in the panel (DEPRIORITIZED 2026-07-22)
+
+Dropped from the active B-series (owner call): the existing workspaces infra + `extensions/workplaces/` (WorkspaceSelector, workspace-store, ContentWorkspace API) already do the job, and users create sessions via existing affordances. The browser-specific value from the original 3.4/3.5 was pulled out into **B3-B** (settle-then-associate link affordance + browser-history-in-recents). Revisit only if browser-specific workspace UX becomes necessary.
+
+- [ ] Wire the panel's workspace chooser to list/switch real `ContentWorkspace`s (full-swap semantics). WorkspaceSelector already exists.
+- [ ] "Browser Sessions" as workspace items — auto-created, date/time-named, most-recent-active first; per-workspace target folder rides the `settings` JSON column (no schema change per C3).
+- [ ] Per-window active-workspace pointer (browser-side, keyed by `windowId`; app renders what the API returns).
+
+---
+
 ## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
 Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
