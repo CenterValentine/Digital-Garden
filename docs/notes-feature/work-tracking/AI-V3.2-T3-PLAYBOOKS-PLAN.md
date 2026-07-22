@@ -114,9 +114,14 @@ clean (Prisma JSON-path query on `metadata.playbook = true`).
   `[[refs]]` (title → note id via a title lookup) with an instruction to
   `read_note` them on demand. Inject as its own section (distinct from generic
   `mentionedContext`), so eviction can "never drop playbook."
+- **Sub-playbook awareness (§ sub-playbooks):** when a `[[ref]]` is itself
+  `metadata.playbook` (`isPlaybookMetadata` from P2), tag it in the manifest as a
+  **sub-playbook — has its own directives; follow them**, not a passive doc.
 - **System prompt** (`system-prompt.ts` ~152 checkpoint paragraph + a new
   `playbookContext` slot ~182): tell the model "only the current phase is loaded;
-  advance with `phase_checkpoint`; trace `[[extensions]]` via `read_note`."
+  advance with `phase_checkpoint`; trace `[[extensions]]` via `read_note`; treat
+  each phase's **`Done when:`** line as its stop condition — finish the phase when
+  satisfied, then checkpoint."
 - **Token meter:** unchanged — it already reports per-phase tokens; the shrunk
   context is the visible proof. **Gate met here.**
 
@@ -128,6 +133,20 @@ clean (Prisma JSON-path query on `metadata.playbook = true`).
 - **Import (future-proofing):** an "Import Skill" affordance (paste a `SKILL.md`,
   or upload `.md`) → `detectAdapter → parse` → create a marked playbook note.
   Adapter-based (§2), so fabric/MCP land later as append-only adapters.
+
+### Sub-playbooks (hierarchical playbooks) — output capability review
+The output plumbing **already exists** (AI v3 core + Folder Studio): `create_folder`
+(explicitly "playbook destinations like `job-search/{Company}`"), `createNote`,
+`create_docx` (files a doc in the target folder), `search_web`/`read_page`. So "a
+sub-playbook does its research and files a document in folder X" is buildable today.
+T3 adds three bounded enhancements, all reusing pieces already built:
+1. **Awareness** — sub-playbook `[[refs]]` tagged in the P4 manifest (above).
+2. **Output routing** — sub-playbook artifacts land in the *run's* target folder
+   (thread the active-run folder through `create_folder`/`createNote`), co-located
+   with the Run Ledger.
+3. **Mint-and-mark** — a phase can *author* a sub-playbook for a later phase via
+   `createNote` + `withPlaybookMetadata` (P2). Closes the loop: phase 2 writes it,
+   phase 5 consumes it.
 
 ## 4. Gates
 `pnpm typecheck` / `pnpm lint` / `pnpm build`. Unit: `parsePlaybook` +
@@ -142,3 +161,25 @@ P3 → P4 gets the **gate** (start-from-registry + per-phase disclosure). P5's
 P5's **import** is the future-proofing bonus — build last; safe to defer if budget
 runs short (the adapter abstraction is already specified, so it's append-only).
 Backlog adapters are documented, not built.
+
+## 6. Resource discipline
+
+Governed by the durable reference:
+**[guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md](../guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md)**
+(principles + the maintained implementation-state table). What T3 does with it:
+
+**Fold into T3 now (cheap, high-leverage):**
+- **`Done when:` per phase** — a one-line convention in the SKILL.md phase format +
+  one system-prompt instruction (P4). Makes *termination* authored: the agent
+  stops on a satisfied criterion, not on exhaustion.
+- **Lean on what exists** — `phase_checkpoint` (completion signal), Run Ledger
+  (externalized state), token meter (observability). No new code.
+- **Sub-playbook enhancements** — the three items under §3 (awareness, output
+  routing, mint-and-mark); they reuse P2/P4, near-zero new surface.
+
+**Defer to a dedicated "resource governance" task (T4):** enforced token/step
+budgets (decrement + stop), **sub-agent isolation** for sub-playbooks (isolate
+context, return conclusion + artifact pointer — the biggest lever for long runs),
+per-run compaction, self-critique / no-progress loop guards, difficulty-based
+effort allocation. Each is a subsystem; keeping them out of T3 protects the gate.
+Tracked in the state table (§4 of the reference).
