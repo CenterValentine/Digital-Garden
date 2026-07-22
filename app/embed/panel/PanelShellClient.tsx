@@ -568,13 +568,32 @@ export function PanelShellClient({
                 )}
               </div>
             )}
-            {/* Bounded flex parent so LeftSidebar's `h-full` resolves against
-                the space LEFT after the chooser (not the whole Files box).
-                Without this, h-full = 100% of the Files box, LeftSidebar
-                overflows by the chooser's height, and the tree is clipped —
-                the real cause of the "can't scroll to the bottom" bug. */}
-            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-              <LeftSidebar />
+            {/* LeftSidebar's root is `h-full` (height:100%), which cannot
+                resolve against a flex-basis:0 parent, so the virtualized tree
+                sized to its own content (a circular 564px) instead of the
+                available space. This relative box IS bounded (flex:1 shares the
+                Files section); the absolutely-positioned inner fills it with a
+                DEFINITE height that h-full resolves against → the tree gets a
+                real height and scrolls. overflow:hidden guarantees nothing can
+                spill into the workspace below even mid-measure. */}
+            <div
+              style={{
+                flex: 1,
+                minHeight: 0,
+                position: "relative",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <LeftSidebar />
+              </div>
             </div>
           </div>
           {/* Quick access — Associated Content ported from the overlay. Same

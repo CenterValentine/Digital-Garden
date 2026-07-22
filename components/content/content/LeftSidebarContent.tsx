@@ -208,18 +208,25 @@ export function LeftSidebarContent({
   // Ref to temporarily store visualization engine when creating from context menu
   const pendingVisualizationEngine = useRef<"diagrams-net" | "excalidraw" | "mermaid" | null>(null);
 
-  // Measure tree container height for virtualized tree (eliminates double scrollbar)
-  const treeContainerRef = useRef<HTMLDivElement>(null);
+  // Measure tree container height for the virtualized tree. This MUST use a
+  // callback ref, not useRef + a mount-time useEffect: the tree container only
+  // renders after data loads (isLoading → false), so at first mount the ref is
+  // null, the effect bails, and the observer is never attached — leaving
+  // treeHeight pinned at its default. In the main app the data is usually warm
+  // so the ref happens to exist by mount; the side panel loads fresh every time
+  // (always async), so the effect approach left the tree stuck at 600px and
+  // unable to scroll. A callback ref attaches the observer whenever the element
+  // mounts, whatever the load timing.
   const [treeHeight, setTreeHeight] = useState(600);
-  useEffect(() => {
-    const el = treeContainerRef.current;
+  const treeResizeObserverRef = useRef<ResizeObserver | null>(null);
+  const treeContainerRef = useCallback((el: HTMLDivElement | null) => {
+    treeResizeObserverRef.current?.disconnect();
+    treeResizeObserverRef.current = null;
     if (!el) return;
-    const ro = new ResizeObserver(() => {
-      setTreeHeight(el.clientHeight);
-    });
+    const ro = new ResizeObserver(() => setTreeHeight(el.clientHeight));
     ro.observe(el);
     setTreeHeight(el.clientHeight);
-    return () => ro.disconnect();
+    treeResizeObserverRef.current = ro;
   }, []);
   const [iconSelector, setIconSelector] = useState<{
     open: boolean;
