@@ -59,6 +59,18 @@ alongside the rich-text editor.
   normal edits; for collab notes the Y.doc stays authoritative.
 - **Gate:** round-trip a formatted note through source view with no
   content loss; a source edit reflects in rich-text on toggle-back.
+- **Recon (2026-07-22):** integration map — the note editor lives in
+  `MainPanelContent.tsx` (the `editorElement`, title header at ~2033 +
+  the TipTap `MarkdownEditor`); `ContentToolbar` (line ~2198) is the
+  toggle's home. There's an existing DEBUG markdown view
+  (`state/debug-view-store.ts` → `MarkdownDebugView`) but it's read-only
+  and dev-only — T2 is a separate USER-facing editable mode, not an
+  extension of it. Approach: a `sourceMode` state; when on, swap the
+  MarkdownEditor for a textarea seeded from `tiptapToMarkdown(noteContent)`;
+  on toggle-off, `markdownToTiptapResult(text)` → setNoteContent → save
+  (reuses T1's hardened converters + degraded flag). Collab-safe: routes
+  through the existing `handleSave`, so Y.doc-backed notes stay
+  authoritative. Sensitive surface (core editor) — build with care.
 
 ## T3 — S4c playbook progressive-disclosure registry
 
