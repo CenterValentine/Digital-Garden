@@ -18,6 +18,17 @@ last_updated: 2026-07-16
 
 ---
 
+## Browser Reach B2 followups (surfaced 2026-07-21, PR #123)
+
+Panel workspace + page-aware chat + Quick access + chat-about-page shipped. Deferred by design:
+
+- [ ] **Composer auto-focus on "Ask AI about this page"** — the new chat opens ready with the opener pre-filled, but the composer isn't focused; the user clicks once to type. Wire a focus signal down `MultiConversationSidebar → ChatPanel → ChatInput` (a ref or a focus-nonce) so the caret lands in the composer when a page-chat starts.
+- [ ] **Page nodes land at tree root** — `createExtensionContentPickerItem(type:"external")` creates the page's external node with `parentId: null` (root). Consider a dedicated "Web pages" (or per-domain) folder so "Ask AI about this page" doesn't accumulate nodes at the tree root. Dedup already prevents duplicates per URL.
+- [ ] **On-demand reader injection for capture** — page capture uses the overlay content script; a tab open *before* the extension loaded (or not reloaded after an update) has no reader → "Reload this tab" error. With the `scripting` permission we could inject a lightweight, UI-free reader on demand and retry, instead of asking the user to reload. Needs a separate `dist/reader.js` esbuild entry (the full overlay is too heavy/intrusive to inject).
+- [ ] **Re-verify fresh-tab capture end-to-end** — confirm page-context attach works on a freshly-loaded tab after an extension reload (content script present). Panel auto-recovery now self-heals the panel context; this verifies the capture half.
+
+---
+
 ## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
 Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
