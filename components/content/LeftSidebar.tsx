@@ -261,7 +261,10 @@ export function LeftSidebar() {
   // Full mode: show complete sidebar with header and content
   return (
     <>
-      <div className="flex h-full flex-col">
+      {/* min-h-0: allow this flex column to shrink below its content so a
+          bounded height cascades to the virtualized tree (otherwise it sizes
+          to the tree and the tree can't scroll — the side-panel scroll bug). */}
+      <div className="flex h-full min-h-0 flex-col">
         {/* Header with create actions */}
         <LeftSidebarHeader
           onCreateFolder={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleFolder : handleCreateFolder}

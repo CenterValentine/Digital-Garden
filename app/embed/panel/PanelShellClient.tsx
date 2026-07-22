@@ -536,7 +536,10 @@ export function PanelShellClient({
               scrollable ancestor competing with it. */}
           <div
             style={{
-              flexBasis: "42%",
+              // Grow to share the column (was a fixed 42%, which starved the
+              // virtualized tree to ~5 rows). minHeight floors it when open;
+              // the tree scrolls internally within whatever height it gets.
+              flex: 1,
               minHeight: treeCollapsed ? 0 : 120,
               display: treeCollapsed ? "none" : "flex",
               flexDirection: "column",
@@ -565,7 +568,14 @@ export function PanelShellClient({
                 )}
               </div>
             )}
-            <LeftSidebar />
+            {/* Bounded flex parent so LeftSidebar's `h-full` resolves against
+                the space LEFT after the chooser (not the whole Files box).
+                Without this, h-full = 100% of the Files box, LeftSidebar
+                overflows by the chooser's height, and the tree is clipped —
+                the real cause of the "can't scroll to the bottom" bug. */}
+            <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+              <LeftSidebar />
+            </div>
           </div>
           {/* Quick access — Associated Content ported from the overlay. Same
               disclosure design as Files (rotating chevron, CSS-var styling). */}

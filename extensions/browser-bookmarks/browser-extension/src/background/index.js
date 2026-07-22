@@ -874,6 +874,30 @@ async function showTreePanelInActiveTab() {
   }
 }
 
+// Send a message to a tab's overlay content script, injecting the overlay on
+// demand if the tab has none yet (opened before the extension loaded, or not
+// reloaded after an update) and retrying once. Lets "Open as overlay" work
+// without asking the user to reload the page tab.
+async function sendToOverlayOrInject(tabId, message) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (err) {
+    const m = err instanceof Error ? err.message : "";
+    if (
+      /receiving end does not exist|could not establish connection/i.test(m) &&
+      chrome.scripting
+    ) {
+      console.log("[DG Bookmarks] overlay missing on tab — injecting on demand", tabId);
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dist/page-bridge.js", "dist/overlay.js"],
+      });
+      return await chrome.tabs.sendMessage(tabId, message);
+    }
+    throw err;
+  }
+}
+
 async function openContentInActiveTab(
   contentId,
   contentKind = "external",
@@ -881,12 +905,18 @@ async function openContentInActiveTab(
   corner
 ) {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  console.log("[DG Bookmarks] openContentInActiveTab", {
+    contentId,
+    contentKind,
+    corner,
+    tabId: tab?.id,
+  });
   if (!tab?.id) {
     throw new Error("No active tab is available");
   }
 
   try {
-    await chrome.tabs.sendMessage(tab.id, {
+    await sendToOverlayOrInject(tab.id, {
       type: "dg-open-associated-content",
       payload: {
         contentId,
@@ -897,6 +927,7 @@ async function openContentInActiveTab(
     });
     return { openedInOverlay: true, tabId: tab.id };
   } catch (error) {
+    console.warn("[DG Bookmarks] openContentInActiveTab failed", error);
     throw new Error(
       error instanceof Error
         ? `This page overlay is not available: ${error.message}`
@@ -1970,16 +2001,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "open-side-panel") {
     const tabId = sender?.tab?.id;
     const windowId = sender?.tab?.windowId;
-    const target = tabId != null ? { tabId } : { windowId };
+    // Open the GLOBAL panel by windowId — opening a manifest-global panel by
+    // tabId toggles/collapses it (learned in B2's chat-panel work); windowId
+    // reveals it for the whole window. tabId is only a last resort.
+    const target = windowId != null ? { windowId } : { tabId };
     chrome.sidePanel
       .open(target)
       .then(() => sendResponse({ ok: true, data: true }))
-      .catch((error) =>
+      .catch((error) => {
+        console.warn("[DG Bookmarks] open-side-panel failed", error, target);
         sendResponse({
           ok: false,
           error: error instanceof Error ? error.message : "Failed to open side panel",
-        })
-      );
+        });
+      });
     return true;
   }
 

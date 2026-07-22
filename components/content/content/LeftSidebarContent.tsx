@@ -2428,7 +2428,7 @@ export function LeftSidebarContent({
   // Render tree
   return (
     <>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* File tree with drag-and-drop zone — single scroll plane via measured height */}
         <div ref={treeContainerRef} className="flex-1 min-h-0 overflow-hidden flex flex-col">
           <RootNodeHeader
