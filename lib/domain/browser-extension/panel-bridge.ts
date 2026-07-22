@@ -52,3 +52,93 @@ export function requestOverlayOpen(
     "*"
   );
 }
+
+/**
+ * Ask the panel host to capture the current page at `scope`. The host relays
+ * to the active tab's content script and posts the result back, which the
+ * PanelShellClient listener writes to the page-context store.
+ */
+export function requestPageCapture(scope: string): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope } },
+    "*"
+  );
+}
+
+/** Ask the panel host to screenshot the visible area of the active tab. */
+export function requestScreenshot(): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "capture-screenshot" },
+    "*"
+  );
+}
+
+/**
+ * Ask the panel host to fetch the Associated-Content resource context for a
+ * page URL (Quick access). The panel embed runs on the app's *session* auth
+ * and can't hit the extension's bearer-auth resource-context route directly,
+ * so the host relays to the background worker (which holds the bearer token)
+ * and posts the result back as a `resource-context` message. Mirrors the B2
+ * page-capture relay.
+ */
+export function requestResourceContext(payload: {
+  url: string;
+  title?: string;
+  faviconUrl?: string;
+}): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "fetch-resource-context", payload },
+    "*"
+  );
+}
+
+/**
+ * Ask the panel host for other content on the same domain ("More from
+ * {hostname}"). Relayed to the background exactly like resource-context; the
+ * result comes back as a `domain-associations` message.
+ */
+export function requestDomainAssociations(payload: {
+  url: string;
+  excludeResourceId?: string;
+}): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "fetch-domain-associations", payload },
+    "*"
+  );
+}
+
+/**
+ * Resolve the page's external content node — the anchor for "chat about this
+ * page." Conversations need a ContentNode; the host reuses the page's existing
+ * external node if there is one, else creates it, and replies with a single
+ * content id as a `page-node-resolved` message.
+ */
+export function requestResolvePageNode(payload: {
+  url: string;
+  title?: string;
+}): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "resolve-page-node", payload },
+    "*"
+  );
+}
+
+/** Decode a data: URL into a File for the chat's attachment path. */
+export function dataUrlToFile(dataUrl: string, filename: string): File | null {
+  try {
+    const [meta, b64] = dataUrl.split(",");
+    if (!b64) return null;
+    const mime = /:(.*?);/.exec(meta)?.[1] ?? "image/jpeg";
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new File([bytes], filename, { type: mime });
+  } catch {
+    return null;
+  }
+}

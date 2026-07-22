@@ -33,9 +33,25 @@ import type { AIProviderId } from "@/lib/domain/ai/types";
 
 interface Props {
   contentId?: string | null;
+  /**
+   * Monotonic counter that, when it increases, forces creation of a fresh
+   * conversation on the current `contentId`. Drives "Ask AI about this page"
+   * (the panel resolves the page's content node, points us at it, then bumps
+   * this to start a new chat). Ignored until `contentId` is set.
+   */
+  newChatNonce?: number;
+  /**
+   * Optional opener to pre-fill (not send) into the newly created conversation
+   * when `newChatNonce` fires. Seeded as the conversation's composer draft.
+   */
+  newChatPrefill?: string;
 }
 
-export function MultiConversationSidebar({ contentId }: Props) {
+export function MultiConversationSidebar({
+  contentId,
+  newChatNonce,
+  newChatPrefill,
+}: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
@@ -189,31 +205,57 @@ export function MultiConversationSidebar({ contentId }: Props) {
     [tabs, seedSessionForTab],
   );
 
-  const handleNew = useCallback(async () => {
-    if (!contentId) return;
-    setCreatingNew(true);
-    try {
-      const res = await fetch("/api/conversations", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          snapshotContentNodeIds: [contentId],
-        }),
-      });
-      if (!res.ok) throw new Error("Create failed");
-      const body = await res.json();
-      const newId: string | undefined = body?.data?.id;
-      if (newId) {
-        await reloadTabs();
-        setActiveId(newId);
+  const handleNew = useCallback(
+    async (options?: { prefillDraft?: string }) => {
+      if (!contentId) return;
+      setCreatingNew(true);
+      try {
+        const res = await fetch("/api/conversations", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            snapshotContentNodeIds: [contentId],
+          }),
+        });
+        if (!res.ok) throw new Error("Create failed");
+        const body = await res.json();
+        const newId: string | undefined = body?.data?.id;
+        if (newId) {
+          // Seed the composer draft BEFORE activating, so the engine hydrates
+          // it as it re-keys to the new conversation. Pre-fill (not send) —
+          // used by "Ask AI about this page" for a short opener.
+          const prefill = options?.prefillDraft?.trim();
+          if (prefill) {
+            try {
+              window.localStorage.setItem(`dg:chat-draft:conv:${newId}`, prefill);
+            } catch {
+              // Non-fatal — the composer just opens empty.
+            }
+          }
+          await reloadTabs();
+          setActiveId(newId);
+        }
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Create failed");
+      } finally {
+        setCreatingNew(false);
       }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Create failed");
-    } finally {
-      setCreatingNew(false);
-    }
-  }, [contentId, reloadTabs]);
+    },
+    [contentId, reloadTabs],
+  );
+
+  // "Ask AI about this page" seam: a bumped nonce forces a fresh conversation
+  // on the now-anchored page node. Guarded by a ref so it fires exactly once
+  // per bump, and only once `contentId` is present (the panel points us at the
+  // page node before bumping, so handleNew snapshots the right node).
+  const handledNewChatNonceRef = useRef<number>(0);
+  useEffect(() => {
+    if (!newChatNonce || newChatNonce === handledNewChatNonceRef.current) return;
+    if (!contentId) return;
+    handledNewChatNonceRef.current = newChatNonce;
+    void handleNew({ prefillDraft: newChatPrefill });
+  }, [newChatNonce, contentId, handleNew, newChatPrefill]);
 
   const handlePick = useCallback(
     (conversationId: string) => {

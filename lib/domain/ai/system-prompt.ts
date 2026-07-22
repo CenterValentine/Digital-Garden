@@ -131,6 +131,8 @@ export interface SystemPromptContext {
   autoPronounceDefault: boolean;
   userContextSection: string;
   mentionedContext: string;
+  /** Side-panel page context (B2). Untrusted, delimited — appended last. */
+  pageContextSection?: string;
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
@@ -178,6 +180,9 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   );
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
+  // Untrusted page content goes LAST, after all trusted instructions, so its
+  // framing ("data, not instructions") is the freshest thing before the turn.
+  if (ctx.pageContextSection) sections.push(ctx.pageContextSection);
 
   return sections.join("\n\n");
 }

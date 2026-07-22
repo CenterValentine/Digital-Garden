@@ -173,7 +173,15 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   //
   // validateSession is cache-backed (hot tokens <1ms; invalid tokens are
   // negative-cached), so the added DB cost is paid only on first-touch.
-  if (pathname.startsWith("/embed/content/")) {
+  // The promotion cookie is scoped to path "/embed", so it already serves
+  // every embed route once set — but the trigger must also fire on the panel
+  // (BROWSER-REACH B2), which previously ran on ?_t= + the fetch-header
+  // fallback alone. /embed/auth (the token-exchange route) is intentionally
+  // excluded.
+  if (
+    pathname.startsWith("/embed/content/") ||
+    pathname.startsWith("/embed/panel")
+  ) {
     const urlToken = searchParams.get("_t");
     const existingCookie = request.cookies.get("session_token")?.value;
     if (urlToken && existingCookie !== urlToken) {

@@ -45,6 +45,7 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
+import { getAttachedPageContext } from "@/state/panel-page-context-store";
 
 /**
  * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's output
@@ -711,6 +712,10 @@ export function useConversationEngine({
       providerId,
       modelId,
       mentionedContentIds: [] as string[],
+      // Side-panel page context (B2). Null everywhere but the browser panel,
+      // where the shell attaches what the extension captured. Read at send
+      // time so the freshest capture rides the turn.
+      pageContext: getAttachedPageContext(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1022,6 +1027,10 @@ export function useConversationEngine({
           providerId,
           modelId,
           mentionedContentIds: ids,
+          // Attached side-panel page context (B2). Null outside the panel.
+          // Lives on the explicit send body because that becomes the
+          // snapshotted per-call body — the resolver is only a fallback.
+          pageContext: getAttachedPageContext(),
         },
       },
     );
@@ -1049,6 +1058,8 @@ export function useConversationEngine({
       providerId,
       modelId,
       mentionedContentIds: [] as string[],
+      // Edited/regenerated turns keep the attached page context too (B2).
+      pageContext: getAttachedPageContext(),
     }),
     [contentId, conversationId, providerId, modelId],
   );
@@ -1067,7 +1078,11 @@ export function useConversationEngine({
       // the new text as a fresh turn. Stamp it with the active selection.
       pendingStampRef.current = { providerId, modelId };
       setMessages(messages.slice(0, idx));
-      void sendMessage({ text }, { body: reRunBody() });
+      // { parts } shape (matches handleSend / studio-invoke).
+      void sendMessage(
+        { parts: [{ type: "text", text }] },
+        { body: reRunBody() }
+      );
     },
     [messages, setMessages, sendMessage, reRunBody, providerId, modelId, truncateRef],
   );

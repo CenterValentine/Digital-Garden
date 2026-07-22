@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-18
+last_updated: 2026-07-21
 ---
 
 # Sprint Backlog
@@ -7,6 +7,25 @@ last_updated: 2026-07-18
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## AI model handling (surfaced during Browser Reach B2, 2026-07-21 — AI-core, do after browser core)
+
+- [ ] **Model-catalog "not found" false-availability** — the model picker marks a model available whenever a Connection advertises its id, but the provider can still 404 it on use (observed: `claude-haiku-3-5` → "Model 'anthropic/claude-haiku-3-5' not found", routed through the AI Gateway connection). `isModelAvailable` (`components/content/ai/MakeAndModelPicker.tsx`) trusts the connection's claimed model list; needs validation against what the provider/gateway actually serves, or a use-time fallback.
+- [ ] **Don't default to / allow selecting an unavailable model** — `useModelSelection` (`components/content/ai/ModelPicker.tsx:149`) falls back to a hardcoded `claude-sonnet-3-5` that may have no key; resolve an *available* default instead. Keep unavailable models greyed for discoverability but make them non-selectable (hard-disable), per owner.
+- [ ] **Gate `web_search` by model capability, not provider** — chat route (~L534) attaches `search_web` whenever the provider is a native-search vendor; models like Claude 3 Haiku don't support it and Anthropic 400s (`web_search_20250305 ... does not match expected tags`). Attach only for models that support the server tool.
+
+---
+
+## Browser Reach B2 followups (surfaced 2026-07-21, PR #123)
+
+Panel workspace + page-aware chat + Quick access + chat-about-page shipped. Deferred by design:
+
+- [x] ~~Composer auto-focus on "Ask AI about this page"~~ — **SHIPPED (PR #123)**: `ChatInput` focuses itself (caret at end) on mount when it opens with content in the panel embed (`isPanelEmbedSurface()`), scoped so it never steals focus from the app editor.
+- [ ] **Page nodes land at tree root** — `createExtensionContentPickerItem(type:"external")` creates the page's external node with `parentId: null` (root). Consider a dedicated "Web pages" (or per-domain) folder so "Ask AI about this page" doesn't accumulate nodes at the tree root. Dedup already prevents duplicates per URL.
+- [x] ~~On-demand reader injection for capture~~ — **SHIPPED (PR #123)**: `src/reader` bundles a UI-free `dg-extract-content` responder to `dist/reader.js`; the panel host injects it via `chrome.scripting` when a tab has no overlay, then retries. Only fires when the overlay is absent (no double-listener). ⚠ verify `chrome.scripting.executeScript` works from the side panel at runtime.
+- [ ] **Re-verify fresh-tab / stale-tab capture end-to-end** — confirm page-context attach works on a tab that predates the extension load (the reader-injection path) and on a freshly-loaded tab. Panel auto-recovery self-heals the panel context; this verifies the capture half.
 
 ---
 
