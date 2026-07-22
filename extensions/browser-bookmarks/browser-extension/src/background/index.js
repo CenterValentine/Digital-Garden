@@ -1764,32 +1764,71 @@ chrome.runtime.onInstalled.addListener(async () => {
   await exchangeEmbedSession();
 });
 
-// Open the side panel on the Chat view for `tab`. Synchronous and awaits
-// nothing before sidePanel.open() so the user-gesture context (context-menu
-// click, keyboard command) is preserved — Chrome rejects sidePanel.open once
-// the gesture has been consumed by an await.
+// The panel document holds a Port open while it's alive; a non-null
+// `panelPort` therefore means the panel is currently open. Checking it is
+// synchronous, so openAiChatPanel can branch without an await (which would
+// consume the user gesture that authorizes sidePanel.open).
+let panelPort = null;
+chrome.runtime.onConnect.addListener((port) => {
+  if (port.name !== "dg-panel") return;
+  panelPort = port;
+  port.onDisconnect.addListener(() => {
+    if (panelPort === port) panelPort = null;
+  });
+});
+
+// Open the side panel on the Chat view for `tab` — or, if the panel is already
+// open, switch it to Chat in place. Re-calling sidePanel.open() on an open
+// panel TOGGLES it shut (the API is not idempotent and has no isOpen()), so we
+// use the port as an open-state signal and never re-open.
 function openAiChatPanel(tab) {
-  chrome.storage.session.set({ dgPanelView: "chat" }).catch(() => {});
+  if (panelPort) {
+    try {
+      // Panel already open: switch to Chat + start a new page-chat in place.
+      panelPort.postMessage({ type: "show-chat", intent: "ask-about-page" });
+      return;
+    } catch {
+      // Port went stale before onDisconnect fired — fall through and open.
+      panelPort = null;
+    }
+  }
   const target =
-    tab?.id != null
-      ? { tabId: tab.id }
-      : tab?.windowId != null
-        ? { windowId: tab.windowId }
+    tab?.windowId != null
+      ? { windowId: tab.windowId }
+      : tab?.id != null
+        ? { tabId: tab.id }
         : null;
-  if (!target) return;
-  chrome.sidePanel.open(target).catch(() => {});
+  if (!target) {
+    console.warn("[DG Bookmarks] openAiChatPanel: no tab/window target", tab);
+    return;
+  }
+  // open() MUST be the first call — it is gesture-gated and any prior async
+  // extension API can consume the active-gesture flag. The session writes only
+  // need to land before the panel boots (two async round-trips away), so they
+  // safely follow. dgPanelIntent distinguishes "Ask AI about this page" (start
+  // a new chat about the page) from a plain "show the chat view".
+  chrome.sidePanel.open(target).catch((error) => {
+    console.warn("[DG Bookmarks] sidePanel.open failed", error, target);
+  });
+  chrome.storage.session
+    .set({ dgPanelView: "chat", dgPanelIntent: "ask-about-page" })
+    .catch(() => {});
 }
 
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "open-ai-chat") openAiChatPanel(tab);
 });
 
-chrome.contextMenus.onClicked.addListener(async (info, tab) => {
-  // Gesture-sensitive: handle before the async try below touches any await.
-  if (info.menuItemId === "dg-open-ai-chat") {
-    openAiChatPanel(tab);
-    return;
-  }
+// sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
+// async listener returns a promise immediately and Chrome no longer treats
+// the call as gesture-initiated (the panel silently fails to open / closes).
+// So AI-chat opening gets its own non-async listener; the other items keep
+// the async handler below.
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === "dg-open-ai-chat") openAiChatPanel(tab);
+});
+
+chrome.contextMenus.onClicked.addListener(async (info) => {
   try {
     if (info.menuItemId === "dg-save-page") {
       await quickSaveCurrentTab({});

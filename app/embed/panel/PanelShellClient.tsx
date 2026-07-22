@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
+import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -12,6 +13,8 @@ import type { ContextMenuActionProvider } from "@/components/content/context-men
 import { usePanelPageContextStore } from "@/state/panel-page-context-store";
 import {
   requestOverlayOpen,
+  requestResolvePageNode,
+  requestPageCapture,
   OVERLAY_CORNERS,
 } from "@/lib/domain/browser-extension/panel-bridge";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
@@ -22,6 +25,10 @@ import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embe
 import { createElement } from "react";
 
 const TREE_COLLAPSED_KEY = "dg-panel-tree-collapsed";
+const QUICK_ACCESS_COLLAPSED_KEY = "dg-panel-quick-access-collapsed";
+// Short opener pre-filled (not sent) into the new chat when opened via "Ask AI
+// about this page" — so a user who isn't expecting to type can just hit send.
+const ASK_ABOUT_PAGE_PREFILL = "Give me a quick overview of this page.";
 
 /**
  * The full file-tree menu is nearly as tall as the panel itself. Trim the
@@ -151,16 +158,65 @@ export function PanelShellClient({
 }: {
   themePreference?: "light" | "dark" | "system";
 }) {
-  // Initial view: "chat" when opened via "Ask AI about this page" (the host
-  // appends ?view=chat), else the Garden. Read once at mount.
-  const [view, setView] = useState<PanelView>(() => {
-    if (typeof window === "undefined") return "garden";
-    return new URLSearchParams(window.location.search).get("view") === "chat"
-      ? "chat"
-      : "garden";
-  });
+  // Always first-paint the Garden, even when opened via "Ask AI about this
+  // page" (?view=chat). Cold-rendering the chat surface visible on the very
+  // first paint — before the Garden view's layout/effects have settled —
+  // tears the panel down. The requested view is applied one paint later in the
+  // effect below, which mirrors the proven launcher→Chat-tab path.
+  const [view, setView] = useState<PanelView>("garden");
+  // "Ask AI about this page" bumps this to force a fresh conversation once the
+  // page's content node is anchored; also gates the orchestration below.
+  const [newChatNonce, setNewChatNonce] = useState(0);
+  // True while we still owe a "new chat about this page" (intent seen, but the
+  // page URL / resolved node isn't ready yet). A ref, not state, so the async
+  // steps can read/clear it without re-render churn.
+  const pageChatPendingRef = useRef(false);
+  // The URL we asked the host to resolve a node for, so a late reply for a page
+  // we've navigated away from is ignored.
+  const pageChatUrlRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("view") === "chat") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate one-paint-later switch; see comment above
+      setView("chat");
+    }
+    if (params.get("intent") === "ask-about-page") {
+      pageChatPendingRef.current = true;
+    }
+  }, []);
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
+  // Quick access (Associated Content) starts collapsed: expanding it is what
+  // triggers the resource-context fetch, so a collapsed default keeps the panel
+  // from creating a WebResource row for every page you open.
+  const [quickAccessCollapsed, setQuickAccessCollapsed] = useState(true);
+
+  // ── "Ask AI about this page" orchestration ──────────────────────────────
+  // Mirror pageContext into a ref so the (stable-closure) message listener and
+  // async kickoff read the latest URL without re-subscribing.
+  const pageContextRef = useRef<PanelPageContext | null>(null);
+  useEffect(() => {
+    pageContextRef.current = pageContext;
+  }, [pageContext]);
+
+  // Ask the host to resolve the current page's content node (reuse-or-create),
+  // which returns as `page-node-resolved` and drives the anchor + new chat.
+  const kickoffPageChat = useCallback(() => {
+    const url = pageContextRef.current?.url;
+    if (!url) return;
+    pageChatUrlRef.current = url;
+    requestResolvePageNode({ url, title: pageContextRef.current?.title ?? "" });
+  }, []);
+
+  // Cold-boot intent (?intent=ask-about-page) is seen before the page URL
+  // arrives; fire the resolve as soon as the URL is known.
+  useEffect(() => {
+    if (!pageChatPendingRef.current) return;
+    if (!pageContext?.url) return;
+    pageChatPendingRef.current = false;
+    kickoffPageChat();
+  }, [pageContext, kickoffPageChat]);
   // Page-context capture results flow into the store; the context bar now
   // lives in the composer (PanelPageContextBar) and drives capture itself.
   // This shell only relays the host's responses in via getState() (below),
@@ -213,6 +269,11 @@ export function PanelShellClient({
     try {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
       setTreeCollapsed(localStorage.getItem(TREE_COLLAPSED_KEY) === "true");
+      // Absent key → keep the collapsed default; only an explicit "false" opens
+      // it. (The disable above covers both setState calls in this effect.)
+      setQuickAccessCollapsed(
+        localStorage.getItem(QUICK_ACCESS_COLLAPSED_KEY) !== "false"
+      );
     } catch {
       // Storage unavailable (partitioned iframe edge cases) — default open.
     }
@@ -230,6 +291,18 @@ export function PanelShellClient({
     });
   }
 
+  function toggleQuickAccessCollapsed() {
+    setQuickAccessCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(QUICK_ACCESS_COLLAPSED_KEY, String(next));
+      } catch {
+        // Non-fatal.
+      }
+      return next;
+    });
+  }
+
   // C2-hardened message listener: exact-origin validation, versioned envelope.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -237,6 +310,56 @@ export function PanelShellClient({
       const data = event.data;
       if (!data || typeof data !== "object") return;
       if (data.v !== 1 || data.source !== "dg-panel-host") return;
+
+      // Live view switch (host → embed). Sent when "Ask AI about this page"
+      // fires while the panel is ALREADY open: the background can't re-open the
+      // panel (that toggles it shut), so it asks us to switch to Chat in place.
+      if (
+        data.type === "set-view" &&
+        (data.payload?.view === "chat" || data.payload?.view === "garden")
+      ) {
+        setView(data.payload.view);
+        // Already-open "Ask AI about this page": kick off now if the page URL
+        // is known, else defer to the pending effect once it arrives.
+        if (data.payload.intent === "ask-about-page") {
+          if (pageContextRef.current?.url) {
+            pageChatPendingRef.current = false;
+            kickoffPageChat();
+          } else {
+            pageChatPendingRef.current = true;
+          }
+        }
+      }
+
+      // The page's content node was resolved (reused or created). Anchor the
+      // chat to it, switch to Chat, start a fresh conversation, and capture the
+      // page so its context rides the user's first message.
+      if (data.type === "page-node-resolved") {
+        if (data.payload?.url && data.payload.url !== pageChatUrlRef.current) {
+          return;
+        }
+        pageChatUrlRef.current = null;
+        const contentId = data.payload?.contentId;
+        if (typeof contentId === "string" && contentId) {
+          useContentStore
+            .getState()
+            .openContentInPane(contentId, TOP_LEFT_PANE_ID, {
+              contentType: "external",
+            });
+          setView("chat");
+          setNewChatNonce((n) => n + 1);
+          requestPageCapture("full");
+        }
+      }
+
+      if (data.type === "page-node-error") {
+        if (data.payload?.url && data.payload.url !== pageChatUrlRef.current) {
+          return;
+        }
+        pageChatUrlRef.current = null;
+        // Couldn't anchor — still show Chat so the user isn't left on Garden.
+        setView("chat");
+      }
 
       if (data.type === "page-context" && data.payload?.url) {
         setPageContext({
@@ -298,7 +421,7 @@ export function PanelShellClient({
     }
     window.addEventListener("message", handleMessage);
     return () => window.removeEventListener("message", handleMessage);
-  }, []);
+  }, [kickoffPageChat]);
 
   // Announce readiness to the panel host (extension page). The host validates
   // our origin on its side; the envelope is versioned from day one.
@@ -444,6 +567,53 @@ export function PanelShellClient({
             )}
             <LeftSidebar />
           </div>
+          {/* Quick access — Associated Content ported from the overlay. Same
+              disclosure design as Files (rotating chevron, CSS-var styling). */}
+          <button
+            type="button"
+            onClick={toggleQuickAccessCollapsed}
+            aria-expanded={!quickAccessCollapsed}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "3px 10px",
+              fontSize: 11,
+              border: 0,
+              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
+              background: "transparent",
+              color: "var(--text-secondary, #9a9a9a)",
+              cursor: "pointer",
+              flexShrink: 0,
+            }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                transition: "transform 0.15s",
+                transform: quickAccessCollapsed ? "rotate(-90deg)" : "none",
+              }}
+            >
+              ▾
+            </span>
+            Quick access
+          </button>
+          <div
+            style={{
+              display: quickAccessCollapsed ? "none" : "block",
+              maxHeight: 260,
+              overflowY: "auto",
+              flexShrink: 0,
+              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
+            }}
+          >
+            <PanelQuickAccess
+              pageUrl={pageContext?.url ?? null}
+              pageTitle={pageContext?.title ?? ""}
+              faviconUrl={pageContext?.faviconUrl}
+              active={!quickAccessCollapsed}
+            />
+          </div>
           <div
             style={{
               flex: 1,
@@ -480,7 +650,11 @@ export function PanelShellClient({
             context bar — its own `h-full` would otherwise claim the full
             parent height and push the composer off the bottom. */}
         <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-          <MultiConversationSidebar contentId={selectedContentId} />
+          <MultiConversationSidebar
+            contentId={selectedContentId}
+            newChatNonce={newChatNonce}
+            newChatPrefill={ASK_ABOUT_PAGE_PREFILL}
+          />
         </div>
       </div>
       </DndWrapper>

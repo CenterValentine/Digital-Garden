@@ -156,11 +156,15 @@ window.addEventListener("message", (event) => {
           capturedAt: Date.now(),
         });
       } catch (error) {
-        postToEmbed("page-content-error", {
-          scope,
-          message:
-            error instanceof Error ? error.message : "Couldn't read this page",
-        });
+        const raw = error instanceof Error ? error.message : "";
+        // "Receiving end does not exist" means the tab has no content script —
+        // it was open before the extension loaded / updated, or is a page the
+        // extension can't run on. A tab reload re-injects the reader.
+        const message =
+          /receiving end does not exist|could not establish connection/i.test(raw)
+            ? "Reload this tab and try again — the reader wasn't loaded on this page (pages like the Chrome Web Store and chrome:// can't be read)."
+            : raw || "Couldn't read this page";
+        postToEmbed("page-content-error", { scope, message });
       }
     })();
     return;
@@ -192,6 +196,91 @@ window.addEventListener("message", (event) => {
           ? "Screenshots need updated permissions. Open chrome://extensions, reload this extension, and accept the access prompt — then try again."
           : raw || "Couldn't screenshot this page";
         postToEmbed("screenshot-error", { message });
+      }
+    })();
+    return;
+  }
+
+  // Associated content (Quick access): the embed asks for the resource context
+  // of a page URL. Only the background holds the bearer token, so relay there.
+  if (data.type === "fetch-resource-context" && data.payload?.url) {
+    const payload = data.payload;
+    void (async () => {
+      try {
+        const context = await sendRuntimeMessage({
+          type: "fetch-resource-context",
+          payload: {
+            url: payload.url,
+            title: payload.title || "",
+            faviconUrl: payload.faviconUrl || undefined,
+          },
+        });
+        postToEmbed("resource-context", { url: payload.url, context });
+      } catch (error) {
+        postToEmbed("resource-context-error", {
+          url: payload.url,
+          message:
+            error instanceof Error ? error.message : "Couldn't load associated content",
+        });
+      }
+    })();
+    return;
+  }
+
+  // Resolve the page's external content node (anchor for "chat about this
+  // page"): reuse an existing node for this URL if one exists, else create one.
+  // Dedup lives here so the embed gets a single content id back.
+  if (data.type === "resolve-page-node" && data.payload?.url) {
+    const payload = data.payload;
+    void (async () => {
+      try {
+        const context = await sendRuntimeMessage({
+          type: "fetch-resource-context",
+          payload: { url: payload.url, title: payload.title || "" },
+        });
+        let contentId = context?.externalContents?.[0]?.id || null;
+        if (!contentId) {
+          const node = await sendRuntimeMessage({
+            type: "create-content-picker-item",
+            payload: {
+              type: "external",
+              url: payload.url,
+              title: payload.title || "",
+              webResourceId: context?.resource?.id || null,
+            },
+          });
+          contentId = node?.id || null;
+        }
+        postToEmbed("page-node-resolved", { url: payload.url, contentId });
+      } catch (error) {
+        postToEmbed("page-node-error", {
+          url: payload.url,
+          message:
+            error instanceof Error ? error.message : "Couldn't save this page",
+        });
+      }
+    })();
+    return;
+  }
+
+  // "More from {hostname}" lazy expansion. The background handler reads `url`
+  // and `excludeResourceId` off the message itself (not a payload wrapper).
+  if (data.type === "fetch-domain-associations" && data.payload?.url) {
+    const payload = data.payload;
+    void (async () => {
+      try {
+        const result = await sendRuntimeMessage({
+          type: "fetch-domain-associations",
+          url: payload.url,
+          excludeResourceId: payload.excludeResourceId || null,
+        });
+        postToEmbed("domain-associations", { url: payload.url, result });
+      } catch (error) {
+        postToEmbed("domain-associations-error", {
+          url: payload.url,
+          message:
+            error instanceof Error ? error.message : "Couldn't load domain content",
+        });
       }
     })();
     return;
@@ -282,13 +371,21 @@ async function boot() {
   const panelUrl = new URL(`${baseUrl}/embed/panel`);
   if (sessionToken) panelUrl.searchParams.set("_t", sessionToken);
   // Opened via "Ask AI about this page" (context menu / shortcut) — land on
-  // the Chat view. One-shot: consumed here so a later manual open is neutral.
+  // the Chat view, and carry the intent (`ask-about-page`) so the embed starts
+  // a fresh chat about the page. One-shot: consumed here so a later manual open
+  // is neutral.
   try {
-    const { dgPanelView } = await chrome.storage.session.get("dgPanelView");
+    const { dgPanelView, dgPanelIntent } = await chrome.storage.session.get([
+      "dgPanelView",
+      "dgPanelIntent",
+    ]);
     if (dgPanelView === "chat") {
       panelUrl.searchParams.set("view", "chat");
-      await chrome.storage.session.remove("dgPanelView");
     }
+    if (dgPanelIntent) {
+      panelUrl.searchParams.set("intent", dgPanelIntent);
+    }
+    await chrome.storage.session.remove(["dgPanelView", "dgPanelIntent"]);
   } catch {
     // Session storage unavailable — default view is fine.
   }
@@ -301,5 +398,44 @@ async function boot() {
 }
 
 reloadBtn.addEventListener("click", () => void boot());
+
+// Long-lived port: its mere existence tells the background the panel is open,
+// so "Ask AI about this page" can switch views over it instead of calling
+// sidePanel.open() again (which would toggle the panel shut). Connect once per
+// panel document (not per boot()).
+let panelPort = null;
+try {
+  panelPort = chrome.runtime.connect({ name: "dg-panel" });
+  panelPort.onMessage.addListener((msg) => {
+    if (msg?.type === "show-chat") {
+      postToEmbed("set-view", { view: "chat", intent: msg.intent });
+    }
+  });
+  // Auto-recovery: a live port keeps the service worker awake, so while the
+  // panel is open the port only disconnects if the EXTENSION was reloaded —
+  // which invalidates this page's context and makes every chrome.* call fail
+  // with "Receiving end does not exist". Detect the dead context (runtime.id
+  // goes undefined) and reload to reconnect to the fresh background.
+  panelPort.onDisconnect.addListener(() => {
+    if (!chrome.runtime?.id) location.reload();
+  });
+} catch {
+  // Background unavailable — the panel still works; only live view-switching
+  // (already-open case) is lost, and the cold-open path is unaffected.
+  panelPort = null;
+}
+
+// Explicitly disconnect on unload so the background nulls its `panelPort`
+// immediately. Closing the side panel (X) unloads this document; relying on
+// Chrome's implicit port teardown alone can lag, leaving a stale port that
+// makes the next "Ask AI about this page" think the panel is still open (so it
+// messages the void instead of re-opening). pagehide is the reliable signal.
+window.addEventListener("pagehide", () => {
+  try {
+    panelPort?.disconnect();
+  } catch {
+    // Already torn down — nothing to do.
+  }
+});
 
 void boot();
