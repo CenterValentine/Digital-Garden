@@ -290,6 +290,8 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 **Schema versioning:** `lib/domain/editor/schema-version.ts` — MUST update `TIPTAP_SCHEMA_VERSION` (semver) whenever the schema changes. MAJOR bump requires a migration in `lib/domain/export/migrations.ts`.
 
+**Lossless markdown system** (source-view toggle + paste-as-markdown): `tiptap → markdown → tiptap` is guaranteed lossless by **per-block self-verification** — a block is emitted as pretty markdown / HTML only if it re-parses deep-equal, else it falls to a verbatim base64 `dg-block` fence. To make a custom block render as pretty markdown (e.g. callout → `> [!note]`), add a codec in `lib/domain/content/markdown-block-codecs.ts` (needs BOTH a `toMarkdown` and a parse-side `reTag`), and fix the extension's `renderHTML`↔`parseHTML` symmetry first if `generateJSON(generateHTML(node))` ≠ node. `pnpm markdown:blocks:check` is the CI gate. **Full guide + safe-extension recipe: [docs/notes-feature/guides/editor/LOSSLESS-MARKDOWN-SYSTEM.md](docs/notes-feature/guides/editor/LOSSLESS-MARKDOWN-SYSTEM.md)** — read before challenging a foundation here.
+
 **Auto-save:** 2-second debounce with visual indicator (yellow → green).
 
 ### Collaboration Architecture
