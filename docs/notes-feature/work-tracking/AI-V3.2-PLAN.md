@@ -185,6 +185,21 @@ self-verifying** serializer. Owner-approved after the empirical audit
   Per-block `> [!note]` etc. for CUSTOM blocks is the later north star. All
   optional prettiness on a proven-lossless floor.
 
+### T2 paste affordances (2026-07-22) ✅ BUILT
+
+Pasting raw markdown into the rich-text editor lands it as literal text (we
+never auto-convert — that guess is unsafe; a code snippet or literal `#` must
+stay literal). Two explicit affordances instead:
+- **Warning toast** (`MarkdownEditor` `handlePaste` + `markdown-detect.ts`):
+  when pasted text looks like markdown (conservative heuristic — one strong
+  structural signal OR two inline signals; validated against plain-prose false
+  positives), a dismissable toast fires with a one-click **"Paste as Markdown"**
+  (undo + reparse) and a **"Don't show again"** that persists in localStorage.
+  Literal paste still proceeds — deny-by-nag, not deny-by-convert.
+- **Context menu "Paste as Markdown"** (editor clipboard actions): reads the
+  clipboard, parses via the lossless converter, inserts through the editor
+  (collab-safe). The reliable path without switching to source view.
+
 - **Original scope notes below (kept for reference):**
 
 - Toggle in the editor toolbar: rich-text ⇄ markdown source. Source view
