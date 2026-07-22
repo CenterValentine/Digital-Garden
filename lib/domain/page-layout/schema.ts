@@ -83,6 +83,10 @@ const listSection = z.object({
   // Garden only: does this category's leaf grow up (shoot) or down (root)?
   // Drives the `gl--root` engine class. Absent → "shoot". Ignored by other kinds.
   growth: z.enum(["shoot", "root"]).optional(),
+  // Prose only: the section's h2 (emphasis-aware) and its margin pull-quote.
+  // `label` is the kicker; items are paragraphs (each item's `blurb`).
+  heading: emphasisString.optional(),
+  aside: z.string().optional(),
   items: z.array(listItem).default([]),
 });
 

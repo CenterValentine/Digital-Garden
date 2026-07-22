@@ -17,6 +17,7 @@
 const PREVIEWABLE: Record<string, string> = {
   results: "/results",
   blog: "/blog",
+  about: "/about",
 };
 
 export function PreviewPane({

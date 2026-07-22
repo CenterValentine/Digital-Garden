@@ -270,7 +270,8 @@ export function ItemEditor({
 
   return (
     <div className="grid grid-cols-1 gap-3 border-t border-white/5 px-3 py-3 sm:grid-cols-2">
-      <TitleField item={item} inherited={inherited} set={set} />
+      {/* Prose paragraphs have no title — the blurb IS the paragraph. */}
+      {pageKind !== "prose" && <TitleField item={item} inherited={inherited} set={set} />}
 
       {pageKind === "record" && (
         <>
@@ -340,13 +341,33 @@ export function ItemEditor({
         </>
       )}
 
-      {(pageKind === "index" || pageKind === "prose") && (
+      {pageKind === "index" && (
         <>
           <OverridableText label="Subtitle" value={item.subtitle} placeholder="Optional secondary line" onChange={(v) => set("subtitle", v)} />
           <div className="flex items-end">
             <HiddenToggle item={item} set={set} />
           </div>
           <BlurbField item={item} inherited={inherited} set={set} />
+        </>
+      )}
+
+      {pageKind === "prose" && (
+        <>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <span className="font-mono text-[10px] uppercase tracking-wider text-white/40">
+              Paragraph — wrap a phrase in **stars** to bold it
+            </span>
+            <textarea
+              aria-label="Paragraph"
+              className={`${inputCls} min-h-[80px] font-serif`}
+              value={item.blurb ?? ""}
+              placeholder="The paragraph text."
+              onChange={(e) => set("blurb", e.target.value === "" ? undefined : e.target.value)}
+            />
+          </div>
+          <div className="flex items-end">
+            <HiddenToggle item={item} set={set} />
+          </div>
         </>
       )}
     </div>

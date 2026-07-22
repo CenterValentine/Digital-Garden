@@ -81,6 +81,7 @@ export function slugToSegment(slug: string): string {
 const PERSONAL_ROUTES: Record<string, { kind: PageKind; label: string }> = {
   results: { kind: "record", label: "Results / Work" },
   blog: { kind: "garden", label: "Field Notes" },
+  about: { kind: "prose", label: "About" },
 };
 
 export type RouteStatus = "wired" | "wrong-kind" | "home" | "unwired";

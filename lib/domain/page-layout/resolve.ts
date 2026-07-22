@@ -28,6 +28,7 @@ import type {
   WorkData,
   GardenData,
   GardenItem,
+  ProseData,
   ResolvedRecordEntry,
   ResolvedRecordSection,
   ResolvedTimelineEntry,
@@ -306,4 +307,31 @@ export async function fetchGardenData(
     };
   }
   return cats;
+}
+
+/**
+ * Resolve a prose page's editable body (About). Each section → a narrative
+ * block: `label` is the kicker, `heading` the h2, items' `blurb`s the
+ * paragraphs, `aside` the margin pull-quote. Hero/intro/CTAs stay in the
+ * component. Null when the page has no sections (component keeps its default).
+ */
+export async function fetchProseData(
+  tenantId: string,
+  slug: string,
+  opts?: ResolveOptions,
+): Promise<ProseData | null> {
+  const loaded = await loadPage(tenantId, slug, opts);
+  if (!loaded || loaded.config.sections.length === 0) return null;
+
+  return {
+    sections: loaded.config.sections.map((section) => ({
+      kicker: section.label,
+      heading: section.heading ?? "",
+      paragraphs: section.items
+        .filter((item) => !item.hidden)
+        .map((item) => item.blurb ?? "")
+        .filter((p) => p.trim().length > 0),
+      aside: section.aside,
+    })),
+  };
 }
