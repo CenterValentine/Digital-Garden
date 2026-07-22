@@ -22,10 +22,10 @@ last_updated: 2026-07-16
 
 Panel workspace + page-aware chat + Quick access + chat-about-page shipped. Deferred by design:
 
-- [ ] **Composer auto-focus on "Ask AI about this page"** — the new chat opens ready with the opener pre-filled, but the composer isn't focused; the user clicks once to type. Wire a focus signal down `MultiConversationSidebar → ChatPanel → ChatInput` (a ref or a focus-nonce) so the caret lands in the composer when a page-chat starts.
+- [x] ~~Composer auto-focus on "Ask AI about this page"~~ — **SHIPPED (PR #123)**: `ChatInput` focuses itself (caret at end) on mount when it opens with content in the panel embed (`isPanelEmbedSurface()`), scoped so it never steals focus from the app editor.
 - [ ] **Page nodes land at tree root** — `createExtensionContentPickerItem(type:"external")` creates the page's external node with `parentId: null` (root). Consider a dedicated "Web pages" (or per-domain) folder so "Ask AI about this page" doesn't accumulate nodes at the tree root. Dedup already prevents duplicates per URL.
-- [ ] **On-demand reader injection for capture** — page capture uses the overlay content script; a tab open *before* the extension loaded (or not reloaded after an update) has no reader → "Reload this tab" error. With the `scripting` permission we could inject a lightweight, UI-free reader on demand and retry, instead of asking the user to reload. Needs a separate `dist/reader.js` esbuild entry (the full overlay is too heavy/intrusive to inject).
-- [ ] **Re-verify fresh-tab capture end-to-end** — confirm page-context attach works on a freshly-loaded tab after an extension reload (content script present). Panel auto-recovery now self-heals the panel context; this verifies the capture half.
+- [x] ~~On-demand reader injection for capture~~ — **SHIPPED (PR #123)**: `src/reader` bundles a UI-free `dg-extract-content` responder to `dist/reader.js`; the panel host injects it via `chrome.scripting` when a tab has no overlay, then retries. Only fires when the overlay is absent (no double-listener). ⚠ verify `chrome.scripting.executeScript` works from the side panel at runtime.
+- [ ] **Re-verify fresh-tab / stale-tab capture end-to-end** — confirm page-context attach works on a tab that predates the extension load (the reader-injection path) and on a freshly-loaded tab. Panel auto-recovery self-heals the panel context; this verifies the capture half.
 
 ---
 
