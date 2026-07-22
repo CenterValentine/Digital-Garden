@@ -193,6 +193,48 @@ const VERCEL_GATEWAY: ConnectionTemplate = {
   supportsModelFetch: true,
 };
 
+// Cost-effective vendor catch-up (AI v3.1 R4, owner addition 2026-07-18).
+// Neither vendor exposes an AI-SDK-expressible native web search (Moonshot's
+// $web_search is a builtin_function the OpenAI-compat adapter can't
+// serialize; DeepSeek has none) — search_web deliberately does NOT attach
+// for either (straight-faced), read_page works fully.
+
+const DEEPSEEK: ConnectionTemplate = {
+  id: "deepseek",
+  name: "DeepSeek",
+  kind: "direct",
+  adapterKind: "deepseek",
+  defaultBaseURL: null, // official @ai-sdk/deepseek uses its own default
+  baseURLLocked: true,
+  defaultModels: [
+    { id: "deepseek-chat", name: "DeepSeek Chat (V3)", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
+    { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)", contextWindow: 128_000, capabilities: ["text", "streaming"] },
+  ],
+  apiKeyHint: "Starts with `sk-` — get one from platform.deepseek.com",
+  apiKeyDocsURL: "https://platform.deepseek.com/api_keys",
+  supportsModelFetch: true,
+};
+
+const MOONSHOT: ConnectionTemplate = {
+  id: "moonshot",
+  name: "Moonshot (Kimi)",
+  kind: "direct",
+  adapterKind: "openai-compat",
+  defaultBaseURL: "https://api.moonshot.ai/v1",
+  baseURLLocked: false, // .cn endpoint for mainland accounts
+  // Moonshot's model ids are VOLATILE and account/tier-specific: every
+  // documented default we tried (kimi-latest, kimi-k2-turbo-preview,
+  // moonshot-v1-*) 404'd with "model not found or permission denied" on
+  // an account that only exposed kimi-k2.6 / kimi-k3 / kimi-k2.7-code.
+  // So ship NO guessed models — the form's "Fetch from API" is the source
+  // of truth for the account's real list (owner directive 2026-07-21:
+  // no hardcoded invalid model ids).
+  defaultModels: [],
+  apiKeyHint: "Get one from platform.moonshot.ai (use api.moonshot.cn as base URL for mainland accounts). After saving, click Fetch from API for your account's exact models.",
+  apiKeyDocsURL: "https://platform.moonshot.ai/console/api-keys",
+  supportsModelFetch: true,
+};
+
 const FIREWORKS: ConnectionTemplate = {
   id: "fireworks",
   name: "Fireworks",
@@ -262,6 +304,8 @@ export const CONNECTION_TEMPLATES: ConnectionTemplate[] = [
   XAI,
   MISTRAL,
   GROQ,
+  DEEPSEEK,
+  MOONSHOT,
   VERCEL_GATEWAY,
   FIREWORKS,
   TOGETHER,

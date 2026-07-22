@@ -11,7 +11,7 @@
  * nodes/edges; the React Flow canvas is another.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -277,6 +277,33 @@ export function WorkflowBuilder({
     void load();
   }, [load]);
 
+  // AI updates to THIS workflow (v3.1 R2): the chat engine dispatches
+  // dg:workflow-refresh when update_workflow/propose_workflow outputs
+  // land. A clean canvas reloads silently; a dirty canvas gets a
+  // non-destructive banner — silent reload would discard local edits,
+  // silently ignoring would let a stale Save clobber the AI's version.
+  const [aiUpdatedBanner, setAiUpdatedBanner] = useState(false);
+  const dirtyRef = useRef(dirty);
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
+  useEffect(() => {
+    const handler = (event: Event) => {
+      const detail = (event as CustomEvent).detail as
+        | { contentId?: string }
+        | undefined;
+      if (!detail?.contentId || detail.contentId !== selectedContentId) return;
+      if (dirtyRef.current) {
+        setAiUpdatedBanner(true);
+      } else {
+        setAiUpdatedBanner(false);
+        void load();
+      }
+    };
+    window.addEventListener("dg:workflow-refresh", handler);
+    return () => window.removeEventListener("dg:workflow-refresh", handler);
+  }, [selectedContentId, load]);
+
   const chain = useMemo(() => (graph ? deriveChain(graph) : null), [graph]);
   const clientIssues = useMemo(
     () => (graph ? validateGraph(graph).issues : []),
@@ -486,6 +513,33 @@ export function WorkflowBuilder({
 
   return (
     <div className="flex h-full flex-col overflow-y-auto">
+      {aiUpdatedBanner && (
+        <div className="flex items-center justify-between gap-2 border-b border-amber-400/40 bg-amber-500/10 px-4 py-2 text-xs text-amber-900 dark:text-amber-200">
+          <span>
+            The AI updated this workflow — your canvas has unsaved changes.
+            Saving now would overwrite the AI&apos;s version.
+          </span>
+          <span className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAiUpdatedBanner(false);
+                void load();
+              }}
+              className="rounded-md border border-amber-500/40 px-2 py-1 font-medium hover:bg-amber-500/15 transition-colors"
+            >
+              Reload (discard my edits)
+            </button>
+            <button
+              type="button"
+              onClick={() => setAiUpdatedBanner(false)}
+              className="rounded-md px-2 py-1 hover:bg-amber-500/15 transition-colors"
+            >
+              Keep editing
+            </button>
+          </span>
+        </div>
+      )}
       <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-black/10 bg-white/90 px-4 py-2 backdrop-blur dark:border-white/10 dark:bg-gray-950/90">
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">

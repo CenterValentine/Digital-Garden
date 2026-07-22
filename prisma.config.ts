@@ -21,5 +21,10 @@ export default defineConfig({
   },
   datasource: {
     url: databaseUrl,
+    // Shadow DB for `migrate dev` / `migrate diff --from-migrations`. Neon
+    // can't create the throwaway shadow itself, so point this at a local
+    // Postgres (e.g. the dev Docker container) via SHADOW_DATABASE_URL.
+    // Unset in normal use (undefined = no effect).
+    shadowDatabaseUrl: process.env.SHADOW_DATABASE_URL,
   },
 });

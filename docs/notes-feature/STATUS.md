@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-18
+last_updated: 2026-07-20
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,15 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 20, 2026**: ✅ Browser Reach B1 — the side panel is a mini-DG shell (PR #115; plan: `work-tracking/BROWSER-REACH-PLAN.md`)
+
+- **Side panel shell**: launch-handle opens `chrome.sidePanel` hosting `/embed/panel` — file tree + tabbed workspace + multi-conversation chat at panel width. Extension chrome is only a context bar (page pill, reload). Alt/shift-click still opens the legacy overlay; older Chromium falls back automatically.
+- **Panel chrome**: navigation bar suppressed, workspace chooser moved inside the collapsible Files section, single-pane enforced through the store, first-run tooltip teaching the two-surface principle.
+- **Overlay projection**: right-click a tree item or tab → "Open as overlay"; drag a tab → four-quadrant chooser that maps to page corners. (A drag can't cross from the panel into the page — separate documents — so the panel shows a miniature *of* the page instead. Umbrella decision #12's drag-onto-page gesture is corrected in the plan.)
+- **App features that came with it**: Recents view (left rail, aggregates navigation history), clear-tabs ⊗ hold-for-per-pane menu, freezable (❆) overlay panels that follow across sites.
+- **Two systemic fixes**: failed collaboration no longer steals the caret (`useEditor` deps reduced to `[editorMode]`); Hocuspocus `/readyz` no longer crashes the process (PR #116 — `throw null` is Hocuspocus's required stop-the-chain signal; the `try` now scopes to the DB probe alone).
+- **Dev collaboration topology changed**: dev DB is local Docker Postgres while the hosted Hocuspocus reads Neon, so local dev now requires `pnpm dev:collab` from the same checkout. Documented in CLAUDE.md.
 
 **July 18, 2026**: AI Infrastructure Upgrade v3 — core (app-side) build complete, S1–S6 (branch `worktree-ai-v3-core`, PR pending; plan: `work-tracking/AI-V3-CORE-PLAN.md`)
 

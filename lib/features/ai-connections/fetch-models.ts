@@ -93,6 +93,10 @@ function planForAdapter(
   if (adapterKind === "groq") {
     return { url: "https://api.groq.com/openai/v1/models", auth: "bearer", shape: "openai" };
   }
+  if (adapterKind === "deepseek") {
+    // OpenAI-shape /models at DeepSeek's API root (v3.1 R4).
+    return { url: "https://api.deepseek.com/models", auth: "bearer", shape: "openai" };
+  }
   if (adapterKind === "vercel-gateway") {
     return { url: "https://ai-gateway.vercel.sh/v1/models", auth: "bearer", shape: "openai" };
   }

@@ -47,6 +47,54 @@ import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { getAttachedPageContext } from "@/state/panel-page-context-store";
 
+/**
+ * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's output
+ * for the __notePayload envelope and dispatches the freshness events —
+ * dg:tree-refresh (file tree), then dg:notes-refresh (surgical note
+ * reload) or dg:workflow-refresh (canvas) by artifact noun. Deduped by
+ * toolCallId through the shared seen-set so the streaming effect and the
+ * onFinish backstop never double-fire, including across two surfaces
+ * bound to the same conversation (toolCallIds are globally unique).
+ */
+const dispatchedArtifactToolCalls = new Set<string>();
+
+function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
+  if (typeof window === "undefined") return;
+  const p = part as { toolCallId?: string; output?: unknown };
+  if (!p.toolCallId || p.output === undefined) return;
+  if (seen.has(p.toolCallId)) return;
+  seen.add(p.toolCallId);
+  const str =
+    typeof p.output === "string" ? p.output : JSON.stringify(p.output);
+  if (!str.includes('"__notePayload"')) return;
+  try {
+    const parsed = JSON.parse(str) as {
+      __notePayload?: boolean;
+      contentId?: string;
+      noun?: string;
+    };
+    if (!parsed.__notePayload || typeof parsed.contentId !== "string") return;
+    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    if (parsed.noun === "workflow") {
+      window.dispatchEvent(
+        new CustomEvent("dg:workflow-refresh", {
+          detail: { contentId: parsed.contentId },
+        }),
+      );
+    } else {
+      // Surgical notes-only refresh — narrower than `content-updated`,
+      // which resets loading/outline/tab state (see MainPanelContent).
+      window.dispatchEvent(
+        new CustomEvent("dg:notes-refresh", {
+          detail: { contentId: parsed.contentId },
+        }),
+      );
+    }
+  } catch {
+    /* unparseable tool output — skip */
+  }
+}
+
 /** Mention syntax shared by composer + send pipeline: `@[Title](id)`. */
 const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
 
@@ -602,35 +650,11 @@ export function useConversationEngine({
       try {
         const fresh = e.message;
         if (fresh && typeof window !== "undefined") {
+          // Backstop only (v3.1 R2): the stream-time effect below has
+          // usually dispatched these already as outputs arrived; the
+          // shared seen-set makes this pass a no-op for anything it saw.
           for (const part of fresh.parts ?? []) {
-            const output = (part as { output?: unknown }).output;
-            if (output === undefined) continue;
-            const str =
-              typeof output === "string" ? output : JSON.stringify(output);
-            if (!str.includes('"__notePayload"')) continue;
-            try {
-              const parsed = JSON.parse(str) as {
-                __notePayload?: boolean;
-                contentId?: string;
-              };
-              if (parsed.__notePayload && typeof parsed.contentId === "string") {
-                window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-                // Surgical notes-only refresh — narrower than the
-                // existing `content-updated` event which triggers
-                // MainPanelContent's full `fetchNote` (which resets
-                // loading + outline + tab title + content + clears
-                // error state). Only the pane whose `selectedContentId`
-                // matches this contentId reacts, and only `noteContent`
-                // gets updated. Outline / title / tab unchanged.
-                window.dispatchEvent(
-                  new CustomEvent("dg:notes-refresh", {
-                    detail: { contentId: parsed.contentId },
-                  }),
-                );
-              }
-            } catch {
-              /* unparseable tool output — skip */
-            }
+            maybeDispatchArtifactRefresh(part, dispatchedArtifactToolCalls);
           }
         }
       } catch {
@@ -659,6 +683,24 @@ export function useConversationEngine({
     regenerate,
     addToolApprovalResponse,
   } = chat;
+
+  // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
+  // outputs ARRIVE in the stream, not just at turn end — a playbook turn
+  // can run for minutes, and the file tree stayed stale the whole time.
+  // The onFinish pass above remains as the backstop; the shared seen-set
+  // keeps the two from double-firing.
+  useEffect(() => {
+    // Active turns only — on conversation load (status "ready") historical
+    // outputs must NOT dispatch, or every page open triggers a spurious
+    // refetch (the original render-path-dispatch hazard). Turn-end outputs
+    // are the onFinish backstop's job.
+    if (status !== "streaming" && status !== "submitted") return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    for (const part of last.parts ?? []) {
+      maybeDispatchArtifactRefresh(part, dispatchedArtifactToolCalls);
+    }
+  }, [messages, status]);
 
   // Keep the transport's baseline body for this chat current. Internal
   // SDK sends (approval resume, regenerate) read it at request time.

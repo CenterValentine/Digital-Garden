@@ -94,6 +94,14 @@ This chat has an attached notes panel (a TipTap editor keyed to this chat's cont
 `;
 }
 
+// ─── Runtime identity ────────────────────────────────────────────────────
+
+function identitySection(providerName: string, modelId: string): string {
+  return `\
+## Your Runtime Identity
+This session is being served by **${providerName}**, model \`${modelId}\`. That is ground truth for THIS conversation — it comes from the app's live routing, not your training data. If asked which model, provider, or version you are, answer with exactly this. Do NOT deny it, guess a different identity, or cite a training-cutoff-based self-description that contradicts it; your own training data about "who you are" is unreliable here and this routing is authoritative.`;
+}
+
 // ─── Builder ──────────────────────────────────────────────────────────────
 
 export interface SystemPromptContext {
@@ -103,6 +111,14 @@ export interface SystemPromptContext {
   hasWebSearch: boolean;
   /** True when phase_checkpoint is attached (AI v3 S4d playbook runtime). */
   hasCheckpointTool: boolean;
+  /**
+   * The provider/model actually serving this turn (v3.1) — resolved from
+   * live routing, NOT settings. Lets the model answer "which model are
+   * you" from ground truth instead of confabulating (Kimi denied being
+   * Kimi; models' self-identity training is unreliable).
+   */
+  runtimeProviderName: string | undefined;
+  runtimeModelId: string | undefined;
   /**
    * Title of the Trellis workflow the user has open (AI v3 S6). When set,
    * the prompt states the default: workflow requests are about THIS
@@ -122,18 +138,13 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
   const sections: string[] = [BASE_PROMPT];
 
-  // Date only (no time) so the prompt stays byte-stable within a day —
-  // preserves provider prompt-cache hits across a session (cache-aware
-  // layout, AI v3 core). Without this, models guess "today" from their
-  // training era and search queries carry years-stale dates.
-  sections.push(
-    `Current date: ${new Date().toLocaleDateString("en-US", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
-  );
+  // Runtime identity first — the model must know what it actually IS
+  // before anything else, so identity questions resolve from routing
+  // rather than confabulated self-knowledge.
+  if (ctx.runtimeProviderName && ctx.runtimeModelId) {
+    sections.push(identitySection(ctx.runtimeProviderName, ctx.runtimeModelId));
+  }
+
   sections.push(
     "Tool discipline: if a tool result is empty or unhelpful, do NOT repeat the same or a near-identical call — vary the approach once at most, then answer with what you have and state the limitation plainly.",
   );
@@ -152,6 +163,21 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.openWorkflowTitle) sections.push(workflowSection(ctx.openWorkflowTitle));
   if (ctx.editableContentId) sections.push(editorSection(ctx.editableContentId));
   if (ctx.isChatContent && ctx.chatContentId) sections.push(chatContentSection(ctx.chatContentId));
+
+  // Date only (no time) so the prompt stays byte-stable within a day —
+  // and placed LAST among the static sections (v3.1 R5 cache-aware
+  // layout): a date rollover mid-session now invalidates only this
+  // suffix, not every tool/feature section after it. Without the date,
+  // models guess "today" from their training era and search queries
+  // carry years-stale dates.
+  sections.push(
+    `Current date: ${new Date().toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
+  );
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
   // Untrusted page content goes LAST, after all trusted instructions, so its

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-16
+last_updated: 2026-07-21
 ---
 
 # Sprint Backlog
@@ -26,6 +26,30 @@ Panel workspace + page-aware chat + Quick access + chat-about-page shipped. Defe
 - [ ] **Page nodes land at tree root** — `createExtensionContentPickerItem(type:"external")` creates the page's external node with `parentId: null` (root). Consider a dedicated "Web pages" (or per-domain) folder so "Ask AI about this page" doesn't accumulate nodes at the tree root. Dedup already prevents duplicates per URL.
 - [x] ~~On-demand reader injection for capture~~ — **SHIPPED (PR #123)**: `src/reader` bundles a UI-free `dg-extract-content` responder to `dist/reader.js`; the panel host injects it via `chrome.scripting` when a tab has no overlay, then retries. Only fires when the overlay is absent (no double-listener). ⚠ verify `chrome.scripting.executeScript` works from the side panel at runtime.
 - [ ] **Re-verify fresh-tab / stale-tab capture end-to-end** — confirm page-context attach works on a tab that predates the extension load (the reader-injection path) and on a freshly-loaded tab. Panel auto-recovery self-heals the panel context; this verifies the capture half.
+
+---
+
+## AI v3 Core Followups (2026-07-18, branch `worktree-ai-v3-core`, PR #114)
+
+S1–S6 built and MERGED (PR #114 / `9f15281`); Anthropic + OpenAI flagship runs passed. **AI v3.1 (R1–R6) is BUILT but UNMERGED — 18 commits on `worktree-ai-v3-core` ahead of main, no PR opened yet.** Status below reflects 3.1 delivery; the memory-bank / JIT-retrieval / validated-compaction thread is deferred to AI V4 (design captured in `AI-V3.1-PLAN.md`'s final section).
+
+- [x] **Mid-run document review disruption** — BUILT 3.1 R1 (`d84b710`): artifact cards open in a split pane during active runs; peek overlay descoped. *Smoke pending.*
+- [x] **Note-card right-click "Open in pane"** — BUILT 3.1 R1 (`d84b710`): portaled menu on every artifact card, both chat surfaces. *Smoke pending.*
+- [ ] **[→ 3.2 T2] Markdown ↔ TipTap source-view toggle** in the editor toolbar (owner request) — view/edit a note's markdown source alongside rich text.
+- [x] **Model-selection stickiness** — BUILT 3.1 R3 (`6cd7d2d`): persisted last-explicit-pick; chain = conversation stamp > last pick > settings. Root cause included a dead `claude-sonnet-3-5` fallback. *Smoke pending.*
+- [x] **File-tree live refresh** — BUILT 3.1 R2 (`d84e945`): refresh dispatches on tool-output arrival mid-stream, not at turn end. *Smoke pending.*
+- [x] **Canvas live-refresh after AI `update_workflow`** — BUILT 3.1 R2 (`d84e945`): builder listens for `dg:workflow-refresh`; clean canvas reloads, dirty canvas gets a non-destructive banner. *Smoke pending.*
+- [ ] **[→ 3.2 T4] Resumable-stream store (live re-attach)** — no-lost-work already ships (server `consumeStream` + idempotent persistence); live re-attach to an in-flight stream needs Redis-class infra (Upstash via Vercel Marketplace, or Redis on the Coolify homeserver).
+- [ ] **[→ 3.2 T3] S4c playbook progressive-disclosure registry** — playbooks currently invoked by @-mentioning the note; the registry adds discovery + per-phase disclosure.
+- [ ] **[→ 3.2 T1] HARDEN the markdown ↔ TipTap translation layer (owner directive 2026-07-20 — "I don't like this patching approach")** — markdown content will keep arriving (AI tools, imports, pastes, publishing), so translation correctness must be a hardened, tested seam rather than a series of repair scripts. Scope when taken up: ONE canonical translation entry point (server + client parity), round-trip test coverage (markdown → TipTap → markdown) over the real node/mark set, explicit failure behavior instead of a silent paragraph fallback, and collab-aware repair semantics (Y.doc is authoritative for collab notes — payload rewrites are invisible/divergent). `scripts/regen-degraded-notes.ts` (R6) is the SALVAGE tool for already-degraded content and should be folded in as the backfill arm of that work, not extended piecemeal.
+- [~] **Regen sweep for pre-fix degraded notes** — TOOL BUILT 3.1 R6 (`af4dca6`, `pnpm notes:regen`). Dry run: 57 payloads → 4 degraded + 3 collab-skipped. **1 of 4 applied** (Resume, verified). Remaining: 3 non-collab notes unapplied by choice; the 3 collab-live notes need the hardening work above, not a patch.
+- [ ] **[→ 3.2 T5] Conversation title strategy for quick URL chats** — page title vs first-message summary (deferred S3-time call).
+- [x] **Context-discipline near-term set** — BUILT 3.1 R5 (`4d1687a`): tokens-per-phase meter + ledger stamps, extraction subagent (`tool-result-extraction` route), cache-aware prompt ordering. **Validated compaction split to R5b → deferred to V4** (no history compaction exists to validate — net-new hot-path work). JIT retrieval stays with V4 memory. *Smoke pending — extraction needs the feature routed.*
+- [x] **Kimi/Moonshot + DeepSeek catch-up** — BUILT 3.1 R4 (`1241291`): BYOK templates + DeepSeek adapter, gateway parity verified. Kimi native search proved unwirable via AI SDK (builtin_function) → both ship straight-faced searchless. *Smoke pending — needs BYOK keys.*
+- [ ] **[→ 3.2 T6] Acquisition explainer session** for the owner (umbrella post-V3 queue).
+
+Completed en route (recorded here so nobody re-plans them): approval-card per-tool previews (486544c), citation-split bubble coalescing (65ae4e7), new-chat auto-targeting + move-follows (0a31ca0), connection-editor instant persistence + fieldset grammar (6fd3dcb/1ea57ee/88b1341).
+- **Universal web search for non-native providers (2026-07-21)** — modular app-executed `search_web` backend (Tavily default + Brave; swappable via APP_SEARCH_PROVIDER; add a backend = one file + one registry line) attaches for "dumb models" (DeepSeek, Kimi, Mistral, Groq, local) that lack native search; big four keep native. Dissolves R4's straight-faced non-attachment. Needs TAVILY_API_KEY (or BRAVE_SEARCH_API_KEY) in env. Followups: settings-UI backend picker + per-connection key (today: env-driven); SearXNG/Serper backends (interface ready).
 
 ---
 

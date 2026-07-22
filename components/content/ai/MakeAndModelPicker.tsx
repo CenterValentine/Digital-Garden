@@ -25,6 +25,7 @@ import Link from "next/link";
 import { ChevronUp, ChevronDown, MoreHorizontal, Sparkles, AlertCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import { lookupTemplate } from "@/lib/features/ai-connections/templates";
 import { compareModelRecency } from "@/lib/domain/ai/model-popularity";
 import {
   BIG_THREE_PROVIDER_IDS,
@@ -303,7 +304,42 @@ export function MakeAndModelPicker({
         models: merged,
       };
     });
-    return [...fromCatalog, ...dynamicProviders];
+
+    // Direct-connection providers the catalog doesn't know about
+    // (DeepSeek, Moonshot, or any future BYOK direct preset). These carry
+    // BARE model ids, so `dynamicProviders` (namespaced-only) misses them
+    // and `fromCatalog` never emits them — without this they were
+    // collected into userModelsByProvider and silently dropped. Named via
+    // the connection template, then the connection label, then the preset
+    // id. This makes the picker fully connection-driven.
+    const known = new Set<string>(PROVIDER_CATALOG.map((p) => p.id));
+    const dynamicIds = new Set(dynamicProviders.map((p) => p.id));
+    const directProviders: PickerProvider[] = [];
+    for (const [prov, models] of userModelsByProvider) {
+      if (known.has(prov) || dynamicIds.has(prov)) continue;
+      const label =
+        lookupTemplate(prov)?.name ??
+        connections.find((c) => c.presetId === prov)?.name ??
+        prov
+          .split(/[-_]/)
+          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+          .join(" ");
+      directProviders.push({
+        id: prov,
+        name: label,
+        models: Array.from(models.values())
+          .map((m) => ({ id: m.id, name: m.name, costTier: "medium" as const }))
+          .sort((a, b) => {
+            const availA = isModelAvailable(prov, a.id, connections) ? 1 : 0;
+            const availB = isModelAvailable(prov, b.id, connections) ? 1 : 0;
+            if (availA !== availB) return availB - availA;
+            return compareModelRecency(a, b);
+          }),
+      });
+    }
+    directProviders.sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...fromCatalog, ...dynamicProviders, ...directProviders];
   }, [connections, dynamicProviders]);
 
   const activeProvider = allProviders.find((p) => p.id === providerId);

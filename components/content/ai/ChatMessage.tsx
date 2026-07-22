@@ -22,6 +22,7 @@ import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
+import { ArtifactContextMenu, openArtifactInSplitPane } from "./artifact-open";
 import { useSettingsStore } from "@/state/settings-store";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
@@ -209,6 +210,13 @@ interface ChatMessageProps {
    * Approve/Reject call this; the engine's sendAutomaticallyWhen resumes
    * the loop once all pending approvals are answered.
    */
+  /**
+   * AI v3.1 R1 — mid-run review. When true (full-page chat while the run
+   * is streaming or parked on an approval), artifact cards default-click
+   * into a SPLIT PANE so review never displaces the conversation.
+   * Right-click "Open in split pane" is available regardless.
+   */
+  midRunPaneOpen?: boolean;
   onToolApprovalResponse?: (opts: {
     id: string;
     approved: boolean;
@@ -252,6 +260,7 @@ export const ChatMessage = memo(function ChatMessage({
   revertableToolIds,
   onToolApprovalResponse,
   approvalActionable = true,
+  midRunPaneOpen = false,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -765,7 +774,11 @@ export const ChatMessage = memo(function ChatMessage({
 
         {/* Note cards — clickable link affordance for createNote / updateNote */}
         {notePayloads.map((payload) => (
-          <NotePayloadCard key={payload.contentId} payload={payload} />
+          <NotePayloadCard
+            key={payload.contentId}
+            payload={payload}
+            midRunPaneOpen={midRunPaneOpen}
+          />
         ))}
 
         {/* Deck proposals — Session 2: interactive card with POST commit */}
@@ -2238,7 +2251,13 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * opens the note in the main panel. Compact so it doesn't dominate the
  * assistant turn — Bug C target.
  */
-function NotePayloadCard({ payload }: { payload: NotePayload }) {
+function NotePayloadCard({
+  payload,
+  midRunPaneOpen = false,
+}: {
+  payload: NotePayload;
+  midRunPaneOpen?: boolean;
+}) {
   // Self-edit detection: the AI updated this very chat's own sidecar
   // notes (same contentId as the open content). In that case clicking
   // "open" doesn't make sense — you're already here — so instead we
@@ -2251,6 +2270,11 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
   // the user is looking at — that's not a notes-panel affair (S6).
   const isSelfEdit =
     selectedContentId === payload.contentId && (payload.noun ?? "note") === "note";
+  // Right-click menu anchor (R1) — null when closed.
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  const noun = payload.noun ?? "note";
+  const artifactContentType = noun === "workflow" ? "workflow" : "note";
 
   const handleClick = useCallback(() => {
     if (isSelfEdit) {
@@ -2264,39 +2288,71 @@ function NotePayloadCard({ payload }: { payload: NotePayload }) {
       }, 0);
       return;
     }
+    // Mid-run review (v3.1 R1): while the run is active, the artifact
+    // opens BESIDE the conversation, never over it.
+    if (midRunPaneOpen) {
+      openArtifactInSplitPane({
+        contentId: payload.contentId,
+        title: payload.title,
+        contentType: artifactContentType,
+      });
+      return;
+    }
     useContentStore.getState().setSelectedContentId(payload.contentId);
-  }, [isSelfEdit, payload.contentId]);
+  }, [
+    isSelfEdit,
+    midRunPaneOpen,
+    payload.contentId,
+    payload.title,
+    artifactContentType,
+  ]);
 
   const verb = payload.kind === "updated" ? "Updated" : "Created";
-  const noun = payload.noun ?? "note";
   const wordCount =
     typeof payload.wordCount === "number" && payload.wordCount > 0
       ? ` · ${payload.wordCount.toLocaleString()} word${payload.wordCount === 1 ? "" : "s"}`
       : "";
   const subline = isSelfEdit
     ? `${verb} this chat's notes${wordCount} · click to view`
-    : `${verb} ${noun}${wordCount} · click to open`;
+    : `${verb} ${noun}${wordCount} · click to ${midRunPaneOpen ? "open in split pane" : "open"}`;
   const tooltipText = isSelfEdit
     ? "View the updated notes for this chat"
-    : `Open "${payload.title}"`;
+    : `Open "${payload.title}"${midRunPaneOpen ? " in a split pane" : ""} — right-click for options`;
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 text-left text-sm transition-colors hover:border-blue-400/40 hover:bg-blue-500/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
-      title={tooltipText}
-    >
-      <FileText className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
-      <span className="flex min-w-0 flex-col">
-        <span className="truncate font-medium text-gray-900 group-hover:text-blue-700 dark:text-gray-100 dark:group-hover:text-blue-300">
-          {payload.title}
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setMenuPos({ x: e.clientX, y: e.clientY });
+        }}
+        className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-black/10 bg-black/[0.03] px-3 py-2 text-left text-sm transition-colors hover:border-blue-400/40 hover:bg-blue-500/5 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10"
+        title={tooltipText}
+      >
+        <FileText className="h-4 w-4 shrink-0 text-blue-500 dark:text-blue-400" />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-gray-900 group-hover:text-blue-700 dark:text-gray-100 dark:group-hover:text-blue-300">
+            {payload.title}
+          </span>
+          <span className="text-[11px] text-gray-500 dark:text-gray-400">
+            {subline}
+          </span>
         </span>
-        <span className="text-[11px] text-gray-500 dark:text-gray-400">
-          {subline}
-        </span>
-      </span>
-    </button>
+      </button>
+      {menuPos && (
+        <ArtifactContextMenu
+          position={menuPos}
+          artifact={{
+            contentId: payload.contentId,
+            title: payload.title,
+            contentType: artifactContentType,
+          }}
+          onClose={() => setMenuPos(null)}
+        />
+      )}
+    </>
   );
 }
 

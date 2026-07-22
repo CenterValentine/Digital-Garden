@@ -1,0 +1,49 @@
+name: migration-drift
+
+# Keeps the migration history and schema.prisma in lockstep. Replays every
+# migration into a throwaway shadow database and asserts the result reproduces
+# schema.prisma. Fails if a schema change shipped without a migration (drift),
+# or if the history can't replay. See docs/.../MIGRATION-BASELINE-SQUASH.md.
+
+on:
+  pull_request:
+    paths:
+      - "prisma/schema.prisma"
+      - "prisma/migrations/**"
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Create shadow database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE shadow;"
+      - name: Migrations must reproduce schema.prisma
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+          SHADOW_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/shadow
+        run: >-
+          npx prisma migrate diff
+          --from-migrations prisma/migrations
+          --to-schema prisma/schema.prisma
+          --exit-code

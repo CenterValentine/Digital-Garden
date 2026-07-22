@@ -260,6 +260,8 @@ Earned across six playbook smokes (2026-07-17/18), each entry a shipped fix:
 
 ## Open items (core-relevant)
 
+**Owner-facing deferred items are consolidated in BACKLOG.md → "AI v3 Core Followups (2026-07-18)"** — that list is canonical; entries below add engineering context.
+
 - **Live stream re-attach needs a stream store (S1 partial, discovered
   2026-07-17).** Built: server-side `consumeStream()` + idempotent server
   persistence, so a disconnected client NEVER loses the turn — on return,
@@ -276,6 +278,7 @@ Earned across six playbook smokes (2026-07-17/18), each entry a shipped fix:
   once its panel requirements firm up.
 - Post-V3 queue (from umbrella): Kimi/Moonshot P0 + gateway + BYOK catch-up;
   acquisition explainer session for the owner.
+- **DONE pre-ship (486544c, 2026-07-18)** — approval cards got per-tool previews (document markdown preview, workflow graph summary, key-value rows; raw JSON collapsible). Original item:
 - **Post-V3: prettify the approval card into a note-preview interface**
   (owner request 2026-07-17, after first live smoke of the S1 card). Today
   the card shows raw JSON args — functional and honest, kept for v3. The

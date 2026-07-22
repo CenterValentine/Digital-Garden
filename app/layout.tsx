@@ -2,7 +2,14 @@ import type { Metadata, Viewport } from "next";
 import React from "react";
 import { headers } from "next/headers";
 import localFont from "next/font/local";
-import { Source_Serif_4, Inter, Roboto } from "next/font/google";
+import {
+  Source_Serif_4,
+  Inter,
+  Roboto,
+  Newsreader,
+  JetBrains_Mono,
+  Caveat,
+} from "next/font/google";
 import "./globals.css";
 
 import Head from "./layout/head";
@@ -10,6 +17,7 @@ import NavBar from "@/components/client/nav/NavBar";
 import { Toaster } from "@/components/client/ui/sonner";
 import { SettingsInitializer } from "@/components/settings/SettingsInitializer";
 import { ThemeProvider, THEME_SCRIPT } from "@/lib/features/theme";
+import { DevWorktreeBanner, withDevWorktreeTitle } from "@/lib/features/dev-banner";
 
 const geistSans = localFont({
   src: "../public/fonts/liberation-sans-regular.ttf",
@@ -44,7 +52,34 @@ const geminiSans = Roboto({
   display: "swap",
 });
 
-export const metadata: Metadata = {
+// Personal site (davidvalentine.org) typography. Consumed by the
+// `.personal-home` token scope in globals.css and the (personal) page routes:
+// Newsreader → serif display + body, JetBrains Mono → labels/kickers,
+// Caveat → hand-written margin annotations.
+const newsreader = Newsreader({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-newsreader",
+  display: "swap",
+});
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500", "700"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
+const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-caveat",
+  display: "swap",
+});
+
+// Base metadata for every route. Exported through `generateMetadata` (not a
+// static `metadata` const) so the title can be prefixed with the worktree/branch
+// in dev — Next forbids exporting both from one segment.
+const baseMetadata: Metadata = {
   title: {
     default: "Digital Garden",
     template: "%s · Digital Garden",
@@ -92,6 +127,16 @@ export const metadata: Metadata = {
   },
   manifest: "/site.webmanifest",
 };
+
+export async function generateMetadata(): Promise<Metadata> {
+  // Identical to baseMetadata in production; in dev the title gains a
+  // `[worktree/branch]` prefix so tabs from different checkouts are
+  // distinguishable. See lib/features/dev-banner/title.ts.
+  return {
+    ...baseMetadata,
+    title: await withDevWorktreeTitle(baseMetadata.title),
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#ffffff",
@@ -143,7 +188,8 @@ export default async function RootLayout({
         />
         <Head />
       </head>
-      <body className={`min-h-dvh w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable}`}>
+      <body className={`min-h-dvh w-full relative ${geistSans.variable} ${geistMono.variable} ${claudeSerif.variable} ${gptSans.variable} ${geminiSans.variable} ${newsreader.variable} ${jetbrainsMono.variable} ${caveat.variable}`}>
+
         {/* Initialize user settings on mount */}
         <SettingsInitializer />
         {/* Keep <html class="dark"> in sync as preference or OS scheme changes */}
@@ -165,6 +211,9 @@ export default async function RootLayout({
             closeButton
           />
         </ThemeProvider>
+        {/* Dev-only: names the worktree/branch this localhost is serving.
+            Renders nothing outside `next dev`. */}
+        <DevWorktreeBanner />
       </body>
     </html>
   );
