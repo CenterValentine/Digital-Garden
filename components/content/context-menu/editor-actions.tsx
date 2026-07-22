@@ -14,6 +14,7 @@ import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
+import { markdownToTiptap } from "@/lib/domain/content/markdown";
 import { toast } from "sonner";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -782,6 +783,27 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
         }
       } catch {
         // Clipboard read permission denied — browser will handle native paste
+      }
+    },
+  });
+
+  // Paste clipboard text INTERPRETED as Markdown → rich text. The reliable way
+  // to bring in Markdown without switching to the source view. Parsing routes
+  // through the (lossless) markdown converter; insertContent goes through the
+  // editor, so it's collab-safe (writes into the Y.doc for collab notes).
+  clipboardActions.push({
+    id: "paste-markdown",
+    label: "Paste as Markdown",
+    onClick: async () => {
+      const editor = Object.values(useEditorInstanceStore.getState().editorsByContentId).find(Boolean) ?? null;
+      if (!editor) return;
+      try {
+        const text = await navigator.clipboard.readText();
+        if (!text) return;
+        const json = markdownToTiptap(text);
+        editor.chain().focus().insertContent(json.content ?? []).run();
+      } catch {
+        toast.error("Couldn't read the clipboard");
       }
     },
   });

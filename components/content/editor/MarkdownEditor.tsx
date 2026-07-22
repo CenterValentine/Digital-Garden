@@ -24,6 +24,12 @@ import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { markdownToTiptap } from "@/lib/domain/content/markdown";
+import {
+  isLikelyMarkdown,
+  isMarkdownPasteHintDismissed,
+  dismissMarkdownPasteHint,
+} from "@/lib/domain/content/markdown-detect";
 import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
@@ -573,6 +579,36 @@ export function MarkdownEditor({
           const tr = state.tr.replaceSelectionWith(node);
           dispatch(tr);
           return true;
+        }
+
+        // Markdown-paste awareness: if the pasted text looks like Markdown, it
+        // just went in as PLAIN TEXT (we never auto-convert — that guessing is
+        // unsafe). Warn, and offer a one-click convert, unless silenced. Return
+        // false so the normal literal paste still proceeds.
+        if (text && isLikelyMarkdown(text) && !isMarkdownPasteHintDismissed()) {
+          const pasted = text;
+          toast("Pasted as plain text", {
+            description: "That looked like Markdown — format it as rich text instead?",
+            action: {
+              label: "Paste as Markdown",
+              onClick: () => {
+                const ed = useEditorInstanceStore
+                  .getState()
+                  .getEditor(contentIdRef.current);
+                // Undo the literal paste, then insert the parsed rich content.
+                ed?.chain()
+                  .focus()
+                  .undo()
+                  .insertContent(markdownToTiptap(pasted).content ?? [])
+                  .run();
+              },
+            },
+            cancel: {
+              label: "Don't show again",
+              onClick: () => dismissMarkdownPasteHint(),
+            },
+            duration: 8000,
+          });
         }
 
         return false;
