@@ -747,6 +747,10 @@ export async function POST(request: Request) {
                     deletedAt: null,
                   },
                   select: {
+                    // id is what read_note (getCurrentNote) needs — it takes a
+                    // UUID, not a title, so the manifest MUST carry the id or
+                    // the model can't act on "read this extension" directly.
+                    id: true,
                     title: true,
                     notePayload: { select: { metadata: true } },
                   },
@@ -754,14 +758,25 @@ export async function POST(request: Request) {
                 const byTitle = new Map(refNodes.map((n) => [n.title, n]));
                 const lines = uniqueTitles.map((title) => {
                   const found = byTitle.get(title);
-                  if (!found) return `- [[${title}]] — not found`;
+                  if (!found) return `- [[${title}]] — not found in your notes`;
                   const isSub = isPlaybookMetadata(found.notePayload?.metadata);
                   return isSub
-                    ? `- [[${title}]] — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
-                    : `- [[${title}]]`;
+                    ? `- [[${title}]] (read_note id: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+                    : `- [[${title}]] (read_note id: ${found.id})`;
                 });
-                refsManifest = `\n\n**Linked extensions** (read via read_note when needed — not preloaded):\n${lines.join("\n")}`;
+                refsManifest = `\n\n**Linked extensions** (call read_note with the id below only when the current phase needs one — not preloaded):\n${lines.join("\n")}`;
               }
+
+              // Phase table-of-contents: the model sees the whole run's SHAPE
+              // (every phase title) but only the current phase's DETAIL. Without
+              // this it can't honor "announce the next phase" — under
+              // progressive disclosure it never saw the other phases.
+              const phaseToc = parsed.phases
+                .map(
+                  (p, i) =>
+                    `${i + 1}. ${p.title}${i === phaseIndex ? "  ← current (only this phase's detail is loaded)" : ""}`,
+                )
+                .join("\n");
 
               const standingText = renderPlaybookSection(
                 parsed.standingRules.content,
@@ -770,10 +785,11 @@ export async function POST(request: Request) {
               playbookContext =
                 `\n\n## Active Playbook: "${playbookNode.title}"\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
+                `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
-                `**Current phase:**\n${phaseText}${refsManifest}`;
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${refsManifest}`;
             }
           }
         } catch (playbookError) {
@@ -910,6 +926,7 @@ export async function POST(request: Request) {
           userContextSection,
           mentionedContext,
           playbookContext,
+          hasAttachedPlaybook: playbookContext.length > 0,
           pageContextSection,
         }),
         onStepFinish: (step) => {

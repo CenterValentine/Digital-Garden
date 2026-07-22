@@ -770,13 +770,22 @@ export function useConversationEngine({
     for (const m of messages) {
       if (m.role !== "assistant") continue;
       for (const part of m.parts ?? []) {
-        const p = part as { type?: string; state?: string };
-        if (
-          p.type === "tool-phase_checkpoint" &&
-          (p.state === "output-available" || p.state === "output-error")
-        ) {
-          count++;
-        }
+        const p = part as { type?: string; state?: string; output?: unknown };
+        if (p.type !== "tool-phase_checkpoint") continue;
+        // Count only APPROVED checkpoints. phase_checkpoint's execute() runs
+        // ONLY on approval and returns an object carrying `__checkpoint`.
+        // Revise and Approve-with-tweaks are BOTH `approved: false` (see
+        // PhaseCheckpointCard) — their execute never runs, the phase is redone
+        // and re-checkpointed. Counting every resolved part would advance the
+        // index twice for one revised phase and inject the wrong phase. Gate
+        // on the executed output shape so only genuine completions advance.
+        const out = p.output;
+        const executed =
+          (typeof out === "object" &&
+            out !== null &&
+            (out as { __checkpoint?: unknown }).__checkpoint === true) ||
+          (typeof out === "string" && out.includes('"__checkpoint"'));
+        if (p.state === "output-available" && executed) count++;
       }
     }
     return count;
