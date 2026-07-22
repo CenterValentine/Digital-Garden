@@ -110,6 +110,27 @@ for (const text of ["write **bold** please", "type `npm i`", "# not a heading", 
   else fail(`literal ${JSON.stringify(text)} — LOSSY`);
 }
 
+// ── 2b. Tier-2 HTML fallback ─────────────────────────────────────────────────
+// Config markdown can't express (image width, underline, …) must land as
+// lossless inline HTML, NOT an opaque base64 fence.
+console.log("\n  ── tier-2 HTML fallback (config → readable HTML, not base64) ──");
+const tier = (m: string) => (m.includes("DGBLOCKv1:") ? "fence" : /^\s*</.test(m.trim()) ? "html" : "md");
+for (const [name, block] of [
+  ["image + width", { type: "image", attrs: { src: "https://x.com/a.png", alt: "pic", width: 300 } }],
+  ["underline text", p([{ type: "text", text: "u", marks: [{ type: "underline" }] }])],
+] as Array<[string, JSONContent]>) {
+  const r = lossless(doc(block));
+  if (!r.ok) fail(`${name} — LOSSY`);
+  else if (tier(r.md) !== "html") fail(`${name} — expected HTML tier, got ${tier(r.md)} (${r.md.slice(0, 40)})`);
+  else pass(`${name} → HTML`);
+}
+// A data-bearing block must still fence (its HTML can't carry the payload).
+{
+  const r = lossless(doc({ type: "excalidrawBlock", attrs: { blockId: "x", elements: [{ id: "a" }] } }));
+  if (r.ok && r.fenced) pass("excalidraw → fence (data-bearing)");
+  else fail(`excalidraw expected fence, got ${tier(r.md)}`);
+}
+
 // ── 3. Schema-driven attr sweep ──────────────────────────────────────────────
 console.log("\n  ── schema-driven attr sweep (no attr silently dropped) ──");
 const schema = getSchema(ext);

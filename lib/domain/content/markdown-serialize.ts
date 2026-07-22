@@ -151,33 +151,72 @@ function canonicalBlock(
   return (bridge.toJson(html, extensions).content ?? [])[0];
 }
 
+/** Does re-parsing `segment` yield a block deep-equal to `canonical`? */
+function roundTripsTo(
+  segment: string,
+  canonical: JSONContent,
+  extensions: Extensions,
+  bridge: HtmlBridge,
+): boolean {
+  const reBlock = (markdownToTiptapRich(segment, extensions, bridge).content ?? [])[0];
+  return !!reBlock && canon(reBlock) === canon(canonical);
+}
+
 /**
- * Serialize one top-level block. Pretty (turndown) if it provably round-trips,
- * else a verbatim fence. This per-block self-verification is the deny-by-default
- * guarantee.
+ * Serialize one top-level block through the tiered ladder, each rung gated by
+ * self-verification (deny-by-default — a rung is used only if it round-trips
+ * deep-equal, else we fall to the next):
+ *
+ *   Tier 1  pretty markdown (turndown)  — everything markdown can express
+ *   Tier 2  the node's own HTML         — config markdown can't (image
+ *                                          width/align, text alignment,
+ *                                          underline/highlight, link attrs);
+ *                                          lossless via TipTap's parseHTML,
+ *                                          human-readable, marked passes it
+ *                                          through
+ *   Tier 3  opaque base64 dg-block fence — verbatim; data-bearing / custom
+ *                                          blocks whose HTML isn't faithful
  */
 function serializeBlock(
   block: JSONContent,
   extensions: Extensions,
   bridge: HtmlBridge,
 ): string {
+  // Custom / data blocks go straight to the fence — their HTML may be a lossy
+  // placeholder, and base64 keeps them opaque-and-safe rather than editable HTML.
   if (typeof block.type !== "string" || !CANDIDATE_PRETTY_TYPES.has(block.type)) {
     return serializeUnknownBlock(block);
   }
+
+  let html: string;
+  let canonical: JSONContent | undefined;
   try {
-    const html = bridge.toHtml({ type: "doc", content: [block] }, extensions);
+    html = bridge.toHtml({ type: "doc", content: [block] }, extensions);
+    canonical = canonicalBlock(block, extensions, bridge);
+  } catch {
+    return serializeUnknownBlock(block);
+  }
+  if (!html || !canonical) return serializeUnknownBlock(block);
+
+  // Tier 1 — pretty markdown.
+  try {
     const md = getTurndown().turndown(html).trim();
-    if (md) {
-      const reparsed = markdownToTiptapRich(md, extensions, bridge);
-      const reBlock = (reparsed.content ?? [])[0];
-      const canonical = canonicalBlock(block, extensions, bridge);
-      if (reBlock && canonical && canon(reBlock) === canon(canonical)) {
-        return md;
-      }
+    if (md && roundTripsTo(md, canonical, extensions, bridge)) return md;
+  } catch {
+    /* fall through */
+  }
+
+  // Tier 2 — the node's own HTML, for config markdown can't express.
+  try {
+    const htmlBlock = html.trim();
+    if (htmlBlock && roundTripsTo(htmlBlock, canonical, extensions, bridge)) {
+      return htmlBlock;
     }
   } catch {
-    // fall through to fence
+    /* fall through */
   }
+
+  // Tier 3 — verbatim fence.
   return serializeUnknownBlock(block);
 }
 
