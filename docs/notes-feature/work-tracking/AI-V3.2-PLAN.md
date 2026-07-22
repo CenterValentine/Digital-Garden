@@ -190,9 +190,21 @@ self-verifying** serializer. Owner-approved after the empirical audit
   *plain* image goes Tier-2 HTML (a top-level image can't round-trip through
   `![]()` — marked paragraph-wraps it) — which is still a win over the old base64.
   Gate proves image+width/underline → HTML, Excalidraw → fence.
-- **North star (later):** per-block `> [!note]` etc. for CUSTOM blocks (registry
-  `toMarkdown`/`fromMarkdown`), enforced by the same gate; fence fallback keeps
-  it always lossless.
+- **North star — per-block markdown codecs (2026-07-22) ✅ BUILT.** A codec
+  registry (`markdown-block-codecs.ts`) lets a CUSTOM block declare a
+  human-readable markdown syntax — both halves: `toMarkdown` (node → markdown) +
+  `reTag` (parse-side reconstruction, since marked doesn't know `> [!note]` is a
+  callout — same as `- [ ]` for task items). A codec is USED only if it
+  round-trips deep-equal (self-verify), else the block fences. `serializeBlock`
+  tries a codec before the fence; `markdownToTiptapRich` applies every codec's
+  re-tagger. **First codec: callout ⇄ `> [!type] Title`** (incl. nested content).
+  Prerequisite: fixed the callout extension's HTML asymmetry — its `parseHTML`
+  absorbed the title-chrome div as an extra content paragraph; added
+  `contentElement: .callout-content` (also fixes callout fidelity for
+  export/paste/collab HTML; no schema-shape change, collab:schema:check passes).
+  Gate proves callout → `> [!warning]` markdown, Excalidraw → fence.
+  **Adding pretty syntax for another custom block = add a codec here** (e.g.
+  tag/wikiLink inline, tabs, columns) — the pattern is proven and gate-enforced.
 
 ### T2 paste affordances (2026-07-22) ✅ BUILT
 
