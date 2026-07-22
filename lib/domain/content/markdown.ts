@@ -16,6 +16,7 @@ import {
   tiptapToMarkdownRich,
   markdownToTiptapRich,
 } from "./markdown-serialize";
+import { decompressMarkdown } from "./markdown-decompress";
 
 // Import TipTap extensions
 // Use server-only file to avoid loading React components
@@ -82,6 +83,17 @@ export function markdownToTiptap(
   extensionsArg?: Extensions,
 ): JSONContent {
   return markdownToTiptapResult(markdown, extensionsArg).json;
+}
+
+/**
+ * Parse PASTED markdown → TipTap, first repairing COMPRESSED structure
+ * (collapsed line breaks — see markdown-decompress.ts). Use this at paste sites
+ * only, NOT the source-view toggle: the toggle is a faithful round-trip of the
+ * note's own content, and decompressing there would rewrite literal text on
+ * every toggle. Decompression is a safe no-op on well-formed markdown.
+ */
+export function markdownPasteToTiptap(markdown: string): JSONContent {
+  return markdownToTiptap(decompressMarkdown(markdown));
 }
 
 /*

@@ -24,12 +24,15 @@ import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
-import { markdownToTiptap } from "@/lib/domain/content/markdown";
+import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import {
   isLikelyMarkdown,
   isMarkdownPasteHintDismissed,
   dismissMarkdownPasteHint,
+  isMarkdownPasteAutoFormat,
+  setMarkdownPasteAutoFormat,
 } from "@/lib/domain/content/markdown-detect";
+import { MarkdownPasteToast } from "./MarkdownPasteToast";
 import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
@@ -581,34 +584,61 @@ export function MarkdownEditor({
           return true;
         }
 
-        // Markdown-paste awareness: if the pasted text looks like Markdown, it
-        // just went in as PLAIN TEXT (we never auto-convert — that guessing is
-        // unsafe). Warn, and offer a one-click convert, unless silenced. Return
-        // false so the normal literal paste still proceeds.
-        if (text && isLikelyMarkdown(text) && !isMarkdownPasteHintDismissed()) {
+        // Markdown-paste handling. We never silently auto-convert by DEFAULT (a
+        // code snippet or literal "#" must stay literal). Instead:
+        //   • opted into "Always format" → convert immediately here, via the
+        //     paste event (no clipboard permission needed);
+        //   • otherwise warn with an explicit 3-choice toast, unless silenced.
+        if (text && isLikelyMarkdown(text)) {
           const pasted = text;
-          toast("Pasted as plain text", {
-            description: "That looked like Markdown — format it as rich text instead?",
-            action: {
-              label: "Paste as Markdown",
-              onClick: () => {
-                const ed = useEditorInstanceStore
-                  .getState()
-                  .getEditor(contentIdRef.current);
-                // Undo the literal paste, then insert the parsed rich content.
-                ed?.chain()
-                  .focus()
-                  .undo()
-                  .insertContent(markdownToTiptap(pasted).content ?? [])
-                  .run();
-              },
-            },
-            cancel: {
-              label: "Don't show again",
-              onClick: () => dismissMarkdownPasteHint(),
-            },
-            duration: 8000,
-          });
+
+          if (isMarkdownPasteAutoFormat()) {
+            // One action: skip the literal paste, insert formatted content.
+            event.preventDefault();
+            const ed = useEditorInstanceStore.getState().getEditor(contentIdRef.current);
+            const parsed = markdownPasteToTiptap(pasted).content ?? [];
+            if (ed && parsed.length > 0) {
+              ed.chain().focus().insertContent(parsed).run();
+              return true;
+            }
+            // Unparseable — fall through to a normal literal paste.
+            return false;
+          }
+
+          if (!isMarkdownPasteHintDismissed()) {
+            // The literal paste still proceeds (return false below). The toast
+            // offers to replace it: "convert" undoes the literal paste, then
+            // inserts parsed — TWO separate dispatches, since chaining undo()
+            // with insertContent() drops the insert (the vanish bug).
+            const convertThisPaste = () => {
+              const ed = useEditorInstanceStore.getState().getEditor(contentIdRef.current);
+              if (!ed) return;
+              const parsed = markdownPasteToTiptap(pasted).content ?? [];
+              if (parsed.length === 0) return; // unparseable — keep the literal
+              ed.commands.undo();
+              ed.chain().focus().insertContent(parsed).run();
+            };
+            toast.custom(
+              (id) => (
+                <MarkdownPasteToast
+                  onConvert={() => {
+                    convertThisPaste();
+                    toast.dismiss(id);
+                  }}
+                  onAlways={() => {
+                    setMarkdownPasteAutoFormat(true);
+                    convertThisPaste();
+                    toast.dismiss(id);
+                  }}
+                  onDismiss={() => {
+                    dismissMarkdownPasteHint();
+                    toast.dismiss(id);
+                  }}
+                />
+              ),
+              { duration: 10000 },
+            );
+          }
         }
 
         return false;
