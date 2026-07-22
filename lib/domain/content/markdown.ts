@@ -7,27 +7,20 @@
  * to know which node types to produce).
  */
 
-// NOTE: client-reachable via ChatPanel → edit-orchestrator. Cannot import the
-// server logger here without breaking the client bundle (node:async_hooks).
-// Migrates to client-safe logger in Phase 5.
-import { generateJSON, generateHTML } from "@tiptap/core";
-// Server-safe twins (zeed-dom backed): @tiptap/core's generateJSON/HTML
-// require a real `window`; in Node (AI tool execution: createNote,
-// create_docx) they throw "no window object" and content silently
-// degraded to plain paragraphs — users saw literal ## / ** markdown in
-// generated notes (AI v3 S4 smoke finding, fixed 2026-07-18).
-import {
-  generateJSON as generateJSONServer,
-  generateHTML as generateHTMLServer,
-} from "@tiptap/html";
+// NOTE: client-reachable via ChatPanel → edit-orchestrator and the source-view
+// toggle. The heavy lifting lives in markdown-serialize.ts (turndown + fence,
+// self-verifying); this file keeps the public API + degraded-signal contract.
 import type { JSONContent, Extensions } from "@tiptap/core";
-import { marked } from "marked";
 import { extractSearchTextFromTipTap } from "./search-text";
+import {
+  tiptapToMarkdownRich,
+  markdownToTiptapRich,
+} from "./markdown-serialize";
+import { decompressMarkdown } from "./markdown-decompress";
 
 // Import TipTap extensions
 // Use server-only file to avoid loading React components
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
 // ============================================================
 // MARKDOWN → TIPTAP JSON
@@ -39,47 +32,101 @@ import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupporte
  * @param markdown - Markdown string
  * @returns TipTap JSON content
  */
-export function markdownToTiptap(markdown: string): JSONContent {
+/**
+ * Result of a markdown → TipTap conversion (v3.2 T1 hardening).
+ *
+ * `degraded` is the load-bearing field: when the structured pipeline
+ * fails, we NO LONGER silently return raw markdown as one plain paragraph
+ * (the root of the R6 degraded-note bug). Instead we preserve the content
+ * as a paragraph-per-block best-effort AND flag `degraded: true` so the
+ * caller can mark the note (metadata + badge) and the regen sweep can find
+ * it. Callers that don't care read `.json`; the thin `markdownToTiptap`
+ * wrapper keeps the old signature.
+ */
+export interface MarkdownConversionResult {
+  json: JSONContent;
+  degraded: boolean;
+  reason?: string;
+}
+
+export function markdownToTiptapResult(
+  markdown: string,
+  extensionsArg?: Extensions,
+): MarkdownConversionResult {
   if (!markdown) {
-    return {
-      type: "doc",
-      content: [],
-    };
+    return { json: { type: "doc", content: [] }, degraded: false };
   }
-
   try {
-    const extensions = getServerExtensions();
-
-    // Step 1: Convert markdown → HTML via `marked`
-    // `generateJSON` expects HTML input, not raw markdown.
-    const html = marked.parse(markdown, { async: false, gfm: true }) as string;
-
-    // Step 2: Convert HTML → TipTap JSON via registered extensions.
-    // Native-DOM path in the browser (faster); zeed-dom path in Node.
-    const json =
-      typeof window === "undefined"
-        ? generateJSONServer(html, extensions)
-        : generateJSON(html, extensions);
-    return json;
+    const extensions = extensionsArg ?? getServerExtensions();
+    // marked → HTML → TipTap JSON, then normalize code blocks, restore
+    // dg-block fences, and de-dupe blockIds. See markdown-serialize.ts.
+    const json = markdownToTiptapRich(markdown, extensions);
+    return { json, degraded: false };
   } catch (error) {
-    console.error("Failed to convert markdown to TipTap:", error);
-
-    // Fallback: wrap in paragraph
+    console.error("markdown → TipTap conversion failed (degraded):", error);
     return {
-      type: "doc",
-      content: [
-        {
-          type: "paragraph",
-          content: [
-            {
-              type: "text",
-              text: markdown,
-            },
-          ],
-        },
-      ],
+      json: paragraphSplit(markdown),
+      degraded: true,
+      reason:
+        error instanceof Error ? error.message : "markdown conversion failed",
     };
   }
+}
+
+/**
+ * Backward-compatible thin wrapper — returns just the document.
+ * `extensionsArg` is for testability (the block-safety CI gate injects the
+ * tsx-safe collaboration extensions); runtime callers omit it.
+ */
+export function markdownToTiptap(
+  markdown: string,
+  extensionsArg?: Extensions,
+): JSONContent {
+  return markdownToTiptapResult(markdown, extensionsArg).json;
+}
+
+/**
+ * Parse PASTED markdown → TipTap, first repairing COMPRESSED structure
+ * (collapsed line breaks — see markdown-decompress.ts). Use this at paste sites
+ * only, NOT the source-view toggle: the toggle is a faithful round-trip of the
+ * note's own content, and decompressing there would rewrite literal text on
+ * every toggle. Decompression is a safe no-op on well-formed markdown.
+ */
+export function markdownPasteToTiptap(markdown: string): JSONContent {
+  return markdownToTiptap(decompressMarkdown(markdown));
+}
+
+/*
+ * Collaboration-write guard (v3.2 T1). This converter is PURE — it does
+ * not know or care whether the target note is collab-enabled. Callers
+ * that WRITE the result to a NotePayload MUST respect the R6 lesson: for
+ * a note with a live CollaborationDocument, the Y.js doc is authoritative,
+ * so overwriting NotePayload.tiptapJson is invisible at best and diverges
+ * the two stores at worst (the daily-notes template-overlay failure). The
+ * regen sweep (scripts/regen-degraded-notes.ts) already skips collab-live
+ * notes; any new write path that converts markdown must do the same, or
+ * route the change through the collaboration content-safety layer.
+ */
+
+/**
+ * Best-effort degraded document: one paragraph per blank-line-separated
+ * block, so at least line/paragraph structure survives when the real
+ * pipeline can't run. Never a single raw blob.
+ */
+function paragraphSplit(source: string): JSONContent {
+  const blocks = source
+    .split(/\n\s*\n/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return {
+    type: "doc",
+    content: blocks.length
+      ? blocks.map((block) => ({
+          type: "paragraph",
+          content: [{ type: "text", text: block }],
+        }))
+      : [{ type: "paragraph" }],
+  };
 }
 
 // ============================================================
@@ -87,122 +134,37 @@ export function markdownToTiptap(markdown: string): JSONContent {
 // ============================================================
 
 /**
- * Convert TipTap JSON to markdown
+ * Convert TipTap JSON to markdown.
+ *
+ * Top-level blocks are partitioned into contiguous *round-trippable* runs
+ * (serialized as normal markdown) and individual *custom* nodes (emitted as
+ * lossless dg-block fences). This guarantees `tiptap → md → tiptap` never
+ * loses a block — the T2 source-view toggle depends on it.
  *
  * @param json - TipTap JSON content
+ * @param extensionsArg - injected extensions (testability; runtime omits it)
  * @returns Markdown string
  */
-export function tiptapToMarkdown(json: JSONContent): string {
+export function tiptapToMarkdown(
+  json: JSONContent,
+  extensionsArg?: Extensions,
+): string {
   if (!json || !json.content || json.content.length === 0) {
     return "";
   }
 
+  const extensions = extensionsArg ?? getServerExtensions();
   try {
-    const extensions = getServerExtensions();
-    const sanitized = sanitizeTipTapJsonWithExtensions(json, extensions).json;
-
-    // Use TipTap's markdown serializer
-    // Note: This requires @tiptap/extension-markdown to be configured
-    const markdown = serializeToMarkdown(sanitized, extensions);
-    return markdown;
+    // turndown (pretty, self-verifying) + dg-block fence fallback. Each block
+    // is emitted pretty only if it provably round-trips; else fenced. See
+    // markdown-serialize.ts.
+    return tiptapToMarkdownRich(json, extensions);
   } catch (error) {
     console.error("Failed to convert TipTap to markdown:", error);
 
     // Fallback: extract plain text
     return extractPlainText(json);
   }
-}
-
-/**
- * Serialize TipTap JSON to markdown (using prosemirror-markdown)
- */
-function serializeToMarkdown(
-  json: JSONContent,
-  extensions: Extensions
-): string {
-  // Server path uses the zeed-dom-backed @tiptap/html twin — the old
-  // plain-text early return is gone (it lost ALL formatting server-side).
-  const html =
-    typeof window === "undefined"
-      ? generateHTMLServer(json, extensions)
-      : generateHTML(json, extensions);
-  return htmlToMarkdown(html);
-}
-
-// ============================================================
-// FALLBACK: HTML → MARKDOWN
-// ============================================================
-
-/**
- * Convert HTML to markdown (basic conversion)
- *
- * Note: This is a simple fallback. For production, use a library
- * like turndown for robust HTML → markdown conversion.
- */
-function htmlToMarkdown(html: string): string {
-  let markdown = html;
-
-  // Headers
-  markdown = markdown.replace(/<h1>(.*?)<\/h1>/gi, "# $1\n\n");
-  markdown = markdown.replace(/<h2>(.*?)<\/h2>/gi, "## $1\n\n");
-  markdown = markdown.replace(/<h3>(.*?)<\/h3>/gi, "### $1\n\n");
-  markdown = markdown.replace(/<h4>(.*?)<\/h4>/gi, "#### $1\n\n");
-  markdown = markdown.replace(/<h5>(.*?)<\/h5>/gi, "##### $1\n\n");
-  markdown = markdown.replace(/<h6>(.*?)<\/h6>/gi, "###### $1\n\n");
-
-  // Bold and italic
-  markdown = markdown.replace(/<strong>(.*?)<\/strong>/gi, "**$1**");
-  markdown = markdown.replace(/<b>(.*?)<\/b>/gi, "**$1**");
-  markdown = markdown.replace(/<em>(.*?)<\/em>/gi, "*$1*");
-  markdown = markdown.replace(/<i>(.*?)<\/i>/gi, "*$1*");
-
-  // Links
-  markdown = markdown.replace(/<a href="(.*?)">(.*?)<\/a>/gi, "[$2]($1)");
-
-  // Images
-  markdown = markdown.replace(/<img src="(.*?)" alt="(.*?)">/gi, "![$2]($1)");
-
-  // Code
-  markdown = markdown.replace(/<code>(.*?)<\/code>/gi, "`$1`");
-  markdown = markdown.replace(
-    /<pre><code>([\s\S]*?)<\/code><\/pre>/gi,
-    "```\n$1\n```\n"
-  );
-
-  // Lists
-  markdown = markdown.replace(/<ul>/gi, "");
-  markdown = markdown.replace(/<\/ul>/gi, "\n");
-  markdown = markdown.replace(/<ol>/gi, "");
-  markdown = markdown.replace(/<\/ol>/gi, "\n");
-  markdown = markdown.replace(/<li>(.*?)<\/li>/gi, "- $1\n");
-
-  // Paragraphs
-  markdown = markdown.replace(/<p>(.*?)<\/p>/gi, "$1\n\n");
-
-  // Blockquotes
-  markdown = markdown.replace(
-    /<blockquote>([\s\S]*?)<\/blockquote>/gi,
-    "> $1\n\n"
-  );
-
-  // Line breaks
-  markdown = markdown.replace(/<br\s*\/?>/gi, "\n");
-
-  // Remove remaining HTML tags
-  markdown = markdown.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
-  markdown = markdown.replace(/&nbsp;/g, " ");
-  markdown = markdown.replace(/&quot;/g, '"');
-  markdown = markdown.replace(/&amp;/g, "&");
-  markdown = markdown.replace(/&lt;/g, "<");
-  markdown = markdown.replace(/&gt;/g, ">");
-
-  // Clean up whitespace
-  markdown = markdown.replace(/\n{3,}/g, "\n\n");
-  markdown = markdown.trim();
-
-  return markdown;
 }
 
 // ============================================================
