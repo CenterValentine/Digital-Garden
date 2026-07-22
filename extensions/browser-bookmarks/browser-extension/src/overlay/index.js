@@ -2538,11 +2538,27 @@ function makePanelDraggable(state, panel) {
   });
 }
 
-// Frozen panels: visual sync + toggle. Frozen = restored on every page in
-// this tab (open or collapsed) regardless of hostname, until closed/unfrozen.
+// Frozen panels ("Pin" in the UI): visual sync + toggle. Frozen = restored on
+// every page in this tab (open or collapsed) regardless of hostname, until
+// closed/unpinned.
+//
+// Association/workspace independence: panels are keyed by their own contentId
+// in state.openPanels and are never torn down when the underlying selection
+// changes — refreshOverlayResourceState() re-renders the associations popover
+// and reloads panel data but keeps panels open. So an overlay already survives
+// switching the active association/workspace; pinning additionally makes it
+// survive full-page navigations across different hostnames.
 function syncPanelFrozenVisual(panel) {
-  panel.container.dataset.frozen = panel.frozen ? "true" : "false";
-  panel.collapsedChip.dataset.frozen = panel.frozen ? "true" : "false";
+  const frozen = panel.frozen === true;
+  panel.container.dataset.frozen = frozen ? "true" : "false";
+  panel.collapsedChip.dataset.frozen = frozen ? "true" : "false";
+  // Tooltip reflects state so the pin reads as a toggle, not a one-way action.
+  const btn = panel.container.querySelector(".dg-freeze-toggle");
+  if (btn) {
+    btn.title = frozen
+      ? "Pinned to every page — click to unpin"
+      : "Pin to keep this panel on every page you visit";
+  }
 }
 
 function togglePanelFrozen(state, panel) {
@@ -2574,7 +2590,7 @@ function createContentPanel(state, item, kind, persisted = null) {
         <button class="dg-toolbar-button" type="button" data-panel-action="open-tree" title="Browse file tree">◂ Tree</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="app" title="Open in app">↗</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="refresh" title="Refresh note">↺</button>
-        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Freeze — keep this panel open on every page">❆</button>
+        <button class="dg-toolbar-button dg-freeze-toggle" type="button" data-panel-action="freeze" title="Pin to keep this panel on every page you visit">📌</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="collapse" title="Collapse">—</button>
         <button class="dg-toolbar-button" type="button" data-panel-action="close" title="Close">×</button>
       </div>
@@ -2585,7 +2601,7 @@ function createContentPanel(state, item, kind, persisted = null) {
   const collapsedChip = document.createElement("button");
   collapsedChip.className = "dg-panel-collapsed";
   collapsedChip.type = "button";
-  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Freeze — keep this panel open on every page">❆</em><strong>Open</strong>`;
+  collapsedChip.innerHTML = `<span>${escapeHtml(title)}</span><em class="dg-chip-freeze" title="Pinned to every page">📌</em><strong>Open</strong>`;
 
   state.panelsMount.appendChild(container);
   state.panelsMount.appendChild(collapsedChip);
