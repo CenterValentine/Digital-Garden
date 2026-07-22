@@ -62,6 +62,31 @@ function postToEmbed(type, payload) {
   );
 }
 
+/**
+ * Extract page content from `tabId`, injecting the lightweight reader on demand
+ * if the tab has no content script yet (opened before the extension loaded, or
+ * not reloaded after an update). Lets capture work without asking the user to
+ * reload the tab; genuinely restricted pages still surface a clear error.
+ */
+async function sendExtractWithInjectFallback(tabId, scope) {
+  try {
+    return await chrome.tabs.sendMessage(tabId, { type: "dg-extract-content", scope });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "";
+    if (
+      /receiving end does not exist|could not establish connection/i.test(msg) &&
+      chrome.scripting
+    ) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dist/reader.js"],
+      });
+      return chrome.tabs.sendMessage(tabId, { type: "dg-extract-content", scope });
+    }
+    throw err;
+  }
+}
+
 function postPageContext(context) {
   if (!frameReady || !appOrigin) {
     pendingPageContext = context;
@@ -146,10 +171,7 @@ window.addEventListener("message", (event) => {
           lastFocusedWindow: true,
         });
         if (!tab?.id) throw new Error("No active tab");
-        const response = await chrome.tabs.sendMessage(tab.id, {
-          type: "dg-extract-content",
-          scope,
-        });
+        const response = await sendExtractWithInjectFallback(tab.id, scope);
         if (!response?.ok) throw new Error(response?.error || "Extraction failed");
         postToEmbed("page-content", {
           ...response.data,
@@ -157,12 +179,13 @@ window.addEventListener("message", (event) => {
         });
       } catch (error) {
         const raw = error instanceof Error ? error.message : "";
-        // "Receiving end does not exist" means the tab has no content script —
-        // it was open before the extension loaded / updated, or is a page the
-        // extension can't run on. A tab reload re-injects the reader.
+        // After the inject-and-retry, a lingering messaging error (or an
+        // executeScript failure) means the page is genuinely restricted.
         const message =
-          /receiving end does not exist|could not establish connection/i.test(raw)
-            ? "Reload this tab and try again — the reader wasn't loaded on this page (pages like the Chrome Web Store and chrome:// can't be read)."
+          /receiving end does not exist|could not establish connection|cannot access|chrome:\/\/|extension gallery|chrome web store/i.test(
+            raw,
+          )
+            ? "Can't read this page — it looks restricted (chrome:// pages, the Chrome Web Store, or the browser's PDF viewer can't be read)."
             : raw || "Couldn't read this page";
         postToEmbed("page-content-error", { scope, message });
       }

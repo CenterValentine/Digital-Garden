@@ -54,6 +54,15 @@ await Promise.all([
     outfile: path.join(outDir, "overlay.js"),
   }),
 
+  // On-demand reader — IIFE, injected via chrome.scripting into tabs that lack
+  // the overlay content script, so page capture works without a tab reload.
+  esbuild.build({
+    ...sharedOptions,
+    format: "iife",
+    entryPoints: [path.join(srcDir, "reader/index.js")],
+    outfile: path.join(outDir, "reader.js"),
+  }),
+
   // Page bridge — IIFE, no bundling (no external imports, same scope isolation requirement)
   esbuild.build({
     ...sharedOptions,

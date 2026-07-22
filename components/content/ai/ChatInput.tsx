@@ -38,6 +38,7 @@ import type { ChatAttachment } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
 import { PanelPageContextBar } from "./PanelPageContextBar";
+import { isPanelEmbedSurface } from "@/lib/domain/browser-extension/panel-bridge";
 
 // react-arborist's drag source type. Must match `type: "NODE"` in
 // node_modules/react-arborist/dist/main/dnd/drag-hook.js so the composer
@@ -152,6 +153,27 @@ export function ChatInput({
     if (value.length === 0) closeSuggestions();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- closeSuggestions is stable; including it would re-render on every render
   }, [value]);
+
+  // Auto-focus the composer when the side panel opens it with content already
+  // in place — e.g. "Ask AI about this page" pre-fills a short opener, so the
+  // composer lands ready to type (or send). Scoped to the panel embed so it
+  // never steals focus from the app editor; mount-only (the sync effect above
+  // has already rendered the value into the DOM by the time this runs).
+  useEffect(() => {
+    if (!isPanelEmbedSurface() || !value.trim()) return;
+    const root = editorRef.current;
+    if (!root) return;
+    root.focus();
+    const sel = window.getSelection();
+    if (sel) {
+      const range = document.createRange();
+      range.selectNodeContents(root);
+      range.collapse(false); // caret at the end, after the opener
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only; value read once to gate initial focus
+  }, []);
 
   const closeSuggestions = useCallback(() => {
     setSuggestionMode(null);
