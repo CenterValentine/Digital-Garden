@@ -7,27 +7,19 @@
  * to know which node types to produce).
  */
 
-// NOTE: client-reachable via ChatPanel → edit-orchestrator. Cannot import the
-// server logger here without breaking the client bundle (node:async_hooks).
-// Migrates to client-safe logger in Phase 5.
-import { generateJSON, generateHTML } from "@tiptap/core";
-// Server-safe twins (zeed-dom backed): @tiptap/core's generateJSON/HTML
-// require a real `window`; in Node (AI tool execution: createNote,
-// create_docx) they throw "no window object" and content silently
-// degraded to plain paragraphs — users saw literal ## / ** markdown in
-// generated notes (AI v3 S4 smoke finding, fixed 2026-07-18).
-import {
-  generateJSON as generateJSONServer,
-  generateHTML as generateHTMLServer,
-} from "@tiptap/html";
+// NOTE: client-reachable via ChatPanel → edit-orchestrator and the source-view
+// toggle. The heavy lifting lives in markdown-serialize.ts (turndown + fence,
+// self-verifying); this file keeps the public API + degraded-signal contract.
 import type { JSONContent, Extensions } from "@tiptap/core";
-import { marked } from "marked";
 import { extractSearchTextFromTipTap } from "./search-text";
+import {
+  tiptapToMarkdownRich,
+  markdownToTiptapRich,
+} from "./markdown-serialize";
 
 // Import TipTap extensions
 // Use server-only file to avoid loading React components
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 
 // ============================================================
 // MARKDOWN → TIPTAP JSON
@@ -58,19 +50,16 @@ export interface MarkdownConversionResult {
 
 export function markdownToTiptapResult(
   markdown: string,
+  extensionsArg?: Extensions,
 ): MarkdownConversionResult {
   if (!markdown) {
     return { json: { type: "doc", content: [] }, degraded: false };
   }
   try {
-    const extensions = getServerExtensions();
-    // marked → HTML, then HTML → TipTap JSON via the registered
-    // extensions (native DOM in the browser, zeed-dom in Node).
-    const html = marked.parse(markdown, { async: false, gfm: true }) as string;
-    const json =
-      typeof window === "undefined"
-        ? generateJSONServer(html, extensions)
-        : generateJSON(html, extensions);
+    const extensions = extensionsArg ?? getServerExtensions();
+    // marked → HTML → TipTap JSON, then normalize code blocks, restore
+    // dg-block fences, and de-dupe blockIds. See markdown-serialize.ts.
+    const json = markdownToTiptapRich(markdown, extensions);
     return { json, degraded: false };
   } catch (error) {
     console.error("markdown → TipTap conversion failed (degraded):", error);
@@ -83,9 +72,16 @@ export function markdownToTiptapResult(
   }
 }
 
-/** Backward-compatible thin wrapper — returns just the document. */
-export function markdownToTiptap(markdown: string): JSONContent {
-  return markdownToTiptapResult(markdown).json;
+/**
+ * Backward-compatible thin wrapper — returns just the document.
+ * `extensionsArg` is for testability (the block-safety CI gate injects the
+ * tsx-safe collaboration extensions); runtime callers omit it.
+ */
+export function markdownToTiptap(
+  markdown: string,
+  extensionsArg?: Extensions,
+): JSONContent {
+  return markdownToTiptapResult(markdown, extensionsArg).json;
 }
 
 /*
@@ -126,122 +122,37 @@ function paragraphSplit(source: string): JSONContent {
 // ============================================================
 
 /**
- * Convert TipTap JSON to markdown
+ * Convert TipTap JSON to markdown.
+ *
+ * Top-level blocks are partitioned into contiguous *round-trippable* runs
+ * (serialized as normal markdown) and individual *custom* nodes (emitted as
+ * lossless dg-block fences). This guarantees `tiptap → md → tiptap` never
+ * loses a block — the T2 source-view toggle depends on it.
  *
  * @param json - TipTap JSON content
+ * @param extensionsArg - injected extensions (testability; runtime omits it)
  * @returns Markdown string
  */
-export function tiptapToMarkdown(json: JSONContent): string {
+export function tiptapToMarkdown(
+  json: JSONContent,
+  extensionsArg?: Extensions,
+): string {
   if (!json || !json.content || json.content.length === 0) {
     return "";
   }
 
+  const extensions = extensionsArg ?? getServerExtensions();
   try {
-    const extensions = getServerExtensions();
-    const sanitized = sanitizeTipTapJsonWithExtensions(json, extensions).json;
-
-    // Use TipTap's markdown serializer
-    // Note: This requires @tiptap/extension-markdown to be configured
-    const markdown = serializeToMarkdown(sanitized, extensions);
-    return markdown;
+    // turndown (pretty, self-verifying) + dg-block fence fallback. Each block
+    // is emitted pretty only if it provably round-trips; else fenced. See
+    // markdown-serialize.ts.
+    return tiptapToMarkdownRich(json, extensions);
   } catch (error) {
     console.error("Failed to convert TipTap to markdown:", error);
 
     // Fallback: extract plain text
     return extractPlainText(json);
   }
-}
-
-/**
- * Serialize TipTap JSON to markdown (using prosemirror-markdown)
- */
-function serializeToMarkdown(
-  json: JSONContent,
-  extensions: Extensions
-): string {
-  // Server path uses the zeed-dom-backed @tiptap/html twin — the old
-  // plain-text early return is gone (it lost ALL formatting server-side).
-  const html =
-    typeof window === "undefined"
-      ? generateHTMLServer(json, extensions)
-      : generateHTML(json, extensions);
-  return htmlToMarkdown(html);
-}
-
-// ============================================================
-// FALLBACK: HTML → MARKDOWN
-// ============================================================
-
-/**
- * Convert HTML to markdown (basic conversion)
- *
- * Note: This is a simple fallback. For production, use a library
- * like turndown for robust HTML → markdown conversion.
- */
-function htmlToMarkdown(html: string): string {
-  let markdown = html;
-
-  // Headers
-  markdown = markdown.replace(/<h1>(.*?)<\/h1>/gi, "# $1\n\n");
-  markdown = markdown.replace(/<h2>(.*?)<\/h2>/gi, "## $1\n\n");
-  markdown = markdown.replace(/<h3>(.*?)<\/h3>/gi, "### $1\n\n");
-  markdown = markdown.replace(/<h4>(.*?)<\/h4>/gi, "#### $1\n\n");
-  markdown = markdown.replace(/<h5>(.*?)<\/h5>/gi, "##### $1\n\n");
-  markdown = markdown.replace(/<h6>(.*?)<\/h6>/gi, "###### $1\n\n");
-
-  // Bold and italic
-  markdown = markdown.replace(/<strong>(.*?)<\/strong>/gi, "**$1**");
-  markdown = markdown.replace(/<b>(.*?)<\/b>/gi, "**$1**");
-  markdown = markdown.replace(/<em>(.*?)<\/em>/gi, "*$1*");
-  markdown = markdown.replace(/<i>(.*?)<\/i>/gi, "*$1*");
-
-  // Links
-  markdown = markdown.replace(/<a href="(.*?)">(.*?)<\/a>/gi, "[$2]($1)");
-
-  // Images
-  markdown = markdown.replace(/<img src="(.*?)" alt="(.*?)">/gi, "![$2]($1)");
-
-  // Code
-  markdown = markdown.replace(/<code>(.*?)<\/code>/gi, "`$1`");
-  markdown = markdown.replace(
-    /<pre><code>([\s\S]*?)<\/code><\/pre>/gi,
-    "```\n$1\n```\n"
-  );
-
-  // Lists
-  markdown = markdown.replace(/<ul>/gi, "");
-  markdown = markdown.replace(/<\/ul>/gi, "\n");
-  markdown = markdown.replace(/<ol>/gi, "");
-  markdown = markdown.replace(/<\/ol>/gi, "\n");
-  markdown = markdown.replace(/<li>(.*?)<\/li>/gi, "- $1\n");
-
-  // Paragraphs
-  markdown = markdown.replace(/<p>(.*?)<\/p>/gi, "$1\n\n");
-
-  // Blockquotes
-  markdown = markdown.replace(
-    /<blockquote>([\s\S]*?)<\/blockquote>/gi,
-    "> $1\n\n"
-  );
-
-  // Line breaks
-  markdown = markdown.replace(/<br\s*\/?>/gi, "\n");
-
-  // Remove remaining HTML tags
-  markdown = markdown.replace(/<[^>]+>/g, "");
-
-  // Decode HTML entities
-  markdown = markdown.replace(/&nbsp;/g, " ");
-  markdown = markdown.replace(/&quot;/g, '"');
-  markdown = markdown.replace(/&amp;/g, "&");
-  markdown = markdown.replace(/&lt;/g, "<");
-  markdown = markdown.replace(/&gt;/g, ">");
-
-  // Clean up whitespace
-  markdown = markdown.replace(/\n{3,}/g, "\n\n");
-  markdown = markdown.trim();
-
-  return markdown;
 }
 
 // ============================================================

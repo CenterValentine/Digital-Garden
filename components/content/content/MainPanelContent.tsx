@@ -10,7 +10,7 @@
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Code2, FileText } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -100,6 +100,13 @@ import {
   getContentCollaborationCapability,
   useCollaborationRuntime,
 } from "@/lib/domain/collaboration/runtime";
+// Import directly from the module (NOT the `@/lib/domain/content` barrel):
+// the barrel re-exports syncContentTags → lib/database/client (Prisma), which
+// would drag a server-only module into this client bundle. markdown.ts is
+// Prisma-free.
+import { tiptapToMarkdown, markdownToTiptapResult } from "@/lib/domain/content/markdown";
+import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { MarkdownSourceView } from "../editor/MarkdownSourceView";
 
 interface ContentResponse {
   success: boolean;
@@ -275,6 +282,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const isActivePane = activePaneId === paneId;
   const isMultiPane = layoutMode !== "single";
   const [noteContent, setNoteContent] = useState<JSONContent | null>(null);
+  // ── Markdown source-view (v3.2 T2) ──────────────────────────────────────
+  // Toggle between the rich-text editor and an editable markdown *source*
+  // view. `sourceDraft` holds the textarea's markdown while the mode is on;
+  // applying re-parses via the T1-hardened converter and writes through the
+  // collab-correct path (see applySourceMode below). Reset on navigation so a
+  // stale draft can never be applied to a different note.
+  const [sourceMode, setSourceMode] = useState(false);
+  const [sourceDraft, setSourceDraft] = useState("");
   const [noteTitle, setNoteTitle] = useState<string>("");
   const [isTitleEditing, setIsTitleEditing] = useState(false);
   const [titleDraft, setTitleDraft] = useState("");
@@ -1096,6 +1111,101 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     } catch {
       toast.error("Couldn't load the other version.");
     }
+  }, [selectedContentId]);
+
+  // ── Markdown source-view toggle (v3.2 T2) ───────────────────────────────
+  // Enter: seed the textarea from the LIVE editor JSON. For a collab note the
+  // Y.doc (reflected in the editor) can be ahead of the parent `noteContent`
+  // state, so read the editor first and fall back to parent state.
+  const enterSourceMode = useCallback(() => {
+    const live =
+      useEditorInstanceStore.getState().getEditor(selectedContentId)?.getJSON() ??
+      noteContent;
+    if (!live) return;
+    try {
+      setSourceDraft(tiptapToMarkdown(live));
+      setSourceMode(true);
+    } catch (err) {
+      clientLogger.error({
+        layer: "ui",
+        event: "source_view:enter_failed",
+        summary: "tiptap → markdown for source view failed",
+        attrs: { content_id: selectedContentId ?? "none" },
+        error: err,
+      });
+      toast.error("Couldn't render markdown source");
+    }
+  }, [noteContent, selectedContentId]);
+
+  // Apply + exit: re-parse the draft via the T1-hardened converter and commit
+  // through the collab-correct path.
+  //
+  // COLLAB SAFETY (R6): when the Y.doc is this note's authoritative store we
+  // must NOT REST-PATCH NotePayload — that write is invisible to collaborators
+  // and is overwritten on the next sync (the NotePayload↔Y.doc divergence the
+  // owner told us to never reintroduce). Instead we push the parsed doc
+  // through the live editor instance; y-prosemirror propagates it into the
+  // Y.doc, which Hocuspocus persists. The collab gate mirrors the editor's own
+  // `shouldUseCollaboration` (collaborationEnabled && contentId &&
+  // collaborationRuntime, notes only) so this behaves like a normal edit at
+  // that moment. `emitUpdate: false` avoids firing the editor's own autosave —
+  // for plain notes we persist explicitly below.
+  const applySourceMode = useCallback(async () => {
+    const result = markdownToTiptapResult(sourceDraft);
+    const collabAuthoritative =
+      collaborationEnabled &&
+      contentType === "note" &&
+      Boolean(selectedContentId) &&
+      Boolean(collaborationRuntime);
+    const editor = useEditorInstanceStore.getState().getEditor(selectedContentId);
+
+    if (collabAuthoritative) {
+      if (!editor) {
+        // Editor not ready — never REST-write a collab note. Keep the draft
+        // and the source view open so the user can retry without losing work.
+        toast.error("Editor still loading — try applying again in a moment");
+        return;
+      }
+      editor.commands.setContent(result.json, { emitUpdate: false });
+      setNoteContent(result.json);
+    } else {
+      // Plain/REST note: NotePayload is the persistence path. Reflect the edit
+      // in the mounted editor too (a `content` prop change alone doesn't
+      // re-apply to a live TipTap instance), then persist via the same REST
+      // save path as autosave.
+      editor?.commands.setContent(result.json, { emitUpdate: false });
+      setNoteContent(result.json);
+      await handleSave(result.json, { userInitiated: true });
+    }
+
+    if (result.degraded) {
+      toast.warning(
+        "Some markdown couldn't be parsed as rich text — saved as plain paragraphs.",
+      );
+    }
+    setSourceMode(false);
+  }, [
+    sourceDraft,
+    collaborationEnabled,
+    contentType,
+    selectedContentId,
+    collaborationRuntime,
+    handleSave,
+  ]);
+
+  const toggleSourceMode = useCallback(() => {
+    if (sourceMode) {
+      void applySourceMode();
+    } else {
+      enterSourceMode();
+    }
+  }, [sourceMode, applySourceMode, enterSourceMode]);
+
+  // Never strand a source draft across notes — applying a stale draft to a
+  // freshly-navigated note would overwrite it. Return to rich text on nav.
+  useEffect(() => {
+    setSourceMode(false);
+    setSourceDraft("");
   }, [selectedContentId]);
 
   // Wiki-link click handler - navigate to note or folder by title
@@ -2094,7 +2204,35 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 ) : null}
               </div>
             )}
-            {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
+            <div className="flex flex-none items-center gap-1">
+              {contentType === "note" && (
+                <button
+                  type="button"
+                  onClick={toggleSourceMode}
+                  aria-pressed={sourceMode}
+                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    sourceMode
+                      ? "bg-muted text-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                  title={
+                    sourceMode
+                      ? "Apply markdown and return to rich text"
+                      : "Edit markdown source"
+                  }
+                >
+                  {sourceMode ? (
+                    <FileText className="h-4 w-4" />
+                  ) : (
+                    <Code2 className="h-4 w-4" />
+                  )}
+                  <span className="whitespace-nowrap">
+                    {sourceMode ? "Rich text" : "Markdown"}
+                  </span>
+                </button>
+              )}
+              {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
+            </div>
           </div>
         )}
 
@@ -2116,30 +2254,43 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           onCloseTheirs={() => setTheirsPreview(null)}
         />
 
-        {/* Editor */}
+        {/* Editor — kept MOUNTED (hidden) in source mode so the collab Y.doc
+            connection and the live editor instance survive; applySourceMode
+            writes the edited markdown back through that instance (Y.doc for
+            collab notes, REST for plain ones). */}
         <div className="flex-1 overflow-hidden">
-          <MarkdownEditor
-            contentId={selectedContentId ?? undefined}
-            title={noteTitle}
-            parentId={contentParentId}
-            content={noteContent}
-            onSave={handleSave}
-            onStatsChange={handleStatsChange}
-            onOutlineChange={handleOutlineChange}
-            onWikiLinkClick={handleWikiLinkClick}
-            fetchNotesForWikiLink={fetchNotesForWikiLink}
-            fetchTags={fetchTags}
-            createTag={createTag}
-            fetchPeopleMentions={fetchPeopleMentions}
-            onPersonMentionClick={handlePersonMentionClick}
-            autoSaveDelay={2000}
-            editable={!isReadOnlyPageTemplate}
-            collaborationEnabled={contentType === "note" ? collaborationEnabled : false}
-            collaborationRuntime={collaborationRuntime}
-            onCollaborationSyncChange={handleCollaborationSyncChange}
-            compact={isEmbedMode}
-            edgeToEdge={isEmbedMode}
-          />
+          <div className={sourceMode ? "hidden" : "h-full"}>
+            <MarkdownEditor
+              contentId={selectedContentId ?? undefined}
+              title={noteTitle}
+              parentId={contentParentId}
+              content={noteContent}
+              onSave={handleSave}
+              onStatsChange={handleStatsChange}
+              onOutlineChange={handleOutlineChange}
+              onWikiLinkClick={handleWikiLinkClick}
+              fetchNotesForWikiLink={fetchNotesForWikiLink}
+              fetchTags={fetchTags}
+              createTag={createTag}
+              fetchPeopleMentions={fetchPeopleMentions}
+              onPersonMentionClick={handlePersonMentionClick}
+              autoSaveDelay={2000}
+              editable={!isReadOnlyPageTemplate}
+              collaborationEnabled={contentType === "note" ? collaborationEnabled : false}
+              collaborationRuntime={collaborationRuntime}
+              onCollaborationSyncChange={handleCollaborationSyncChange}
+              compact={isEmbedMode}
+              edgeToEdge={isEmbedMode}
+            />
+          </div>
+          {sourceMode && (
+            <MarkdownSourceView
+              value={sourceDraft}
+              onChange={setSourceDraft}
+              onApply={applySourceMode}
+              editable={!isReadOnlyPageTemplate}
+            />
+          )}
         </div>
       </div>
     );
