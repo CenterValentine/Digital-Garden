@@ -488,13 +488,42 @@ export async function POST(request: Request) {
 
       // Output ownership (Chat Outputs & References plan, WS3): the chat
       // that can own referenced output by default — a full-page chat is
-      // itself; a sidebar chat is its archived ContentNode, if the
-      // conversation has been saved/archived to the tree. Undefined for a
-      // transient/unsaved sidebar chat — output tools fall back to their
-      // existing folder-only default (primary, not referenced) in that case.
-      const outputOwnerId: string | undefined = isChatContent
+      // itself; a sidebar chat is its (now eagerly materialized, WS6)
+      // archived ContentNode. Undefined for a transient/unsaved sidebar chat
+      // — output tools fall back to their folder-only default there.
+      const chatNodeId: string | undefined = isChatContent
         ? contentId
         : archivedChatNodeId;
+      // The content this chat was started FROM (side chats only) — used by the
+      // "next to this chat" output-target mode.
+      const originContentId: string | undefined = isChatContent
+        ? undefined
+        : contentId;
+
+      // Output-target chip (WS7): the user's per-turn choice of where NEW
+      // content lands by default. `chat` (owner = the chat, WS3 default),
+      // `nextToChat` (owner = origin content — a sibling of the chat under it),
+      // or `folder` (a chosen folder, as a plain primary node). Only the
+      // default when the user doesn't tell the bot otherwise — an explicit
+      // destination the bot resolves from the request always wins downstream.
+      let outputOwnerId: string | undefined = chatNodeId;
+      let outputParentOverride: string | undefined;
+      const outputTarget = body.outputTarget as
+        | { mode?: string; folderId?: string }
+        | undefined;
+      if (outputTarget && typeof outputTarget === "object") {
+        const mode = outputTarget.mode;
+        if (mode === "nextToChat") {
+          outputOwnerId = originContentId ?? chatNodeId;
+        } else if (mode === "folder") {
+          outputOwnerId = undefined;
+          outputParentOverride =
+            typeof outputTarget.folderId === "string"
+              ? outputTarget.folderId
+              : undefined;
+        }
+        // mode "chat" (or anything else) → keep the chat-owner default.
+      }
 
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
@@ -515,6 +544,7 @@ export async function POST(request: Request) {
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
         outputOwnerId,
+        outputParentOverride,
         attachedMedia,
       };
       const allTools = {

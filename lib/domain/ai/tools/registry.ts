@@ -339,10 +339,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({ title, markdown, parentId }) => {
-        // Explicit destination (WS3): parentId means the user named a
-        // folder — the output-ownership default below does not apply then.
-        const explicitDestination = Boolean(parentId);
-        const destination = parentId ?? ctx.targetFolderId;
+        // Explicit destination (WS3): parentId means the user named a folder;
+        // the output-target chip's "folder" mode (WS7, ctx.outputParentOverride)
+        // is likewise an explicit folder → both file a PLAIN primary node and
+        // skip the referenced-owner default.
+        const explicitDestination = Boolean(parentId || ctx.outputParentOverride);
+        const destination = parentId ?? ctx.outputParentOverride ?? ctx.targetFolderId;
         if (!destination) {
           return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
         }
@@ -547,6 +549,24 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           });
           if (candidate) {
             resolvedParentId = candidate.id;
+            explicitDestination = true;
+          }
+        }
+        // Output-target chip "folder" mode (WS7): the user chose a folder for
+        // outputs → file there as a PLAIN primary node (explicitDestination
+        // suppresses the referenced-owner default), same as naming a folder.
+        if (!resolvedParentId && ctx.outputParentOverride) {
+          const folder = await prisma.contentNode.findFirst({
+            where: {
+              id: ctx.outputParentOverride,
+              ownerId: ctx.userId,
+              deletedAt: null,
+              contentType: "folder",
+            },
+            select: { id: true },
+          });
+          if (folder) {
+            resolvedParentId = folder.id;
             explicitDestination = true;
           }
         }

@@ -55,6 +55,14 @@ export interface ToolExecuteContext {
    */
   outputOwnerId?: string;
   /**
+   * Output-target chip "folder" mode (WS7): when the user chose a specific
+   * folder for outputs, this is that folder id. Output tools file new content
+   * there as a PLAIN primary node (not a referenced child) — the same as if
+   * the user had named the folder. Overrides the referenced-owner default;
+   * still yields to an explicit destination the model resolves per-request.
+   */
+  outputParentOverride?: string;
+  /**
    * Image/audio attachments on the conversation, in order. propose_cards_from_media
    * references these by index to build each card's media front. The model has
    * already seen them in context, so it supplies the identification per item.

@@ -25,6 +25,7 @@ import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { TargetFolderChip } from "./TargetFolderChip";
+import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -186,6 +187,8 @@ export function ChatPanel({
     activePlaybook,
     attachPlaybook,
     detachPlaybook,
+    outputTarget,
+    setOutputTarget,
     followUps,
     clearFollowUps,
     setScrollEl,
@@ -731,6 +734,13 @@ export function ChatPanel({
             // and (in the browser panel) remembered for the next chat.
             disabled={false}
             onChange={handleTargetChange}
+          />
+          {/* WS7: where generated content lands by default. */}
+          <OutputTargetChip
+            value={outputTarget}
+            onChange={setOutputTarget}
+            hasOrigin={Boolean(contentId)}
+            compact
           />
         </div>
         <div className="flex items-center gap-1">

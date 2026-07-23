@@ -316,6 +316,12 @@ export interface UseConversationEngineResult {
   /** Detach the active playbook (dismiss the composer chip). */
   detachPlaybook: () => void;
 
+  // ── output target (WS7) ──
+  /** Where new content lands by default (persisted per conversation). */
+  outputTarget: OutputTarget;
+  /** Update the output target (the OutputTargetChip's onChange). */
+  setOutputTarget: (target: OutputTarget) => void;
+
   // ── suggested follow-ups (Session 7) ──
   /** 2-3 chip suggestions generated after the last assistant turn. */
   followUps: string[];
@@ -402,6 +408,19 @@ export interface ActivePlaybook {
   phaseIndex: number;
   phaseCount: number;
 }
+
+/**
+ * Output-target selection (Chat Outputs & References plan, WS7) — where the
+ * assistant files NEW content by default when the user doesn't say otherwise.
+ *   - `chat`       → nested under this chat (referenced) — the default.
+ *   - `nextToChat` → under the origin content, a sibling of the chat.
+ *   - `folder`     → a chosen folder, as a plain (movable) node.
+ * Rides per-turn in the send body; persisted client-side per conversation.
+ */
+export type OutputTarget =
+  | { mode: "chat" }
+  | { mode: "nextToChat" }
+  | { mode: "folder"; folderId: string; folderTitle: string };
 
 export function useConversationEngine({
   conversationKey,
@@ -624,6 +643,39 @@ export function useConversationEngine({
     setActivePlaybookTitle(null);
   }, []);
 
+  // ── output target (WS7) ──
+  // Where new content lands by default; persisted client-side per chat so the
+  // choice sticks across reloads. Keyed by conversationId when bound, else
+  // contentId (transient). Hydrated once at mount (a transient→bound key
+  // change is rare and just resets to the default, which is fine).
+  const outputTargetKey = conversationId
+    ? `dg:output-target:conv:${conversationId}`
+    : contentId
+      ? `dg:output-target:content:${contentId}`
+      : null;
+  const [outputTarget, setOutputTargetState] = useState<OutputTarget>(() => {
+    if (typeof window === "undefined" || !outputTargetKey) return { mode: "chat" };
+    try {
+      const saved = window.localStorage.getItem(outputTargetKey);
+      return saved ? (JSON.parse(saved) as OutputTarget) : { mode: "chat" };
+    } catch {
+      return { mode: "chat" };
+    }
+  });
+  const setOutputTarget = useCallback(
+    (t: OutputTarget) => {
+      setOutputTargetState(t);
+      if (typeof window !== "undefined" && outputTargetKey) {
+        try {
+          window.localStorage.setItem(outputTargetKey, JSON.stringify(t));
+        } catch {
+          /* non-blocking */
+        }
+      }
+    },
+    [outputTargetKey],
+  );
+
   // ── suggested follow-ups (Session 7) ──
   const [followUps, setFollowUps] = useState<string[]>([]);
   const clearFollowUps = useCallback(() => setFollowUps([]), []);
@@ -840,6 +892,8 @@ export function useConversationEngine({
       // started them.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,
+      // Output-target chip (WS7): where new content lands by default.
+      outputTarget,
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -854,6 +908,7 @@ export function useConversationEngine({
     modelId,
     activePlaybookId,
     resolvedPhaseIndex,
+    outputTarget,
   ]);
   const isActive = status === "streaming" || status === "submitted";
 
@@ -1160,6 +1215,8 @@ export function useConversationEngine({
           // Attached playbook (AI v3.2 T3).
           playbookId: activePlaybookId,
           activePhaseIndex: resolvedPhaseIndex,
+          // Output-target chip (WS7).
+          outputTarget,
         },
       },
     );
@@ -1178,6 +1235,7 @@ export function useConversationEngine({
     modelId,
     activePlaybookId,
     resolvedPhaseIndex,
+    outputTarget,
   ]);
 
   // ── edit / regenerate (Session 5a) ──
@@ -1194,8 +1252,18 @@ export function useConversationEngine({
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,
+      // Output-target chip (WS7).
+      outputTarget,
     }),
-    [contentId, conversationId, providerId, modelId, activePlaybookId, resolvedPhaseIndex],
+    [
+      contentId,
+      conversationId,
+      providerId,
+      modelId,
+      activePlaybookId,
+      resolvedPhaseIndex,
+      outputTarget,
+    ],
   );
 
   const editMessage = useCallback(
@@ -1279,6 +1347,8 @@ export function useConversationEngine({
     activePlaybook,
     attachPlaybook,
     detachPlaybook,
+    outputTarget,
+    setOutputTarget,
     followUps,
     clearFollowUps,
     scrollRef,

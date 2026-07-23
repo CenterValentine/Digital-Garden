@@ -19,6 +19,7 @@ function formatTokenCount(n: number): string {
   return n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
 }
 import { TargetFolderChip } from "../ai/TargetFolderChip";
+import { OutputTargetChip } from "../ai/OutputTargetChip";
 import { ChatInput } from "../ai/ChatInput";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
@@ -236,6 +237,8 @@ function ChatViewerInner({
     activePlaybook,
     attachPlaybook,
     detachPlaybook,
+    outputTarget,
+    setOutputTarget,
     followUps,
     clearFollowUps,
     scrollRef,
@@ -791,6 +794,13 @@ function ChatViewerInner({
             location={initialTargetLocation}
             disabled={!conversationId}
             onChange={handleTargetChange}
+          />
+          {/* WS7: where generated content lands by default. A full-page chat
+              IS the content, so there's no distinct "next to this chat". */}
+          <OutputTargetChip
+            value={outputTarget}
+            onChange={setOutputTarget}
+            hasOrigin={false}
           />
           {conversationId && (
             <AssociatedContentChips conversationId={conversationId} />
