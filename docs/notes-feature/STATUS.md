@@ -53,6 +53,10 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: File-tree Shift selection no longer opens content on PR #126
+
+- Shift-click and Shift-double-click now remain selection-only gestures: range selection, persisted selection state, status counts, and bulk context-menu actions still work without changing the active content pane.
+
 **July 23, 2026**: AI content writes gain durable destination receipts on PR #126
 
 - Every AI tool that persists garden content now returns a shared write receipt resolved from the saved `ContentNode`, including its effective folder or referenced-under owner.

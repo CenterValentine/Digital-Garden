@@ -28,7 +28,10 @@ interface FileTreeProps {
     parentId: string | null;
     index: number;
   }) => Promise<void>;
-  onSelect?: (nodes: TreeNode[]) => void;
+  onSelect?: (
+    nodes: TreeNode[],
+    options?: { openContent: boolean },
+  ) => void;
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
@@ -88,6 +91,11 @@ export function FileTree({
   } = useTreeStateStore();
   const hasRestoredRef = useRef(false);
   const isRestoringScrollRef = useRef(false);
+  // React Arborist emits one onSelect callback for both navigation clicks
+  // and range-selection clicks. FileNode marks Shift-clicks immediately
+  // before selectContiguous() so this callback can persist the selection
+  // without asking the parent to open any content.
+  const selectionOnlyRef = useRef(false);
 
   useEffect(() => {
     const targetOffset = scrollOffset;
@@ -245,6 +253,9 @@ export function FileTree({
         onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet}
         onCreateAiImage={onCreateAiImage}
         onAddPeopleTarget={onAddPeopleTarget}
+        onSelectionOnly={() => {
+          selectionOnlyRef.current = true;
+        }}
       />
     );
   };
@@ -279,6 +290,8 @@ export function FileTree({
 
   const handleSelect = (nodes: NodeApi<TreeNode>[]) => {
     const nodeIds = nodes.map(n => n.id);
+    const openContent = !selectionOnlyRef.current;
+    selectionOnlyRef.current = false;
 
     // Persist selection state
     setSelectedIds(nodeIds);
@@ -286,7 +299,7 @@ export function FileTree({
     // Notify parent
     if (onSelect) {
       const selectedNodes = nodes.map(n => n.data);
-      onSelect(selectedNodes);
+      onSelect(selectedNodes, { openContent });
     }
   };
 

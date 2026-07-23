@@ -940,7 +940,10 @@ export function LeftSidebarContent({
   };
 
   // Handle node selection
-  const handleSelect = (nodes: TreeNode[]) => {
+  const handleSelect = (
+    nodes: TreeNode[],
+    options: { openContent: boolean } = { openContent: true },
+  ) => {
     // Update selection count for status bar
     setSelectedCount(nodes.length);
 
@@ -949,6 +952,10 @@ export function LeftSidebarContent({
     if (onSelectionChange) {
       onSelectionChange(hasMultiple);
     }
+
+    // Shift-click is a bulk-selection gesture, not navigation. Keep every
+    // selection/status update above, but leave the active pane untouched.
+    if (!options.openContent) return;
 
     // Open content in main panel - use first selected.
     // An EMPTY selection must NOT clear the open content: react-arborist fires
