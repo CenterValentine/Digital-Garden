@@ -24,6 +24,7 @@ import {
   findOrCreateFolder,
 } from "@/lib/domain/ai/documents";
 import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
+import { listPlaybooks, isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
@@ -434,10 +435,49 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
         const summaries = results.map((r, i) => {
           const excerpt = r.notePayload?.searchText?.slice(0, 150) || "";
-          return `${i + 1}. "${r.title}" (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
+          // Flag playbook notes inline so a generic search still surfaces
+          // them unambiguously — no separate read needed to tell.
+          const tag = isPlaybookMetadata(r.notePayload?.metadata)
+            ? " [PLAYBOOK]"
+            : "";
+          return `${i + 1}. "${r.title}"${tag} (id: ${r.id})${excerpt ? `\n   ${excerpt}...` : ""}`;
         });
 
         return `Found ${results.length} note${results.length !== 1 ? "s" : ""} matching "${query}":\n\n${summaries.join("\n\n")}`;
+      },
+    }),
+
+    search_playbooks: tool({
+      description:
+        "List the user's playbooks (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a playbook by name or topic; it searches ONLY playbooks, so it won't return unrelated notes. If a playbook is already attached to this chat (see the Active Playbook section, if present), you don't need this — that one is already the answer.",
+      inputSchema: z.object({
+        query: z
+          .string()
+          .optional()
+          .describe(
+            "Optional filter — matches playbook title or description (case-insensitive substring). Omit to list all.",
+          ),
+      }),
+      execute: async ({ query }) => {
+        const all = await listPlaybooks(ctx.userId);
+        const q = query?.trim().toLowerCase();
+        const matches = q
+          ? all.filter(
+              (p) =>
+                p.title.toLowerCase().includes(q) ||
+                p.description.toLowerCase().includes(q),
+            )
+          : all;
+        if (matches.length === 0) {
+          return q
+            ? `No playbooks match "${query}".`
+            : "No playbooks found — none of the user's notes/folders are marked as playbooks yet.";
+        }
+        const lines = matches.map(
+          (p, i) =>
+            `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
+        );
+        return `Found ${matches.length} playbook${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with read_note using its id.`;
       },
     }),
 

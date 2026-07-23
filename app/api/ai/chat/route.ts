@@ -891,6 +891,7 @@ export async function POST(request: Request) {
               const phaseText = renderPlaybookSection(phase.content);
               playbookContext =
                 `\n\n## Active Playbook: "${playbookNode.title}"\n` +
+                `This playbook is ALREADY ATTACHED and loaded below — when the user asks to run "this playbook" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
                 `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
                 `**Phases:**\n${phaseToc}\n\n` +
                 (standingText
@@ -954,10 +955,23 @@ export async function POST(request: Request) {
       if (contentId && !isChatContent && !openWorkflowTitle && rootedContentTitle) {
         const readable =
           rootedContentType === "note" || rootedContentType === "folder";
+        // A playbook explicitly attached via /playbook is a DIFFERENT,
+        // more specific target than the rooted content — it must win any
+        // "this playbook" reference, or the model conflates the two (bug:
+        // it went to read the rooted note instead of the actually-attached
+        // playbook below). Omit the "this playbook" mapping entirely when
+        // one is attached; the Active Playbook section states its own id.
+        const playbookPhrase =
+          playbookContext.length > 0
+            ? `"this file", "this note", "the current one", etc.`
+            : `"this file", "this note", "the current one", "this playbook", etc.`;
         rootedContentSection =
-          `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+          `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to ${playbookPhrase} without naming it, they mean "${rootedContentTitle}".` +
           (readable
             ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+            : "") +
+          (playbookContext.length > 0
+            ? ` A DIFFERENT playbook is explicitly attached to this chat (see "Active Playbook" below) — that one takes priority for any playbook-related request; do not confuse it with this rooted content.`
             : "") +
           " New content you create nests under this chat by default.";
       }
