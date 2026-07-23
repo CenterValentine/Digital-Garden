@@ -33,7 +33,7 @@ export async function findOrCreateFolder(
   ownerId: string,
   title: string,
   parentId: string | null,
-): Promise<string> {
+): Promise<{ contentNodeId: string; created: boolean }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
       ownerId,
@@ -44,7 +44,9 @@ export async function findOrCreateFolder(
     },
     select: { id: true },
   });
-  if (existing) return existing.id;
+  if (existing) {
+    return { contentNodeId: existing.id, created: false };
+  }
 
   const slug = await generateUniqueSlug(title, ownerId);
   const folder = await prisma.contentNode.create({
@@ -64,7 +66,7 @@ export async function findOrCreateFolder(
     summary: `folder "${title}" created`,
     attrs: { folderId: folder.id, parentId },
   });
-  return folder.id;
+  return { contentNodeId: folder.id, created: true };
 }
 
 export interface CreateDocxInput {

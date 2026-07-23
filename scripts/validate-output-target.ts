@@ -7,6 +7,7 @@ import {
   resolveOutputTargetKeyChange,
   type OutputTarget,
 } from "../lib/domain/ai/output-target";
+import { parseContentWriteReceipts } from "../lib/domain/ai/content-write-receipts";
 
 const folderTarget: OutputTarget = {
   mode: "folder",
@@ -75,5 +76,38 @@ const instruction = renderOutputTargetInstruction(folderTarget);
 assert.match(instruction, /AI Playbook Tests/);
 assert.match(instruction, /omit parentId/);
 assert.match(instruction, /explicitly names a different destination/);
+
+const writeReceipt = {
+  operation: "updated",
+  contentId: "90c01845-bdb9-40e8-8ffc-410f4044b900",
+  title: "Run Ledger",
+  contentType: "note",
+  noun: "run ledger",
+  location: {
+    kind: "reference",
+    contentId: "5a9e2278-8a2b-49c0-922e-39932314cbcc",
+    title: "Clipboard Health research",
+  },
+} as const;
+
+assert.deepEqual(
+  parseContentWriteReceipts(
+    JSON.stringify({ __checkpoint: true, __contentWrites: [writeReceipt] }),
+  ),
+  [writeReceipt],
+  "JSON tool results must expose their persisted content destinations",
+);
+assert.deepEqual(
+  parseContentWriteReceipts({ __contentWrites: [writeReceipt] }),
+  [writeReceipt],
+  "object tool results must expose their persisted content destinations",
+);
+assert.deepEqual(
+  parseContentWriteReceipts({
+    __contentWrites: [{ ...writeReceipt, contentId: null }],
+  }),
+  [],
+  "malformed write receipts must never render as actionable content",
+);
 
 console.log("Output-target checks passed.");

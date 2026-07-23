@@ -62,9 +62,9 @@ export async function upsertRunLedger(
    * owner` (storage parentId still the target folder), and keyed by owner so
    * each chat carries its own ledger. Omit → the historical folder-scoped
    * primary ledger.
-   */
+  */
   ownerContentId?: string,
-): Promise<{ contentNodeId: string }> {
+): Promise<{ contentNodeId: string; created: boolean }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
@@ -110,7 +110,7 @@ export async function upsertRunLedger(
       update: payloadData,
       create: { contentId: existing.id, ...payloadData },
     });
-    return { contentNodeId: existing.id };
+    return { contentNodeId: existing.id, created: false };
   }
 
   const slug = await generateUniqueSlug(LEDGER_TITLE, userId);
@@ -136,5 +136,5 @@ export async function upsertRunLedger(
     summary: `run ledger created in folder ${targetFolderId}`,
     attrs: { contentNodeId: node.id, targetFolderId },
   });
-  return { contentNodeId: node.id };
+  return { contentNodeId: node.id, created: true };
 }

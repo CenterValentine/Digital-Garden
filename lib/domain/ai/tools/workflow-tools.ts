@@ -29,6 +29,7 @@ import {
 } from "@/extensions/workflows/server/dispatch";
 import { pushWorkflowToN8n } from "@/extensions/workflows/server/engines/n8n/push";
 import { N8N_PAYLOAD_ENGINE } from "@/extensions/workflows/server/engines/n8n/meta";
+import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
 
 /** Render schema/structural issues in a model-repairable form. */
@@ -352,6 +353,12 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           noun: "workflow",
           contentId: resolved.id,
           title: newName ?? resolved.title,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            resolved.id,
+            "updated",
+            "workflow",
+          )),
           note:
             "The canvas does NOT live-refresh: if the user has this workflow open they must reopen it to load the new graph before manual edits — saving a stale canvas would overwrite this change. Relay that in one short line." +
             syncNote,
@@ -494,6 +501,12 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
           contentId: node.id,
           title: name,
           parentId: resolvedParentId,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            node.id,
+            "created",
+            "workflow",
+          )),
           note: engineNote,
         });
       },
@@ -532,7 +545,15 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
               "tool-call",
             );
           }
-          return `Pushed "${resolved.title}" to n8n and activated it (n8n workflow id: ${result.workflowId}). View it there: ${result.n8nUrl} — share that link with the user. The workflow's engine is now n8n; future runs (run_workflow or the Run button) execute on n8n. Edits made here need a re-push to reach n8n.`;
+          return JSON.stringify({
+            message: `Pushed "${resolved.title}" to n8n and activated it (n8n workflow id: ${result.workflowId}). View it there: ${result.n8nUrl} — share that link with the user. The workflow's engine is now n8n; future runs (run_workflow or the Run button) execute on n8n. Edits made here need a re-push to reach n8n.`,
+            ...(await getContentWriteReceiptEnvelope(
+              ctx.userId,
+              resolved.id,
+              "updated",
+              "workflow",
+            )),
+          });
         } catch (error) {
           return `Push to n8n failed: ${error instanceof Error ? error.message : "unknown error"}. Relay this to the user — it is usually configuration (n8n connection or callback URL), not the graph.`;
         }

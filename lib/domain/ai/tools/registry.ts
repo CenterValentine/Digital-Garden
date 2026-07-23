@@ -42,6 +42,7 @@ import {
   type SpeechModelId,
 } from "@/lib/domain/ai/speech/types";
 import { publishEvent } from "@/lib/domain/notifications";
+import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import {
   consumeRateLimit,
   RATE_LIMITS,
@@ -108,20 +109,31 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // (find-or-create, owner-wide dedupe) and links the chat to it —
         // the read IS the settle signal.
         let gardenNodeId: string | undefined;
+        let gardenWriteReceipt:
+          | Awaited<ReturnType<typeof getContentWriteReceiptEnvelope>>
+          | undefined;
         if (ctx.conversationId && ctx.targetFolderId) {
-          const nodeId = await findOrCreatePageNode(
+          const settled = await findOrCreatePageNode(
             ctx.userId,
             ctx.targetFolderId,
             c,
           );
-          if (nodeId) {
-            gardenNodeId = nodeId;
+          if (settled) {
+            gardenNodeId = settled.contentNodeId;
             void addAutoAssociation(
               ctx.userId,
               ctx.conversationId,
-              nodeId,
+              settled.contentNodeId,
               "tool-call",
             ).catch(() => null);
+            if (settled.created) {
+              gardenWriteReceipt = await getContentWriteReceiptEnvelope(
+                ctx.userId,
+                settled.contentNodeId,
+                "cached",
+                "web page",
+              );
+            }
           }
         }
         // Extraction subagent (v3.1 R5): oversized reads are condensed by
@@ -159,6 +171,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               }
             : {}),
           gardenNodeId,
+          ...(gardenWriteReceipt ?? {}),
           // Field name carries the trust label on purpose — structural
           // reinforcement of the never-instructions rule above.
           untrustedWebContent: contentForContext,
@@ -236,6 +249,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             phase,
             recorded: true,
             ledgerNodeId: ledger.contentNodeId,
+            ...(await getContentWriteReceiptEnvelope(
+              ctx.userId,
+              ledger.contentNodeId,
+              ledger.created ? "created" : "updated",
+              "run ledger",
+            )),
             nextAction:
               "APPROVED. Continue IMMEDIATELY with the next phase in this same response — announce it in one line, then proceed. If this was the FINAL phase, give a short completion summary instead (artifacts + where they were saved).",
           };
@@ -280,8 +299,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           }
         }
         try {
-          const folderId = await findOrCreateFolder(ctx.userId, name, parent);
-          return { folderId, name };
+          const folder = await findOrCreateFolder(ctx.userId, name, parent);
+          return {
+            folderId: folder.contentNodeId,
+            name,
+            ...(folder.created
+              ? await getContentWriteReceiptEnvelope(
+                  ctx.userId,
+                  folder.contentNodeId,
+                  "created",
+                  "folder",
+                )
+              : {}),
+          };
         } catch (error) {
           return `Could not create the folder: ${error instanceof Error ? error.message : "unknown error"}.`;
         }
@@ -354,6 +384,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             contentNodeId: result.contentNodeId,
             fileName: result.fileName,
             parentFolderId: destination,
+            ...(await getContentWriteReceiptEnvelope(
+              ctx.userId,
+              result.contentNodeId,
+              "created",
+              "Word document",
+            )),
           };
         } catch (error) {
           return `Could not create the document: ${error instanceof Error ? error.message : "unknown error"}.`;
@@ -656,6 +692,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           title,
           parentId: resolvedParentId,
           wordCount,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            node.id,
+            "created",
+            "note",
+          )),
         });
       },
     }),
@@ -764,6 +806,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           title: titleToApply ?? existing.title,
           wordCount,
           targetKind: existing.contentType,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            existing.id,
+            "updated",
+            existing.contentType === "note" ? "note" : "notes",
+          )),
         });
       },
     }),
@@ -830,6 +878,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             width: stored.width,
             height: stored.height,
             fileName: stored.fileName,
+            ...(await getContentWriteReceiptEnvelope(
+              ctx.userId,
+              stored.contentId,
+              "generated",
+              "image",
+            )),
           });
         } catch (error) {
           const message = error instanceof Error ? error.message : "Image generation failed";
@@ -894,6 +948,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             providerId: stored.providerId,
             modelId: stored.modelId,
             fileName: stored.fileName,
+            ...(await getContentWriteReceiptEnvelope(
+              ctx.userId,
+              stored.contentId,
+              "generated",
+              "audio file",
+            )),
           });
         } catch (error) {
           // Swap the low-level "no key" error for actionable setup guidance

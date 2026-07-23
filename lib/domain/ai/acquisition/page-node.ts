@@ -22,7 +22,7 @@ export async function findOrCreatePageNode(
   userId: string,
   targetFolderId: string,
   content: AcquiredContent,
-): Promise<string | null> {
+): Promise<{ contentNodeId: string; created: boolean } | null> {
   try {
     const normalized = normalizeUrl(content.url);
     const canonical = content.canonicalUrl
@@ -40,7 +40,9 @@ export async function findOrCreatePageNode(
       },
       select: { contentId: true },
     });
-    if (existing) return existing.contentId;
+    if (existing) {
+      return { contentNodeId: existing.contentId, created: false };
+    }
 
     const title = (content.title ?? content.url).slice(0, 255);
     const slug = await generateUniqueSlug(title, userId);
@@ -88,7 +90,7 @@ export async function findOrCreatePageNode(
       summary: `page node created for ${content.url} in target folder`,
       attrs: { contentId: node.id, url: content.url, targetFolderId },
     });
-    return node.id;
+    return { contentNodeId: node.id, created: true };
   } catch (error) {
     logger.info({
       layer: "ai",

@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: AI content writes gain durable destination receipts on PR #126
+
+- Every AI tool that persists garden content now returns a shared write receipt resolved from the saved `ContentNode`, including its effective folder or referenced-under owner.
+- Chat messages render the receipt as a clickable emerald affordance naming what was created/updated/generated/cached and exactly where it lives.
+- Coverage includes notes and sidecar notes, editor writes, Word documents, generated image/audio files, workflows, acquisition-cached web pages, created folders, and the playbook Run Ledger; legacy note cards still render for older persisted conversations.
+
 **July 23, 2026**: Phase-checkpoint approval survives conversation reload on PR #126
 
 - The owner reproduction was confirmed in persisted data: the live checkpoint reached `approval-requested`, but `ConversationMessage.parts` captured the stale `input-streaming` React snapshot without its approval ID, so reload rendered a running tool bubble.

@@ -16,7 +16,7 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus, ShieldAlert, X } from "lucide-react";
+import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus, FolderOpen, ShieldAlert, X } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
@@ -38,6 +38,10 @@ import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  parseContentWriteReceipts,
+  type ContentWriteReceipt,
+} from "@/lib/domain/ai/content-write-receipts";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -354,6 +358,7 @@ export const ChatMessage = memo(function ChatMessage({
     imagePayloads,
     audioPayloads,
     notePayloads,
+    writeReceipts,
     deckProposals,
     deckWithCardsProposals,
     hasRunningTools,
@@ -361,6 +366,10 @@ export const ChatMessage = memo(function ChatMessage({
     const images: ImagePayload[] = [];
     const audios: AudioPayload[] = [];
     const notes: NotePayload[] = [];
+    const writes: Array<{
+      toolCallId: string;
+      receipt: ContentWriteReceipt;
+    }> = [];
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
     let running = false;
@@ -377,6 +386,10 @@ export const ChatMessage = memo(function ChatMessage({
       }
 
       if (tp.state === "output-available" && tp.output !== undefined) {
+        const receipts = parseContentWriteReceipts(tp.output);
+        for (const receipt of receipts) {
+          writes.push({ toolCallId: tp.toolCallId, receipt });
+        }
         const image = parseImagePayload(tp.output);
         if (image && !seenImageIds.has(image.contentId)) {
           seenImageIds.add(image.contentId);
@@ -389,7 +402,11 @@ export const ChatMessage = memo(function ChatMessage({
           audios.push(audio);
           continue;
         }
-        const note = parseNotePayload(tp.output);
+        // New results use the generic write receipt. Keep the legacy note
+        // parser only for already-persisted conversations from before the
+        // receipt contract landed.
+        const note =
+          receipts.length === 0 ? parseNotePayload(tp.output) : null;
         if (note && !seenNoteIds.has(note.contentId)) {
           seenNoteIds.add(note.contentId);
           notes.push(note);
@@ -411,6 +428,7 @@ export const ChatMessage = memo(function ChatMessage({
       imagePayloads: images,
       audioPayloads: audios,
       notePayloads: notes,
+      writeReceipts: writes,
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
       hasRunningTools: running,
@@ -806,6 +824,16 @@ export const ChatMessage = memo(function ChatMessage({
           <NotePayloadCard
             key={payload.contentId}
             payload={payload}
+            midRunPaneOpen={midRunPaneOpen}
+          />
+        ))}
+
+        {/* Durable write receipts — every AI tool that persists content
+            declares both the written node and its effective tree location. */}
+        {writeReceipts.map(({ toolCallId, receipt }, index) => (
+          <ContentWriteReceiptCard
+            key={`${toolCallId}-${receipt.contentId}-${index}`}
+            receipt={receipt}
             midRunPaneOpen={midRunPaneOpen}
           />
         ))}
@@ -2274,6 +2302,98 @@ function toolActionLabel(toolName: string, isRunning: boolean): string {
  * - Draggable via HTML5 drag with image URL in dataTransfer,
  *   compatible with TipTap's image drop handler.
  */
+/**
+ * Clickable receipt for every ContentNode write performed by an AI tool.
+ * The second line names the effective tree container after persistence, so
+ * referenced outputs and folder-targeted outputs are distinguishable.
+ */
+function ContentWriteReceiptCard({
+  receipt,
+  midRunPaneOpen = false,
+}: {
+  receipt: ContentWriteReceipt;
+  midRunPaneOpen?: boolean;
+}) {
+  const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const isSelfNotes =
+    selectedContentId === receipt.contentId && receipt.noun === "notes";
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null);
+
+  const handleClick = useCallback(() => {
+    if (isSelfNotes) {
+      useNotesPanelStore.getState().setExpanded(true);
+      setTimeout(() => {
+        document
+          .getElementById("notes-panel-anchor")
+          ?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 0);
+      return;
+    }
+    if (midRunPaneOpen) {
+      openArtifactInSplitPane({
+        contentId: receipt.contentId,
+        title: receipt.title,
+        contentType: receipt.contentType,
+      });
+      return;
+    }
+    useContentStore.getState().setSelectedContentId(receipt.contentId);
+  }, [
+    isSelfNotes,
+    midRunPaneOpen,
+    receipt.contentId,
+    receipt.contentType,
+    receipt.title,
+  ]);
+
+  const operation =
+    receipt.operation.charAt(0).toUpperCase() + receipt.operation.slice(1);
+  const location =
+    receipt.location.kind === "reference"
+      ? `under ${receipt.location.title}`
+      : receipt.location.kind === "folder"
+        ? `in ${receipt.location.title}`
+        : `in ${receipt.location.title}`;
+  const subline = `${operation} ${receipt.noun} · ${location}`;
+  const tooltipText = `${operation} ${receipt.noun} "${receipt.title}" ${location}. Click to ${midRunPaneOpen ? "open in a split pane" : "open"}; right-click for options.`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={handleClick}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setMenuPos({ x: event.clientX, y: event.clientY });
+        }}
+        className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2 text-left text-sm transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
+        title={tooltipText}
+      >
+        <FolderOpen className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <span className="flex min-w-0 flex-col">
+          <span className="truncate font-medium text-gray-900 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
+            {receipt.title}
+          </span>
+          <span className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/75">
+            {subline}
+          </span>
+        </span>
+      </button>
+      {menuPos && (
+        <ArtifactContextMenu
+          position={menuPos}
+          artifact={{
+            contentId: receipt.contentId,
+            title: receipt.title,
+            contentType: receipt.contentType,
+          }}
+          onClose={() => setMenuPos(null)}
+        />
+      )}
+    </>
+  );
+}
+
 /**
  * Inline card rendered when createNote / updateNote tool returns. Replaces
  * the raw "Created note (id: …)" string with a clickable affordance that
