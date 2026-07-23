@@ -54,6 +54,7 @@ import {
   writeStoredOutputTarget,
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
+import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
@@ -1179,6 +1180,20 @@ export function useConversationEngine({
     // reads it to inline content for providers that can't consume the file
     // natively, while the displayed/persisted message stays a clean chip.
     const parts: UIMessage["parts"] = [];
+    if (activePlaybookId) {
+      // Unlike the composer-only chip, this data part belongs to the sent
+      // user turn, survives persistence/reload, and renders alongside that
+      // message. The server validates the id independently before adding
+      // authoritative model context.
+      parts.push(
+        createPlaybookMessageAttachmentPart({
+          id: activePlaybookId,
+          title: activePlaybookTitle ?? "Attached playbook",
+          phaseIndex: resolvedPhaseIndex,
+          phaseCount: activePlaybook?.phaseCount ?? 0,
+        }),
+      );
+    }
     if (text) parts.push({ type: "text", text });
     for (const a of ready) {
       const part: FileUIPart = {
@@ -1249,6 +1264,8 @@ export function useConversationEngine({
     providerId,
     modelId,
     activePlaybookId,
+    activePlaybookTitle,
+    activePlaybook,
     resolvedPhaseIndex,
     outputTarget,
   ]);
@@ -1296,12 +1313,36 @@ export function useConversationEngine({
       pendingStampRef.current = { providerId, modelId };
       setMessages(messages.slice(0, idx));
       // { parts } shape (matches handleSend / studio-invoke).
+      const editedParts: UIMessage["parts"] = [];
+      if (activePlaybookId) {
+        editedParts.push(
+          createPlaybookMessageAttachmentPart({
+            id: activePlaybookId,
+            title: activePlaybookTitle ?? "Attached playbook",
+            phaseIndex: resolvedPhaseIndex,
+            phaseCount: activePlaybook?.phaseCount ?? 0,
+          }),
+        );
+      }
+      editedParts.push({ type: "text", text });
       void sendMessage(
-        { parts: [{ type: "text", text }] },
+        { parts: editedParts },
         { body: reRunBody() }
       );
     },
-    [messages, setMessages, sendMessage, reRunBody, providerId, modelId, truncateRef],
+    [
+      messages,
+      setMessages,
+      sendMessage,
+      reRunBody,
+      providerId,
+      modelId,
+      truncateRef,
+      activePlaybookId,
+      activePlaybookTitle,
+      activePlaybook,
+      resolvedPhaseIndex,
+    ],
   );
 
   const regenerateMessage = useCallback(

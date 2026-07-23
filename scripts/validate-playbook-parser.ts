@@ -3,6 +3,11 @@ import type { JSONContent } from "@tiptap/core";
 
 import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import {
+  bindPlaybookToLatestUserMessage,
+  createPlaybookMessageAttachmentPart,
+  parsePlaybookMessageAttachment,
+} from "@/lib/domain/ai/playbooks/message-binding";
 
 function paragraph(text: string): JSONContent {
   return {
@@ -87,5 +92,38 @@ assert.equal(
 
 const empty = parsePlaybook({ type: "doc", content: [] });
 assert.equal(empty.phases.length, 0);
+
+const attachmentPart = createPlaybookMessageAttachmentPart({
+  id: "playbook-id",
+  title: "Test",
+  phaseIndex: 0,
+  phaseCount: 2,
+});
+assert.deepEqual(parsePlaybookMessageAttachment(attachmentPart), {
+  id: "playbook-id",
+  title: "Test",
+  phaseIndex: 0,
+  phaseCount: 2,
+});
+
+const boundMessages = bindPlaybookToLatestUserMessage(
+  [
+    { role: "user", content: "Earlier request" },
+    { role: "assistant", content: "Earlier reply" },
+    { role: "user", content: [{ type: "text", text: "Run this playbook." }] },
+  ],
+  "Test",
+);
+assert.equal(boundMessages[0]?.content, "Earlier request");
+assert.deepEqual(boundMessages[2]?.content, [
+  {
+    type: "text",
+    text:
+      '[Attached playbook selected by the user: "Test". ' +
+      "This is the procedure to execute for the request below. Its validated current-phase instructions are in the Active Playbook system section. " +
+      "Do not read rooted content to identify or discover the playbook; use rooted content only when the request or active phase actually requires it.]",
+  },
+  { type: "text", text: "Run this playbook." },
+]);
 
 console.log("Playbook parser checks passed.");

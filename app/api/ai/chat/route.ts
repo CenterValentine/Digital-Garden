@@ -135,6 +135,7 @@ import { refreshContextOnAccess } from "@/extensions/studio/server/context-refre
 import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import { bindPlaybookToLatestUserMessage } from "@/lib/domain/ai/playbooks/message-binding";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -684,7 +685,7 @@ export async function POST(request: Request) {
       );
 
       // Convert UIMessages to ModelMessages for streamText
-      const modelMessages = await convertToModelMessages(
+      let modelMessages = await convertToModelMessages(
         resolvedMessages as Parameters<typeof convertToModelMessages>[0],
       );
 
@@ -784,6 +785,7 @@ export async function POST(request: Request) {
       let playbookContext = "";
       let playbookAwareness = "";
       let attachedPlaybookResolved = false;
+      let attachedPlaybookTitle = "";
       // An EXPLICIT attach (/playbook picker) gets the full progressive
       // disclosure below — standing rules + the active phase + reference
       // manifest, and flips the checkpoint cadence.
@@ -821,6 +823,7 @@ export async function POST(request: Request) {
             isPlaybookMetadata(playbookNode.notePayload.metadata)
           ) {
             attachedPlaybookResolved = true;
+            attachedPlaybookTitle = playbookNode.title;
             const parsed = parsePlaybook(
               playbookNode.notePayload.tiptapJson as JSONContent,
             );
@@ -958,6 +961,14 @@ export async function POST(request: Request) {
       // already loaded. Generic note search remains available for phase work.
       if (attachedPlaybookResolved) {
         delete tools.search_playbooks;
+        // System context alone proved insufficient for weaker models: the
+        // owner smoke trace showed a correctly injected Active Playbook, yet
+        // DeepSeek still opened the rooted note first. Put the validated
+        // selection directly on the latest user request as well.
+        modelMessages = bindPlaybookToLatestUserMessage(
+          modelMessages,
+          attachedPlaybookTitle,
+        );
       }
 
       // Rooted-content context: tell the model what this chat is ABOUT, so
@@ -969,24 +980,15 @@ export async function POST(request: Request) {
       if (contentId && !isChatContent && !openWorkflowTitle && rootedContentTitle) {
         const readable =
           rootedContentType === "note" || rootedContentType === "folder";
-        // A playbook explicitly attached via /playbook is a DIFFERENT,
-        // more specific target than the rooted content — it must win any
-        // "this playbook" reference, or the model conflates the two (bug:
-        // it went to read the rooted note instead of the actually-attached
-        // playbook below). Omit the "this playbook" mapping entirely when
-        // one is attached; the Active Playbook section states its own id.
-        const playbookPhrase =
-          attachedPlaybookResolved
-            ? `"this file", "this note", "the current one", etc.`
-            : `"this file", "this note", "the current one", "this playbook", etc.`;
-        rootedContentSection =
-          `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to ${playbookPhrase} without naming it, they mean "${rootedContentTitle}".` +
-          (readable
-            ? ` Read its content with read_note (id: ${contentId}) when you need it.`
-            : "") +
-          (attachedPlaybookResolved
-            ? ` A DIFFERENT playbook is explicitly attached to this chat (see "Active Playbook" below) — that one takes priority for any playbook-related request; do not confuse it with this rooted content.`
-            : "");
+        rootedContentSection = attachedPlaybookResolved
+          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected playbook. The playbook attached to the current user message and loaded in "Active Playbook" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the playbook.` +
+            (readable
+              ? ` Read the rooted content with read_note (id: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
+              : "")
+          : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+            (readable
+              ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+              : "");
       }
 
       // Resolve the selected custom-instruction context, if any. Sent by

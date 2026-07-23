@@ -37,6 +37,7 @@ import {
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
+import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -575,6 +576,34 @@ export const ChatMessage = memo(function ChatMessage({
                 text={reasoningText}
                 streaming={isStreaming && isAssistant}
               />
+            );
+          }
+
+          // Playbook attachments are durable data parts bound to the user
+          // turn, rather than composer-only state. They render as a sent
+          // attachment and are ignored by the SDK's model conversion; the
+          // server adds independently validated model context.
+          if (part.type === "data-playbook") {
+            const playbook = parsePlaybookMessageAttachment(part);
+            if (!playbook) return null;
+            const phaseLabel =
+              playbook.phaseCount > 0
+                ? ` · Phase ${Math.min(playbook.phaseIndex + 1, playbook.phaseCount)}/${playbook.phaseCount}`
+                : "";
+            return (
+              <div
+                key={i}
+                title="Playbook attached to this message"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-indigo-500/30 bg-indigo-500/[0.08] px-2.5 py-1.5 text-xs text-indigo-700 dark:text-indigo-300"
+              >
+                <GitBranch className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{playbook.title}</span>
+                {phaseLabel && (
+                  <span className="shrink-0 text-indigo-500/80 dark:text-indigo-300/70">
+                    {phaseLabel}
+                  </span>
+                )}
+              </div>
             );
           }
 
