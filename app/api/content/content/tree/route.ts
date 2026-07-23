@@ -129,9 +129,28 @@ export async function GET(request: NextRequest) {
             where: {
               ownerId: session.user.id,
               deletedAt: includeDeleted ? undefined : null,
-              role: showReferencedContent
-                ? { in: ["primary", "referenced"] }
-                : "primary",
+              ...(showReferencedContent
+                ? { role: { in: ["primary", "referenced"] } }
+                : {
+                    // Chat Outputs & References plan (WS3): a chat's generated
+                    // deliverables are role:"referenced" + ownedByNoteId = the
+                    // chat, so a naive `role:"primary"` filter would hide them
+                    // until the user flips the global "show referenced" toggle
+                    // (default off) — the "where did my resume go?" failure.
+                    // Surface deliverables (referenced content whose OWNER is a
+                    // chat) under their chat by default, while embedded media
+                    // (referenced, owned via the embed graph with no
+                    // ownedByNoteId, or owned by a NOTE) stays hidden until
+                    // toggled — that's why it's hidden (a note with 10 images
+                    // shouldn't spray 10 tree children).
+                    OR: [
+                      { role: "primary" as const },
+                      {
+                        role: "referenced" as const,
+                        ownedByNote: { contentType: "chat" as const },
+                      },
+                    ],
+                  }),
             },
             select: {
               id: true,
@@ -603,7 +622,9 @@ export async function GET(request: NextRequest) {
       }
 
       // When referenced content is hidden, report how many referenced
-      // items exist so the file tree can offer to reveal them.
+      // items exist so the file tree can offer to reveal them. Excludes
+      // chat-owned deliverables (WS3) — those are already shown under their
+      // chat above, so they aren't "hidden" and mustn't inflate this count.
       let hiddenReferencedCount = 0;
       if (!showReferencedContent) {
         hiddenReferencedCount = await prisma.contentNode.count({
@@ -611,6 +632,7 @@ export async function GET(request: NextRequest) {
             ownerId: session.user.id,
             deletedAt: null,
             role: "referenced",
+            NOT: { ownedByNote: { contentType: "chat" } },
           },
         });
       }

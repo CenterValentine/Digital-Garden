@@ -185,3 +185,36 @@ chip deferred to a schema decision).
 4. **Move-lock UX — RESOLVED, pre-existing.** Already a toast
    ("Unable to move referenced content… still embedded in X"), not a silent
    no-op. See WS2.
+
+## 5. Post-review fixes (Opus review of `bcb4b78`, 2026-07-22)
+
+**Finding 1 (critical) — bot deliverables were invisible in the tree.** WS3 tags
+output `role:"referenced"`, but the tree fetch excludes ALL referenced content
+unless the global "show referenced" toggle is on (default off), with no
+owner-scoped reveal — so "make me a resume" produced a file that vanished from
+the tree (only `hiddenReferencedCount` incremented). **Fixed** in
+`app/api/content/content/tree/route.ts`: when the toggle is off, the fetch now
+`OR`s in referenced nodes whose **owner is a chat** (`ownedByNote: { contentType:
+"chat" }`) — i.e. WS3 deliverables — so they show under their chat by default,
+while embedded media (referenced, owned via the embed graph / by a NOTE, no
+chat owner) stays hidden until toggled (that's why it's hidden — a note with 10
+images shouldn't spray 10 tree children). `hiddenReferencedCount` adjusted to
+exclude the now-shown deliverables. The distinction is clean because WS3
+deliverables get an EXPLICIT `ownedByNoteId = chat`, whereas embedded media
+never does.
+
+**Finding 2 (medium) — ambient playbook hijacked every turn.** The WS1
+`playbookId ?? contentId` fallback meant any chat anchored on a playbook-marked
+note/folder injected the full playbook + flipped the checkpoint cadence on EVERY
+message. **Fixed** in `route.ts` + `system-prompt.ts`: split explicit vs
+ambient. Explicit `/playbook` attach keeps full progressive disclosure. Ambient
+(chatting from a playbook-marked note) now only adds a one-line **awareness**
+hint (`playbookAwareness`) — "the content you're in is a playbook; run it only
+if asked; read_note id X to follow it" — which does NOT inject phase detail or
+change the cadence. Still fixes the original "couldn't see what I'm viewing"
+complaint (the model gets the id + knows it's runnable) without hijacking casual
+chat.
+
+**Still to smoke-test (needs auth fixture — not automatable here):** confirm the
+file-tree UI renders a chat node as an expandable parent showing its deliverable
+children (the data layer is correct; the UI affordance is unverified).

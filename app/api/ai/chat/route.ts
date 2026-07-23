@@ -709,23 +709,27 @@ export async function POST(request: Request) {
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let playbookContext = "";
-      // Active-context fallback: if the client didn't explicitly attach a
-      // playbook via /playbook, but the user is chatting FROM a note/folder
-      // that is itself marked as a playbook, treat that as the playbook —
-      // "run this playbook" while viewing a marked folder must resolve to
-      // its own content, not send the model text-searching by name (the
-      // failure mode this fixes: read_note used to reject folders outright).
-      // Harmless when contentId isn't a playbook — the isPlaybookMetadata
-      // guard below no-ops exactly like an invalid explicit id would.
-      const playbookId: string | null =
-        (typeof body.playbookId === "string" ? body.playbookId : null) ??
-        contentId ??
-        null;
-      if (playbookId) {
+      let playbookAwareness = "";
+      // An EXPLICIT attach (/playbook picker) gets the full progressive
+      // disclosure below — standing rules + the active phase + reference
+      // manifest, and flips the checkpoint cadence.
+      const explicitPlaybookId =
+        typeof body.playbookId === "string" ? body.playbookId : null;
+      // AMBIENT: the user is chatting FROM a note/folder that is itself a
+      // playbook, without attaching it. We do NOT auto-run it — that would
+      // flip EVERY casual message on a playbook-anchored chat into playbook
+      // mode (per-turn phase injection + the stricter checkpoint cadence)
+      // the user never asked for. Instead, add a one-line AWARENESS hint so
+      // the model can run it WHEN ASKED and knows the content's id — which
+      // is what fixes "it couldn't look at what I'm actively viewing" without
+      // hijacking the whole conversation.
+      const ambientPlaybookId =
+        !explicitPlaybookId && contentId ? contentId : null;
+      if (explicitPlaybookId) {
         try {
           const playbookNode = await prisma.contentNode.findFirst({
             where: {
-              id: playbookId,
+              id: explicitPlaybookId,
               ownerId: session.user.id,
               // Folders can carry a notePayload (the folder "Notes" editor),
               // so a folder marked as a playbook is a legitimate source, not
@@ -824,6 +828,42 @@ export async function POST(request: Request) {
             event: "playbook:chat:injection_failed",
             summary: "playbook context injection failed — continuing without it",
             error: playbookError,
+          });
+        }
+      } else if (ambientPlaybookId) {
+        try {
+          const node = await prisma.contentNode.findFirst({
+            where: {
+              id: ambientPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          if (
+            node?.notePayload &&
+            isPlaybookMetadata(node.notePayload.metadata)
+          ) {
+            const parsed = parsePlaybook(
+              node.notePayload.tiptapJson as JSONContent,
+            );
+            playbookAwareness =
+              `\n\nThe content you're working in — "${node.title}" — is itself a PLAYBOOK` +
+              (parsed.phases.length > 0
+                ? ` (${parsed.phases.length} phases)`
+                : "") +
+              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with read_note (id: ${ambientPlaybookId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
+          }
+        } catch (awarenessError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:awareness_failed",
+            summary: "ambient playbook awareness failed — continuing without it",
+            error: awarenessError,
           });
         }
       }
@@ -952,6 +992,7 @@ export async function POST(request: Request) {
           userContextSection,
           mentionedContext,
           playbookContext,
+          playbookAwareness,
           hasAttachedPlaybook: playbookContext.length > 0,
           pageContextSection,
         }),

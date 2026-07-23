@@ -141,6 +141,15 @@ export interface SystemPromptContext {
    */
   playbookContext?: string;
   /**
+   * Lightweight one-liner (AI v3.2 T3, Finding 2 fix) shown when the user is
+   * chatting FROM a note/folder that is itself a playbook but hasn't attached
+   * it. Unlike `playbookContext`, this does NOT inject phase detail or flip
+   * the checkpoint cadence — it just makes the model aware it can run the
+   * anchored playbook on request. Empty when not on a playbook or when one is
+   * explicitly attached (that path uses the full `playbookContext` instead).
+   */
+  playbookAwareness?: string;
+  /**
    * True when a playbook is attached AND its context was injected (AI v3.2
    * T3). Switches the checkpoint cadence: an attached playbook uses
    * progressive disclosure (only the current phase's detail is loaded), so
@@ -213,6 +222,10 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   );
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
+  // Ambient-playbook awareness (Finding 2): a cheap hint, not the full
+  // progressive-disclosure block — the model runs the anchored playbook only
+  // when asked. Never present at the same time as playbookContext.
+  if (ctx.playbookAwareness) sections.push(ctx.playbookAwareness);
   // Playbook context is per-request but STABLE within a phase (only changes
   // when the phase advances), so it sits with the other trusted sections
   // rather than at the very end — closer to the checkpoint instructions
