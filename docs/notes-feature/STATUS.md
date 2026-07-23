@@ -57,7 +57,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 - The paste suggestion now has an `×` that dismisses only the current prompt; the existing “Don't show again” action remains the persistent preference.
 - Paste conversion preserves a leading YAML-shaped block as visible plain text between two horizontal rules instead of letting its closing `---` become a Setext heading underline.
-- Unmarked labels such as `Phase A:` and `Phase B:` remain plain text; headings are created only when the pasted source actually contains heading syntax.
+- Unmarked labels such as `name:`, `description:`, `Phase A:`, and `Phase B:` gain bold emphasis inside ordinary paragraph content; headings are created only when the pasted source actually contains heading syntax.
 
 **July 23, 2026**: Run Ledgers receive searchable, run-stable titles on PR #126
 

@@ -19,9 +19,38 @@
 
 export function decompressMarkdown(text: string): string {
   if (!text) return text;
-  return normalizePasteFrontmatter(text)
+  return emphasizeLeadingLabels(normalizePasteFrontmatter(text))
     .split("\n")
     .flatMap((line) => decompressLine(line))
+    .join("\n");
+}
+
+/**
+ * Give label-style lines visual hierarchy without promoting them to headings.
+ *
+ * Examples: `name: …`, `description: …`, and `Phase A: …`. Fenced code is
+ * deliberately left byte-for-byte alone, and labels already carrying Markdown
+ * formatting do not match the beginning-of-line rule.
+ */
+export function emphasizeLeadingLabels(text: string): string {
+  let fence: "`" | "~" | null = null;
+
+  return text
+    .split("\n")
+    .map((line) => {
+      const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
+      if (fenceMatch) {
+        const marker = fenceMatch[1][0] as "`" | "~";
+        fence = fence === marker ? null : fence ?? marker;
+        return line;
+      }
+      if (fence) return line;
+
+      return line.replace(
+        /^([A-Za-z][A-Za-z0-9 _/-]{0,60}:)(?=\s|$)/,
+        "**$1**",
+      );
+    })
     .join("\n");
 }
 

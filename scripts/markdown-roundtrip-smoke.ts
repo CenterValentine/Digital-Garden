@@ -3,7 +3,12 @@ import { marked } from "marked";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 
-type Node = { type?: string; content?: Node[] };
+type Node = {
+  type?: string;
+  text?: string;
+  marks?: Array<{ type?: string }>;
+  content?: Node[];
+};
 
 const extensions = getCollaborationServerExtensions();
 
@@ -73,23 +78,39 @@ const headingTexts = topLevel
   .filter((node) => node.type === "heading")
   .map((node) =>
     (node.content ?? [])
-      .map((child) => ("text" in child ? String(child.text ?? "") : ""))
+      .map((child) => child.text ?? "")
       .join(""),
   );
-const frontmatterText = JSON.stringify(frontmatterDoc);
+const boldLabels: string[] = [];
+const collectBoldLabels = (node: Node) => {
+  if (
+    node.text?.endsWith(":") &&
+    node.marks?.some((mark) => mark.type === "bold")
+  ) {
+    boldLabels.push(node.text);
+  }
+  for (const child of node.content ?? []) collectBoldLabels(child);
+};
+collectBoldLabels(frontmatterDoc);
+const textContent = (node: Node): string =>
+  [node.text ?? "", ...(node.content ?? []).map(textContent)].join("");
+const frontmatterText = textContent(frontmatterDoc);
 if (
   dividerCount === 2 &&
   headingTexts.length === 0 &&
+  ["name:", "description:", "Phase A:", "Phase B:"].every((label) =>
+    boldLabels.includes(label),
+  ) &&
   frontmatterText.includes("name: Company Research Directive") &&
   frontmatterText.includes("Phase A: Surface facts") &&
   frontmatterText.includes("Phase B: Read between the lines")
 ) {
   console.log(
-    "  PASS  pasted frontmatter and phase labels stay plain between two dividers",
+    "  PASS  pasted labels are bold paragraph text between two dividers",
   );
 } else {
   console.log(
-    `  FAIL  pasted frontmatter parsed incorrectly — dividers=${dividerCount}, headings=${JSON.stringify(headingTexts)}`,
+    `  FAIL  pasted frontmatter parsed incorrectly — dividers=${dividerCount}, headings=${JSON.stringify(headingTexts)}, bold labels=${JSON.stringify(boldLabels)}`,
   );
   fails++;
 }
