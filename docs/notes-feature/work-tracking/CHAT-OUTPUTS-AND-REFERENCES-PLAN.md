@@ -218,3 +218,47 @@ chat.
 **Still to smoke-test (needs auth fixture — not automatable here):** confirm the
 file-tree UI renders a chat node as an expandable parent showing its deliverable
 children (the data layer is correct; the UI affordance is unverified).
+
+## 6. Side-chat foundation + output-target chip (owner testing, 2026-07-22)
+
+Testing in a SIDE chat surfaced the real gap: **a sidebar chat is a
+`Conversation`, not a `ContentNode`** (`createConversation` — no tree node
+unless "opened in page"). So WS3's "outputs nest under the chat" **can't work
+in a side chat** — `outputOwnerId` resolves to `archivedChatNodeId`, which is
+null. This is the foundation the owner is asking for. Migration-free; the
+materialization primitive already exists.
+
+### WS6 — Side chats are referenced ContentNodes under their origin
+- **Materialize:** extend `ensureConversationContentNode`
+  (`lib/features/conversations/service.ts:491` — already creates a
+  `contentType:"chat"` node with an empty payload shell + links
+  `archivedToContentNodeId`) to accept an owner: set `role:"referenced"` +
+  `ownedByNoteId = originContentId` + `parentId = origin's folder`.
+- **Trigger:** `createConversation` gains `originContentNodeId?`; the sidebar
+  POST (`ChatPanel.tsx:421`) passes the panel's `contentId`. So every side chat
+  bound to content materializes as a referenced chat node under it.
+- **Tree visibility:** extend the Finding-1 fetch to also surface referenced
+  nodes that ARE chats (`contentType:"chat"`), not only chat-OWNED deliverables
+  — so the side chat itself shows nested under its origin.
+- **Output ownership:** now works for side chats for free — `outputOwnerId`
+  resolves to the materialized chat node (WS3, unchanged).
+- **Cascade delete (app-level, no FK migration):** in the content DELETE
+  handler, soft-delete a node's owned chats (`ownedByNoteId` children of
+  `contentType:"chat"`) + their `Conversation`s (`softDeleteConversation`) +
+  those chats' owned outputs; deleting a chat soft-deletes its owned outputs.
+
+### WS7 — Output-target chip (the affordance next to the folder chip)
+Migration-free: the selection rides per-turn in the send body (like
+`playbookId`/`activeContextId`) + persists client-side (localStorage per
+conversation) — no `Conversation` column. Options: **this chat** (owner = chat
+node), **next to this chat** (owner = origin, sibling reference), **origin's
+folder** (primary in the origin's parent), **a folder/file…** (pick any).
+Route reads `body.outputTarget` → resolves `ctx.outputOwnerId` + storage
+parent. Default when the user says nothing to the bot = whatever the chip is
+set to (default: this chat).
+
+**One model decision for the owner:** materialize the chat node **eagerly**
+(every side chat that binds to content becomes a tree node — matches "every
+side-chat should appear," but a throwaway 2-message chat also leaves a node) vs
+**lazily** (materialize on first output OR first real turn — less tree clutter).
+Owner's words say eager; flagged because it's a visible product tradeoff.
