@@ -567,7 +567,16 @@ export async function POST(request: Request) {
         outputParentOverride = openContentLocationId;
       } else if (outputTarget.mode === "folder") {
         outputOwnerId = undefined;
-        outputParentOverride = outputTarget.folderId;
+        const selectedOutputFolder = await prisma.contentNode.findFirst({
+          where: {
+            id: outputTarget.folderId,
+            ownerId: session.user.id,
+            contentType: "folder",
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        outputParentOverride = selectedOutputFolder?.id;
       }
       // mode "chat" → keep the chat-owner default.
 

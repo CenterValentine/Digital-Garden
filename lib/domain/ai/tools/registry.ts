@@ -48,6 +48,7 @@ import {
   RATE_LIMITS,
 } from "@/lib/infrastructure/rate-limiting";
 import type { ToolExecuteContext } from "./types";
+import { resolveToolOutputPlacement } from "./output-placement";
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -112,11 +113,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         let gardenWriteReceipt:
           | Awaited<ReturnType<typeof getContentWriteReceiptEnvelope>>
           | undefined;
-        if (ctx.conversationId && ctx.targetFolderId) {
+        const pagePlacement = resolveToolOutputPlacement(ctx);
+        if (
+          ctx.conversationId &&
+          (pagePlacement.parentId || pagePlacement.ownedByNoteId)
+        ) {
           const settled = await findOrCreatePageNode(
             ctx.userId,
-            ctx.targetFolderId,
+            pagePlacement.parentId,
             c,
+            { ownerContentId: pagePlacement.ownedByNoteId },
           );
           if (settled) {
             gardenNodeId = settled.contentNodeId;
@@ -228,7 +234,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         next,
         runTitle,
       }) => {
-        if (!ctx.targetFolderId) {
+        const ledgerPlacement = resolveToolOutputPlacement(ctx);
+        if (!ledgerPlacement.parentId && !ledgerPlacement.ownedByNoteId) {
           return {
             __checkpoint: true,
             phase,
@@ -239,7 +246,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         try {
           const ledger = await upsertRunLedger(
             ctx.userId,
-            ctx.targetFolderId,
+            ledgerPlacement.parentId,
             {
               phase,
               summary,
@@ -255,14 +262,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
             {
               // WS7: nest the ledger under the chat when the output target does.
-              ownerContentId: ctx.outputOwnerId,
+              ownerContentId: ledgerPlacement.ownedByNoteId,
               // Conversation identity keeps a stable ledger across phases;
               // fallbacks cover full-page/transient chat shapes.
               runKey:
                 ctx.conversationId ??
                 ctx.outputOwnerId ??
                 ctx.chatContentId ??
-                ctx.targetFolderId,
+                ledgerPlacement.parentId ??
+                "garden-root",
             },
           );
           if (ctx.conversationId) {
@@ -312,7 +320,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({ name, parentId }) => {
-        const parent = parentId ?? ctx.targetFolderId ?? null;
+        const placement = resolveToolOutputPlacement(ctx, parentId);
+        const parent = placement.parentId;
         if (parentId) {
           const owned = await prisma.contentNode.findFirst({
             where: {
@@ -328,7 +337,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           }
         }
         try {
-          const folder = await findOrCreateFolder(ctx.userId, name, parent);
+          const folder = await findOrCreateFolder(ctx.userId, name, parent, {
+            ownerContentId: placement.ownedByNoteId,
+          });
           return {
             folderId: folder.contentNodeId,
             name,
@@ -890,9 +901,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             size: size as ImageSize,
             quality,
             style,
-            // Co-locate the generated image beside the chat it came from and
-            // mark it owned, so it's discoverable + lifecycle-tracked.
-            sourceContentId: ctx.chatContentId ?? null,
+            placement: resolveToolOutputPlacement(ctx),
           });
 
           // Return structured result for ChatMessage rendering
@@ -960,9 +969,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             modelId: modelId as SpeechModelId,
             voice,
             language,
-            // Co-locate the generated clip beside the chat it came from and
-            // mark it owned, so it's discoverable + lifecycle-tracked.
-            sourceContentId: ctx.chatContentId ?? null,
+            placement: resolveToolOutputPlacement(ctx),
           });
 
           // Return structured result for ChatMessage rendering (mirrors

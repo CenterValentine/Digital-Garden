@@ -145,6 +145,14 @@ export interface GenerateAndStoreSpeechInput {
    * null) → stored at the root, unowned.
    */
   sourceContentId?: string | null;
+  /**
+   * Pre-resolved output-target placement. Chat tools pass this so generated
+   * audio follows the selected chat/content/folder destination.
+   */
+  placement?: {
+    parentId: string | null;
+    ownedByNoteId?: string;
+  };
 }
 
 export interface GeneratedStoredSpeech {
@@ -174,14 +182,16 @@ export async function generateAndStoreSpeech(
     apiKey,
     label,
     sourceContentId,
+    placement,
   } = input;
 
   // Resolve placement (co-locate under the source) up front so it also keys
   // the idempotency lookup.
-  const { parentId, ownedByNoteId } = await resolveGeneratedMediaPlacement(
-    userId,
-    sourceContentId,
-  );
+  const resolvedPlacement =
+    placement ??
+    (await resolveGeneratedMediaPlacement(userId, sourceContentId));
+  const parentId = resolvedPlacement.parentId;
+  const ownedByNoteId = resolvedPlacement.ownedByNoteId ?? null;
   const searchText = `AI generated speech: ${text.slice(0, 200)}`;
 
   // Idempotency: reuse a recent identical generation instead of producing a
@@ -256,8 +266,9 @@ export async function generateAndStoreSpeech(
       slug,
       contentType: "file",
       parentId,
-      role: "referenced",
-      ownedByNoteId,
+      ...(ownedByNoteId
+        ? { role: "referenced" as const, ownedByNoteId }
+        : {}),
       displayOrder: 0,
       filePayload: {
         create: {

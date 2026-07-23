@@ -33,11 +33,13 @@ export async function findOrCreateFolder(
   ownerId: string,
   title: string,
   parentId: string | null,
+  options: { ownerContentId?: string } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
       ownerId,
       parentId,
+      ownedByNoteId: options.ownerContentId ?? null,
       contentType: "folder",
       deletedAt: null,
       title: { equals: title, mode: "insensitive" },
@@ -57,6 +59,12 @@ export async function findOrCreateFolder(
       contentType: "folder",
       parentId,
       displayOrder: 0,
+      ...(options.ownerContentId
+        ? {
+            role: "referenced" as const,
+            ownedByNoteId: options.ownerContentId,
+          }
+        : {}),
     },
     select: { id: true },
   });
@@ -64,7 +72,7 @@ export async function findOrCreateFolder(
     layer: "ai",
     event: "ai_documents:folder_created",
     summary: `folder "${title}" created`,
-    attrs: { folderId: folder.id, parentId },
+    attrs: { folderId: folder.id, parentId, ownerContentId: options.ownerContentId },
   });
   return { contentNodeId: folder.id, created: true };
 }

@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: AI output routing and receipt icons unified on PR #126
+
+- Cached web pages, generated image/audio files, workflows, folders, and Run Ledgers now use the same output-placement resolver as notes and Word documents.
+- “Under this chat” creates referenced children of the chat; a selected folder creates primary children there; an explicitly user-named destination still overrides the preset.
+- Content-write receipts now show type-appropriate icons for notes, external pages, folders, files, images, audio, workflows, chats, visualizations, data, and code instead of presenting every write as a folder.
+
 **July 23, 2026**: Markdown paste prompt and frontmatter conversion corrected on PR #126
 
 - The paste suggestion now has an `×` that dismisses only the current prompt; the existing “Don't show again” action remains the persistent preference.

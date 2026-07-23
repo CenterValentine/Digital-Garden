@@ -57,7 +57,7 @@ function renderEntry(entry: CheckpointEntry): string {
 
 export async function upsertRunLedger(
   userId: string,
-  targetFolderId: string,
+  targetFolderId: string | null,
   entry: CheckpointEntry,
   options: {
     /**
@@ -72,7 +72,8 @@ export async function upsertRunLedger(
   } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
   const { ownerContentId } = options;
-  const runKey = options.runKey ?? ownerContentId ?? targetFolderId;
+  const runKey =
+    options.runKey ?? ownerContentId ?? targetFolderId ?? "garden-root";
   const scope = ownerContentId
     ? { ownedByNoteId: ownerContentId }
     : { parentId: targetFolderId };

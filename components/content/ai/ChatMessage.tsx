@@ -16,7 +16,34 @@ import { createPortal } from "react-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { common, createLowlight } from "lowlight";
-import { Bot, User, Wrench, Loader2, Copy, Check, ImagePlus, GripVertical, BrainCircuit, ChevronRight, Pencil, RotateCcw, GitBranch, FileText, Volume2, FolderPlus, FolderOpen, ShieldAlert, X } from "lucide-react";
+import {
+  Activity,
+  Bot,
+  BrainCircuit,
+  Check,
+  ChevronRight,
+  Copy,
+  ExternalLink,
+  File,
+  FileCode2,
+  FileText,
+  FolderOpen,
+  FolderPlus,
+  GitBranch,
+  GripVertical,
+  Image as ImageIcon,
+  ImagePlus,
+  Loader2,
+  MessageSquare,
+  Pencil,
+  RotateCcw,
+  ShieldAlert,
+  Table2,
+  User,
+  Volume2,
+  Wrench,
+  X,
+} from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
@@ -2356,6 +2383,32 @@ function ContentWriteReceiptCard({
         : `in ${receipt.location.title}`;
   const subline = `${operation} ${receipt.noun} · ${location}`;
   const tooltipText = `${operation} ${receipt.noun} "${receipt.title}" ${location}. Click to ${midRunPaneOpen ? "open in a split pane" : "open"}; right-click for options.`;
+  const noun = receipt.noun.toLowerCase();
+  const ReceiptIcon =
+    receipt.contentType === "folder"
+      ? FolderOpen
+      : receipt.contentType === "external"
+        ? ExternalLink
+        : receipt.contentType === "workflow"
+          ? GitBranch
+          : receipt.contentType === "chat"
+            ? MessageSquare
+            : receipt.contentType === "visualization"
+              ? Activity
+              : receipt.contentType === "data"
+                ? Table2
+                : receipt.contentType === "code" ||
+                    receipt.contentType === "html" ||
+                    receipt.contentType === "template"
+                  ? FileCode2
+                  : receipt.contentType === "file" && noun.includes("image")
+                    ? ImageIcon
+                    : receipt.contentType === "file" &&
+                        (noun.includes("audio") || noun.includes("speech"))
+                      ? Volume2
+                      : receipt.contentType === "file"
+                        ? File
+                        : FileText;
 
   return (
     <>
@@ -2369,7 +2422,7 @@ function ContentWriteReceiptCard({
         className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2 text-left text-sm transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
         title={tooltipText}
       >
-        <FolderOpen className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        <ReceiptIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <span className="flex min-w-0 flex-col">
           <span className="truncate font-medium text-gray-900 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
             {receipt.title}

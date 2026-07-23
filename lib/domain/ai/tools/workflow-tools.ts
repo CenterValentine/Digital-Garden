@@ -31,6 +31,7 @@ import { pushWorkflowToN8n } from "@/extensions/workflows/server/engines/n8n/pus
 import { N8N_PAYLOAD_ENGINE } from "@/extensions/workflows/server/engines/n8n/meta";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
+import { resolveToolOutputPlacement } from "./output-placement";
 
 /** Render schema/structural issues in a model-repairable form. */
 function formatGraphIssues(
@@ -421,7 +422,7 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
 
         // Parent resolution mirrors createNote: explicit > target folder >
         // chat's own parent > vault root ("chats serve their location").
-        let resolvedParentId: string | null = null;
+        let explicitParentId: string | null = null;
         if (parentId) {
           const candidate = await prisma.contentNode.findFirst({
             where: {
@@ -432,11 +433,10 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
             },
             select: { id: true },
           });
-          if (candidate) resolvedParentId = candidate.id;
+          if (candidate) explicitParentId = candidate.id;
         }
-        if (!resolvedParentId && ctx.targetFolderId) {
-          resolvedParentId = ctx.targetFolderId;
-        }
+        const placement = resolveToolOutputPlacement(ctx, explicitParentId);
+        let resolvedParentId = placement.parentId;
         if (!resolvedParentId && ctx.chatContentId) {
           const chatNode = await prisma.contentNode.findFirst({
             where: { id: ctx.chatContentId, ownerId: ctx.userId },
@@ -454,6 +454,12 @@ export function createWorkflowTools(ctx: ToolExecuteContext) {
             contentType: "workflow",
             parentId: resolvedParentId,
             displayOrder: 0,
+            ...(placement.ownedByNoteId
+              ? {
+                  role: "referenced" as const,
+                  ownedByNoteId: placement.ownedByNoteId,
+                }
+              : {}),
             workflowPayload: {
               create: {
                 engine: WDK_INTERPRETER_ENGINE,

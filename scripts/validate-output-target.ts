@@ -8,6 +8,7 @@ import {
   type OutputTarget,
 } from "../lib/domain/ai/output-target";
 import { parseContentWriteReceipts } from "../lib/domain/ai/content-write-receipts";
+import { resolveToolOutputPlacement } from "../lib/domain/ai/tools/output-placement";
 
 const folderTarget: OutputTarget = {
   mode: "folder",
@@ -76,6 +77,40 @@ const instruction = renderOutputTargetInstruction(folderTarget);
 assert.match(instruction, /AI Playbook Tests/);
 assert.match(instruction, /omit parentId/);
 assert.match(instruction, /explicitly names a different destination/);
+
+assert.deepEqual(
+  resolveToolOutputPlacement({
+    targetFolderId: "research-folder",
+    outputOwnerId: "chat-node",
+  }),
+  {
+    parentId: "research-folder",
+    role: "referenced",
+    ownedByNoteId: "chat-node",
+  },
+  "under-chat output must be a referenced child of the chat",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement({
+    targetFolderId: "research-folder",
+    outputOwnerId: "chat-node",
+    outputParentOverride: "selected-folder",
+  }),
+  { parentId: "selected-folder" },
+  "a selected folder must override chat ownership",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement(
+    {
+      targetFolderId: "research-folder",
+      outputOwnerId: "chat-node",
+      outputParentOverride: "selected-folder",
+    },
+    "user-named-folder",
+  ),
+  { parentId: "user-named-folder" },
+  "a destination explicitly named by the user must override the preset",
+);
 
 const writeReceipt = {
   operation: "updated",

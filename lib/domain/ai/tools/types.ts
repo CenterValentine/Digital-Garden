@@ -19,8 +19,9 @@ export interface ToolExecuteContext {
   conversationId?: string;
   /**
    * The conversation's target folder (AI v3 core S3, umbrella decision #7).
-   * read_page files page nodes here; document tools default their
-   * destination to it.
+   * This is the storage parent for output nodes unless the selected target or
+   * an explicit user destination overrides it. Referenced outputs additionally
+   * use outputOwnerId so they appear under the selected chat/content.
    */
   targetFolderId?: string;
   /**
@@ -47,7 +48,7 @@ export interface ToolExecuteContext {
    * full-page chat's own id, or a sidebar chat's archived ContentNode id.
    * Undefined for a transient/unsaved sidebar chat (no node to own under).
    *
-   * Output tools (createNote, create_docx) use this to nest content they
+   * Output tools use this to nest content they
    * create as a REFERENCE under the chat by default — `role: "referenced"`
    * + `ownedByNoteId: outputOwnerId` — but ONLY when the user didn't name an
    * explicit destination (an explicit parentId always wins; this is a

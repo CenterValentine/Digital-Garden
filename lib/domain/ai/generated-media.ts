@@ -58,7 +58,7 @@ export async function findRecentGeneratedMedia(
   const node = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      role: "referenced",
+      role: params.ownedByNoteId ? "referenced" : "primary",
       deletedAt: null,
       ownedByNoteId: params.ownedByNoteId,
       createdAt: { gt: new Date(Date.now() - within) },

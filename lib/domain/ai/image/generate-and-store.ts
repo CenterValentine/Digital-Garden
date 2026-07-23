@@ -92,6 +92,15 @@ export interface GenerateAndStoreImageInput {
    * lifecycle can follow it. Omit (or null) → stored at the root, unowned.
    */
   sourceContentId?: string | null;
+  /**
+   * Pre-resolved output-target placement. Chat tools pass this so generated
+   * files obey the same selected destination as notes, documents, and caches.
+   * When present it takes precedence over sourceContentId.
+   */
+  placement?: {
+    parentId: string | null;
+    ownedByNoteId?: string;
+  };
 }
 
 export interface GeneratedStoredImage {
@@ -122,14 +131,16 @@ export async function generateAndStoreImage(
     apiKey,
     gateway,
     sourceContentId,
+    placement,
   } = input;
 
   // Resolve placement (co-locate under the source) up front so it also keys
   // the idempotency lookup.
-  const { parentId, ownedByNoteId } = await resolveGeneratedMediaPlacement(
-    userId,
-    sourceContentId,
-  );
+  const resolvedPlacement =
+    placement ??
+    (await resolveGeneratedMediaPlacement(userId, sourceContentId));
+  const parentId = resolvedPlacement.parentId;
+  const ownedByNoteId = resolvedPlacement.ownedByNoteId ?? null;
   const searchText = `AI generated image: ${prompt}`;
 
   // Idempotency: reuse a recent identical generation instead of producing a
@@ -230,8 +241,9 @@ export async function generateAndStoreImage(
       slug,
       contentType: "file",
       parentId,
-      role: "referenced",
-      ownedByNoteId,
+      ...(ownedByNoteId
+        ? { role: "referenced" as const, ownedByNoteId }
+        : {}),
       displayOrder: 0,
       filePayload: {
         create: {
