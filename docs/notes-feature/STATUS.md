@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Phase-checkpoint approval survives conversation reload on PR #126
+
+- The owner reproduction was confirmed in persisted data: the live checkpoint reached `approval-requested`, but `ConversationMessage.parts` captured the stale `input-streaming` React snapshot without its approval ID, so reload rendered a running tool bubble.
+- Conversation persistence now uses the AI SDK's fresh final assistant parts for both initial saves and post-approval continuation patches, not only for token metadata.
+- Reload seeds persisted part signatures so the first resumed approval is patched, and complete legacy checkpoint snapshots are safely restored to an actionable approval card with a deterministic approval ID.
+
 **July 23, 2026**: First transient side-chat submission preserved during referenced-chat creation on PR #126
 
 - Root cause matched the owner report: the first send created the referenced chat node, then changed the conversation-scoped draft key before the queued resend. The queue stored only a boolean, so valid draft rehydration could clear the only copy of the submitted prompt.

@@ -262,6 +262,7 @@ function ChatViewerInner({
       const fresh = event.message
         ? {
             id: event.message.id,
+            parts: event.message.parts,
             metadata: (event.message as { metadata?: unknown }).metadata,
           }
         : undefined;
@@ -837,6 +838,10 @@ function ChatViewerInner({
                     onRegenerate={(id) => void regenerateMessage(id)}
                     onToolApprovalResponse={(opts) =>
                       void addToolApprovalResponse(opts)
+                    }
+                    approvalActionable={
+                      i === messages.length - 1 &&
+                      message.role === "assistant"
                     }
                     onBranch={
                       conversationId

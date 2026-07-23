@@ -8,6 +8,7 @@ import {
   createPlaybookMessageAttachmentPart,
   parsePlaybookMessageAttachment,
 } from "@/lib/domain/ai/playbooks/message-binding";
+import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 
 function paragraph(text: string): JSONContent {
   return {
@@ -125,5 +126,48 @@ assert.deepEqual(boundMessages[2]?.content, [
   },
   { type: "text", text: "Run this playbook." },
 ]);
+
+const restoredCheckpoint = normalizePersistedToolParts([
+  {
+    type: "tool-phase_checkpoint",
+    toolCallId: "checkpoint-call",
+    state: "input-streaming",
+    input: {
+      phase: "Phase A",
+      summary: "All required research is complete.",
+    },
+  },
+]);
+assert.deepEqual(restoredCheckpoint, [
+  {
+    type: "tool-phase_checkpoint",
+    toolCallId: "checkpoint-call",
+    state: "approval-requested",
+    input: {
+      phase: "Phase A",
+      summary: "All required research is complete.",
+    },
+    approval: { id: "aitxt-restored-checkpoint-call" },
+  },
+]);
+assert.deepEqual(
+  normalizePersistedToolParts([
+    {
+      type: "tool-phase_checkpoint",
+      toolCallId: "incomplete-call",
+      state: "input-streaming",
+      input: { phase: "Phase A" },
+    },
+  ]),
+  [
+    {
+      type: "tool-phase_checkpoint",
+      toolCallId: "incomplete-call",
+      state: "input-streaming",
+      input: { phase: "Phase A" },
+    },
+  ],
+  "an incomplete streamed checkpoint must not become actionable",
+);
 
 console.log("Playbook parser checks passed.");

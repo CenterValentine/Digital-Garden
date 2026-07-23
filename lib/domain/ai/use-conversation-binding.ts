@@ -29,19 +29,21 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { clientLogger } from "@/lib/core/logger/client";
 import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 
 /**
  * Optional payload that flows through `persistRef.current(...)` to
  * give persistTurns access to the SDK's onFinish snapshot — specifically
- * the fresh assistant message with its `metadata` already populated.
+ * the fresh assistant message with its final `parts` and `metadata`.
  * React's useCallback closure for persistTurns can capture a stale
  * `messages` array when the SDK fires onFinish before React commits
- * its metadata update; reading from this payload bypasses that race.
+ * its final tool/approval state; reading from this payload bypasses that race.
  */
 export interface PersistFinishPayload {
   /** Fresh assistant UIMessage from the AI SDK's onFinish event. */
   freshAssistant?: {
     id: string;
+    parts?: unknown[];
     metadata?: Record<string, unknown> | unknown;
   };
 }
@@ -152,7 +154,7 @@ export function useConversationBinding({
   // Parts signature per saved client id — detects continuations (approval
   // resumes mutate/extend an already-saved assistant message) so the
   // persister can PATCH the row instead of skipping it forever.
-  const savedPartsSigRef = useRef<Map<string, number>>(new Map());
+  const savedPartsSigRef = useRef<Map<string, string>>(new Map());
   const [loadingInitial, setLoadingInitial] = useState<boolean>(
     Boolean(conversationId),
   );
@@ -287,8 +289,15 @@ export function useConversationBinding({
         });
 
         // Every loaded message is already saved — track by DB UUID.
-        for (const m of stored as Array<{ id: string }>) {
+        for (const m of stored as Array<{ id: string; parts?: unknown }>) {
           savedIdsRef.current.add(m.id);
+          // Seed the exact persisted baseline. Without this, the first
+          // post-reload approval continuation only established a baseline and
+          // skipped its PATCH, so the resumed turn vanished on the next reload.
+          savedPartsSigRef.current.set(
+            m.id,
+            JSON.stringify(m.parts ?? []),
+          );
         }
 
         // Seed per-message stamps from the persisted provider/model so the
@@ -352,7 +361,7 @@ export function useConversationBinding({
             id: m.id,
             role: m.role as "user" | "assistant",
             parts: Array.isArray(m.parts)
-              ? (m.parts as Array<{ type: string; text?: string }>)
+              ? normalizePersistedToolParts(m.parts)
               : [{ type: "text" as const, text: "" }],
           }));
         setMessages(ui);
@@ -376,13 +385,20 @@ export function useConversationBinding({
     if (!conversationId || messages.length === 0) return;
     for (const m of messages) {
       if (m.role !== "user" && m.role !== "assistant") continue;
+      const freshAssistantMatches =
+        m.role === "assistant" &&
+        payload?.freshAssistant?.id === m.id &&
+        Array.isArray(payload.freshAssistant.parts);
+      const effectiveParts = freshAssistantMatches
+        ? payload.freshAssistant!.parts!
+        : m.parts;
       if (savedIdsRef.current.has(m.id)) {
         // Continuation persistence (S4): an approval resume EXTENDS a
         // saved assistant message (resolved approval state + new parts).
         // Detect via a parts signature and PATCH the row; a missing
         // signature (message loaded from history) just sets the baseline.
         if (m.role !== "assistant") continue;
-        const sig = JSON.stringify(m.parts).length;
+        const sig = JSON.stringify(effectiveParts);
         const prevSig = savedPartsSigRef.current.get(m.id);
         if (prevSig === undefined) {
           savedPartsSigRef.current.set(m.id, sig);
@@ -397,7 +413,7 @@ export function useConversationBinding({
               method: "PATCH",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ parts: m.parts }),
+              body: JSON.stringify({ parts: effectiveParts }),
             },
           );
           if (res.ok) savedPartsSigRef.current.set(m.id, sig);
@@ -410,7 +426,7 @@ export function useConversationBinding({
       // Prefer the exact parts the engine sent for a fresh user turn —
       // they reliably include attachment file parts, which AI SDK's
       // in-memory message can drop after the turn. Consumed once.
-      let partsToSave: unknown = m.parts;
+      let partsToSave: unknown = effectiveParts;
       if (m.role === "user" && pendingUserPartsRef?.current) {
         partsToSave = pendingUserPartsRef.current;
         pendingUserPartsRef.current = null;
@@ -458,7 +474,10 @@ export function useConversationBinding({
         );
         if (res.ok) {
           savedIdsRef.current.add(m.id);
-          savedPartsSigRef.current.set(m.id, JSON.stringify(m.parts).length);
+          savedPartsSigRef.current.set(
+            m.id,
+            JSON.stringify(partsToSave),
+          );
           // Capture the DB-generated row id so a later edit/regenerate
           // can resolve this session-created message to its DB anchor.
           try {

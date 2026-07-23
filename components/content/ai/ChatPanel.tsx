@@ -217,6 +217,7 @@ export function ChatPanel({
           const fresh = event.message
             ? {
                 id: event.message.id,
+                parts: event.message.parts,
                 metadata: (event.message as { metadata?: unknown }).metadata,
               }
             : undefined;
@@ -863,6 +864,10 @@ export function ChatPanel({
                   onRevertEdit={revertEdit}
                   onToolApprovalResponse={(opts) =>
                     void addToolApprovalResponse(opts)
+                  }
+                  approvalActionable={
+                    i === messages.length - 1 &&
+                    message.role === "assistant"
                   }
                   revertableToolIds={revertableToolIds}
                 />
