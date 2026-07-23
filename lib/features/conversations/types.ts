@@ -105,6 +105,14 @@ export interface CreateConversationInput {
    * existing conversation is reused (no duplicate copy).
    */
   fromContentNodeId?: string;
+  /**
+   * The content this chat is being started FROM (Chat Outputs & References
+   * plan, WS6). When set, the new conversation is eagerly materialized as a
+   * referenced `chat` ContentNode nested under that origin (see
+   * `ensureConversationContentNode`) — so every side chat appears under the
+   * content it was generated from. Ignored on the promotion path.
+   */
+  originContentNodeId?: string;
 }
 
 /** Input to `appendMessage`. */

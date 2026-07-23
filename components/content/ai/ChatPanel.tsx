@@ -423,7 +423,15 @@ export function ChatPanel({
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              ...(contentId ? { snapshotContentNodeIds: [contentId] } : {}),
+              ...(contentId
+                ? {
+                    snapshotContentNodeIds: [contentId],
+                    // WS6: the content this side chat was started FROM — the
+                    // server materializes the chat as a referenced node nested
+                    // under it (so it appears in the tree and owns its outputs).
+                    originContentNodeId: contentId,
+                  }
+                : {}),
               // Carry a target chosen before the conversation existed
               // (the chip is now usable in transient chats) so the very
               // first turn already files its outputs in the right place.

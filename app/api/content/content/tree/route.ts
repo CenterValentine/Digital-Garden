@@ -145,9 +145,17 @@ export async function GET(request: NextRequest) {
                     // shouldn't spray 10 tree children).
                     OR: [
                       { role: "primary" as const },
+                      // WS3 deliverables: referenced content OWNED BY a chat.
                       {
                         role: "referenced" as const,
                         ownedByNote: { contentType: "chat" as const },
+                      },
+                      // WS6 side chats: a chat is ITSELF referenced content
+                      // nested under its origin — surface it so every side
+                      // chat appears under the content it was started from.
+                      {
+                        role: "referenced" as const,
+                        contentType: "chat" as const,
                       },
                     ],
                   }),
@@ -632,7 +640,12 @@ export async function GET(request: NextRequest) {
             ownerId: session.user.id,
             deletedAt: null,
             role: "referenced",
-            NOT: { ownedByNote: { contentType: "chat" } },
+            // Exclude what's already shown above: chat-owned deliverables (WS3)
+            // and side chats themselves (WS6).
+            NOT: [
+              { ownedByNote: { contentType: "chat" } },
+              { contentType: "chat" },
+            ],
           },
         });
       }

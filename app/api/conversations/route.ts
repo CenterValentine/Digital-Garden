@@ -101,6 +101,11 @@ export async function POST(request: NextRequest) {
           body.fromContentNodeId.length > 0
             ? body.fromContentNodeId
             : undefined,
+        originContentNodeId:
+          typeof body.originContentNodeId === "string" &&
+          body.originContentNodeId.length > 0
+            ? body.originContentNodeId
+            : undefined,
       };
 
       const conversation = await createConversation(session.user.id, input);

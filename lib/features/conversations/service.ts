@@ -222,6 +222,25 @@ export async function createConversation(
     at: new Date().toISOString(),
   });
 
+  // WS6 (Chat Outputs & References): eagerly materialize the side chat as a
+  // referenced ContentNode nested under its origin, so it appears in the tree
+  // and can own its generated outputs (WS3). Non-fatal — a failure here must
+  // never break conversation creation.
+  if (input.originContentNodeId) {
+    try {
+      await ensureConversationContentNode(userId, row.id, {
+        ownerContentId: input.originContentNodeId,
+      });
+    } catch (error) {
+      logger.warn({
+        layer: "ai",
+        event: "conv.materialize_failed",
+        summary: `failed to materialize side-chat node for ${row.id}`,
+        error,
+      });
+    }
+  }
+
   const chatParent = row.archivedToContentNode?.parent ?? null;
   return {
     ...toSummary(row),
@@ -491,6 +510,17 @@ export async function findConversationIdByArchivedContent(
 export async function ensureConversationContentNode(
   userId: string,
   conversationId: string,
+  opts?: {
+    /**
+     * The content this chat was generated FROM (Chat Outputs & References
+     * plan, WS6). When set + valid, the chat node is created as REFERENCED
+     * content owned by it — `role:"referenced"` + `ownedByNoteId = owner` +
+     * storage `parentId = owner's folder` — so the side chat displays nested
+     * under its origin in the tree (and, via WS3, its outputs nest under the
+     * chat). Omit for a standalone/full-page chat (plain primary node).
+     */
+    ownerContentId?: string | null;
+  },
 ): Promise<string> {
   const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, ownerId: userId, deletedAt: null },
@@ -511,6 +541,28 @@ export async function ensureConversationContentNode(
     // Link points at a deleted/missing node — fall through and re-create.
   }
 
+  // Referenced placement under the origin content (WS6). Storage parentId
+  // follows the owner's folder so path/cascade invariants hold; display
+  // parentage comes from ownedByNoteId (the tree re-homes referenced content
+  // under its owner). A missing/foreign owner degrades to a plain primary
+  // node — never blocks chat creation.
+  let referencedPlacement:
+    | { role: "referenced"; ownedByNoteId: string; parentId: string | null }
+    | null = null;
+  if (opts?.ownerContentId) {
+    const owner = await prisma.contentNode.findFirst({
+      where: { id: opts.ownerContentId, ownerId: userId, deletedAt: null },
+      select: { id: true, parentId: true },
+    });
+    if (owner) {
+      referencedPlacement = {
+        role: "referenced",
+        ownedByNoteId: owner.id,
+        parentId: owner.parentId,
+      };
+    }
+  }
+
   const title = conv.title?.trim() || "Chat";
   const slug = await generateUniqueSlug(title, userId);
 
@@ -520,6 +572,7 @@ export async function ensureConversationContentNode(
       title,
       slug,
       contentType: "chat",
+      ...(referencedPlacement ?? {}),
       chatPayload: {
         create: {
           messages: [] as unknown as Prisma.InputJsonValue,
