@@ -458,7 +458,7 @@ export function MultiConversationSidebar({
           the in-flight first message would be lost across the remount.
           Without it, the ChatPanel rebinds in place — useChat re-keys
           internally on conversationKey change, but the surrounding
-          refs (pendingTransientSendRef, etc.) survive so the queued
+          refs (pendingTransientInputRef, etc.) survive so the queued
           first send can fire after the conversationId catches up.
         */}
         <ChatPanel
@@ -472,10 +472,12 @@ export function MultiConversationSidebar({
             })();
           }}
           onTransientPromoted={(newId) => {
-            void (async () => {
-              await reloadTabs();
-              setActiveId(newId);
-            })();
+            // Rebind immediately: the first prompt is already queued against
+            // this id. Tab refresh is presentation state and must never gate
+            // message delivery (a slow/failed refresh previously stranded the
+            // submission in transient mode).
+            setActiveId(newId);
+            void reloadTabs();
           }}
         />
       </div>

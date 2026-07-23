@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: First transient side-chat submission preserved during referenced-chat creation on PR #126
+
+- Root cause matched the owner report: the first send created the referenced chat node, then changed the conversation-scoped draft key before the queued resend. The queue stored only a boolean, so valid draft rehydration could clear the only copy of the submitted prompt.
+- Promotion now snapshots the exact submitted text, seeds the new conversation's draft before rebinding, restores it if necessary, and only then sends through the bound conversation engine.
+- The sidebar activates the new conversation immediately; refreshing its tab metadata no longer gates delivery of the first turn.
+
 **July 23, 2026**: AI output-target persistence and routing hardened on PR #126
 
 - Root-caused a side-chat output that ignored its preset: `createNote` correctly omitted `parentId`, but the client had reverted to `{ mode: "chat" }` because the long-lived sidebar engine did not rehydrate output-target state when conversation keys changed.
