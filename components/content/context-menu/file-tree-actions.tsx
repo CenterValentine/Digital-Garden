@@ -35,8 +35,10 @@ import {
   FolderInput,
   Captions,
   LampDesk,
+  BookUp,
 } from "lucide-react";
 import { toast } from "sonner";
+import { useImportSkillStore } from "@/state/import-skill-store";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -278,6 +280,15 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           icon: <Plus className="h-4 w-4" />,
           submenu: newMenuItems.map(mapMenuItem),
           divider: true,
+        },
+        {
+          // Import an Anthropic SKILL.md as a marked playbook note (AI v3.2
+          // T3, P5-import). Uses the same resolved `targetId` as the Add
+          // submenu — folder → into it, file → sibling, empty → root.
+          id: "import-skill-playbook",
+          label: "Import Skill as Playbook…",
+          icon: <BookUp className="h-4 w-4" />,
+          onClick: () => useImportSkillStore.getState().openDialog(targetId),
         },
       ],
     });
