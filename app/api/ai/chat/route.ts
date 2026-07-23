@@ -662,8 +662,6 @@ export async function POST(request: Request) {
           createAppWebSearchTool(session.user.id);
       }
 
-      const toolsActive = Object.keys(tools).length > 0;
-
       // Resolve attachments for the model: keep file parts the active
       // provider can consume natively (images for vision; PDFs for
       // Anthropic/Google), and inline the server-extracted text for
@@ -787,6 +785,7 @@ export async function POST(request: Request) {
       // their own directives rather than treating them as passive reading.
       let playbookContext = "";
       let playbookAwareness = "";
+      let attachedPlaybookResolved = false;
       // An EXPLICIT attach (/playbook picker) gets the full progressive
       // disclosure below — standing rules + the active phase + reference
       // manifest, and flips the checkpoint cadence.
@@ -823,6 +822,7 @@ export async function POST(request: Request) {
             playbookNode?.notePayload &&
             isPlaybookMetadata(playbookNode.notePayload.metadata)
           ) {
+            attachedPlaybookResolved = true;
             const parsed = parsePlaybook(
               playbookNode.notePayload.tiptapJson as JSONContent,
             );
@@ -898,6 +898,14 @@ export async function POST(request: Request) {
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
                 `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${refsManifest}`;
+            } else {
+              // A valid marked playbook can be empty. Keep its explicit
+              // identity in context instead of silently falling through to
+              // discovery/rooted-note behavior; the assistant should report
+              // the missing instructions, never search for a replacement.
+              playbookContext =
+                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
+                "This playbook is explicitly attached, but it contains no instructions. Do not search for another playbook. Tell the user this attached playbook is empty and needs content before it can run.";
             }
           }
         } catch (playbookError) {
@@ -946,6 +954,14 @@ export async function POST(request: Request) {
         }
       }
 
+      // Discovery and execution are mutually exclusive states. Once the
+      // ownership-scoped attachment resolves, remove the discovery tool for
+      // this turn so weaker models cannot search for the playbook that is
+      // already loaded. Generic note search remains available for phase work.
+      if (attachedPlaybookResolved) {
+        delete tools.search_playbooks;
+      }
+
       // Rooted-content context: tell the model what this chat is ABOUT, so
       // "this file / the current note / this playbook" resolves to the chat's
       // own subject without the user re-naming it (the "can't you see what I
@@ -962,7 +978,7 @@ export async function POST(request: Request) {
         // playbook below). Omit the "this playbook" mapping entirely when
         // one is attached; the Active Playbook section states its own id.
         const playbookPhrase =
-          playbookContext.length > 0
+          attachedPlaybookResolved
             ? `"this file", "this note", "the current one", etc.`
             : `"this file", "this note", "the current one", "this playbook", etc.`;
         rootedContentSection =
@@ -970,7 +986,7 @@ export async function POST(request: Request) {
           (readable
             ? ` Read its content with read_note (id: ${contentId}) when you need it.`
             : "") +
-          (playbookContext.length > 0
+          (attachedPlaybookResolved
             ? ` A DIFFERENT playbook is explicitly attached to this chat (see "Active Playbook" below) — that one takes priority for any playbook-related request; do not confuse it with this rooted content.`
             : "") +
           " New content you create nests under this chat by default.";
@@ -1021,6 +1037,8 @@ export async function POST(request: Request) {
         });
       }
 
+      const toolsActive = Object.keys(tools).length > 0;
+
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
       // with the captured trace_id even after ALS scope exits.
@@ -1048,6 +1066,7 @@ export async function POST(request: Request) {
         messages: modelMessages,
         mentionedContext,
         playbookContext,
+        attachedPlaybookResolved,
         providerId,
         modelId,
         temperature: effectiveTemperature,
@@ -1102,7 +1121,7 @@ export async function POST(request: Request) {
           playbookContext,
           playbookAwareness,
           rootedContentSection,
-          hasAttachedPlaybook: playbookContext.length > 0,
+          hasAttachedPlaybook: attachedPlaybookResolved,
           pageContextSection,
         }),
         onStepFinish: (step) => {

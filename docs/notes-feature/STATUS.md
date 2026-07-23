@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-22
+last_updated: 2026-07-23
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,13 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 23, 2026**: AI v3.2 T3 — explicit playbook recognition hardened on PR #126
+
+- Root-caused the owner smoke failure from the captured `chat_input` trace: the marked test notes stored pasted SKILL.md as ordinary TipTap paragraphs, so the structural parser reported `0 phases`; the chat route then silently omitted the attachment and told the model that “this playbook” meant the rooted note.
+- The parser now recognizes markdown-like headings/frontmatter in ordinary text and treats unsectioned instructions as one implicit phase. Valid empty attachments remain explicitly identified instead of falling back to discovery.
+- Once an ownership-scoped attachment resolves, `search_playbooks` is removed for that turn. Discovery and execution are now server-enforced mutually exclusive states; generic note search remains available for phase work.
+- Added `pnpm playbooks:check` to the build and Quality workflow with structured, pasted-SKILL, textual-reference, unsectioned, and empty-playbook coverage.
 
 **July 22, 2026**: AI v3.2 T3 — playbook registry + progressive disclosure, P1–P4 + P5-mark built (branch `feature/ai-v3.2-t3-playbooks`, worktree `ai-v32-t3`; plan: `work-tracking/AI-V3.2-T3-PLAYBOOKS-PLAN.md`; resource-discipline reference: `guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md`)
 

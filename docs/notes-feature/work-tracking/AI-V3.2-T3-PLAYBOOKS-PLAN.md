@@ -80,7 +80,11 @@ AI version.
 
 ### P1 — Playbook parser ✅ BUILT
 `lib/domain/ai/playbooks/parse.ts`. Pure, tsx-tested (phases + standing rules +
-`[[refs]]`; phase level = shallowest heading).
+`[[refs]]`; phase level = shallowest heading). **Owner-smoke hardening
+(2026-07-23):** a pasted SKILL.md can live in ordinary TipTap paragraphs rather
+than structured heading nodes. That shape now recognizes literal markdown
+headings/frontmatter; useful unsectioned content becomes one implicit phase
+instead of `0 phases`.
 
 ### P2 — Marker + registry ✅ BUILT
 `lib/domain/ai/playbooks/registry.ts` + `GET /api/content/playbooks`. Typecheck
@@ -116,6 +120,11 @@ clean (Prisma JSON-path query on `metadata.playbook = true`).
   `[[refs]]`, since wikiLink nodes carry no id) with a `read_note`-on-demand
   instruction. Injected as its own `buildSystemPrompt` field, separate from
   `mentionedContext`.
+- **Explicit attachment wins deterministically (owner-smoke fix, 2026-07-23):**
+  once the ownership-scoped marked note resolves, the turn cannot use
+  `search_playbooks`; discovery and execution are mutually exclusive. A valid
+  empty attachment stays named in context and reports that it needs content
+  rather than silently searching for another playbook.
 - **Renderer — DEVIATION from plan:** the plan called for the export
   `MarkdownConverter`'s wikiLink case; that lives in
   `lib/domain/content/markdown-serialize.ts` (AI v3.2 T2, PR #125), which is
