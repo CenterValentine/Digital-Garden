@@ -29,7 +29,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
-  markdownToTiptap,
+  markdownToTiptapResult,
 } from "@/lib/domain/content";
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
@@ -47,39 +47,6 @@ import {
   RATE_LIMITS,
 } from "@/lib/infrastructure/rate-limiting";
 import type { ToolExecuteContext } from "./types";
-
-/**
- * Detect markdownToTiptap's silent fallback. The fallback wraps the
- * entire markdown string as a SINGLE plain-text paragraph — so the user
- * sees raw `### Heading` / `- **Bold**` text in the rendered note
- * instead of structured TipTap nodes (Bug G). When this happens we
- * upgrade to a paragraph-per-blank-line split so at least newline
- * structure survives.
- */
-function isMarkdownFallback(
-  json: { content?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }> },
-  source: string,
-): boolean {
-  const doc = json.content;
-  if (!doc || doc.length !== 1) return false;
-  const p = doc[0];
-  if (!p || p.type !== "paragraph") return false;
-  const text = p.content?.[0]?.text;
-  return typeof text === "string" && text.trim() === source.trim();
-}
-
-function paragraphSplitFallback(source: string) {
-  const blocks = source.split(/\n\s*\n/).map((s) => s.trim()).filter(Boolean);
-  return {
-    type: "doc" as const,
-    content: blocks.length
-      ? blocks.map((block) => ({
-          type: "paragraph" as const,
-          content: [{ type: "text" as const, text: block }],
-        }))
-      : [{ type: "paragraph" as const }],
-  };
-}
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -627,19 +594,15 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
 
         const slug = await generateUniqueSlug(title, ctx.userId);
-        // markdownToTiptap → marked → generateJSON pipeline. If it throws,
-        // the internal fallback wraps raw markdown as plain text — which
-        // produces the "raw ### headings showing in the note" bug. Detect
-        // that fallback (single paragraph whose text equals the input) and
-        // upgrade to a paragraph-per-blank-line split so at least line
-        // breaks survive. The full markdown features depend on the
-        // pipeline succeeding upstream.
-        let tiptapJson = content
-          ? markdownToTiptap(content)
-          : { type: "doc", content: [{ type: "paragraph" }] };
-        if (content && isMarkdownFallback(tiptapJson, content)) {
-          tiptapJson = paragraphSplitFallback(content);
-        }
+        // Hardened conversion (v3.2 T1): the converter signals `degraded`
+        // when the structured pipeline fails, instead of silently
+        // returning raw markdown as plain text. On degradation we still
+        // persist the content (paragraph-per-block) but FLAG the note so
+        // it's visibly recoverable by the regen sweep — never silent.
+        const conversion = content
+          ? markdownToTiptapResult(content)
+          : { json: { type: "doc", content: [{ type: "paragraph" }] }, degraded: false };
+        const tiptapJson = conversion.json;
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
@@ -672,6 +635,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   readingTime: Math.ceil(wordCount / 200),
                   // Summarize-on-write (S5): abstract-first re-reads.
                   ...(abstract ? { abstract } : {}),
+                  // Degradation flag (T1): surfaced as a badge + found by
+                  // the regen sweep. Absent on clean conversions.
+                  ...(conversion.degraded
+                    ? { markdownDegraded: true, degradedReason: conversion.reason }
+                    : {}),
                 },
               },
             },
@@ -747,12 +715,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ctx.chatContentId !== undefined && contentId === ctx.chatContentId;
         const titleToApply = isUpdatingActiveChat ? undefined : title;
 
-        let tiptapJson = markdownToTiptap(content);
-        if (isMarkdownFallback(tiptapJson, content)) {
-          tiptapJson = paragraphSplitFallback(content);
-        }
+        const conversion = markdownToTiptapResult(content);
+        const tiptapJson = conversion.json;
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
+        const degradedMeta = conversion.degraded
+          ? { markdownDegraded: true, degradedReason: conversion.reason }
+          : {};
 
         // Upsert (not nested update) because non-note content types may
         // not have a NotePayload row yet. Mirrors the PATCH route's
@@ -766,6 +735,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               wordCount,
               characterCount: searchText.length,
               readingTime: Math.ceil(wordCount / 200),
+              ...degradedMeta,
             },
           },
           create: {
@@ -776,6 +746,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               wordCount,
               characterCount: searchText.length,
               readingTime: Math.ceil(wordCount / 200),
+              ...degradedMeta,
             },
           },
         });

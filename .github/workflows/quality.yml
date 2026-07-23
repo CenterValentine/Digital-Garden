@@ -69,3 +69,38 @@ jobs:
 
       - name: Playbook parser checks
         run: pnpm playbooks:check
+
+  markdown-safety:
+    name: Markdown block-safety
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm exec prisma generate
+
+      # Asserts every registered TipTap block survives a markdown round-trip
+      # losslessly (dg-block fences). A new block that can't round-trip fails
+      # here rather than silently destroying user content via the source-view
+      # toggle. Structural smoke covers the markdown → tiptap parse direction.
+      - name: Markdown block-safety gate
+        run: pnpm markdown:blocks:check
+
+      - name: Markdown round-trip smoke
+        run: pnpm markdown:smoke
