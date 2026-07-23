@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Run Ledgers receive searchable, run-stable titles on PR #126
+
+- New ledgers are named `Run Ledger — <whole-run summary> · <memorable word pair>`; the phase-checkpoint contract asks for a stable subject-and-deliverables title and derives one from the summary when omitted.
+- The word pair is deterministic from conversation identity, so every phase updates the same ledger while otherwise-similar runs remain distinguishable in search.
+- Existing plain `Run Ledger` notes are adopted, tagged with their run identity, and renamed on their next checkpoint instead of being duplicated.
+
 **July 23, 2026**: File-tree Shift selection no longer opens content on PR #126
 
 - Shift-click and Shift-double-click now remain selection-only gestures: range selection, persisted selection state, status counts, and bulk context-menu actions still work without changing the active content pane.

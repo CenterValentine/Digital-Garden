@@ -188,7 +188,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/playbook. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
         "Do NOT continue to the next phase without calling this. If the verdict includes revision feedback, redo the current phase incorporating it before checkpointing again. " +
-        "Summarize concretely: what was produced, key decisions, where artifacts were saved.",
+        "Summarize concretely: what was produced, key decisions, where artifacts were saved. On the first checkpoint, provide runTitle as a stable short title for the WHOLE run (subject + anticipated deliverables), not merely this phase.",
       inputSchema: z.object({
         phase: z
           .string()
@@ -211,8 +211,23 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe("One line on what the next phase will do"),
+        runTitle: z
+          .string()
+          .min(3)
+          .max(80)
+          .optional()
+          .describe(
+            "Stable 3-10 word title for the entire run, covering its subject and anticipated outputs. Provide on the first checkpoint when the whole-run scope is known.",
+          ),
       }),
-      execute: async ({ phase, summary, artifacts, openQuestions, next }) => {
+      execute: async ({
+        phase,
+        summary,
+        artifacts,
+        openQuestions,
+        next,
+        runTitle,
+      }) => {
         if (!ctx.targetFolderId) {
           return {
             __checkpoint: true,
@@ -222,20 +237,34 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           };
         }
         try {
-          const ledger = await upsertRunLedger(ctx.userId, ctx.targetFolderId, {
-            phase,
-            summary,
-            artifacts,
-            openQuestions,
-            next,
-            // Tokens-per-phase eval (v3.1 R5): route-accumulated usage
-            // through this step — the ledger becomes the per-run cost
-            // record ("tokens so far" at each checkpoint = per-phase
-            // deltas by subtraction).
-            tokensSoFar: ctx.runTokens?.total,
-          },
-          // WS7: nest the ledger under the chat when the output target does.
-          ctx.outputOwnerId);
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            ctx.targetFolderId,
+            {
+              phase,
+              summary,
+              artifacts,
+              openQuestions,
+              next,
+              runTitle,
+              // Tokens-per-phase eval (v3.1 R5): route-accumulated usage
+              // through this step — the ledger becomes the per-run cost
+              // record ("tokens so far" at each checkpoint = per-phase
+              // deltas by subtraction).
+              tokensSoFar: ctx.runTokens?.total,
+            },
+            {
+              // WS7: nest the ledger under the chat when the output target does.
+              ownerContentId: ctx.outputOwnerId,
+              // Conversation identity keeps a stable ledger across phases;
+              // fallbacks cover full-page/transient chat shapes.
+              runKey:
+                ctx.conversationId ??
+                ctx.outputOwnerId ??
+                ctx.chatContentId ??
+                ctx.targetFolderId,
+            },
+          );
           if (ctx.conversationId) {
             void addAutoAssociation(
               ctx.userId,

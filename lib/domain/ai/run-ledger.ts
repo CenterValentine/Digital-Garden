@@ -20,8 +20,10 @@ import {
   markdownToTiptap,
   extractSearchTextFromTipTap,
 } from "@/lib/domain/content";
+import { buildRunLedgerTitle } from "@/lib/domain/ai/run-ledger-title";
 
 const LEDGER_TITLE = "Run Ledger";
+const LEDGER_RUN_KEY = "runLedgerKey";
 
 export interface CheckpointEntry {
   phase: string;
@@ -29,6 +31,8 @@ export interface CheckpointEntry {
   artifacts?: string[];
   openQuestions?: string[];
   next?: string;
+  /** Stable short title covering the whole run and its anticipated outputs. */
+  runTitle?: string;
   /** Route-accumulated token usage through this checkpoint (v3.1 R5). */
   tokensSoFar?: number;
 }
@@ -55,32 +59,62 @@ export async function upsertRunLedger(
   userId: string,
   targetFolderId: string,
   entry: CheckpointEntry,
-  /**
-   * Output owner (Chat Outputs & References plan, WS7): when the chat's
-   * output target nests under a chat/content, the ledger is this run's state
-   * and belongs there too — created `role:"referenced"` + `ownedByNoteId =
-   * owner` (storage parentId still the target folder), and keyed by owner so
-   * each chat carries its own ledger. Omit → the historical folder-scoped
-   * primary ledger.
-  */
-  ownerContentId?: string,
+  options: {
+    /**
+     * Output owner (Chat Outputs & References plan, WS7): when the chat's
+     * output target nests under a chat/content, the ledger is this run's state
+     * and belongs there too — created `role:"referenced"` + `ownedByNoteId =
+     * owner` (storage parentId still the target folder).
+     */
+    ownerContentId?: string;
+    /** Stable conversation/run identity used to find later phase writes. */
+    runKey?: string;
+  } = {},
 ): Promise<{ contentNodeId: string; created: boolean }> {
-  const existing = await prisma.contentNode.findFirst({
+  const { ownerContentId } = options;
+  const runKey = options.runKey ?? ownerContentId ?? targetFolderId;
+  const scope = ownerContentId
+    ? { ownedByNoteId: ownerContentId }
+    : { parentId: targetFolderId };
+
+  // New ledgers are keyed in metadata because their visible titles are now
+  // descriptive. Fall back once to the legacy exact title so an existing
+  // "Run Ledger" is adopted and renamed at its next checkpoint.
+  const keyedLedger = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      // Key by the owner when nesting under a chat, else by the folder.
-      ...(ownerContentId
-        ? { ownedByNoteId: ownerContentId }
-        : { parentId: targetFolderId }),
+      ...scope,
       contentType: "note",
       deletedAt: null,
-      title: LEDGER_TITLE,
+      notePayload: {
+        metadata: { path: [LEDGER_RUN_KEY], equals: runKey },
+      },
     },
     select: {
       id: true,
+      title: true,
       notePayload: { select: { metadata: true } },
     },
   });
+  const existing =
+    keyedLedger ??
+    (await prisma.contentNode.findFirst({
+      where: {
+        ownerId: userId,
+        ...scope,
+        contentType: "note",
+        deletedAt: null,
+        title: LEDGER_TITLE,
+      },
+      select: {
+        id: true,
+        title: true,
+        notePayload: { select: { metadata: true } },
+      },
+    }));
+  const ledgerTitle = existing?.title.startsWith(`${LEDGER_TITLE} —`)
+    ? existing.title
+    : buildRunLedgerTitle(entry, runKey);
 
   const prior =
     existing?.notePayload?.metadata &&
@@ -91,7 +125,7 @@ export async function upsertRunLedger(
 
   const markdown = prior
     ? `${prior}\n\n${renderEntry(entry)}`
-    : `# Run Ledger\n\n${renderEntry(entry)}`;
+    : `# ${ledgerTitle}\n\n${renderEntry(entry)}`;
 
   const tiptapJson = markdownToTiptap(markdown);
   const searchText = extractSearchTextFromTipTap(tiptapJson);
@@ -100,11 +134,19 @@ export async function upsertRunLedger(
     searchText,
     metadata: {
       ledgerMarkdown: markdown,
+      [LEDGER_RUN_KEY]: runKey,
+      ledgerTitle,
       wordCount: searchText.split(/\s+/).length,
     } as unknown as Prisma.InputJsonValue,
   };
 
   if (existing) {
+    if (existing.title !== ledgerTitle) {
+      await prisma.contentNode.update({
+        where: { id: existing.id },
+        data: { title: ledgerTitle },
+      });
+    }
     await prisma.notePayload.upsert({
       where: { contentId: existing.id },
       update: payloadData,
@@ -113,11 +155,11 @@ export async function upsertRunLedger(
     return { contentNodeId: existing.id, created: false };
   }
 
-  const slug = await generateUniqueSlug(LEDGER_TITLE, userId);
+  const slug = await generateUniqueSlug(ledgerTitle, userId);
   const node = await prisma.contentNode.create({
     data: {
       ownerId: userId,
-      title: LEDGER_TITLE,
+      title: ledgerTitle,
       slug,
       contentType: "note",
       parentId: targetFolderId,

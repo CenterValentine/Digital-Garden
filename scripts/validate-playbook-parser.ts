@@ -8,6 +8,7 @@ import {
   createPlaybookMessageAttachmentPart,
   parsePlaybookMessageAttachment,
 } from "@/lib/domain/ai/playbooks/message-binding";
+import { buildRunLedgerTitle } from "@/lib/domain/ai/run-ledger-title";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 
 function paragraph(text: string): JSONContent {
@@ -168,6 +169,55 @@ assert.deepEqual(
     },
   ],
   "an incomplete streamed checkpoint must not become actionable",
+);
+
+const namedLedger = buildRunLedgerTitle(
+  {
+    phase: "Phase A: Surface facts",
+    summary: "Researched Clipboard Health and compiled the source record.",
+    artifacts: ["Company profile", "Research brief"],
+    runTitle: "Clipboard Health research package",
+  },
+  "conversation-one",
+);
+assert.match(
+  namedLedger,
+  /^Run Ledger — Clipboard Health research package · [A-Z][a-z]+ [A-Z][a-z]+$/,
+);
+assert.equal(
+  buildRunLedgerTitle(
+    {
+      phase: "Phase B: Read between the lines",
+      summary: "Analyzed hiring signals and product positioning.",
+      runTitle: "Clipboard Health research package",
+    },
+    "conversation-one",
+  ),
+  namedLedger,
+  "the deterministic run suffix must stay stable across checkpoint phases",
+);
+assert.notEqual(
+  buildRunLedgerTitle(
+    {
+      phase: "Phase A: Surface facts",
+      summary: "Researched Clipboard Health and compiled the source record.",
+      runTitle: "Clipboard Health research package",
+    },
+    "conversation-two",
+  ),
+  namedLedger,
+  "otherwise-identical runs should remain distinguishable in search",
+);
+assert.match(
+  buildRunLedgerTitle(
+    {
+      phase: "Phase A: Surface facts",
+      summary: "Researched Clipboard Health across product, funding, and hiring.",
+    },
+    "conversation-three",
+  ),
+  /^Run Ledger — Clipboard Health across product, funding, and hiring · /,
+  "checkpoint-summary fallback should remain human-searchable",
 );
 
 console.log("Playbook parser checks passed.");
