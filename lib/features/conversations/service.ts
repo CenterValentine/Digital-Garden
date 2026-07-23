@@ -692,12 +692,44 @@ export async function softDeleteConversation(
   userId: string,
   conversationId: string,
 ): Promise<void> {
-  const { count } = await prisma.conversation.updateMany({
+  // Look up the materialized chat node (WS6) before flipping deletedAt so we
+  // can retire it alongside the conversation — otherwise deleting a side chat
+  // left its referenced node lingering + viewable in the tree.
+  const conv = await prisma.conversation.findFirst({
     where: { id: conversationId, ownerId: userId, deletedAt: null },
-    data: { deletedAt: new Date() },
+    select: { id: true, archivedToContentNodeId: true },
+  });
+  if (!conv) throw new ConversationNotFoundError(conversationId);
+
+  const now = new Date();
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { deletedAt: now },
   });
 
-  if (count === 0) throw new ConversationNotFoundError(conversationId);
+  // Cascade to the chat's ContentNode + the outputs it owns (WS6): deleting a
+  // side chat removes it as referenced content AND takes its generated
+  // outputs with it. Idempotent (deletedAt-null guard), so it composes
+  // safely with the content-route cascade that calls this in the reverse
+  // direction.
+  if (conv.archivedToContentNodeId) {
+    await prisma.contentNode.updateMany({
+      where: {
+        ownedByNoteId: conv.archivedToContentNodeId,
+        ownerId: userId,
+        deletedAt: null,
+      },
+      data: { deletedAt: now, deletedBy: userId },
+    });
+    await prisma.contentNode.updateMany({
+      where: {
+        id: conv.archivedToContentNodeId,
+        ownerId: userId,
+        deletedAt: null,
+      },
+      data: { deletedAt: now, deletedBy: userId },
+    });
+  }
 
   publishConversationEvent(userId, {
     type: "conversation.deleted",

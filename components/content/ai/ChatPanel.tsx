@@ -454,6 +454,9 @@ export function ChatPanel({
           skipNextLoadRef.current = true;
           pendingTransientSendRef.current = true;
           onTransientPromoted(newId);
+          // WS6: creating the conversation materialized a referenced chat node
+          // under the origin content — refresh the tree so it appears.
+          window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         } catch (err) {
           // Promote failed — fall back to sending transient so the user
           // doesn't lose their message. The chat won't persist this
@@ -638,6 +641,9 @@ export function ChatPanel({
   const handleClearOrDelete = useCallback(async () => {
     if (conversationId && onDeleteConversation) {
       await onDeleteConversation(conversationId);
+      // WS6: deleting a side chat also retires its materialized tree node +
+      // owned outputs (server-side) — refresh so they disappear immediately.
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       return;
     }
     setMessages([]);

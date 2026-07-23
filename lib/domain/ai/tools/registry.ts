@@ -252,7 +252,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             // record ("tokens so far" at each checkpoint = per-phase
             // deltas by subtraction).
             tokensSoFar: ctx.runTokens?.total,
-          });
+          },
+          // WS7: nest the ledger under the chat when the output target does.
+          ctx.outputOwnerId);
           if (ctx.conversationId) {
             void addAutoAssociation(
               ctx.userId,

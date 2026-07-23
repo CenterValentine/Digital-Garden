@@ -55,11 +55,23 @@ export async function upsertRunLedger(
   userId: string,
   targetFolderId: string,
   entry: CheckpointEntry,
+  /**
+   * Output owner (Chat Outputs & References plan, WS7): when the chat's
+   * output target nests under a chat/content, the ledger is this run's state
+   * and belongs there too — created `role:"referenced"` + `ownedByNoteId =
+   * owner` (storage parentId still the target folder), and keyed by owner so
+   * each chat carries its own ledger. Omit → the historical folder-scoped
+   * primary ledger.
+   */
+  ownerContentId?: string,
 ): Promise<{ contentNodeId: string }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
       ownerId: userId,
-      parentId: targetFolderId,
+      // Key by the owner when nesting under a chat, else by the folder.
+      ...(ownerContentId
+        ? { ownedByNoteId: ownerContentId }
+        : { parentId: targetFolderId }),
       contentType: "note",
       deletedAt: null,
       title: LEDGER_TITLE,
@@ -110,6 +122,10 @@ export async function upsertRunLedger(
       contentType: "note",
       parentId: targetFolderId,
       displayOrder: 0,
+      // Nest under the chat when the output target says so (WS7).
+      ...(ownerContentId
+        ? { role: "referenced" as const, ownedByNoteId: ownerContentId }
+        : {}),
       notePayload: { create: payloadData },
     },
     select: { id: true },
