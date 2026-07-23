@@ -323,8 +323,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       needsApproval: true,
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
-        "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. " +
-        "By default the file lands in this conversation's target folder; pass parentId to override (e.g. a folder id from create_folder).",
+        "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
+        "Targeting: pass parentId ONLY when the user names a specific folder (e.g. a folder id from create_folder) — that is the only thing that counts as an explicit destination. Omit it otherwise: the file lands in this conversation's target folder, nested as referenced content under this chat by default. You may always place content wherever the user actually asks; this default only applies when they don't say.",
       inputSchema: z.object({
         title: z.string().min(1).max(200).describe("Document title (also the file name)"),
         markdown: z
@@ -339,6 +339,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({ title, markdown, parentId }) => {
+        // Explicit destination (WS3): parentId means the user named a
+        // folder — the output-ownership default below does not apply then.
+        const explicitDestination = Boolean(parentId);
         const destination = parentId ?? ctx.targetFolderId;
         if (!destination) {
           return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
@@ -360,6 +363,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             title,
             markdown,
             parentFolderId: destination,
+            // Output ownership (WS3): same default-under-the-chat rule as
+            // createNote — see its comment for the full rationale.
+            ...(!explicitDestination && ctx.outputOwnerId
+              ? { role: "referenced" as const, ownedByNoteId: ctx.outputOwnerId }
+              : {}),
           });
           if (ctx.conversationId) {
             void addAutoAssociation(
@@ -431,7 +439,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
 
     getCurrentNote: tool({
       description:
-        "Get the full content of a specific note by its ID. Useful for reading context about a note the user is viewing.",
+        "Get the full content of a specific note (or a folder's own notes content) by its ID. Useful for reading context about a note the user is viewing, or a folder's notes when the folder itself is referenced.",
       inputSchema: z.object({
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
@@ -453,8 +461,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Note with ID "${contentId}" not found or not accessible.`;
         }
 
-        if (content.contentType !== "note" || !content.notePayload) {
-          return `Content "${content.title}" is a ${content.contentType}, not a note. Cannot read its text content.`;
+        // Folders can carry a notePayload too (the folder "Notes" editor), so
+        // a folder WITH notes content is readable the same as a note — only a
+        // folder with no notePayload (or a genuinely non-text content type)
+        // is rejected.
+        const isTextBearing =
+          content.contentType === "note" || content.contentType === "folder";
+        if (!isTextBearing || !content.notePayload) {
+          return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
         }
 
         const text = content.notePayload.searchText || "(empty note)";
@@ -481,7 +495,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Create a NEW note in the user's Digital Garden. Use this only when the user EXPLICITLY asks for a new file. " +
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
-        "By default the new note is placed in the same folder as the active chat (when the user is chatting from a chat content page). Pass `parentId` to override.",
+        "Do NOT create output on your own initiative — only when the user asks for it. " +
+        "Targeting: pass `parentId` ONLY when the user names a specific folder — that is the only thing that counts as an explicit destination. Omit it otherwise: the note then nests as referenced content under this chat by default (hidden-by-default in the tree, shown via 'show referenced' — not lost, just out of the way). You may always place content wherever the user actually asks; this default only applies when they don't say.",
       inputSchema: z.object({
         title: z
           .string()
@@ -515,6 +530,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         //   2. Chat's own parent folder (when in a chat context)
         //   3. null (vault root)
         let resolvedParentId: string | null = null;
+        // Explicit destination (Chat Outputs & References plan, WS3): the
+        // model only passes parentId when the user named a specific folder
+        // (see the tool description) — true here means the user asked for
+        // a location, so the output-ownership default below does NOT apply.
+        let explicitDestination = false;
         if (parentId) {
           const candidate = await prisma.contentNode.findFirst({
             where: {
@@ -525,7 +545,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
             select: { id: true },
           });
-          if (candidate) resolvedParentId = candidate.id;
+          if (candidate) {
+            resolvedParentId = candidate.id;
+            explicitDestination = true;
+          }
         }
         // Conversation target folder (S4b): chats serve their location —
         // the target (explicit or location-inferred) outranks the raw
@@ -558,6 +581,17 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
+        // Output ownership (WS3): no explicit destination named → nest as a
+        // REFERENCE under the chat that produced it (hidden-by-default,
+        // shown via "show referenced" — same visibility model as an
+        // embedded image), storage parentId unchanged. An explicit
+        // destination always wins; this is a fallback default only, and the
+        // bot can always place content elsewhere when the user says so.
+        const ownedOutput =
+          !explicitDestination && ctx.outputOwnerId
+            ? { role: "referenced" as const, ownedByNoteId: ctx.outputOwnerId }
+            : {};
+
         const node = await prisma.contentNode.create({
           data: {
             ownerId: ctx.userId,
@@ -565,6 +599,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             slug,
             contentType: "note",
             parentId: resolvedParentId,
+            ...ownedOutput,
             notePayload: {
               create: {
                 tiptapJson,
@@ -602,6 +637,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Common phrasings: 'update this conversation's notes', 'add to my Sourdough note', 'put X in the notes for this chat'. " +
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
+        "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
         "RENAME RULE: do NOT set the `title` argument unless the user EXPLICITLY asks to rename (e.g. 'rename this to X'). Mentioning a topic or theme is NOT a rename request. NEVER set `title` when the target is the user's open chat — renaming a chat while updating its notes is wrong.",
       inputSchema: z.object({
         contentId: z

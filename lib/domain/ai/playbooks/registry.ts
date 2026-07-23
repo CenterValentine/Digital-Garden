@@ -1,7 +1,10 @@
 /**
  * Playbook registry (AI v3.2 T3)
  *
- * A "playbook" is a note marked in its `NotePayload.metadata`:
+ * A "playbook" is a NOTE OR FOLDER marked via its `NotePayload.metadata`
+ * (folders can carry a `notePayload` too — the folder "Notes" editor — so a
+ * folder's own notes content is a legitimate playbook source, not just a
+ * dedicated note):
  *   metadata.playbook            = true            (the discoverable flag)
  *   metadata.playbookDescription = "one-liner"     (SKILL.md `description`)
  *
@@ -47,12 +50,12 @@ export function isPlaybookMetadata(metadata: unknown): boolean {
   );
 }
 
-/** List the user's playbook notes for the registry / picker. */
+/** List the user's playbook notes/folders for the registry / picker. */
 export async function listPlaybooks(userId: string): Promise<PlaybookListItem[]> {
   const rows = await prisma.contentNode.findMany({
     where: {
       ownerId: userId,
-      contentType: "note",
+      contentType: { in: ["note", "folder"] },
       deletedAt: null,
       notePayload: { metadata: { path: [PLAYBOOK_FLAG_KEY], equals: true } },
     },

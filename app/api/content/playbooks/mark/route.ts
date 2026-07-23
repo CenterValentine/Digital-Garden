@@ -2,9 +2,11 @@
  * Mark-as-playbook action (AI v3.2 T3).
  *
  * POST /api/content/playbooks/mark — hand-authoring path (primary use
- * case): flag an existing note as a playbook via NotePayload.metadata.
- * The note's `##` sections are already phases (see lib/domain/ai/playbooks
- * /parse.ts); this just marks it discoverable in the /playbook picker.
+ * case): flag an existing note OR folder as a playbook via
+ * NotePayload.metadata (folders can carry a notePayload too — the folder
+ * "Notes" editor). The `##` sections are already phases (see
+ * lib/domain/ai/playbooks/parse.ts); this just marks it discoverable in
+ * the /playbook picker.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -40,14 +42,14 @@ export async function POST(request: NextRequest) {
         where: {
           id: contentId,
           ownerId: session.user.id,
-          contentType: "note",
+          contentType: { in: ["note", "folder"] },
           deletedAt: null,
         },
         select: { id: true, notePayload: { select: { metadata: true } } },
       });
       if (!node) {
         return NextResponse.json(
-          { success: false, error: { message: "Note not found" } },
+          { success: false, error: { message: "Note or folder not found" } },
           { status: 404 },
         );
       }
@@ -56,9 +58,19 @@ export async function POST(request: NextRequest) {
         (node.notePayload?.metadata as Record<string, unknown> | null) ?? null,
         description,
       );
-      await prisma.notePayload.update({
+      // upsert, not update — a folder's notePayload is created lazily by its
+      // Notes editor on first edit, so a freshly-created folder with content
+      // already typed may not have a row yet even though notePayload.metadata
+      // above read null via the optional relation.
+      await prisma.notePayload.upsert({
         where: { contentId: node.id },
-        data: { metadata: metadata as unknown as Prisma.InputJsonValue },
+        update: { metadata: metadata as unknown as Prisma.InputJsonValue },
+        create: {
+          contentId: node.id,
+          tiptapJson: { type: "doc", content: [] } as unknown as Prisma.InputJsonValue,
+          searchText: "",
+          metadata: metadata as unknown as Prisma.InputJsonValue,
+        },
       });
 
       return NextResponse.json({ success: true });

@@ -73,6 +73,14 @@ export interface CreateDocxInput {
   markdown: string;
   /** Destination folder — required; callers resolve from the target. */
   parentFolderId: string;
+  /**
+   * Output ownership (Chat Outputs & References plan, WS3): when set, the
+   * document is created as `role: "referenced"`, nested under this owner
+   * (a chat's ContentNode) rather than as a loose primary file. Omit for the
+   * default primary-in-folder placement.
+   */
+  role?: "referenced";
+  ownedByNoteId?: string;
 }
 
 export async function createDocxDocument(
@@ -114,6 +122,8 @@ export async function createDocxDocument(
       contentType: "file",
       parentId: input.parentFolderId,
       displayOrder: 0,
+      ...(input.role ? { role: input.role } : {}),
+      ...(input.ownedByNoteId ? { ownedByNoteId: input.ownedByNoteId } : {}),
       filePayload: {
         create: {
           fileName,

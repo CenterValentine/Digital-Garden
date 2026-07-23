@@ -42,6 +42,19 @@ export interface ToolExecuteContext {
    */
   chatContentId?: string;
   /**
+   * Output-owner ContentNode id (Chat Outputs & References plan, WS3): the
+   * chat this turn belongs to, when it can own referenced content — a
+   * full-page chat's own id, or a sidebar chat's archived ContentNode id.
+   * Undefined for a transient/unsaved sidebar chat (no node to own under).
+   *
+   * Output tools (createNote, create_docx) use this to nest content they
+   * create as a REFERENCE under the chat by default — `role: "referenced"`
+   * + `ownedByNoteId: outputOwnerId` — but ONLY when the user didn't name an
+   * explicit destination (an explicit parentId always wins; this is a
+   * fallback default, never an override of what the user asked for).
+   */
+  outputOwnerId?: string;
+  /**
    * Image/audio attachments on the conversation, in order. propose_cards_from_media
    * references these by index to build each card's media front. The model has
    * already seen them in context, so it supplies the identification per item.

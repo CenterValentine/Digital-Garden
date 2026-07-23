@@ -461,6 +461,7 @@ export async function POST(request: Request) {
       // tool context: read_page files page nodes there; document tools
       // default their destination to it.
       let targetFolderId: string | undefined;
+      let archivedChatNodeId: string | undefined;
       if (conversationIdForAssoc) {
         const conv = await prisma.conversation.findFirst({
           where: {
@@ -472,17 +473,28 @@ export async function POST(request: Request) {
             targetFolderId: true,
             // Location inference: chats serve their location — the chat
             // node's parent folder is the target unless explicitly set.
-            archivedToContentNode: { select: { parentId: true } },
+            archivedToContentNode: { select: { id: true, parentId: true } },
           },
         });
         targetFolderId =
           conv?.targetFolderId ??
           conv?.archivedToContentNode?.parentId ??
           undefined;
+        archivedChatNodeId = conv?.archivedToContentNode?.id;
       }
       // Final fallback: the open content's folder (sidebar chats and
       // transient chats have no chat node to infer from).
       if (!targetFolderId) targetFolderId = openContentLocationId;
+
+      // Output ownership (Chat Outputs & References plan, WS3): the chat
+      // that can own referenced output by default — a full-page chat is
+      // itself; a sidebar chat is its archived ContentNode, if the
+      // conversation has been saved/archived to the tree. Undefined for a
+      // transient/unsaved sidebar chat — output tools fall back to their
+      // existing folder-only default (primary, not referenced) in that case.
+      const outputOwnerId: string | undefined = isChatContent
+        ? contentId
+        : archivedChatNodeId;
 
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
@@ -502,6 +514,7 @@ export async function POST(request: Request) {
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
+        outputOwnerId,
         attachedMedia,
       };
       const allTools = {
@@ -692,19 +705,32 @@ export async function POST(request: Request) {
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
       // references in that phase surface as a manifest the model traces on
-      // demand via read_note; sub-playbooks (a linked note that is itself
-      // marked as a playbook) are called out so the model follows their own
-      // directives rather than treating them as passive reading.
+      // demand via read_note; sub-playbooks (a linked note OR folder that is
+      // itself marked as a playbook) are called out so the model follows
+      // their own directives rather than treating them as passive reading.
       let playbookContext = "";
+      // Active-context fallback: if the client didn't explicitly attach a
+      // playbook via /playbook, but the user is chatting FROM a note/folder
+      // that is itself marked as a playbook, treat that as the playbook —
+      // "run this playbook" while viewing a marked folder must resolve to
+      // its own content, not send the model text-searching by name (the
+      // failure mode this fixes: read_note used to reject folders outright).
+      // Harmless when contentId isn't a playbook — the isPlaybookMetadata
+      // guard below no-ops exactly like an invalid explicit id would.
       const playbookId: string | null =
-        typeof body.playbookId === "string" ? body.playbookId : null;
+        (typeof body.playbookId === "string" ? body.playbookId : null) ??
+        contentId ??
+        null;
       if (playbookId) {
         try {
           const playbookNode = await prisma.contentNode.findFirst({
             where: {
               id: playbookId,
               ownerId: session.user.id,
-              contentType: "note",
+              // Folders can carry a notePayload (the folder "Notes" editor),
+              // so a folder marked as a playbook is a legitimate source, not
+              // just a dedicated note.
+              contentType: { in: ["note", "folder"] },
               deletedAt: null,
             },
             select: {

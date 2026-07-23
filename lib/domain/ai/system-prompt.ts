@@ -167,6 +167,9 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   sections.push(
     "Tool discipline: if a tool result is empty or unhelpful, do NOT repeat the same or a near-identical call — vary the approach once at most, then answer with what you have and state the limitation plainly.",
   );
+  sections.push(
+    "Content targeting: never write to a note (updateNote) or create output (createNote/create_docx) on your own initiative — only when the user's request actually asks for it. There is no default rule for choosing between the two; read what the user asked for. When you DO create output and the user named a specific destination, use it (pass parentId) — that always wins. When they didn't name one, let the tool's own default apply; do not invent a folder or ask where to put it unless something is actually ambiguous.",
+  );
   if (ctx.hasCheckpointTool) {
     // Cadence after an approved checkpoint depends on how the playbook is
     // loaded. Attached playbook = progressive disclosure (only the current
