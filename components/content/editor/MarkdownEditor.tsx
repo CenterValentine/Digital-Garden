@@ -630,6 +630,7 @@ export function MarkdownEditor({
                     convertThisPaste();
                     toast.dismiss(id);
                   }}
+                  onClose={() => toast.dismiss(id)}
                   onDismiss={() => {
                     dismissMarkdownPasteHint();
                     toast.dismiss(id);

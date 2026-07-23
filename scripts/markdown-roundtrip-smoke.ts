@@ -1,6 +1,7 @@
 import { generateJSON, generateHTML } from "@tiptap/html/server";
 import { marked } from "marked";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
+import { decompressMarkdown } from "@/lib/domain/content/markdown-decompress";
 
 type Node = { type?: string; content?: Node[] };
 
@@ -53,6 +54,44 @@ if (plainTypes.has("heading") || plainTypes.has("bulletList")) {
   fails++;
 } else {
   console.log("  PASS  plain text stays a paragraph");
+}
+
+const pastedFrontmatter = `---
+name: Company Research Directive
+description: How to research a company thoroughly before writing anything about it.
+---
+Phase A: Surface facts
+Find the product and funding.
+Phase B: Read between the lines
+Infer the current priorities.`;
+const frontmatterDoc = toTiptap(decompressMarkdown(pastedFrontmatter));
+const topLevel = frontmatterDoc.content ?? [];
+const dividerCount = topLevel.filter(
+  (node) => node.type === "horizontalRule",
+).length;
+const headingTexts = topLevel
+  .filter((node) => node.type === "heading")
+  .map((node) =>
+    (node.content ?? [])
+      .map((child) => ("text" in child ? String(child.text ?? "") : ""))
+      .join(""),
+  );
+const frontmatterText = JSON.stringify(frontmatterDoc);
+if (
+  dividerCount === 2 &&
+  headingTexts.length === 0 &&
+  frontmatterText.includes("name: Company Research Directive") &&
+  frontmatterText.includes("Phase A: Surface facts") &&
+  frontmatterText.includes("Phase B: Read between the lines")
+) {
+  console.log(
+    "  PASS  pasted frontmatter and phase labels stay plain between two dividers",
+  );
+} else {
+  console.log(
+    `  FAIL  pasted frontmatter parsed incorrectly — dividers=${dividerCount}, headings=${JSON.stringify(headingTexts)}`,
+  );
+  fails++;
 }
 
 const backToHtml = generateHTML(toTiptap("# H\n\n- a\n- b") as never, extensions);
