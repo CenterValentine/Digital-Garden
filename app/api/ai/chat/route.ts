@@ -36,6 +36,11 @@ import {
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
+import {
+  DEFAULT_OUTPUT_TARGET,
+  parseOutputTarget,
+  renderOutputTargetInstruction,
+} from "@/lib/domain/ai/output-target";
 
 /**
  * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
@@ -549,28 +554,21 @@ export async function POST(request: Request) {
       // destination the bot resolves from the request always wins downstream.
       let outputOwnerId: string | undefined = chatNodeId;
       let outputParentOverride: string | undefined;
-      const outputTarget = body.outputTarget as
-        | { mode?: string; folderId?: string }
-        | undefined;
-      if (outputTarget && typeof outputTarget === "object") {
-        const mode = outputTarget.mode;
-        if (mode === "underContent") {
-          // Referenced under the rooted content (a child of it, sibling of
-          // the chat).
-          outputOwnerId = originContentId ?? chatNodeId;
-        } else if (mode === "besideContent") {
-          // Primary in the rooted content's folder (next to it).
-          outputOwnerId = undefined;
-          outputParentOverride = openContentLocationId;
-        } else if (mode === "folder") {
-          outputOwnerId = undefined;
-          outputParentOverride =
-            typeof outputTarget.folderId === "string"
-              ? outputTarget.folderId
-              : undefined;
-        }
-        // mode "chat" (or anything else) → keep the chat-owner default.
+      const outputTarget =
+        parseOutputTarget(body.outputTarget) ?? DEFAULT_OUTPUT_TARGET;
+      if (outputTarget.mode === "underContent") {
+        // Referenced under the rooted content (a child of it, sibling of
+        // the chat).
+        outputOwnerId = originContentId ?? chatNodeId;
+      } else if (outputTarget.mode === "besideContent") {
+        // Primary in the rooted content's folder (next to it).
+        outputOwnerId = undefined;
+        outputParentOverride = openContentLocationId;
+      } else if (outputTarget.mode === "folder") {
+        outputOwnerId = undefined;
+        outputParentOverride = outputTarget.folderId;
       }
+      // mode "chat" → keep the chat-owner default.
 
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
@@ -988,8 +986,7 @@ export async function POST(request: Request) {
             : "") +
           (attachedPlaybookResolved
             ? ` A DIFFERENT playbook is explicitly attached to this chat (see "Active Playbook" below) — that one takes priority for any playbook-related request; do not confuse it with this rooted content.`
-            : "") +
-          " New content you create nests under this chat by default.";
+            : "");
       }
 
       // Resolve the selected custom-instruction context, if any. Sent by
@@ -1067,6 +1064,9 @@ export async function POST(request: Request) {
         mentionedContext,
         playbookContext,
         attachedPlaybookResolved,
+        outputTarget,
+        outputOwnerId,
+        outputParentOverride,
         providerId,
         modelId,
         temperature: effectiveTemperature,
@@ -1121,6 +1121,7 @@ export async function POST(request: Request) {
           playbookContext,
           playbookAwareness,
           rootedContentSection,
+          outputTargetSection: renderOutputTargetInstruction(outputTarget),
           hasAttachedPlaybook: attachedPlaybookResolved,
           pageContextSection,
         }),

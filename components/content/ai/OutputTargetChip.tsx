@@ -20,7 +20,7 @@ import { createPortal } from "react-dom";
 import { Crosshair, MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
-import type { OutputTarget } from "@/lib/domain/ai/use-conversation-engine";
+import type { OutputTarget } from "@/lib/domain/ai/output-target";
 
 const MENU_WIDTH = 240;
 const MENU_MAX_HEIGHT = 360;
@@ -163,6 +163,7 @@ export function OutputTargetChip({
     const q = filter.trim().toLowerCase();
     return q ? folders.filter((f) => f.title.toLowerCase().includes(q)) : folders;
   }, [folders, filter]);
+  const isOverride = value.mode !== "chat";
 
   const pick = useCallback(
     (target: OutputTarget) => {
@@ -183,7 +184,9 @@ export function OutputTargetChip({
         title="Where new content lands by default when you don't tell the assistant otherwise (it can always place things where you ask)"
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",
-          "border-black/10 dark:border-white/15 text-gray-500 dark:text-gray-400",
+          isOverride
+            ? "border-emerald-500/30 bg-emerald-500/[0.07] text-emerald-700 dark:text-emerald-300"
+            : "border-black/10 dark:border-white/15 text-gray-500 dark:text-gray-400",
           disabled
             ? "opacity-50 cursor-default"
             : "hover:bg-black/[0.04] dark:hover:bg-white/[0.06] cursor-pointer",

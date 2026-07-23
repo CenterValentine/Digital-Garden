@@ -15,10 +15,8 @@
  * affordance. It does NOT decide whether output nests as a reference under
  * this chat by default (Chat Outputs & References plan, WS3) — that's a
  * separate, chat-scoped default (server-resolved from the chat's own
- * ContentNode), independent of where this chip points. A dedicated
- * output-target affordance (letting the user redirect that default without
- * naming a folder every message) is planned but not yet built — see
- * CHAT-OUTPUTS-AND-REFERENCES-PLAN.md WS4.
+ * ContentNode), independent of where this chip points. OutputTargetChip is
+ * the separate control that redirects generated artifacts.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -156,8 +154,8 @@ export function TargetFolderChip({
             : mismatch
               ? `Operating folder differs from this chat's own location (${location?.title ?? "its location"}) — this chat works from the target folder, not where it lives`
               : inherited
-                ? "Operating context — inherited from this chat's own folder. Click to override the folder this chat works from. (New content you create nests under this chat by default, regardless of this setting.)"
-                : "Operating folder — where this chat works from (read_page filing, storage fallback). New content you create nests under this chat by default, regardless of this setting."
+                ? "Operating context — inherited from this chat's own folder. Click to override the folder this chat works from. Generated-artifact placement is controlled separately by the output-target chip."
+                : "Operating folder — where this chat works from (read_page filing and storage fallback). Generated-artifact placement is controlled separately by the output-target chip."
         }
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",

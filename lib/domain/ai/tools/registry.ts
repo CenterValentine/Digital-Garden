@@ -294,7 +294,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: pass parentId ONLY when the user names a specific folder (e.g. a folder id from create_folder) — that is the only thing that counts as an explicit destination. Omit it otherwise: the file lands in this conversation's target folder, nested as referenced content under this chat by default. You may always place content wherever the user actually asks; this default only applies when they don't say.",
+        "Targeting: pass parentId ONLY when the user names a specific folder (e.g. a folder id from create_folder) — that is the only thing that counts as an explicit destination. Omit it otherwise: the tool runtime applies the configured output-target preset (which defaults to referenced content under this chat). You may always place content wherever the user actually asks; the preset only applies when they don't say.",
       inputSchema: z.object({
         title: z.string().min(1).max(200).describe("Document title (also the file name)"),
         markdown: z
@@ -305,7 +305,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .optional()
           .describe(
-            "Destination folder id. Omit to use the conversation's target folder.",
+            "Destination folder id. Pass ONLY when the user explicitly names a folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
       }),
       execute: async ({ title, markdown, parentId }) => {
@@ -507,7 +507,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: pass `parentId` ONLY when the user names a specific folder — that is the only thing that counts as an explicit destination. Omit it otherwise: the note then nests as referenced content under this chat by default (hidden-by-default in the tree, shown via 'show referenced' — not lost, just out of the way). You may always place content wherever the user actually asks; this default only applies when they don't say.",
+        "Targeting: pass `parentId` ONLY when the user names a specific folder — that is the only thing that counts as an explicit destination. Omit it otherwise: the tool runtime applies the configured output-target preset (which defaults to referenced content under this chat). You may always place content wherever the user actually asks; the preset only applies when they don't say.",
       inputSchema: z.object({
         title: z
           .string()
@@ -532,7 +532,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .uuid()
           .optional()
           .describe(
-            "Optional UUID of a folder to create the note in. Defaults to the active chat's parent folder. Omit unless the user names a specific folder.",
+            "Optional UUID of a folder to create the note in. Pass ONLY when the user explicitly names that folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
       }),
       execute: async ({ title, abstract, content = "", parentId }) => {

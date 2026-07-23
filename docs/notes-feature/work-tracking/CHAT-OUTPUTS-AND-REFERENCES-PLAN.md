@@ -262,3 +262,27 @@ set to (default: this chat).
 side-chat should appear," but a throwaway 2-message chat also leaves a node) vs
 **lazily** (materialize on first output OR first real turn — less tree clutter).
 Owner's words say eager; flagged because it's a visible product tradeoff.
+
+## 7. Owner-smoke fix — preset lost across side-chat rebinding (2026-07-23)
+
+The captured failing turn showed `createNote` correctly omitted `parentId`, but
+the created note used the `{ mode:"chat" }` default instead of the folder the
+owner had previously selected. Root cause: `MultiConversationSidebar`
+deliberately keeps `ChatPanel` mounted across tab switches and
+transient→Conversation promotion, while the output-target state only read
+localStorage in its initial `useState`. Changing `conversationId` changed the
+storage key without rehydrating the value; the compact crosshair also hid which
+target was active.
+
+- Output-target state now hydrates on every key change.
+- A transient content-key selection migrates to the new conversation key on
+  promotion; switching unrelated conversations hydrates that conversation or
+  resets to "This chat" instead of leaking stale state.
+- The sidebar chip now shows its label. Non-default choices use the same emerald
+  selected treatment as the operating-context chip.
+- The route validates the per-turn target, includes its resolved values in the
+  `chat_input` trace, and injects an explicit model instruction: omit `parentId`
+  to let the runtime enforce the preset; pass it only when the user names a
+  different destination.
+- `pnpm output-targets:check` covers parsing, chat switching, promotion
+  migration, saved-target precedence, and prompt wording in build + CI.

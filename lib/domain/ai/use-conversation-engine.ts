@@ -46,6 +46,16 @@ import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu"
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { getAttachedPageContext } from "@/state/panel-page-context-store";
+import {
+  DEFAULT_OUTPUT_TARGET,
+  outputTargetStorageKey,
+  readStoredOutputTarget,
+  resolveOutputTargetKeyChange,
+  writeStoredOutputTarget,
+  type OutputTarget,
+} from "@/lib/domain/ai/output-target";
+
+export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
 /**
  * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's output
@@ -409,23 +419,6 @@ export interface ActivePlaybook {
   phaseCount: number;
 }
 
-/**
- * Output-target selection (Chat Outputs & References plan, WS7) — where the
- * assistant files NEW content by default when the user doesn't say otherwise.
- * Relational to the content this chat is rooted in:
- *   - `chat`         → under this chat (referenced) — the default.
- *   - `underContent` → under the rooted content (a child of it, sibling of
- *                      the chat).
- *   - `besideContent`→ in the rooted content's folder (next to it), primary.
- *   - `folder`       → a chosen folder, as a plain (movable) node.
- * Rides per-turn in the send body; persisted client-side per conversation.
- */
-export type OutputTarget =
-  | { mode: "chat" }
-  | { mode: "underContent" }
-  | { mode: "besideContent" }
-  | { mode: "folder"; folderId: string; folderTitle: string };
-
 export function useConversationEngine({
   conversationKey,
   contentId,
@@ -650,28 +643,46 @@ export function useConversationEngine({
   // ── output target (WS7) ──
   // Where new content lands by default; persisted client-side per chat so the
   // choice sticks across reloads. Keyed by conversationId when bound, else
-  // contentId (transient). Hydrated once at mount (a transient→bound key
-  // change is rare and just resets to the default, which is fine).
-  const outputTargetKey = conversationId
-    ? `dg:output-target:conv:${conversationId}`
-    : contentId
-      ? `dg:output-target:content:${contentId}`
-      : null;
-  const [outputTarget, setOutputTargetState] = useState<OutputTarget>(() => {
-    if (typeof window === "undefined" || !outputTargetKey) return { mode: "chat" };
-    try {
-      const saved = window.localStorage.getItem(outputTargetKey);
-      return saved ? (JSON.parse(saved) as OutputTarget) : { mode: "chat" };
-    } catch {
-      return { mode: "chat" };
-    }
+  // contentId (transient). ChatPanel intentionally stays mounted while the
+  // active conversation changes, so the key-change effect below must hydrate
+  // each conversation instead of leaking the prior chat's selection.
+  const outputTargetKey = outputTargetStorageKey({
+    conversationId,
+    contentId,
   });
+  const [outputTarget, setOutputTargetState] = useState<OutputTarget>(() => {
+    if (typeof window === "undefined") return DEFAULT_OUTPUT_TARGET;
+    return (
+      readStoredOutputTarget(window.localStorage, outputTargetKey) ??
+      DEFAULT_OUTPUT_TARGET
+    );
+  });
+  const lastOutputTargetKeyRef = useRef<string | null>(outputTargetKey);
+
+  useEffect(() => {
+    const previousKey = lastOutputTargetKeyRef.current;
+    if (previousKey === outputTargetKey) return;
+
+    const storedTarget =
+      typeof window === "undefined"
+        ? null
+        : readStoredOutputTarget(window.localStorage, outputTargetKey);
+    const resolvedTarget = resolveOutputTargetKeyChange({
+      previousKey,
+      nextKey: outputTargetKey,
+      currentTarget: outputTarget,
+      storedTarget,
+    });
+    lastOutputTargetKeyRef.current = outputTargetKey;
+    setOutputTargetState(resolvedTarget);
+  }, [outputTargetKey, outputTarget]);
+
   const setOutputTarget = useCallback(
     (t: OutputTarget) => {
       setOutputTargetState(t);
       if (typeof window !== "undefined" && outputTargetKey) {
         try {
-          window.localStorage.setItem(outputTargetKey, JSON.stringify(t));
+          writeStoredOutputTarget(window.localStorage, outputTargetKey, t);
         } catch {
           /* non-blocking */
         }

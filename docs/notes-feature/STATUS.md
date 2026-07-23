@@ -53,6 +53,13 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: AI output-target persistence and routing hardened on PR #126
+
+- Root-caused a side-chat output that ignored its preset: `createNote` correctly omitted `parentId`, but the client had reverted to `{ mode: "chat" }` because the long-lived sidebar engine did not rehydrate output-target state when conversation keys changed.
+- Output targets now hydrate per conversation, migrate from transient content keys when a side chat is promoted, reset rather than leak across unrelated chats, and remain visibly labeled in the sidebar header.
+- The server validates and traces the target, tells the model the exact configured default, and preserves the contract that an explicitly named user destination overrides the preset.
+- Added `pnpm output-targets:check` to the build and Quality workflow.
+
 **July 23, 2026**: AI v3.2 T3 — explicit playbook recognition hardened on PR #126
 
 - Root-caused the owner smoke failure from the captured `chat_input` trace: the marked test notes stored pasted SKILL.md as ordinary TipTap paragraphs, so the structural parser reported `0 phases`; the chat route then silently omitted the attachment and told the model that “this playbook” meant the rooted note.

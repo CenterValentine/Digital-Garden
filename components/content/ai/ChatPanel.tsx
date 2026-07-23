@@ -33,6 +33,10 @@ import { MakeAndModelPicker } from "./MakeAndModelPicker";
 import { ChatContextPicker } from "./ChatContextPicker";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
+  outputTargetStorageKey,
+  writeStoredOutputTarget,
+} from "@/lib/domain/ai/output-target";
+import {
   useConversationBinding,
   type PersistFinishPayload,
 } from "@/lib/domain/ai/use-conversation-binding";
@@ -447,6 +451,21 @@ export function ChatPanel({
           const body = (await res.json()) as { data?: { id?: string } };
           const newId = body?.data?.id;
           if (!newId) throw new Error("Server didn't return a conversation id");
+          // Preserve a target picked while this was still a transient chat.
+          // ChatPanel intentionally rebinds without remounting; writing the
+          // conversation-scoped value before the id flips makes the key
+          // transition deterministic and avoids confusing a click on an
+          // unrelated existing chat with a promotion.
+          try {
+            writeStoredOutputTarget(
+              window.localStorage,
+              outputTargetStorageKey({ conversationId: newId }),
+              outputTarget,
+            );
+          } catch {
+            // The active in-memory selection still rides the first send; only
+            // persistence across a later reopen is lost.
+          }
           // The skip flag prevents the binding hook from fetching the
           // (empty) just-created conversation and wiping our in-flight
           // input. pendingTransientSendRef tells the resend useEffect
@@ -484,6 +503,7 @@ export function ChatPanel({
     handleSend,
     targetFolder,
     targetInherited,
+    outputTarget,
   ]);
 
   // Resend the queued transient first message once conversationId catches up.
@@ -746,7 +766,6 @@ export function ChatPanel({
             value={outputTarget}
             onChange={setOutputTarget}
             hasOrigin={Boolean(contentId)}
-            compact
           />
         </div>
         <div className="flex items-center gap-1">
