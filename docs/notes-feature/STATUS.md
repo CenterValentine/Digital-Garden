@@ -93,6 +93,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 - Promotion now snapshots the exact submitted text, seeds the new conversation's draft before rebinding, restores it if necessary, and only then sends through the bound conversation engine.
 - The sidebar activates the new conversation immediately; refreshing its tab metadata no longer gates delivery of the first turn.
 
+**July 23, 2026**: Assistant replies can be copied or sent to their configured output target on PR #126
+
+- Completed assistant replies now retain a visible action row with copy and “send to output target” controls instead of hiding all actions until hover.
+- Sending a reply creates a Markdown-backed note through the same validated chat/content/folder placement rules used by AI content tools.
+- The naming dialog prefills only when the reply contains an explicit Markdown or standalone-bold title; otherwise it requires the user to name the note.
+
 **July 23, 2026**: AI output-target persistence and routing hardened on PR #126
 
 - Root-caused a side-chat output that ignored its preset: `createNote` correctly omitted `parentId`, but the client had reverted to `{ mode: "chat" }` because the long-lived sidebar engine did not rehydrate output-target state when conversation keys changed.

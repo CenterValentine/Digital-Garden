@@ -9,6 +9,7 @@ import {
 } from "../lib/domain/ai/output-target";
 import { parseContentWriteReceipts } from "../lib/domain/ai/content-write-receipts";
 import { resolveToolOutputPlacement } from "../lib/domain/ai/tools/output-placement";
+import { inferReplyExportTitle } from "../lib/domain/ai/reply-export";
 
 const folderTarget: OutputTarget = {
   mode: "folder",
@@ -29,6 +30,31 @@ assert.deepEqual(
   }),
   { mode: "besideContent" },
   "switching conversations must hydrate the destination conversation",
+);
+
+assert.equal(
+  inferReplyExportTitle(
+    "That was the final phase. Here's the summary:\n\n## GitLab Company Research — Complete ✅\n\nFindings.",
+  ),
+  "GitLab Company Research — Complete ✅",
+  "an explicit reply heading should prefill the exported note name",
+);
+assert.equal(
+  inferReplyExportTitle("**Clipboard Health Research Summary**\n\nFindings."),
+  "Clipboard Health Research Summary",
+  "a standalone bold summary title should prefill the note name",
+);
+assert.equal(
+  inferReplyExportTitle(
+    "Here is the research you requested, with **important findings** inline.",
+  ),
+  "",
+  "ordinary reply prose must leave the note name blank",
+);
+assert.equal(
+  inferReplyExportTitle("Here is the result.\n\n**Artifacts produced:**\n\n- Note"),
+  "",
+  "a bold section label must not be mistaken for a summary title",
 );
 
 assert.deepEqual(

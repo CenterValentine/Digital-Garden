@@ -850,6 +850,9 @@ function ChatViewerInner({
                     }
                     actionsDisabled={isActive}
                     midRunPaneOpen={midRunPaneOpen}
+                    outputTarget={outputTarget}
+                    conversationId={conversationId}
+                    contentId={contentId}
                   />
                 </div>
               );

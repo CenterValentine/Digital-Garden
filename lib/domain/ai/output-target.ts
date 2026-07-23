@@ -11,6 +11,20 @@ export type OutputTarget =
 
 export const DEFAULT_OUTPUT_TARGET: OutputTarget = { mode: "chat" };
 
+/** User-facing destination copy shared by the chip and reply-export dialog. */
+export function getOutputTargetLabel(target: OutputTarget): string {
+  switch (target.mode) {
+    case "chat":
+      return "Under this chat";
+    case "underContent":
+      return "Under this content";
+    case "besideContent":
+      return "Beside this content";
+    case "folder":
+      return target.folderTitle || "Selected folder";
+  }
+}
+
 interface OutputTargetStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

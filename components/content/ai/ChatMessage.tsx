@@ -26,6 +26,7 @@ import {
   ExternalLink,
   File,
   FileCode2,
+  FileOutput,
   FileText,
   FolderOpen,
   FolderPlus,
@@ -69,6 +70,12 @@ import {
   parseContentWriteReceipts,
   type ContentWriteReceipt,
 } from "@/lib/domain/ai/content-write-receipts";
+import {
+  getOutputTargetLabel,
+  type OutputTarget,
+} from "@/lib/domain/ai/output-target";
+import { inferReplyExportTitle } from "@/lib/domain/ai/reply-export";
+import { toast } from "sonner";
 
 /**
  * Detect tool parts in AI SDK v6 UIMessage.
@@ -277,6 +284,12 @@ interface ChatMessageProps {
   onRevertEdit?: (toolCallId: string) => void;
   /** Set of tool call IDs for which a pre-edit snapshot is available (drives undo button visibility). */
   revertableToolIds?: ReadonlySet<string>;
+  /** Current chat destination used by the reply-to-note action. */
+  outputTarget?: OutputTarget;
+  /** Persistence context used to resolve the selected output target safely. */
+  conversationId?: string | null;
+  /** Rooted note/folder/chat for sidebar and full-page placement semantics. */
+  contentId?: string | null;
 }
 
 export const ChatMessage = memo(function ChatMessage({
@@ -293,6 +306,9 @@ export const ChatMessage = memo(function ChatMessage({
   onToolApprovalResponse,
   approvalActionable = true,
   midRunPaneOpen = false,
+  outputTarget,
+  conversationId,
+  contentId,
 }: ChatMessageProps) {
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
@@ -321,6 +337,10 @@ export const ChatMessage = memo(function ChatMessage({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
+  const [exportTitle, setExportTitle] = useState("");
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   /**
    * Snapshot of the message's `@[Title](id)` mentions captured at edit
    * start. On commit we walk this list and re-canonicalize each plain
@@ -356,6 +376,72 @@ export const ChatMessage = memo(function ChatMessage({
       /* clipboard may be blocked in iframe contexts — silent */
     }
   }, [messageText]);
+
+  const beginReplyExport = useCallback(() => {
+    setExportTitle(inferReplyExportTitle(messageText));
+    setExportError(null);
+    setExportOpen(true);
+  }, [messageText]);
+
+  const handleReplyExport = useCallback(async () => {
+    const title = exportTitle.trim();
+    if (!title || !outputTarget || exporting) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const response = await fetch("/api/ai/reply-to-note", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          markdown: messageText,
+          messageId: message.id,
+          conversationId,
+          contentId,
+          outputTarget,
+        }),
+      });
+      const body = (await response.json()) as {
+        success?: boolean;
+        error?: string;
+        data?: {
+          contentId?: string;
+          receipt?: ContentWriteReceipt | null;
+        };
+      };
+      if (!response.ok || !body.success || !body.data?.contentId) {
+        throw new Error(body.error || "Couldn't create the note.");
+      }
+
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      window.dispatchEvent(
+        new CustomEvent("dg:notes-refresh", {
+          detail: { contentId: body.data.contentId },
+        }),
+      );
+      setExportOpen(false);
+      toast.success(
+        body.data.receipt
+          ? `Created "${title}" in ${body.data.receipt.location.title}`
+          : `Created "${title}"`,
+      );
+    } catch (error) {
+      setExportError(
+        error instanceof Error ? error.message : "Couldn't create the note.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }, [
+    contentId,
+    conversationId,
+    exportTitle,
+    exporting,
+    message.id,
+    messageText,
+    outputTarget,
+  ]);
 
   const commitEdit = useCallback(() => {
     let next = draft.trim();
@@ -514,6 +600,7 @@ export const ChatMessage = memo(function ChatMessage({
   // which caused a refetch loop on page open. Do NOT move it back.
 
   return (
+    <>
     <div
       // Assistant turns get aria-live="polite" so screen-reader users
       // hear streaming progress without interrupting other speech.
@@ -904,7 +991,8 @@ export const ChatMessage = memo(function ChatMessage({
             // tab into invisible (opacity-0) buttons that they can't
             // see they've focused.
             className={cn(
-              "flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity text-gray-500",
+              "flex items-center gap-0.5 group-hover:opacity-100 focus-within:opacity-100 transition-opacity text-gray-500",
+              isAssistant ? "opacity-60" : "opacity-0",
               isUser ? "justify-end" : "justify-start",
             )}
           >
@@ -918,6 +1006,16 @@ export const ChatMessage = memo(function ChatMessage({
                 <Copy className="h-3.5 w-3.5" />
               )}
             </MessageActionButton>
+
+            {isAssistant && outputTarget && (
+              <MessageActionButton
+                onClick={beginReplyExport}
+                disabled={actionsDisabled}
+                label={`Send reply to output target: ${getOutputTargetLabel(outputTarget)}`}
+              >
+                <FileOutput className="h-3.5 w-3.5" />
+              </MessageActionButton>
+            )}
 
             {isUser && onEdit && (
               <MessageActionButton
@@ -961,8 +1059,134 @@ export const ChatMessage = memo(function ChatMessage({
         )}
       </div>
     </div>
+    {exportOpen &&
+      outputTarget &&
+      createPortal(
+        <ReplyExportDialog
+          title={exportTitle}
+          targetLabel={getOutputTargetLabel(outputTarget)}
+          busy={exporting}
+          error={exportError}
+          onTitleChange={setExportTitle}
+          onCancel={() => {
+            if (!exporting) setExportOpen(false);
+          }}
+          onSubmit={() => void handleReplyExport()}
+        />,
+        document.body,
+      )}
+    </>
   );
 });
+
+function ReplyExportDialog({
+  title,
+  targetLabel,
+  busy,
+  error,
+  onTitleChange,
+  onCancel,
+  onSubmit,
+}: {
+  title: string;
+  targetLabel: string;
+  busy: boolean;
+  error: string | null;
+  onTitleChange: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onCancel();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [busy, onCancel]);
+
+  return (
+    <div
+      className="fixed inset-0 z-[160] flex items-center justify-center bg-black/45 px-4 backdrop-blur-[2px]"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !busy) onCancel();
+      }}
+    >
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="reply-export-title"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit();
+        }}
+        className="w-full max-w-md rounded-xl border border-black/10 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-[#1b1b1d]"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2
+              id="reply-export-title"
+              className="text-sm font-semibold text-gray-900 dark:text-gray-100"
+            >
+              Send reply to output target
+            </h2>
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Destination: {targetLabel}.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            aria-label="Close"
+            className="rounded-md p-1 text-gray-500 hover:bg-black/5 hover:text-gray-800 disabled:opacity-40 dark:hover:bg-white/10 dark:hover:text-gray-200"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <label
+          htmlFor="reply-export-name"
+          className="mt-4 block text-xs font-medium text-gray-700 dark:text-gray-300"
+        >
+          Note name
+        </label>
+        <input
+          id="reply-export-name"
+          autoFocus
+          value={title}
+          maxLength={255}
+          onChange={(event) => onTitleChange(event.target.value)}
+          placeholder="Name this note"
+          disabled={busy}
+          className="mt-1.5 w-full rounded-lg border border-black/15 bg-black/[0.025] px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-blue-500/60 focus:ring-2 focus:ring-blue-500/20 disabled:opacity-60 dark:border-white/15 dark:bg-white/[0.04] dark:text-gray-100"
+        />
+        {error && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>
+        )}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={busy}
+            className="rounded-lg px-3 py-1.5 text-xs text-gray-600 hover:bg-black/5 disabled:opacity-40 dark:text-gray-300 dark:hover:bg-white/10"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={busy || !title.trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-500 disabled:cursor-default disabled:opacity-40"
+          >
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+            Create note
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 /**
  * Icon-only message action with an accessible tooltip. `label` drives

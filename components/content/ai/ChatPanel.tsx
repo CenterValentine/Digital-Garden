@@ -861,6 +861,9 @@ export function ChatPanel({
                   onRegenerate={(id) => void regenerateMessage(id)}
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
+                  outputTarget={outputTarget}
+                  conversationId={conversationId}
+                  contentId={contentId}
                   onRevertEdit={revertEdit}
                   onToolApprovalResponse={(opts) =>
                     void addToolApprovalResponse(opts)

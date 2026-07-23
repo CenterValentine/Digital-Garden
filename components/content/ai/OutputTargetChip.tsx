@@ -20,7 +20,10 @@ import { createPortal } from "react-dom";
 import { Crosshair, MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
-import type { OutputTarget } from "@/lib/domain/ai/output-target";
+import {
+  getOutputTargetLabel,
+  type OutputTarget,
+} from "@/lib/domain/ai/output-target";
 
 const MENU_WIDTH = 240;
 const MENU_MAX_HEIGHT = 360;
@@ -49,19 +52,6 @@ function flattenFolders(
     }
   }
   return out;
-}
-
-function labelFor(target: OutputTarget): string {
-  switch (target.mode) {
-    case "chat":
-      return "This chat";
-    case "underContent":
-      return "This content";
-    case "besideContent":
-      return "Content's folder";
-    case "folder":
-      return target.folderTitle || "Folder";
-  }
 }
 
 export function OutputTargetChip({
@@ -193,7 +183,9 @@ export function OutputTargetChip({
         )}
       >
         <Crosshair className="h-3 w-3 shrink-0" />
-        {!compact && <span className="truncate">{labelFor(value)}</span>}
+        {!compact && (
+          <span className="truncate">{getOutputTargetLabel(value)}</span>
+        )}
       </button>
 
       {open &&
