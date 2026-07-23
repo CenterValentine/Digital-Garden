@@ -16,9 +16,14 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Crosshair, MessageSquare, CornerDownRight, FolderOpen, Check } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import type { OutputTarget } from "@/lib/domain/ai/use-conversation-engine";
+
+const MENU_WIDTH = 240;
+const MENU_MAX_HEIGHT = 360;
 
 interface TreeNodeLite {
   id: string;
@@ -50,8 +55,10 @@ function labelFor(target: OutputTarget): string {
   switch (target.mode) {
     case "chat":
       return "This chat";
-    case "nextToChat":
-      return "Next to chat";
+    case "underContent":
+      return "This content";
+    case "besideContent":
+      return "Content's folder";
     case "folder":
       return target.folderTitle || "Folder";
   }
@@ -75,6 +82,37 @@ export function OutputTargetChip({
   const [folders, setFolders] = useState<FlatFolder[] | null>(null);
   const [filter, setFilter] = useState("");
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  // Menu is portaled to <body> (position: fixed) so the narrow chat panel's
+  // overflow-hidden can't clip it — the convention the other context menus
+  // use (calculateMenuPosition flips/shifts to keep it in the viewport).
+  const [menuPos, setMenuPos] = useState<{
+    x: number;
+    y: number;
+    maxHeight: number;
+  } | null>(null);
+
+  // Compute the portal position from the trigger rect at open time (an event
+  // handler, not an effect — the position is only needed when the menu opens).
+  const toggle = useCallback(() => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPos(
+        calculateMenuPosition({
+          triggerPosition: { x: rect.left, y: rect.bottom + 4 },
+          menuDimensions: { width: MENU_WIDTH, height: MENU_MAX_HEIGHT },
+          preferredPlacementX: "right",
+          preferredPlacementY: "bottom",
+        }),
+      );
+    }
+    setOpen(true);
+  }, [open]);
 
   useEffect(() => {
     if (!open || folders !== null) return;
@@ -106,9 +144,15 @@ export function OutputTargetChip({
   useEffect(() => {
     if (!open) return;
     const onDown = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        setOpen(false);
+      const t = e.target as Node;
+      // The menu is portaled outside rootRef, so check it too.
+      if (
+        rootRef.current?.contains(t) ||
+        menuRef.current?.contains(t)
+      ) {
+        return;
       }
+      setOpen(false);
     };
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
@@ -132,9 +176,10 @@ export function OutputTargetChip({
   return (
     <div ref={rootRef} className="relative min-w-0">
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={toggle}
         title="Where new content lands by default when you don't tell the assistant otherwise (it can always place things where you ask)"
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",
@@ -148,35 +193,58 @@ export function OutputTargetChip({
         {!compact && <span className="truncate">{labelFor(value)}</span>}
       </button>
 
-      {open && (
-        <div className="absolute bottom-full left-0 mb-1 z-50 w-56 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl overflow-hidden">
-          <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-black/5 dark:border-white/5">
-            Where new content goes
-          </div>
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              left: menuPos.x,
+              top: menuPos.y,
+              width: MENU_WIDTH,
+              maxHeight: menuPos.maxHeight,
+            }}
+            className="z-[130] flex flex-col rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-[#1a1a1a] shadow-xl overflow-hidden"
+          >
+            <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 font-medium border-b border-black/5 dark:border-white/5">
+              Where new content goes
+            </div>
           <Option
             active={value.mode === "chat"}
             icon={<MessageSquare className="h-3.5 w-3.5 text-indigo-400" />}
-            label="This chat"
-            hint="Nested under this chat"
+            label="Under this chat"
+            hint="Nested inside this chat"
             onClick={() => pick({ mode: "chat" })}
           />
           {hasOrigin && (
-            <Option
-              active={value.mode === "nextToChat"}
-              icon={<CornerDownRight className="h-3.5 w-3.5 text-indigo-400" />}
-              label="Next to this chat"
-              hint="Under the content this chat is on"
-              onClick={() => pick({ mode: "nextToChat" })}
-            />
+            <>
+              <Option
+                active={value.mode === "underContent"}
+                icon={
+                  <CornerDownRight className="h-3.5 w-3.5 text-indigo-400" />
+                }
+                label="Under this content"
+                hint="A child of what this chat is on (beside the chat)"
+                onClick={() => pick({ mode: "underContent" })}
+              />
+              <Option
+                active={value.mode === "besideContent"}
+                icon={<FolderOpen className="h-3.5 w-3.5 text-indigo-400" />}
+                label="Beside this content"
+                hint="In the content's own folder"
+                onClick={() => pick({ mode: "besideContent" })}
+              />
+            </>
           )}
-          <div className="border-t border-black/5 dark:border-white/5">
+          <div className="flex min-h-0 flex-1 flex-col border-t border-black/5 dark:border-white/5">
             <input
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
               placeholder="A folder…"
               className="w-full bg-transparent px-3 py-1.5 text-xs outline-none placeholder:text-gray-500"
             />
-            <div className="max-h-40 overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto">
               {folders === null ? (
                 <div className="px-3 py-2 text-[11px] text-gray-500">Loading…</div>
               ) : visibleFolders.length === 0 ? (
@@ -207,8 +275,9 @@ export function OutputTargetChip({
               )}
             </div>
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

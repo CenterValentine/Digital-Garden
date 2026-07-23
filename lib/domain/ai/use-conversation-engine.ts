@@ -412,14 +412,18 @@ export interface ActivePlaybook {
 /**
  * Output-target selection (Chat Outputs & References plan, WS7) — where the
  * assistant files NEW content by default when the user doesn't say otherwise.
- *   - `chat`       → nested under this chat (referenced) — the default.
- *   - `nextToChat` → under the origin content, a sibling of the chat.
- *   - `folder`     → a chosen folder, as a plain (movable) node.
+ * Relational to the content this chat is rooted in:
+ *   - `chat`         → under this chat (referenced) — the default.
+ *   - `underContent` → under the rooted content (a child of it, sibling of
+ *                      the chat).
+ *   - `besideContent`→ in the rooted content's folder (next to it), primary.
+ *   - `folder`       → a chosen folder, as a plain (movable) node.
  * Rides per-turn in the send body; persisted client-side per conversation.
  */
 export type OutputTarget =
   | { mode: "chat" }
-  | { mode: "nextToChat" }
+  | { mode: "underContent" }
+  | { mode: "besideContent" }
   | { mode: "folder"; folderId: string; folderTitle: string };
 
 export function useConversationEngine({

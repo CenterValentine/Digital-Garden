@@ -91,7 +91,11 @@ import {
   lookupTemplate,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
-import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
+import {
+  addAutoAssociation,
+  appendMessage,
+  ensureConversationContentNode,
+} from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
 import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
@@ -382,12 +386,20 @@ export async function POST(request: Request) {
       // run_workflow resolve to it when called with no arguments.
       let openWorkflowTitle: string | undefined;
       let openContentLocationId: string | undefined;
+      // The content this chat is rooted in (title + type), for the "you can
+      // see what I have open" context section — so the model resolves "this
+      // file / the current note / this playbook" to the chat's own subject
+      // without the user re-naming it.
+      let rootedContentTitle: string | undefined;
+      let rootedContentType: string | undefined;
       if (contentId) {
         const node = await prisma.contentNode.findFirst({
           where: { id: contentId, ownerId: session.user.id },
           select: { contentType: true, title: true, parentId: true },
         });
         isChatContent = node?.contentType === "chat";
+        rootedContentTitle = node?.title ?? undefined;
+        rootedContentType = node?.contentType ?? undefined;
         if (node?.contentType === "workflow") openWorkflowTitle = node.title;
         // Location inference fallback (v3 ship fix, 2026-07-18): "chats
         // serve their location" must hold for sidebar chats too — they
@@ -486,6 +498,35 @@ export async function POST(request: Request) {
       // transient chats have no chat node to infer from).
       if (!targetFolderId) targetFolderId = openContentLocationId;
 
+      // WS6 (robust materialization): a sidebar chat rooted in content must
+      // exist as a referenced ContentNode under that content — both so it
+      // appears nested in the tree and so its outputs can nest under it. The
+      // client's transient-promotion POST only covers freshly-created chats;
+      // doing it here too (idempotent — ensureConversationContentNode reuses
+      // an existing node) covers every path: reopened chats, chats created
+      // before WS6, the browser side panel, etc. Non-fatal.
+      if (
+        conversationIdForAssoc &&
+        !isChatContent &&
+        contentId &&
+        !archivedChatNodeId
+      ) {
+        try {
+          archivedChatNodeId = await ensureConversationContentNode(
+            session.user.id,
+            conversationIdForAssoc,
+            { ownerContentId: contentId },
+          );
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "chat:materialize_failed",
+            summary: "side-chat node materialization failed — continuing",
+            error,
+          });
+        }
+      }
+
       // Output ownership (Chat Outputs & References plan, WS3): the chat
       // that can own referenced output by default — a full-page chat is
       // itself; a sidebar chat is its (now eagerly materialized, WS6)
@@ -513,8 +554,14 @@ export async function POST(request: Request) {
         | undefined;
       if (outputTarget && typeof outputTarget === "object") {
         const mode = outputTarget.mode;
-        if (mode === "nextToChat") {
+        if (mode === "underContent") {
+          // Referenced under the rooted content (a child of it, sibling of
+          // the chat).
           outputOwnerId = originContentId ?? chatNodeId;
+        } else if (mode === "besideContent") {
+          // Primary in the rooted content's folder (next to it).
+          outputOwnerId = undefined;
+          outputParentOverride = openContentLocationId;
         } else if (mode === "folder") {
           outputOwnerId = undefined;
           outputParentOverride =
@@ -898,6 +945,23 @@ export async function POST(request: Request) {
         }
       }
 
+      // Rooted-content context: tell the model what this chat is ABOUT, so
+      // "this file / the current note / this playbook" resolves to the chat's
+      // own subject without the user re-naming it (the "can't you see what I
+      // have open?" gap). Skipped when the chat IS the content (full-page chat
+      // has its own section) or it's a workflow (workflow section covers it).
+      let rootedContentSection = "";
+      if (contentId && !isChatContent && !openWorkflowTitle && rootedContentTitle) {
+        const readable =
+          rootedContentType === "note" || rootedContentType === "folder";
+        rootedContentSection =
+          `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+          (readable
+            ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+            : "") +
+          " New content you create nests under this chat by default.";
+      }
+
       // Resolve the selected custom-instruction context, if any. Sent by
       // the composer's context picker. Ownership-gated; a missing/foreign/
       // deleted id degrades to the base system prompt (returns null).
@@ -1023,6 +1087,7 @@ export async function POST(request: Request) {
           mentionedContext,
           playbookContext,
           playbookAwareness,
+          rootedContentSection,
           hasAttachedPlaybook: playbookContext.length > 0,
           pageContextSection,
         }),

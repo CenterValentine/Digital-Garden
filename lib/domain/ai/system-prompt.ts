@@ -150,6 +150,12 @@ export interface SystemPromptContext {
    */
   playbookAwareness?: string;
   /**
+   * What this chat is rooted in (title + type), so the model resolves "this
+   * file / the current note / this playbook" to the chat's own subject
+   * without the user re-naming it. Empty for full-page chats / workflows.
+   */
+  rootedContentSection?: string;
+  /**
    * True when a playbook is attached AND its context was injected (AI v3.2
    * T3). Switches the checkpoint cadence: an attached playbook uses
    * progressive disclosure (only the current phase's detail is loaded), so
@@ -222,6 +228,9 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   );
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
+  // What this chat is rooted in — stated before the playbook awareness below
+  // so "run this playbook" / "this file" resolves to the chat's own subject.
+  if (ctx.rootedContentSection) sections.push(ctx.rootedContentSection);
   // Ambient-playbook awareness (Finding 2): a cheap hint, not the full
   // progressive-disclosure block — the model runs the anchored playbook only
   // when asked. Never present at the same time as playbookContext.
