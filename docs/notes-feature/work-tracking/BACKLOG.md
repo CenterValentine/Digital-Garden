@@ -63,6 +63,7 @@ P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection)
 - [ ] **"Unmark as Playbook"** — the context-menu action only marks; no UI path to clear `metadata.playbook` yet. Low priority (metadata edit via any generic note-metadata surface works today).
 - [ ] **Full authenticated browser smoke test** — automated verification was pure-logic + live-route-boot only (no auth fixture in this repo; documented gap — same one blocking 5 stubbed dark-mode e2e tests). Owner should manually verify: mark a note → `/playbook` attach → token meter shows only the active phase → checkpoint approval advances the phase → a `[[reference]]` gets traced via `read_note` → a sub-playbook reference is tagged in the manifest.
 - [ ] **[T4] Resource governance** (see `guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md` §4 state table) — enforced token/step budgets (decrement + stop), sub-agent isolation for sub-playbooks (isolate context, return conclusion + artifact pointer), per-run compaction, self-critique/no-progress loop guards, difficulty-based effort allocation. Each is its own subsystem; deliberately kept out of T3 to protect the gate.
+- [ ] **Phase checkpoint stuck "running…" after leaving and returning to a chat** (owner-reported 2026-07-23) — the approval card doesn't resolve/re-render correctly on a chat re-open while a `phase_checkpoint` was mid-flight. Not yet root-caused; explicitly backlogged by the owner over a credit-budget concern, not fixed in this pass.
 
 ---
 
