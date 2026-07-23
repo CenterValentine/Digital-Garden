@@ -271,7 +271,12 @@ export function ChatInput({
         commandItems.filter(
           (c) =>
             c.label.toLowerCase().includes(q) ||
-            c.description?.toLowerCase().includes(q),
+            c.description?.toLowerCase().includes(q) ||
+            // Playbooks are labeled by their own title, but the user was told
+            // the command is "/playbook" — so make every playbook item match
+            // the keyword "playbook" (covers /p, /play, /playbook). `"playbook"
+            // .includes("")` is true, so a bare "/" still lists them too.
+            (c.contentType === "playbook" && "playbook".includes(q)),
         ),
       );
     }
