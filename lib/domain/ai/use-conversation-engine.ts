@@ -363,6 +363,14 @@ export interface UseConversationEngineResult {
   providerId: string;
   modelId: string;
   handleModelChange: ReturnType<typeof useModelSelection>["handleChange"];
+  /**
+   * Whether the user's model pick is pinned for this conversation (AI 3.4).
+   * Pinned ⇒ the pick wins over playbook phase directives. Set implicitly by
+   * `handleModelChange`; cleared by `unpinModel`.
+   */
+  modelPinned: boolean;
+  /** Release the model pin so playbook phase directives can route again. */
+  unpinModel: () => void;
 
   // ── suggestions ──
   mentionResults: SuggestionItem[];
@@ -608,6 +616,69 @@ export function useConversationEngine({
 
   const { providerId, modelId, handleChange: handleModelChange } =
     useModelSelection();
+
+  // ── model pin (AI 3.4) ──
+  // A pinned pick is the TOP rung of the server's routing ladder — it wins
+  // over any playbook phase directive. `modelPinned` is what lets the server
+  // tell a deliberate user choice apart from the provider/model the engine
+  // echoes in every baseline body. Persisted per-conversation (mirrors the
+  // output-target persistence) so the choice survives reload; released by the
+  // picker's unpin control so a playbook can take the wheel again.
+  const modelPinKey = conversationId
+    ? `dg:model-pinned:conv:${conversationId}`
+    : contentId
+      ? `dg:model-pinned:content:${contentId}`
+      : null;
+  const [modelPinned, setModelPinnedState] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !modelPinKey) return false;
+    try {
+      return window.localStorage.getItem(modelPinKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const lastModelPinKeyRef = useRef<string | null>(modelPinKey);
+  useEffect(() => {
+    // ChatPanel stays mounted across conversation switches — rehydrate the
+    // pin for the new key instead of leaking the previous chat's pin.
+    if (lastModelPinKeyRef.current === modelPinKey) return;
+    lastModelPinKeyRef.current = modelPinKey;
+    if (typeof window === "undefined" || !modelPinKey) {
+      setModelPinnedState(false);
+      return;
+    }
+    try {
+      setModelPinnedState(window.localStorage.getItem(modelPinKey) === "1");
+    } catch {
+      setModelPinnedState(false);
+    }
+  }, [modelPinKey]);
+  const persistModelPin = useCallback(
+    (pinned: boolean) => {
+      setModelPinnedState(pinned);
+      if (typeof window === "undefined" || !modelPinKey) return;
+      try {
+        if (pinned) window.localStorage.setItem(modelPinKey, "1");
+        else window.localStorage.removeItem(modelPinKey);
+      } catch {
+        /* non-blocking — pin stays in memory until next key change */
+      }
+    },
+    [modelPinKey],
+  );
+  // The picker calls this — a user model change is an explicit pick, so it
+  // pins. Internal re-seeds use the raw `handleModelChange` and never pin.
+  const handleModelChangePinned = useCallback(
+    (...args: Parameters<typeof handleModelChange>) => {
+      handleModelChange(...args);
+      persistModelPin(true);
+    },
+    [handleModelChange, persistModelPin],
+  );
+  const unpinModel = useCallback(
+    () => persistModelPin(false),
+    [persistModelPin],
+  );
 
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
@@ -1035,6 +1106,9 @@ export function useConversationEngine({
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
+      // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
+      // and playbook phase directives are ignored for this conversation.
+      modelPinned,
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1050,6 +1124,7 @@ export function useConversationEngine({
     activePlaybookId,
     resolvedPhaseIndex,
     outputTarget,
+    modelPinned,
   ]);
 
   // ── resumable streams (AI 3.3) ──
@@ -1591,7 +1666,11 @@ export function useConversationEngine({
     regenerateMessage,
     providerId,
     modelId,
-    handleModelChange,
+    // Expose the PINNING wrapper as handleModelChange so a user pick from the
+    // picker records the pin; internal re-seeds keep using the raw handler.
+    handleModelChange: handleModelChangePinned,
+    modelPinned,
+    unpinModel,
     mentionResults,
     handleMentionSearch,
     commandItems,

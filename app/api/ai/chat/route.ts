@@ -144,6 +144,14 @@ import {
   getPhaseModelDirective,
   type PhaseModelResolution,
 } from "@/lib/domain/ai/playbooks/model-directives";
+import {
+  resolvePlaybookModelRoute,
+  describeUnresolvedDirective,
+} from "@/lib/domain/ai/model-route-resolver";
+import type {
+  ModelRouteSource,
+  ResolvedModelRoute,
+} from "@/lib/domain/ai/model-directive";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import {
@@ -345,10 +353,6 @@ export async function POST(request: Request) {
           });
         }
       }
-      void phaseModelResolution;
-      void routingPlaybookTitle;
-      void routingActivePhaseIndex;
-
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
         body.providerId ?? aiSettings.providerId ?? "anthropic";
@@ -391,7 +395,44 @@ export async function POST(request: Request) {
       let resolveSource: "explicit" | "preset-match" | "feature-route" | "legacy" =
         "legacy";
 
-      if (explicitConnectionId) {
+      // The user's full Connection list — shared by playbook routing (S2b),
+      // preset-match, and namespaced-model-match below, so we only fetch once.
+      const userConns: ConnectionView[] = await listConnections(session.user.id);
+
+      // ── Playbook model-routing ladder (AI 3.4, S2b) ──────────────────────
+      // Precedence: a PINNED user pick wins (rung 1 — the explicit path
+      // below); otherwise the active phase's model directive selects the
+      // model HERE, ahead of the provider/model the engine echoes in every
+      // baseline body. `modelPinned` is what distinguishes a real user choice
+      // from that carried default. A directive that can't resolve emits a
+      // visible fall-through notice and drops to the normal ladder — never a
+      // silent vendor swap (owner: "prevention is king").
+      const modelPinned = body.modelPinned === true;
+      let modelRouteSource: ModelRouteSource = "default";
+      let playbookRouteApplied = false;
+      const modelRouteNotices: string[] = [];
+      if (!modelPinned && phaseModelResolution) {
+        const applied = await resolvePlaybookModelRoute(
+          session.user.id,
+          phaseModelResolution.directive,
+          userConns,
+        );
+        if (applied) {
+          activeConnection = applied.connection;
+          activeModelId = applied.modelId;
+          resolveSource = "feature-route";
+          modelRouteSource = phaseModelResolution.source;
+          playbookRouteApplied = true;
+        } else {
+          modelRouteNotices.push(
+            describeUnresolvedDirective(phaseModelResolution.directive),
+          );
+        }
+      }
+
+      // Rung 1: a pinned/explicit connection pick. Skipped when a playbook
+      // directive already resolved (not pinned) so the phase model wins.
+      if (!playbookRouteApplied && explicitConnectionId) {
         try {
           activeConnection = await getConnectionWithKey(
             session.user.id,
@@ -402,10 +443,6 @@ export async function POST(request: Request) {
           if (!(e instanceof ConnectionNotFoundError)) throw e;
         }
       }
-
-      // The user's full Connection list — shared by preset-match AND
-      // namespaced-model-match below, so we only fetch once.
-      const userConns: ConnectionView[] = await listConnections(session.user.id);
 
       if (!activeConnection) {
         // Transition shim: pick the first user connection whose presetId
@@ -499,6 +536,29 @@ export async function POST(request: Request) {
           resolveSource = "feature-route";
         }
       }
+
+      // Finalize the route source for the inline switch line (AI 3.4). A
+      // playbook directive already set it; otherwise a pinned pick reads as
+      // "by you", everything else is the conversation's default (no divider).
+      if (!playbookRouteApplied) {
+        modelRouteSource = modelPinned ? "user" : "default";
+      }
+
+      // The durable turn route (prevention layer 1): one resolution, stamped
+      // so approval continuations + reloads replay THIS model instead of
+      // re-resolving. Emitted to the client via messageMetadata below.
+      const resolvedModelRoute: ResolvedModelRoute = {
+        providerId,
+        modelId: activeModelId,
+        connectionId: activeConnection?.id,
+        source: modelRouteSource,
+        ...(playbookRouteApplied && routingPlaybookTitle
+          ? {
+              playbookTitle: routingPlaybookTitle,
+              phaseIndex: routingActivePhaseIndex,
+            }
+          : {}),
+      };
 
       // BYOK now flows exclusively through Connections (each carries its
       // own encrypted key). Request-body `apiKey` remains supported for
@@ -1693,8 +1753,21 @@ export async function POST(request: Request) {
           }
         },
         messageMetadata: ({ part }) => {
+          // The turn's resolved model route (AI 3.4) — attached at `start`
+          // so the client can render the inline switch line before the first
+          // token, and REPEATED on `finish` so it survives to persistence
+          // regardless of how the SDK merges start/finish metadata. Any
+          // fall-through notices ride alongside.
+          const routeMeta = {
+            modelRoute: resolvedModelRoute,
+            ...(modelRouteNotices.length > 0 ? { modelRouteNotices } : {}),
+          };
+          if (part.type === "start") {
+            return routeMeta;
+          }
           if (part.type === "finish") {
             return {
+              ...routeMeta,
               usage: {
                 inputTokens: part.totalUsage?.inputTokens,
                 outputTokens: part.totalUsage?.outputTokens,
