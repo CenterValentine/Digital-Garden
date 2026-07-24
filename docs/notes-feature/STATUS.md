@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Playbook outputs support per-artifact location overrides on PR #126
+
+- Root-caused the Test 14 smoke failure from its `chat_input` trace: the playbook explicitly routed one note under the chat, but `createNote` could only override the preset with a folder UUID, so the model had no way to express a referenced-under-chat destination.
+- Note and Word-document tools now accept ownership-safe symbolic destinations (`under_chat`, `under_content`, `beside_content`) for one artifact; omitted placement still uses the selected output preference and specifically resolved folders still use `parentId`.
+- `output-targets:check` now verifies overrides in both directions plus sibling placement, preserving the rule that a run-wide preference yields to an explicit per-artifact instruction without affecting other outputs.
+
 **July 23, 2026**: AI output routing and receipt icons unified on PR #126
 
 - Cached web pages, generated image/audio files, workflows, folders, and Run Ledgers now use the same output-placement resolver as notes and Word documents.

@@ -135,8 +135,9 @@ assert.equal(
 
 const instruction = renderOutputTargetInstruction(folderTarget);
 assert.match(instruction, /AI Playbook Tests/);
-assert.match(instruction, /omit parentId/);
-assert.match(instruction, /explicitly names a different destination/);
+assert.match(instruction, /outputLocation/);
+assert.match(instruction, /parentId only/);
+assert.match(instruction, /active playbook explicitly gives one artifact/);
 
 assert.deepEqual(
   resolveToolOutputPlacement({
@@ -170,6 +171,60 @@ assert.deepEqual(
   ),
   { parentId: "user-named-folder" },
   "a destination explicitly named by the user must override the preset",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement(
+    {
+      targetFolderId: "research-folder",
+      outputOwnerId: "rooted-content",
+      outputParentOverride: undefined,
+      outputChatOwnerId: "chat-node",
+      outputContentOwnerId: "rooted-content",
+      outputContentParentId: "research-folder",
+    },
+    undefined,
+    "under_chat",
+  ),
+  {
+    parentId: "research-folder",
+    role: "referenced",
+    ownedByNoteId: "chat-node",
+  },
+  "a per-artifact under-chat instruction must override an under-content preset",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement(
+    {
+      targetFolderId: "research-folder",
+      outputOwnerId: "chat-node",
+      outputChatOwnerId: "chat-node",
+      outputContentOwnerId: "rooted-content",
+      outputContentParentId: "research-folder",
+    },
+    undefined,
+    "under_content",
+  ),
+  {
+    parentId: "research-folder",
+    role: "referenced",
+    ownedByNoteId: "rooted-content",
+  },
+  "a per-artifact under-content instruction must override an under-chat preset",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement(
+    {
+      targetFolderId: "research-folder",
+      outputOwnerId: "rooted-content",
+      outputChatOwnerId: "chat-node",
+      outputContentOwnerId: "rooted-content",
+      outputContentParentId: "research-folder",
+    },
+    undefined,
+    "beside_content",
+  ),
+  { parentId: "research-folder" },
+  "a per-artifact beside-content instruction must create a primary sibling",
 );
 
 const writeReceipt = {

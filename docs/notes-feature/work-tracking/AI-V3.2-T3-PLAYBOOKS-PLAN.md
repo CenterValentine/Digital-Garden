@@ -220,3 +220,29 @@ context, return conclusion + artifact pointer — the biggest lever for long run
 per-run compaction, self-critique / no-progress loop guards, difficulty-based
 effort allocation. Each is a subsystem; keeping them out of T3 protects the gate.
 Tracked in the state table (§4 of the reference).
+
+## 7. Owner-smoke fix — per-artifact output override was inexpressible (2026-07-23)
+
+**Observed:** Test 14 selected `underContent` as the run-wide output preference,
+then instructed Phase B to place only `"Between the Lines - …"` under the chat.
+The note still landed under the rooted content with every other artifact.
+
+**Root cause:** the prompt promised that an explicit destination overrides the
+preset, but the write-tool schema only exposed `parentId`. That field accepts a
+folder UUID; `"under the chat"` is a referenced-content ownership relationship,
+not a folder. The model therefore called `createNote` with no placement field,
+and the runtime correctly—but undesirably—applied the run-wide preset. The
+contract described a capability the tool could not express.
+
+**Correction:** note and Word-document writes now accept a symbolic,
+per-artifact `outputLocation` (`under_chat`, `under_content`, or
+`beside_content`). The server resolves those aliases from ownership-validated
+chat/rooted-content IDs; the model never handles internal IDs. Omitting both
+`outputLocation` and `parentId` still applies the selected preference, while a
+resolved folder UUID remains the mechanism for a specifically named folder.
+
+**Regression guard:** `output-targets:check` covers symbolic overrides in both
+directions (under-content preset → one under-chat artifact, and under-chat
+preset → one under-content artifact), plus beside-content placement and prompt
+wording. This is the durable rule: **preferences govern omitted placement;
+explicit per-artifact instructions govern only that artifact.**

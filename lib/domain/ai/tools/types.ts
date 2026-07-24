@@ -56,6 +56,15 @@ export interface ToolExecuteContext {
    */
   outputOwnerId?: string;
   /**
+   * Stable symbolic destinations available to an individual tool call.
+   * These are distinct from outputOwnerId, which is only the turn's preset.
+   * A playbook can therefore route one artifact under the chat/content while
+   * leaving every other artifact on the preset.
+   */
+  outputChatOwnerId?: string;
+  outputContentOwnerId?: string;
+  outputContentParentId?: string | null;
+  /**
    * Output-target chip "folder" mode (WS7): when the user chose a specific
    * folder for outputs, this is that folder id. Output tools file new content
    * there as a PLAIN primary node (not a referenced child) — the same as if

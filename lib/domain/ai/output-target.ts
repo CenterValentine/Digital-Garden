@@ -184,8 +184,8 @@ export function renderOutputTargetInstruction(target: OutputTarget): string {
 
   return (
     `Configured output target: new notes and documents default to ${destination}. ` +
-    "This preset is enforced by the tool runtime when parentId is omitted. " +
-    "If the user explicitly names a different destination in their message, resolve it and pass parentId so their instruction overrides the preset. " +
-    "Otherwise omit parentId — do not substitute the active file's parent, the operating-context folder, or another inferred location."
+    "This preset is enforced by the tool runtime when the write tool's parentId and outputLocation are both omitted. " +
+    "If the user or active playbook explicitly gives one artifact a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`) for that artifact so it overrides the preset. " +
+    "Use parentId only for a specifically resolved folder UUID. Otherwise omit both placement fields — do not substitute the active file's parent, the operating-context folder, or another inferred location."
   );
 }

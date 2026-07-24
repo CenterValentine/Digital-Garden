@@ -611,6 +611,15 @@ export async function POST(request: Request) {
         chatContentId: isChatContent ? contentId : undefined,
         outputOwnerId,
         outputParentOverride,
+        // Per-artifact symbolic overrides. The preset above still governs
+        // omitted placement, while tools can safely honor instructions such
+        // as "put this specific document under the chat" without asking the
+        // model to invent or discover internal ContentNode UUIDs.
+        outputChatOwnerId: chatNodeId,
+        outputContentOwnerId: originContentId,
+        outputContentParentId: originContentId
+          ? openContentLocationId ?? null
+          : undefined,
         attachedMedia,
       };
       const allTools = {

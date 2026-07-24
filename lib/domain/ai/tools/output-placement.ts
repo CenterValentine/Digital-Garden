@@ -1,9 +1,15 @@
 import type { ToolExecuteContext } from "./types";
 
+export type ToolOutputLocation =
+  | "under_chat"
+  | "under_content"
+  | "beside_content";
+
 export interface ToolOutputPlacement {
   parentId: string | null;
   role?: "referenced";
   ownedByNoteId?: string;
+  error?: string;
 }
 
 /**
@@ -16,12 +22,51 @@ export interface ToolOutputPlacement {
 export function resolveToolOutputPlacement(
   ctx: Pick<
     ToolExecuteContext,
-    "targetFolderId" | "outputOwnerId" | "outputParentOverride"
+    | "targetFolderId"
+    | "outputOwnerId"
+    | "outputParentOverride"
+    | "outputChatOwnerId"
+    | "outputContentOwnerId"
+    | "outputContentParentId"
   >,
   explicitParentId?: string | null,
+  explicitLocation?: ToolOutputLocation,
 ): ToolOutputPlacement {
   if (explicitParentId) {
     return { parentId: explicitParentId };
+  }
+  if (explicitLocation === "under_chat") {
+    return ctx.outputChatOwnerId
+      ? {
+          parentId: ctx.targetFolderId ?? null,
+          role: "referenced",
+          ownedByNoteId: ctx.outputChatOwnerId,
+        }
+      : {
+          parentId: null,
+          error:
+            "This conversation has no materialized chat node, so an under-chat destination is unavailable.",
+        };
+  }
+  if (
+    explicitLocation === "under_content" ||
+    explicitLocation === "beside_content"
+  ) {
+    if (!ctx.outputContentOwnerId) {
+      return {
+        parentId: null,
+        error:
+          "This conversation is not rooted in content, so that content-relative destination is unavailable.",
+      };
+    }
+    if (explicitLocation === "beside_content") {
+      return { parentId: ctx.outputContentParentId ?? null };
+    }
+    return {
+      parentId: ctx.outputContentParentId ?? null,
+      role: "referenced",
+      ownedByNoteId: ctx.outputContentOwnerId,
+    };
   }
   if (ctx.outputParentOverride) {
     return { parentId: ctx.outputParentOverride };

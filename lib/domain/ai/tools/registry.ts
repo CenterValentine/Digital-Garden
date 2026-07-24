@@ -48,7 +48,10 @@ import {
   RATE_LIMITS,
 } from "@/lib/infrastructure/rate-limiting";
 import type { ToolExecuteContext } from "./types";
-import { resolveToolOutputPlacement } from "./output-placement";
+import {
+  resolveToolOutputPlacement,
+  type ToolOutputLocation,
+} from "./output-placement";
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -364,7 +367,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       description:
         "Create a Word (.docx) document from markdown content and file it in the user's garden. " +
         "Use when the user asks for a Word/docx deliverable (e.g. a resume). Headings, lists, bold/italic and links from the markdown are preserved. Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: pass parentId ONLY when the user names a specific folder (e.g. a folder id from create_folder) — that is the only thing that counts as an explicit destination. Omit it otherwise: the tool runtime applies the configured output-target preset (which defaults to referenced content under this chat). You may always place content wherever the user actually asks; the preset only applies when they don't say.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS document a different relative destination, pass outputLocation (`under_chat`, `under_content`, or `beside_content`). Pass parentId only for a specifically resolved folder UUID. A per-document instruction always overrides the preset.",
       inputSchema: z.object({
         title: z.string().min(1).max(200).describe("Document title (also the file name)"),
         markdown: z
@@ -377,14 +380,21 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Destination folder id. Pass ONLY when the user explicitly names a folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
+        outputLocation: z
+          .enum(["under_chat", "under_content", "beside_content"])
+          .optional()
+          .describe(
+            "Per-document relative destination. Pass when the user or active playbook explicitly routes this document differently from the configured preset; otherwise omit.",
+          ),
       }),
-      execute: async ({ title, markdown, parentId }) => {
-        // Explicit destination (WS3): parentId means the user named a folder;
-        // the output-target chip's "folder" mode (WS7, ctx.outputParentOverride)
-        // is likewise an explicit folder → both file a PLAIN primary node and
-        // skip the referenced-owner default.
-        const explicitDestination = Boolean(parentId || ctx.outputParentOverride);
-        const destination = parentId ?? ctx.outputParentOverride ?? ctx.targetFolderId;
+      execute: async ({ title, markdown, parentId, outputLocation }) => {
+        const placement = resolveToolOutputPlacement(
+          ctx,
+          parentId,
+          outputLocation as ToolOutputLocation | undefined,
+        );
+        if (placement.error) return placement.error;
+        const destination = placement.parentId;
         if (!destination) {
           return "No destination folder: this chat has no target folder set. Ask the user to pick a target (the folder chip in the header) or to name a folder, then use create_folder.";
         }
@@ -405,10 +415,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             title,
             markdown,
             parentFolderId: destination,
-            // Output ownership (WS3): same default-under-the-chat rule as
-            // createNote — see its comment for the full rationale.
-            ...(!explicitDestination && ctx.outputOwnerId
-              ? { role: "referenced" as const, ownedByNoteId: ctx.outputOwnerId }
+            ...(placement.ownedByNoteId
+              ? {
+                  role: "referenced" as const,
+                  ownedByNoteId: placement.ownedByNoteId,
+                }
               : {}),
           });
           if (ctx.conversationId) {
@@ -583,7 +594,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: pass `parentId` ONLY when the user names a specific folder — that is the only thing that counts as an explicit destination. Omit it otherwise: the tool runtime applies the configured output-target preset (which defaults to referenced content under this chat). You may always place content wherever the user actually asks; the preset only applies when they don't say.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset.",
       inputSchema: z.object({
         title: z
           .string()
@@ -610,18 +621,25 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Optional UUID of a folder to create the note in. Pass ONLY when the user explicitly names that folder; otherwise omit it so the configured output-target preset is enforced.",
           ),
+        outputLocation: z
+          .enum(["under_chat", "under_content", "beside_content"])
+          .optional()
+          .describe(
+            "Per-note relative destination. Pass when the user or active playbook explicitly routes this note differently from the configured preset; otherwise omit.",
+          ),
       }),
-      execute: async ({ title, abstract, content = "", parentId }) => {
+      execute: async ({
+        title,
+        abstract,
+        content = "",
+        parentId,
+        outputLocation,
+      }) => {
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
         //   2. Chat's own parent folder (when in a chat context)
         //   3. null (vault root)
-        let resolvedParentId: string | null = null;
-        // Explicit destination (Chat Outputs & References plan, WS3): the
-        // model only passes parentId when the user named a specific folder
-        // (see the tool description) — true here means the user asked for
-        // a location, so the output-ownership default below does NOT apply.
-        let explicitDestination = false;
+        let explicitParentId: string | null = null;
         if (parentId) {
           const candidate = await prisma.contentNode.findFirst({
             where: {
@@ -633,34 +651,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             select: { id: true },
           });
           if (candidate) {
-            resolvedParentId = candidate.id;
-            explicitDestination = true;
+            explicitParentId = candidate.id;
           }
         }
-        // Output-target chip "folder" mode (WS7): the user chose a folder for
-        // outputs → file there as a PLAIN primary node (explicitDestination
-        // suppresses the referenced-owner default), same as naming a folder.
-        if (!resolvedParentId && ctx.outputParentOverride) {
-          const folder = await prisma.contentNode.findFirst({
-            where: {
-              id: ctx.outputParentOverride,
-              ownerId: ctx.userId,
-              deletedAt: null,
-              contentType: "folder",
-            },
-            select: { id: true },
-          });
-          if (folder) {
-            resolvedParentId = folder.id;
-            explicitDestination = true;
-          }
-        }
-        // Conversation target folder (S4b): chats serve their location —
-        // the target (explicit or location-inferred) outranks the raw
-        // chat-parent fallback below.
-        if (!resolvedParentId && ctx.targetFolderId) {
-          resolvedParentId = ctx.targetFolderId;
-        }
+        const placement = resolveToolOutputPlacement(
+          ctx,
+          explicitParentId,
+          outputLocation as ToolOutputLocation | undefined,
+        );
+        if (placement.error) return placement.error;
+        let resolvedParentId = placement.parentId;
         if (!resolvedParentId && ctx.chatContentId) {
           const chatNode = await prisma.contentNode.findFirst({
             where: { id: ctx.chatContentId, ownerId: ctx.userId },
@@ -689,8 +689,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // destination always wins; this is a fallback default only, and the
         // bot can always place content elsewhere when the user says so.
         const ownedOutput =
-          !explicitDestination && ctx.outputOwnerId
-            ? { role: "referenced" as const, ownedByNoteId: ctx.outputOwnerId }
+          placement.ownedByNoteId
+            ? {
+                role: "referenced" as const,
+                ownedByNoteId: placement.ownedByNoteId,
+              }
             : {};
 
         const node = await prisma.contentNode.create({
