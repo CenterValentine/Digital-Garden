@@ -83,6 +83,28 @@ directives behaves byte-for-byte as today.
 
 ---
 
+## 2b. ⚠ Verify against installed reality before wiring (the 3.3 discipline)
+
+The 3.3 build's biggest win was checking every ⚠ against the installed code
+before writing any — one check overturned the handoff's suggested API
+(`resume: true` → idle-guarded `resumeStream()`). Same drill here:
+
+- ⚠ `messageMetadata` on the `start` part: the route's existing callback
+  (route ~1519) pattern-matches `part.type === "finish"`; `type: "start"`
+  chunks exist in the installed `ai` types. Confirm the callback actually
+  fires for `start` parts in `ai@6.x` before relying on it; if it doesn't,
+  fall back to a `data-model-route` part written into the stream via
+  `originalMessages`/start-of-stream data instead.
+- ⚠ The hoist dependency contract (§4e) — re-derive the exact variable set
+  the moved block reads at build time; the route WILL have drifted.
+- ⚠ `parsePlaybook` client-safety: it imports only `type JSONContent` today —
+  confirm no server-only import crept in before using it in the pre-flight.
+- ⚠ Role capability inference: `effectiveCapabilities` does NOT infer
+  `reasoning` from ids today (§8 note) — decide add-inference vs demote-to-
+  preferred and pin it in `model-routing:check`.
+
+---
+
 ## 3. What exists TODAY (grounded — read before designing)
 
 ### 3a. Feature routing — already a full router; reuse, don't rebuild
@@ -260,6 +282,17 @@ In `app/api/ai/chat/route.ts`:
    (~264–467). The injection/render half stays where it is; only
    parse/phase-select moves. Keep the parsed result in one variable consumed
    by both halves (parse once, not twice).
+   **Dependency contract for the moved block** (verify at build, §2b): it may
+   consume only `session.user.id`, `body.playbookId`, `contentId`, and
+   `messages` (the rooted-execution cue regex reads the latest user message).
+   It must NOT reference `conversationIdForAssoc`, `targetFolderId`, or
+   anything computed in the conversation-binding section (~558+) — if it
+   seems to need one of those, the hoist is being cut at the wrong seam.
+   Reference-context resolution, checkpoint-gate config, and prompt
+   injection all stay at their current downstream sites.
+   **Do the hoist as its own behavior-identical commit (S2a)**: no ladder, no
+   new logic — gate it on build green (incl. `prompt-cache:check`) plus a
+   manual chat smoke showing identical behavior, THEN add the ladder (S2b).
 2. **Add the ladder** ahead of today's `resolveSource` steps, new source value
    `"playbook-phase"` / `"playbook"`:
    - `body.modelPinned === true` (new flag, §4f) → today's explicit path
@@ -273,9 +306,16 @@ In `app/api/ai/chat/route.ts`:
    - else standing-rules directive (same resolution).
    - else today's ladder verbatim (explicit → preset-match → namespaced →
      feature-route → legacy).
-3. **Wrap the phase-routed call in `executeWithFallback` semantics** for the
-   resolved chain — with the streaming caveat: hop ONLY on pre-first-token
-   errors; once tokens flow the turn is committed to its model.
+3. **V1: the resolved chain informs RESOLUTION ORDER only — no runtime hop.**
+   The turn commits to the chain's top candidate; a mid-stream provider
+   failure keeps today's behavior (error banner → regenerate, which
+   re-resolves and naturally tries again). Do NOT wire `executeWithFallback`
+   around `streamText` in v1 — adapting the non-streaming fallback wrapper to
+   a streaming call (hop only pre-first-token, never after tokens flow) is
+   the single trickiest integration in this feature and is deliberately
+   deferred to a followup once telemetry shows it's worth it. This also
+   matches "prevention is king": a visible failed turn beats an invisible
+   vendor hop.
 4. Temperature/reasoning constraints re-apply per resolved model
    (`resolveModelTemperature`, reasoning `providerOptions`) — they key off
    modelId and already run post-resolution; verify order after the hoist.
@@ -288,12 +328,21 @@ Today the route treats `body.providerId` presence as "explicit" (the 422
 guard keys off it), but the engine sends provider/model in EVERY baseline
 body — it cannot distinguish "user chose this" from "engine carried the
 default." Add `modelPinned: boolean` to the baseline body
-(`chatBodyResolvers`, engine ~994–1013): set true when `handleModelChange`
-fires from an actual user pick for this conversation (the per-conversation
-model memory already tracks this distinction — reuse its signal), false for
-carried defaults. `modelPinned` also rides the `data-model-route` part so
-continuations replay it. **This flag is the precedence ladder's top rung —
-get it right first, everything else keys off it.**
+(`chatBodyResolvers`, engine ~994–1013).
+
+**Concrete spec — mirror the output-target persistence machinery verbatim**
+(engine ~707–745, the template is in scope a few lines above where the pin
+lives): a per-conversation localStorage key via a `modelPinStorageKey({
+conversationId, contentId })` twin of `outputTargetStorageKey`, hydrated on
+key change exactly like the output-target key-change effect (ChatPanel stays
+mounted across conversation switches — same leak hazard, same fix). The pin
+sets to `true` inside `handleModelChange` (engine ~800–824, the only
+user-pick entry point) and clears on… nothing automatic in v1 — an explicit
+"unpin" affordance in the picker (small "following playbook" / "pinned"
+state) is the release valve. `modelPinned` rides the baseline body AND the
+`data-model-route` part so continuations replay it. **This flag is the
+precedence ladder's top rung — build and gate it first (S2b), everything
+else keys off it.**
 
 ### 4g. Turn stamping, echo-compare, and the switch divider
 
@@ -368,12 +417,21 @@ executed model resolved at different times by different code paths. Layers:
   (Prompt-cache key rotates on edit — correct, already built.)
 - **Checkpoint pre-flight (heals BEFORE failure):** when the
   `phase_checkpoint` approval card for advancing to phase N+1 renders, the
-  client resolves phase N+1's directive **locally** (pure `model-directive.ts`
-  matcher + `capabilities.ts` + the connections list the picker already
-  fetches — no new endpoint) and shows the outcome: "Phase 3 will run on
-  GPT-5" or "Phase 3 wants `gpt-5 series` — no matching connection:
-  [Continue on current] [Open AI settings]". The user approves a phase
-  knowing what will run it.
+  client resolves phase N+1's directive **locally** and shows the outcome:
+  "Phase 3 will run on GPT-5" or "Phase 3 wants `gpt-5 series` — no matching
+  connection: [Continue on current] [Open AI settings]". The user approves a
+  phase knowing what will run it.
+  **Data path (verified gap — spec it, don't improvise):** the client-side
+  `ActivePlaybook` object is only `{id, title, phaseIndex, phaseCount}`
+  (engine ~987–997) — it does NOT carry directives. The pre-flight therefore:
+  (1) fetches the playbook note's TipTap JSON by `activePlaybookId` via the
+  existing content GET (playbooks are ordinary notes), (2) runs
+  `parsePlaybook` client-side — it is a pure JSONContent function with a
+  type-only import (⚠ confirm, §2b), (3) applies `getPhaseModelDirective` +
+  the `model-directive.ts` matcher against `effectiveCapabilities` (already
+  client-safe) + the connections list the picker already fetches. No new
+  endpoint. Cache the parse per (playbookId, note updatedAt) so repeated
+  checkpoints don't refetch.
 - Runtime 429/5xx mid-phase: today's error banner + regenerate (re-resolves).
 
 ---
@@ -430,6 +488,8 @@ choice.
 - No catalog cost/deprecation enrichment (role mapping encodes that judgment).
 - No changes to modality-tool routing (`toolConfig.routeOverride` stands).
 - No new settings prose editor — Feature Routing rows are the criteria surface.
+- No runtime mid-stream fallback hop in v1 (§4e.3) — chain informs resolution
+  order only; failures surface via the error banner + regenerate.
 
 ---
 
@@ -462,11 +522,16 @@ choice.
   3.3 worktree.
 - First commands: `pnpm install` → `pnpm exec prisma generate` (committed
   client is stale; use `pnpm exec`, not npx).
-- Suggested build order (gate each before the next):
-  **S1** canonical module + parser + roles + check script →
-  **S2** route hoist + ladder + `modelPinned` →
+- Build order (gate each before the next — the S2a/S2b split is the
+  reliability keystone):
+  **S1** canonical module + parser + roles + check script (pure code, fully
+  unit-testable before touching the route) →
+  **S2a** route hoist as a behavior-identical pure refactor — no ladder, no
+  new logic; gate: build green + chat smoke unchanged →
+  **S2b** ladder + `modelPinned` + fall-through notices →
   **S3** stamping + divider + echo-compare →
-  **S4** checkpoint pre-flight + settings polish →
+  **S4** checkpoint pre-flight + settings polish (stretch — if it fights
+  back, ship v1 without it; §7's other two recovery paths stand alone) →
   **S5** docs + smoke.
 - Gates: `pnpm typecheck` → `pnpm lint` (ratchet: zero new warnings) →
   `NODE_OPTIONS='--max-old-space-size=8192' pnpm build` (now includes
