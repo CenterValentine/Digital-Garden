@@ -53,7 +53,7 @@ export async function resolveFeatureRoute(
     for (const route of userRoutes) {
       try {
         const conn = await getConnectionWithKey(userId, route.connectionId);
-        if (modelSatisfiesCapabilities(conn, route.modelId, feature.requiredCapabilities)) {
+        if (modelSatisfiesCapabilities(conn, route.modelId, feature.requiredCapabilities, feature.minContextWindow)) {
           resolved.push({
             connection: conn,
             modelId: route.modelId,
@@ -76,7 +76,7 @@ export async function resolveFeatureRoute(
     if (match) {
       try {
         const conn = await getConnectionWithKey(userId, match.id);
-        if (modelSatisfiesCapabilities(conn, feature.defaultSuggestion.modelId, feature.requiredCapabilities)) {
+        if (modelSatisfiesCapabilities(conn, feature.defaultSuggestion.modelId, feature.requiredCapabilities, feature.minContextWindow)) {
           resolved.push({
             connection: conn,
             modelId: feature.defaultSuggestion.modelId,
@@ -102,8 +102,11 @@ export async function resolveFeatureRoute(
     const conns = await listConnections(userId);
     for (const c of conns) {
       const model = c.models.find((m) =>
-        feature.requiredCapabilities.every((cap) =>
-          effectiveCapabilities(m).has(cap),
+        modelSatisfiesCapabilities(
+          c,
+          m.id,
+          feature.requiredCapabilities,
+          feature.minContextWindow,
         ),
       );
       if (!model) continue;
@@ -148,10 +151,21 @@ function modelSatisfiesCapabilities(
   connection: ConnectionView,
   modelId: string,
   required: CapabilityFlag[],
+  minContextWindow?: number,
 ): boolean {
-  if (required.length === 0) return true;
   const model = connection.models.find((m) => m.id === modelId);
   if (!model) return false;
+  // Context-window floor (AI 3.4, role-archivist). A model that doesn't
+  // advertise its window is treated as not meeting an explicit floor.
+  if (minContextWindow !== undefined) {
+    if (
+      typeof model.contextWindow !== "number" ||
+      model.contextWindow < minContextWindow
+    ) {
+      return false;
+    }
+  }
+  if (required.length === 0) return true;
   const have = effectiveCapabilities(model);
   return required.every((cap) => have.has(cap));
 }
