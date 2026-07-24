@@ -17,9 +17,20 @@
 import Redis from "ioredis";
 import { logger } from "@/lib/core/logger";
 
+/**
+ * The TCP Redis endpoint (`redis://` or `rediss://`). This project's
+ * Vercel Upstash integration provisions env vars with a `dg_` prefix
+ * (`dg_REDIS_URL`), so both names are accepted; a plain REDIS_URL wins
+ * when present. The REST pair (dg_KV_REST_API_*) is deliberately NOT
+ * consulted — REST cannot hold persistent pub/sub subscriptions.
+ */
+function resolveRedisUrl(): string | null {
+  return process.env.REDIS_URL ?? process.env.dg_REDIS_URL ?? null;
+}
+
 /** True when a Redis endpoint is configured (the feature's master gate). */
 export function isResumableConfigured(): boolean {
-  return !!process.env.REDIS_URL;
+  return !!resolveRedisUrl();
 }
 
 // globalThis-cached so dev hot-reload doesn't leak connections (same
@@ -36,7 +47,7 @@ const lastErrorLoggedAt: Record<string, number> = {};
 const ERROR_LOG_INTERVAL_MS = 60_000;
 
 function createClient(role: "publisher" | "subscriber"): Redis {
-  const client = new Redis(process.env.REDIS_URL as string, {
+  const client = new Redis(resolveRedisUrl() as string, {
     // Fail fast: a down Redis should degrade the feature (callers catch
     // and no-op), never stall the chat hot path behind command retries.
     maxRetriesPerRequest: 1,
