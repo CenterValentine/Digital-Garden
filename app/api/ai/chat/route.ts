@@ -40,6 +40,13 @@ import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
 import { renderPageContextSection } from "@/lib/domain/browser-extension/page-context";
 import {
+  buildPromptCachePolicy,
+  mergeAIProviderOptions,
+  summarizePromptCacheUsage,
+  type AIProviderOptions,
+  type PromptCacheUsageLike,
+} from "@/lib/domain/ai/prompt-cache";
+import {
   resolveChatModel,
   resolveChatModelFromConnection,
   BYOKRequiredError,
@@ -55,21 +62,6 @@ import {
 } from "@/lib/domain/ai/output-target";
 
 /**
- * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
- * underlying type is `Record<string, JSONObject>`). Re-declared locally
- * because the canonical `SharedV3ProviderOptions` lives in `@ai-sdk/provider`,
- * which isn't a direct dep — we only need a structural match.
- */
-type JSONValueLite =
-  | string
-  | number
-  | boolean
-  | null
-  | { [k: string]: JSONValueLite }
-  | JSONValueLite[];
-type ProviderOptionsLite = Record<string, Record<string, JSONValueLite>>;
-
-/**
  * Build per-provider `providerOptions` for streamText based on the
  * model's reasoning posture in the catalog. Returns undefined when no
  * options are needed so we don't pass empty objects through. Session 6.
@@ -77,7 +69,7 @@ type ProviderOptionsLite = Record<string, Record<string, JSONValueLite>>;
 function buildProviderOptions(
   providerId: string,
   modelId: string,
-): ProviderOptionsLite | undefined {
+): AIProviderOptions | undefined {
   const model = PROVIDER_CATALOG
     .find((p) => p.id === providerId)
     ?.models.find((m) => m.id === modelId);
@@ -1254,6 +1246,19 @@ export async function POST(request: Request) {
       }
 
       const toolsActive = Object.keys(tools).length > 0;
+      const validatedPlaybookId = attachedPlaybookResolved
+        ? explicitPlaybookId
+        : rootedPlaybookResolved
+          ? rootedPlaybookId
+          : null;
+      const promptCachePolicy = buildPromptCachePolicy({
+        providerId: executedProviderId,
+        modelId: activeModelId,
+        userId: session.user.id,
+        toolNames: Object.keys(tools),
+        playbookId: validatedPlaybookId,
+        playbookContext,
+      });
 
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
@@ -1272,6 +1277,9 @@ export async function POST(request: Request) {
             tool_names: Object.keys(tools).join(","),
             native_search: "search_web" in tools,
             executed_provider: executedProviderId ?? "aggregator",
+            prompt_cache_enabled: promptCachePolicy.enabled,
+            prompt_cache_scope: promptCachePolicy.scope,
+            prompt_cache_policy: promptCachePolicy.policyVersion,
           },
           summary: `${providerId}:${modelId} streaming`,
         },
@@ -1292,9 +1300,18 @@ export async function POST(request: Request) {
         modelId,
         temperature: effectiveTemperature,
         maxTokens,
+        promptCache: {
+          enabled: promptCachePolicy.enabled,
+          scope: promptCachePolicy.scope,
+          policyVersion: promptCachePolicy.policyVersion,
+        },
       });
 
       const reasoningProviderOptions = buildProviderOptions(providerId, modelId);
+      const providerOptions = mergeAIProviderOptions(
+        reasoningProviderOptions,
+        promptCachePolicy.providerOptions,
+      );
 
       const result = streamText({
         model: wrappedModel,
@@ -1304,8 +1321,8 @@ export async function POST(request: Request) {
         // Reasoning opt-in for Anthropic + Google (Session 6). Undefined
         // for OpenAI o-series (reasoning is automatic) and non-reasoning
         // chat models.
-        ...(reasoningProviderOptions && {
-          providerOptions: reasoningProviderOptions,
+        ...(providerOptions && {
+          providerOptions,
         }),
         // Allow up to 8 model turns for multi-step tool workflows.
         // Editor tools may need: read → plan → diff → diff → diff → finish + final text.
@@ -1394,11 +1411,26 @@ export async function POST(request: Request) {
           // Token usage / finish reason live on the finishEvent shape. The
           // structure varies slightly across AI SDK versions; we read fields
           // defensively to avoid the span ending with bad attrs.
-          const usage = (finishEvent as { usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } }).usage;
+          const usage = (
+            finishEvent as {
+              usage?: PromptCacheUsageLike & {
+                outputTokens?: number;
+                totalTokens?: number;
+              };
+            }
+          ).usage;
           const finishReason = (finishEvent as { finishReason?: string }).finishReason;
           if (usage?.inputTokens !== undefined) streamSpan.attr("input_tokens", usage.inputTokens);
           if (usage?.outputTokens !== undefined) streamSpan.attr("output_tokens", usage.outputTokens);
           if (usage?.totalTokens !== undefined) streamSpan.attr("total_tokens", usage.totalTokens);
+          const cacheUsage = summarizePromptCacheUsage(usage);
+          streamSpan.attr("cache_read_tokens", cacheUsage.cacheReadTokens);
+          streamSpan.attr("cache_write_tokens", cacheUsage.cacheWriteTokens);
+          streamSpan.attr("cache_uncached_tokens", cacheUsage.noCacheTokens);
+          streamSpan.attr(
+            "cache_hit_rate",
+            Number(cacheUsage.hitRate.toFixed(4)),
+          );
           if (finishReason) streamSpan.attr("finish_reason", finishReason);
           // Capture the full finish event to sidecar for replay.
           await spanPayload(streamSpan, "chat_finish", finishEvent);

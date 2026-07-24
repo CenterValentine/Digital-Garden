@@ -57,7 +57,22 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 - A reload or second tab now re-attaches to the still-running chat response and keeps rendering it live, on top of (not replacing) S1's `consumeStream()` no-lost-work machinery.
 - SSE output tees into Redis via `toUIMessageStreamResponse`'s `consumeSseStream` (`resumable-stream` + ioredis, Upstash TCP `REDIS_URL`); a new GET on `/api/ai/chat` replays it; the engine fires one gated `resumeStream()` per chat with a `prepareReconnectToStreamRequest` bridge (useChat id is the surface key, server keys by persistent conversationId).
+- Reloaded content settles in full instead of re-typing the buffered backlog (the resumed message would otherwise re-run the typewriter over already-generated text); only genuinely new tokens type.
 - Kill-switch in `/settings/ai` (`ai.resumableStreams`, default on). Off or no `REDIS_URL` ⇒ byte-for-byte prior behavior with zero Redis traffic. Association keys are owner-scoped with 1h TTL; migration-free.
+
+**July 23, 2026**: AI v3.2.2 prompt-cache foundation
+
+- Supported OpenAI models now receive a stable, privacy-safe cache key scoped
+  to the executed model, final toolset, user boundary, and validated playbook
+  phase—not the individual conversation—so unchanged phases can reuse prefixes
+  across separate runs.
+- Chat stream traces now report normalized cache reads, writes, uncached input,
+  hit rate, policy version, and general/playbook scope from AI SDK usage.
+- Active Playbook instructions precede current date, output target, rooted
+  content, mentions, and page data, preserving a deterministic reusable prefix
+  without enabling paid Anthropic/Google cache writes.
+- `prompt-cache:check` covers key stability/rotation, provider safety, option
+  merging, usage math, and prompt ordering and is part of the build pipeline.
 
 **July 23, 2026**: Playbook checkpoints now require provider-neutral evidence
 
