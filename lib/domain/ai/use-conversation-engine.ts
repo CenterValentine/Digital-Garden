@@ -202,6 +202,24 @@ const chatTransport = new DefaultChatTransport({
       },
     };
   },
+  // Resume bridge (AI 3.3): the SDK's default reconnect URL is
+  // `${api}/${useChat-id}/stream`, but the useChat id is the
+  // surface-scoped conversationKey — the server keys resumable streams
+  // by the persistent conversationId. Rewrite the reconnect GET to the
+  // same route with the real conversationId in the query, resolved from
+  // this chat's registered baseline body. An empty conversationId (chat
+  // not yet bound) still produces a valid URL the server answers with
+  // 204 — a quiet no-op.
+  prepareReconnectToStreamRequest: ({ id, api }) => {
+    const baseline = id ? chatBodyResolvers.get(id)?.() : undefined;
+    const conversationId =
+      baseline && typeof baseline.conversationId === "string"
+        ? baseline.conversationId
+        : "";
+    return {
+      api: `${api}?conversationId=${encodeURIComponent(conversationId)}`,
+    };
+  },
 });
 
 /**
@@ -925,6 +943,7 @@ export function useConversationEngine({
     setMessages,
     regenerate,
     addToolApprovalResponse,
+    resumeStream,
   } = chat;
 
   // ── active playbook: derived phase index (AI v3.2 T3) ──
@@ -1026,6 +1045,36 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
   ]);
+
+  // ── resumable streams (AI 3.3) ──
+  // Re-attach to an in-flight server stream after a reload or in a
+  // second tab. One attempt per conversationKey: fired the first time
+  // this chat is bound + idle, then never again for the same instance.
+  //
+  // Deliberately NOT useChat's `resume: true` option: resumeStream()
+  // replaces the transport's active response unconditionally, and
+  // conversationId can bind mid-turn (fresh chat promoted after its
+  // first send) — the option's mount-effect would then fire while a
+  // stream is rendering and clobber it. Gating on idle status closes
+  // that window; the server's 204 makes the no-stream case free.
+  const resumableStreamsEnabled = useSettingsStore(
+    (s) => s.ai?.resumableStreams !== false,
+  );
+  const resumeAttemptedForKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!resumableStreamsEnabled || !conversationId) return;
+    if (status === "streaming" || status === "submitted") return;
+    if (resumeAttemptedForKeyRef.current === conversationKey) return;
+    resumeAttemptedForKeyRef.current = conversationKey;
+    void resumeStream();
+  }, [
+    resumableStreamsEnabled,
+    conversationId,
+    conversationKey,
+    status,
+    resumeStream,
+  ]);
+
   const isActive = status === "streaming" || status === "submitted";
   const stop = useCallback(() => {
     // Settle synchronously for immediate visual feedback; the SDK's abort

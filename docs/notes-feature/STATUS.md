@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-23
+last_updated: 2026-07-24
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,12 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 24, 2026**: AI 3.3 — resumable streams BUILT (branch `feat/ai-v3.3-resumable-streams`, worktree `ai-v33-resumable`; awaiting Upstash provisioning + smoke test, no PR yet)
+
+- A reload or second tab now re-attaches to the still-running chat response and keeps rendering it live, on top of (not replacing) S1's `consumeStream()` no-lost-work machinery.
+- SSE output tees into Redis via `toUIMessageStreamResponse`'s `consumeSseStream` (`resumable-stream` + ioredis, Upstash TCP `REDIS_URL`); a new GET on `/api/ai/chat` replays it; the engine fires one gated `resumeStream()` per chat with a `prepareReconnectToStreamRequest` bridge (useChat id is the surface key, server keys by persistent conversationId).
+- Kill-switch in `/settings/ai` (`ai.resumableStreams`, default on). Off or no `REDIS_URL` ⇒ byte-for-byte prior behavior with zero Redis traffic. Association keys are owner-scoped with 1h TTL; migration-free.
 
 **July 23, 2026**: Playbook checkpoints now require provider-neutral evidence
 

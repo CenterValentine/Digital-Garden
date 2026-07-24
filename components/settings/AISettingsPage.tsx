@@ -87,6 +87,7 @@ export default function AISettingsPage() {
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
   const showFollowUps = ai?.showFollowUps ?? true;
+  const resumableStreams = ai?.resumableStreams ?? true;
   const folderAssistantEnabled = ai?.folderAssistant?.enabled ?? true;
   const toolConfig: Record<string, ToolConfigEntry> = ai?.toolConfig ?? {};
 
@@ -275,6 +276,22 @@ export default function AISettingsPage() {
             checked={showFollowUps}
             onCheckedChange={(checked) =>
               void generation.track(setAISettings({ showFollowUps: checked }))
+            }
+          />
+        </SettingRow>
+
+        <SettingRow
+          label="Resume streams after reload"
+          description="Keep an in-progress reply streaming live across page reloads and second tabs. Uses Redis while a reply streams; turn off to avoid that usage — finished replies still appear after reload."
+          htmlFor="ai-resumable-streams"
+        >
+          <Switch
+            id="ai-resumable-streams"
+            checked={resumableStreams}
+            onCheckedChange={(checked) =>
+              void generation.track(
+                setAISettings({ resumableStreams: checked }),
+              )
             }
           />
         </SettingRow>
