@@ -99,6 +99,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 - Sending a reply creates a Markdown-backed note through the same validated chat/content/folder placement rules used by AI content tools.
 - The naming dialog prefills only when the reply contains an explicit Markdown or standalone-bold title; otherwise it requires the user to name the note.
 
+**July 23, 2026**: Output targets survive playbook checkpoint reloads on PR #126
+
+- Root-caused mixed placement in one run: web caches executed during the original `underContent` request, while approved note/checkpoint tools resumed after reload with the default `chat` target.
+- Each user turn now carries its selected output target as a durable data part. Approval continuations recover that turn-start contract instead of trusting rehydrated live UI state.
+- Phase tool affordances now identify their phase as `Phase checkpoint: [phase]` in both approval and completed states.
+
 **July 23, 2026**: AI output-target persistence and routing hardened on PR #126
 
 - Root-caused a side-chat output that ignored its preset: `createNote` correctly omitted `parentId`, but the client had reverted to `{ mode: "chat" }` because the long-lived sidebar engine did not rehydrate output-target state when conversation keys changed.

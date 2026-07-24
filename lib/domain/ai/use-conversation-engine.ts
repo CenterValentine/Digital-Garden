@@ -48,6 +48,7 @@ import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { getAttachedPageContext } from "@/state/panel-page-context-store";
 import {
   DEFAULT_OUTPUT_TARGET,
+  createOutputTargetMessagePart,
   outputTargetStorageKey,
   readStoredOutputTarget,
   resolveOutputTargetKeyChange,
@@ -1100,7 +1101,12 @@ export function useConversationEngine({
     }
     if (!prompt || !prompt.trim()) return;
     sendMessage(
-      { parts: [{ type: "text", text: prompt }] },
+      {
+        parts: [
+          createOutputTargetMessagePart(outputTarget),
+          { type: "text", text: prompt },
+        ],
+      },
       {
         body: {
           contentId,
@@ -1109,6 +1115,7 @@ export function useConversationEngine({
           providerId,
           modelId,
           mentionedContentIds: [],
+          outputTarget,
         },
       },
     );
@@ -1120,6 +1127,7 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    outputTarget,
   ]);
 
   // ── send ──
@@ -1179,7 +1187,9 @@ export function useConversationEngine({
     // the extracted text in `providerMetadata.app.text`; the chat route
     // reads it to inline content for providers that can't consume the file
     // natively, while the displayed/persisted message stays a clean chip.
-    const parts: UIMessage["parts"] = [];
+    const parts: UIMessage["parts"] = [
+      createOutputTargetMessagePart(outputTarget),
+    ];
     if (activePlaybookId) {
       // Unlike the composer-only chip, this data part belongs to the sent
       // user turn, survives persistence/reload, and renders alongside that
@@ -1313,7 +1323,9 @@ export function useConversationEngine({
       pendingStampRef.current = { providerId, modelId };
       setMessages(messages.slice(0, idx));
       // { parts } shape (matches handleSend / studio-invoke).
-      const editedParts: UIMessage["parts"] = [];
+      const editedParts: UIMessage["parts"] = [
+        createOutputTargetMessagePart(outputTarget),
+      ];
       if (activePlaybookId) {
         editedParts.push(
           createPlaybookMessageAttachmentPart({
@@ -1342,6 +1354,7 @@ export function useConversationEngine({
       activePlaybookTitle,
       activePlaybook,
       resolvedPhaseIndex,
+      outputTarget,
     ],
   );
 

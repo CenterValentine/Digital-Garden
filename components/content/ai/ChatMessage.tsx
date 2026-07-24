@@ -1936,7 +1936,9 @@ function PhaseCheckpointCard({
       <div className="flex items-center gap-2 px-3 py-1.5">
         <GitBranch className="h-3 w-3 shrink-0 text-indigo-400" />
         <span className="font-medium text-gray-700 dark:text-gray-300 truncate">
-          {data.phase ?? "Phase checkpoint"}
+          {data.phase
+            ? `Phase checkpoint: ${data.phase}`
+            : "Phase checkpoint"}
         </span>
       </div>
       {data.summary && (
@@ -2323,7 +2325,7 @@ function ToolCallBubble({
   toolName,
   toolCallId,
   state,
-  args: _args,
+  args,
   result,
   isRevertable = false,
   onRevertEdit,
@@ -2387,8 +2389,19 @@ function ToolCallBubble({
   // tense while running, past tense when done) rather than echoing the
   // raw tool identifier.
   const prettyName = useMemo(
-    () => toolActionLabel(toolName, isRunning),
-    [toolName, isRunning],
+    () => {
+      if (toolName === "phase_checkpoint") {
+        const phase =
+          args &&
+          typeof args === "object" &&
+          typeof (args as { phase?: unknown }).phase === "string"
+            ? (args as { phase: string }).phase.trim()
+            : "";
+        if (phase) return `Phase checkpoint: ${phase}`;
+      }
+      return toolActionLabel(toolName, isRunning);
+    },
+    [toolName, isRunning, args],
   );
 
   // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).

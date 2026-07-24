@@ -25,6 +25,59 @@ export function getOutputTargetLabel(target: OutputTarget): string {
   }
 }
 
+/**
+ * Durable turn binding for output placement.
+ *
+ * Approval continuations are separate HTTP requests and may happen after a
+ * reload. Keeping the turn-start target on the user message makes the
+ * original placement contract survive when the transport's in-memory request
+ * snapshot no longer exists.
+ */
+export interface OutputTargetMessagePart {
+  type: "data-output-target";
+  data: { target: OutputTarget };
+}
+
+export function createOutputTargetMessagePart(
+  target: OutputTarget,
+): OutputTargetMessagePart {
+  return { type: "data-output-target", data: { target } };
+}
+
+export function parseOutputTargetMessagePart(
+  part: unknown,
+): OutputTarget | null {
+  if (!part || typeof part !== "object") return null;
+  const candidate = part as {
+    type?: unknown;
+    data?: { target?: unknown };
+  };
+  if (candidate.type !== "data-output-target") return null;
+  return parseOutputTarget(candidate.data?.target);
+}
+
+/**
+ * Read only the latest user turn. Falling back to an older turn would make a
+ * newly-sent legacy message inherit placement it never selected.
+ */
+export function getLatestUserMessageOutputTarget(
+  messages: unknown[],
+): OutputTarget | null {
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+    if (!message || typeof message !== "object") continue;
+    const candidate = message as { role?: unknown; parts?: unknown };
+    if (candidate.role !== "user") continue;
+    if (!Array.isArray(candidate.parts)) return null;
+    for (const part of candidate.parts) {
+      const target = parseOutputTargetMessagePart(part);
+      if (target) return target;
+    }
+    return null;
+  }
+  return null;
+}
+
 interface OutputTargetStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;

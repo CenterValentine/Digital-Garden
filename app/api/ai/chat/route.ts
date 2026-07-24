@@ -38,6 +38,7 @@ import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
+  getLatestUserMessageOutputTarget,
   parseOutputTarget,
   renderOutputTargetInstruction,
 } from "@/lib/domain/ai/output-target";
@@ -166,6 +167,14 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+
+      // Approval resumes can occur after a reload, when the transport's
+      // in-memory turn snapshot is gone and its live fallback may have reset
+      // to the default "chat" target. New turns bind placement to their user
+      // message, so every continuation replays the target that STARTED the
+      // turn. Legacy turns without the data part retain request-body behavior.
+      const turnBoundOutputTarget =
+        getLatestUserMessageOutputTarget(messages);
 
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
@@ -556,7 +565,9 @@ export async function POST(request: Request) {
       let outputOwnerId: string | undefined = chatNodeId;
       let outputParentOverride: string | undefined;
       const outputTarget =
-        parseOutputTarget(body.outputTarget) ?? DEFAULT_OUTPUT_TARGET;
+        turnBoundOutputTarget ??
+        parseOutputTarget(body.outputTarget) ??
+        DEFAULT_OUTPUT_TARGET;
       if (outputTarget.mode === "underContent") {
         // Referenced under the rooted content (a child of it, sibling of
         // the chat).

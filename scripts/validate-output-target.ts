@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import {
   DEFAULT_OUTPUT_TARGET,
+  createOutputTargetMessagePart,
+  getLatestUserMessageOutputTarget,
   outputTargetStorageKey,
   parseOutputTarget,
   renderOutputTargetInstruction,
@@ -20,6 +22,38 @@ const folderTarget: OutputTarget = {
 assert.deepEqual(parseOutputTarget(folderTarget), folderTarget);
 assert.equal(parseOutputTarget({ mode: "folder" }), null);
 assert.equal(parseOutputTarget({ mode: "unknown" }), null);
+
+assert.deepEqual(
+  getLatestUserMessageOutputTarget([
+    {
+      role: "user",
+      parts: [
+        createOutputTargetMessagePart({ mode: "underContent" }),
+        { type: "text", text: "Run this playbook" },
+      ],
+    },
+    {
+      role: "assistant",
+      parts: [{ type: "tool-phase_checkpoint" }],
+    },
+  ]),
+  { mode: "underContent" },
+  "approval continuations must recover the target bound to the user turn",
+);
+assert.equal(
+  getLatestUserMessageOutputTarget([
+    {
+      role: "user",
+      parts: [createOutputTargetMessagePart({ mode: "underContent" })],
+    },
+    {
+      role: "user",
+      parts: [{ type: "text", text: "A legacy later turn" }],
+    },
+  ]),
+  null,
+  "a legacy latest turn must not inherit an older turn's target",
+);
 
 assert.deepEqual(
   resolveOutputTargetKeyChange({
