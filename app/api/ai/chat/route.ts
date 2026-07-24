@@ -21,8 +21,19 @@
  * emits with the correct trace association.
  */
 
-import { streamText, convertToModelMessages, stepCountIs } from "ai";
+import {
+  streamText,
+  convertToModelMessages,
+  stepCountIs,
+  UI_MESSAGE_STREAM_HEADERS,
+} from "ai";
 import type { UIMessage } from "ai";
+import { isResumableConfigured } from "@/lib/domain/ai/resumable/redis";
+import { getStreamContext } from "@/lib/domain/ai/resumable/context";
+import {
+  associateStream,
+  getActiveStreamId,
+} from "@/lib/domain/ai/resumable/association";
 import type { JSONContent } from "@tiptap/core";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
@@ -549,6 +560,20 @@ export async function POST(request: Request) {
       // content they touch; the mention/tool-call interceptors below reuse it.
       const conversationIdForAssoc: string | null =
         typeof body.conversationId === "string" ? body.conversationId : null;
+
+      // Resumable streams (AI 3.3): when on, this turn's SSE output is
+      // teed into Redis (see consumeSseStream below) so a reload or a
+      // second tab can re-attach mid-generation via GET. The gate is the
+      // feature's core correctness property: off or unconfigured MUST be
+      // byte-for-byte today's behavior with zero Redis traffic, and only
+      // conversation-bound turns are resumable (transient chats have no
+      // stable key to reconnect by).
+      const resumableStreamId =
+        isResumableConfigured() &&
+        aiSettings.resumableStreams !== false &&
+        conversationIdForAssoc
+          ? crypto.randomUUID()
+          : null;
 
       // The conversation's target folder (umbrella decision #7) rides into
       // tool context: read_page files page nodes there; document tools
@@ -1432,7 +1457,38 @@ export async function POST(request: Request) {
       // response below tees off the same stream — this does not starve it.
       void result.consumeStream();
 
+      // Resumable tee (AI 3.3): pipe a tee'd copy of the SSE output into
+      // Redis for replay. The AI SDK tees internally — this neither
+      // consumes the response stream nor competes with consumeStream()
+      // above. Undefined when the gate is off ⇒ nothing changes.
+      const teeToResumable =
+        resumableStreamId && conversationIdForAssoc
+          ? ({ stream }: { stream: ReadableStream<string> }) => {
+              const streamContext = getStreamContext();
+              if (!streamContext) return;
+              // Association first so the mapping exists by the time the
+              // first chunks land in Redis.
+              void associateStream(
+                session.user.id,
+                conversationIdForAssoc,
+                resumableStreamId,
+              );
+              void streamContext
+                .createNewResumableStream(resumableStreamId, () => stream)
+                .catch((error) => {
+                  logger.warn({
+                    layer: "ai",
+                    event: "resumable:tee_failed",
+                    summary:
+                      "resumable stream tee failed — turn continues non-resumable",
+                    error,
+                  });
+                });
+            }
+          : undefined;
+
       return result.toUIMessageStreamResponse({
+        consumeSseStream: teeToResumable,
         // Continuation awareness (smoke #4 root cause): approval resumes
         // execute tools whose invocation lives in the LAST assistant
         // message of the incoming history. Without originalMessages the
@@ -1707,4 +1763,76 @@ function resolveAttachmentsForModel(
     }
     return { ...m, parts: merged };
   });
+}
+
+/**
+ * GET /api/ai/chat — re-attach to an in-flight stream (AI 3.3).
+ *
+ * useChat's reconnectToStream issues a GET here; the client transport's
+ * prepareReconnectToStreamRequest puts the persistent conversationId in
+ * the query (the useChat id is the surface-scoped conversationKey,
+ * which the server doesn't know). Authorization is the association key
+ * itself — lookups are scoped to the caller's userId, so a guessed
+ * conversationId can never reach another owner's stream.
+ *
+ * Every quiet path returns 204: the transport treats 204 as "nothing to
+ * resume" and ANY non-OK status as an error surfaced to onError, so
+ * ordinary absence must never 4xx/5xx here.
+ */
+export async function GET(request: Request) {
+  try {
+    const session = await requireAuth();
+
+    const conversationId = new URL(request.url).searchParams.get(
+      "conversationId",
+    );
+    if (!conversationId || !isResumableConfigured()) {
+      return new Response(null, { status: 204 });
+    }
+
+    // Same gate as the POST tee: toggle off ⇒ zero Redis traffic.
+    const userSettings = await getUserSettings(session.user.id);
+    if (userSettings.ai?.resumableStreams === false) {
+      return new Response(null, { status: 204 });
+    }
+
+    const streamContext = getStreamContext();
+    if (!streamContext) return new Response(null, { status: 204 });
+
+    const streamId = await getActiveStreamId(session.user.id, conversationId);
+    if (!streamId) return new Response(null, { status: 204 });
+
+    // undefined = unknown streamId, null = stream already finished —
+    // both mean "nothing live to attach to"; persistence has (or will
+    // have) the completed message for the next history load.
+    const stream = await streamContext.resumeExistingStream(streamId);
+    if (!stream) return new Response(null, { status: 204 });
+
+    return new Response(stream.pipeThrough(new TextEncoderStream()), {
+      status: 200,
+      headers: UI_MESSAGE_STREAM_HEADERS,
+    });
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === "Authentication required"
+    ) {
+      return Response.json(
+        {
+          success: false,
+          error: { code: "UNAUTHORIZED", message: "Authentication required" },
+        },
+        { status: 401 },
+      );
+    }
+    // Redis/replay hiccups must not surface as chat errors — absence
+    // semantics keep the client on today's behavior.
+    logger.warn({
+      layer: "ai",
+      event: "resumable:get_failed",
+      summary: "resume GET failed — returning 204 (no resume)",
+      error,
+    });
+    return new Response(null, { status: 204 });
+  }
 }

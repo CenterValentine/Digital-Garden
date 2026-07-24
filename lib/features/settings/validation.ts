@@ -139,6 +139,11 @@ const aiSettingsSchema = z
     // call after each assistant reply and render 2-3 next-prompt chips.
     // The chosen model lives in Feature Routing under "follow-ups".
     showFollowUps: z.boolean().optional(),
+    // Resumable streams (AI 3.3) — a reload or second tab re-attaches to
+    // the in-flight response via a Redis-buffered replay. Off ⇒ zero
+    // Redis traffic; reload shows the finished message instead (the
+    // pre-3.3 behavior). Default on; inert without REDIS_URL.
+    resumableStreams: z.boolean().optional(),
     // Optional free-form guidance appended to the follow-up generator's
     // system prompt. Lets users steer suggestions toward their domain
     // (e.g. "Focus on next experiments / pitfalls to watch for / cite
@@ -521,6 +526,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     showAiHighlight: true,
     showReasoning: true,
     showFollowUps: true,
+    resumableStreams: true,
     folderAssistant: { enabled: true, recent: [] },
   },
   exportBackup: {

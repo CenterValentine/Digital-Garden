@@ -202,6 +202,24 @@ const chatTransport = new DefaultChatTransport({
       },
     };
   },
+  // Resume bridge (AI 3.3): the SDK's default reconnect URL is
+  // `${api}/${useChat-id}/stream`, but the useChat id is the
+  // surface-scoped conversationKey — the server keys resumable streams
+  // by the persistent conversationId. Rewrite the reconnect GET to the
+  // same route with the real conversationId in the query, resolved from
+  // this chat's registered baseline body. An empty conversationId (chat
+  // not yet bound) still produces a valid URL the server answers with
+  // 204 — a quiet no-op.
+  prepareReconnectToStreamRequest: ({ id, api }) => {
+    const baseline = id ? chatBodyResolvers.get(id)?.() : undefined;
+    const conversationId =
+      baseline && typeof baseline.conversationId === "string"
+        ? baseline.conversationId
+        : "";
+    return {
+      api: `${api}?conversationId=${encodeURIComponent(conversationId)}`,
+    };
+  },
 });
 
 /**
@@ -304,6 +322,12 @@ export interface UseConversationEngineResult {
   >["addToolApprovalResponse"];
   /** True while the model is processing (submitted or streaming). */
   isActive: boolean;
+  /**
+   * True while the active stream began as a resume (reload / second tab)
+   * rather than a fresh send (AI 3.3). Lets the view render the buffered
+   * flood settled instead of re-typing it.
+   */
+  resumedStream: boolean;
 
   // ── input + send ──
   input: string;
@@ -925,6 +949,7 @@ export function useConversationEngine({
     setMessages,
     regenerate,
     addToolApprovalResponse,
+    resumeStream,
   } = chat;
 
   // ── active playbook: derived phase index (AI v3.2 T3) ──
@@ -1026,6 +1051,44 @@ export function useConversationEngine({
     resolvedPhaseIndex,
     outputTarget,
   ]);
+
+  // ── resumable streams (AI 3.3) ──
+  // Re-attach to an in-flight server stream after a reload or in a
+  // second tab. One attempt per conversationKey: fired the first time
+  // this chat is bound + idle, then never again for the same instance.
+  //
+  // Deliberately NOT useChat's `resume: true` option: resumeStream()
+  // replaces the transport's active response unconditionally, and
+  // conversationId can bind mid-turn (fresh chat promoted after its
+  // first send) — the option's mount-effect would then fire while a
+  // stream is rendering and clobber it. Gating on idle status closes
+  // that window; the server's 204 makes the no-stream case free.
+  const resumableStreamsEnabled = useSettingsStore(
+    (s) => s.ai?.resumableStreams !== false,
+  );
+  const resumeAttemptedForKeyRef = useRef<string | null>(null);
+  // True while the active stream began as a resume (reload / second tab)
+  // rather than a fresh send. Consumed by ChatPanel → ChatMessage so the
+  // buffered flood renders settled instead of re-typing (AI 3.3). Reset
+  // by every fresh user send (which has no buffer); this also clears the
+  // no-stream 204 case, where the resume returns nothing and status never
+  // leaves "ready".
+  const streamStartedViaResumeRef = useRef(false);
+  useEffect(() => {
+    if (!resumableStreamsEnabled || !conversationId) return;
+    if (status === "streaming" || status === "submitted") return;
+    if (resumeAttemptedForKeyRef.current === conversationKey) return;
+    resumeAttemptedForKeyRef.current = conversationKey;
+    streamStartedViaResumeRef.current = true;
+    void resumeStream();
+  }, [
+    resumableStreamsEnabled,
+    conversationId,
+    conversationKey,
+    status,
+    resumeStream,
+  ]);
+
   const isActive = status === "streaming" || status === "submitted";
   const stop = useCallback(() => {
     // Settle synchronously for immediate visual feedback; the SDK's abort
@@ -1243,6 +1306,9 @@ export function useConversationEngine({
   // (contentId / provider / model / mentions) flows per-call via the
   // second arg's body — no transport-level refs needed.
   const handleSend = useCallback(() => {
+    // A fresh user send has no buffered backlog — clear the resume flag so
+    // this turn types normally (and un-stick the no-stream 204 case).
+    streamStartedViaResumeRef.current = false;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
@@ -1471,6 +1537,10 @@ export function useConversationEngine({
       const target = messages.find((m) => m.id === messageId);
       if (!target || target.role !== "assistant") return;
 
+      // A regenerated turn is freshly generated — no buffered backlog, so
+      // it should type normally, not settle like a resume.
+      streamStartedViaResumeRef.current = false;
+
       // Supersede the old answer (inclusive) + anything after, server-side.
       await truncateRef?.current?.(messageId, true);
 
@@ -1505,6 +1575,10 @@ export function useConversationEngine({
     setMessages,
     addToolApprovalResponse,
     isActive,
+    // Only meaningful while a stream is active; the settle latch itself
+    // lives per-message in the typewriter, so a stale-true ref between
+    // turns is harmless, but gating on isActive keeps the contract clean.
+    resumedStream: streamStartedViaResumeRef.current && isActive,
     input,
     setInput,
     handleSend,

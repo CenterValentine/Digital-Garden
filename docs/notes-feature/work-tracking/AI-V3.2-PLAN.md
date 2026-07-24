@@ -281,7 +281,7 @@ principles this build follows (and future AI-agent work should too):
   T4 resource governance (enforced budgets, sub-agent isolation). See
   BACKLOG.md "AI v3.2 T3 Followups."
 
-## T4 — Resumable-stream store (live re-attach)
+## T4 — Resumable-stream store (live re-attach) — SHIPPED AS AI 3.3
 
 The S1 "survives reload" gate ships at the no-lost-work level (server
 `consumeStream` + idempotent persistence); live re-attach to an in-flight
@@ -291,6 +291,19 @@ stream needs a resumable-stream store (Redis-class).
   Coolify homeserver) and wire `useChat` resume / `resumeStream`.
 - **Gate:** reload mid-stream → the SAME in-flight response continues
   rendering live, not just the completed message on next load.
+- — BUILT as its own point release, **AI 3.3** (PR #130, branch
+  `feat/ai-v3.3-resumable-streams`; handoff doc
+  `AI-V3.3-T4-HANDOFF.md`). Store decision: **Upstash Redis** (TCP
+  `REDIS_URL`; homeserver rejected — Cloudflare-Tunnel-only, too fragile
+  for the live-chat hot path). `resumable-stream` + ioredis tee the SSE
+  output into Redis via `toUIMessageStreamResponse`'s `consumeSseStream`;
+  a new GET on `/api/ai/chat` replays it; the engine fires one gated
+  `resumeStream()` per chat. Kill-switch toggle in `/settings/ai`
+  (`ai.resumableStreams`, default on) — off or no `REDIS_URL` ⇒
+  byte-for-byte pre-3.3 behavior, zero Redis traffic. Migration-free
+  (stream↔conversation association lives in Redis, owner-scoped, 1h TTL).
+  (Version framing: next milestone 3.4 = playbook-orchestrated model
+  routing.)
 
 ## T5 — Conversation title strategy for quick URL chats
 

@@ -170,6 +170,7 @@ export function ChatPanel({
     setMessages,
     addToolApprovalResponse,
     isActive,
+    resumedStream,
     input,
     setInput,
     handleSend,
@@ -844,6 +845,7 @@ export function ChatPanel({
                     i === messages.length - 1 &&
                     message.role === "assistant"
                   }
+                  resumedStream={resumedStream}
                   onEdit={(id, text) => void editMessage(id, text)}
                   onRegenerate={(id) => void regenerateMessage(id)}
                   onBranch={(id) => void handleBranch(id)}
