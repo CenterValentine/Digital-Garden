@@ -22,6 +22,7 @@ import {
   BrainCircuit,
   Check,
   ChevronRight,
+  CircleStop,
   Copy,
   ExternalLink,
   File,
@@ -90,6 +91,7 @@ interface DetectedToolPart {
   state: string;
   input?: unknown;
   output?: unknown;
+  errorText?: string;
   /** Present when state is approval-requested (needsApproval pause). */
   approvalId?: string;
 }
@@ -120,6 +122,7 @@ function detectToolPart(part: unknown): DetectedToolPart | null {
     state: (p.state as string) || "unknown",
     input: p.input,
     output: p.output,
+    errorText: typeof p.errorText === "string" ? p.errorText : undefined,
     approvalId: (p.approval as { id?: string } | undefined)?.id,
   };
 }
@@ -914,6 +917,7 @@ export const ChatMessage = memo(function ChatMessage({
                 state={toolPart.state}
                 args={toolPart.input}
                 result={toolPart.output}
+                errorText={toolPart.errorText}
                 isRevertable={revertableToolIds?.has(toolPart.toolCallId) ?? false}
                 onRevertEdit={onRevertEdit}
               />
@@ -2327,6 +2331,7 @@ function ToolCallBubble({
   state,
   args,
   result,
+  errorText,
   isRevertable = false,
   onRevertEdit,
 }: {
@@ -2335,28 +2340,36 @@ function ToolCallBubble({
   state: string;
   args: unknown;
   result?: unknown;
+  errorText?: string;
   isRevertable?: boolean;
   onRevertEdit?: (toolCallId: string) => void;
 }) {
   const isRunning = state === "input-streaming" || state === "input-available";
   const hasResult = state === "output-available";
+  const hasError = state === "output-error";
+  const wasStopped =
+    hasError && errorText?.startsWith("Stopped by the user") === true;
+  const hasDetails = hasResult || (hasError && Boolean(errorText));
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const [reverted, setReverted] = useState(false);
 
   // Canonical string form of the result for display + clipboard.
   const resultString = useMemo(() => {
+    if (hasError) return errorText ?? null;
     if (!hasResult || result === undefined) return null;
     return typeof result === "string"
       ? result
       : JSON.stringify(result, null, 2);
-  }, [hasResult, result]);
+  }, [hasError, hasResult, result, errorText]);
 
   // One-line summary used in the collapsed header. Tells the user what
   // came back without forcing them to expand — char counts for text,
   // item counts for arrays, "edit applied" for orchestrator payloads.
   const summary = useMemo<string | null>(() => {
     if (isRunning) return "running…";
+    if (wasStopped) return "stopped";
+    if (hasError) return "failed";
     if (!hasResult || result === undefined) return null;
     // Edit-payload JSON → render the action verb only.
     if (
@@ -2383,7 +2396,7 @@ function ToolCallBubble({
       return `${keys.length} field${keys.length === 1 ? "" : "s"}`;
     }
     return "ok";
-  }, [isRunning, hasResult, result]);
+  }, [isRunning, wasStopped, hasError, hasResult, result]);
 
   // Human action phrase — describes what the tool is *doing* (present
   // tense while running, past tense when done) rather than echoing the
@@ -2399,9 +2412,11 @@ function ToolCallBubble({
             : "";
         if (phase) return `Phase checkpoint: ${phase}`;
       }
-      return toolActionLabel(toolName, isRunning);
+      // A stopped card names the action that was in progress rather than
+      // claiming the tool completed successfully.
+      return toolActionLabel(toolName, isRunning || wasStopped);
     },
-    [toolName, isRunning, args],
+    [toolName, isRunning, wasStopped, args],
   );
 
   // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).
@@ -2435,17 +2450,21 @@ function ToolCallBubble({
     <div className="rounded-lg border border-black/10 dark:border-white/10 bg-black/[0.02] dark:bg-white/[0.03] text-xs overflow-hidden">
       <button
         type="button"
-        onClick={() => hasResult && setExpanded((v) => !v)}
-        disabled={!hasResult}
+        onClick={() => hasDetails && setExpanded((v) => !v)}
+        disabled={!hasDetails}
         className={cn(
           "flex w-full items-center gap-2 px-3 py-1.5 text-left",
-          hasResult && "hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer",
-          !hasResult && "cursor-default",
+          hasDetails && "hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors cursor-pointer",
+          !hasDetails && "cursor-default",
         )}
-        title={hasResult ? (expanded ? "Hide details" : "Show details") : undefined}
+        title={hasDetails ? (expanded ? "Hide details" : "Show details") : undefined}
       >
         {isRunning ? (
           <Loader2 className="h-3 w-3 shrink-0 animate-spin text-amber-400" />
+        ) : wasStopped ? (
+          <CircleStop className="h-3 w-3 shrink-0 text-gray-500 dark:text-gray-400" />
+        ) : hasError ? (
+          <ShieldAlert className="h-3 w-3 shrink-0 text-red-500/80" />
         ) : (
           <Wrench className="h-3 w-3 shrink-0 text-emerald-400/80" />
         )}
@@ -2458,13 +2477,17 @@ function ToolCallBubble({
               "ml-auto shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-mono",
               isRunning
                 ? "bg-amber-500/10 text-amber-400/80"
-                : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-gray-400",
+                : wasStopped
+                  ? "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-gray-400"
+                  : hasError
+                    ? "bg-red-500/10 text-red-500/80"
+                    : "bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-gray-400",
             )}
           >
             {summary}
           </span>
         )}
-        {hasResult && (
+        {hasDetails && (
           <ChevronRight
             className={cn(
               "h-3 w-3 shrink-0 text-gray-500 transition-transform",
@@ -2474,10 +2497,10 @@ function ToolCallBubble({
           />
         )}
       </button>
-      {hasResult && expanded && resultString && (
+      {hasDetails && expanded && resultString && (
         <div className="border-t border-black/[0.06] dark:border-white/[0.06] bg-black/[0.02] dark:bg-black/20">
           <div className="flex items-center justify-between px-3 py-1 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-500">
-            <span>Result</span>
+            <span>{hasError ? (wasStopped ? "Stopped" : "Error") : "Result"}</span>
             <button
               type="button"
               onClick={handleCopy}

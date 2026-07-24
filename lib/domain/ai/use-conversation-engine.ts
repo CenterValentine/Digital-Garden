@@ -56,6 +56,7 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
+import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
@@ -198,6 +199,8 @@ export interface ConversationEngineFinishEvent {
    */
   message?: UIMessage;
   finishReason?: string;
+  /** True when the user explicitly stopped the active response. */
+  isAbort: boolean;
 }
 
 export interface UseConversationEngineParams {
@@ -695,7 +698,13 @@ export function useConversationEngine({
 
   // ── suggested follow-ups (Session 7) ──
   const [followUps, setFollowUps] = useState<string[]>([]);
-  const clearFollowUps = useCallback(() => setFollowUps([]), []);
+  const followUpRequestVersionRef = useRef(0);
+  const clearFollowUps = useCallback(() => {
+    // Invalidate an already-running suggestion request too. Otherwise a
+    // response started before Send/Stop can repopulate stale chips afterward.
+    followUpRequestVersionRef.current += 1;
+    setFollowUps([]);
+  }, []);
 
   /**
    * Extract the text content of the latest user + assistant messages and
@@ -704,6 +713,8 @@ export function useConversationEngine({
    */
   const fetchFollowUps = useCallback(
     async (finalMessages: UIMessage[]) => {
+      const requestVersion = followUpRequestVersionRef.current + 1;
+      followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
         .reverse()
         .find((m) => m.role === "assistant");
@@ -741,6 +752,7 @@ export function useConversationEngine({
         const cleaned = Array.from(
           new Set(list.map((s) => s.trim()).filter(Boolean)),
         ).slice(0, 3);
+        if (followUpRequestVersionRef.current !== requestVersion) return;
         setFollowUps(cleaned);
       } catch {
         /* soft-fail */
@@ -772,15 +784,33 @@ export function useConversationEngine({
         message?: UIMessage;
         messages?: UIMessage[];
         finishReason?: string;
+        isAbort?: boolean;
       };
-      const finalMessages = e.messages ?? [];
+      const isAbort = e.isAbort === true;
+      const streamedMessages = e.messages ?? [];
+      const finalMessages = isAbort
+        ? stopPendingToolCalls(streamedMessages)
+        : streamedMessages;
+      const finalMessage =
+        e.message && isAbort
+          ? finalMessages.find((message) => message.id === e.message?.id) ??
+            e.message
+          : e.message;
+
+      // AI SDK preserves partial tool input when a request is aborted. Replace
+      // those live parts with terminal errors so tool cards and the thinking
+      // indicator stop immediately instead of looking active indefinitely.
+      if (isAbort) {
+        setMessages(finalMessages);
+      }
 
       // Forward to the consumer's onFinish (persistence, etc.) first.
       if (onFinish) {
         onFinish({
           messages: finalMessages,
-          message: e.message,
+          message: finalMessage,
           finishReason: e.finishReason,
+          isAbort,
         });
       }
 
@@ -792,7 +822,7 @@ export function useConversationEngine({
       // time historical messages mount, which previously caused a
       // refetch loop on page open.
       try {
-        const fresh = e.message;
+        const fresh = finalMessage;
         if (fresh && typeof window !== "undefined") {
           // Backstop only (v3.1 R2): the stream-time effect below has
           // usually dispatched these already as outputs arrived; the
@@ -803,6 +833,13 @@ export function useConversationEngine({
         }
       } catch {
         /* never let dispatch errors break the chat */
+      }
+
+      // An aborted partial answer is not a completed state worth suggesting
+      // next actions from. It also keeps the UI quiet after Stop.
+      if (isAbort) {
+        clearFollowUps();
+        return;
       }
 
       // Fire suggested follow-ups (Session 7). Decorative, soft-fails
@@ -821,7 +858,7 @@ export function useConversationEngine({
     messages,
     sendMessage,
     status,
-    stop,
+    stop: stopRequest,
     error,
     setMessages,
     regenerate,
@@ -928,6 +965,14 @@ export function useConversationEngine({
     outputTarget,
   ]);
   const isActive = status === "streaming" || status === "submitted";
+  const stop = useCallback(() => {
+    // Settle synchronously for immediate visual feedback; the SDK's abort
+    // onFinish path repeats the normalization on its authoritative snapshot
+    // before persistence.
+    stopRequest();
+    setMessages((current) => stopPendingToolCalls(current));
+    clearFollowUps();
+  }, [stopRequest, setMessages, clearFollowUps]);
 
   // ── per-message provider + model stamping ──
   // AI SDK's UIMessage doesn't carry provider/model identity — we
@@ -1148,7 +1193,7 @@ export function useConversationEngine({
 
     // Drop any follow-up chips from the previous turn — they describe
     // a state that's about to change.
-    setFollowUps([]);
+    clearFollowUps();
 
     // Vision guard: a text-only model can't read images.
     if (hasImageParts && !supportsImageAttachments) {
@@ -1278,6 +1323,7 @@ export function useConversationEngine({
     activePlaybook,
     resolvedPhaseIndex,
     outputTarget,
+    clearFollowUps,
   ]);
 
   // ── edit / regenerate (Session 5a) ──

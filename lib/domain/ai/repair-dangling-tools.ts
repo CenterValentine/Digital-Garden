@@ -29,9 +29,24 @@ const PRE_OUTPUT_STATES = new Set([
 export const INTERRUPTED_TOOL_MESSAGE =
   "Interrupted — this tool call never executed (the conversation moved on before approval or execution completed). Re-issue the action if it is still wanted.";
 
-export function repairDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
+export const STOPPED_TOOL_MESSAGE =
+  "Stopped by the user before this tool call completed.";
+
+function settlePendingToolCalls(
+  messages: UIMessage[],
+  {
+    includeFinalMessage,
+    errorText,
+  }: {
+    includeFinalMessage: boolean;
+    errorText: string;
+  },
+): UIMessage[] {
   return messages.map((message, index) => {
-    if (message.role !== "assistant" || index === messages.length - 1) {
+    if (
+      message.role !== "assistant" ||
+      (!includeFinalMessage && index === messages.length - 1)
+    ) {
       return message;
     }
     let touched = false;
@@ -46,7 +61,7 @@ export function repairDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
         return {
           ...part,
           state: "output-error",
-          errorText: INTERRUPTED_TOOL_MESSAGE,
+          errorText,
           // An unanswered approval must not resurrect as actionable.
           approval: undefined,
         };
@@ -55,5 +70,24 @@ export function repairDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
     return touched
       ? ({ ...message, parts } as unknown as UIMessage)
       : message;
+  });
+}
+
+export function repairDanglingToolCalls(messages: UIMessage[]): UIMessage[] {
+  return settlePendingToolCalls(messages, {
+    includeFinalMessage: false,
+    errorText: INTERRUPTED_TOOL_MESSAGE,
+  });
+}
+
+/**
+ * User-initiated stop is terminal for the live final message too. Settling
+ * every pre-output tool part removes stale spinners immediately and gives the
+ * persistence layer an honest result that stays settled after reload.
+ */
+export function stopPendingToolCalls(messages: UIMessage[]): UIMessage[] {
+  return settlePendingToolCalls(messages, {
+    includeFinalMessage: true,
+    errorText: STOPPED_TOOL_MESSAGE,
   });
 }
