@@ -1,5 +1,14 @@
 # AI 3.4 — Playbook-Orchestrated Model Routing · Build Plan
 
+> **BUILD STATUS (2026-07-24): S1–S3 BUILT on `feat/ai-v3.4-model-routing`
+> (worktree `ai-v34-model-routing`), gates green.** S4 checkpoint pre-flight
+> DEFERRED (see §7 note below) — its core value is already delivered by the
+> visible fall-through notice + single-resolution stamping, so it's a UX
+> nicety, not a correctness gap. What shipped: directive parse + role features
+> + `model-routing:check` (S1); hoisted resolve + precedence ladder +
+> `modelPinned` + route stamp (S2); inline switch divider + notices + unpin in
+> both chat surfaces (S3). Not pushed / no PR until owner review.
+>
 > **Purpose:** self-contained plan so a **fresh chat** can build AI 3.4 with zero
 > prior context. Read top-to-bottom, then build. Nothing here depends on the
 > conversation that produced it.
