@@ -315,3 +315,31 @@ this file as a playbook” from an ordinary question about the open file.
 Durable rule: **natural-language playbook directives that affect system state
 must be compiled into trusted runtime intent; model-generated tool arguments
 are an override channel, not the sole enforcement mechanism.**
+
+## 10. Owner-smoke fix — generic write receipts did not refresh the tree (2026-07-23)
+
+**Observed:** chat receipts showed newly created Word documents, cached pages,
+and Run Ledger writes in real time, but the file tree did not show those nodes
+until a later reload.
+
+**Root cause:** the receipt UI had moved to the generic `__contentWrites`
+contract, while the conversation freshness hook still gated tree refreshes on
+the older `__notePayload` envelope. Receipt-only outputs such as
+`create_docx` and checkpoint ledger writes therefore rendered successfully but
+never dispatched `dg:tree-refresh`. The hook also marked an unrecognized tool
+call as seen before checking it, preventing the completion backstop from
+recovering it.
+
+**Correction:** freshness dispatch now derives from validated generic write
+receipts. Every persisted write refreshes the tree; note/folder and workflow
+receipts additionally dispatch their surgical live-view events. Legacy
+`__notePayload` results remain supported for older persisted conversations, and
+tool calls are deduplicated only after a recognized write.
+
+**Regression guard:** `output-targets:check` verifies a mixed receipt set
+(Run Ledger note, Word file, workflow) produces one tree refresh requirement
+and the correct type-specific content IDs.
+
+Durable rule: **the visible receipt contract and the freshness contract must
+share the same parser; adding a new persisted output type must not require a
+second envelope-specific refresh path.**

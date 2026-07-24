@@ -9,7 +9,10 @@ import {
   resolveOutputTargetKeyChange,
   type OutputTarget,
 } from "../lib/domain/ai/output-target";
-import { parseContentWriteReceipts } from "../lib/domain/ai/content-write-receipts";
+import {
+  getContentWriteRefreshTargets,
+  parseContentWriteReceipts,
+} from "../lib/domain/ai/content-write-receipts";
 import { resolveToolOutputPlacement } from "../lib/domain/ai/tools/output-placement";
 import { inferReplyExportTitle } from "../lib/domain/ai/reply-export";
 
@@ -270,6 +273,35 @@ assert.deepEqual(
   }),
   [],
   "malformed write receipts must never render as actionable content",
+);
+assert.deepEqual(
+  getContentWriteRefreshTargets({
+    __contentWrites: [
+      writeReceipt,
+      {
+        ...writeReceipt,
+        operation: "created",
+        contentId: "word-document-id",
+        title: "Surface Facts - LTK.docx",
+        contentType: "file",
+        noun: "Word document",
+      },
+      {
+        ...writeReceipt,
+        operation: "updated",
+        contentId: "workflow-id",
+        title: "Research workflow",
+        contentType: "workflow",
+        noun: "workflow",
+      },
+    ],
+  }),
+  {
+    tree: true,
+    noteContentIds: ["90c01845-bdb9-40e8-8ffc-410f4044b900"],
+    workflowContentIds: ["workflow-id"],
+  },
+  "generic receipts must refresh the tree for files and route surgical events by content type",
 );
 
 console.log("Output-target checks passed.");

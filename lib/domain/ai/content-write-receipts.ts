@@ -108,3 +108,41 @@ export function parseContentWriteReceipts(
     .map(parseReceipt)
     .filter((receipt): receipt is ContentWriteReceipt => receipt !== null);
 }
+
+export interface ContentWriteRefreshTargets {
+  tree: boolean;
+  noteContentIds: string[];
+  workflowContentIds: string[];
+}
+
+/**
+ * Convert persisted write receipts into the client freshness signals their
+ * content types require. Every write refreshes the tree; only text-bearing
+ * note/folder surfaces and workflows need their narrower live-view events.
+ */
+export function getContentWriteRefreshTargets(
+  output: unknown,
+): ContentWriteRefreshTargets {
+  const receipts = parseContentWriteReceipts(output);
+  return {
+    tree: receipts.length > 0,
+    noteContentIds: Array.from(
+      new Set(
+        receipts
+          .filter(
+            (receipt) =>
+              receipt.contentType === "note" ||
+              receipt.contentType === "folder",
+          )
+          .map((receipt) => receipt.contentId),
+      ),
+    ),
+    workflowContentIds: Array.from(
+      new Set(
+        receipts
+          .filter((receipt) => receipt.contentType === "workflow")
+          .map((receipt) => receipt.contentId),
+      ),
+    ),
+  };
+}

@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Generic AI writes refresh the file tree in real time on PR #126
+
+- Root-caused the stale tree to a contract split: chat cards rendered generic `__contentWrites` receipts, while freshness dispatch still recognized only legacy `__notePayload` results.
+- Every validated persisted write now dispatches a tree refresh; note/folder and workflow receipts also dispatch their narrower live-view events, with legacy results retained for old conversations.
+- The completion backstop can now recover partial stream states because tool calls are marked seen only after a recognized write.
+
 **July 23, 2026**: Rooted-playbook output directives are runtime-enforced on PR #126
 
 - Confirmed the Test 14 model understood “under the chat” but omitted `outputLocation` from `create_docx`; the runtime then correctly used the `underContent` preference.

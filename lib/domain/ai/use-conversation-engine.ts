@@ -57,17 +57,19 @@ import {
 } from "@/lib/domain/ai/output-target";
 import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
 export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
 /**
- * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's output
- * for the __notePayload envelope and dispatches the freshness events —
+ * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's generic
+ * content-write receipts and dispatches the freshness events —
  * dg:tree-refresh (file tree), then dg:notes-refresh (surgical note
- * reload) or dg:workflow-refresh (canvas) by artifact noun. Deduped by
+ * reload) or dg:workflow-refresh (canvas) by content type. Deduped by
  * toolCallId through the shared seen-set so the streaming effect and the
  * onFinish backstop never double-fire, including across two surfaces
  * bound to the same conversation (toolCallIds are globally unique).
+ * Legacy __notePayload results remain supported for persisted older chats.
  */
 const dispatchedArtifactToolCalls = new Set<string>();
 
@@ -76,33 +78,54 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
   const p = part as { toolCallId?: string; output?: unknown };
   if (!p.toolCallId || p.output === undefined) return;
   if (seen.has(p.toolCallId)) return;
-  seen.add(p.toolCallId);
-  const str =
-    typeof p.output === "string" ? p.output : JSON.stringify(p.output);
-  if (!str.includes('"__notePayload"')) return;
-  try {
-    const parsed = JSON.parse(str) as {
-      __notePayload?: boolean;
-      contentId?: string;
-      noun?: string;
-    };
-    if (!parsed.__notePayload || typeof parsed.contentId !== "string") return;
+  const refreshTargets = getContentWriteRefreshTargets(p.output);
+  if (refreshTargets.tree) {
+    seen.add(p.toolCallId);
     window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-    if (parsed.noun === "workflow") {
+    for (const contentId of refreshTargets.workflowContentIds) {
       window.dispatchEvent(
         new CustomEvent("dg:workflow-refresh", {
-          detail: { contentId: parsed.contentId },
+          detail: { contentId },
         }),
       );
-    } else {
+    }
+    for (const contentId of refreshTargets.noteContentIds) {
       // Surgical notes-only refresh — narrower than `content-updated`,
       // which resets loading/outline/tab state (see MainPanelContent).
       window.dispatchEvent(
         new CustomEvent("dg:notes-refresh", {
-          detail: { contentId: parsed.contentId },
+          detail: { contentId },
         }),
       );
     }
+    return;
+  }
+
+  // Backward compatibility for persisted pre-receipt tool results.
+  try {
+    const legacy =
+      typeof p.output === "string"
+        ? (JSON.parse(p.output) as {
+            __notePayload?: boolean;
+            contentId?: string;
+            noun?: string;
+          })
+        : (p.output as {
+            __notePayload?: boolean;
+            contentId?: string;
+            noun?: string;
+          });
+    if (!legacy.__notePayload || typeof legacy.contentId !== "string") return;
+    seen.add(p.toolCallId);
+    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    window.dispatchEvent(
+      new CustomEvent(
+        legacy.noun === "workflow"
+          ? "dg:workflow-refresh"
+          : "dg:notes-refresh",
+        { detail: { contentId: legacy.contentId } },
+      ),
+    );
   } catch {
     /* unparseable tool output — skip */
   }
