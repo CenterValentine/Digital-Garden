@@ -53,6 +53,7 @@ import {
   type ToolOutputLocation,
 } from "./output-placement";
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
+import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -194,9 +195,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // phase incorporating it); Approve-with-tweaks = approved + reason
       // (apply the changes, then continue). Execution (post-approval)
       // writes the Run Ledger so the folder carries the run state.
-      needsApproval: true,
+      // A verifiable research/reference phase cannot request approval until
+      // its required supporting tools have actually completed. When the gate
+      // is not ready, execute immediately and return a corrective tool result
+      // so the model can continue working instead of surfacing a false
+      // approval card.
+      needsApproval: () =>
+        getPhaseCheckpointGateStatus(ctx.phaseCheckpointGate).ready,
       description:
         "Call at EVERY phase boundary of a multi-phase procedure/playbook. Pauses for the user's verdict (approve / revise / approve-with-tweaks) and records the phase in the Run Ledger note. " +
+        "This is a completion signal, never a planning shortcut: do not call it until the phase's required research, linked-note reads, analysis, and outputs have actually been completed. The runtime rejects checkpoints that lack verifiable required tool activity. " +
         "Do NOT continue to the next phase without calling this. If the verdict includes revision feedback, redo the current phase incorporating it before checkpointing again. " +
         "Summarize concretely: what was produced, key decisions, where artifacts were saved. On the first checkpoint, provide runTitle as a stable short title for the WHOLE run (subject + anticipated deliverables), not merely this phase.",
       inputSchema: z.object({
@@ -238,6 +246,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         next,
         runTitle,
       }) => {
+        const checkpointStatus = getPhaseCheckpointGateStatus(
+          ctx.phaseCheckpointGate,
+        );
+        if (!checkpointStatus.ready) {
+          return {
+            __checkpointRejected: true,
+            phase,
+            recorded: false,
+            missingRequirements: checkpointStatus.missingRequirements,
+            nextAction:
+              "PREMATURE CHECKPOINT REJECTED. Complete every missing requirement with the named tools, do the phase work, and only then call phase_checkpoint again. Do not claim unfinished work is complete.",
+          };
+        }
+
         const ledgerPlacement = resolveToolOutputPlacement(ctx);
         if (!ledgerPlacement.parentId && !ledgerPlacement.ownedByNoteId) {
           return {
@@ -538,7 +560,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           (p, i) =>
             `${i + 1}. "${p.title}" (id: ${p.id}, ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"})${p.description ? `\n   ${p.description}` : ""}`,
         );
-        return `Found ${matches.length} playbook${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with read_note using its id.`;
+        return `Found ${matches.length} playbook${matches.length !== 1 ? "s" : ""}:\n\n${lines.join("\n\n")}\n\nRead the right one with getCurrentNote using its contentId.`;
       },
     }),
 

@@ -7,6 +7,7 @@
  */
 
 import type { PlaybookOutputDirective } from "../playbooks/output-directives";
+import type { PhaseCheckpointGate } from "../playbooks/checkpoint-gate";
 
 /** Context passed to tool execute functions from the API route */
 export interface ToolExecuteContext {
@@ -72,6 +73,11 @@ export interface ToolExecuteContext {
    * only when the artifact title matches the directive's literal prefix.
    */
   playbookOutputDirectives?: PlaybookOutputDirective[];
+  /**
+   * Mutable request-scoped proof that externally verifiable current-phase
+   * work actually ran before `phase_checkpoint` can request approval.
+   */
+  phaseCheckpointGate?: PhaseCheckpointGate;
   /**
    * Output-target chip "folder" mode (WS7): when the user chose a specific
    * folder for outputs, this is that folder id. Output tools file new content

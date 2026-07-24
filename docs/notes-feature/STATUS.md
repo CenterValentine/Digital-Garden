@@ -53,6 +53,13 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Playbook checkpoints now require provider-neutral evidence
+
+- Root-caused GPT-4o's instant false Phase 1 completion to a nonexistent model-facing `read_note` name, missing rooted-playbook reference IDs, and a checkpoint tool that trusted completion claims without runtime proof.
+- All providers now receive the real `getCurrentNote` contract; rooted and picker-attached playbooks share the same ownership-scoped linked-extension manifest.
+- Research/reference phases cannot surface approval until their required observable tool activity completes. Premature checkpoints return corrective results, while approval resumes recover evidence from persisted tool parts.
+- `playbooks:check` covers premature rejection, independent research/reference requirements, resume hydration, pure-writing phases, and disabled-tool safety.
+
 **July 23, 2026**: Generic AI writes refresh the file tree in real time on PR #126
 
 - Root-caused the stale tree to a contract split: chat cards rendered generic `__contentWrites` receipts, while freshness dispatch still recognized only legacy `__notePayload` results.

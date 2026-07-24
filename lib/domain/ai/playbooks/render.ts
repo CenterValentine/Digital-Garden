@@ -4,7 +4,7 @@
  * One-way TipTap JSON → plain text for MODEL CONTEXT ONLY — not user-facing
  * markdown, not round-trip safe, nothing writes this back into a document.
  * Preserves `[[Target]]` / `[[Target|Display]]` wiki-link syntax verbatim so
- * the model can trace references via `read_note`, plus enough block
+ * the model can trace references via `getCurrentNote`, plus enough block
  * structure (headings, lists, code, quotes) to stay readable.
  *
  * Deliberately does NOT depend on the richer lossless markdown serializer

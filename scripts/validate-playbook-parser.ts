@@ -16,6 +16,14 @@ import {
 import { resolveToolOutputPlacement } from "@/lib/domain/ai/tools/output-placement";
 import { buildRunLedgerTitle } from "@/lib/domain/ai/run-ledger-title";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
+import {
+  configurePhaseCheckpointGate,
+  createPhaseCheckpointGate,
+  getPhaseCheckpointGateStatus,
+  recordCompletedPhaseTools,
+  recordCompletedPhaseToolsFromMessages,
+  renderPhaseCheckpointGateInstruction,
+} from "@/lib/domain/ai/playbooks/checkpoint-gate";
 
 function paragraph(text: string): JSONContent {
   return {
@@ -96,6 +104,134 @@ assert.equal(unsectioned.phases[0].title, "Instructions");
 assert.equal(
   renderPlaybookSection(unsectioned.phases[0].content),
   "Research the subject, then summarize the evidence.",
+);
+
+// Regression: OpenAI called phase_checkpoint immediately and claimed it had
+// researched/read helper notes even though the turn contained no supporting
+// tool calls. Externally verifiable requirements must be runtime-gated rather
+// than trusted to provider-specific prompt obedience.
+const checkpointGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(checkpointGate, {
+  phaseTitle: "Phase 1: Understand the employer",
+  phaseText:
+    "Construct an evidence-backed company thesis. Research as needed using web resources, then use [[Research Questions]].",
+  referenceContentIds: ["11111111-1111-4111-8111-111111111111"],
+});
+assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
+  ready: false,
+  missingRequirements: [
+    "Complete at least one web research call with search_web or read_page.",
+    "Read at least one linked extension with getCurrentNote.",
+  ],
+});
+assert.match(
+  renderPhaseCheckpointGateInstruction(checkpointGate),
+  /runtime rejects a premature checkpoint/i,
+);
+assert.match(
+  renderPhaseCheckpointGateInstruction(checkpointGate),
+  /getCurrentNote/,
+);
+recordCompletedPhaseTools(
+  checkpointGate,
+  [
+    {
+      toolCallId: "search-call",
+      toolName: "search_web",
+      input: { query: "Acme employer research" },
+    },
+  ],
+  [{ toolCallId: "search-call" }],
+);
+assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
+  ready: false,
+  missingRequirements: [
+    "Read at least one linked extension with getCurrentNote.",
+  ],
+});
+recordCompletedPhaseTools(
+  checkpointGate,
+  [
+    {
+      toolCallId: "read-call",
+      toolName: "getCurrentNote",
+      input: { contentId: "11111111-1111-4111-8111-111111111111" },
+    },
+  ],
+  [{ toolCallId: "read-call" }],
+);
+assert.deepEqual(getPhaseCheckpointGateStatus(checkpointGate), {
+  ready: true,
+  missingRequirements: [],
+});
+
+const resumedCheckpointGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(resumedCheckpointGate, {
+  phaseTitle: "Phase 1: Understand the employer",
+  phaseText: "Research the employer using [[Research Questions]].",
+  referenceContentIds: ["11111111-1111-4111-8111-111111111111"],
+});
+recordCompletedPhaseToolsFromMessages(resumedCheckpointGate, [
+  {
+    role: "user",
+    parts: [{ type: "text", text: "Run Phase 1." }],
+  },
+  {
+    role: "assistant",
+    parts: [
+      {
+        type: "tool-search_web",
+        toolCallId: "persisted-search",
+        state: "output-available",
+        input: { query: "Acme employer research" },
+        output: [],
+      },
+      {
+        type: "tool-getCurrentNote",
+        toolCallId: "persisted-read",
+        state: "output-available",
+        input: { contentId: "11111111-1111-4111-8111-111111111111" },
+        output: "Research questions",
+      },
+      {
+        type: "tool-phase_checkpoint",
+        toolCallId: "pending-checkpoint",
+        state: "approval-requested",
+        input: { phase: "Phase 1", summary: "Complete." },
+      },
+    ],
+  },
+]);
+assert.deepEqual(
+  getPhaseCheckpointGateStatus(resumedCheckpointGate),
+  { ready: true, missingRequirements: [] },
+  "approval resumes must recover completed phase evidence from persisted UI tool parts",
+);
+
+const proseOnlyCheckpointGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(proseOnlyCheckpointGate, {
+  phaseTitle: "Draft",
+  phaseText: "Draft three headline options.",
+  referenceContentIds: [],
+});
+assert.deepEqual(
+  getPhaseCheckpointGateStatus(proseOnlyCheckpointGate),
+  { ready: true, missingRequirements: [] },
+  "pure writing phases must not be forced to make irrelevant tool calls",
+);
+
+const disabledToolsCheckpointGate = createPhaseCheckpointGate();
+configurePhaseCheckpointGate(disabledToolsCheckpointGate, {
+  phaseTitle: "Research",
+  phaseText: "Research the employer using [[Research Questions]].",
+  referenceContentIds: ["11111111-1111-4111-8111-111111111111"],
+  researchToolsAvailable: false,
+  referenceToolAvailable: false,
+});
+assert.deepEqual(
+  getPhaseCheckpointGateStatus(disabledToolsCheckpointGate),
+  { ready: true, missingRequirements: [] },
+  "disabled tools must not create an impossible checkpoint gate",
 );
 
 const routedOutputPlaybook = parsePlaybook({

@@ -133,9 +133,19 @@ import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
-import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
+import {
+  parsePlaybook,
+  type PlaybookReference,
+} from "@/lib/domain/ai/playbooks/parse";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import {
+  configurePhaseCheckpointGate,
+  createPhaseCheckpointGate,
+  recordCompletedPhaseTools,
+  recordCompletedPhaseToolsFromMessages,
+  renderPhaseCheckpointGateInstruction,
+} from "@/lib/domain/ai/playbooks/checkpoint-gate";
 import {
   bindPlaybookToLatestUserMessage,
   requestsRootedPlaybookExecution,
@@ -146,6 +156,63 @@ import {
 } from "@/lib/domain/ai/playbooks/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
+
+async function resolvePlaybookReferenceContext(
+  userId: string,
+  references: PlaybookReference[],
+  activePhaseReferences: PlaybookReference[],
+): Promise<{
+  manifest: string;
+  activeReferenceContentIds: string[];
+}> {
+  if (references.length === 0) {
+    return { manifest: "", activeReferenceContentIds: [] };
+  }
+
+  const uniqueTitles = Array.from(
+    new Set(references.map((reference) => reference.targetTitle)),
+  );
+  const referenceNodes = await prisma.contentNode.findMany({
+    where: {
+      ownerId: userId,
+      title: { in: uniqueTitles },
+      contentType: { in: ["note", "folder"] },
+      deletedAt: null,
+    },
+    select: {
+      id: true,
+      title: true,
+      notePayload: { select: { metadata: true } },
+    },
+  });
+  const byTitle = new Map(referenceNodes.map((node) => [node.title, node]));
+  const activeTitles = new Set(
+    activePhaseReferences.map((reference) => reference.targetTitle),
+  );
+  const activeReferenceContentIds = Array.from(
+    new Set(
+      referenceNodes
+        .filter((node) => activeTitles.has(node.title))
+        .map((node) => node.id),
+    ),
+  );
+  const lines = uniqueTitles.map((title) => {
+    const found = byTitle.get(title);
+    if (!found) return `- [[${title}]] — not found in your notes`;
+    const isSubPlaybook = isPlaybookMetadata(found.notePayload?.metadata);
+    return isSubPlaybook
+      ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+      : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
+  });
+
+  return {
+    manifest:
+      "\n\n**Linked extensions** " +
+      "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
+      lines.join("\n"),
+    activeReferenceContentIds,
+  };
+}
 
 export async function POST(request: Request) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
@@ -606,6 +673,10 @@ export async function POST(request: Request) {
       // Tool closures retain this array reference, so trusted directives
       // pushed before streamText begins are available at execution time.
       const playbookOutputDirectives: PlaybookOutputDirective[] = [];
+      // Provider-neutral checkpoint proof is configured after the selected
+      // playbook is parsed below. Tool closures retain this request-scoped
+      // object and consult its live state before surfacing approval.
+      const phaseCheckpointGate = createPhaseCheckpointGate();
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
@@ -632,6 +703,7 @@ export async function POST(request: Request) {
           ? openContentLocationId ?? null
           : undefined,
         playbookOutputDirectives,
+        phaseCheckpointGate,
         attachedMedia,
       };
       const allTools = {
@@ -820,7 +892,7 @@ export async function POST(request: Request) {
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
       // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
       // references in that phase surface as a manifest the model traces on
-      // demand via read_note; sub-playbooks (a linked note OR folder that is
+      // demand via getCurrentNote; sub-playbooks (a linked note OR folder that is
       // itself marked as a playbook) are called out so the model follows
       // their own directives rather than treating them as passive reading.
       let playbookContext = "";
@@ -896,37 +968,25 @@ export async function POST(request: Request) {
                 ...parsed.standingRules.references,
                 ...phase.references,
               ];
-              let refsManifest = "";
-              if (allRefs.length > 0) {
-                const uniqueTitles = Array.from(
-                  new Set(allRefs.map((r) => r.targetTitle)),
-                );
-                const refNodes = await prisma.contentNode.findMany({
-                  where: {
-                    ownerId: session.user.id,
-                    title: { in: uniqueTitles },
-                    deletedAt: null,
-                  },
-                  select: {
-                    // id is what read_note (getCurrentNote) needs — it takes a
-                    // UUID, not a title, so the manifest MUST carry the id or
-                    // the model can't act on "read this extension" directly.
-                    id: true,
-                    title: true,
-                    notePayload: { select: { metadata: true } },
-                  },
-                });
-                const byTitle = new Map(refNodes.map((n) => [n.title, n]));
-                const lines = uniqueTitles.map((title) => {
-                  const found = byTitle.get(title);
-                  if (!found) return `- [[${title}]] — not found in your notes`;
-                  const isSub = isPlaybookMetadata(found.notePayload?.metadata);
-                  return isSub
-                    ? `- [[${title}]] (read_note id: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
-                    : `- [[${title}]] (read_note id: ${found.id})`;
-                });
-                refsManifest = `\n\n**Linked extensions** (call read_note with the id below only when the current phase needs one — not preloaded):\n${lines.join("\n")}`;
-              }
+              const phaseText = renderPlaybookSection(phase.content);
+              const referenceContext = await resolvePlaybookReferenceContext(
+                session.user.id,
+                allRefs,
+                phase.references,
+              );
+              configurePhaseCheckpointGate(phaseCheckpointGate, {
+                phaseTitle: phase.title,
+                phaseText,
+                referenceContentIds:
+                  referenceContext.activeReferenceContentIds,
+                researchToolsAvailable:
+                  "search_web" in tools || "read_page" in tools,
+                referenceToolAvailable: "getCurrentNote" in tools,
+              });
+              recordCompletedPhaseToolsFromMessages(
+                phaseCheckpointGate,
+                messages,
+              );
 
               // Phase table-of-contents: the model sees the whole run's SHAPE
               // (every phase title) but only the current phase's DETAIL. Without
@@ -942,7 +1002,6 @@ export async function POST(request: Request) {
               const standingText = renderPlaybookSection(
                 parsed.standingRules.content,
               );
-              const phaseText = renderPlaybookSection(phase.content);
               playbookContext =
                 `\n\n## Active Playbook: "${playbookNode.title}"\n` +
                 `This playbook is ALREADY ATTACHED and loaded below — when the user asks to run "this playbook" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
@@ -951,7 +1010,7 @@ export async function POST(request: Request) {
                 (standingText
                   ? `**Standing rules (always apply):**\n${standingText}\n\n`
                   : "") +
-                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${refsManifest}`;
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${referenceContext.manifest}`;
             } else {
               // A valid marked playbook can be empty. Keep its explicit
               // identity in context instead of silently falling through to
@@ -997,6 +1056,31 @@ export async function POST(request: Request) {
             const standingText = renderPlaybookSection(
               parsed.standingRules.content,
             );
+            const activePhase = parsed.phases[0];
+            const allReferences = [
+              ...parsed.standingRules.references,
+              ...parsed.phases.flatMap((phase) => phase.references),
+            ];
+            const referenceContext = await resolvePlaybookReferenceContext(
+              session.user.id,
+              allReferences,
+              activePhase?.references ?? [],
+            );
+            if (activePhase) {
+              configurePhaseCheckpointGate(phaseCheckpointGate, {
+                phaseTitle: activePhase.title,
+                phaseText: renderPlaybookSection(activePhase.content),
+                referenceContentIds:
+                  referenceContext.activeReferenceContentIds,
+                researchToolsAvailable:
+                  "search_web" in tools || "read_page" in tools,
+                referenceToolAvailable: "getCurrentNote" in tools,
+              });
+              recordCompletedPhaseToolsFromMessages(
+                phaseCheckpointGate,
+                messages,
+              );
+            }
             const phaseText = parsed.phases
               .map(
                 (phase, index) =>
@@ -1010,7 +1094,8 @@ export async function POST(request: Request) {
                 ? `**Standing rules (always apply):**\n${standingText}\n\n`
                 : "") +
               (phaseText ||
-                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.");
+                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.") +
+              referenceContext.manifest;
           }
         } catch (rootedPlaybookError) {
           logger.warn({
@@ -1047,7 +1132,7 @@ export async function POST(request: Request) {
               (parsed.phases.length > 0
                 ? ` (${parsed.phases.length} phases)`
                 : "") +
-              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with read_note (id: ${ambientPlaybookId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
+              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with getCurrentNote (contentId: ${ambientPlaybookId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
           }
         } catch (awarenessError) {
           logger.warn({
@@ -1088,13 +1173,13 @@ export async function POST(request: Request) {
         rootedContentSection = attachedPlaybookResolved
           ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected playbook. The playbook attached to the current user message and loaded in "Active Playbook" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the playbook.` +
             (readable
-              ? ` Read the rooted content with read_note (id: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
+              ? ` Read the rooted content with getCurrentNote (contentId: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
               : "")
           : rootedPlaybookResolved
             ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Playbook. Its validated instructions are already loaded; do not read or search for another playbook.`
             : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
               (readable
-                ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+                ? ` Read its content with getCurrentNote (contentId: ${contentId}) when you need it.`
                 : "");
       }
 
@@ -1234,6 +1319,8 @@ export async function POST(request: Request) {
           rootedContentSection,
           outputTargetSection: renderOutputTargetInstruction(outputTarget),
           hasAttachedPlaybook: attachedPlaybookResolved,
+          checkpointIntegritySection:
+            renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,
         }),
         onStepFinish: (step) => {
@@ -1241,6 +1328,15 @@ export async function POST(request: Request) {
           runTokenCounter.total +=
             (step as { usage?: { totalTokens?: number } }).usage
               ?.totalTokens ?? 0;
+          // A checkpoint approval may only surface after the current phase's
+          // runtime-verifiable research/reference requirements completed.
+          // This includes provider-native search because it is represented in
+          // the SDK step's tool calls/results just like app-executed tools.
+          recordCompletedPhaseTools(
+            phaseCheckpointGate,
+            step.toolCalls,
+            step.toolResults,
+          );
           // Tool-call auto-association interceptor (Session 4b).
           // After each model step, scan the step's tool calls for any
           // content-id-bearing args (per the CONTENT_ID_TOOL_ARGS
