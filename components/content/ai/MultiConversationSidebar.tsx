@@ -55,6 +55,12 @@ export function MultiConversationSidebar({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [creatingNew, setCreatingNew] = useState(false);
+  // A transient chat is rebound to its newly-created conversation before the
+  // tab cache necessarily contains that id. Preserve that activation through
+  // any older in-flight tab response; otherwise the validity effect below can
+  // switch the panel back to an existing chat and send the queued first turn
+  // with that chat's output target.
+  const pendingPromotionIdRef = useRef<string | null>(null);
   // Active provider drives the active-tab bg so it merges with the
   // chat surface below. Reads from the shared session store first
   // (which `useModelSelection` writes to on every picker change), and
@@ -86,6 +92,7 @@ export function MultiConversationSidebar({
 
   // Initial / content-switch load.
   useEffect(() => {
+    pendingPromotionIdRef.current = null;
     if (contentId) void loadTabsCache(contentId);
   }, [contentId, loadTabsCache]);
 
@@ -139,7 +146,9 @@ export function MultiConversationSidebar({
 
   // Keep activeId valid as the tab list changes (load, delete, unpin).
   useEffect(() => {
+    const pendingPromotionId = pendingPromotionIdRef.current;
     setActiveId((prev) => {
+      if (prev && prev === pendingPromotionId) return prev;
       if (prev && tabs.some((t) => t.conversationId === prev)) return prev;
       return tabs[0]?.conversationId ?? null;
     });
@@ -199,6 +208,7 @@ export function MultiConversationSidebar({
   // tab's color on the FIRST render after the click. No 1-frame flash.
   const handleActivate = useCallback(
     (id: string) => {
+      pendingPromotionIdRef.current = null;
       setActiveId(id);
       seedSessionForTab(id, tabs);
     },
@@ -234,6 +244,7 @@ export function MultiConversationSidebar({
             }
           }
           await reloadTabs();
+          pendingPromotionIdRef.current = null;
           setActiveId(newId);
         }
       } catch (e) {
@@ -262,6 +273,7 @@ export function MultiConversationSidebar({
       setPickerOpen(false);
       void (async () => {
         await reloadTabs();
+        pendingPromotionIdRef.current = null;
         setActiveId(conversationId);
       })();
     },
@@ -300,6 +312,9 @@ export function MultiConversationSidebar({
       }
       const ok = await unpinConversationFromContent(conversationId, contentId);
       if (!ok) return;
+      if (pendingPromotionIdRef.current === conversationId) {
+        pendingPromotionIdRef.current = null;
+      }
       toast.success("Unpinned from this content");
       await reloadTabs();
     },
@@ -361,7 +376,10 @@ export function MultiConversationSidebar({
         );
         if (!res.ok) throw new Error("Delete failed");
         toast.success("Chat deleted");
-        if (activeId === conversationId) setActiveId(null);
+        if (activeId === conversationId) {
+          pendingPromotionIdRef.current = null;
+          setActiveId(null);
+        }
         await reloadTabs();
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "Delete failed");
@@ -468,6 +486,7 @@ export function MultiConversationSidebar({
           onForked={(newId) => {
             void (async () => {
               await reloadTabs();
+              pendingPromotionIdRef.current = null;
               setActiveId(newId);
             })();
           }}
@@ -475,7 +494,10 @@ export function MultiConversationSidebar({
             // Rebind immediately: the first prompt is already queued against
             // this id. Tab refresh is presentation state and must never gate
             // message delivery (a slow/failed refresh previously stranded the
-            // submission in transient mode).
+            // submission in transient mode). Mark the id as pending first so
+            // an older initial tab request cannot reject it before the forced
+            // refresh observes the newly-created association.
+            pendingPromotionIdRef.current = newId;
             setActiveId(newId);
             void reloadTabs();
           }}
