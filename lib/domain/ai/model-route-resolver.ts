@@ -15,10 +15,28 @@
 
 import "server-only";
 import {
+  ConnectionNotFoundError,
   getConnectionWithKey,
   type ConnectionView,
   type ConnectionWithKey,
 } from "@/lib/features/ai-connections";
+import { logger } from "@/lib/core/logger";
+
+/**
+ * A vanished connection is an expected miss (try the next candidate); any
+ * OTHER failure (key decryption, DB fault) must be logged — swallowing it
+ * would report an infra error to the user as "isn't connected", sending them
+ * to fix a config problem that doesn't exist (review fix).
+ */
+function logUnlessNotFound(error: unknown, where: string): void {
+  if (error instanceof ConnectionNotFoundError) return;
+  logger.warn({
+    layer: "ai",
+    event: "model_routing:connection_resolve_failed",
+    summary: `model-route ${where} connection fetch failed — treating as unavailable`,
+    error,
+  });
+}
 import { resolveFeatureRoute } from "./features/router";
 import {
   resolveModelClass,
@@ -55,8 +73,9 @@ export async function resolvePlaybookModelRoute(
       try {
         const connection = await getConnectionWithKey(userId, match.connectionId);
         return { connection, modelId: match.modelId };
-      } catch {
-        /* connection vanished — try the next ranked match */
+      } catch (error) {
+        logUnlessNotFound(error, "class");
+        /* try the next ranked match */
       }
     }
     return null;
@@ -75,7 +94,8 @@ export async function resolvePlaybookModelRoute(
         connection: await getConnectionWithKey(userId, presetMatch.id),
         modelId,
       };
-    } catch {
+    } catch (error) {
+      logUnlessNotFound(error, "explicit-preset");
       /* fall through to namespaced */
     }
   }
@@ -89,7 +109,8 @@ export async function resolvePlaybookModelRoute(
         connection: await getConnectionWithKey(userId, nsMatch.id),
         modelId: namespaced,
       };
-    } catch {
+    } catch (error) {
+      logUnlessNotFound(error, "explicit-namespaced");
       /* fall through to null */
     }
   }

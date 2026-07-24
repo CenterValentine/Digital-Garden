@@ -355,6 +355,7 @@ export function useConversationBinding({
           id: string;
           role: string;
           parts: unknown;
+          metadata?: unknown;
         }>)
           .filter((m) => m.role === "user" || m.role === "assistant")
           .map((m) => ({
@@ -363,6 +364,10 @@ export function useConversationBinding({
             parts: Array.isArray(m.parts)
               ? normalizePersistedToolParts(m.parts)
               : [{ type: "text" as const, text: "" }],
+            // Carry persisted metadata through (AI 3.4): the model-route
+            // stamp (and usage) live here — dropping it made every
+            // model-switch divider vanish on reload.
+            ...(m.metadata != null ? { metadata: m.metadata } : {}),
           }));
         setMessages(ui);
       } finally {

@@ -26,6 +26,15 @@ somewhere to route. Each `[ ]` is a PR-checklist line.
       again.
 - [ ] **Pin survives reload.** Pin a model, reload → still pinned (per-
       conversation localStorage), playbook still overridden until you unpin.
+- [ ] **Pin survives promotion.** Pin BEFORE the first send in a fresh chat,
+      then send (conversation gets created) → still pinned afterward.
+- [ ] **Pin visible in full-page chat.** Pick a model in the full-page chat
+      viewer → the "Pinned · unpin" control appears there too.
+- [ ] **Directive in a code sample does NOT route.** A phase whose
+      instructions include a fenced config example containing `model: x` →
+      no switch, no divider (first-line-only contract).
+- [ ] **Dividers survive reload.** After a run with model switches, reload →
+      the switch lines are still in the transcript.
 - [ ] **Class directive — match.** Put `model: gpt-5 series` (or a family you
       have connected, e.g. `model: claude`) on a phase → a family member runs;
       divider shows it.

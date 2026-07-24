@@ -849,8 +849,24 @@ export function useConversationEngine({
           // The in-memory transfer remains authoritative for this promotion.
         }
       }
+      // Model pin (AI 3.4) rides the same promotion: a pin set while the
+      // chat was still content-keyed must survive the flip to the conv key,
+      // or the user's explicit pick silently unpins mid-conversation and the
+      // next playbook phase overrides it. This callback is the de facto
+      // "conversation promoted" hook, so both chat surfaces inherit the
+      // carry-over without a second API.
+      if (modelPinned && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            `dg:model-pinned:conv:${nextConversationId}`,
+            "1",
+          );
+        } catch {
+          /* pin re-hydration will fall back to unpinned — non-fatal */
+        }
+      }
     },
-    [outputTarget],
+    [outputTarget, modelPinned],
   );
 
   // ── suggested follow-ups (Session 7) ──
@@ -1361,6 +1377,9 @@ export function useConversationEngine({
           modelId,
           mentionedContentIds: [],
           outputTarget,
+          // Model pin (AI 3.4) — see handleSend for why every per-call
+          // body must carry it.
+          modelPinned,
         },
       },
     );
@@ -1373,6 +1392,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     outputTarget,
+    modelPinned,
   ]);
 
   // ── send ──
@@ -1505,6 +1525,11 @@ export function useConversationEngine({
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
+          // Model pin (AI 3.4). MUST live on every per-call body: the
+          // transport snapshots this body into lastSentBodies BEFORE the
+          // resolver baseline is consulted, so a flag that lives only in
+          // the resolver never reaches the server after a real send.
+          modelPinned,
         },
       },
     );
@@ -1526,6 +1551,7 @@ export function useConversationEngine({
     activePlaybook,
     resolvedPhaseIndex,
     outputTarget,
+    modelPinned,
     clearFollowUps,
   ]);
 
@@ -1545,6 +1571,9 @@ export function useConversationEngine({
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
+      // Model pin (AI 3.4) — see handleSend for why every per-call body
+      // must carry it.
+      modelPinned,
     }),
     [
       contentId,
@@ -1554,6 +1583,7 @@ export function useConversationEngine({
       activePlaybookId,
       resolvedPhaseIndex,
       outputTarget,
+      modelPinned,
     ],
   );
 

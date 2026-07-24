@@ -233,7 +233,11 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       "Playbook phases tagged `model: analyst` — weighing tradeoffs, deciding, planning.",
     requiredCapabilities: ["text", "tools"],
     preferredCapabilities: ["reasoning"],
-    defaultSuggestion: { presetId: "openai", modelId: "o3-mini" },
+    // Suggestion ids MUST exist in the preset template's defaultModels
+    // (review fix: o3-mini is not in the direct OpenAI template, so the
+    // old suggestion could never match and silently fell to auto-bind).
+    // model-routing:check now pins every suggestion against templates.
+    defaultSuggestion: { presetId: "openai", modelId: "gpt-4o" },
   },
   {
     id: "role-writer",
@@ -249,7 +253,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     description:
       "Playbook phases tagged `model: coder` — implementing and scripting.",
     requiredCapabilities: ["text", "tools"],
-    defaultSuggestion: { presetId: "mistral", modelId: "codestral" },
+    defaultSuggestion: { presetId: "mistral", modelId: "codestral-latest" },
   },
   {
     id: "role-reviewer",

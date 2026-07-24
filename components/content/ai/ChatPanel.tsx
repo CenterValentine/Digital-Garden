@@ -28,11 +28,7 @@ import {
   ModelSwitchDivider,
   ModelRouteNotices,
 } from "./ModelSwitchDivider";
-import {
-  readMessageModelRoute,
-  sameModelIdentity,
-  type ResolvedModelRoute,
-} from "@/lib/domain/ai/model-directive";
+import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
@@ -752,33 +748,12 @@ export function ChatPanel({
 
   const hasMessages = messages.length > 0;
 
-  // Model-switch dividers (AI 3.4): walk assistant messages in order; when the
-  // executed model changes between consecutive turns, mark a divider before the
-  // newer one (attributed to whoever switched). A turn that kept the model but
-  // carries a fall-through notice gets a notices-only row. Derived from the
-  // server's per-turn route stamp, so it's reload-safe and history-correct.
-  const messageRouteDecorations = useMemo(() => {
-    const deco: Record<
-      string,
-      { kind: "divider" | "notices"; route?: ResolvedModelRoute; notices: string[] }
-    > = {};
-    let prevRoute: ResolvedModelRoute | null = null;
-    for (const message of messages) {
-      if (message.role !== "assistant") continue;
-      const { route, notices } = readMessageModelRoute(message.metadata);
-      if (route) {
-        if (prevRoute && !sameModelIdentity(prevRoute, route)) {
-          deco[message.id] = { kind: "divider", route, notices };
-        } else if (notices.length > 0) {
-          deco[message.id] = { kind: "notices", notices };
-        }
-        prevRoute = route;
-      } else if (notices.length > 0) {
-        deco[message.id] = { kind: "notices", notices };
-      }
-    }
-    return deco;
-  }, [messages]);
+  // Model-switch dividers (AI 3.4): derived from the server's per-turn route
+  // stamp via the SHARED domain walk (one implementation for both surfaces).
+  const messageRouteDecorations = useMemo(
+    () => computeModelRouteDecorations(messages),
+    [messages],
+  );
 
   // Surface follows the *active* provider — selecting OpenAI tints
   // immediately even if previous messages were from Claude. Per-message
@@ -970,12 +945,15 @@ export function ChatPanel({
               contributors={mixed.contributors as AIProviderId[]}
               compact
             />
-            {modelPinned && activePlaybook ? (
+            {/* Ungated from activePlaybook: rooted runs never set it, and a
+                pin silently suppresses phase directives server-side — the
+                badge must be visible wherever the pin is in effect. */}
+            {modelPinned ? (
               <button
                 type="button"
                 onClick={unpinModel}
                 disabled={isActive}
-                title="Your model pick is fixed for this chat and overrides the playbook. Unpin to let the playbook route models per phase."
+                title="Your model pick is fixed for this chat and overrides any playbook model directives. Unpin to let playbooks route models per phase."
                 className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 disabled:opacity-40 dark:text-amber-300"
               >
                 Pinned · unpin

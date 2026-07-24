@@ -52,14 +52,18 @@ export function ModelSwitchDivider({
         <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
       </div>
       {notices?.map((notice, i) => (
-        <div
-          key={i}
-          className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300"
-        >
-          <TriangleAlert className="h-3 w-3 shrink-0" />
-          <span>{notice}</span>
-        </div>
+        <NoticeRow key={i} notice={notice} />
       ))}
+    </div>
+  );
+}
+
+/** Single amber fall-through notice row — shared by both renderings. */
+function NoticeRow({ notice }: { notice: string }) {
+  return (
+    <div className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300">
+      <TriangleAlert className="h-3 w-3 shrink-0" />
+      <span>{notice}</span>
     </div>
   );
 }
@@ -73,13 +77,7 @@ export function ModelRouteNotices({ notices }: { notices: string[] }) {
   return (
     <div className="my-1.5 flex flex-col items-center gap-1 px-3">
       {notices.map((notice, i) => (
-        <div
-          key={i}
-          className="inline-flex items-center gap-1.5 rounded-md bg-amber-500/10 px-2 py-1 text-[11px] text-amber-700 dark:text-amber-300"
-        >
-          <TriangleAlert className="h-3 w-3 shrink-0" />
-          <span>{notice}</span>
-        </div>
+        <NoticeRow key={i} notice={notice} />
       ))}
     </div>
   );

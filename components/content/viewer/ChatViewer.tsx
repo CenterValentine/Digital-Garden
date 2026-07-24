@@ -17,11 +17,7 @@ import {
   ModelSwitchDivider,
   ModelRouteNotices,
 } from "../ai/ModelSwitchDivider";
-import {
-  readMessageModelRoute,
-  sameModelIdentity,
-  type ResolvedModelRoute,
-} from "@/lib/domain/ai/model-directive";
+import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
 function formatTokenCount(n: number): string {
@@ -100,6 +96,9 @@ function toUIMessages(stored: StoredChatMessage[]): UIMessage[] {
         id: m.id || crypto.randomUUID(),
         role: m.role as "user" | "assistant",
         parts,
+        // Legacy rows can carry metadata too — keep it for divider/usage
+        // consumers (AI 3.4).
+        ...(m.metadata != null ? { metadata: m.metadata } : {}),
       };
     });
 }
@@ -240,6 +239,8 @@ function ChatViewerInner({
     providerId,
     modelId,
     handleModelChange,
+    modelPinned,
+    unpinModel,
     mentionResults,
     handleMentionSearch,
     commandItems,
@@ -564,30 +565,12 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
-  // Model-switch dividers (AI 3.4) — mirrors ChatPanel: mark a divider before
-  // an assistant turn whose executed model differs from the prior turn's.
-  const messageRouteDecorations = useMemo(() => {
-    const deco: Record<
-      string,
-      { kind: "divider" | "notices"; route?: ResolvedModelRoute; notices: string[] }
-    > = {};
-    let prevRoute: ResolvedModelRoute | null = null;
-    for (const message of messages) {
-      if (message.role !== "assistant") continue;
-      const { route, notices } = readMessageModelRoute(message.metadata);
-      if (route) {
-        if (prevRoute && !sameModelIdentity(prevRoute, route)) {
-          deco[message.id] = { kind: "divider", route, notices };
-        } else if (notices.length > 0) {
-          deco[message.id] = { kind: "notices", notices };
-        }
-        prevRoute = route;
-      } else if (notices.length > 0) {
-        deco[message.id] = { kind: "notices", notices };
-      }
-    }
-    return deco;
-  }, [messages]);
+  // Model-switch dividers (AI 3.4): SHARED domain walk — the panel and this
+  // viewer must never disagree about where a model switched.
+  const messageRouteDecorations = useMemo(
+    () => computeModelRouteDecorations(messages),
+    [messages],
+  );
 
   // Mid-run review (v3.1 R1): the run counts as "active" while streaming
   // AND while parked on an unanswered approval (the stream has ended but
@@ -952,6 +935,20 @@ function ChatViewerInner({
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
             />
+            {/* Pin badge/release (AI 3.4) — a pick here pins via the engine's
+                wrapped handleModelChange, so the release control must exist
+                on this surface too, not only in the sidebar panel. */}
+            {modelPinned ? (
+              <button
+                type="button"
+                onClick={unpinModel}
+                disabled={isActive}
+                title="Your model pick is fixed for this chat and overrides any playbook model directives. Unpin to let playbooks route models per phase."
+                className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 disabled:opacity-40 dark:text-amber-300"
+              >
+                Pinned · unpin
+              </button>
+            ) : null}
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}

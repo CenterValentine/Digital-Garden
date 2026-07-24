@@ -22,6 +22,7 @@ import {
   type ConnectionWithKey,
 } from "@/lib/features/ai-connections";
 import { lookupFeature, type CapabilityFlag } from "./registry";
+import { getModelMeta } from "../providers/catalog";
 
 export interface ResolvedRoute {
   /** Decrypted connection — ready to pass to `resolveChatModelFromConnection`. */
@@ -53,7 +54,7 @@ export async function resolveFeatureRoute(
     for (const route of userRoutes) {
       try {
         const conn = await getConnectionWithKey(userId, route.connectionId);
-        if (modelSatisfiesCapabilities(conn, route.modelId, feature.requiredCapabilities, feature.minContextWindow)) {
+        if (modelSatisfiesCapabilities(conn, route.modelId, feature.requiredCapabilities, feature.minContextWindow, true)) {
           resolved.push({
             connection: conn,
             modelId: route.modelId,
@@ -152,16 +153,29 @@ function modelSatisfiesCapabilities(
   modelId: string,
   required: CapabilityFlag[],
   minContextWindow?: number,
+  trustUserMapping = false,
 ): boolean {
   const model = connection.models.find((m) => m.id === modelId);
   if (!model) return false;
-  // Context-window floor (AI 3.4, role-archivist). A model that doesn't
-  // advertise its window is treated as not meeting an explicit floor.
+  // Context-window floor (AI 3.4, role-archivist). Fetched/manually-added
+  // connection models carry no contextWindow (the fetch flow persists only
+  // {id, name, capabilities}), so a strict missing⇒fail check rejected
+  // models the user explicitly mapped (review fix). Resolution order:
+  // the connection model's own window → the static catalog's (by bare id)
+  // → if still unknown, trust an EXPLICIT user mapping (their route rows
+  // encode their judgment) but fail defaults/auto-bind, which have no
+  // human in the loop.
   if (minContextWindow !== undefined) {
-    if (
-      typeof model.contextWindow !== "number" ||
-      model.contextWindow < minContextWindow
-    ) {
+    const bareId = modelId.includes("/")
+      ? modelId.slice(modelId.lastIndexOf("/") + 1)
+      : modelId;
+    const contextWindow =
+      typeof model.contextWindow === "number"
+        ? model.contextWindow
+        : getModelMeta(bareId)?.model.contextWindow;
+    if (typeof contextWindow === "number") {
+      if (contextWindow < minContextWindow) return false;
+    } else if (!trustUserMapping) {
       return false;
     }
   }

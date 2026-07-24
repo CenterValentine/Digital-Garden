@@ -9,6 +9,27 @@
 > `modelPinned` + route stamp (S2); inline switch divider + notices + unpin in
 > both chat surfaces (S3). Not pushed / no PR until owner review.
 >
+> **REVIEW PASS (2026-07-24, 8-angle + verified):** 10 confirmed findings,
+> all fixed in the follow-up commits: pin now rides every per-call body +
+> survives conversation promotion + has unpin on both surfaces; message
+> metadata survives reload (binding/viewer mappers) and server persistence;
+> ONE executed-vendor identity feeds stamp/spans/attachments/reasoning-
+> options/prompt-cache; directive extraction is FIRST-LINE-only (never code
+> blocks/prose) and class matching is prefix-not-substring; rooted-path
+> eligibility mirrors the downstream block; `minContextWindow` falls back to
+> the catalog and trusts explicit user mappings; analyst/coder suggestions
+> now template-valid (CI-pinned); `resolve_source` telemetry gained
+> `playbook-phase`/`playbook`. The unused `data-model-route` part API was
+> DELETED (was dead code claiming an unimplemented replay contract).
+>
+> **Deferred followups (from the review):** (a) durable turn-replay rung —
+> continuations currently re-resolve from turn-start inputs (playbookId +
+> activePhaseIndex via the transport snapshot); a stamped-part replay would
+> also freeze routing across mid-approval playbook edits; (b) thread the
+> hoisted parse into the downstream context block (second fetch+parse per
+> playbook turn); (c) `resolveFeatureRoute` early-exit / reuse of the
+> caller's connection list (decrypts every backup to use routes[0]).
+>
 > **Purpose:** self-contained plan so a **fresh chat** can build AI 3.4 with zero
 > prior context. Read top-to-bottom, then build. Nothing here depends on the
 > conversation that produced it.

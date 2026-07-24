@@ -7,10 +7,10 @@
  *   - `class`    — a vendor family, best-interpretation (model: gpt-5 series)
  *   - `explicit` — a specific provider/model (model: anthropic/claude-opus-4)
  *
- * Everything here is DETERMINISTIC and client-safe (no Prisma, no LLM). The
- * module mirrors `output-target.ts`: a directive type, a durable message part
- * so the turn's resolved route survives reload/approval continuations, and a
- * latest-user-turn reader. See AI-V3.4-MODEL-ROUTING-PLAN.md.
+ * Everything here is DETERMINISTIC and client-safe (no Prisma, no LLM):
+ * directive types + parse, the class-family matcher, and readers for the
+ * server-stamped per-turn route that message metadata carries. See
+ * AI-V3.4-MODEL-ROUTING-PLAN.md.
  */
 
 /** The six capability-contracted role slots (also FeatureSpec ids `role-<name>`). */
@@ -126,9 +126,12 @@ function normalizeModelId(modelId: string): string {
  * Ranking tiers (deterministic, table-tested):
  *   0 — normalized id equals the family exactly
  *   1 — id starts with `family-` or `family.` (a variant of the family)
- *   2 — id otherwise contains the family token
+ *   2 — id starts with the family token (e.g. "gpt-4o" for family "gpt-4")
  * Within a tier: shorter id first (base model before variants), then the
- * input order (stable).
+ * input order (stable). Tier 2 is prefix — NOT substring — a substring
+ * tier let near-arbitrary tokens ("mini") match unrelated models, which
+ * combined with the class-degradation parse made prose accidentally
+ * routable.
  */
 export function resolveModelClass(
   family: string,
@@ -149,7 +152,7 @@ export function resolveModelClass(
       tier = 0;
     } else if (id.startsWith(`${fam}-`) || id.startsWith(`${fam}.`)) {
       tier = 1;
-    } else if (id.includes(fam)) {
+    } else if (id.startsWith(fam)) {
       tier = 2;
     }
     if (tier >= 0) scored.push({ model, tier, index });
@@ -167,24 +170,13 @@ export function resolveModelClass(
     .map((s) => s.model);
 }
 
-// ── durable turn binding (mirror data-output-target) ─────────────────────
-
-/**
- * The turn's resolved route, stamped onto the user message so approval
- * continuations and reloads replay the SAME model instead of re-resolving —
- * the prevention-layer-1 durability contract from the plan (§6), identical in
- * spirit to `data-output-target`.
- */
-export interface ModelRouteMessagePart {
-  type: "data-model-route";
-  data: { route: ResolvedModelRoute };
-}
-
-export function createModelRouteMessagePart(
-  route: ResolvedModelRoute,
-): ModelRouteMessagePart {
-  return { type: "data-model-route", data: { route } };
-}
+// ── stamped-route parsing ─────────────────────────────────────────────────
+// NOTE (review fix): an earlier revision shipped a `data-model-route`
+// user-message part here ("durable turn replay") that nothing produced or
+// consumed — deleted rather than left as dead API. Continuations today
+// re-resolve from turn-start inputs (playbookId + activePhaseIndex ride the
+// transport's turn snapshot); a true stamped-part replay rung is a
+// documented followup in AI-V3.4-MODEL-ROUTING-PLAN.md.
 
 const ROUTE_SOURCES: readonly ModelRouteSource[] = [
   "user",
@@ -219,38 +211,6 @@ export function parseResolvedModelRoute(
   return route;
 }
 
-export function parseModelRouteMessagePart(
-  part: unknown,
-): ResolvedModelRoute | null {
-  if (!part || typeof part !== "object") return null;
-  const candidate = part as { type?: unknown; data?: { route?: unknown } };
-  if (candidate.type !== "data-model-route") return null;
-  return parseResolvedModelRoute(candidate.data?.route);
-}
-
-/**
- * Read only the latest user turn's stamped route. Falling back to an older
- * turn would make a fresh send inherit a route it never resolved (mirrors
- * getLatestUserMessageOutputTarget).
- */
-export function getLatestUserMessageModelRoute(
-  messages: unknown[],
-): ResolvedModelRoute | null {
-  for (let index = messages.length - 1; index >= 0; index -= 1) {
-    const message = messages[index];
-    if (!message || typeof message !== "object") continue;
-    const candidate = message as { role?: unknown; parts?: unknown };
-    if (candidate.role !== "user") continue;
-    if (!Array.isArray(candidate.parts)) return null;
-    for (const part of candidate.parts) {
-      const route = parseModelRouteMessagePart(part);
-      if (route) return route;
-    }
-    return null;
-  }
-  return null;
-}
-
 // ── switch-line copy (the inline divider, not a pill) ─────────────────────
 
 /**
@@ -279,6 +239,42 @@ export function sameModelIdentity(
 ): boolean {
   if (!a || !b) return false;
   return a.providerId === b.providerId && a.modelId === b.modelId;
+}
+
+/** Per-message divider/notice decoration for the chat surfaces. */
+export interface ModelRouteDecoration {
+  kind: "divider" | "notices";
+  route?: ResolvedModelRoute;
+  notices: string[];
+}
+
+/**
+ * Walk assistant messages in order and decide, per message, whether to render
+ * a model-switch divider (executed model differs from the previous assistant
+ * turn's) or a notices-only row. ONE implementation for both chat surfaces —
+ * the panel and the full-page viewer must never disagree about where a model
+ * switched in the same conversation.
+ */
+export function computeModelRouteDecorations(
+  messages: Array<{ id: string; role: string; metadata?: unknown }>,
+): Record<string, ModelRouteDecoration> {
+  const decorations: Record<string, ModelRouteDecoration> = {};
+  let prevRoute: ResolvedModelRoute | null = null;
+  for (const message of messages) {
+    if (message.role !== "assistant") continue;
+    const { route, notices } = readMessageModelRoute(message.metadata);
+    if (route) {
+      if (prevRoute && !sameModelIdentity(prevRoute, route)) {
+        decorations[message.id] = { kind: "divider", route, notices };
+      } else if (notices.length > 0) {
+        decorations[message.id] = { kind: "notices", notices };
+      }
+      prevRoute = route;
+    } else if (notices.length > 0) {
+      decorations[message.id] = { kind: "notices", notices };
+    }
+  }
+  return decorations;
 }
 
 /** Human label for who/what selected the model, for the ModelSwitchDivider. */

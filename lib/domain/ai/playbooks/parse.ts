@@ -136,19 +136,27 @@ function stripYamlFrontmatter(text: string): string {
 }
 
 /**
- * Find the first `model:` directive line in a section's rendered text (AI 3.4).
- * Scans per-node text split into lines, so it works for both the TipTap path
- * (directive is its own paragraph node) and the markdown-like path (all lines
- * live in one joined paragraph).
+ * Extract a `model:` directive from a section (AI 3.4) — FIRST-LINE contract.
+ *
+ * The directive must be the first non-empty line of the section's first
+ * non-empty node, and that node must be plain (never a codeBlock/blockquote).
+ * Deliberately strict: an earlier scan-everything version turned `model:`
+ * lines inside example config blocks and mid-prose sentences into live
+ * routing directives — a phase's INSTRUCTIONS could silently reroute the
+ * phase. Works for both the TipTap path (directive is its own first
+ * paragraph) and the markdown-like path (first line of the joined text).
  */
 function extractModelDirective(content: JSONContent[]): string | undefined {
-  for (const node of content) {
-    for (const line of nodeText(node).split("\n")) {
-      const match = line.match(/^\s*model:\s*(.+?)\s*$/i);
-      if (match && match[1].trim()) return match[1].trim();
-    }
+  const first = content.find((node) => nodeText(node).trim().length > 0);
+  if (!first || first.type === "codeBlock" || first.type === "blockquote") {
+    return undefined;
   }
-  return undefined;
+  const firstLine = nodeText(first)
+    .split("\n")
+    .find((line) => line.trim().length > 0);
+  const match = firstLine?.match(/^\s*model:\s*(.+?)\s*$/i);
+  const value = match?.[1]?.trim();
+  return value || undefined;
 }
 
 function textSection(title: string, lines: string[]): PlaybookSection {

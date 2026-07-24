@@ -17,8 +17,9 @@ import {
   MODEL_ROLES,
   parseModelDirective,
   resolveModelClass,
-  createModelRouteMessagePart,
-  getLatestUserMessageModelRoute,
+  parseResolvedModelRoute,
+  readMessageModelRoute,
+  computeModelRouteDecorations,
   describeModelRouteSource,
   isModelRole,
   roleFeatureId,
@@ -28,6 +29,7 @@ import {
 import { parsePlaybook } from "../lib/domain/ai/playbooks/parse";
 import { getPhaseModelDirective } from "../lib/domain/ai/playbooks/model-directives";
 import { FEATURE_BY_ID, lookupFeature } from "../lib/domain/ai/features/registry";
+import { lookupTemplate } from "../lib/features/ai-connections/templates";
 
 // ── directive parsing ─────────────────────────────────────────────────────
 
@@ -204,7 +206,41 @@ const plainParsed = parsePlaybook(plainDoc);
 assert.equal(plainParsed.phases[0].modelDirective, undefined);
 assert.equal(getPhaseModelDirective(plainParsed, 0), null);
 
-// ── durable turn-part round trip ───────────────────────────────────────────
+// FIRST-LINE contract (review fix): a `model:` line inside a code sample or
+// buried mid-prose must NOT become a live routing directive.
+const codeBlockDoc = {
+  type: "doc",
+  content: [
+    { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Configure" }] },
+    {
+      type: "codeBlock",
+      attrs: { language: "yaml" },
+      content: [
+        { type: "text", text: "# example config\nmodel: gpt-4o-mini\ntemperature: 0.2" },
+      ],
+    },
+  ],
+};
+assert.equal(
+  parsePlaybook(codeBlockDoc).phases[0].modelDirective,
+  undefined,
+  "a model: line inside a code block must not route",
+);
+const midProseDoc = {
+  type: "doc",
+  content: [
+    { type: "heading", attrs: { level: 2 }, content: [{ type: "text", text: "Write" }] },
+    { type: "paragraph", content: [{ type: "text", text: "Draft the intro first." }] },
+    { type: "paragraph", content: [{ type: "text", text: "model: scout" }] },
+  ],
+};
+assert.equal(
+  parsePlaybook(midProseDoc).phases[0].modelDirective,
+  undefined,
+  "a model: line that is not the phase's first line must not route",
+);
+
+// ── stamped-route round trip + divider decoration walk ─────────────────────
 
 const route: ResolvedModelRoute = {
   providerId: "openai",
@@ -214,21 +250,48 @@ const route: ResolvedModelRoute = {
   playbookTitle: "Job Hunt",
   phaseIndex: 2,
 };
-const part = createModelRouteMessagePart(route);
-const messages = [
-  { role: "user", parts: [{ type: "text", text: "hi" }] },
-  { role: "assistant", parts: [{ type: "text", text: "hello" }] },
-  { role: "user", parts: [{ type: "text", text: "go" }, part] },
-];
-assert.deepEqual(getLatestUserMessageModelRoute(messages), route);
-// Latest user turn only; an older stamped route is not inherited.
-assert.equal(
-  getLatestUserMessageModelRoute([
-    { role: "user", parts: [part] },
-    { role: "user", parts: [{ type: "text", text: "fresh" }] },
-  ]),
-  null,
+// The metadata stamp survives a JSON round trip (persistence shape).
+assert.deepEqual(
+  parseResolvedModelRoute(JSON.parse(JSON.stringify(route))),
+  route,
 );
+assert.equal(parseResolvedModelRoute({ providerId: "x" }), null);
+assert.deepEqual(
+  readMessageModelRoute({ modelRoute: route, modelRouteNotices: ["n1", 2] }),
+  { route, notices: ["n1"] },
+);
+assert.deepEqual(readMessageModelRoute(undefined), {
+  route: null,
+  notices: [],
+});
+
+// Divider decoration walk (ONE implementation for both chat surfaces):
+// divider appears only when the executed model changes between assistant
+// turns; notices-only rows when the model held; legacy metadata-less
+// history renders nothing.
+const routeA: ResolvedModelRoute = {
+  providerId: "anthropic",
+  modelId: "claude-sonnet-4",
+  source: "default",
+};
+const decoMessages = [
+  { id: "u1", role: "user" },
+  { id: "a1", role: "assistant", metadata: { modelRoute: routeA } },
+  { id: "a2", role: "assistant", metadata: { modelRoute: routeA } },
+  {
+    id: "a3",
+    role: "assistant",
+    metadata: { modelRoute: route, modelRouteNotices: ["fell through"] },
+  },
+  { id: "a4", role: "assistant" },
+];
+const deco = computeModelRouteDecorations(decoMessages);
+assert.equal(deco["a1"], undefined);
+assert.equal(deco["a2"], undefined);
+assert.equal(deco["a3"]?.kind, "divider");
+assert.deepEqual(deco["a3"]?.notices, ["fell through"]);
+assert.equal(deco["a4"], undefined);
+
 // Switch-line copy names who switched.
 assert.equal(
   describeModelRouteSource(route),
@@ -262,5 +325,20 @@ for (const role of MODEL_ROLES) {
 }
 // Archivist carries the long-context floor.
 assert.equal(FEATURE_BY_ID["role-archivist"].minContextWindow, 200_000);
+
+// Every role defaultSuggestion must name a model id that ACTUALLY EXISTS in
+// the preset template's defaultModels (review fix: two suggestions pointed
+// at catalog-only ids — 'o3-mini' absent from the OpenAI template,
+// 'codestral' vs the template's 'codestral-latest' — so they could never
+// match a real connection and silently fell to arbitrary auto-bind).
+for (const role of MODEL_ROLES) {
+  const suggestion = FEATURE_BY_ID[roleFeatureId(role)].defaultSuggestion!;
+  const template = lookupTemplate(suggestion.presetId);
+  assert.ok(template, `role ${role}: no template for preset ${suggestion.presetId}`);
+  assert.ok(
+    template!.defaultModels.some((m) => m.id === suggestion.modelId),
+    `role ${role}: suggestion ${suggestion.presetId}/${suggestion.modelId} is not in the template's defaultModels — it can never match a real connection`,
+  );
+}
 
 console.log("model-routing checks passed");
