@@ -253,6 +253,34 @@ export function getLatestUserMessageModelRoute(
 
 // ── switch-line copy (the inline divider, not a pill) ─────────────────────
 
+/**
+ * Read the server-stamped route + fall-through notices off a message's
+ * metadata (AI 3.4). Tolerant of legacy messages (no such metadata) — returns
+ * a null route + empty notices, so pre-3.4 history renders no divider.
+ */
+export function readMessageModelRoute(metadata: unknown): {
+  route: ResolvedModelRoute | null;
+  notices: string[];
+} {
+  if (!metadata || typeof metadata !== "object") {
+    return { route: null, notices: [] };
+  }
+  const m = metadata as { modelRoute?: unknown; modelRouteNotices?: unknown };
+  const notices = Array.isArray(m.modelRouteNotices)
+    ? m.modelRouteNotices.filter((n): n is string => typeof n === "string")
+    : [];
+  return { route: parseResolvedModelRoute(m.modelRoute), notices };
+}
+
+/** Compare two routes by executed identity (provider + model). */
+export function sameModelIdentity(
+  a: ResolvedModelRoute | null,
+  b: ResolvedModelRoute | null,
+): boolean {
+  if (!a || !b) return false;
+  return a.providerId === b.providerId && a.modelId === b.modelId;
+}
+
 /** Human label for who/what selected the model, for the ModelSwitchDivider. */
 export function describeModelRouteSource(route: ResolvedModelRoute): string {
   switch (route.source) {
