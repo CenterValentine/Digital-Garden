@@ -33,10 +33,6 @@ import { MakeAndModelPicker } from "./MakeAndModelPicker";
 import { ChatContextPicker } from "./ChatContextPicker";
 import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
 import {
-  outputTargetStorageKey,
-  writeStoredOutputTarget,
-} from "@/lib/domain/ai/output-target";
-import {
   useConversationBinding,
   type PersistFinishPayload,
 } from "@/lib/domain/ai/use-conversation-binding";
@@ -195,6 +191,7 @@ export function ChatPanel({
     detachPlaybook,
     outputTarget,
     setOutputTarget,
+    promoteOutputTarget,
     followUps,
     clearFollowUps,
     setScrollEl,
@@ -457,21 +454,11 @@ export function ChatPanel({
           const body = (await res.json()) as { data?: { id?: string } };
           const newId = body?.data?.id;
           if (!newId) throw new Error("Server didn't return a conversation id");
-          // Preserve a target picked while this was still a transient chat.
-          // ChatPanel intentionally rebinds without remounting; writing the
-          // conversation-scoped value before the id flips makes the key
-          // transition deterministic and avoids confusing a click on an
-          // unrelated existing chat with a promotion.
-          try {
-            writeStoredOutputTarget(
-              window.localStorage,
-              outputTargetStorageKey({ conversationId: newId }),
-              outputTarget,
-            );
-          } catch {
-            // The active in-memory selection still rides the first send; only
-            // persistence across a later reopen is lost.
-          }
+          // Explicitly carry the transient selection into the new
+          // conversation before rebinding. The engine owns both sides of this
+          // transfer, so a storage read cannot reset the visible chip while
+          // promotion is in flight; storage remains the remount fallback.
+          promoteOutputTarget(newId);
           // Seed the destination draft BEFORE rebinding. The conversation
           // engine hydrates per-key drafts on conversationId changes; without
           // this, that valid hydration replaces the submitted transient text
@@ -529,7 +516,7 @@ export function ChatPanel({
     handleSend,
     targetFolder,
     targetInherited,
-    outputTarget,
+    promoteOutputTarget,
   ]);
 
   // Restore, then send, the queued first prompt once conversationId catches

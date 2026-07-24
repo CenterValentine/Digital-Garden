@@ -53,6 +53,12 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Promoted chats retain their visible output preference on PR #126
+
+- Confirmed from the owner-smoke trace that the first promoted request and its artifact still used `underContent`; only the chip regressed to `Under this chat` after the client key transition.
+- Replaced the storage-only promotion transfer with an explicit in-memory handoff owned by the conversation engine, while retaining per-conversation storage for reloads and ordinary chat switching.
+- `output-targets:check` covers promotion with unavailable storage so the visible preference cannot silently reset at the transient-to-conversation boundary.
+
 **July 23, 2026**: Playbook outputs support per-artifact location overrides on PR #126
 
 - Root-caused the Test 14 smoke failure from its `chat_input` trace: the playbook explicitly routed one note under the chat, but `createNote` could only override the preset with a folder UUID, so the model had no way to express a referenced-under-chat destination.

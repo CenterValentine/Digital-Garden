@@ -336,6 +336,12 @@ export interface UseConversationEngineResult {
   outputTarget: OutputTarget;
   /** Update the output target (the OutputTargetChip's onChange). */
   setOutputTarget: (target: OutputTarget) => void;
+  /**
+   * Carry the transient chat's current target across promotion to a newly
+   * created conversation. This is an explicit state handoff; localStorage is
+   * retained as the remount/reload fallback.
+   */
+  promoteOutputTarget: (conversationId: string) => void;
 
   // ── suggested follow-ups (Session 7) ──
   /** 2-3 chip suggestions generated after the last assistant turn. */
@@ -663,11 +669,20 @@ export function useConversationEngine({
     );
   });
   const lastOutputTargetKeyRef = useRef<string | null>(outputTargetKey);
+  const pendingOutputTargetPromotionRef = useRef<{
+    nextKey: string;
+    target: OutputTarget;
+  } | null>(null);
 
   useEffect(() => {
     const previousKey = lastOutputTargetKeyRef.current;
     if (previousKey === outputTargetKey) return;
 
+    const pendingPromotion = pendingOutputTargetPromotionRef.current;
+    const promotedTarget =
+      pendingPromotion?.nextKey === outputTargetKey
+        ? pendingPromotion.target
+        : null;
     const storedTarget =
       typeof window === "undefined"
         ? null
@@ -677,7 +692,11 @@ export function useConversationEngine({
       nextKey: outputTargetKey,
       currentTarget: outputTarget,
       storedTarget,
+      promotedTarget,
     });
+    if (pendingPromotion) {
+      pendingOutputTargetPromotionRef.current = null;
+    }
     lastOutputTargetKeyRef.current = outputTargetKey;
     setOutputTargetState(resolvedTarget);
   }, [outputTargetKey, outputTarget]);
@@ -694,6 +713,26 @@ export function useConversationEngine({
       }
     },
     [outputTargetKey],
+  );
+  const promoteOutputTarget = useCallback(
+    (nextConversationId: string) => {
+      const nextKey = outputTargetStorageKey({
+        conversationId: nextConversationId,
+      });
+      if (!nextKey) return;
+      pendingOutputTargetPromotionRef.current = {
+        nextKey,
+        target: outputTarget,
+      };
+      if (typeof window !== "undefined") {
+        try {
+          writeStoredOutputTarget(window.localStorage, nextKey, outputTarget);
+        } catch {
+          // The in-memory transfer remains authoritative for this promotion.
+        }
+      }
+    },
+    [outputTarget],
   );
 
   // ── suggested follow-ups (Session 7) ──
@@ -1464,6 +1503,7 @@ export function useConversationEngine({
     detachPlaybook,
     outputTarget,
     setOutputTarget,
+    promoteOutputTarget,
     followUps,
     clearFollowUps,
     scrollRef,

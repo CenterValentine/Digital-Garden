@@ -148,23 +148,28 @@ export function writeStoredOutputTarget(
  * Resolve state when ChatPanel rebinds without remounting.
  *
  * Every key change hydrates the destination key (or resets to the default)
- * instead of leaking the previous conversation's target. The sidebar's
- * transient-promotion flow explicitly writes its current selection to the new
- * conversation key before rebinding, so promotion is unambiguous here.
+ * instead of leaking the previous conversation's target. A transient
+ * promotion carries its current selection explicitly; persisted state remains
+ * the fallback for remounts, reloads, and ordinary conversation switches.
  */
 export function resolveOutputTargetKeyChange({
   previousKey,
   nextKey,
   currentTarget,
   storedTarget,
+  promotedTarget,
 }: {
   previousKey: string | null;
   nextKey: string | null;
   currentTarget: OutputTarget;
   storedTarget: OutputTarget | null;
+  promotedTarget?: OutputTarget | null;
 }): OutputTarget {
   if (previousKey === nextKey) {
     return currentTarget;
+  }
+  if (promotedTarget) {
+    return promotedTarget;
   }
   if (storedTarget) {
     return storedTarget;

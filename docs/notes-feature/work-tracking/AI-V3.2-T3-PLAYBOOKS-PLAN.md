@@ -246,3 +246,31 @@ directions (under-content preset → one under-chat artifact, and under-chat
 preset → one under-content artifact), plus beside-content placement and prompt
 wording. This is the durable rule: **preferences govern omitted placement;
 explicit per-artifact instructions govern only that artifact.**
+
+## 8. Owner-smoke fix — promoted chat target visibly reset (2026-07-23)
+
+**Observed:** a transient side chat displayed `Under this content` before its
+first send, but displayed `Under this chat` immediately after promotion.
+
+**Trace evidence:** the promoted turn's server payload still contained
+`{"mode":"underContent"}` and the resulting artifact used the correct rooted
+content owner. The regression was therefore in the client preference state,
+not the server routing contract.
+
+**Root cause:** promotion copied the target only through `localStorage`, then
+the still-mounted conversation engine re-keyed from the transient content key
+to the new conversation key. That made a browser-storage read responsible for
+an in-flight React state transfer. When that read missed or raced, the generic
+conversation-switch fallback reset the visible selection to `Under this chat`.
+
+**Correction:** the conversation engine now owns an explicit in-memory
+promotion handoff keyed to the new conversation ID. The handoff has precedence
+at that one key transition; storage is still written for reload/remount
+durability. Ordinary conversation switches remain isolated and hydrate only
+their own saved preference.
+
+**Regression guard:** `output-targets:check` now verifies that a promoted target
+survives even when persisted storage is unavailable. The durable rule is:
+**state required to complete an in-flight promotion must travel through the
+promotion transaction itself; persistence is a recovery mechanism, not the
+transaction.**

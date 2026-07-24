@@ -117,6 +117,18 @@ assert.deepEqual(
   resolveOutputTargetKeyChange({
     previousKey: "dg:output-target:content:rooted-note",
     nextKey: "dg:output-target:conv:new-chat",
+    currentTarget: DEFAULT_OUTPUT_TARGET,
+    storedTarget: null,
+    promotedTarget: { mode: "underContent" },
+  }),
+  { mode: "underContent" },
+  "an explicit promotion handoff must survive even when storage is unavailable",
+);
+
+assert.deepEqual(
+  resolveOutputTargetKeyChange({
+    previousKey: "dg:output-target:content:rooted-note",
+    nextKey: "dg:output-target:conv:new-chat",
     currentTarget: folderTarget,
     storedTarget: null,
   }),
