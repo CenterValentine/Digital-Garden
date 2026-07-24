@@ -7,7 +7,13 @@ import {
   bindPlaybookToLatestUserMessage,
   createPlaybookMessageAttachmentPart,
   parsePlaybookMessageAttachment,
+  requestsRootedPlaybookExecution,
 } from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  extractPlaybookOutputDirectives,
+  resolvePlaybookOutputLocation,
+} from "@/lib/domain/ai/playbooks/output-directives";
+import { resolveToolOutputPlacement } from "@/lib/domain/ai/tools/output-placement";
 import { buildRunLedgerTitle } from "@/lib/domain/ai/run-ledger-title";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
 
@@ -92,6 +98,65 @@ assert.equal(
   "Research the subject, then summarize the evidence.",
 );
 
+const routedOutputPlaybook = parsePlaybook({
+  type: "doc",
+  content: [
+    paragraph(`name: Company Research Directive
+Phase A: Surface facts
+Output findings in a document starting with "Surface Facts - [COMPANY NAME]"
+Phase B: Read between the lines
+Output findings in a document with the title "Between the Lines - Company Research - [COMPANY NAME]*  under the chat.`),
+  ],
+});
+const routedOutputDirectives = extractPlaybookOutputDirectives(
+  routedOutputPlaybook,
+);
+assert.deepEqual(routedOutputDirectives, [
+  {
+    location: "under_chat",
+    titlePrefix: "Between the Lines - Company Research -",
+    phaseTitle: "Instructions",
+  },
+]);
+assert.equal(
+  resolvePlaybookOutputLocation(
+    routedOutputDirectives,
+    "Between the Lines - Company Research - LTK",
+  ),
+  "under_chat",
+  "the exact owner-smoke wording must bind the matching artifact under the chat",
+);
+assert.equal(
+  resolvePlaybookOutputLocation(
+    routedOutputDirectives,
+    "Surface Facts - LTK",
+  ),
+  undefined,
+  "an explicit directive for one artifact must not alter other outputs",
+);
+assert.deepEqual(
+  resolveToolOutputPlacement(
+    {
+      targetFolderId: "research-folder",
+      outputOwnerId: "rooted-content",
+      outputChatOwnerId: "chat-node",
+      outputContentOwnerId: "rooted-content",
+      outputContentParentId: "research-folder",
+    },
+    undefined,
+    resolvePlaybookOutputLocation(
+      routedOutputDirectives,
+      "Between the Lines - Company Research - LTK",
+    ),
+  ),
+  {
+    parentId: "research-folder",
+    role: "referenced",
+    ownedByNoteId: "chat-node",
+  },
+  "a matched playbook directive must override the under-content preset at runtime",
+);
+
 const empty = parsePlaybook({ type: "doc", content: [] });
 assert.equal(empty.phases.length, 0);
 
@@ -127,6 +192,41 @@ assert.deepEqual(boundMessages[2]?.content, [
   },
   { type: "text", text: "Run this playbook." },
 ]);
+assert.equal(
+  requestsRootedPlaybookExecution([
+    {
+      role: "user",
+      parts: [
+        {
+          type: "text",
+          text: "Execute this file as a playbook. Research LTK.",
+        },
+      ],
+    },
+  ]),
+  true,
+);
+assert.equal(
+  requestsRootedPlaybookExecution([
+    {
+      role: "user",
+      parts: [{ type: "text", text: "What does this file say?" }],
+    },
+  ]),
+  false,
+  "ordinary rooted-note questions must not activate playbook execution",
+);
+const rootedBoundMessages = bindPlaybookToLatestUserMessage(
+  [{ role: "user", content: "Execute this file as a playbook." }],
+  "Test 14",
+  "rooted",
+);
+assert.equal(
+  rootedBoundMessages[0]?.content,
+  '[The user explicitly asked to execute the rooted content "Test 14" as a playbook. ' +
+    "Its validated instructions are in the Active Playbook system section. Follow that playbook directly; do not search for or substitute another one.]\n\n" +
+    "Execute this file as a playbook.",
+);
 
 const restoredCheckpoint = normalizePersistedToolParts([
   {

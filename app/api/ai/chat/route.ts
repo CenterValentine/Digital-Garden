@@ -136,7 +136,14 @@ import { refreshContextOnAccess } from "@/extensions/studio/server/context-refre
 import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
-import { bindPlaybookToLatestUserMessage } from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  bindPlaybookToLatestUserMessage,
+  requestsRootedPlaybookExecution,
+} from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  extractPlaybookOutputDirectives,
+  type PlaybookOutputDirective,
+} from "@/lib/domain/ai/playbooks/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -595,6 +602,10 @@ export async function POST(request: Request) {
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger.
       const runTokenCounter = { total: 0 };
+      // Playbook validation happens below, after the tool registry is built.
+      // Tool closures retain this array reference, so trusted directives
+      // pushed before streamText begins are available at execution time.
+      const playbookOutputDirectives: PlaybookOutputDirective[] = [];
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
@@ -620,6 +631,7 @@ export async function POST(request: Request) {
         outputContentParentId: originContentId
           ? openContentLocationId ?? null
           : undefined,
+        playbookOutputDirectives,
         attachedMedia,
       };
       const allTools = {
@@ -814,12 +826,19 @@ export async function POST(request: Request) {
       let playbookContext = "";
       let playbookAwareness = "";
       let attachedPlaybookResolved = false;
+      let rootedPlaybookResolved = false;
       let attachedPlaybookTitle = "";
       // An EXPLICIT attach (/playbook picker) gets the full progressive
       // disclosure below — standing rules + the active phase + reference
       // manifest, and flips the checkpoint cadence.
       const explicitPlaybookId =
         typeof body.playbookId === "string" ? body.playbookId : null;
+      const rootedPlaybookId =
+        !explicitPlaybookId &&
+        contentId &&
+        requestsRootedPlaybookExecution(messages)
+          ? contentId
+          : null;
       // AMBIENT: the user is chatting FROM a note/folder that is itself a
       // playbook, without attaching it. We do NOT auto-run it — that would
       // flip EVERY casual message on a playbook-anchored chat into playbook
@@ -829,7 +848,9 @@ export async function POST(request: Request) {
       // is what fixes "it couldn't look at what I'm actively viewing" without
       // hijacking the whole conversation.
       const ambientPlaybookId =
-        !explicitPlaybookId && contentId ? contentId : null;
+        !explicitPlaybookId && !rootedPlaybookId && contentId
+          ? contentId
+          : null;
       if (explicitPlaybookId) {
         try {
           const playbookNode = await prisma.contentNode.findFirst({
@@ -864,6 +885,9 @@ export async function POST(request: Request) {
                 parsed.phases.length - 1,
               );
               const phase = parsed.phases[phaseIndex];
+              playbookOutputDirectives.push(
+                ...extractPlaybookOutputDirectives(parsed, [phaseIndex]),
+              );
 
               // Reference manifest: title-resolve every [[link]] in the
               // standing rules + active phase (wiki-links carry no id — see
@@ -946,6 +970,57 @@ export async function POST(request: Request) {
             error: playbookError,
           });
         }
+      } else if (rootedPlaybookId) {
+        try {
+          const rootedNode = await prisma.contentNode.findFirst({
+            where: {
+              id: rootedPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true } },
+            },
+          });
+          if (rootedNode?.notePayload) {
+            const parsed = parsePlaybook(
+              rootedNode.notePayload.tiptapJson as JSONContent,
+            );
+            rootedPlaybookResolved = true;
+            attachedPlaybookTitle = rootedNode.title;
+            playbookOutputDirectives.push(
+              ...extractPlaybookOutputDirectives(parsed),
+            );
+
+            const standingText = renderPlaybookSection(
+              parsed.standingRules.content,
+            );
+            const phaseText = parsed.phases
+              .map(
+                (phase, index) =>
+                  `### Phase ${index + 1}: ${phase.title}\n${renderPlaybookSection(phase.content)}`,
+              )
+              .join("\n\n");
+            playbookContext =
+              `\n\n## Active Playbook: "${rootedNode.title}"\n` +
+              "The user explicitly asked to execute the rooted file as a playbook. Its validated contents are loaded below. Follow it directly; do not search for or substitute another playbook. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
+              (standingText
+                ? `**Standing rules (always apply):**\n${standingText}\n\n`
+                : "") +
+              (phaseText ||
+                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.");
+          }
+        } catch (rootedPlaybookError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:rooted_injection_failed",
+            summary:
+              "explicit rooted playbook injection failed — continuing without it",
+            error: rootedPlaybookError,
+          });
+        }
       } else if (ambientPlaybookId) {
         try {
           const node = await prisma.contentNode.findFirst({
@@ -988,7 +1063,7 @@ export async function POST(request: Request) {
       // ownership-scoped attachment resolves, remove the discovery tool for
       // this turn so weaker models cannot search for the playbook that is
       // already loaded. Generic note search remains available for phase work.
-      if (attachedPlaybookResolved) {
+      if (attachedPlaybookResolved || rootedPlaybookResolved) {
         delete tools.search_playbooks;
         // System context alone proved insufficient for weaker models: the
         // owner smoke trace showed a correctly injected Active Playbook, yet
@@ -997,6 +1072,7 @@ export async function POST(request: Request) {
         modelMessages = bindPlaybookToLatestUserMessage(
           modelMessages,
           attachedPlaybookTitle,
+          rootedPlaybookResolved ? "rooted" : "attached",
         );
       }
 
@@ -1014,10 +1090,12 @@ export async function POST(request: Request) {
             (readable
               ? ` Read the rooted content with read_note (id: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
               : "")
-          : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
-            (readable
-              ? ` Read its content with read_note (id: ${contentId}) when you need it.`
-              : "");
+          : rootedPlaybookResolved
+            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Playbook. Its validated instructions are already loaded; do not read or search for another playbook.`
+            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+              (readable
+                ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+                : "");
       }
 
       // Resolve the selected custom-instruction context, if any. Sent by
@@ -1095,6 +1173,8 @@ export async function POST(request: Request) {
         mentionedContext,
         playbookContext,
         attachedPlaybookResolved,
+        rootedPlaybookResolved,
+        playbookOutputDirectives,
         outputTarget,
         outputOwnerId,
         outputParentOverride,

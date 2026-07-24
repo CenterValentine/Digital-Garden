@@ -6,6 +6,8 @@
  * plus editor tools (read_first_chunk, apply_diff, etc.) added in Sprint 39.
  */
 
+import type { PlaybookOutputDirective } from "../playbooks/output-directives";
+
 /** Context passed to tool execute functions from the API route */
 export interface ToolExecuteContext {
   userId: string;
@@ -64,6 +66,12 @@ export interface ToolExecuteContext {
   outputChatOwnerId?: string;
   outputContentOwnerId?: string;
   outputContentParentId?: string | null;
+  /**
+   * Trusted output-location directives extracted from the active/rooted
+   * playbook. Write tools use these only when the model omits placement, and
+   * only when the artifact title matches the directive's literal prefix.
+   */
+  playbookOutputDirectives?: PlaybookOutputDirective[];
   /**
    * Output-target chip "folder" mode (WS7): when the user chose a specific
    * folder for outputs, this is that folder id. Output tools file new content

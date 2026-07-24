@@ -53,6 +53,13 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: Rooted-playbook output directives are runtime-enforced on PR #126
+
+- Confirmed the Test 14 model understood “under the chat” but omitted `outputLocation` from `create_docx`; the runtime then correctly used the `underContent` preference.
+- Canonicalized chat/content/folder placement vocabulary, removed the legacy `parentId` contradiction, and made “execute this file as a playbook” validate and bind the rooted file as Active Playbook context.
+- Trusted title-matched output directives now provide a note/Word placement fallback when the model omits the optional field; explicit tool placement remains highest priority and unrelated artifacts remain on the selected preset.
+- `playbooks:check` covers the exact malformed owner-smoke wording, rooted execution cues, and non-playbook ordinary questions.
+
 **July 23, 2026**: Promoted chats retain their visible output preference on PR #126
 
 - Confirmed from the owner-smoke trace that the first promoted request and its artifact still used `underContent`; only the chip regressed to `Under this chat` after the client key transition.

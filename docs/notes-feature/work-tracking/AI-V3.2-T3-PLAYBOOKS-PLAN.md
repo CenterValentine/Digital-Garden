@@ -274,3 +274,44 @@ survives even when persisted storage is unavailable. The durable rule is:
 **state required to complete an in-flight promotion must travel through the
 promotion transaction itself; persistence is a recovery mechanism, not the
 transaction.**
+
+## 9. Owner-smoke fix — understood placement was omitted from the tool call (2026-07-23)
+
+**Observed:** Test 14 selected `underContent` as its run-wide preference and
+instructed the `"Between the Lines - …"` document to go `under the chat`. The
+document still appeared under Test 14.
+
+**Trace evidence:** the provider received the updated `create_docx` schema and
+the assistant repeated the Phase B destination as “under the chat” in its
+checkpoint. Its eventual `create_docx` arguments nevertheless contained only
+`title` and `markdown`; `outputLocation` was omitted. The tool runtime therefore
+applied the selected preset exactly as designed.
+
+**Contributing gaps:**
+
+1. A legacy system-prompt sentence still told the model that every explicit
+   destination should use `parentId`, conflicting with the newer relative
+   `outputLocation` contract.
+2. “Execute this file as a playbook” left the rooted note as generic context
+   instead of validating and binding it as the requested procedure.
+3. Correct placement still depended on the model serializing an optional field
+   after understanding the natural-language instruction.
+
+**Correction:** relative placement vocabulary is now canonical in the system
+prompt (`under_chat`, `under_content`, `beside_content`; `parentId` only for a
+resolved folder). An explicit request to execute the rooted file validates and
+loads that file as the Active Playbook without requiring metadata or a picker
+attachment. Trusted output directives are extracted from its text and bound to
+matching artifact-title prefixes. If the model omits placement, note/Word write
+tools use the matching directive before the run-wide preference; explicit tool
+placement still wins.
+
+**Regression guard:** `playbooks:check` uses the exact Test 14 wording,
+including the missing closing quote/stray `*`, and proves only
+`"Between the Lines - Company Research - …"` resolves to `under_chat` while
+`"Surface Facts - …"` remains on the preset. It also distinguishes “execute
+this file as a playbook” from an ordinary question about the open file.
+
+Durable rule: **natural-language playbook directives that affect system state
+must be compiled into trusted runtime intent; model-generated tool arguments
+are an override channel, not the sole enforcement mechanism.**

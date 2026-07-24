@@ -52,6 +52,7 @@ import {
   resolveToolOutputPlacement,
   type ToolOutputLocation,
 } from "./output-placement";
+import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -388,10 +389,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           ),
       }),
       execute: async ({ title, markdown, parentId, outputLocation }) => {
+        const effectiveOutputLocation =
+          (outputLocation as ToolOutputLocation | undefined) ??
+          resolvePlaybookOutputLocation(
+            ctx.playbookOutputDirectives,
+            title,
+          );
         const placement = resolveToolOutputPlacement(
           ctx,
           parentId,
-          outputLocation as ToolOutputLocation | undefined,
+          effectiveOutputLocation,
         );
         if (placement.error) return placement.error;
         const destination = placement.parentId;
@@ -657,7 +664,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const placement = resolveToolOutputPlacement(
           ctx,
           explicitParentId,
-          outputLocation as ToolOutputLocation | undefined,
+          (outputLocation as ToolOutputLocation | undefined) ??
+            resolvePlaybookOutputLocation(
+              ctx.playbookOutputDirectives,
+              title,
+            ),
         );
         if (placement.error) return placement.error;
         let resolvedParentId = placement.parentId;
