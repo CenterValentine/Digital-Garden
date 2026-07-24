@@ -20,7 +20,7 @@ meter.
    Ledger). No schema change.
 5. **Progressive disclosure = the Skill mechanism.** Metadata (name/description) in
    the picker; standing rules + the **active phase only** in model context. The
-   `[[wiki-link]]` extensions are traced on demand via the existing `read_note`
+   `[[wiki-link]]` extensions are traced on demand via the existing `getCurrentNote`
    tool (JIT — never pre-loaded).
 
 ## 1. The internal playbook model (framework-agnostic)
@@ -117,7 +117,7 @@ clean (Prisma JSON-path query on `metadata.playbook = true`).
   guards with `isPlaybookMetadata`, `parsePlaybook`s it, clamps the phase index to
   `[0, phases.length-1]`, and builds a **`playbookContext`** string = standing
   rules + the active phase + a **"Linked extensions"** manifest (title-resolved
-  `[[refs]]`, since wikiLink nodes carry no id) with a `read_note`-on-demand
+  `[[refs]]`, since wikiLink nodes carry no id) with a `getCurrentNote`-on-demand
   instruction. Injected as its own `buildSystemPrompt` field, separate from
   `mentionedContext`.
 - **Explicit attachment wins deterministically (owner-smoke fix, 2026-07-23):**
@@ -190,7 +190,7 @@ T3 adds three bounded enhancements, all reusing pieces already built:
 `skillMdAdapter.parse` round-trip (tsx probe → promote to a check if time). In-app
 smoke: mark a note as a playbook → `/playbook` it → confirm only the active phase
 is in context (token meter) → approve a checkpoint → next phase loads → a
-`[[reference]]` is read via `read_note`.
+`[[reference]]` is read via `getCurrentNote`.
 
 ## 5. Sequencing for budget efficiency
 P3 → P4 gets the **gate** (start-from-registry + per-phase disclosure). P5's
@@ -343,3 +343,43 @@ and the correct type-specific content IDs.
 Durable rule: **the visible receipt contract and the freshness contract must
 share the same parser; adding a new persisted output type must not require a
 second envelope-specific refresh path.**
+
+## 11. Post-ship fix — OpenAI could checkpoint before doing the phase (2026-07-23)
+
+**Observed:** GPT-4o immediately requested approval for Phase 1 and summarized
+company research, job-description analysis, and an employer-needs hypothesis
+as completed. No research, linked-context reads, analysis output, or other
+phase work had actually run.
+
+**Root causes:**
+
+1. Model-facing instructions and reference manifests named a nonexistent
+   `read_note` tool while the registered tool is `getCurrentNote`. Models that
+   adhere strictly to the provided tool schema had no callable tool matching
+   the instruction.
+2. Rooted-file playbooks loaded their text but did not receive the resolved
+   linked-extension manifest that picker-attached playbooks received.
+3. `phase_checkpoint` trusted the provider's completion claim. Its approval
+   affordance could surface without any runtime proof that checkable research
+   or linked-context work had completed.
+
+**Correction:** all model-facing note-read instructions now use the registered
+`getCurrentNote` name and `contentId` argument. Explicitly attached and
+rooted-file playbooks share the same ownership-scoped linked-extension
+manifest. A request-scoped checkpoint gate derives checkable requirements from
+the active phase: research language requires a completed `search_web` or
+`read_page` call, and resolved phase references require a completed
+`getCurrentNote` call. A premature checkpoint executes without approval,
+returns a structured rejection naming the missing work, and lets the tool loop
+continue. Approval resumes rebuild proof from persisted UI tool parts so the
+gate survives the HTTP boundary.
+
+**Regression guard:** `playbooks:check` covers the reported employer-research
+phase, verifies each missing requirement independently, verifies approval
+resume hydration, and proves pure writing phases or user-disabled tools are not
+forced into impossible gates.
+
+Durable rule: **a model-authored completion summary is a claim, not proof.
+Whenever a phase requirement has observable system evidence, checkpoint
+eligibility must derive from that evidence and use the exact registered tool
+contract across every provider.**
