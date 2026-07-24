@@ -5,6 +5,7 @@ import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
+import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -651,6 +652,15 @@ export function PanelShellClient({
               flexDirection: "column",
             }}
           >
+            {/* B3-B: note↔page link toggle. Renders only in the panel embed with
+                both an open note and a current page (self-hides otherwise). */}
+            <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+              <PanelPageLinkButton
+                pageUrl={pageContext?.url ?? null}
+                pageTitle={pageContext?.title ?? ""}
+                contentId={selectedContentId}
+              />
+            </div>
             <MainPanelWorkspace />
           </div>
         </>

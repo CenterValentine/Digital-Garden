@@ -128,6 +128,37 @@ export function requestResolvePageNode(payload: {
   );
 }
 
+/**
+ * Link the given page (by URL) to a content note (B3-B). The host resolves the
+ * URL to a webResourceId (via resource-context) then creates the association;
+ * the result comes back as an `association-changed` message. Also used as the
+ * manual "associate the page I'm viewing right now" action from the note's link
+ * icon — the caller passes its current (live) page URL.
+ */
+export function requestAssociate(payload: {
+  url: string;
+  contentId: string;
+  title?: string;
+}): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "associate-page", payload },
+    "*"
+  );
+}
+
+/** Unlink a page from a content note (B3-B). Replies `association-changed`. */
+export function requestUnassociate(payload: {
+  url: string;
+  contentId: string;
+}): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "unassociate-page", payload },
+    "*"
+  );
+}
+
 /** Decode a data: URL into a File for the chat's attachment path. */
 export function dataUrlToFile(dataUrl: string, filename: string): File | null {
   try {
