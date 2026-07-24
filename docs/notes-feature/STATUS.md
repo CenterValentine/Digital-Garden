@@ -53,7 +53,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**July 24, 2026**: AI 3.3 — resumable streams BUILT (branch `feat/ai-v3.3-resumable-streams`, worktree `ai-v33-resumable`; awaiting Upstash provisioning + smoke test, no PR yet)
+**July 24, 2026**: AI 3.3 — resumable streams on PR #130 (branch `feat/ai-v3.3-resumable-streams`, worktree `ai-v33-resumable`; Upstash provisioned + TCP/pub-sub verified, owner smoke-tested the live re-attach path)
 
 - A reload or second tab now re-attaches to the still-running chat response and keeps rendering it live, on top of (not replacing) S1's `consumeStream()` no-lost-work machinery.
 - SSE output tees into Redis via `toUIMessageStreamResponse`'s `consumeSseStream` (`resumable-stream` + ioredis, Upstash TCP `REDIS_URL`); a new GET on `/api/ai/chat` replays it; the engine fires one gated `resumeStream()` per chat with a `prepareReconnectToStreamRequest` bridge (useChat id is the surface key, server keys by persistent conversationId).

@@ -280,7 +280,7 @@ stream needs a resumable-stream store (Redis-class).
   Coolify homeserver) and wire `useChat` resume / `resumeStream`.
 - **Gate:** reload mid-stream → the SAME in-flight response continues
   rendering live, not just the completed message on next load.
-- — BUILT as its own point release, **AI 3.3** (branch
+- — BUILT as its own point release, **AI 3.3** (PR #130, branch
   `feat/ai-v3.3-resumable-streams`; handoff doc
   `AI-V3.3-T4-HANDOFF.md`). Store decision: **Upstash Redis** (TCP
   `REDIS_URL`; homeserver rejected — Cloudflare-Tunnel-only, too fragile
