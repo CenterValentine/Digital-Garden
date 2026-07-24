@@ -19,10 +19,84 @@
 
 export function decompressMarkdown(text: string): string {
   if (!text) return text;
-  return text
+  return emphasizeLeadingLabels(normalizePasteFrontmatter(text))
     .split("\n")
     .flatMap((line) => decompressLine(line))
     .join("\n");
+}
+
+/**
+ * Give label-style lines visual hierarchy without promoting them to headings.
+ *
+ * Examples: `name: …`, `description: …`, and `Phase A: …`. Fenced code is
+ * deliberately left byte-for-byte alone, and labels already carrying Markdown
+ * formatting do not match the beginning-of-line rule.
+ */
+export function emphasizeLeadingLabels(text: string): string {
+  let fence: "`" | "~" | null = null;
+
+  return text
+    .split("\n")
+    .map((line) => {
+      const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
+      if (fenceMatch) {
+        const marker = fenceMatch[1][0] as "`" | "~";
+        fence = fence === marker ? null : fence ?? marker;
+        return line;
+      }
+      if (fence) return line;
+
+      return line.replace(
+        /^([A-Za-z][A-Za-z0-9 _/-]{0,60}:)(?=\s|$)/,
+        "**$1**",
+      );
+    })
+    .join("\n");
+}
+
+/**
+ * Preserve a leading YAML-shaped frontmatter block as visible rich text.
+ *
+ * In ordinary CommonMark, the closing `---` directly under `description: …`
+ * is a Setext H2 underline. That consumes the second divider and turns every
+ * preceding key/value line into one heading. Paste conversion intentionally
+ * displays frontmatter rather than interpreting metadata, so add the blank
+ * boundaries Markdown needs for two horizontal rules and hard line breaks
+ * between consecutive key/value rows.
+ */
+export function normalizePasteFrontmatter(text: string): string {
+  const lines = text.split("\n");
+  const opening = lines.findIndex((line) => line.trim().length > 0);
+  if (opening === -1 || lines[opening].trim() !== "---") return text;
+
+  const closing = lines.findIndex(
+    (line, index) => index > opening && line.trim() === "---",
+  );
+  if (closing <= opening + 1) return text;
+
+  const body = lines.slice(opening + 1, closing);
+  const looksLikeFrontmatter = body.some((line) =>
+    /^[A-Za-z_][A-Za-z0-9_-]*\s*:\s*\S/.test(line.trim()),
+  );
+  if (!looksLikeFrontmatter) return text;
+
+  const visibleBody = body.map((line, index) => {
+    const next = body[index + 1];
+    if (line.trim() && next?.trim()) {
+      return `${line.replace(/\s+$/, "")}  `;
+    }
+    return line;
+  });
+
+  return [
+    ...lines.slice(0, opening),
+    "---",
+    "",
+    ...visibleBody,
+    "",
+    "---",
+    ...lines.slice(closing + 1),
+  ].join("\n");
 }
 
 function decompressLine(line: string): string[] {

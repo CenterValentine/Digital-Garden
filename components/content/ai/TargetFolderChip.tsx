@@ -10,9 +10,13 @@
  * picker fed by the content tree endpoint; selecting PATCHes the
  * conversation (owner-validated server-side).
  *
- * Inputs (page-node filing), outputs (document tools), and grounding all
- * follow the target — the chip is the user's one lever for "where does
- * this conversation operate".
+ * Inputs (page-node filing), grounding, and output STORAGE location
+ * (parentId) all follow the target — this is the "operating context"
+ * affordance. It does NOT decide whether output nests as a reference under
+ * this chat by default (Chat Outputs & References plan, WS3) — that's a
+ * separate, chat-scoped default (server-resolved from the chat's own
+ * ContentNode), independent of where this chip points. OutputTargetChip is
+ * the separate control that redirects generated artifacts.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -146,12 +150,12 @@ export function TargetFolderChip({
         onClick={() => setOpen((v) => !v)}
         title={
           disabled
-            ? "Save the chat to set a target folder"
+            ? "Save the chat to set an operating folder"
             : mismatch
-              ? `Target differs from this chat's folder (${location?.title ?? "its location"}) — outputs go to the target, not the chat's folder`
+              ? `Operating folder differs from this chat's own location (${location?.title ?? "its location"}) — this chat works from the target folder, not where it lives`
               : inherited
-                ? "Inherited from this chat's folder — click to override"
-                : "Target folder — new pages and documents from this chat land here"
+                ? "Operating context — inherited from this chat's own folder. Click to override the folder this chat works from. Generated-artifact placement is controlled separately by the output-target chip."
+                : "Operating folder — where this chat works from (read_page filing and storage fallback). Generated-artifact placement is controlled separately by the output-target chip."
         }
         className={cn(
           "flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] max-w-[160px] transition-colors",

@@ -83,9 +83,11 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
    */
   onCreateAiImage?: (parentId: string | null) => Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => Promise<void>;
+  /** Mark the next tree selection callback as selection-only (Shift-click). */
+  onSelectionOnly?: () => void;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget, onSelectionOnly }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
@@ -341,6 +343,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (e.shiftKey) {
       e.preventDefault();
       e.stopPropagation();
+      onSelectionOnly?.();
       node.selectContiguous();
       return;
     }
@@ -357,6 +360,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // internal dblclick handler (which starts rename mode). stopPropagation()
   // prevents the event from reaching tree-level handlers.
   const handleDoubleClick = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
     if (isFolder) {
       e.preventDefault();
       e.stopPropagation();

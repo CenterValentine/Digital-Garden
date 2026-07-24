@@ -26,7 +26,7 @@ import {
   type KeyboardEvent,
   type FormEvent,
 } from "react";
-import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2 } from "lucide-react";
+import { ArrowUp, Square, Mic, Paperclip, X, FileText, Loader2, GitBranch } from "lucide-react";
 import { useDrop } from "react-dnd";
 import { cn } from "@/lib/core/utils";
 import {
@@ -34,7 +34,10 @@ import {
   type SuggestionItem,
 } from "./ChatSuggestionMenu";
 import type { ChatStatus } from "ai";
-import type { ChatAttachment } from "@/lib/domain/ai/use-conversation-engine";
+import type {
+  ChatAttachment,
+  ActivePlaybook,
+} from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
 import { PanelPageContextBar } from "./PanelPageContextBar";
@@ -68,8 +71,14 @@ interface ChatInputProps {
   onMentionSearch?: (query: string) => void;
   /** Results returned from mention search */
   mentionResults?: SuggestionItem[];
-  /** Static list of / command items */
+  /** Static list of / command items (tool hints + playbook attach entries) */
   commandItems?: SuggestionItem[];
+  /** Called when a `/` selection is a playbook (contentType "playbook") — attach instead of inserting text. */
+  onAttachPlaybook?: (item: SuggestionItem) => void;
+  /** The playbook currently attached to this conversation, if any. */
+  activePlaybook?: ActivePlaybook | null;
+  /** Detach the active playbook (dismiss the chip). */
+  onDetachPlaybook?: () => void;
   /**
    * Slot for controls on the left of the footer row — typically the
    * make/model picker.
@@ -94,6 +103,9 @@ export function ChatInput({
   onMentionSearch,
   mentionResults = [],
   commandItems = [],
+  onAttachPlaybook,
+  activePlaybook = null,
+  onDetachPlaybook,
   footerLeading,
   attachments = [],
   onAddFiles,
@@ -259,7 +271,12 @@ export function ChatInput({
         commandItems.filter(
           (c) =>
             c.label.toLowerCase().includes(q) ||
-            c.description?.toLowerCase().includes(q),
+            c.description?.toLowerCase().includes(q) ||
+            // Playbooks are labeled by their own title, but the user was told
+            // the command is "/playbook" — so make every playbook item match
+            // the keyword "playbook" (covers /p, /play, /playbook). `"playbook"
+            // .includes("")` is true, so a bare "/" still lists them too.
+            (c.contentType === "playbook" && "playbook".includes(q)),
         ),
       );
     }
@@ -313,6 +330,10 @@ export function ChatInput({
         const space = document.createTextNode(" ");
         pill.after(space);
         placeCaretAfter(space);
+      } else if (item.contentType === "playbook") {
+        // Attach, don't insert text — the trigger text was already deleted
+        // above. The composer chip (below) shows what's attached.
+        onAttachPlaybook?.(item);
       } else {
         const inserted = document.createTextNode(item.insertText ?? item.label);
         replaceRange.insertNode(inserted);
@@ -323,7 +344,7 @@ export function ChatInput({
       emit();
       root.focus();
     },
-    [closeSuggestions, emit, suggestionMode],
+    [closeSuggestions, emit, onAttachPlaybook, suggestionMode],
   );
 
   // ── submit / keyboard ──
@@ -513,6 +534,30 @@ export function ChatInput({
             onSelect={handleSelect}
             mode={suggestionMode!}
           />
+        )}
+
+        {/* Active playbook chip (AI v3.2 T3) */}
+        {activePlaybook && (
+          <div className="flex flex-wrap gap-1.5 px-2.5 pt-2.5">
+            <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/30 bg-indigo-500/10 px-2 py-1 text-[11px] text-indigo-700 dark:text-indigo-300">
+              <GitBranch className="h-3 w-3 shrink-0" />
+              <span className="truncate max-w-[160px]">{activePlaybook.title}</span>
+              {activePlaybook.phaseCount > 0 && (
+                <span className="text-indigo-500/70 dark:text-indigo-400/70">
+                  · Phase {Math.min(activePlaybook.phaseIndex + 1, activePlaybook.phaseCount)}/
+                  {activePlaybook.phaseCount}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={onDetachPlaybook}
+                aria-label="Detach playbook"
+                className="shrink-0 text-indigo-500/70 hover:text-red-400 transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          </div>
         )}
 
         {/* Attachment chips */}

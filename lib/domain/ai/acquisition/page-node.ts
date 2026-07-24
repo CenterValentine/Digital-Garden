@@ -20,9 +20,10 @@ import type { AcquiredContent } from "./types";
 
 export async function findOrCreatePageNode(
   userId: string,
-  targetFolderId: string,
+  targetFolderId: string | null,
   content: AcquiredContent,
-): Promise<string | null> {
+  options: { ownerContentId?: string } = {},
+): Promise<{ contentNodeId: string; created: boolean } | null> {
   try {
     const normalized = normalizeUrl(content.url);
     const canonical = content.canonicalUrl
@@ -40,7 +41,9 @@ export async function findOrCreatePageNode(
       },
       select: { contentId: true },
     });
-    if (existing) return existing.contentId;
+    if (existing) {
+      return { contentNodeId: existing.contentId, created: false };
+    }
 
     const title = (content.title ?? content.url).slice(0, 255);
     const slug = await generateUniqueSlug(title, userId);
@@ -60,6 +63,12 @@ export async function findOrCreatePageNode(
         slug,
         contentType: "external",
         parentId: targetFolderId,
+        ...(options.ownerContentId
+          ? {
+              role: "referenced" as const,
+              ownedByNoteId: options.ownerContentId,
+            }
+          : {}),
         externalPayload: {
           create: {
             url: content.url,
@@ -85,10 +94,15 @@ export async function findOrCreatePageNode(
     logger.info({
       layer: "ai",
       event: "acquisition:page_node_created",
-      summary: `page node created for ${content.url} in target folder`,
-      attrs: { contentId: node.id, url: content.url, targetFolderId },
+      summary: `page node created for ${content.url} at configured output target`,
+      attrs: {
+        contentId: node.id,
+        url: content.url,
+        targetFolderId,
+        ownerContentId: options.ownerContentId,
+      },
     });
-    return node.id;
+    return { contentNodeId: node.id, created: true };
   } catch (error) {
     logger.info({
       layer: "ai",

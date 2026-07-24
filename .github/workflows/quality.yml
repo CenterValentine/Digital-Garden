@@ -67,6 +67,12 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      - name: Playbook parser checks
+        run: pnpm playbooks:check
+
+      - name: Output-target checks
+        run: pnpm output-targets:check
+
   markdown-safety:
     name: Markdown block-safety
     runs-on: ubuntu-latest

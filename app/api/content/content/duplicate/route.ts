@@ -147,12 +147,16 @@ async function duplicateNode(
 
   const duplicate = await prisma.contentNode.create({
     data: {
+      // ownerId is required — its absence was the "Argument `owner` is missing"
+      // crash on every duplicate. `categoryId` (scalar FK) is the right field;
+      // `category` was passing the relation object (always undefined here).
+      ownerId: userId,
       title: newTitle,
       slug: `${original.slug}-copy-${Date.now()}`,
       contentType: original.contentType,
       parentId: parentId ?? original.parentId,
       displayOrder: original.displayOrder,
-      category: original.category,
+      categoryId: original.categoryId ?? null,
       customIcon: original.customIcon,
       iconColor: original.iconColor,
       isPublished: false,

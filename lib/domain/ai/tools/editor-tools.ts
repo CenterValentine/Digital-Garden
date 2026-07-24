@@ -30,6 +30,7 @@ import { prisma } from "@/lib/database/client";
 import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
+import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
 
 /**
@@ -189,6 +190,12 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           after,
           documentTitle: node.title,
           action,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            node.id,
+            "updated",
+            "note",
+          )),
         });
       },
     }),
@@ -217,6 +224,12 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           markdown,
           documentTitle: node.title,
           action: `Replacing entire document "${node.title}"`,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            node.id,
+            "updated",
+            "note",
+          )),
         });
       },
     }),
@@ -251,6 +264,12 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           alt: alt || "",
           documentTitle: node.title,
           action: `Inserted image into "${node.title}"`,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            node.id,
+            "updated",
+            "note",
+          )),
         });
       },
     }),

@@ -46,15 +46,30 @@ import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu"
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
 import { getAttachedPageContext } from "@/state/panel-page-context-store";
+import {
+  DEFAULT_OUTPUT_TARGET,
+  createOutputTargetMessagePart,
+  outputTargetStorageKey,
+  readStoredOutputTarget,
+  resolveOutputTargetKeyChange,
+  writeStoredOutputTarget,
+  type OutputTarget,
+} from "@/lib/domain/ai/output-target";
+import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
+import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
+import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
+
+export type { OutputTarget } from "@/lib/domain/ai/output-target";
 
 /**
- * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's output
- * for the __notePayload envelope and dispatches the freshness events —
+ * Stream-time artifact refresh (AI v3.1 R2). Parses a tool part's generic
+ * content-write receipts and dispatches the freshness events —
  * dg:tree-refresh (file tree), then dg:notes-refresh (surgical note
- * reload) or dg:workflow-refresh (canvas) by artifact noun. Deduped by
+ * reload) or dg:workflow-refresh (canvas) by content type. Deduped by
  * toolCallId through the shared seen-set so the streaming effect and the
  * onFinish backstop never double-fire, including across two surfaces
  * bound to the same conversation (toolCallIds are globally unique).
+ * Legacy __notePayload results remain supported for persisted older chats.
  */
 const dispatchedArtifactToolCalls = new Set<string>();
 
@@ -63,33 +78,54 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
   const p = part as { toolCallId?: string; output?: unknown };
   if (!p.toolCallId || p.output === undefined) return;
   if (seen.has(p.toolCallId)) return;
-  seen.add(p.toolCallId);
-  const str =
-    typeof p.output === "string" ? p.output : JSON.stringify(p.output);
-  if (!str.includes('"__notePayload"')) return;
-  try {
-    const parsed = JSON.parse(str) as {
-      __notePayload?: boolean;
-      contentId?: string;
-      noun?: string;
-    };
-    if (!parsed.__notePayload || typeof parsed.contentId !== "string") return;
+  const refreshTargets = getContentWriteRefreshTargets(p.output);
+  if (refreshTargets.tree) {
+    seen.add(p.toolCallId);
     window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-    if (parsed.noun === "workflow") {
+    for (const contentId of refreshTargets.workflowContentIds) {
       window.dispatchEvent(
         new CustomEvent("dg:workflow-refresh", {
-          detail: { contentId: parsed.contentId },
+          detail: { contentId },
         }),
       );
-    } else {
+    }
+    for (const contentId of refreshTargets.noteContentIds) {
       // Surgical notes-only refresh — narrower than `content-updated`,
       // which resets loading/outline/tab state (see MainPanelContent).
       window.dispatchEvent(
         new CustomEvent("dg:notes-refresh", {
-          detail: { contentId: parsed.contentId },
+          detail: { contentId },
         }),
       );
     }
+    return;
+  }
+
+  // Backward compatibility for persisted pre-receipt tool results.
+  try {
+    const legacy =
+      typeof p.output === "string"
+        ? (JSON.parse(p.output) as {
+            __notePayload?: boolean;
+            contentId?: string;
+            noun?: string;
+          })
+        : (p.output as {
+            __notePayload?: boolean;
+            contentId?: string;
+            noun?: string;
+          });
+    if (!legacy.__notePayload || typeof legacy.contentId !== "string") return;
+    seen.add(p.toolCallId);
+    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    window.dispatchEvent(
+      new CustomEvent(
+        legacy.noun === "workflow"
+          ? "dg:workflow-refresh"
+          : "dg:notes-refresh",
+        { detail: { contentId: legacy.contentId } },
+      ),
+    );
   } catch {
     /* unparseable tool output — skip */
   }
@@ -186,6 +222,8 @@ export interface ConversationEngineFinishEvent {
    */
   message?: UIMessage;
   finishReason?: string;
+  /** True when the user explicitly stopped the active response. */
+  isAbort: boolean;
 }
 
 export interface UseConversationEngineParams {
@@ -305,7 +343,28 @@ export interface UseConversationEngineResult {
   // ── suggestions ──
   mentionResults: SuggestionItem[];
   handleMentionSearch: (query: string) => void;
+  /** Tool-hint commands + playbook attach entries for the `/` menu. */
   commandItems: SuggestionItem[];
+
+  // ── playbooks (AI v3.2 T3) ──
+  /** The playbook attached to this conversation, or null. */
+  activePlaybook: ActivePlaybook | null;
+  /** Attach a playbook — called when ChatInput's `/` selection is a playbook. */
+  attachPlaybook: (item: SuggestionItem) => void;
+  /** Detach the active playbook (dismiss the composer chip). */
+  detachPlaybook: () => void;
+
+  // ── output target (WS7) ──
+  /** Where new content lands by default (persisted per conversation). */
+  outputTarget: OutputTarget;
+  /** Update the output target (the OutputTargetChip's onChange). */
+  setOutputTarget: (target: OutputTarget) => void;
+  /**
+   * Carry the transient chat's current target across promotion to a newly
+   * created conversation. This is an explicit state handoff; localStorage is
+   * retained as the remount/reload fallback.
+   */
+  promoteOutputTarget: (conversationId: string) => void;
 
   // ── suggested follow-ups (Session 7) ──
   /** 2-3 chip suggestions generated after the last assistant turn. */
@@ -377,6 +436,22 @@ export interface ChatAttachment {
   error?: string;
 }
 
+/** Playbook summary shape returned by GET /api/content/playbooks. */
+interface PlaybookCommandSource {
+  id: string;
+  title: string;
+  description: string;
+  phaseCount: number;
+}
+
+/** The playbook currently attached to the composer (AI v3.2 T3). */
+export interface ActivePlaybook {
+  id: string;
+  title: string;
+  /** Phases completed so far — derived from resolved phase_checkpoint calls. */
+  phaseIndex: number;
+  phaseCount: number;
+}
 
 export function useConversationEngine({
   conversationKey,
@@ -539,19 +614,159 @@ export function useConversationEngine({
     }, 150);
   }, []);
 
-  // ── / command items (static) ──
+  // ── playbooks (AI v3.2 T3) ──
+  // Fetched once per mount for the /playbook command entry. A handful of
+  // playbooks per user is the expected scale — no search-as-you-type needed,
+  // the existing "/" substring filter (below) already narrows the list.
+  const [playbooks, setPlaybooks] = useState<PlaybookCommandSource[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/content/playbooks", { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (cancelled) return;
+        const items = data?.data?.playbooks;
+        if (Array.isArray(items)) setPlaybooks(items);
+      })
+      .catch(() => {
+        /* best-effort — the picker just shows no playbooks */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ── / command items (tool hints + playbooks) ──
   const commandItems = useMemo<SuggestionItem[]>(() => {
-    return BASE_TOOL_IDS.map((id) => ({
+    const playbookItems: SuggestionItem[] = playbooks.map((p) => ({
+      id: p.id,
+      label: p.title,
+      description:
+        p.description ||
+        `Playbook · ${p.phaseCount} phase${p.phaseCount === 1 ? "" : "s"}`,
+      contentType: "playbook",
+    }));
+    const toolItems: SuggestionItem[] = BASE_TOOL_IDS.map((id) => ({
       id,
       label: BASE_TOOL_METADATA[id].name,
       description: BASE_TOOL_METADATA[id].description,
       insertText: COMMAND_HINTS[id] ?? BASE_TOOL_METADATA[id].name,
     }));
+    return [...playbookItems, ...toolItems];
+  }, [playbooks]);
+
+  // ── active playbook state (AI v3.2 T3) ──
+  // Attached via the /playbook command (ChatInput routes "contentType ===
+  // playbook" selections here instead of inserting text). The derived
+  // phase-index memo lives below, after `messages` is available from `chat`.
+  const [activePlaybookId, setActivePlaybookId] = useState<string | null>(null);
+  const [activePlaybookTitle, setActivePlaybookTitle] = useState<string | null>(
+    null,
+  );
+
+  const attachPlaybook = useCallback((item: SuggestionItem) => {
+    setActivePlaybookId(item.id);
+    setActivePlaybookTitle(item.label);
   }, []);
+
+  const detachPlaybook = useCallback(() => {
+    setActivePlaybookId(null);
+    setActivePlaybookTitle(null);
+  }, []);
+
+  // ── output target (WS7) ──
+  // Where new content lands by default; persisted client-side per chat so the
+  // choice sticks across reloads. Keyed by conversationId when bound, else
+  // contentId (transient). ChatPanel intentionally stays mounted while the
+  // active conversation changes, so the key-change effect below must hydrate
+  // each conversation instead of leaking the prior chat's selection.
+  const outputTargetKey = outputTargetStorageKey({
+    conversationId,
+    contentId,
+  });
+  const [outputTarget, setOutputTargetState] = useState<OutputTarget>(() => {
+    if (typeof window === "undefined") return DEFAULT_OUTPUT_TARGET;
+    return (
+      readStoredOutputTarget(window.localStorage, outputTargetKey) ??
+      DEFAULT_OUTPUT_TARGET
+    );
+  });
+  const lastOutputTargetKeyRef = useRef<string | null>(outputTargetKey);
+  const pendingOutputTargetPromotionRef = useRef<{
+    nextKey: string;
+    target: OutputTarget;
+  } | null>(null);
+
+  useEffect(() => {
+    const previousKey = lastOutputTargetKeyRef.current;
+    if (previousKey === outputTargetKey) return;
+
+    const pendingPromotion = pendingOutputTargetPromotionRef.current;
+    const promotedTarget =
+      pendingPromotion?.nextKey === outputTargetKey
+        ? pendingPromotion.target
+        : null;
+    const storedTarget =
+      typeof window === "undefined"
+        ? null
+        : readStoredOutputTarget(window.localStorage, outputTargetKey);
+    const resolvedTarget = resolveOutputTargetKeyChange({
+      previousKey,
+      nextKey: outputTargetKey,
+      currentTarget: outputTarget,
+      storedTarget,
+      promotedTarget,
+    });
+    if (pendingPromotion) {
+      pendingOutputTargetPromotionRef.current = null;
+    }
+    lastOutputTargetKeyRef.current = outputTargetKey;
+    setOutputTargetState(resolvedTarget);
+  }, [outputTargetKey, outputTarget]);
+
+  const setOutputTarget = useCallback(
+    (t: OutputTarget) => {
+      setOutputTargetState(t);
+      if (typeof window !== "undefined" && outputTargetKey) {
+        try {
+          writeStoredOutputTarget(window.localStorage, outputTargetKey, t);
+        } catch {
+          /* non-blocking */
+        }
+      }
+    },
+    [outputTargetKey],
+  );
+  const promoteOutputTarget = useCallback(
+    (nextConversationId: string) => {
+      const nextKey = outputTargetStorageKey({
+        conversationId: nextConversationId,
+      });
+      if (!nextKey) return;
+      pendingOutputTargetPromotionRef.current = {
+        nextKey,
+        target: outputTarget,
+      };
+      if (typeof window !== "undefined") {
+        try {
+          writeStoredOutputTarget(window.localStorage, nextKey, outputTarget);
+        } catch {
+          // The in-memory transfer remains authoritative for this promotion.
+        }
+      }
+    },
+    [outputTarget],
+  );
 
   // ── suggested follow-ups (Session 7) ──
   const [followUps, setFollowUps] = useState<string[]>([]);
-  const clearFollowUps = useCallback(() => setFollowUps([]), []);
+  const followUpRequestVersionRef = useRef(0);
+  const clearFollowUps = useCallback(() => {
+    // Invalidate an already-running suggestion request too. Otherwise a
+    // response started before Send/Stop can repopulate stale chips afterward.
+    followUpRequestVersionRef.current += 1;
+    setFollowUps([]);
+  }, []);
 
   /**
    * Extract the text content of the latest user + assistant messages and
@@ -560,6 +775,8 @@ export function useConversationEngine({
    */
   const fetchFollowUps = useCallback(
     async (finalMessages: UIMessage[]) => {
+      const requestVersion = followUpRequestVersionRef.current + 1;
+      followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
         .reverse()
         .find((m) => m.role === "assistant");
@@ -597,6 +814,7 @@ export function useConversationEngine({
         const cleaned = Array.from(
           new Set(list.map((s) => s.trim()).filter(Boolean)),
         ).slice(0, 3);
+        if (followUpRequestVersionRef.current !== requestVersion) return;
         setFollowUps(cleaned);
       } catch {
         /* soft-fail */
@@ -628,15 +846,33 @@ export function useConversationEngine({
         message?: UIMessage;
         messages?: UIMessage[];
         finishReason?: string;
+        isAbort?: boolean;
       };
-      const finalMessages = e.messages ?? [];
+      const isAbort = e.isAbort === true;
+      const streamedMessages = e.messages ?? [];
+      const finalMessages = isAbort
+        ? stopPendingToolCalls(streamedMessages)
+        : streamedMessages;
+      const finalMessage =
+        e.message && isAbort
+          ? finalMessages.find((message) => message.id === e.message?.id) ??
+            e.message
+          : e.message;
+
+      // AI SDK preserves partial tool input when a request is aborted. Replace
+      // those live parts with terminal errors so tool cards and the thinking
+      // indicator stop immediately instead of looking active indefinitely.
+      if (isAbort) {
+        setMessages(finalMessages);
+      }
 
       // Forward to the consumer's onFinish (persistence, etc.) first.
       if (onFinish) {
         onFinish({
           messages: finalMessages,
-          message: e.message,
+          message: finalMessage,
           finishReason: e.finishReason,
+          isAbort,
         });
       }
 
@@ -648,7 +884,7 @@ export function useConversationEngine({
       // time historical messages mount, which previously caused a
       // refetch loop on page open.
       try {
-        const fresh = e.message;
+        const fresh = finalMessage;
         if (fresh && typeof window !== "undefined") {
           // Backstop only (v3.1 R2): the stream-time effect below has
           // usually dispatched these already as outputs arrived; the
@@ -659,6 +895,13 @@ export function useConversationEngine({
         }
       } catch {
         /* never let dispatch errors break the chat */
+      }
+
+      // An aborted partial answer is not a completed state worth suggesting
+      // next actions from. It also keeps the UI quiet after Stop.
+      if (isAbort) {
+        clearFollowUps();
+        return;
       }
 
       // Fire suggested follow-ups (Session 7). Decorative, soft-fails
@@ -677,12 +920,56 @@ export function useConversationEngine({
     messages,
     sendMessage,
     status,
-    stop,
+    stop: stopRequest,
     error,
     setMessages,
     regenerate,
     addToolApprovalResponse,
   } = chat;
+
+  // ── active playbook: derived phase index (AI v3.2 T3) ──
+  // Phase index is DERIVED from the message history, not manually
+  // incremented — the count of phase_checkpoint tool calls that have
+  // resolved so far this conversation, mirroring ChatViewer's phaseTokens
+  // bucketing. That keeps it correct across reloads/regenerate with no
+  // separate state to desync.
+  const resolvedPhaseIndex = useMemo(() => {
+    let count = 0;
+    for (const m of messages) {
+      if (m.role !== "assistant") continue;
+      for (const part of m.parts ?? []) {
+        const p = part as { type?: string; state?: string; output?: unknown };
+        if (p.type !== "tool-phase_checkpoint") continue;
+        // Count only APPROVED checkpoints. phase_checkpoint's execute() runs
+        // ONLY on approval and returns an object carrying `__checkpoint`.
+        // Revise and Approve-with-tweaks are BOTH `approved: false` (see
+        // PhaseCheckpointCard) — their execute never runs, the phase is redone
+        // and re-checkpointed. Counting every resolved part would advance the
+        // index twice for one revised phase and inject the wrong phase. Gate
+        // on the executed output shape so only genuine completions advance.
+        const out = p.output;
+        const executed =
+          (typeof out === "object" &&
+            out !== null &&
+            (out as { __checkpoint?: unknown }).__checkpoint === true) ||
+          (typeof out === "string" && out.includes('"__checkpoint"'));
+        if (p.state === "output-available" && executed) count++;
+      }
+    }
+    return count;
+  }, [messages]);
+
+  const activePlaybook = useMemo<ActivePlaybook | null>(() => {
+    if (!activePlaybookId) return null;
+    const phaseCount =
+      playbooks.find((p) => p.id === activePlaybookId)?.phaseCount ?? 0;
+    return {
+      id: activePlaybookId,
+      title: activePlaybookTitle ?? "",
+      phaseIndex: resolvedPhaseIndex,
+      phaseCount,
+    };
+  }, [activePlaybookId, activePlaybookTitle, playbooks, resolvedPhaseIndex]);
 
   // Stream-time freshness (v3.1 R2): dispatch artifact refresh as tool
   // outputs ARRIVE in the stream, not just at turn end — a playbook turn
@@ -716,6 +1003,13 @@ export function useConversationEngine({
       // where the shell attaches what the extension captured. Read at send
       // time so the freshest capture rides the turn.
       pageContext: getAttachedPageContext(),
+      // Attached playbook (AI v3.2 T3) — read at request time so approval
+      // resumes / internal sends carry the same binding as the turn that
+      // started them.
+      playbookId: activePlaybookId,
+      activePhaseIndex: resolvedPhaseIndex,
+      // Output-target chip (WS7): where new content lands by default.
+      outputTarget,
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -728,8 +1022,19 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    activePlaybookId,
+    resolvedPhaseIndex,
+    outputTarget,
   ]);
   const isActive = status === "streaming" || status === "submitted";
+  const stop = useCallback(() => {
+    // Settle synchronously for immediate visual feedback; the SDK's abort
+    // onFinish path repeats the normalization on its authoritative snapshot
+    // before persistence.
+    stopRequest();
+    setMessages((current) => stopPendingToolCalls(current));
+    clearFollowUps();
+  }, [stopRequest, setMessages, clearFollowUps]);
 
   // ── per-message provider + model stamping ──
   // AI SDK's UIMessage doesn't carry provider/model identity — we
@@ -903,7 +1208,12 @@ export function useConversationEngine({
     }
     if (!prompt || !prompt.trim()) return;
     sendMessage(
-      { parts: [{ type: "text", text: prompt }] },
+      {
+        parts: [
+          createOutputTargetMessagePart(outputTarget),
+          { type: "text", text: prompt },
+        ],
+      },
       {
         body: {
           contentId,
@@ -912,6 +1222,7 @@ export function useConversationEngine({
           providerId,
           modelId,
           mentionedContentIds: [],
+          outputTarget,
         },
       },
     );
@@ -923,6 +1234,7 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    outputTarget,
   ]);
 
   // ── send ──
@@ -943,7 +1255,7 @@ export function useConversationEngine({
 
     // Drop any follow-up chips from the previous turn — they describe
     // a state that's about to change.
-    setFollowUps([]);
+    clearFollowUps();
 
     // Vision guard: a text-only model can't read images.
     if (hasImageParts && !supportsImageAttachments) {
@@ -982,7 +1294,23 @@ export function useConversationEngine({
     // the extracted text in `providerMetadata.app.text`; the chat route
     // reads it to inline content for providers that can't consume the file
     // natively, while the displayed/persisted message stays a clean chip.
-    const parts: UIMessage["parts"] = [];
+    const parts: UIMessage["parts"] = [
+      createOutputTargetMessagePart(outputTarget),
+    ];
+    if (activePlaybookId) {
+      // Unlike the composer-only chip, this data part belongs to the sent
+      // user turn, survives persistence/reload, and renders alongside that
+      // message. The server validates the id independently before adding
+      // authoritative model context.
+      parts.push(
+        createPlaybookMessageAttachmentPart({
+          id: activePlaybookId,
+          title: activePlaybookTitle ?? "Attached playbook",
+          phaseIndex: resolvedPhaseIndex,
+          phaseCount: activePlaybook?.phaseCount ?? 0,
+        }),
+      );
+    }
     if (text) parts.push({ type: "text", text });
     for (const a of ready) {
       const part: FileUIPart = {
@@ -1031,6 +1359,11 @@ export function useConversationEngine({
           // Lives on the explicit send body because that becomes the
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
+          // Attached playbook (AI v3.2 T3).
+          playbookId: activePlaybookId,
+          activePhaseIndex: resolvedPhaseIndex,
+          // Output-target chip (WS7).
+          outputTarget,
         },
       },
     );
@@ -1047,6 +1380,12 @@ export function useConversationEngine({
     activeContextId,
     providerId,
     modelId,
+    activePlaybookId,
+    activePlaybookTitle,
+    activePlaybook,
+    resolvedPhaseIndex,
+    outputTarget,
+    clearFollowUps,
   ]);
 
   // ── edit / regenerate (Session 5a) ──
@@ -1060,8 +1399,21 @@ export function useConversationEngine({
       mentionedContentIds: [] as string[],
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
+      // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
+      playbookId: activePlaybookId,
+      activePhaseIndex: resolvedPhaseIndex,
+      // Output-target chip (WS7).
+      outputTarget,
     }),
-    [contentId, conversationId, providerId, modelId],
+    [
+      contentId,
+      conversationId,
+      providerId,
+      modelId,
+      activePlaybookId,
+      resolvedPhaseIndex,
+      outputTarget,
+    ],
   );
 
   const editMessage = useCallback(
@@ -1079,12 +1431,39 @@ export function useConversationEngine({
       pendingStampRef.current = { providerId, modelId };
       setMessages(messages.slice(0, idx));
       // { parts } shape (matches handleSend / studio-invoke).
+      const editedParts: UIMessage["parts"] = [
+        createOutputTargetMessagePart(outputTarget),
+      ];
+      if (activePlaybookId) {
+        editedParts.push(
+          createPlaybookMessageAttachmentPart({
+            id: activePlaybookId,
+            title: activePlaybookTitle ?? "Attached playbook",
+            phaseIndex: resolvedPhaseIndex,
+            phaseCount: activePlaybook?.phaseCount ?? 0,
+          }),
+        );
+      }
+      editedParts.push({ type: "text", text });
       void sendMessage(
-        { parts: [{ type: "text", text }] },
+        { parts: editedParts },
         { body: reRunBody() }
       );
     },
-    [messages, setMessages, sendMessage, reRunBody, providerId, modelId, truncateRef],
+    [
+      messages,
+      setMessages,
+      sendMessage,
+      reRunBody,
+      providerId,
+      modelId,
+      truncateRef,
+      activePlaybookId,
+      activePlaybookTitle,
+      activePlaybook,
+      resolvedPhaseIndex,
+      outputTarget,
+    ],
   );
 
   const regenerateMessage = useCallback(
@@ -1142,6 +1521,12 @@ export function useConversationEngine({
     mentionResults,
     handleMentionSearch,
     commandItems,
+    activePlaybook,
+    attachPlaybook,
+    detachPlaybook,
+    outputTarget,
+    setOutputTarget,
+    promoteOutputTarget,
     followUps,
     clearFollowUps,
     scrollRef,

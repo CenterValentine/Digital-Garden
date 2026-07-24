@@ -6,6 +6,8 @@
  * plus editor tools (read_first_chunk, apply_diff, etc.) added in Sprint 39.
  */
 
+import type { PlaybookOutputDirective } from "../playbooks/output-directives";
+
 /** Context passed to tool execute functions from the API route */
 export interface ToolExecuteContext {
   userId: string;
@@ -19,8 +21,9 @@ export interface ToolExecuteContext {
   conversationId?: string;
   /**
    * The conversation's target folder (AI v3 core S3, umbrella decision #7).
-   * read_page files page nodes here; document tools default their
-   * destination to it.
+   * This is the storage parent for output nodes unless the selected target or
+   * an explicit user destination overrides it. Referenced outputs additionally
+   * use outputOwnerId so they appear under the selected chat/content.
    */
   targetFolderId?: string;
   /**
@@ -41,6 +44,42 @@ export interface ToolExecuteContext {
    * note next to the chat instead of at the vault root.
    */
   chatContentId?: string;
+  /**
+   * Output-owner ContentNode id (Chat Outputs & References plan, WS3): the
+   * chat this turn belongs to, when it can own referenced content — a
+   * full-page chat's own id, or a sidebar chat's archived ContentNode id.
+   * Undefined for a transient/unsaved sidebar chat (no node to own under).
+   *
+   * Output tools use this to nest content they
+   * create as a REFERENCE under the chat by default — `role: "referenced"`
+   * + `ownedByNoteId: outputOwnerId` — but ONLY when the user didn't name an
+   * explicit destination (an explicit parentId always wins; this is a
+   * fallback default, never an override of what the user asked for).
+   */
+  outputOwnerId?: string;
+  /**
+   * Stable symbolic destinations available to an individual tool call.
+   * These are distinct from outputOwnerId, which is only the turn's preset.
+   * A playbook can therefore route one artifact under the chat/content while
+   * leaving every other artifact on the preset.
+   */
+  outputChatOwnerId?: string;
+  outputContentOwnerId?: string;
+  outputContentParentId?: string | null;
+  /**
+   * Trusted output-location directives extracted from the active/rooted
+   * playbook. Write tools use these only when the model omits placement, and
+   * only when the artifact title matches the directive's literal prefix.
+   */
+  playbookOutputDirectives?: PlaybookOutputDirective[];
+  /**
+   * Output-target chip "folder" mode (WS7): when the user chose a specific
+   * folder for outputs, this is that folder id. Output tools file new content
+   * there as a PLAIN primary node (not a referenced child) — the same as if
+   * the user had named the folder. Overrides the referenced-owner default;
+   * still yields to an explicit destination the model resolves per-request.
+   */
+  outputParentOverride?: string;
   /**
    * Image/audio attachments on the conversation, in order. propose_cards_from_media
    * references these by index to build each card's media front. The model has

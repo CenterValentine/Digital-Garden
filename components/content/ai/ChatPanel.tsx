@@ -25,6 +25,7 @@ import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import { TargetFolderChip } from "./TargetFolderChip";
+import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
@@ -125,16 +126,18 @@ export function ChatPanel({
   // local in-memory chat is authoritative for the in-flight first
   // message).
   //
-  // pendingTransientSendRef carries a queued first message across the
-  // null → set transition. When the conversationId prop updates, the
-  // useEffect below fires handleSend() to actually send the queued
-  // message through the now-bound engine.
+  // pendingTransientInputRef carries the EXACT submitted first prompt across
+  // the null → set transition. A boolean is insufficient: conversationId
+  // changes the engine's draft-storage key, whose rehydration can replace the
+  // in-memory input with the new conversation's empty draft before the queued
+  // send fires. The effect below restores this snapshot first, then sends it
+  // through the now-bound engine.
   //
   // promotingInFlightRef guards against double-clicks during the brief
   // POST window so we don't kick off two concurrent createConversation
   // requests.
   const skipNextLoadRef = useRef(false);
-  const pendingTransientSendRef = useRef(false);
+  const pendingTransientInputRef = useRef<string | null>(null);
   const promotingInFlightRef = useRef(false);
   // Distinct useChat key per conversation so message arrays don't bleed
   // across tabs. Falls back to contentId for transient mode.
@@ -183,6 +186,12 @@ export function ChatPanel({
     mentionResults,
     handleMentionSearch,
     commandItems,
+    activePlaybook,
+    attachPlaybook,
+    detachPlaybook,
+    outputTarget,
+    setOutputTarget,
+    promoteOutputTarget,
     followUps,
     clearFollowUps,
     setScrollEl,
@@ -205,6 +214,7 @@ export function ChatPanel({
           const fresh = event.message
             ? {
                 id: event.message.id,
+                parts: event.message.parts,
                 metadata: (event.message as { metadata?: unknown }).metadata,
               }
             : undefined;
@@ -402,7 +412,7 @@ export function ChatPanel({
   // When the panel is in transient mode AND the parent opted in via
   // onTransientPromoted, the first send triggers a conversation create
   // BEFORE the message goes out. We queue the user's text in
-  // pendingTransientSendRef, fire the callback so the parent updates
+  // pendingTransientInputRef, fire the callback so the parent updates
   // activeId, and let the useEffect below resend through the bound
   // engine once conversationId flips from null → set.
   const wrappedHandleSend = useCallback(() => {
@@ -412,6 +422,9 @@ export function ChatPanel({
       !promotingInFlightRef.current &&
       input.trim().length > 0
     ) {
+      // Snapshot at submission time. Do not rely on `input` surviving the
+      // transient → conversation draft-key transition.
+      pendingTransientInputRef.current = input;
       promotingInFlightRef.current = true;
       void (async () => {
         try {
@@ -420,7 +433,15 @@ export function ChatPanel({
             credentials: "include",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              ...(contentId ? { snapshotContentNodeIds: [contentId] } : {}),
+              ...(contentId
+                ? {
+                    snapshotContentNodeIds: [contentId],
+                    // WS6: the content this side chat was started FROM — the
+                    // server materializes the chat as a referenced node nested
+                    // under it (so it appears in the tree and owns its outputs).
+                    originContentNodeId: contentId,
+                  }
+                : {}),
               // Carry a target chosen before the conversation existed
               // (the chip is now usable in transient chats) so the very
               // first turn already files its outputs in the right place.
@@ -433,17 +454,45 @@ export function ChatPanel({
           const body = (await res.json()) as { data?: { id?: string } };
           const newId = body?.data?.id;
           if (!newId) throw new Error("Server didn't return a conversation id");
+          // Explicitly carry the transient selection into the new
+          // conversation before rebinding. The engine owns both sides of this
+          // transfer, so a storage read cannot reset the visible chip while
+          // promotion is in flight; storage remains the remount fallback.
+          promoteOutputTarget(newId);
+          // Seed the destination draft BEFORE rebinding. The conversation
+          // engine hydrates per-key drafts on conversationId changes; without
+          // this, that valid hydration replaces the submitted transient text
+          // with an empty string and the queued first turn disappears.
+          try {
+            const queuedInput = pendingTransientInputRef.current;
+            if (queuedInput !== null) {
+              window.localStorage.setItem(
+                `dg:chat-draft:conv:${newId}`,
+                queuedInput,
+              );
+            }
+            if (contentId) {
+              window.localStorage.removeItem(
+                `dg:chat-draft:content:${contentId}`,
+              );
+            }
+          } catch {
+            // The in-memory snapshot below remains authoritative.
+          }
           // The skip flag prevents the binding hook from fetching the
           // (empty) just-created conversation and wiping our in-flight
-          // input. pendingTransientSendRef tells the resend useEffect
-          // to fire once the conversationId prop catches up.
+          // input. pendingTransientInputRef tells the resend effect to restore
+          // and send the exact submitted prompt once conversationId catches up.
           skipNextLoadRef.current = true;
-          pendingTransientSendRef.current = true;
           onTransientPromoted(newId);
+          // WS6: creating the conversation materialized a referenced chat node
+          // under the origin content — refresh the tree so it appears.
+          window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         } catch (err) {
           // Promote failed — fall back to sending transient so the user
           // doesn't lose their message. The chat won't persist this
           // turn, but at least they get a response.
+          pendingTransientInputRef.current = null;
           toast.error(
             err instanceof Error
               ? `${err.message} — sending as scratch chat`
@@ -467,15 +516,23 @@ export function ChatPanel({
     handleSend,
     targetFolder,
     targetInherited,
+    promoteOutputTarget,
   ]);
 
-  // Resend the queued transient first message once conversationId catches up.
+  // Restore, then send, the queued first prompt once conversationId catches
+  // up. This is deliberately a two-render state machine when draft hydration
+  // cleared the input: first restore the snapshot, then invoke the newly-bound
+  // handleSend closure. The ref is consumed before sending to prevent repeats.
   useEffect(() => {
-    if (conversationId && pendingTransientSendRef.current) {
-      pendingTransientSendRef.current = false;
-      handleSend();
+    const queuedInput = pendingTransientInputRef.current;
+    if (!conversationId || queuedInput === null) return;
+    if (input !== queuedInput) {
+      setInput(queuedInput);
+      return;
     }
-  }, [conversationId, handleSend]);
+    pendingTransientInputRef.current = null;
+    handleSend();
+  }, [conversationId, input, setInput, handleSend]);
 
   // ─── AI Edit Orchestrator ───
   const isAiEditing = useEditorInstanceStore((s) =>
@@ -624,6 +681,9 @@ export function ChatPanel({
   const handleClearOrDelete = useCallback(async () => {
     if (conversationId && onDeleteConversation) {
       await onDeleteConversation(conversationId);
+      // WS6: deleting a side chat also retires its materialized tree node +
+      // owned outputs (server-side) — refresh so they disappear immediately.
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       return;
     }
     setMessages([]);
@@ -721,6 +781,12 @@ export function ChatPanel({
             disabled={false}
             onChange={handleTargetChange}
           />
+          {/* WS7: where generated content lands by default. */}
+          <OutputTargetChip
+            value={outputTarget}
+            onChange={setOutputTarget}
+            hasOrigin={Boolean(contentId)}
+          />
         </div>
         <div className="flex items-center gap-1">
           {conversationId && (
@@ -782,9 +848,16 @@ export function ChatPanel({
                   onRegenerate={(id) => void regenerateMessage(id)}
                   onBranch={(id) => void handleBranch(id)}
                   actionsDisabled={isActive}
+                  outputTarget={outputTarget}
+                  conversationId={conversationId}
+                  contentId={contentId}
                   onRevertEdit={revertEdit}
                   onToolApprovalResponse={(opts) =>
                     void addToolApprovalResponse(opts)
+                  }
+                  approvalActionable={
+                    i === messages.length - 1 &&
+                    message.role === "assistant"
                   }
                   revertableToolIds={revertableToolIds}
                 />
@@ -828,6 +901,9 @@ export function ChatPanel({
         onMentionSearch={handleMentionSearch}
         mentionResults={mentionResults}
         commandItems={commandItems}
+        onAttachPlaybook={attachPlaybook}
+        activePlaybook={activePlaybook}
+        onDetachPlaybook={detachPlaybook}
         attachments={attachments}
         onAddFiles={addAttachmentFiles}
         onRemoveAttachment={removeAttachment}

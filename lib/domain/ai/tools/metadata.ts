@@ -30,6 +30,7 @@ export const BASE_TOOL_IDS = [
   "create_folder",
   "create_docx",
   "searchNotes",
+  "search_playbooks",
   "getCurrentNote",
   "createNote",
   "updateNote",
@@ -86,6 +87,10 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   searchNotes: {
     name: "Search Notes",
     description: "Search through your notes by title or content",
+  },
+  search_playbooks: {
+    name: "Search Playbooks",
+    description: "List/search playbooks by name or topic (scoped, not generic note search)",
   },
   getCurrentNote: {
     name: "Read Note",

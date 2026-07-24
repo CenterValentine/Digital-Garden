@@ -1553,6 +1553,38 @@ export async function DELETE(
       // guard for deletedAt prevents re-population from in-flight reads.
       invalidateCachedContent(id);
 
+      // WS6 (Chat Outputs & References): cascade the delete down the ownership
+      // chain — a deleted node's owned side chats (and the outputs those chats
+      // generated) go with it, and each chat's Conversation is soft-deleted
+      // too. Realizes "deleting the content deletes the side chat, and
+      // deleting the side chat removes its referenced content." Best-effort —
+      // a cascade hiccup must never fail the primary delete.
+      try {
+        await cascadeOwnedDeletes(id, session.user.id, now);
+        if (existing.contentType === "chat") {
+          const conv = await prisma.conversation.findFirst({
+            where: {
+              archivedToContentNodeId: id,
+              ownerId: session.user.id,
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (conv) {
+            await softDeleteConversation(session.user.id, conv.id).catch(
+              () => null,
+            );
+          }
+        }
+      } catch (error) {
+        logger.warn({
+          layer: "route",
+          event: "content.delete.cascade_failed",
+          summary: `WS6 owned-delete cascade failed for ${id}`,
+          error,
+        });
+      }
+
       // Folder Studio auto-context: removal changes the parent's roll-up
       // inputs. The deleted node's own metadata row is ignored by the
       // refresh engine (scope queries filter deletedAt).
@@ -1685,6 +1717,64 @@ export async function DELETE(
       );
     }
   });
+}
+
+/**
+ * WS6 (Chat Outputs & References) owned-delete cascade.
+ *
+ * Breadth-first soft-delete down the `ownedByNoteId` ownership chain from a
+ * just-deleted root: its owned side chats, then those chats' generated
+ * outputs, etc. Each `chat` node's linked Conversation is soft-deleted too.
+ * Depth is shallow in practice (content → side chat → outputs) and bounded to
+ * guard against pathological cycles. Only touches EXPLICITLY-owned content
+ * (`ownedByNoteId` set) — embedded media (owned via the ContentLink embed
+ * graph, no `ownedByNoteId`) is out of scope and handled by its own lifecycle.
+ */
+async function cascadeOwnedDeletes(
+  rootId: string,
+  userId: string,
+  now: Date,
+): Promise<void> {
+  let frontier = [rootId];
+  const seen = new Set<string>([rootId]);
+  for (let depth = 0; depth < 5 && frontier.length > 0; depth++) {
+    const owned = await prisma.contentNode.findMany({
+      where: {
+        ownedByNoteId: { in: frontier },
+        ownerId: userId,
+        deletedAt: null,
+      },
+      select: { id: true, contentType: true },
+    });
+    const fresh = owned.filter((o) => !seen.has(o.id));
+    if (fresh.length === 0) break;
+    const ids = fresh.map((o) => o.id);
+    for (const id of ids) seen.add(id);
+
+    await prisma.contentNode.updateMany({
+      where: { id: { in: ids } },
+      data: { deletedAt: now, deletedBy: userId },
+    });
+
+    const chatIds = fresh
+      .filter((o) => o.contentType === "chat")
+      .map((o) => o.id);
+    if (chatIds.length > 0) {
+      const convs = await prisma.conversation.findMany({
+        where: {
+          archivedToContentNodeId: { in: chatIds },
+          ownerId: userId,
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      for (const conv of convs) {
+        await softDeleteConversation(userId, conv.id).catch(() => null);
+      }
+    }
+
+    frontier = ids;
+  }
 }
 
 // syncContentTags extracted to lib/domain/content/tag-sync.ts for reuse by import service

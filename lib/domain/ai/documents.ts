@@ -33,18 +33,22 @@ export async function findOrCreateFolder(
   ownerId: string,
   title: string,
   parentId: string | null,
-): Promise<string> {
+  options: { ownerContentId?: string } = {},
+): Promise<{ contentNodeId: string; created: boolean }> {
   const existing = await prisma.contentNode.findFirst({
     where: {
       ownerId,
       parentId,
+      ownedByNoteId: options.ownerContentId ?? null,
       contentType: "folder",
       deletedAt: null,
       title: { equals: title, mode: "insensitive" },
     },
     select: { id: true },
   });
-  if (existing) return existing.id;
+  if (existing) {
+    return { contentNodeId: existing.id, created: false };
+  }
 
   const slug = await generateUniqueSlug(title, ownerId);
   const folder = await prisma.contentNode.create({
@@ -55,6 +59,12 @@ export async function findOrCreateFolder(
       contentType: "folder",
       parentId,
       displayOrder: 0,
+      ...(options.ownerContentId
+        ? {
+            role: "referenced" as const,
+            ownedByNoteId: options.ownerContentId,
+          }
+        : {}),
     },
     select: { id: true },
   });
@@ -62,9 +72,9 @@ export async function findOrCreateFolder(
     layer: "ai",
     event: "ai_documents:folder_created",
     summary: `folder "${title}" created`,
-    attrs: { folderId: folder.id, parentId },
+    attrs: { folderId: folder.id, parentId, ownerContentId: options.ownerContentId },
   });
-  return folder.id;
+  return { contentNodeId: folder.id, created: true };
 }
 
 export interface CreateDocxInput {
@@ -73,6 +83,14 @@ export interface CreateDocxInput {
   markdown: string;
   /** Destination folder — required; callers resolve from the target. */
   parentFolderId: string;
+  /**
+   * Output ownership (Chat Outputs & References plan, WS3): when set, the
+   * document is created as `role: "referenced"`, nested under this owner
+   * (a chat's ContentNode) rather than as a loose primary file. Omit for the
+   * default primary-in-folder placement.
+   */
+  role?: "referenced";
+  ownedByNoteId?: string;
 }
 
 export async function createDocxDocument(
@@ -114,6 +132,8 @@ export async function createDocxDocument(
       contentType: "file",
       parentId: input.parentFolderId,
       displayOrder: 0,
+      ...(input.role ? { role: input.role } : {}),
+      ...(input.ownedByNoteId ? { ownedByNoteId: input.ownedByNoteId } : {}),
       filePayload: {
         create: {
           fileName,

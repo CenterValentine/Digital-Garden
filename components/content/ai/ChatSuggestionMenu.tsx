@@ -9,7 +9,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { FileText, Folder, MessageCircle, File, Wrench } from "lucide-react";
+import { FileText, Folder, MessageCircle, File, Wrench, GitBranch } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export interface SuggestionItem {
@@ -30,8 +30,11 @@ interface ChatSuggestionMenuProps {
 
 function getItemIcon(item: SuggestionItem, mode: "mention" | "command") {
   const cls = "h-3.5 w-3.5 shrink-0";
-  if (mode === "command")
+  if (mode === "command") {
+    if (item.contentType === "playbook")
+      return <GitBranch className={cn(cls, "text-indigo-400")} />;
     return <Wrench className={cn(cls, "text-purple-400")} />;
+  }
   switch (item.contentType) {
     case "note":
       return <FileText className={cn(cls, "text-blue-400")} />;

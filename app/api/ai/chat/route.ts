@@ -23,6 +23,7 @@
 
 import { streamText, convertToModelMessages, stepCountIs } from "ai";
 import type { UIMessage } from "ai";
+import type { JSONContent } from "@tiptap/core";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { getUserSettings } from "@/lib/features/settings";
 import { getChatContextBody } from "@/lib/features/chat-contexts";
@@ -35,6 +36,12 @@ import {
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
+import {
+  DEFAULT_OUTPUT_TARGET,
+  getLatestUserMessageOutputTarget,
+  parseOutputTarget,
+  renderOutputTargetInstruction,
+} from "@/lib/domain/ai/output-target";
 
 /**
  * JSON-safe shape compatible with AI SDK's `providerOptions` (whose
@@ -90,7 +97,11 @@ import {
   lookupTemplate,
   ConnectionNotFoundError,
 } from "@/lib/features/ai-connections";
-import { addAutoAssociation, appendMessage } from "@/lib/features/conversations";
+import {
+  addAutoAssociation,
+  appendMessage,
+  ensureConversationContentNode,
+} from "@/lib/features/conversations";
 import { publishEvent } from "@/lib/domain/notifications";
 import { resolveNativeWebSearchTool } from "@/lib/domain/ai/acquisition";
 import { userHasSearchConnection } from "@/lib/domain/ai/acquisition/search/resolve";
@@ -122,6 +133,17 @@ import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
 import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
+import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
+import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import {
+  bindPlaybookToLatestUserMessage,
+  requestsRootedPlaybookExecution,
+} from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  extractPlaybookOutputDirectives,
+  type PlaybookOutputDirective,
+} from "@/lib/domain/ai/playbooks/output-directives";
 
 const ROUTE_PATH = "/api/ai/chat";
 
@@ -152,6 +174,14 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
+
+      // Approval resumes can occur after a reload, when the transport's
+      // in-memory turn snapshot is gone and its live fallback may have reset
+      // to the default "chat" target. New turns bind placement to their user
+      // message, so every continuation replays the target that STARTED the
+      // turn. Legacy turns without the data part retain request-body behavior.
+      const turnBoundOutputTarget =
+        getLatestUserMessageOutputTarget(messages);
 
       // Load user's stored AI settings as defaults
       const userSettings = await getUserSettings(session.user.id);
@@ -378,12 +408,20 @@ export async function POST(request: Request) {
       // run_workflow resolve to it when called with no arguments.
       let openWorkflowTitle: string | undefined;
       let openContentLocationId: string | undefined;
+      // The content this chat is rooted in (title + type), for the "you can
+      // see what I have open" context section — so the model resolves "this
+      // file / the current note / this playbook" to the chat's own subject
+      // without the user re-naming it.
+      let rootedContentTitle: string | undefined;
+      let rootedContentType: string | undefined;
       if (contentId) {
         const node = await prisma.contentNode.findFirst({
           where: { id: contentId, ownerId: session.user.id },
           select: { contentType: true, title: true, parentId: true },
         });
         isChatContent = node?.contentType === "chat";
+        rootedContentTitle = node?.title ?? undefined;
+        rootedContentType = node?.contentType ?? undefined;
         if (node?.contentType === "workflow") openWorkflowTitle = node.title;
         // Location inference fallback (v3 ship fix, 2026-07-18): "chats
         // serve their location" must hold for sidebar chats too — they
@@ -457,6 +495,7 @@ export async function POST(request: Request) {
       // tool context: read_page files page nodes there; document tools
       // default their destination to it.
       let targetFolderId: string | undefined;
+      let archivedChatNodeId: string | undefined;
       if (conversationIdForAssoc) {
         const conv = await prisma.conversation.findFirst({
           where: {
@@ -468,22 +507,105 @@ export async function POST(request: Request) {
             targetFolderId: true,
             // Location inference: chats serve their location — the chat
             // node's parent folder is the target unless explicitly set.
-            archivedToContentNode: { select: { parentId: true } },
+            archivedToContentNode: { select: { id: true, parentId: true } },
           },
         });
         targetFolderId =
           conv?.targetFolderId ??
           conv?.archivedToContentNode?.parentId ??
           undefined;
+        archivedChatNodeId = conv?.archivedToContentNode?.id;
       }
       // Final fallback: the open content's folder (sidebar chats and
       // transient chats have no chat node to infer from).
       if (!targetFolderId) targetFolderId = openContentLocationId;
 
+      // WS6 (robust materialization): a sidebar chat rooted in content must
+      // exist as a referenced ContentNode under that content — both so it
+      // appears nested in the tree and so its outputs can nest under it. The
+      // client's transient-promotion POST only covers freshly-created chats;
+      // doing it here too (idempotent — ensureConversationContentNode reuses
+      // an existing node) covers every path: reopened chats, chats created
+      // before WS6, the browser side panel, etc. Non-fatal.
+      if (
+        conversationIdForAssoc &&
+        !isChatContent &&
+        contentId &&
+        !archivedChatNodeId
+      ) {
+        try {
+          archivedChatNodeId = await ensureConversationContentNode(
+            session.user.id,
+            conversationIdForAssoc,
+            { ownerContentId: contentId },
+          );
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "chat:materialize_failed",
+            summary: "side-chat node materialization failed — continuing",
+            error,
+          });
+        }
+      }
+
+      // Output ownership (Chat Outputs & References plan, WS3): the chat
+      // that can own referenced output by default — a full-page chat is
+      // itself; a sidebar chat is its (now eagerly materialized, WS6)
+      // archived ContentNode. Undefined for a transient/unsaved sidebar chat
+      // — output tools fall back to their folder-only default there.
+      const chatNodeId: string | undefined = isChatContent
+        ? contentId
+        : archivedChatNodeId;
+      // The content this chat was started FROM (side chats only) — used by the
+      // "next to this chat" output-target mode.
+      const originContentId: string | undefined = isChatContent
+        ? undefined
+        : contentId;
+
+      // Output-target chip (WS7): the user's per-turn choice of where NEW
+      // content lands by default. `chat` (owner = the chat, WS3 default),
+      // `nextToChat` (owner = origin content — a sibling of the chat under it),
+      // or `folder` (a chosen folder, as a plain primary node). Only the
+      // default when the user doesn't tell the bot otherwise — an explicit
+      // destination the bot resolves from the request always wins downstream.
+      let outputOwnerId: string | undefined = chatNodeId;
+      let outputParentOverride: string | undefined;
+      const outputTarget =
+        turnBoundOutputTarget ??
+        parseOutputTarget(body.outputTarget) ??
+        DEFAULT_OUTPUT_TARGET;
+      if (outputTarget.mode === "underContent") {
+        // Referenced under the rooted content (a child of it, sibling of
+        // the chat).
+        outputOwnerId = originContentId ?? chatNodeId;
+      } else if (outputTarget.mode === "besideContent") {
+        // Primary in the rooted content's folder (next to it).
+        outputOwnerId = undefined;
+        outputParentOverride = openContentLocationId;
+      } else if (outputTarget.mode === "folder") {
+        outputOwnerId = undefined;
+        const selectedOutputFolder = await prisma.contentNode.findFirst({
+          where: {
+            id: outputTarget.folderId,
+            ownerId: session.user.id,
+            contentType: "folder",
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        outputParentOverride = selectedOutputFolder?.id;
+      }
+      // mode "chat" → keep the chat-owner default.
+
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger.
       const runTokenCounter = { total: 0 };
+      // Playbook validation happens below, after the tool registry is built.
+      // Tool closures retain this array reference, so trusted directives
+      // pushed before streamText begins are available at execution time.
+      const playbookOutputDirectives: PlaybookOutputDirective[] = [];
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
@@ -498,6 +620,18 @@ export async function POST(request: Request) {
         // chat IS the open content. Pass that through so createNote can
         // default the new note's parent folder to the chat's own parent.
         chatContentId: isChatContent ? contentId : undefined,
+        outputOwnerId,
+        outputParentOverride,
+        // Per-artifact symbolic overrides. The preset above still governs
+        // omitted placement, while tools can safely honor instructions such
+        // as "put this specific document under the chat" without asking the
+        // model to invent or discover internal ContentNode UUIDs.
+        outputChatOwnerId: chatNodeId,
+        outputContentOwnerId: originContentId,
+        outputContentParentId: originContentId
+          ? openContentLocationId ?? null
+          : undefined,
+        playbookOutputDirectives,
         attachedMedia,
       };
       const allTools = {
@@ -568,8 +702,6 @@ export async function POST(request: Request) {
           createAppWebSearchTool(session.user.id);
       }
 
-      const toolsActive = Object.keys(tools).length > 0;
-
       // Resolve attachments for the model: keep file parts the active
       // provider can consume natively (images for vision; PDFs for
       // Anthropic/Google), and inline the server-extracted text for
@@ -594,7 +726,7 @@ export async function POST(request: Request) {
       );
 
       // Convert UIMessages to ModelMessages for streamText
-      const modelMessages = await convertToModelMessages(
+      let modelMessages = await convertToModelMessages(
         resolvedMessages as Parameters<typeof convertToModelMessages>[0],
       );
 
@@ -685,6 +817,287 @@ export async function POST(request: Request) {
         }
       }
 
+      // Playbook progressive disclosure (AI v3.2 T3): inject standing rules
+      // + the ACTIVE PHASE ONLY — never the whole playbook. `[[wiki-link]]`
+      // references in that phase surface as a manifest the model traces on
+      // demand via read_note; sub-playbooks (a linked note OR folder that is
+      // itself marked as a playbook) are called out so the model follows
+      // their own directives rather than treating them as passive reading.
+      let playbookContext = "";
+      let playbookAwareness = "";
+      let attachedPlaybookResolved = false;
+      let rootedPlaybookResolved = false;
+      let attachedPlaybookTitle = "";
+      // An EXPLICIT attach (/playbook picker) gets the full progressive
+      // disclosure below — standing rules + the active phase + reference
+      // manifest, and flips the checkpoint cadence.
+      const explicitPlaybookId =
+        typeof body.playbookId === "string" ? body.playbookId : null;
+      const rootedPlaybookId =
+        !explicitPlaybookId &&
+        contentId &&
+        requestsRootedPlaybookExecution(messages)
+          ? contentId
+          : null;
+      // AMBIENT: the user is chatting FROM a note/folder that is itself a
+      // playbook, without attaching it. We do NOT auto-run it — that would
+      // flip EVERY casual message on a playbook-anchored chat into playbook
+      // mode (per-turn phase injection + the stricter checkpoint cadence)
+      // the user never asked for. Instead, add a one-line AWARENESS hint so
+      // the model can run it WHEN ASKED and knows the content's id — which
+      // is what fixes "it couldn't look at what I'm actively viewing" without
+      // hijacking the whole conversation.
+      const ambientPlaybookId =
+        !explicitPlaybookId && !rootedPlaybookId && contentId
+          ? contentId
+          : null;
+      if (explicitPlaybookId) {
+        try {
+          const playbookNode = await prisma.contentNode.findFirst({
+            where: {
+              id: explicitPlaybookId,
+              ownerId: session.user.id,
+              // Folders can carry a notePayload (the folder "Notes" editor),
+              // so a folder marked as a playbook is a legitimate source, not
+              // just a dedicated note.
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          if (
+            playbookNode?.notePayload &&
+            isPlaybookMetadata(playbookNode.notePayload.metadata)
+          ) {
+            attachedPlaybookResolved = true;
+            attachedPlaybookTitle = playbookNode.title;
+            const parsed = parsePlaybook(
+              playbookNode.notePayload.tiptapJson as JSONContent,
+            );
+            if (parsed.phases.length > 0) {
+              const rawIndex =
+                typeof body.activePhaseIndex === "number" ? body.activePhaseIndex : 0;
+              const phaseIndex = Math.min(
+                Math.max(rawIndex, 0),
+                parsed.phases.length - 1,
+              );
+              const phase = parsed.phases[phaseIndex];
+              playbookOutputDirectives.push(
+                ...extractPlaybookOutputDirectives(parsed, [phaseIndex]),
+              );
+
+              // Reference manifest: title-resolve every [[link]] in the
+              // standing rules + active phase (wiki-links carry no id — see
+              // lib/domain/editor/extensions/wiki-link.ts).
+              const allRefs = [
+                ...parsed.standingRules.references,
+                ...phase.references,
+              ];
+              let refsManifest = "";
+              if (allRefs.length > 0) {
+                const uniqueTitles = Array.from(
+                  new Set(allRefs.map((r) => r.targetTitle)),
+                );
+                const refNodes = await prisma.contentNode.findMany({
+                  where: {
+                    ownerId: session.user.id,
+                    title: { in: uniqueTitles },
+                    deletedAt: null,
+                  },
+                  select: {
+                    // id is what read_note (getCurrentNote) needs — it takes a
+                    // UUID, not a title, so the manifest MUST carry the id or
+                    // the model can't act on "read this extension" directly.
+                    id: true,
+                    title: true,
+                    notePayload: { select: { metadata: true } },
+                  },
+                });
+                const byTitle = new Map(refNodes.map((n) => [n.title, n]));
+                const lines = uniqueTitles.map((title) => {
+                  const found = byTitle.get(title);
+                  if (!found) return `- [[${title}]] — not found in your notes`;
+                  const isSub = isPlaybookMetadata(found.notePayload?.metadata);
+                  return isSub
+                    ? `- [[${title}]] (read_note id: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
+                    : `- [[${title}]] (read_note id: ${found.id})`;
+                });
+                refsManifest = `\n\n**Linked extensions** (call read_note with the id below only when the current phase needs one — not preloaded):\n${lines.join("\n")}`;
+              }
+
+              // Phase table-of-contents: the model sees the whole run's SHAPE
+              // (every phase title) but only the current phase's DETAIL. Without
+              // this it can't honor "announce the next phase" — under
+              // progressive disclosure it never saw the other phases.
+              const phaseToc = parsed.phases
+                .map(
+                  (p, i) =>
+                    `${i + 1}. ${p.title}${i === phaseIndex ? "  ← current (only this phase's detail is loaded)" : ""}`,
+                )
+                .join("\n");
+
+              const standingText = renderPlaybookSection(
+                parsed.standingRules.content,
+              );
+              const phaseText = renderPlaybookSection(phase.content);
+              playbookContext =
+                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
+                `This playbook is ALREADY ATTACHED and loaded below — when the user asks to run "this playbook" (or a bare "run it"/"go"), THIS is it. Do not search notes or read anything else to find it; act on the content already provided here.\n` +
+                `Phase ${phaseIndex + 1} of ${parsed.phases.length}: "${phase.title}"\n\n` +
+                `**Phases:**\n${phaseToc}\n\n` +
+                (standingText
+                  ? `**Standing rules (always apply):**\n${standingText}\n\n`
+                  : "") +
+                `**Current phase (the ONLY phase detail loaded):**\n${phaseText}${refsManifest}`;
+            } else {
+              // A valid marked playbook can be empty. Keep its explicit
+              // identity in context instead of silently falling through to
+              // discovery/rooted-note behavior; the assistant should report
+              // the missing instructions, never search for a replacement.
+              playbookContext =
+                `\n\n## Active Playbook: "${playbookNode.title}"\n` +
+                "This playbook is explicitly attached, but it contains no instructions. Do not search for another playbook. Tell the user this attached playbook is empty and needs content before it can run.";
+            }
+          }
+        } catch (playbookError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:injection_failed",
+            summary: "playbook context injection failed — continuing without it",
+            error: playbookError,
+          });
+        }
+      } else if (rootedPlaybookId) {
+        try {
+          const rootedNode = await prisma.contentNode.findFirst({
+            where: {
+              id: rootedPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true } },
+            },
+          });
+          if (rootedNode?.notePayload) {
+            const parsed = parsePlaybook(
+              rootedNode.notePayload.tiptapJson as JSONContent,
+            );
+            rootedPlaybookResolved = true;
+            attachedPlaybookTitle = rootedNode.title;
+            playbookOutputDirectives.push(
+              ...extractPlaybookOutputDirectives(parsed),
+            );
+
+            const standingText = renderPlaybookSection(
+              parsed.standingRules.content,
+            );
+            const phaseText = parsed.phases
+              .map(
+                (phase, index) =>
+                  `### Phase ${index + 1}: ${phase.title}\n${renderPlaybookSection(phase.content)}`,
+              )
+              .join("\n\n");
+            playbookContext =
+              `\n\n## Active Playbook: "${rootedNode.title}"\n` +
+              "The user explicitly asked to execute the rooted file as a playbook. Its validated contents are loaded below. Follow it directly; do not search for or substitute another playbook. All phases are visible, so continue through approved checkpoints as instructed.\n\n" +
+              (standingText
+                ? `**Standing rules (always apply):**\n${standingText}\n\n`
+                : "") +
+              (phaseText ||
+                "This rooted playbook contains no executable instructions. Tell the user it needs content before it can run.");
+          }
+        } catch (rootedPlaybookError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:rooted_injection_failed",
+            summary:
+              "explicit rooted playbook injection failed — continuing without it",
+            error: rootedPlaybookError,
+          });
+        }
+      } else if (ambientPlaybookId) {
+        try {
+          const node = await prisma.contentNode.findFirst({
+            where: {
+              id: ambientPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          if (
+            node?.notePayload &&
+            isPlaybookMetadata(node.notePayload.metadata)
+          ) {
+            const parsed = parsePlaybook(
+              node.notePayload.tiptapJson as JSONContent,
+            );
+            playbookAwareness =
+              `\n\nThe content you're working in — "${node.title}" — is itself a PLAYBOOK` +
+              (parsed.phases.length > 0
+                ? ` (${parsed.phases.length} phases)`
+                : "") +
+              `. Do NOT start running it on your own initiative. Only if the user asks you to run, start, or follow it: read its full content with read_note (id: ${ambientPlaybookId}), then follow its standing rules and phases in order, calling phase_checkpoint at each phase boundary.`;
+          }
+        } catch (awarenessError) {
+          logger.warn({
+            layer: "ai",
+            event: "playbook:chat:awareness_failed",
+            summary: "ambient playbook awareness failed — continuing without it",
+            error: awarenessError,
+          });
+        }
+      }
+
+      // Discovery and execution are mutually exclusive states. Once the
+      // ownership-scoped attachment resolves, remove the discovery tool for
+      // this turn so weaker models cannot search for the playbook that is
+      // already loaded. Generic note search remains available for phase work.
+      if (attachedPlaybookResolved || rootedPlaybookResolved) {
+        delete tools.search_playbooks;
+        // System context alone proved insufficient for weaker models: the
+        // owner smoke trace showed a correctly injected Active Playbook, yet
+        // DeepSeek still opened the rooted note first. Put the validated
+        // selection directly on the latest user request as well.
+        modelMessages = bindPlaybookToLatestUserMessage(
+          modelMessages,
+          attachedPlaybookTitle,
+          rootedPlaybookResolved ? "rooted" : "attached",
+        );
+      }
+
+      // Rooted-content context: tell the model what this chat is ABOUT, so
+      // "this file / the current note / this playbook" resolves to the chat's
+      // own subject without the user re-naming it (the "can't you see what I
+      // have open?" gap). Skipped when the chat IS the content (full-page chat
+      // has its own section) or it's a workflow (workflow section covers it).
+      let rootedContentSection = "";
+      if (contentId && !isChatContent && !openWorkflowTitle && rootedContentTitle) {
+        const readable =
+          rootedContentType === "note" || rootedContentType === "folder";
+        rootedContentSection = attachedPlaybookResolved
+          ? `\n\nThis chat was opened from **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}). It is optional working context, NOT the selected playbook. The playbook attached to the current user message and loaded in "Active Playbook" is the procedure to execute. Do not read "${rootedContentTitle}" merely to identify, discover, or understand the playbook.` +
+            (readable
+              ? ` Read the rooted content with read_note (id: ${contentId}) only when the user's request or the active playbook phase actually requires its contents.`
+              : "")
+          : rootedPlaybookResolved
+            ? `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}), and the user explicitly asked to execute it as the Active Playbook. Its validated instructions are already loaded; do not read or search for another playbook.`
+            : `\n\nThis chat is rooted in **"${rootedContentTitle}"** (a ${rootedContentType ?? "content"}) — that is what this conversation is about. When the user refers to "this file", "this note", "the current one", "this playbook", etc. without naming it, they mean "${rootedContentTitle}".` +
+              (readable
+                ? ` Read its content with read_note (id: ${contentId}) when you need it.`
+                : "");
+      }
+
       // Resolve the selected custom-instruction context, if any. Sent by
       // the composer's context picker. Ownership-gated; a missing/foreign/
       // deleted id degrades to the base system prompt (returns null).
@@ -730,6 +1143,8 @@ export async function POST(request: Request) {
         });
       }
 
+      const toolsActive = Object.keys(tools).length > 0;
+
       // Open the streaming span manually — it outlives this function via
       // streamText's onFinish callback. span.end() / span.fail() will emit
       // with the captured trace_id even after ALS scope exits.
@@ -756,6 +1171,13 @@ export async function POST(request: Request) {
       await spanPayload(streamSpan, "chat_input", {
         messages: modelMessages,
         mentionedContext,
+        playbookContext,
+        attachedPlaybookResolved,
+        rootedPlaybookResolved,
+        playbookOutputDirectives,
+        outputTarget,
+        outputOwnerId,
+        outputParentOverride,
         providerId,
         modelId,
         temperature: effectiveTemperature,
@@ -807,6 +1229,11 @@ export async function POST(request: Request) {
           autoPronounceDefault,
           userContextSection,
           mentionedContext,
+          playbookContext,
+          playbookAwareness,
+          rootedContentSection,
+          outputTargetSection: renderOutputTargetInstruction(outputTarget),
+          hasAttachedPlaybook: attachedPlaybookResolved,
           pageContextSection,
         }),
         onStepFinish: (step) => {

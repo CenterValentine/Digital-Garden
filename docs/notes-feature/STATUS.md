@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-20
+last_updated: 2026-07-23
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,109 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**July 23, 2026**: Generic AI writes refresh the file tree in real time on PR #126
+
+- Root-caused the stale tree to a contract split: chat cards rendered generic `__contentWrites` receipts, while freshness dispatch still recognized only legacy `__notePayload` results.
+- Every validated persisted write now dispatches a tree refresh; note/folder and workflow receipts also dispatch their narrower live-view events, with legacy results retained for old conversations.
+- The completion backstop can now recover partial stream states because tool calls are marked seen only after a recognized write.
+
+**July 23, 2026**: Rooted-playbook output directives are runtime-enforced on PR #126
+
+- Confirmed the Test 14 model understood “under the chat” but omitted `outputLocation` from `create_docx`; the runtime then correctly used the `underContent` preference.
+- Canonicalized chat/content/folder placement vocabulary, removed the legacy `parentId` contradiction, and made “execute this file as a playbook” validate and bind the rooted file as Active Playbook context.
+- Trusted title-matched output directives now provide a note/Word placement fallback when the model omits the optional field; explicit tool placement remains highest priority and unrelated artifacts remain on the selected preset.
+- `playbooks:check` covers the exact malformed owner-smoke wording, rooted execution cues, and non-playbook ordinary questions.
+
+**July 23, 2026**: Promoted chats retain their visible output preference on PR #126
+
+- Confirmed from the owner-smoke trace that the first promoted request and its artifact still used `underContent`; only the chip regressed to `Under this chat` after the client key transition.
+- Replaced the storage-only promotion transfer with an explicit in-memory handoff owned by the conversation engine, while retaining per-conversation storage for reloads and ordinary chat switching.
+- `output-targets:check` covers promotion with unavailable storage so the visible preference cannot silently reset at the transient-to-conversation boundary.
+
+**July 23, 2026**: Playbook outputs support per-artifact location overrides on PR #126
+
+- Root-caused the Test 14 smoke failure from its `chat_input` trace: the playbook explicitly routed one note under the chat, but `createNote` could only override the preset with a folder UUID, so the model had no way to express a referenced-under-chat destination.
+- Note and Word-document tools now accept ownership-safe symbolic destinations (`under_chat`, `under_content`, `beside_content`) for one artifact; omitted placement still uses the selected output preference and specifically resolved folders still use `parentId`.
+- `output-targets:check` now verifies overrides in both directions plus sibling placement, preserving the rule that a run-wide preference yields to an explicit per-artifact instruction without affecting other outputs.
+
+**July 23, 2026**: AI output routing and receipt icons unified on PR #126
+
+- Cached web pages, generated image/audio files, workflows, folders, and Run Ledgers now use the same output-placement resolver as notes and Word documents.
+- “Under this chat” creates referenced children of the chat; a selected folder creates primary children there; an explicitly user-named destination still overrides the preset.
+- Content-write receipts now show type-appropriate icons for notes, external pages, folders, files, images, audio, workflows, chats, visualizations, data, and code instead of presenting every write as a folder.
+
+**July 23, 2026**: Markdown paste prompt and frontmatter conversion corrected on PR #126
+
+- The paste suggestion now has an `×` that dismisses only the current prompt; the existing “Don't show again” action remains the persistent preference.
+- Paste conversion preserves a leading YAML-shaped block as visible plain text between two horizontal rules instead of letting its closing `---` become a Setext heading underline.
+- Unmarked labels such as `name:`, `description:`, `Phase A:`, and `Phase B:` gain bold emphasis inside ordinary paragraph content; headings are created only when the pasted source actually contains heading syntax.
+
+**July 23, 2026**: Run Ledgers receive searchable, run-stable titles on PR #126
+
+- New ledgers are named `Run Ledger — <whole-run summary> · <memorable word pair>`; the phase-checkpoint contract asks for a stable subject-and-deliverables title and derives one from the summary when omitted.
+- The word pair is deterministic from conversation identity, so every phase updates the same ledger while otherwise-similar runs remain distinguishable in search.
+- Existing plain `Run Ledger` notes are adopted, tagged with their run identity, and renamed on their next checkpoint instead of being duplicated.
+
+**July 23, 2026**: File-tree Shift selection no longer opens content on PR #126
+
+- Shift-click and Shift-double-click now remain selection-only gestures: range selection, persisted selection state, status counts, and bulk context-menu actions still work without changing the active content pane.
+
+**July 23, 2026**: AI content writes gain durable destination receipts on PR #126
+
+- Every AI tool that persists garden content now returns a shared write receipt resolved from the saved `ContentNode`, including its effective folder or referenced-under owner.
+- Chat messages render the receipt as a clickable emerald affordance naming what was created/updated/generated/cached and exactly where it lives.
+- Coverage includes notes and sidecar notes, editor writes, Word documents, generated image/audio files, workflows, acquisition-cached web pages, created folders, and the playbook Run Ledger; legacy note cards still render for older persisted conversations.
+
+**July 23, 2026**: Phase-checkpoint approval survives conversation reload on PR #126
+
+- The owner reproduction was confirmed in persisted data: the live checkpoint reached `approval-requested`, but `ConversationMessage.parts` captured the stale `input-streaming` React snapshot without its approval ID, so reload rendered a running tool bubble.
+- Conversation persistence now uses the AI SDK's fresh final assistant parts for both initial saves and post-approval continuation patches, not only for token metadata.
+- Reload seeds persisted part signatures so the first resumed approval is patched, and complete legacy checkpoint snapshots are safely restored to an actionable approval card with a deterministic approval ID.
+
+**July 23, 2026**: First transient side-chat submission preserved during referenced-chat creation on PR #126
+
+- Root cause matched the owner report: the first send created the referenced chat node, then changed the conversation-scoped draft key before the queued resend. The queue stored only a boolean, so valid draft rehydration could clear the only copy of the submitted prompt.
+- Promotion now snapshots the exact submitted text, seeds the new conversation's draft before rebinding, restores it if necessary, and only then sends through the bound conversation engine.
+- The sidebar activates the new conversation immediately; refreshing its tab metadata no longer gates delivery of the first turn.
+
+**July 23, 2026**: Assistant replies can be copied or sent to their configured output target on PR #126
+
+- Completed assistant replies now retain a visible action row with copy and “send to output target” controls instead of hiding all actions until hover.
+- Sending a reply creates a Markdown-backed note through the same validated chat/content/folder placement rules used by AI content tools.
+- The naming dialog prefills only when the reply contains an explicit Markdown or standalone-bold title; otherwise it requires the user to name the note.
+
+**July 23, 2026**: Output targets survive playbook checkpoint reloads on PR #126
+
+- Root-caused mixed placement in one run: web caches executed during the original `underContent` request, while approved note/checkpoint tools resumed after reload with the default `chat` target.
+- Each user turn now carries its selected output target as a durable data part. Approval continuations recover that turn-start contract instead of trusting rehydrated live UI state.
+- Phase tool affordances now identify their phase as `Phase checkpoint: [phase]` in both approval and completed states.
+
+**July 23, 2026**: AI output-target persistence and routing hardened on PR #126
+
+- Root-caused a side-chat output that ignored its preset: `createNote` correctly omitted `parentId`, but the client had reverted to `{ mode: "chat" }` because the long-lived sidebar engine did not rehydrate output-target state when conversation keys changed.
+- Output targets now hydrate per conversation, migrate from transient content keys when a side chat is promoted, reset rather than leak across unrelated chats, and remain visibly labeled in the sidebar header.
+- The server validates and traces the target, tells the model the exact configured default, and preserves the contract that an explicitly named user destination overrides the preset.
+- Added `pnpm output-targets:check` to the build and Quality workflow.
+
+**July 23, 2026**: AI v3.2 T3 — explicit playbook recognition hardened on PR #126
+
+- Root-caused the owner smoke failure from the captured `chat_input` trace: the marked test notes stored pasted SKILL.md as ordinary TipTap paragraphs, so the structural parser reported `0 phases`; the chat route then silently omitted the attachment and told the model that “this playbook” meant the rooted note.
+- The parser now recognizes markdown-like headings/frontmatter in ordinary text and treats unsectioned instructions as one implicit phase. Valid empty attachments remain explicitly identified instead of falling back to discovery.
+- Once an ownership-scoped attachment resolves, `search_playbooks` is removed for that turn. Discovery and execution are now server-enforced mutually exclusive states; generic note search remains available for phase work.
+- Owner retest exposed a second representation gap: the server had correctly injected `Active Playbook: "Test"`, but the selection existed only in system context and the composer chip, so DeepSeek still opened rooted note `Test6` first. Each sent user message now carries a persistent `data-playbook` pill, and the server places the ownership-validated attachment directly beside the latest user request in model context. Rooted content is framed as optional task input whenever a playbook is attached.
+- Added `pnpm playbooks:check` to the build and Quality workflow with structured, pasted-SKILL, textual-reference, unsectioned, and empty-playbook coverage.
+
+**July 22, 2026**: AI v3.2 T3 — playbook registry + progressive disclosure, P1–P4 + P5-mark built (branch `feature/ai-v3.2-t3-playbooks`, worktree `ai-v32-t3`; plan: `work-tracking/AI-V3.2-T3-PLAYBOOKS-PLAN.md`; resource-discipline reference: `guides/ai/AGENTIC-RESOURCE-DISCIPLINE.md`)
+
+- **Framework-agnostic playbook model**: a playbook is just a note (`metadata.playbook` flag + `##` phases + `[[wiki-link]]` references) with a pluggable import-adapter interface for future frameworks (SKILL.md-shaped now; fabric/MCP-prompts backlogged, not built).
+- **Registry + picker**: `GET /api/content/playbooks`, merged into the composer's `/` command list — selecting a playbook attaches it (chip in composer) instead of inserting text. Active phase is DERIVED from resolved `phase_checkpoint` calls in the message history, not manually tracked — survives reload for free.
+- **Progressive-disclosure injection (the gate)**: `app/api/ai/chat/route.ts` injects standing rules + the ACTIVE PHASE ONLY (never the whole playbook) plus a "Linked extensions" manifest (title-resolved `[[refs]]`, sub-playbooks tagged) that the model traces on demand via `read_note` — never preloaded.
+- **Hand-authoring (primary use case)**: "Mark as Playbook" in the editor context menu (inline description input) → `POST /api/content/playbooks/mark`.
+- **Resource discipline formalized**: durable principles doc (termination/effort/context/decomposition mechanisms + maintained state table) governs this and future AI-agent builds; enforced budgets + sub-agent isolation deferred to T4.
+- **Smoke-tested**: pure parser/renderer logic verified (wiki-link preservation, phase clamping, sub-playbook tagging); live route boot-check caught and fixed a 401-vs-500 auth bug on both new endpoints. Full authenticated browser click-through NOT done — no auth fixture in this repo yet (documented gap); manual smoke test recommended before merge.
+- **Deferred**: SKILL.md import adapter (P5-import) — backlogged per the plan's own sequencing (append-only, no cost to defer).
+- ⚠ Branches from `origin/main` before AI v3.2 T2 (PR #125, lossless markdown) merged — `lib/domain/ai/playbooks/render.ts` is a scoped temporary renderer (preserves `[[links]]`, not full markdown fidelity); revisit once T2 lands.
 
 **July 20, 2026**: ✅ Browser Reach B1 — the side panel is a mini-DG shell (PR #115; plan: `work-tracking/BROWSER-REACH-PLAN.md`)
 
