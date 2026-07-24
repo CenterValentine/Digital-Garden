@@ -53,6 +53,20 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 23, 2026**: AI v3.2.2 prompt-cache foundation
+
+- Supported OpenAI models now receive a stable, privacy-safe cache key scoped
+  to the executed model, final toolset, user boundary, and validated playbook
+  phase—not the individual conversation—so unchanged phases can reuse prefixes
+  across separate runs.
+- Chat stream traces now report normalized cache reads, writes, uncached input,
+  hit rate, policy version, and general/playbook scope from AI SDK usage.
+- Active Playbook instructions precede current date, output target, rooted
+  content, mentions, and page data, preserving a deterministic reusable prefix
+  without enabling paid Anthropic/Google cache writes.
+- `prompt-cache:check` covers key stability/rotation, provider safety, option
+  merging, usage math, and prompt ordering and is part of the build pipeline.
+
 **July 23, 2026**: Playbook checkpoints now require provider-neutral evidence
 
 - Root-caused GPT-4o's instant false Phase 1 completion to a nonexistent model-facing `read_note` name, missing rooted-playbook reference IDs, and a checkpoint tool that trusted completion claims without runtime proof.

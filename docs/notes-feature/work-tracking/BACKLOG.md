@@ -12,6 +12,14 @@ last_updated: 2026-07-22
 
 ## AI model handling (surfaced during Browser Reach B2, 2026-07-21 — AI-core, do after browser core)
 
+- [x] **AI v3.2.2 prompt-cache foundation** — stable OpenAI cache keys,
+  provider-neutral read/write/hit-rate traces, and cross-run Active Playbook
+  prefix ordering built on `codex/ai-v3.2.2-prompt-cache-foundation`; see
+  `AI-V3.2.2-PROMPT-CACHING-PLAN.md`.
+- [ ] **Prompt-cache policy graduation** — review measured reuse cadence before
+  enabling paid writes: Anthropic 5m first / selective 1h, Google explicit only
+  for large recurring corpora, GPT-5.6 explicit breakpoints after the OpenAI
+  adapter exposes the current options contract. Do not add keep-warm requests.
 - [ ] **Model-catalog "not found" false-availability** — the model picker marks a model available whenever a Connection advertises its id, but the provider can still 404 it on use (observed: `claude-haiku-3-5` → "Model 'anthropic/claude-haiku-3-5' not found", routed through the AI Gateway connection). `isModelAvailable` (`components/content/ai/MakeAndModelPicker.tsx`) trusts the connection's claimed model list; needs validation against what the provider/gateway actually serves, or a use-time fallback.
 - [ ] **Don't default to / allow selecting an unavailable model** — `useModelSelection` (`components/content/ai/ModelPicker.tsx:149`) falls back to a hardcoded `claude-sonnet-3-5` that may have no key; resolve an *available* default instead. Keep unavailable models greyed for discoverability but make them non-selectable (hard-disable), per owner.
 - [ ] **Gate `web_search` by model capability, not provider** — chat route (~L534) attaches `search_web` whenever the provider is a native-search vendor; models like Claude 3 Haiku don't support it and Anthropic 400s (`web_search_20250305 ... does not match expected tags`). Attach only for models that support the server tool.

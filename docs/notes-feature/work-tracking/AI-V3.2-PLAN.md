@@ -9,6 +9,17 @@ the feature that sits on it (T2). Branch continues on
 The AI V4 thread (conversation memory bank, JIT retrieval, validated
 compaction) stays separate — see `AI-V3.1-PLAN.md`'s final section.
 
+## v3.2.2 revision — Prompt-cache foundation ✅ BUILT (2026-07-23)
+
+The first provider-cache pass is intentionally observational and free of paid
+write policy: supported OpenAI models receive privacy-safe stable cache keys,
+AI SDK cache-read/write usage is stamped into chat stream traces, and Active
+Playbook phase context now precedes run-specific target/root/page context so
+separate runs can reuse the same exact procedure prefix. No Anthropic cache
+writes, Google explicit resources, retention override, or semantic result cache
+is enabled. Full design, regression contract, and deferred economics work:
+`AI-V3.2.2-PROMPT-CACHING-PLAN.md`.
+
 ## T1 — Harden the markdown ↔ TipTap translation seam
 
 The owner directive ("I don't like this patching approach… manage

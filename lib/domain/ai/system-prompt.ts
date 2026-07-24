@@ -196,7 +196,6 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   sections.push(
     "Content targeting: never write to a note (updateNote) or create output (createNote/create_docx) on your own initiative — only when the user's request actually asks for it. There is no default rule for choosing between the two; read what the user asked for. Placement vocabulary is canonical: “under the chat” means outputLocation `under_chat`; “under this/current content, file, or note” means `under_content`; “beside/next to this content, file, or note” means `beside_content`. A specifically named folder must be resolved to its UUID and passed as parentId. Explicit per-artifact placement always wins. When neither the user nor active playbook names placement for an artifact, omit both fields and let the configured output-target preset apply.",
   );
-  if (ctx.outputTargetSection) sections.push(ctx.outputTargetSection);
   if (ctx.hasCheckpointTool) {
     // Cadence after an approved checkpoint depends on how the playbook is
     // loaded. Attached playbook = progressive disclosure (only the current
@@ -227,12 +226,20 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.editableContentId) sections.push(editorSection(ctx.editableContentId));
   if (ctx.isChatContent && ctx.chatContentId) sections.push(chatContentSection(ctx.chatContentId));
 
-  // Date only (no time) so the prompt stays byte-stable within a day —
-  // and placed LAST among the static sections (v3.1 R5 cache-aware
-  // layout): a date rollover mid-session now invalidates only this
-  // suffix, not every tool/feature section after it. Without the date,
-  // models guess "today" from their training era and search queries
-  // carry years-stale dates.
+  // A validated Active Playbook is stable across separate runs of the same
+  // unchanged phase. Keep it ahead of run-specific targeting/root context so
+  // provider prefix caches can reuse the procedure while the subject changes.
+  if (ctx.playbookContext) sections.push(ctx.playbookContext);
+  // What this chat is rooted in — stated before ambient playbook awareness so
+  // "this file" resolves correctly. For an explicitly loaded playbook this
+  // intentionally follows Active Playbook, preserving the reusable procedure
+  // prefix across chats rooted in different content.
+  if (ctx.rootedContentSection) sections.push(ctx.rootedContentSection);
+  // Ambient-playbook awareness is a cheap hint, not executable phase context.
+  if (ctx.playbookAwareness) sections.push(ctx.playbookAwareness);
+  // Date only (no time), after the cross-run playbook prefix. A date rollover
+  // invalidates current-date/run context without invalidating the reusable
+  // procedure prefix before it.
   sections.push(
     `Current date: ${new Date().toLocaleDateString("en-US", {
       weekday: "long",
@@ -241,20 +248,11 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
       day: "numeric",
     })}. Use it when interpreting relative dates ("yesterday", "this week") — including in search queries.`,
   );
+  // Everything below is deliberately run-specific. The selected output target
+  // remains authoritative, but no longer fragments the stable playbook prefix.
+  if (ctx.outputTargetSection) sections.push(ctx.outputTargetSection);
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
-  // What this chat is rooted in — stated before the playbook awareness below
-  // so "run this playbook" / "this file" resolves to the chat's own subject.
-  if (ctx.rootedContentSection) sections.push(ctx.rootedContentSection);
-  // Ambient-playbook awareness (Finding 2): a cheap hint, not the full
-  // progressive-disclosure block — the model runs the anchored playbook only
-  // when asked. Never present at the same time as playbookContext.
-  if (ctx.playbookAwareness) sections.push(ctx.playbookAwareness);
-  // Playbook context is per-request but STABLE within a phase (only changes
-  // when the phase advances), so it sits with the other trusted sections
-  // rather than at the very end — closer to the checkpoint instructions
-  // above, which is what actually governs it.
-  if (ctx.playbookContext) sections.push(ctx.playbookContext);
   // Untrusted page content goes LAST, after all trusted instructions, so its
   // framing ("data, not instructions") is the freshest thing before the turn.
   if (ctx.pageContextSection) sections.push(ctx.pageContextSection);
