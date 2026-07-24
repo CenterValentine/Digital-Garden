@@ -140,6 +140,10 @@ import {
   parsePlaybook,
   type PlaybookReference,
 } from "@/lib/domain/ai/playbooks/parse";
+import {
+  getPhaseModelDirective,
+  type PhaseModelResolution,
+} from "@/lib/domain/ai/playbooks/model-directives";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import {
@@ -260,6 +264,90 @@ export async function POST(request: Request) {
       // audio to non-English vocab cards by default. The proposal gate still
       // gates the actual TTS spend, so "default on" never auto-bills.
       const autoPronounceDefault = userSettings.flashcards?.autoPronounce !== false;
+
+      // ── Playbook model routing — hoisted resolve (AI 3.4, S2a) ──────────
+      // The playbook context block far below (~line 915+) parses the playbook
+      // to build the system prompt AFTER the model is already chosen, so a
+      // phase-declared model has no read site there. This hoisted, read-only
+      // resolver derives the active phase's model directive BEFORE model
+      // resolution. It is deliberately independent of (and runs a separate
+      // fetch+parse from) the downstream context block — keeping that block
+      // byte-for-byte unchanged makes the injection/checkpoint/reference
+      // machinery provably behavior-identical. The small cost is a second
+      // fetch+parse of the playbook note on attached-playbook turns.
+      // Attach-mode + phase-index derivation MUST mirror the downstream block:
+      //   - explicit `body.playbookId` → progressive disclosure, clamped index
+      //   - rooted execution cue → all phases visible, active phase is phase 0
+      //   - ambient (viewing a playbook without attaching) does NOT route
+      // S2a wires the OUTPUT into nothing — the ladder consumes it in S2b.
+      const routingExplicitPlaybookId =
+        typeof body.playbookId === "string" ? body.playbookId : null;
+      const routingRootedPlaybookId =
+        !routingExplicitPlaybookId &&
+        contentId &&
+        requestsRootedPlaybookExecution(messages)
+          ? contentId
+          : null;
+      let phaseModelResolution: PhaseModelResolution | null = null;
+      let routingPlaybookTitle = "";
+      let routingActivePhaseIndex = 0;
+      const routingPlaybookId =
+        routingExplicitPlaybookId ?? routingRootedPlaybookId;
+      if (routingPlaybookId) {
+        try {
+          const routingNode = await prisma.contentNode.findFirst({
+            where: {
+              id: routingPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          if (
+            routingNode?.notePayload &&
+            isPlaybookMetadata(routingNode.notePayload.metadata)
+          ) {
+            const routingParsed = parsePlaybook(
+              routingNode.notePayload.tiptapJson as JSONContent,
+            );
+            if (routingParsed.phases.length > 0) {
+              // Rooted execution injects all phases and gates on phase 0; an
+              // explicit attach uses the clamped client-derived active index.
+              routingActivePhaseIndex = routingExplicitPlaybookId
+                ? Math.min(
+                    Math.max(
+                      typeof body.activePhaseIndex === "number"
+                        ? body.activePhaseIndex
+                        : 0,
+                      0,
+                    ),
+                    routingParsed.phases.length - 1,
+                  )
+                : 0;
+              routingPlaybookTitle = routingNode.title;
+              phaseModelResolution = getPhaseModelDirective(
+                routingParsed,
+                routingActivePhaseIndex,
+              );
+            }
+          }
+        } catch (error) {
+          // Non-fatal: routing degrades to the normal ladder on any error.
+          logger.warn({
+            layer: "ai",
+            event: "chat:model_routing_resolve_failed",
+            summary: "playbook model-routing resolve failed — normal ladder",
+            error,
+          });
+        }
+      }
+      void phaseModelResolution;
+      void routingPlaybookTitle;
+      void routingActivePhaseIndex;
 
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
