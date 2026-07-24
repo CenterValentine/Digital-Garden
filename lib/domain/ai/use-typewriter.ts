@@ -11,6 +11,14 @@
  * up (no growing lag) while a slow trickle still types smoothly. The rAF
  * loop parks itself the moment it catches the target and only restarts
  * when more text arrives, so an idle/complete message costs nothing.
+ *
+ * `settleInitial` (AI 3.3, resumed streams): when a reload re-attaches to
+ * an in-flight response, the whole buffered portion floods in at once.
+ * Re-typing content that was actually generated seconds ago reads as a
+ * jarring "catch-up race." With `settleInitial` the first non-empty text
+ * snaps in fully — as if it had been there the whole time — and only
+ * genuinely new tokens arriving afterward type. It's inert for fresh
+ * sends (no buffer), so callers pass it only for the resumed turn.
  */
 
 "use client";
@@ -20,13 +28,21 @@ import { useEffect, useRef, useState } from "react";
 /** Fraction of the remaining backlog revealed per frame (higher = faster). */
 const REVEAL_DIVISOR = 8;
 
-export function useTypewriter(text: string, active: boolean): string {
+export function useTypewriter(
+  text: string,
+  active: boolean,
+  settleInitial = false,
+): string {
   // Initialize from `active` once: a part mounting mid-stream reveals from
   // the start; a historical part shows in full immediately.
   const [displayed, setDisplayed] = useState(active ? "" : text);
   const indexRef = useRef(active ? 0 : text.length);
   const targetRef = useRef(text);
   const rafRef = useRef<number | null>(null);
+  // One-shot latch for `settleInitial`: the first non-empty target snaps
+  // to full instead of revealing from zero. Persists for the component's
+  // life so live tokens after the settle still type normally.
+  const settledRef = useRef(false);
 
   useEffect(() => {
     targetRef.current = text;
@@ -57,7 +73,16 @@ export function useTypewriter(text: string, active: boolean): string {
         return;
       }
       const backlog = target.length - current;
-      const step = Math.max(1, Math.ceil(backlog / REVEAL_DIVISOR));
+      // Resumed-stream settle (AI 3.3): the first tick with real content
+      // reveals the entire buffered flood at once — it was generated
+      // seconds ago, so it should appear as if it had been there the whole
+      // time. The latch flips here (not on an empty mount), so live tokens
+      // arriving after the settle type normally.
+      const settleNow = settleInitial && !settledRef.current;
+      if (settleNow) settledRef.current = true;
+      const step = settleNow
+        ? backlog
+        : Math.max(1, Math.ceil(backlog / REVEAL_DIVISOR));
       indexRef.current = Math.min(target.length, current + step);
       setDisplayed(target.slice(0, indexRef.current));
       rafRef.current = requestAnimationFrame(tick);
@@ -73,7 +98,7 @@ export function useTypewriter(text: string, active: boolean): string {
         rafRef.current = null;
       }
     };
-  }, [text, active]);
+  }, [text, active, settleInitial]);
 
   return active ? displayed : text;
 }

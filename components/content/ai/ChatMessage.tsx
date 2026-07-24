@@ -229,6 +229,12 @@ interface ChatMessageProps {
   message: UIMessage;
   isStreaming?: boolean;
   /**
+   * True when this streaming message is a resumed stream (reload / second
+   * tab), so the buffered flood settles in full instead of re-typing
+   * already-generated content (AI 3.3). Inert unless `isStreaming`.
+   */
+  resumedStream?: boolean;
+  /**
    * Provider id that produced this message. Drives per-message theming
    * (bubble shape, code-block chrome, typography). Falls back to the
    * surface's active provider when undefined — Session 4 will pass the
@@ -298,6 +304,7 @@ interface ChatMessageProps {
 export const ChatMessage = memo(function ChatMessage({
   message,
   isStreaming = false,
+  resumedStream = false,
   providerId,
   modelId,
   onEdit,
@@ -854,6 +861,7 @@ export const ChatMessage = memo(function ChatMessage({
                   text={part.text}
                   theme={theme}
                   active={typingActive}
+                  settleInitial={resumedStream}
                 />
               </div>
             );
@@ -1286,12 +1294,14 @@ function AssistantText({
   text,
   theme,
   active,
+  settleInitial = false,
 }: {
   text: string;
   theme: ProviderTheme;
   active: boolean;
+  settleInitial?: boolean;
 }) {
-  const revealed = useTypewriter(text, active);
+  const revealed = useTypewriter(text, active, settleInitial);
   return <MarkdownContent text={revealed} theme={theme} />;
 }
 

@@ -322,6 +322,12 @@ export interface UseConversationEngineResult {
   >["addToolApprovalResponse"];
   /** True while the model is processing (submitted or streaming). */
   isActive: boolean;
+  /**
+   * True while the active stream began as a resume (reload / second tab)
+   * rather than a fresh send (AI 3.3). Lets the view render the buffered
+   * flood settled instead of re-typing it.
+   */
+  resumedStream: boolean;
 
   // ── input + send ──
   input: string;
@@ -1061,11 +1067,19 @@ export function useConversationEngine({
     (s) => s.ai?.resumableStreams !== false,
   );
   const resumeAttemptedForKeyRef = useRef<string | null>(null);
+  // True while the active stream began as a resume (reload / second tab)
+  // rather than a fresh send. Consumed by ChatPanel → ChatMessage so the
+  // buffered flood renders settled instead of re-typing (AI 3.3). Reset
+  // by every fresh user send (which has no buffer); this also clears the
+  // no-stream 204 case, where the resume returns nothing and status never
+  // leaves "ready".
+  const streamStartedViaResumeRef = useRef(false);
   useEffect(() => {
     if (!resumableStreamsEnabled || !conversationId) return;
     if (status === "streaming" || status === "submitted") return;
     if (resumeAttemptedForKeyRef.current === conversationKey) return;
     resumeAttemptedForKeyRef.current = conversationKey;
+    streamStartedViaResumeRef.current = true;
     void resumeStream();
   }, [
     resumableStreamsEnabled,
@@ -1292,6 +1306,9 @@ export function useConversationEngine({
   // (contentId / provider / model / mentions) flows per-call via the
   // second arg's body — no transport-level refs needed.
   const handleSend = useCallback(() => {
+    // A fresh user send has no buffered backlog — clear the resume flag so
+    // this turn types normally (and un-stick the no-stream 204 case).
+    streamStartedViaResumeRef.current = false;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
@@ -1520,6 +1537,10 @@ export function useConversationEngine({
       const target = messages.find((m) => m.id === messageId);
       if (!target || target.role !== "assistant") return;
 
+      // A regenerated turn is freshly generated — no buffered backlog, so
+      // it should type normally, not settle like a resume.
+      streamStartedViaResumeRef.current = false;
+
       // Supersede the old answer (inclusive) + anything after, server-side.
       await truncateRef?.current?.(messageId, true);
 
@@ -1554,6 +1575,10 @@ export function useConversationEngine({
     setMessages,
     addToolApprovalResponse,
     isActive,
+    // Only meaningful while a stream is active; the settle latch itself
+    // lives per-message in the typewriter, so a stale-true ref between
+    // turns is harmless, but gating on isActive keeps the contract clean.
+    resumedStream: streamStartedViaResumeRef.current && isActive,
     input,
     setInput,
     handleSend,
