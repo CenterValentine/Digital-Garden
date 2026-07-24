@@ -17,8 +17,10 @@ somewhere to route. Each `[ ]` is a PR-checklist line.
       `model: scout` as the first line of Phase 2. Attach it (`/playbook`),
       run Phase 1, approve the checkpoint → the Phase 2 turn runs the model
       mapped to `scout`, and a subtle divider reads
-      *"Switched to <model> · by playbook \"<title>\" (Phase 2)"* — a hairline
-      line, not a pill.
+      *"Switched to `MODEL` · by playbook `TITLE` (Phase 2)"* — a hairline
+      line, not a pill. (Placeholders backticked deliberately: raw
+      angle-bracket placeholders parse as HTML tags in markdown renderers,
+      and an unclosed `title` element swallows the rest of the document.)
 - [ ] **Pinned pick wins.** With a playbook attached, change the model in the
       picker → a **"Pinned · unpin"** control appears; the next turn runs your
       pick and the divider reads *"· by you"*; the playbook directive is NOT
