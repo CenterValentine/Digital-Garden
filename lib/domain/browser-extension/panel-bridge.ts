@@ -159,6 +159,63 @@ export function requestUnassociate(payload: {
   );
 }
 
+/**
+ * Auto-capture controls (B3-B), stored in the extension's chrome.storage.
+ * `autoAssociate` defaults OFF (settle-then-associate is opt-in); `navHistory`
+ * defaults ON (viewership log, user-disableable); `denylist` is user-authored.
+ */
+export interface CaptureSettings {
+  autoAssociate: boolean;
+  navHistory: boolean;
+  denylist: string[];
+}
+
+/** One "page you visited" entry from the persisted browser-history log. */
+export interface PageHistoryEntry {
+  url: string;
+  normalizedUrl: string;
+  title: string;
+  favIconUrl: string | null;
+  firstViewedAt: string;
+  lastViewedAt: string;
+  viewCount: number;
+}
+
+/**
+ * Ask the host for the capture settings (killswitch + denylist). The reply
+ * arrives as a `capture-settings` host→embed message. Used to gate the panel's
+ * settle-then-associate and to seed the Recents browser-history filter.
+ */
+export function requestCaptureSettings(): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "get-capture-settings" },
+    "*"
+  );
+}
+
+/**
+ * Ask the host for the persisted browser page-history (Phase C viewership).
+ * The reply arrives as a `page-history` host→embed message. Browser-only —
+ * this data never left the browser, so it's absent in the standalone app.
+ */
+export function requestPageHistory(): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "get-page-history" },
+    "*"
+  );
+}
+
+/** Ask the host to open a URL in a new browser tab (Recents history click). */
+export function requestOpenUrl(url: string): void {
+  if (!isPanelEmbedSurface()) return;
+  window.parent.postMessage(
+    { v: 1, source: "dg-panel-embed", type: "open-url", payload: { url } },
+    "*"
+  );
+}
+
 /** Decode a data: URL into a File for the chat's attachment path. */
 export function dataUrlToFile(dataUrl: string, filename: string): File | null {
   try {

@@ -285,6 +285,31 @@ document.addEventListener("dg-browser-bookmarks-request", async (event) => {
       await dispatchResponseEvent("send-note-to-tabs-result", { results });
       return;
     }
+
+    // ── BROWSER-REACH B3-B capture controls (settings page ↔ chrome.storage) ──
+    if (detail.type === "get-capture-settings") {
+      const settings = await sendRuntimeMessage({ type: "get-capture-settings" });
+      await postMessageToPage("capture-settings", settings);
+      await dispatchResponseEvent("capture-settings", settings);
+      return;
+    }
+
+    if (detail.type === "set-capture-settings") {
+      const settings = await sendRuntimeMessage({
+        type: "set-capture-settings",
+        payload: detail.payload,
+      });
+      await postMessageToPage("capture-settings-saved", settings);
+      await dispatchResponseEvent("capture-settings-saved", settings);
+      return;
+    }
+
+    if (detail.type === "clear-page-history") {
+      await sendRuntimeMessage({ type: "clear-page-history" });
+      await postMessageToPage("page-history-cleared", {});
+      await dispatchResponseEvent("page-history-cleared", {});
+      return;
+    }
   } catch (error) {
     await postMessageToPage("bridge-error", {
       message: error?.message || "Bridge request failed",

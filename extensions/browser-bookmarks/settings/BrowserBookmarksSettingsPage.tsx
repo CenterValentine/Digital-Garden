@@ -223,6 +223,14 @@ export default function BrowserBookmarksSettingsPage() {
   const [selectedInstallIds, setSelectedInstallIds] = useState<string[]>([]);
   const [bridgeState, setBridgeState] = useState<ExtensionBridgeState>({ status: "checking" });
   const [expandedBrowserFolderIds, setExpandedBrowserFolderIds] = useState<Set<string>>(new Set());
+  // B3-B capture controls (killswitch + nav-history + denylist), stored in the
+  // extension's chrome.storage and reached through the app↔extension bridge.
+  const [capture, setCapture] = useState<{
+    autoAssociate: boolean;
+    navHistory: boolean;
+    denylist: string[];
+  }>({ autoAssociate: false, navHistory: true, denylist: [] });
+  const [newDenylistEntry, setNewDenylistEntry] = useState("");
   const hasShownLoadError = useRef(false);
   const hasShownBridgeError = useRef(false);
   const hasAttemptedBridgeRepair = useRef<string | null>(null);
@@ -562,6 +570,70 @@ export default function BrowserBookmarksSettingsPage() {
     hasAttemptedBridgeRepair.current = currentTrustedInstall.id;
     void handleRefreshTrustedInstall(currentTrustedInstall.id, { silentSuccess: true });
   }, [currentInstallNeedsBridgeRepair, currentTrustedInstall]);
+
+  // Load B3-B capture settings once the extension bridge is live.
+  useEffect(() => {
+    if (bridgeState.status !== "installed") return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const settings = await requestBridgeResponse<{
+          autoAssociate?: boolean;
+          navHistory?: boolean;
+          denylist?: string[];
+        }>("get-capture-settings", "capture-settings");
+        if (cancelled) return;
+        setCapture({
+          autoAssociate: settings?.autoAssociate === true,
+          navHistory: settings?.navHistory !== false,
+          denylist: Array.isArray(settings?.denylist) ? settings.denylist : [],
+        });
+      } catch {
+        // Bridge not ready — leave conservative defaults; the card is disabled.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [bridgeState.status]);
+
+  async function persistCapture(
+    patch: Partial<{ autoAssociate: boolean; navHistory: boolean; denylist: string[] }>
+  ) {
+    const next = { ...capture, ...patch };
+    setCapture(next); // optimistic — settings edits are human-paced and sequential
+    try {
+      await requestBridgeResponse("set-capture-settings", "capture-settings-saved", next);
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "Couldn't save capture settings"
+      );
+    }
+  }
+
+  function handleAddDenylistEntry(event: React.FormEvent) {
+    event.preventDefault();
+    const entry = newDenylistEntry.trim();
+    if (!entry || capture.denylist.includes(entry)) {
+      setNewDenylistEntry("");
+      return;
+    }
+    void persistCapture({ denylist: [...capture.denylist, entry] });
+    setNewDenylistEntry("");
+  }
+
+  function handleRemoveDenylistEntry(entry: string) {
+    void persistCapture({ denylist: capture.denylist.filter((e) => e !== entry) });
+  }
+
+  async function handleClearPageHistory() {
+    try {
+      await requestBridgeResponse("clear-page-history", "page-history-cleared");
+      toast.success("Browsing history cleared");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Couldn't clear history");
+    }
+  }
 
   async function handleTrustCurrentInstall() {
     if (bridgeState.status !== "installed") return;
@@ -996,6 +1068,122 @@ export default function BrowserBookmarksSettingsPage() {
             </div>
           ) : null}
         </div>
+      </section>
+
+      <section
+        className="space-y-4 rounded-xl border border-white/10 p-6"
+        style={{ background: glass0.background, backdropFilter: glass0.backdropFilter }}
+      >
+        <div>
+          <h2 className="text-xl font-semibold">Capture &amp; privacy</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            What the extension captures as you browse. Auto-linking is off until you
+            turn it on; navigation history stays in this browser and never creates notes.
+          </p>
+        </div>
+
+        <div
+          className={`space-y-4 ${bridgeState.status !== "installed" ? "pointer-events-none opacity-55" : ""}`}
+        >
+          <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/5 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={capture.autoAssociate}
+              onChange={(event) => void persistCapture({ autoAssociate: event.target.checked })}
+              className="mt-1"
+            />
+            <div className="min-w-0">
+              <div className="font-medium">Auto-link pages to the open note</div>
+              <div className="text-xs text-muted-foreground">
+                When a page settles while a note is open in the side panel, link it
+                automatically. Off by default — the note&apos;s link icon still lets you
+                link or unlink any page by hand.
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/5 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={capture.navHistory}
+              onChange={(event) => void persistCapture({ navHistory: event.target.checked })}
+              className="mt-1"
+            />
+            <div className="min-w-0">
+              <div className="font-medium">Remember pages I visit (browser history)</div>
+              <div className="text-xs text-muted-foreground">
+                Powers the Recents browser-history list in the side panel. Stored only in
+                this browser; it never reaches Digital Garden&apos;s servers and never
+                becomes a note.
+              </div>
+            </div>
+          </label>
+
+          <div className="rounded-lg border border-white/10 bg-black/5 px-3 py-3">
+            <div className="text-sm font-medium">Never capture these sites</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+              Pages matching any entry (hostname or any part of the URL) are never
+              auto-linked or added to history. Mailboxes and sign-in pages are already
+              excluded automatically.
+            </div>
+            <form onSubmit={handleAddDenylistEntry} className="mt-3 flex gap-2">
+              <input
+                value={newDenylistEntry}
+                onChange={(event) => setNewDenylistEntry(event.target.value)}
+                placeholder="e.g. bank.com or /admin"
+                className="flex-1 rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                className="rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm"
+              >
+                Add
+              </button>
+            </form>
+            {capture.denylist.length > 0 ? (
+              <ul className="mt-3 space-y-2">
+                {capture.denylist.map((entry) => (
+                  <li
+                    key={entry}
+                    className="flex items-center justify-between rounded-lg border border-white/10 bg-black/10 px-3 py-2 text-sm"
+                  >
+                    <span className="truncate font-mono text-xs">{entry}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveDenylistEntry(entry)}
+                      className="rounded-md border border-red-500/30 px-2 py-1 text-xs text-red-400"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="mt-3 text-xs text-muted-foreground">No blocked sites yet.</div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border border-white/10 bg-black/5 px-3 py-3">
+            <div className="text-sm">
+              <div className="font-medium">Browsing history</div>
+              <div className="text-xs text-muted-foreground">
+                Clear the pages remembered in this browser.
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleClearPageHistory()}
+              className="rounded-lg border border-white/10 bg-black/10 px-3 py-1.5 text-sm"
+            >
+              Clear history
+            </button>
+          </div>
+        </div>
+        {bridgeState.status !== "installed" ? (
+          <div className="text-xs text-muted-foreground">
+            Connect the browser extension to manage capture settings.
+          </div>
+        ) : null}
       </section>
 
       <section

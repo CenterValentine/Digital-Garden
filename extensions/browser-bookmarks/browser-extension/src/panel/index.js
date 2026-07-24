@@ -351,6 +351,51 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Capture settings (B3-B): the embed reads the auto-associate killswitch +
+  // denylist from chrome.storage (via the background). Replied as
+  // `capture-settings`. The panel gates its settle-then-associate on these.
+  if (data.type === "get-capture-settings") {
+    void (async () => {
+      try {
+        const settings = await sendRuntimeMessage({ type: "get-capture-settings" });
+        postToEmbed("capture-settings", settings);
+      } catch (error) {
+        postToEmbed("capture-settings-error", {
+          message: error instanceof Error ? error.message : "Couldn't load settings",
+        });
+      }
+    })();
+    return;
+  }
+
+  // Browser page history (B3-B, Phase C): the embed reads the persisted
+  // "pages you visited" log for the Recents browser-history source. Replied as
+  // `page-history`. This never leaves the browser.
+  if (data.type === "get-page-history") {
+    void (async () => {
+      try {
+        const history = await sendRuntimeMessage({ type: "get-page-history" });
+        postToEmbed("page-history", { history });
+      } catch (error) {
+        postToEmbed("page-history-error", {
+          message: error instanceof Error ? error.message : "Couldn't load history",
+        });
+      }
+    })();
+    return;
+  }
+
+  // Open a URL in a new browser tab — Recents browser-history items are pages,
+  // not content nodes, so clicking one re-opens it rather than selecting in a pane.
+  if (data.type === "open-url" && data.payload?.url) {
+    try {
+      chrome.tabs.create({ url: data.payload.url });
+    } catch {
+      // Non-fatal — restricted URL scheme, etc.
+    }
+    return;
+  }
+
   // Pop-out: the panel asks for content to open as an overlay on the page.
   // A drag can't cross from this document into the page, so the panel offers
   // four quadrants instead and tells us which corner the user chose.
