@@ -6,6 +6,10 @@ const STORAGE_KEYS = {
   install: "dgBrowserBookmarksInstall",
   quickSaveDrafts: "dgBrowserBookmarksQuickSaveDrafts",
   strategyOverrides: "dgUrlStrategyOverrides",
+  // BROWSER-REACH B3-B: persisted "pages you visited" ring buffer (viewership →
+  // Recents). Kept OUT of config so it can't bloat the settings blob or ride an
+  // export. Never leaves the browser — no server row is ever created for it.
+  pageHistory: "dgBrowserPageHistory",
 };
 
 const DEFAULT_CONFIG = {
@@ -19,6 +23,14 @@ const DEFAULT_CONFIG = {
     domainIntelligenceEnabled: true,
   },
   rules: [],
+  // BROWSER-REACH B3-B capture controls. Deliberately conservative defaults:
+  // auto-association is OFF until the user opts in (killswitch); navigation
+  // history capture is ON but user-disableable and never creates content.
+  capture: {
+    autoAssociate: false,
+    navHistory: true,
+    denylist: [],
+  },
 };
 
 async function getConfig() {
@@ -1965,11 +1977,80 @@ function pruneMruTab(tabId) {
   if (idx !== -1) mruTabs.splice(idx, 1);
 }
 
+// ── Persisted page history (BROWSER-REACH B3-B, Phase C) ─────────────────────
+// A capped, deduped "pages you visited" log that SURVIVES service-worker
+// restarts (unlike mruTabs). Stored only in chrome.storage.local — it never
+// reaches the server and never becomes a ContentNode. Gated by the navHistory
+// killswitch and the same record-time safety guards as auto-associate, so a
+// page the user has blacklisted is never even written to disk.
+const PAGE_HISTORY_MAX = 250;
+
+function safeOrigin(url) {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+}
+
+// Cheap substring denylist check — the extension can't import the shared TS
+// capture-policy module (the build is walled off), so record-time keeps the
+// structural guards here and the panel applies the full policy at display.
+function matchesCaptureDenylist(url, denylist) {
+  if (!Array.isArray(denylist) || denylist.length === 0) return false;
+  const lower = String(url).toLowerCase();
+  return denylist.some((raw) => {
+    const entry = String(raw).trim().toLowerCase();
+    return entry.length > 0 && lower.includes(entry);
+  });
+}
+
+async function getPageHistory() {
+  const result = await chrome.storage.local.get(STORAGE_KEYS.pageHistory);
+  const stored = result[STORAGE_KEYS.pageHistory];
+  return Array.isArray(stored) ? stored : [];
+}
+
+async function recordPageView(tab) {
+  if (!tab?.url || isIneligibleMruUrl(tab.url)) return;
+  const config = await getConfig();
+  const capture = config.capture || {};
+  if (capture.navHistory === false) return; // user turned history off
+  // Never record Digital Garden's own pages as "external" viewership.
+  const appOrigin = safeOrigin(config.appBaseUrl);
+  if (appOrigin && safeOrigin(tab.url) === appOrigin) return;
+  // Honor the user denylist at record time — blacklisted pages never touch disk.
+  if (matchesCaptureDenylist(tab.url, capture.denylist)) return;
+
+  const normalizedUrl = normalizeComparableUrl(tab.url);
+  if (!normalizedUrl) return;
+
+  const history = await getPageHistory();
+  const existingIdx = history.findIndex((h) => h.normalizedUrl === normalizedUrl);
+  const firstViewedAt =
+    existingIdx !== -1 ? history[existingIdx].firstViewedAt : new Date().toISOString();
+  const viewCount =
+    existingIdx !== -1 ? (history[existingIdx].viewCount || 1) + 1 : 1;
+  if (existingIdx !== -1) history.splice(existingIdx, 1);
+  history.unshift({
+    url: tab.url,
+    normalizedUrl,
+    title: tab.title || "",
+    favIconUrl: tab.favIconUrl || null,
+    firstViewedAt,
+    lastViewedAt: new Date().toISOString(),
+    viewCount,
+  });
+  if (history.length > PAGE_HISTORY_MAX) history.length = PAGE_HISTORY_MAX;
+  await chrome.storage.local.set({ [STORAGE_KEYS.pageHistory]: history });
+}
+
 chrome.tabs.onActivated.addListener(({ tabId }) => {
   chrome.tabs.get(tabId, (tab) => {
     if (chrome.runtime.lastError || !tab?.url) return;
     void updateTabBadge(tabId, tab.url);
     updateMruTab(tabId, tab);
+    void recordPageView(tab);
   });
 });
 
@@ -1978,12 +2059,16 @@ chrome.windows.onFocusChanged.addListener((windowId) => {
   chrome.tabs.query({ active: true, windowId }, ([tab]) => {
     if (chrome.runtime.lastError || !tab) return;
     updateMruTab(tab.id, tab);
+    void recordPageView(tab);
   });
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   if (changeInfo.status === "complete" && tab?.url) {
     void updateTabBadge(tabId, tab.url);
+    // Only the tab the user is actually looking at counts as a page view;
+    // background tabs finishing their load do not.
+    if (tab.active) void recordPageView(tab);
   }
 });
 
@@ -2277,7 +2362,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: true, data: result });
       return;
     }
-    sendResponse({ ok: false, error: "Unknown message type" });
     if (message.type === "get-recent-viewed-tabs") {
       const config = await getConfig();
       const appOrigin = config.appBaseUrl
@@ -2327,6 +2411,58 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return;
     }
 
+    // ── BROWSER-REACH B3-B capture controls (read/write chrome.storage) ──────
+    if (message.type === "get-capture-settings") {
+      const config = await getConfig();
+      const capture = config.capture || {};
+      sendResponse({
+        ok: true,
+        data: {
+          autoAssociate: capture.autoAssociate === true,
+          navHistory: capture.navHistory !== false,
+          denylist: Array.isArray(capture.denylist) ? capture.denylist : [],
+        },
+      });
+      return;
+    }
+    if (message.type === "set-capture-settings") {
+      const config = await getConfig();
+      const prev = config.capture || {};
+      const patch = message.payload || {};
+      const next = {
+        ...config,
+        capture: {
+          autoAssociate:
+            typeof patch.autoAssociate === "boolean"
+              ? patch.autoAssociate
+              : prev.autoAssociate === true,
+          navHistory:
+            typeof patch.navHistory === "boolean"
+              ? patch.navHistory
+              : prev.navHistory !== false,
+          denylist: Array.isArray(patch.denylist)
+            ? patch.denylist.map((entry) => String(entry).trim()).filter(Boolean)
+            : Array.isArray(prev.denylist)
+              ? prev.denylist
+              : [],
+        },
+      };
+      await saveConfig(next);
+      sendResponse({ ok: true, data: next.capture });
+      return;
+    }
+    if (message.type === "get-page-history") {
+      sendResponse({ ok: true, data: await getPageHistory() });
+      return;
+    }
+    if (message.type === "clear-page-history") {
+      await chrome.storage.local.remove(STORAGE_KEYS.pageHistory);
+      sendResponse({ ok: true, data: [] });
+      return;
+    }
+
+    // Catch-all — MUST stay last so every real handler above gets first refusal.
+    sendResponse({ ok: false, error: "Unknown message type" });
   })().catch((error) => {
     sendResponse({ ok: false, error: error.message || "Unknown error" });
   });

@@ -81,6 +81,33 @@ P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection)
 
 ---
 
+## Browser Reach B3-A — workspaces in the panel (DEPRIORITIZED 2026-07-22)
+
+Dropped from the active B-series (owner call): the existing workspaces infra + `extensions/workplaces/` (WorkspaceSelector, workspace-store, ContentWorkspace API) already do the job, and users create sessions via existing affordances. The browser-specific value from the original 3.4/3.5 was pulled out into **B3-B** (settle-then-associate link affordance + browser-history-in-recents). Revisit only if browser-specific workspace UX becomes necessary.
+
+- [ ] Wire the panel's workspace chooser to list/switch real `ContentWorkspace`s (full-swap semantics). WorkspaceSelector already exists.
+- [ ] "Browser Sessions" as workspace items — auto-created, date/time-named, most-recent-active first; per-workspace target folder rides the `settings` JSON column (no schema change per C3).
+- [ ] Per-window active-workspace pointer (browser-side, keyed by `windowId`; app renders what the API returns).
+
+## Browser Reach B3-B — settle-then-associate + viewership (BUILT 2026-07-23, awaiting smoke test)
+
+Branch `feat/browser-reach-b3b-associations`. Gates green (typecheck + lint 0-err + full build + `pnpm extension:build`). NOT yet smoke-tested (owner deferred to after all building). Requires `pnpm extension:build` + reload the extension before testing.
+
+Shipped:
+- **Capture policy** (`lib/domain/browser-extension/capture-policy.ts`) — pure `shouldCapturePage()` shared safety gate: blocks non-web schemes, browser-internal (Web Store), Digital Garden's own origins, mailboxes/auth/password-managers, and a user denylist. Applied at record time (extension) and display time (panel).
+- **Phase B — settle-then-associate** (`PanelShellClient`): a page that holds steady 5s while a note is open auto-links to it, gated by the killswitch + policy + panel visibility + a per-session dedup (so a manual unlink isn't re-linked). The Phase A link icon reflects/undoes it.
+- **Phase C — viewership → Recents**: the background records a capped, deduped page-history ring buffer to `chrome.storage.local` (record-time guards: navHistory on, not DG-origin, not denylisted). `RecentsPanel` gains a panel-only browser-history section behind a "Show/Hide history" filter (default shown in panel, absent in the app); clicking re-opens the URL in a new tab. Also fixed a dormant background bug: the catch-all `sendResponse` sat above `get-recent-viewed-tabs`/`send-note-to-tabs`, making both unreachable.
+- **Settings** — a "Capture & privacy" card in the browser-bookmarks extension settings page (killswitch, nav-history toggle, denylist editor, clear-history), stored in `chrome.storage` via the app↔extension bridge.
+
+⚠ **Deviation to confirm with owner**: browsing history lives in `chrome.storage` (never the server), because adding a server-side `PageView` table is blocked by the repo's schema guardrail (denied `Edit`/`Write` to `prisma/**` + `prisma` CLI) *and* the local DB's post-squash migration drift. Consequence: browser history is **panel-only** (not visible in the standalone app's Recents), and its toggle/filter live with the extension settings rather than general app settings. If owner wants app-side history visibility, that's the server-`PageView` follow-up — needs the schema guardrail lifted + the `MIGRATION-BASELINE-SQUASH.md` reconciliation.
+
+Followups:
+- [ ] Server-side `PageView` table (opt-in) for app-side Recents history visibility + cross-device sync. Needs schema change (guardrailed) + DB baseline reconciliation.
+- [ ] Refresh panel browser-history on visibility change (today it loads once per panel mount).
+- [ ] "a browser extension setting allows this default to be ON" — the killswitch default is currently a fixed OFF; a chrome.storage/popup override to flip the *default* is not yet wired.
+
+---
+
 ## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
 Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:

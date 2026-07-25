@@ -5,6 +5,7 @@ import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
+import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -15,8 +16,12 @@ import {
   requestOverlayOpen,
   requestResolvePageNode,
   requestPageCapture,
+  requestCaptureSettings,
+  requestAssociate,
   OVERLAY_CORNERS,
+  type CaptureSettings,
 } from "@/lib/domain/browser-extension/panel-bridge";
+import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
@@ -29,6 +34,10 @@ const QUICK_ACCESS_COLLAPSED_KEY = "dg-panel-quick-access-collapsed";
 // Short opener pre-filled (not sent) into the new chat when opened via "Ask AI
 // about this page" — so a user who isn't expecting to type can just hit send.
 const ASK_ABOUT_PAGE_PREFILL = "Give me a quick overview of this page.";
+// B3-B settle window: how long a page URL must hold steady before auto-linking
+// it to the open note. Long enough that flipping through tabs doesn't associate
+// every page you glance at.
+const AUTO_ASSOCIATE_DWELL_MS = 5000;
 
 /**
  * The full file-tree menu is nearly as tall as the panel itself. Trim the
@@ -230,6 +239,45 @@ export function PanelShellClient({
   const shellNavigationControls = useExtensionShellNavigationControls();
   const selectedContentId = useContentStore((s) => s.selectedContentId);
 
+  // ── B3-B settle-then-associate ────────────────────────────────────────────
+  // Capture settings (killswitch + denylist) live in the extension's
+  // chrome.storage; this partitioned iframe's own settings store is empty, so we
+  // ask the host once (the reply is handled in the message listener below).
+  const [captureSettings, setCaptureSettings] = useState<CaptureSettings | null>(
+    null
+  );
+  // (url|contentId) pairs already auto-attempted this session, so a manual unlink
+  // isn't immediately re-linked and the settle effect can't spam the host.
+  const autoLinkedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    requestCaptureSettings();
+  }, []);
+
+  // When a page holds steady for the dwell window AND a note is open AND the
+  // killswitch is on AND the page passes the capture policy (not DG's own
+  // content, not a mailbox/auth page, not denylisted), link it to the note.
+  // The note's link icon reflects it; unlinking there is the undo.
+  useEffect(() => {
+    const url = pageContext?.url;
+    if (!url || !selectedContentId) return;
+    if (!captureSettings?.autoAssociate) return;
+    const key = `${url}|${selectedContentId}`;
+    if (autoLinkedRef.current.has(key)) return;
+    const decision = shouldCapturePage(url, {
+      appOrigins: [window.location.origin],
+      userDenylist: captureSettings.denylist,
+    });
+    if (!decision.capture) return;
+    const title = pageContext?.title ?? "";
+    const timer = setTimeout(() => {
+      // Only associate while the user is actually looking at the panel.
+      if (document.visibilityState !== "visible") return;
+      autoLinkedRef.current.add(key);
+      requestAssociate({ url, contentId: selectedContentId, title });
+    }, AUTO_ASSOCIATE_DWELL_MS);
+    return () => clearTimeout(timer);
+  }, [pageContext?.url, pageContext?.title, selectedContentId, captureSettings]);
+
   // Server-resolved preference; "system" defers to the iframe's own media
   // query, subscribed through useSyncExternalStore so it stays SSR-safe and
   // needs no setState-in-effect.
@@ -368,6 +416,17 @@ export function PanelShellClient({
           faviconUrl: data.payload.faviconUrl
             ? String(data.payload.faviconUrl)
             : undefined,
+        });
+      }
+
+      // B3-B capture settings (killswitch + denylist) from chrome.storage.
+      if (data.type === "capture-settings" && data.payload) {
+        setCaptureSettings({
+          autoAssociate: data.payload.autoAssociate === true,
+          navHistory: data.payload.navHistory !== false,
+          denylist: Array.isArray(data.payload.denylist)
+            ? data.payload.denylist.map((entry: unknown) => String(entry))
+            : [],
         });
       }
 
@@ -651,6 +710,15 @@ export function PanelShellClient({
               flexDirection: "column",
             }}
           >
+            {/* B3-B: note↔page link toggle. Renders only in the panel embed with
+                both an open note and a current page (self-hides otherwise). */}
+            <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+              <PanelPageLinkButton
+                pageUrl={pageContext?.url ?? null}
+                pageTitle={pageContext?.title ?? ""}
+                contentId={selectedContentId}
+              />
+            </div>
             <MainPanelWorkspace />
           </div>
         </>

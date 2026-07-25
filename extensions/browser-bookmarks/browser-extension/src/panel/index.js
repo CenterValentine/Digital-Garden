@@ -286,6 +286,48 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Link / unlink a page to a content note (B3-B). Resolve the URL to a
+  // webResourceId (resource-context) first, then call the existing background
+  // association handlers. Ack as `association-changed` so the note's link icon
+  // updates. `linked` = the resulting state.
+  if (
+    (data.type === "associate-page" || data.type === "unassociate-page") &&
+    data.payload?.url &&
+    data.payload?.contentId
+  ) {
+    const payload = data.payload;
+    const linking = data.type === "associate-page";
+    void (async () => {
+      try {
+        const context = await sendRuntimeMessage({
+          type: "fetch-resource-context",
+          payload: { url: payload.url, title: payload.title || "" },
+        });
+        const webResourceId = context?.resource?.id;
+        if (!webResourceId) throw new Error("Couldn't resolve this page");
+        await sendRuntimeMessage({
+          type: linking
+            ? "create-resource-association"
+            : "delete-resource-association",
+          payload: { webResourceId, contentId: payload.contentId },
+        });
+        postToEmbed("association-changed", {
+          url: payload.url,
+          contentId: payload.contentId,
+          linked: linking,
+        });
+      } catch (error) {
+        postToEmbed("association-error", {
+          url: payload.url,
+          contentId: payload.contentId,
+          message:
+            error instanceof Error ? error.message : "Couldn't update the link",
+        });
+      }
+    })();
+    return;
+  }
+
   // "More from {hostname}" lazy expansion. The background handler reads `url`
   // and `excludeResourceId` off the message itself (not a payload wrapper).
   if (data.type === "fetch-domain-associations" && data.payload?.url) {
@@ -306,6 +348,51 @@ window.addEventListener("message", (event) => {
         });
       }
     })();
+    return;
+  }
+
+  // Capture settings (B3-B): the embed reads the auto-associate killswitch +
+  // denylist from chrome.storage (via the background). Replied as
+  // `capture-settings`. The panel gates its settle-then-associate on these.
+  if (data.type === "get-capture-settings") {
+    void (async () => {
+      try {
+        const settings = await sendRuntimeMessage({ type: "get-capture-settings" });
+        postToEmbed("capture-settings", settings);
+      } catch (error) {
+        postToEmbed("capture-settings-error", {
+          message: error instanceof Error ? error.message : "Couldn't load settings",
+        });
+      }
+    })();
+    return;
+  }
+
+  // Browser page history (B3-B, Phase C): the embed reads the persisted
+  // "pages you visited" log for the Recents browser-history source. Replied as
+  // `page-history`. This never leaves the browser.
+  if (data.type === "get-page-history") {
+    void (async () => {
+      try {
+        const history = await sendRuntimeMessage({ type: "get-page-history" });
+        postToEmbed("page-history", { history });
+      } catch (error) {
+        postToEmbed("page-history-error", {
+          message: error instanceof Error ? error.message : "Couldn't load history",
+        });
+      }
+    })();
+    return;
+  }
+
+  // Open a URL in a new browser tab — Recents browser-history items are pages,
+  // not content nodes, so clicking one re-opens it rather than selecting in a pane.
+  if (data.type === "open-url" && data.payload?.url) {
+    try {
+      chrome.tabs.create({ url: data.payload.url });
+    } catch {
+      // Non-fatal — restricted URL scheme, etc.
+    }
     return;
   }
 
