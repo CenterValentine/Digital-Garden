@@ -9,6 +9,12 @@
  * affordances unconditionally and let the surface decide.
  */
 
+import { isAllowedEmbedMessageOrigin } from "./embed-message-origins";
+import type {
+  ExtensionAcquireMode,
+  ExtensionAcquireResult,
+} from "./page-bridge-client";
+
 export type OverlayCorner =
   | "top-left"
   | "top-right"
@@ -214,6 +220,59 @@ export function requestOpenUrl(url: string): void {
     { v: 1, source: "dg-panel-embed", type: "open-url", payload: { url } },
     "*"
   );
+}
+
+const PANEL_ACQUIRE_TIMEOUT_MS = 35_000;
+
+/**
+ * Panel-embed acquisition (B5). The extension's `page-bridge` content script
+ * doesn't run in this iframe, so acquisition can't use it here — it rides the
+ * panel-host channel instead (embed → host → background → provider). Unlike the
+ * fire-and-forget helpers above, this is a promise-based round-trip: the host
+ * replies with a single `acquire-url-result`. Only meaningful in the panel
+ * embed; resolves `ok:false` elsewhere so the caller can fall back.
+ *
+ * Requests are issued sequentially by the acquisition ladder (P2 then P3), so a
+ * single in-flight listener is sufficient — no request id needed.
+ */
+export function requestPanelAcquire(
+  url: string,
+  mode: ExtensionAcquireMode
+): Promise<ExtensionAcquireResult> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, reason: "not in the panel embed" });
+      return;
+    }
+    let settled = false;
+    const finish = (result: ExtensionAcquireResult) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "acquire-url-result") {
+        finish(
+          (data.payload ?? { ok: false, reason: "empty result" }) as ExtensionAcquireResult
+        );
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, reason: "the extension took too long" }),
+      PANEL_ACQUIRE_TIMEOUT_MS
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "acquire-url", payload: { url, mode } },
+      "*"
+    );
+  });
 }
 
 /** Decode a data: URL into a File for the chat's attachment path. */

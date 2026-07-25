@@ -20,6 +20,7 @@ import {
   requestExtensionAcquire,
   type ExtensionAcquireMode,
 } from "./page-bridge-client";
+import { isPanelEmbedSurface, requestPanelAcquire } from "./panel-bridge";
 import type { AcquiredContent } from "@/lib/domain/ai/acquisition/types";
 
 /** Below this, an extraction is treated as a failed rung and escalates. */
@@ -67,12 +68,27 @@ async function callAcquireApi(
   }
 }
 
-/** One extension rung: ask the extension for material, then finalize server-side. */
+/**
+ * True when the extension is reachable — via the page-bridge (a tab's top
+ * frame) OR the panel-host channel (the side-panel iframe, where the page-bridge
+ * content script can't run).
+ */
+function extensionAvailable(): boolean {
+  return isPanelEmbedSurface() || isExtensionInstalled();
+}
+
+/**
+ * One extension rung: ask the extension for material, then finalize server-side.
+ * In the panel embed the page-bridge isn't present, so route through the panel
+ * host instead — same background provider, different channel.
+ */
 async function extensionRung(
   url: string,
   mode: ExtensionAcquireMode,
 ): Promise<{ ok: boolean; content?: AcquiredContent; reason?: string }> {
-  const material = await requestExtensionAcquire(url, { mode });
+  const material = isPanelEmbedSurface()
+    ? await requestPanelAcquire(url, mode)
+    : await requestExtensionAcquire(url, { mode });
   if (!material.ok) {
     return { ok: false, reason: material.reason ?? "extension could not fetch this page" };
   }
@@ -91,8 +107,8 @@ export async function acquireUrlWithFallback(url: string): Promise<AcquireOutcom
   }
   const p1Reason = p1.ok ? "the site returned little readable content" : p1.reason;
 
-  // No extension → return the best P1 had (content if any, else the reason).
-  if (!isExtensionInstalled()) {
+  // No extension reachable → return the best P1 had (content if any, else reason).
+  if (!extensionAvailable()) {
     return {
       ok: Boolean(p1.content),
       content: p1.content,
