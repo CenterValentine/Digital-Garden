@@ -53,7 +53,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**July 24, 2026**: AI 3.4 — playbook-orchestrated model routing BUILT (branch `feat/ai-v3.4-model-routing`, worktree `ai-v34-model-routing`; S1–S3, gates green; no PR yet)
+**July 25, 2026**: AI 3.4 — playbook-orchestrated model routing on PR #132 (branch `feat/ai-v3.4-model-routing`; S1–S3 + 8-angle review fixes + 4 browser-smoke rounds + catalog-drift safety net; typecheck/lint/build/model-routing:check green)
 
 - A playbook phase declares its model via a structured `model:` line — a role (`scout`/`analyst`/`writer`/`coder`/`reviewer`/`archivist`), a vendor class (`gpt-5 series`, resolved deterministically), or an explicit `provider/model`. Resolution is deterministic — no runtime LLM router, no prose interpretation.
 - Roles are new `role-*` FeatureSpecs, so users map each to their own ordered backups in the existing Feature Routing settings page; the whole existing fallback + capability-filter machinery is reused. Precedence: pinned user pick > phase directive > standing-rules > default; `modelPinned` (per-conversation, mirrors output-target) distinguishes a real pick from the carried baseline.
