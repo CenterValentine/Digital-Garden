@@ -151,7 +151,7 @@ export function SnippetEditorDialog() {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
       <div className="w-full max-w-lg rounded-xl border border-white/15 bg-white dark:bg-gray-900/95 shadow-2xl backdrop-blur-md flex flex-col max-h-[80vh]">
