@@ -938,13 +938,14 @@ function ChatViewerInner({
             {/* Pin badge/release (AI 3.4) — a pick here pins via the engine's
                 wrapped handleModelChange, so the release control must exist
                 on this surface too, not only in the sidebar panel. */}
+            {/* Never disabled: unpinning mid-stream is harmless (affects the
+                next turn) and a dead-looking button reads as "unpin broken". */}
             {modelPinned ? (
               <button
                 type="button"
                 onClick={unpinModel}
-                disabled={isActive}
                 title="Your model pick is fixed for this chat and overrides any playbook model directives. Unpin to let playbooks route models per phase."
-                className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 disabled:opacity-40 dark:text-amber-300"
+                className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
               >
                 Pinned · unpin
               </button>

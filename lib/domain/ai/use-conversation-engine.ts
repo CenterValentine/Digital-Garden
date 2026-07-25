@@ -629,6 +629,12 @@ export function useConversationEngine({
     : contentId
       ? `dg:model-pinned:content:${contentId}`
       : null;
+  // Every key this chat could have been pinned under: promotion dual-writes
+  // (a pre-promotion pin lives under content:, then gets copied to conv:),
+  // so UNPIN must clear the whole set or stale residue re-pins the chat on
+  // the next remount/key flip (smoke finding: "can't unpin").
+  const modelPinAltKey =
+    conversationId && contentId ? `dg:model-pinned:content:${contentId}` : null;
   const [modelPinned, setModelPinnedState] = useState<boolean>(() => {
     if (typeof window === "undefined" || !modelPinKey) return false;
     try {
@@ -653,18 +659,49 @@ export function useConversationEngine({
       setModelPinnedState(false);
     }
   }, [modelPinKey]);
+  // Same-tab cross-instance sync (smoke finding): the sidebar panel and the
+  // full-page viewer each mount their own engine over the SAME chat, and
+  // localStorage writes don't notify the same tab — without this event an
+  // unpin in one surface left the other's in-memory pin (and its request
+  // bodies) stale.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPinEvent = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ keys?: unknown; pinned?: unknown }>
+      ).detail;
+      const keys = Array.isArray(detail?.keys) ? detail.keys : [];
+      if (modelPinKey && keys.includes(modelPinKey)) {
+        setModelPinnedState(detail?.pinned === true);
+      }
+    };
+    window.addEventListener("dg:model-pin", onPinEvent);
+    return () => window.removeEventListener("dg:model-pin", onPinEvent);
+  }, [modelPinKey]);
   const persistModelPin = useCallback(
     (pinned: boolean) => {
       setModelPinnedState(pinned);
       if (typeof window === "undefined" || !modelPinKey) return;
       try {
-        if (pinned) window.localStorage.setItem(modelPinKey, "1");
-        else window.localStorage.removeItem(modelPinKey);
+        if (pinned) {
+          window.localStorage.setItem(modelPinKey, "1");
+        } else {
+          window.localStorage.removeItem(modelPinKey);
+          if (modelPinAltKey) window.localStorage.removeItem(modelPinAltKey);
+        }
+        window.dispatchEvent(
+          new CustomEvent("dg:model-pin", {
+            detail: {
+              keys: [modelPinKey, modelPinAltKey].filter(Boolean),
+              pinned,
+            },
+          }),
+        );
       } catch {
         /* non-blocking — pin stays in memory until next key change */
       }
     },
-    [modelPinKey],
+    [modelPinKey, modelPinAltKey],
   );
   // The picker calls this — a user model change is an explicit pick, so it
   // pins. Internal re-seeds use the raw `handleModelChange` and never pin.
