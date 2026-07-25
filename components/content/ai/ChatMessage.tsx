@@ -32,6 +32,7 @@ import {
   FolderOpen,
   FolderPlus,
   GitBranch,
+  Globe,
   GripVertical,
   Image as ImageIcon,
   ImagePlus,
@@ -603,6 +604,20 @@ export const ChatMessage = memo(function ChatMessage({
     return units;
   }, [message.parts]);
 
+  // Native-provider web search (Anthropic/OpenAI/Google big-provider tools)
+  // surfaces its sources as `source-url`/`source-document` parts rather than a
+  // `search_web` tool card — those parts are skipped by the unit renderer
+  // above, so the search was previously invisible. Count them so the message
+  // can show "Searched the web · N sources", matching the integrated-search
+  // tool-card count.
+  const webSourceCount = useMemo(() => {
+    let n = 0;
+    for (const part of message.parts) {
+      if (part.type === "source-url" || part.type === "source-document") n += 1;
+    }
+    return n;
+  }, [message.parts]);
+
   // NOTE: tree-refresh + content-updated dispatch for AI note writes
   // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
   // once per AI completion. Putting that logic here (in the render
@@ -935,6 +950,19 @@ export const ChatMessage = memo(function ChatMessage({
           return null;
         })}
 
+        {/* Native-provider web search summary (AI 3.4 smoke finding): big
+            providers cite via source parts, not a search_web card, so show
+            how many sources the search consulted. */}
+        {webSourceCount > 0 && (
+          <div className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-black/[0.03] px-2 py-1 text-[11px] text-gray-500 dark:bg-white/5 dark:text-gray-400">
+            <Globe className="h-3 w-3 shrink-0 opacity-70" />
+            <span>
+              Searched the web · {webSourceCount} source
+              {webSourceCount === 1 ? "" : "s"}
+            </span>
+          </div>
+        )}
+
         {/* Image cards — rendered at message level for reliability */}
         {imagePayloads.map((payload) => (
           <GeneratedImageCard key={payload.contentId} payload={payload} />
@@ -955,14 +983,20 @@ export const ChatMessage = memo(function ChatMessage({
         ))}
 
         {/* Durable write receipts — every AI tool that persists content
-            declares both the written node and its effective tree location. */}
-        {writeReceipts.map(({ toolCallId, receipt }, index) => (
-          <ContentWriteReceiptCard
-            key={`${toolCallId}-${receipt.contentId}-${index}`}
-            receipt={receipt}
-            midRunPaneOpen={midRunPaneOpen}
-          />
-        ))}
+            declares both the written node and its effective tree location.
+            Flow + wrap as compact chips (smoke finding) rather than a
+            full-width vertical stack. */}
+        {writeReceipts.length > 0 && (
+          <div className="my-1 flex flex-wrap gap-1.5">
+            {writeReceipts.map(({ toolCallId, receipt }, index) => (
+              <ContentWriteReceiptCard
+                key={`${toolCallId}-${receipt.contentId}-${index}`}
+                receipt={receipt}
+                midRunPaneOpen={midRunPaneOpen}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Deck proposals — Session 2: interactive card with POST commit */}
         {deckProposals.map((payload, i) => (
@@ -2422,11 +2456,48 @@ function ToolCallBubble({
             : "";
         if (phase) return `Phase checkpoint: ${phase}`;
       }
+      // Name the note being read (smoke finding: "Read a note" didn't say
+      // WHICH note). The getCurrentNote result is "Title: <title>\n…".
+      if (toolName === "getCurrentNote" && typeof result === "string") {
+        const m = result.match(/^Title:\s*(.+)$/m);
+        if (m?.[1]?.trim()) {
+          return `${isRunning ? "Reading" : "Read"} note: ${m[1].trim()}`;
+        }
+      }
+      // Web search: surface how many results/sources came back (integrated
+      // app-executed search returns untrustedWebResults).
+      if (
+        (toolName === "search_web" || toolName === "web_search") &&
+        result &&
+        typeof result === "object"
+      ) {
+        const r = result as { untrustedWebResults?: unknown };
+        if (Array.isArray(r.untrustedWebResults)) {
+          const n = r.untrustedWebResults.length;
+          return `Searched the web · ${n} result${n === 1 ? "" : "s"}`;
+        }
+      }
+      // Name the page being fetched by its domain.
+      if (
+        (toolName === "read_page" || toolName === "read_url") &&
+        args &&
+        typeof args === "object"
+      ) {
+        const url = (args as { url?: unknown }).url;
+        if (typeof url === "string" && url) {
+          try {
+            const host = new URL(url).hostname.replace(/^www\./, "");
+            return `${isRunning ? "Reading" : "Read"} page: ${host}`;
+          } catch {
+            /* not a parseable URL — fall through */
+          }
+        }
+      }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
       return toolActionLabel(toolName, isRunning || wasStopped);
     },
-    [toolName, isRunning, wasStopped, args],
+    [toolName, isRunning, wasStopped, args, result],
   );
 
   // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).
@@ -2651,7 +2722,6 @@ function ContentWriteReceiptCard({
       : receipt.location.kind === "folder"
         ? `in ${receipt.location.title}`
         : `in ${receipt.location.title}`;
-  const subline = `${operation} ${receipt.noun} · ${location}`;
   const tooltipText = `${operation} ${receipt.noun} "${receipt.title}" ${location}. Click to ${midRunPaneOpen ? "open in a split pane" : "open"}; right-click for options.`;
   const noun = receipt.noun.toLowerCase();
   const ReceiptIcon =
@@ -2689,17 +2759,15 @@ function ContentWriteReceiptCard({
           event.preventDefault();
           setMenuPos({ x: event.clientX, y: event.clientY });
         }}
-        className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2 text-left text-sm transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
+        className="group inline-flex max-w-[220px] items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.07] px-2 py-1 text-left text-xs transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
         title={tooltipText}
       >
-        <ReceiptIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate font-medium text-gray-900 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
-            {receipt.title}
-          </span>
-          <span className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/75">
-            {subline}
-          </span>
+        <ReceiptIcon className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        {/* Compact single-line chip (smoke finding: the old two-line cards
+            ate the panel). The operation + location moved to the tooltip;
+            the icon + green tone already signal "AI wrote this". */}
+        <span className="truncate font-medium text-gray-800 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
+          {receipt.title}
         </span>
       </button>
       {menuPos && (

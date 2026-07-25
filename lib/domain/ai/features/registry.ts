@@ -56,6 +56,12 @@ export interface FeatureSpec {
     label: string;
     href: string;
   };
+  /**
+   * Minimum context window (tokens) a model must advertise to serve this
+   * feature (AI 3.4 — used by the `role-archivist` corpus role). Enforced in
+   * the router alongside `requiredCapabilities`. Omitted = no floor.
+   */
+  minContextWindow?: number;
 }
 
 export const FEATURE_REGISTRY: FeatureSpec[] = [
@@ -199,6 +205,74 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       label: "Configure Studio defaults",
       href: "/settings/extensions/studio",
     },
+  },
+
+  // ── Playbook model roles (AI 3.4) ──────────────────────────────────────
+  // Capability-contracted slots a playbook phase can request via `model: <role>`.
+  // Users map each to their own ordered (connection, model) backups in the same
+  // Feature Routing page (rows render automatically from this registry). The
+  // `defaultSuggestion`s use catalog-present models so resolution succeeds
+  // out-of-box before any mapping. NOTE: `reasoning` is `preferred`, not
+  // `required` — `effectiveCapabilities` does not emit a `reasoning` flag today
+  // (catalog `ModelCapability` has no reasoning member, and inference doesn't
+  // derive it), so requiring it would make every model ineligible. Revisit if
+  // reasoning inference lands. Pinned by `model-routing:check`.
+  {
+    id: "role-scout",
+    label: "Playbook role · Scout",
+    description:
+      "Playbook phases tagged `model: scout` — fast, low-cost research/gather/search work.",
+    requiredCapabilities: ["text", "tools"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-3-5" },
+  },
+  {
+    id: "role-analyst",
+    label: "Playbook role · Analyst",
+    description:
+      "Playbook phases tagged `model: analyst` — weighing tradeoffs, deciding, planning.",
+    requiredCapabilities: ["text", "tools"],
+    preferredCapabilities: ["reasoning"],
+    // Suggestion ids MUST exist in the preset template's defaultModels
+    // (review fix: o3-mini is not in the direct OpenAI template, so the
+    // old suggestion could never match and silently fell to auto-bind).
+    // model-routing:check now pins every suggestion against templates.
+    defaultSuggestion: { presetId: "openai", modelId: "gpt-4o" },
+  },
+  {
+    id: "role-writer",
+    label: "Playbook role · Writer",
+    description:
+      "Playbook phases tagged `model: writer` — drafting and composing prose.",
+    requiredCapabilities: ["text", "streaming"],
+    defaultSuggestion: { presetId: "anthropic", modelId: "claude-sonnet-4" },
+  },
+  {
+    id: "role-coder",
+    label: "Playbook role · Coder",
+    description:
+      "Playbook phases tagged `model: coder` — implementing and scripting.",
+    requiredCapabilities: ["text", "tools"],
+    defaultSuggestion: { presetId: "mistral", modelId: "codestral-latest" },
+  },
+  {
+    id: "role-reviewer",
+    label: "Playbook role · Reviewer",
+    description:
+      "Playbook phases tagged `model: reviewer` — adversarial critique and verification.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["reasoning"],
+    defaultSuggestion: { presetId: "anthropic", modelId: "claude-opus-4" },
+  },
+  {
+    id: "role-archivist",
+    label: "Playbook role · Archivist",
+    description:
+      "Playbook phases tagged `model: archivist` — digesting a large corpus (long context).",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    minContextWindow: 200_000,
+    defaultSuggestion: { presetId: "google", modelId: "gemini-2.5-pro" },
   },
 ];
 

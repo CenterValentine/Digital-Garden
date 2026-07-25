@@ -13,6 +13,12 @@
 import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Bot, ChevronDown } from "lucide-react";
 import { ChatMessage } from "../ai/ChatMessage";
+import {
+  ModelSwitchDivider,
+  ModelRouteNotices,
+} from "../ai/ModelSwitchDivider";
+import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
+import { ModelPinToggle } from "../ai/ModelPinToggle";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
 function formatTokenCount(n: number): string {
@@ -91,6 +97,9 @@ function toUIMessages(stored: StoredChatMessage[]): UIMessage[] {
         id: m.id || crypto.randomUUID(),
         role: m.role as "user" | "assistant",
         parts,
+        // Legacy rows can carry metadata too — keep it for divider/usage
+        // consumers (AI 3.4).
+        ...(m.metadata != null ? { metadata: m.metadata } : {}),
       };
     });
 }
@@ -231,6 +240,8 @@ function ChatViewerInner({
     providerId,
     modelId,
     handleModelChange,
+    modelPinned,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,
@@ -555,6 +566,13 @@ function ChatViewerInner({
 
   const hasMessages = messages.length > 0;
 
+  // Model-switch dividers (AI 3.4): SHARED domain walk — the panel and this
+  // viewer must never disagree about where a model switched.
+  const messageRouteDecorations = useMemo(
+    () => computeModelRouteDecorations(messages),
+    [messages],
+  );
+
   // Mid-run review (v3.1 R1): the run counts as "active" while streaming
   // AND while parked on an unanswered approval (the stream has ended but
   // the procedure hasn't — an approval card is waiting). In either state,
@@ -823,8 +841,17 @@ function ChatViewerInner({
           <div className="space-y-1 py-4">
             {messages.map((message, i) => {
               const stamp = getMessageStamp(message.id, { providerId, modelId });
+              const deco = messageRouteDecorations[message.id];
               return (
                 <div key={message.id} data-message-index={i}>
+                  {deco?.kind === "divider" && deco.route ? (
+                    <ModelSwitchDivider
+                      route={deco.route}
+                      notices={deco.notices}
+                    />
+                  ) : deco?.kind === "notices" ? (
+                    <ModelRouteNotices notices={deco.notices} />
+                  ) : null}
                   <ChatMessage
                     message={message}
                     providerId={stamp.providerId}
@@ -909,6 +936,7 @@ function ChatViewerInner({
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
             />
+            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}

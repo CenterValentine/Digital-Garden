@@ -140,6 +140,18 @@ import {
   parsePlaybook,
   type PlaybookReference,
 } from "@/lib/domain/ai/playbooks/parse";
+import {
+  getPhaseModelDirective,
+  type PhaseModelResolution,
+} from "@/lib/domain/ai/playbooks/model-directives";
+import {
+  resolvePlaybookModelRoute,
+  describeUnresolvedDirective,
+} from "@/lib/domain/ai/model-route-resolver";
+import type {
+  ModelRouteSource,
+  ResolvedModelRoute,
+} from "@/lib/domain/ai/model-directive";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import {
@@ -261,6 +273,103 @@ export async function POST(request: Request) {
       // gates the actual TTS spend, so "default on" never auto-bills.
       const autoPronounceDefault = userSettings.flashcards?.autoPronounce !== false;
 
+      // ── Playbook model routing — hoisted resolve (AI 3.4, S2a) ──────────
+      // The playbook context block far below (~line 915+) parses the playbook
+      // to build the system prompt AFTER the model is already chosen, so a
+      // phase-declared model has no read site there. This hoisted, read-only
+      // resolver derives the active phase's model directive BEFORE model
+      // resolution. It is deliberately independent of (and runs a separate
+      // fetch+parse from) the downstream context block — keeping that block
+      // byte-for-byte unchanged makes the injection/checkpoint/reference
+      // machinery provably behavior-identical. The small cost is a second
+      // fetch+parse of the playbook note on attached-playbook turns.
+      // Attach-mode + phase-index derivation MUST mirror the downstream block:
+      //   - explicit `body.playbookId` → progressive disclosure, clamped index
+      //   - rooted execution cue → all phases visible, active phase is phase 0
+      //   - ambient (viewing a playbook without attaching) does NOT route
+      // S2a wires the OUTPUT into nothing — the ladder consumes it in S2b.
+      const routingExplicitPlaybookId =
+        typeof body.playbookId === "string" ? body.playbookId : null;
+      const routingRootedPlaybookId =
+        !routingExplicitPlaybookId &&
+        contentId &&
+        requestsRootedPlaybookExecution(messages)
+          ? contentId
+          : null;
+      let phaseModelResolution: PhaseModelResolution | null = null;
+      let routingPlaybookTitle = "";
+      let routingActivePhaseIndex = 0;
+      // Pinned pick = ladder rung 1; the directive resolution below is
+      // provably unused when pinned, so skip the fetch+parse entirely
+      // (review fix — a pinned playbook conversation paid a DB round-trip
+      // + full TipTap parse per turn just to discard the result).
+      const modelPinned = body.modelPinned === true;
+      const routingPlaybookId = modelPinned
+        ? null
+        : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
+      if (routingPlaybookId) {
+        try {
+          const routingNode = await prisma.contentNode.findFirst({
+            where: {
+              id: routingPlaybookId,
+              ownerId: session.user.id,
+              contentType: { in: ["note", "folder"] },
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              notePayload: { select: { tiptapJson: true, metadata: true } },
+            },
+          });
+          // Eligibility MUST mirror the downstream execution blocks (review
+          // fix): explicit attach requires playbook metadata (downstream
+          // checks it too), but rooted execution downstream runs ANY note
+          // with a payload — requiring metadata here made rooted runs of
+          // unmarked notes execute playbook machinery while their model
+          // directives silently never routed.
+          if (
+            routingNode?.notePayload &&
+            (routingRootedPlaybookId != null ||
+              isPlaybookMetadata(routingNode.notePayload.metadata))
+          ) {
+            const routingParsed = parsePlaybook(
+              routingNode.notePayload.tiptapJson as JSONContent,
+            );
+            if (routingParsed.phases.length > 0) {
+              // The active phase is the client-derived index (count of
+              // approved phase_checkpoints) for BOTH modes — smoke finding:
+              // hardcoding 0 for rooted meant a `model:` directive on any
+              // phase past the first NEVER routed during rooted "run this
+              // playbook" execution, which is the primary flow. The index
+              // advances only across checkpoint-bounded turns, so a playbook
+              // must checkpoint between phases for the switch to land (a turn
+              // is atomic — one model).
+              routingActivePhaseIndex = Math.min(
+                Math.max(
+                  typeof body.activePhaseIndex === "number"
+                    ? body.activePhaseIndex
+                    : 0,
+                  0,
+                ),
+                routingParsed.phases.length - 1,
+              );
+              routingPlaybookTitle = routingNode.title;
+              phaseModelResolution = getPhaseModelDirective(
+                routingParsed,
+                routingActivePhaseIndex,
+              );
+            }
+          }
+        } catch (error) {
+          // Non-fatal: routing degrades to the normal ladder on any error.
+          logger.warn({
+            layer: "ai",
+            event: "chat:model_routing_resolve_failed",
+            summary: "playbook model-routing resolve failed — normal ladder",
+            error,
+          });
+        }
+      }
       // Resolve provider and model — request overrides > user settings > defaults
       const providerId =
         body.providerId ?? aiSettings.providerId ?? "anthropic";
@@ -300,10 +409,58 @@ export async function POST(request: Request) {
 
       let activeConnection: ConnectionWithKey | null = null;
       let activeModelId: string = modelId;
-      let resolveSource: "explicit" | "preset-match" | "feature-route" | "legacy" =
-        "legacy";
+      // "playbook-phase"/"playbook" added in AI 3.4 (review fix): logging
+      // playbook routes as "feature-route" made sanctioned playbook
+      // overrides indistinguishable from the banned silent-substitution
+      // class in the very telemetry the straight-faced-routing decision
+      // audits.
+      let resolveSource:
+        | "explicit"
+        | "preset-match"
+        | "feature-route"
+        | "playbook-phase"
+        | "playbook"
+        | "legacy" = "legacy";
 
-      if (explicitConnectionId) {
+      // The user's full Connection list — shared by playbook routing (S2b),
+      // preset-match, and namespaced-model-match below, so we only fetch once.
+      const userConns: ConnectionView[] = await listConnections(session.user.id);
+
+      // ── Playbook model-routing ladder (AI 3.4, S2b) ──────────────────────
+      // Precedence: a PINNED user pick wins (rung 1 — the explicit path
+      // below); otherwise the active phase's model directive selects the
+      // model HERE, ahead of the provider/model the engine echoes in every
+      // baseline body. `modelPinned` is what distinguishes a real user choice
+      // from that carried default. A directive that can't resolve emits a
+      // visible fall-through notice and drops to the normal ladder — never a
+      // silent vendor swap (owner: "prevention is king").
+      // (modelPinned is hoisted above the S2a resolver so a pinned turn
+      // skips the playbook fetch entirely.)
+      let modelRouteSource: ModelRouteSource = "default";
+      let playbookRouteApplied = false;
+      const modelRouteNotices: string[] = [];
+      if (!modelPinned && phaseModelResolution) {
+        const applied = await resolvePlaybookModelRoute(
+          session.user.id,
+          phaseModelResolution.directive,
+          userConns,
+        );
+        if (applied) {
+          activeConnection = applied.connection;
+          activeModelId = applied.modelId;
+          resolveSource = phaseModelResolution.source;
+          modelRouteSource = phaseModelResolution.source;
+          playbookRouteApplied = true;
+        } else {
+          modelRouteNotices.push(
+            describeUnresolvedDirective(phaseModelResolution.directive),
+          );
+        }
+      }
+
+      // Rung 1: a pinned/explicit connection pick. Skipped when a playbook
+      // directive already resolved (not pinned) so the phase model wins.
+      if (!playbookRouteApplied && explicitConnectionId) {
         try {
           activeConnection = await getConnectionWithKey(
             session.user.id,
@@ -314,10 +471,6 @@ export async function POST(request: Request) {
           if (!(e instanceof ConnectionNotFoundError)) throw e;
         }
       }
-
-      // The user's full Connection list — shared by preset-match AND
-      // namespaced-model-match below, so we only fetch once.
-      const userConns: ConnectionView[] = await listConnections(session.user.id);
 
       if (!activeConnection) {
         // Transition shim: pick the first user connection whose presetId
@@ -412,6 +565,51 @@ export async function POST(request: Request) {
         }
       }
 
+      // Finalize the route source for the inline switch line (AI 3.4). A
+      // playbook directive already set it; otherwise a pinned pick reads as
+      // "by you", everything else is the conversation's default (no divider).
+      if (!playbookRouteApplied) {
+        modelRouteSource = modelPinned ? "user" : "default";
+      }
+
+      // ── Executed vendor identity (AI 3.4 review fix) ────────────────────
+      // ONE derivation of "which vendor actually executes this turn", fed to
+      // the stamp, spans, attachment policy, audio capability, reasoning
+      // provider-options, and persistence. The body-derived `providerId` is
+      // the REQUESTED vendor; when a playbook (or feature route) resolves a
+      // different connection, the two diverge — deriving per-consumer was
+      // exactly the announced-vs-executed divergence class this feature
+      // exists to prevent. Namespaced ids ("vendor/model") name the vendor
+      // in the prefix; direct connections name it in presetId; the legacy
+      // no-connection path keeps the body value.
+      const executedVendorId = activeConnection
+        ? activeModelId.includes("/")
+          ? activeModelId.split("/")[0]
+          : activeConnection.presetId ?? providerId
+        : providerId;
+      const executedBareModelId = activeModelId.includes("/")
+        ? activeModelId.slice(activeModelId.indexOf("/") + 1)
+        : activeModelId;
+
+      // The turn's resolved route — emitted to the client via
+      // messageMetadata below and persisted with the message. NOTE: this is
+      // a per-turn record of what ran, not a replay contract — continuations
+      // re-resolve from turn-start inputs (playbookId + activePhaseIndex via
+      // the transport's turn snapshot); a stamped-part replay rung is a
+      // documented followup in the plan doc.
+      const resolvedModelRoute: ResolvedModelRoute = {
+        providerId: executedVendorId,
+        modelId: activeModelId,
+        connectionId: activeConnection?.id,
+        source: modelRouteSource,
+        ...(playbookRouteApplied && routingPlaybookTitle
+          ? {
+              playbookTitle: routingPlaybookTitle,
+              phaseIndex: routingActivePhaseIndex,
+            }
+          : {}),
+      };
+
       // BYOK now flows exclusively through Connections (each carries its
       // own encrypted key). Request-body `apiKey` remains supported for
       // explicit one-off overrides; legacy AIProviderKey lookups removed.
@@ -435,15 +633,17 @@ export async function POST(request: Request) {
         { layer: "ai", name: "resolve_model" },
         {
           attrs: {
-            provider: providerId,
+            provider: executedVendorId,
+            requested_provider: providerId,
             model: activeModelId,
             byok: activeConnection !== null || apiKey !== undefined,
             transport,
             resolve_source: resolveSource,
+            model_route_source: modelRouteSource,
             connection_id: activeConnection?.id ?? null,
             connection_kind: activeConnection?.kind ?? null,
           },
-          summary: `${providerId}:${activeModelId} via ${resolveSource}`,
+          summary: `${executedVendorId}:${activeModelId} via ${resolveSource}`,
         },
         async () => {
           const model = activeConnection
@@ -760,17 +960,11 @@ export async function POST(request: Request) {
       // prefix names the vendor that actually executes, and the Vercel AI
       // Gateway passes provider-defined tools through to it (owner
       // expectation: the Gateway serves everything; live smoke verifies).
-      const namespacedVendor =
-        activeConnection && activeModelId.includes("/")
-          ? activeModelId.split("/")[0]
-          : null;
-      const executedProviderId = activeConnection
-        ? activeConnection.presetId && NATIVE_TOOL_VENDORS.has(activeConnection.presetId)
-          ? activeConnection.presetId
-          : namespacedVendor
-        : transport === "direct" || transport === "gateway"
-          ? providerId
-          : null;
+      // Derived from the single executed-vendor identity (AI 3.4 review
+      // fix) — same values as the old inline derivation, one source of truth.
+      const executedProviderId = NATIVE_TOOL_VENDORS.has(executedVendorId)
+        ? executedVendorId
+        : null;
       const nativeSearch =
         executedProviderId && NATIVE_TOOL_VENDORS.has(executedProviderId)
           ? resolveNativeWebSearchTool(executedProviderId)
@@ -796,7 +990,9 @@ export async function POST(request: Request) {
       // Anthropic/Google), and inline the server-extracted text for
       // everything else — so the displayed/persisted message stays a clean
       // chip while the model still receives the content.
-      const audioCapable = effectiveCapabilities({ id: modelId }).has("audio-input");
+      const audioCapable = effectiveCapabilities({ id: activeModelId }).has(
+        "audio-input",
+      );
       // Repair dangling tool calls BEFORE conversion (S4 smoke finding):
       // an approval that never executed (network error, user typed past
       // it) leaves tool_use without tool_result — Anthropic 400s on every
@@ -810,7 +1006,7 @@ export async function POST(request: Request) {
       );
       const resolvedMessages = resolveAttachmentsForModel(
         repairedMessages,
-        providerId,
+        executedVendorId,
         audioCapable,
       );
 
@@ -1252,7 +1448,7 @@ export async function POST(request: Request) {
           ? rootedPlaybookId
           : null;
       const promptCachePolicy = buildPromptCachePolicy({
-        providerId: executedProviderId,
+        providerId: executedVendorId,
         modelId: activeModelId,
         userId: session.user.id,
         toolNames: Object.keys(tools),
@@ -1267,8 +1463,9 @@ export async function POST(request: Request) {
         { layer: "ai", name: "chat_stream" },
         {
           attrs: {
-            provider: providerId,
-            model: modelId,
+            provider: executedVendorId,
+            requested_provider: providerId,
+            model: activeModelId,
             messages: modelMessages.length,
             tools: tools ? Object.keys(tools).length : 0,
             // S2 debug surface: which tools actually attached, and whether
@@ -1276,12 +1473,12 @@ export async function POST(request: Request) {
             // handle provider-defined tools differently than direct).
             tool_names: Object.keys(tools).join(","),
             native_search: "search_web" in tools,
-            executed_provider: executedProviderId ?? "aggregator",
+            executed_provider: executedVendorId,
             prompt_cache_enabled: promptCachePolicy.enabled,
             prompt_cache_scope: promptCachePolicy.scope,
             prompt_cache_policy: promptCachePolicy.policyVersion,
           },
-          summary: `${providerId}:${modelId} streaming`,
+          summary: `${executedVendorId}:${activeModelId} streaming`,
         },
       );
 
@@ -1298,6 +1495,9 @@ export async function POST(request: Request) {
         outputParentOverride,
         providerId,
         modelId,
+        executedProvider: executedVendorId,
+        executedModel: activeModelId,
+        modelRouteSource,
         temperature: effectiveTemperature,
         maxTokens,
         promptCache: {
@@ -1307,7 +1507,14 @@ export async function POST(request: Request) {
         },
       });
 
-      const reasoningProviderOptions = buildProviderOptions(providerId, modelId);
+      // Keyed off the EXECUTED vendor/model (AI 3.4 review fix) — building
+      // e.g. anthropic thinking options for an OpenAI-executed turn silently
+      // dropped the routed model's reasoning config. Bare id: the catalog
+      // stores un-namespaced ids.
+      const reasoningProviderOptions = buildProviderOptions(
+        executedVendorId,
+        executedBareModelId,
+      );
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
         promptCachePolicy.providerOptions,
@@ -1530,11 +1737,20 @@ export async function POST(request: Request) {
             await appendMessage(session.user.id, conversationIdForAssoc, {
               id: messageId,
               role: "assistant",
-              providerId,
-              modelId,
+              providerId: executedVendorId,
+              modelId: activeModelId,
               parts: responseMessage.parts,
               textCache: textCache || null,
-              metadata: null,
+              // Persist the turn's model-route stamp (AI 3.4) — this is the
+              // only durable record for server-persisted turns (the client
+              // path forwards its own metadata; this path used to write
+              // null, leaving those turns permanently unattributed).
+              metadata: {
+                modelRoute: resolvedModelRoute,
+                ...(modelRouteNotices.length > 0
+                  ? { modelRouteNotices }
+                  : {}),
+              },
               parentId: null,
             });
             }
@@ -1605,8 +1821,21 @@ export async function POST(request: Request) {
           }
         },
         messageMetadata: ({ part }) => {
+          // The turn's resolved model route (AI 3.4) — attached at `start`
+          // so the client can render the inline switch line before the first
+          // token, and REPEATED on `finish` so it survives to persistence
+          // regardless of how the SDK merges start/finish metadata. Any
+          // fall-through notices ride alongside.
+          const routeMeta = {
+            modelRoute: resolvedModelRoute,
+            ...(modelRouteNotices.length > 0 ? { modelRouteNotices } : {}),
+          };
+          if (part.type === "start") {
+            return routeMeta;
+          }
           if (part.type === "finish") {
             return {
+              ...routeMeta,
               usage: {
                 inputTokens: part.totalUsage?.inputTokens,
                 outputTokens: part.totalUsage?.outputTokens,

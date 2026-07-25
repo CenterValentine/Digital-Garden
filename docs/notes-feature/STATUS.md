@@ -53,6 +53,13 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 25, 2026**: AI 3.4 — playbook-orchestrated model routing on PR #132 (branch `feat/ai-v3.4-model-routing`; S1–S3 + 8-angle review fixes + 4 browser-smoke rounds + catalog-drift safety net; typecheck/lint/build/model-routing:check green)
+
+- A playbook phase declares its model via a structured `model:` line — a role (`scout`/`analyst`/`writer`/`coder`/`reviewer`/`archivist`), a vendor class (`gpt-5 series`, resolved deterministically), or an explicit `provider/model`. Resolution is deterministic — no runtime LLM router, no prose interpretation.
+- Roles are new `role-*` FeatureSpecs, so users map each to their own ordered backups in the existing Feature Routing settings page; the whole existing fallback + capability-filter machinery is reused. Precedence: pinned user pick > phase directive > standing-rules > default; `modelPinned` (per-conversation, mirrors output-target) distinguishes a real pick from the carried baseline.
+- Every turn's resolved model is stamped into message metadata (single source of truth) and shown inline in both chat surfaces as a subtle "Switched to X · by playbook Y (Phase N)" divider — never a pill, and it names who switched. Unresolvable directives emit a visible fall-through notice (never a silent vendor swap). `model-routing:check` gate added to the build.
+- Deferred: checkpoint pre-flight (warn before running an unresolvable next-phase directive) — its value is already covered by the visible notice + structural single-resolution; documented in the plan doc.
+
 **July 24, 2026**: AI 3.3 — resumable streams on PR #130 (branch `feat/ai-v3.3-resumable-streams`, worktree `ai-v33-resumable`; Upstash provisioned + TCP/pub-sub verified, owner smoke-tested the live re-attach path)
 
 - A reload or second tab now re-attaches to the still-running chat response and keeps rendering it live, on top of (not replacing) S1's `consumeStream()` no-lost-work machinery.

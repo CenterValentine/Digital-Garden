@@ -363,6 +363,14 @@ export interface UseConversationEngineResult {
   providerId: string;
   modelId: string;
   handleModelChange: ReturnType<typeof useModelSelection>["handleChange"];
+  /**
+   * Whether the model is pinned for this conversation (AI 3.4). Pinned ⇒ the
+   * selected model wins over playbook phase directives. Toggled explicitly
+   * via `setModelPinned` (the footer pin control).
+   */
+  modelPinned: boolean;
+  /** Pin/unpin the current model for this conversation. */
+  setModelPinned: (pinned: boolean) => void;
 
   // ── suggestions ──
   mentionResults: SuggestionItem[];
@@ -609,6 +617,99 @@ export function useConversationEngine({
   const { providerId, modelId, handleChange: handleModelChange } =
     useModelSelection();
 
+  // ── model pin (AI 3.4) ──
+  // A pinned pick is the TOP rung of the server's routing ladder — it wins
+  // over any playbook phase directive. `modelPinned` is what lets the server
+  // tell a deliberate user choice apart from the provider/model the engine
+  // echoes in every baseline body. Persisted per-conversation (mirrors the
+  // output-target persistence) so the choice survives reload; released by the
+  // picker's unpin control so a playbook can take the wheel again.
+  const modelPinKey = conversationId
+    ? `dg:model-pinned:conv:${conversationId}`
+    : contentId
+      ? `dg:model-pinned:content:${contentId}`
+      : null;
+  // Every key this chat could have been pinned under: promotion dual-writes
+  // (a pre-promotion pin lives under content:, then gets copied to conv:),
+  // so UNPIN must clear the whole set or stale residue re-pins the chat on
+  // the next remount/key flip (smoke finding: "can't unpin").
+  const modelPinAltKey =
+    conversationId && contentId ? `dg:model-pinned:content:${contentId}` : null;
+  const [modelPinned, setModelPinnedState] = useState<boolean>(() => {
+    if (typeof window === "undefined" || !modelPinKey) return false;
+    try {
+      return window.localStorage.getItem(modelPinKey) === "1";
+    } catch {
+      return false;
+    }
+  });
+  const lastModelPinKeyRef = useRef<string | null>(modelPinKey);
+  useEffect(() => {
+    // ChatPanel stays mounted across conversation switches — rehydrate the
+    // pin for the new key instead of leaking the previous chat's pin.
+    if (lastModelPinKeyRef.current === modelPinKey) return;
+    lastModelPinKeyRef.current = modelPinKey;
+    if (typeof window === "undefined" || !modelPinKey) {
+      setModelPinnedState(false);
+      return;
+    }
+    try {
+      setModelPinnedState(window.localStorage.getItem(modelPinKey) === "1");
+    } catch {
+      setModelPinnedState(false);
+    }
+  }, [modelPinKey]);
+  // Same-tab cross-instance sync (smoke finding): the sidebar panel and the
+  // full-page viewer each mount their own engine over the SAME chat, and
+  // localStorage writes don't notify the same tab — without this event an
+  // unpin in one surface left the other's in-memory pin (and its request
+  // bodies) stale.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onPinEvent = (event: Event) => {
+      const detail = (
+        event as CustomEvent<{ keys?: unknown; pinned?: unknown }>
+      ).detail;
+      const keys = Array.isArray(detail?.keys) ? detail.keys : [];
+      if (modelPinKey && keys.includes(modelPinKey)) {
+        setModelPinnedState(detail?.pinned === true);
+      }
+    };
+    window.addEventListener("dg:model-pin", onPinEvent);
+    return () => window.removeEventListener("dg:model-pin", onPinEvent);
+  }, [modelPinKey]);
+  const persistModelPin = useCallback(
+    (pinned: boolean) => {
+      setModelPinnedState(pinned);
+      if (typeof window === "undefined" || !modelPinKey) return;
+      try {
+        if (pinned) {
+          window.localStorage.setItem(modelPinKey, "1");
+        } else {
+          window.localStorage.removeItem(modelPinKey);
+          if (modelPinAltKey) window.localStorage.removeItem(modelPinAltKey);
+        }
+        window.dispatchEvent(
+          new CustomEvent("dg:model-pin", {
+            detail: {
+              keys: [modelPinKey, modelPinAltKey].filter(Boolean),
+              pinned,
+            },
+          }),
+        );
+      } catch {
+        /* non-blocking — pin stays in memory until next key change */
+      }
+    },
+    [modelPinKey, modelPinAltKey],
+  );
+  // Pin is now an EXPLICIT toggle, not a side effect of picking a model
+  // (smoke finding: auto-pin-on-change was undiscoverable — a user in a
+  // rooted-playbook chat who never re-picked saw no pin control at all, and
+  // silently pinning on every switch was itself surprising). The picker uses
+  // the raw handleModelChange; the footer pin button drives setModelPinned.
+  const setModelPinned = persistModelPin;
+
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -778,8 +879,24 @@ export function useConversationEngine({
           // The in-memory transfer remains authoritative for this promotion.
         }
       }
+      // Model pin (AI 3.4) rides the same promotion: a pin set while the
+      // chat was still content-keyed must survive the flip to the conv key,
+      // or the user's explicit pick silently unpins mid-conversation and the
+      // next playbook phase overrides it. This callback is the de facto
+      // "conversation promoted" hook, so both chat surfaces inherit the
+      // carry-over without a second API.
+      if (modelPinned && typeof window !== "undefined") {
+        try {
+          window.localStorage.setItem(
+            `dg:model-pinned:conv:${nextConversationId}`,
+            "1",
+          );
+        } catch {
+          /* pin re-hydration will fall back to unpinned — non-fatal */
+        }
+      }
     },
-    [outputTarget],
+    [outputTarget, modelPinned],
   );
 
   // ── suggested follow-ups (Session 7) ──
@@ -1035,6 +1152,9 @@ export function useConversationEngine({
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7): where new content lands by default.
       outputTarget,
+      // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
+      // and playbook phase directives are ignored for this conversation.
+      modelPinned,
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1050,6 +1170,7 @@ export function useConversationEngine({
     activePlaybookId,
     resolvedPhaseIndex,
     outputTarget,
+    modelPinned,
   ]);
 
   // ── resumable streams (AI 3.3) ──
@@ -1286,6 +1407,9 @@ export function useConversationEngine({
           modelId,
           mentionedContentIds: [],
           outputTarget,
+          // Model pin (AI 3.4) — see handleSend for why every per-call
+          // body must carry it.
+          modelPinned,
         },
       },
     );
@@ -1298,6 +1422,7 @@ export function useConversationEngine({
     providerId,
     modelId,
     outputTarget,
+    modelPinned,
   ]);
 
   // ── send ──
@@ -1430,6 +1555,11 @@ export function useConversationEngine({
           activePhaseIndex: resolvedPhaseIndex,
           // Output-target chip (WS7).
           outputTarget,
+          // Model pin (AI 3.4). MUST live on every per-call body: the
+          // transport snapshots this body into lastSentBodies BEFORE the
+          // resolver baseline is consulted, so a flag that lives only in
+          // the resolver never reaches the server after a real send.
+          modelPinned,
         },
       },
     );
@@ -1451,6 +1581,7 @@ export function useConversationEngine({
     activePlaybook,
     resolvedPhaseIndex,
     outputTarget,
+    modelPinned,
     clearFollowUps,
   ]);
 
@@ -1470,6 +1601,9 @@ export function useConversationEngine({
       activePhaseIndex: resolvedPhaseIndex,
       // Output-target chip (WS7).
       outputTarget,
+      // Model pin (AI 3.4) — see handleSend for why every per-call body
+      // must carry it.
+      modelPinned,
     }),
     [
       contentId,
@@ -1479,6 +1613,7 @@ export function useConversationEngine({
       activePlaybookId,
       resolvedPhaseIndex,
       outputTarget,
+      modelPinned,
     ],
   );
 
@@ -1592,6 +1727,8 @@ export function useConversationEngine({
     providerId,
     modelId,
     handleModelChange,
+    modelPinned,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,

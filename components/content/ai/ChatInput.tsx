@@ -602,7 +602,13 @@ export function ChatInput({
 
         {/* Footer row — picker / voice / submit */}
         <div className="flex items-center gap-1 px-1.5 pb-1.5 pt-0.5">
-          <div className="flex-1 min-w-0 flex items-center">{footerLeading}</div>
+          {/* The leading control rail (model picker, target/output chips,
+              pin toggle, expand) crowds in a narrow sidebar — scroll it
+              horizontally instead of clipping controls off the edge.
+              BACKLOG: condense this rail (see BACKLOG.md 2026-07-25). */}
+          <div className="flex-1 min-w-0 flex items-center overflow-x-auto scrollbar-hide">
+            {footerLeading}
+          </div>
           {onAddFiles && (
             <>
               <input

@@ -252,6 +252,9 @@ function FeatureRow({
     const opts: Array<{ connectionId: string; modelId: string; label: string }> = [];
     for (const c of connections) {
       for (const m of c.models) {
+        // Don't offer provider-retired models as route targets — routing to
+        // one hard-errors (catalog-drift reconciliation flags them).
+        if (m.unsupported) continue;
         const have = effectiveCapabilities(m);
         const ok = feature.requiredCapabilities.every((cap) => have.has(cap));
         if (ok) opts.push({ connectionId: c.id, modelId: m.id, label: `${c.label} • ${m.name}` });

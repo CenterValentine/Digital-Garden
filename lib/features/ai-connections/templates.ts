@@ -206,9 +206,14 @@ const DEEPSEEK: ConnectionTemplate = {
   adapterKind: "deepseek",
   defaultBaseURL: null, // official @ai-sdk/deepseek uses its own default
   baseURLLocked: true,
+  // Seed only — the DeepSeek registry is authoritative. These ids were
+  // refreshed after DeepSeek renamed its API models (the old
+  // deepseek-chat / deepseek-reasoner ids now 400). "Fetch from API" +
+  // catalog-drift reconciliation keep this current going forward, so a
+  // future rename self-heals instead of surprising the user.
   defaultModels: [
-    { id: "deepseek-chat", name: "DeepSeek Chat (V3)", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
-    { id: "deepseek-reasoner", name: "DeepSeek Reasoner (R1)", contextWindow: 128_000, capabilities: ["text", "streaming"] },
+    { id: "deepseek-v4-pro", name: "DeepSeek V4 Pro", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
+    { id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
   ],
   apiKeyHint: "Starts with `sk-` — get one from platform.deepseek.com",
   apiKeyDocsURL: "https://platform.deepseek.com/api_keys",

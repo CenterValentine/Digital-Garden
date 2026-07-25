@@ -30,6 +30,13 @@ export interface PlaybookSection {
   content: JSONContent[];
   /** `[[wiki-link]]` references found anywhere in this section. */
   references: PlaybookReference[];
+  /**
+   * Raw value of a `model:` directive line in this section, if any (AI 3.4).
+   * Kept verbatim here (e.g. "scout", "gpt-5 series", "anthropic/claude-opus-4");
+   * `parseModelDirective` in `../model-directive` interprets it. The line is
+   * left in `content` — it's author-visible and harmless to the model.
+   */
+  modelDirective?: string;
 }
 
 export interface ParsedPlaybook {
@@ -128,15 +135,41 @@ function stripYamlFrontmatter(text: string): string {
     .trim();
 }
 
+/**
+ * Extract a `model:` directive from a section (AI 3.4) — FIRST-LINE contract.
+ *
+ * The directive must be the first non-empty line of the section's first
+ * non-empty node, and that node must be plain (never a codeBlock/blockquote).
+ * Deliberately strict: an earlier scan-everything version turned `model:`
+ * lines inside example config blocks and mid-prose sentences into live
+ * routing directives — a phase's INSTRUCTIONS could silently reroute the
+ * phase. Works for both the TipTap path (directive is its own first
+ * paragraph) and the markdown-like path (first line of the joined text).
+ */
+function extractModelDirective(content: JSONContent[]): string | undefined {
+  const first = content.find((node) => nodeText(node).trim().length > 0);
+  if (!first || first.type === "codeBlock" || first.type === "blockquote") {
+    return undefined;
+  }
+  const firstLine = nodeText(first)
+    .split("\n")
+    .find((line) => line.trim().length > 0);
+  const match = firstLine?.match(/^\s*model:\s*(.+?)\s*$/i);
+  const value = match?.[1]?.trim();
+  return value || undefined;
+}
+
 function textSection(title: string, lines: string[]): PlaybookSection {
   const text = lines.join("\n").trim();
   const content: JSONContent[] = text
     ? [{ type: "paragraph", content: [{ type: "text", text }] }]
     : [];
+  const modelDirective = extractModelDirective(content);
   return {
     title,
     content,
     references: collectReferences(content),
+    ...(modelDirective ? { modelDirective } : {}),
   };
 }
 
@@ -218,18 +251,24 @@ export function parsePlaybook(doc: JSONContent): ParsedPlaybook {
     }
   }
 
-  for (const phase of phases) phase.references = collectReferences(phase.content);
+  for (const phase of phases) {
+    phase.references = collectReferences(phase.content);
+    const directive = extractModelDirective(phase.content);
+    if (directive) phase.modelDirective = directive;
+  }
 
   if (phases.length === 0) {
     const markdownLike = parseMarkdownLikePlaybook(top);
     if (markdownLike) return markdownLike;
   }
 
+  const standingDirective = extractModelDirective(standing);
   return {
     standingRules: {
       title: "",
       content: standing,
       references: collectReferences(standing),
+      ...(standingDirective ? { modelDirective: standingDirective } : {}),
     },
     phases,
     phaseLevel,

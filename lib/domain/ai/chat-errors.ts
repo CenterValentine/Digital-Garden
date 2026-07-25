@@ -24,6 +24,7 @@ const KNOWN_CODES = new Set([
   "SERVER_ERROR",
   "RATE_LIMITED",
   "MODEL_NOT_FOUND",
+  "MODEL_RETIRED",
   "CONTEXT_OVERFLOW",
   "TIMEOUT",
   "CONTENT_FILTERED",
@@ -42,6 +43,20 @@ function inferCodeFromMessage(msg: string): string | null {
   const m = msg.toLowerCase();
   if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("429")) {
     return "RATE_LIMITED";
+  }
+  // Retired/renamed model (catalog drift) — the provider still runs, but
+  // this specific id is gone. Distinct from MODEL_NOT_FOUND so the copy can
+  // point at the fetch-and-reconcile fix. Checked first (more specific).
+  if (
+    m.includes("supported api model") ||
+    m.includes("supported model names") ||
+    m.includes("no longer supported") ||
+    m.includes("has been deprecated") ||
+    m.includes("deprecated model") ||
+    m.includes("model is retired") ||
+    (m.includes("but you passed") && m.includes("model"))
+  ) {
+    return "MODEL_RETIRED";
   }
   if (m.includes("model not found") || m.includes("model_not_found") || m.includes("no such model") || m.includes("unknown model")) {
     return "MODEL_NOT_FOUND";
@@ -122,6 +137,9 @@ export function describeChatError(parsed: ParsedChatError): string {
   if (parsed.code === "MODEL_NOT_FOUND") {
     return "The selected model isn't recognized by the Connection routing this turn. Check the model ID in Settings → AI → Connections.";
   }
+  if (parsed.code === "MODEL_RETIRED") {
+    return "This model is no longer recognized by the provider (it was renamed or retired). Open Settings → AI → Connections and use “Fetch from API” to flag outdated models, then remove or replace them.";
+  }
   if (parsed.code === "CONTEXT_OVERFLOW") {
     return "This turn exceeds the model's context window. Shorten the conversation, drop attachments, or switch to a higher-context model.";
   }
@@ -151,6 +169,7 @@ export function shouldOfferSettingsCta(parsed: ParsedChatError): boolean {
     parsed.code === "BYOK_REQUIRED" ||
     parsed.code === "UNAUTHORIZED" ||
     parsed.code === "MODEL_NOT_FOUND" ||
+    parsed.code === "MODEL_RETIRED" ||
     parsed.code === "INVALID_API_KEY" ||
     parsed.code === "QUOTA_EXCEEDED"
   );

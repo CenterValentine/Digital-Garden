@@ -24,6 +24,12 @@ import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
+import {
+  ModelSwitchDivider,
+  ModelRouteNotices,
+} from "./ModelSwitchDivider";
+import { ModelPinToggle } from "./ModelPinToggle";
+import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
@@ -184,6 +190,8 @@ export function ChatPanel({
     providerId,
     modelId,
     handleModelChange,
+    modelPinned,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,
@@ -741,6 +749,13 @@ export function ChatPanel({
 
   const hasMessages = messages.length > 0;
 
+  // Model-switch dividers (AI 3.4): derived from the server's per-turn route
+  // stamp via the SHARED domain walk (one implementation for both surfaces).
+  const messageRouteDecorations = useMemo(
+    () => computeModelRouteDecorations(messages),
+    [messages],
+  );
+
   // Surface follows the *active* provider — selecting OpenAI tints
   // immediately even if previous messages were from Claude. Per-message
   // stamps drive bubble identity; the Mixed chip surfaces actual
@@ -834,9 +849,18 @@ export function ChatPanel({
           <div className="space-y-1 py-2">
             {messages.map((message, i) => {
               const stamp = getMessageStamp(message.id, { providerId, modelId });
+              const deco = messageRouteDecorations[message.id];
               return (
+                <div key={message.id}>
+                  {deco?.kind === "divider" && deco.route ? (
+                    <ModelSwitchDivider
+                      route={deco.route}
+                      notices={deco.notices}
+                    />
+                  ) : deco?.kind === "notices" ? (
+                    <ModelRouteNotices notices={deco.notices} />
+                  ) : null}
                 <ChatMessage
-                  key={message.id}
                   message={message}
                   providerId={stamp.providerId}
                   modelId={stamp.modelId}
@@ -863,6 +887,7 @@ export function ChatPanel({
                   }
                   revertableToolIds={revertableToolIds}
                 />
+                </div>
               );
             })}
           </div>
@@ -921,6 +946,7 @@ export function ChatPanel({
               contributors={mixed.contributors as AIProviderId[]}
               compact
             />
+            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}

@@ -632,10 +632,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe("Title for the new note"),
         abstract: z
           .string()
-          .max(300)
+          // Truncate rather than reject: a slightly-too-long abstract used to
+          // hard-fail the WHOLE createNote call, discarding the note's entire
+          // content (smoke finding). The abstract is a cosmetic summary, so
+          // clip it to the limit and keep the note.
+          .transform((s) =>
+            s.length > 300 ? `${s.slice(0, 299).trimEnd()}…` : s,
+          )
           .optional()
           .describe(
-            "1-2 sentence abstract of the note. ALWAYS provide it — later phases and re-reads see the abstract first (summarize-on-write).",
+            "1-2 sentence abstract of the note (≤300 chars; longer is truncated). ALWAYS provide it — later phases and re-reads see the abstract first (summarize-on-write).",
           ),
         content: z
           .string()
