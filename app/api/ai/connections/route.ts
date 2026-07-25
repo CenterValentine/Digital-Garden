@@ -16,6 +16,7 @@ import {
   type AdapterKind,
 } from "@/lib/features/ai-connections";
 import { lookupTemplate } from "@/lib/features/ai-connections";
+import { autoPopulateModels } from "@/lib/features/ai-connections/auto-populate";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/ai/connections";
@@ -94,8 +95,23 @@ export async function POST(request: NextRequest) {
       };
 
       const created = await createConnection(session.user.id, input);
+      // Registry-authoritative population (AI 3.5): replace the template's
+      // seed models with the provider's live list on install. Never blocks
+      // creation — falls back to the seeds with a status the client surfaces.
+      const populated = await autoPopulateModels(
+        session.user.id,
+        created,
+        template,
+      );
       return NextResponse.json(
-        { success: true, data: created },
+        {
+          success: true,
+          data: populated.connection,
+          modelsPopulate: {
+            status: populated.status,
+            ...(populated.count !== undefined ? { count: populated.count } : {}),
+          },
+        },
         { status: 201 },
       );
     } catch (error) {
