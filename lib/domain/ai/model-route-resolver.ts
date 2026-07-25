@@ -65,7 +65,11 @@ export async function resolvePlaybookModelRoute(
 
   if (directive.kind === "class") {
     const routable: RoutableModel[] = userConns.flatMap((c) =>
-      c.models.map((m) => ({ connectionId: c.id, modelId: m.id })),
+      c.models
+        // Skip provider-retired models (catalog-drift reconciliation) — a
+        // class must never resolve to an id the provider will reject.
+        .filter((m) => !m.unsupported)
+        .map((m) => ({ connectionId: c.id, modelId: m.id })),
     );
     // Ranked most-specific-first — walk the chain so a vanished connection
     // falls to the next family member rather than dropping the directive.

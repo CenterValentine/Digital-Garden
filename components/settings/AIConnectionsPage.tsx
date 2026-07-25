@@ -713,6 +713,12 @@ function ModelEditor({
   // Upstream-fetch state (A6 — gateway model auto-fetch).
   const canFetchModels = supportsFetch && connectionId !== null;
   const [fetching, setFetching] = useState(false);
+  // Count of saved models the last fetch flagged as no-longer-offered
+  // (catalog-drift reconciliation). Drives the amber "outdated models"
+  // warning. null = no fetch run this session yet.
+  const [staleFlaggedCount, setStaleFlaggedCount] = useState<number | null>(
+    null,
+  );
   const [fetchedModels, setFetchedModels] = useState<
     Array<{ id: string; name: string; capabilities?: string[] }> | null
   >(null);
@@ -900,13 +906,43 @@ function ModelEditor({
         setFetchedFilter("");
       setCapabilityFilter(null);
       setFetchedSort("suggested");
+
+      // ── Catalog-drift reconciliation ──────────────────────────────────
+      // The upstream registry is authoritative. Any SAVED model the
+      // provider no longer lists is FROZEN + flagged (not deleted, so
+      // existing routes don't silently vanish); a previously-flagged model
+      // the provider lists again is un-flagged. This is what makes stale
+      // ids (e.g. a renamed model) visible instead of producing surprise
+      // chat errors.
+      const fetchedIds = new Set(items.map((m) => m.id));
+      let changed = false;
+      let flaggedNow = 0;
+      const reconciled = models.map((m) => {
+        const offered = fetchedIds.has(m.id);
+        if (!offered) flaggedNow += 1;
+        if (offered && m.unsupported) {
+          changed = true;
+          const { unsupported: _drop, ...rest } = m;
+          return rest;
+        }
+        if (!offered && !m.unsupported) {
+          changed = true;
+          return { ...m, unsupported: true };
+        }
+        return m;
+      });
+      setStaleFlaggedCount(flaggedNow);
+      if (changed) {
+        setModels(reconciled);
+        void persistModels(reconciled, models);
+      }
     } catch (e) {
       setFetchError(e instanceof Error ? e.message : "Network error");
       setFetchedModels(null);
     } finally {
       setFetching(false);
     }
-  }, [canFetchModels, connectionId]);
+  }, [canFetchModels, connectionId, models, setModels, persistModels]);
 
   const toggleFetchedSelection = useCallback(
     (id: string) => {
@@ -942,6 +978,43 @@ function ModelEditor({
       }
     >
       <div className="space-y-1.5">
+        {/* Providers without a live model list can't self-heal from catalog
+            drift — the user must keep the list current by hand or hit chat
+            errors when an id goes stale. Permanent warning. */}
+        {!supportsFetch && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <div>
+              This provider doesn&apos;t offer a model-list API, so we can&apos;t
+              auto-detect outdated models. Keep this list up to date manually to
+              avoid chat errors when the provider renames or retires a model.
+            </div>
+          </div>
+        )}
+        {/* Catalog-drift reconciliation result — some saved models are no
+            longer offered upstream and have been frozen + flagged below. */}
+        {staleFlaggedCount !== null && staleFlaggedCount > 0 && (
+          <div className="flex items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+            <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <span className="font-medium">
+                {staleFlaggedCount} saved model
+                {staleFlaggedCount === 1 ? "" : "s"} no longer offered by this
+                provider.
+              </span>{" "}
+              Flagged below — remove them (or update your routes) so they
+              don&apos;t cause chat errors.
+            </div>
+            <button
+              type="button"
+              onClick={() => setStaleFlaggedCount(null)}
+              className="text-red-400/70 hover:text-red-300 shrink-0"
+              aria-label="Dismiss"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        )}
         {/* ─── Fetch-from-API affordance ─── */}
         {supportsFetch && (
           <div className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
@@ -1179,10 +1252,39 @@ function ModelEditor({
           </div>
         )}
         {models.map((m) => (
-          <div key={m.id} className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
+          <div
+            key={m.id}
+            className={
+              m.unsupported
+                ? "flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5"
+                : "flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5"
+            }
+          >
+            {m.unsupported && (
+              <AlertCircle
+                className="h-3.5 w-3.5 shrink-0 text-red-400"
+                aria-label="No longer offered by this provider"
+              />
+            )}
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-white truncate">{m.name}</div>
-              <div className="text-[10px] text-gray-500 font-mono truncate">{m.id}</div>
+              <div
+                className={
+                  m.unsupported
+                    ? "text-xs font-medium text-red-200 truncate"
+                    : "text-xs font-medium text-white truncate"
+                }
+              >
+                {m.name}
+              </div>
+              <div className="text-[10px] text-gray-500 font-mono truncate">
+                {m.id}
+              </div>
+              {m.unsupported && (
+                <div className="text-[10px] text-red-300/90">
+                  No longer recognized by this provider — remove it, or it will
+                  cause chat errors if used.
+                </div>
+              )}
             </div>
             <button
               type="button"

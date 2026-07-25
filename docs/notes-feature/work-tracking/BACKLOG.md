@@ -10,6 +10,13 @@ last_updated: 2026-07-25
 
 ---
 
+## Registry-authoritative model population (owner direction, 2026-07-25)
+
+The catalog-drift safety net shipped (see `guides/ai/MODEL-CATALOG-FRESHNESS.md`): fetch reconciliation flags/freezes provider-retired models, danger affordances surface them, routing skips them, and a `MODEL_RETIRED` chat error points at re-fetch. The **end state** is to stop pre-installing model lists entirely:
+
+- **Auto-populate on install.** When a user adds a provider connection (with a valid key), auto-fetch its model list from the registry instead of relying on the template's seed `defaultModels`. Templates would then carry only provider metadata (endpoint, adapter kind, key hint) — no hardcoded model ids to go stale. Bootstrapping edge cases to handle: fetch failure at create time (fall back to seed + prompt manual fetch), and providers without a model-list API (keep manual entry + the permanent warning).
+- **Monthly model-category cron.** Provider `/models` payloads don't reliably classify models by category (realtime / audio / image / reasoning / …). Keep our own category map, refreshed by a **monthly cron**, as the one piece of locally-maintained model metadata. Everything else (ids, names, context windows where provided) comes from the live registry.
+
 ## Chat surface UX (surfaced during AI 3.4 smoke, 2026-07-25)
 
 These are **pre-existing** issues (not caused by AI 3.4 model routing) noticed while smoke-testing it.

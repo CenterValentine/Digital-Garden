@@ -36,6 +36,16 @@ export interface ConnectionModel {
    *   "image"       — image output (DALL·E, Imagen, FLUX)
    */
   capabilities?: string[];
+  /**
+   * True when a "fetch models" reconciliation found this saved model is no
+   * longer offered by the provider (catalog drift — e.g. the provider
+   * renamed or retired the id). The model is FROZEN, not deleted: it stays
+   * so existing routes don't vanish silently, but it's flagged with danger
+   * affordances everywhere it's shown and routing skips it, since sending a
+   * retired id to the provider produces a hard chat error. Cleared on the
+   * next fetch if the provider lists it again.
+   */
+  unsupported?: boolean;
 }
 
 /** Connection record returned to API consumers (encrypted key hidden). */

@@ -157,6 +157,10 @@ function modelSatisfiesCapabilities(
 ): boolean {
   const model = connection.models.find((m) => m.id === modelId);
   if (!model) return false;
+  // Catalog drift: a model the provider no longer offers (flagged by fetch
+  // reconciliation) is frozen — never route to it, or the turn hard-errors
+  // when the retired id reaches the provider.
+  if (model.unsupported) return false;
   // Context-window floor (AI 3.4, role-archivist). Fetched/manually-added
   // connection models carry no contextWindow (the fetch flow persists only
   // {id, name, capabilities}), so a strict missing⇒fail check rejected
