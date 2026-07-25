@@ -46,6 +46,13 @@ export interface ConnectionModel {
    * next fetch if the provider lists it again.
    */
   unsupported?: boolean;
+  /**
+   * True for a model the user typed in by hand (not from a template seed or a
+   * provider fetch). Surfaced with a soft warning affordance: hand-maintained
+   * ids can drift out of sync with the provider, so the UI nudges the user
+   * toward "Fetch from API" for the current, compatible list.
+   */
+  manual?: boolean;
 }
 
 /** Connection record returned to API consumers (encrypted key hidden). */

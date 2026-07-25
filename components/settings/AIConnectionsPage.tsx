@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareModelsBySuggested } from "@/lib/domain/ai/model-popularity";
-import { Plus, Trash2, Edit3, AlertCircle, Check, X, KeyRound, ExternalLink, HelpCircle, Sparkles, Search, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, Edit3, AlertCircle, AlertTriangle, Check, X, KeyRound, ExternalLink, HelpCircle, Sparkles, Search, ArrowUpDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/glass/button";
 import { getSurfaceStyles } from "@/lib/design/system";
@@ -868,6 +868,7 @@ function ModelEditor({
         id: newId.trim(),
         name: newName.trim() || newId.trim(),
         capabilities: ["text", "streaming"],
+        manual: true,
       },
     ];
     setModels(next);
@@ -1274,50 +1275,61 @@ function ModelEditor({
             No models yet. Add at least one to use this connection.
           </div>
         )}
-        {models.map((m) => (
-          <div
-            key={m.id}
-            className={
-              m.unsupported
-                ? "flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5"
-                : "flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5"
-            }
-          >
-            {m.unsupported && (
-              <AlertCircle
-                className="h-3.5 w-3.5 shrink-0 text-red-400"
-                aria-label="No longer offered by this provider"
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <div
-                className={
-                  m.unsupported
-                    ? "text-xs font-medium text-red-200 truncate"
-                    : "text-xs font-medium text-white truncate"
+        {models.map((m) => {
+          // Icon-only status affordance (owner 2026-07-25): the row stays
+          // neutral; a leading icon + tooltip carries the message.
+          //  - unsupported (fetch-flagged, provider-retired) → red danger,
+          //    worded as possible disruption (not a hard "will error").
+          //  - manual (user-typed) → amber caution: user maintains it, and a
+          //    nudge toward Fetch from API for the compatible list.
+          const flag = m.unsupported
+            ? {
+                Icon: AlertCircle,
+                color: "text-red-400",
+                title:
+                  "This model is no longer offered by this provider. Remove it — you could encounter disruptions if it's used in chat.",
+              }
+            : m.manual
+              ? {
+                  Icon: AlertTriangle,
+                  color: "text-amber-400",
+                  title: supportsFetch
+                    ? "Custom model — keeping it valid is your responsibility. Tip: use “Fetch from API” to pull this provider's current, compatible models."
+                    : "Custom model — keeping it valid is your responsibility, since this provider offers no live model list.",
                 }
-              >
-                {m.name}
-              </div>
-              <div className="text-[10px] text-gray-500 font-mono truncate">
-                {m.id}
-              </div>
-              {m.unsupported && (
-                <div className="text-[10px] text-red-300/90">
-                  No longer recognized by this provider — remove it, or it will
-                  cause chat errors if used.
-                </div>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={() => removeModel(m.id)}
-              className="text-gray-500 hover:text-red-400 transition-colors"
+              : null;
+          return (
+            <div
+              key={m.id}
+              className="flex items-center gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5"
             >
-              <Trash2 className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        ))}
+              {flag && (
+                <span
+                  className="shrink-0 cursor-help"
+                  title={flag.title}
+                  aria-label={flag.title}
+                >
+                  <flag.Icon className={`h-3.5 w-3.5 ${flag.color}`} />
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium text-white truncate">
+                  {m.name}
+                </div>
+                <div className="text-[10px] text-gray-500 font-mono truncate">
+                  {m.id}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => removeModel(m.id)}
+                className="text-gray-500 hover:text-red-400 transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
         <div className="relative flex gap-1.5 pt-1">
           <div className="relative flex-1">
             <input
