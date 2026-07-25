@@ -96,7 +96,7 @@ Related: [AI-V3.2-T3-PLAYBOOKS-PLAN.md](../../work-tracking/AI-V3.2-T3-PLAYBOOKS
 
 ## 4. Implementation state — **MAINTAIN THIS**
 
-Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred (T4 "resource governance") · 💤 not planned
+Legend: ✅ shipped · 🟡 in T3 · ⏳ deferred → **AI 3.7 "resource governance"** (owner-scoped 2026-07-25; NOT the v3.2 "T4" resumable streams, shipped as 3.3) · 💤 not planned
 
 | Mechanism | Family | Status | Where |
 |---|---|---|---|
