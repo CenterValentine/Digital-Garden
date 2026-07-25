@@ -27,6 +27,7 @@ import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outlin
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import {
   isLikelyMarkdown,
+  isProseMirrorClipboardHtml,
   isMarkdownPasteHintDismissed,
   dismissMarkdownPasteHint,
   isMarkdownPasteAutoFormat,
@@ -589,7 +590,16 @@ export function MarkdownEditor({
         //   • opted into "Always format" → convert immediately here, via the
         //     paste event (no clipboard permission needed);
         //   • otherwise warn with an explicit 3-choice toast, unless silenced.
-        if (text && isLikelyMarkdown(text)) {
+        //
+        // Neither applies to a paste that came FROM a ProseMirror editor: that
+        // content arrives as a rich slice, so nothing was flattened to warn
+        // about, and "Always format" would actively downgrade it by re-parsing
+        // the plain-text flavour instead. See isProseMirrorClipboardHtml().
+        const pastedAsRichSlice = isProseMirrorClipboardHtml(
+          event.clipboardData?.getData("text/html"),
+        );
+
+        if (text && !pastedAsRichSlice && isLikelyMarkdown(text)) {
           const pasted = text;
 
           if (isMarkdownPasteAutoFormat()) {

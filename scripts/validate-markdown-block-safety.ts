@@ -140,6 +140,40 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   else pass("callout → > [!warning] markdown");
 }
 
+// ── 2d. Tables (regression: every TipTap table used to leak as raw HTML) ─────
+// turndown-plugin-gfm converts a table only when its first row is a heading
+// row, and its check requires <tbody> to be the table's first child. TipTap
+// always renders <colgroup> first, so EVERY table — header row or not — was
+// `keep`-ed verbatim as HTML: still lossless, but the "markdown" source view
+// showed an HTML blob you can't edit as markdown. markdown-serialize.ts now
+// owns the table rules; these assert the SHAPE, not just losslessness, since
+// the regression was invisible to a lossless-only check.
+console.log("\n  ── tables (GFM where expressible, HTML where not) ──");
+const thc = (text: string): JSONContent => ({ type: "tableHeader", content: [p([t(text)])] });
+const trow = (...cells: JSONContent[]): JSONContent => ({ type: "tableRow", content: cells });
+const tableDoc = (...rows: JSONContent[]) => doc({ type: "table", content: rows });
+for (const [name, fixture, want] of [
+  ["header row → GFM", tableDoc(trow(thc("Claim"), thc("Evidence")), trow(tc("1.1M"), tc("Dashboard"))), "md"],
+  ["pipes in cells escaped", tableDoc(trow(thc("a|b"), thc("c")), trow(tc("x | y"), tc("z"))), "md"],
+  ["marks in cells", tableDoc(trow(thc("H")), trow({ type: "tableCell", content: [p([tm("b", ["bold"])])] })), "md"],
+  ["empty cell", tableDoc(trow(thc("A"), thc("B")), trow({ type: "tableCell", content: [{ type: "paragraph" }] }, tc("z"))), "md"],
+  // No GFM form — must fall back, never be reshaped into a lossy grid.
+  ["headerless → HTML", tableDoc(trow(tc("A"), tc("B")), trow(tc("1"), tc("2"))), "html"],
+  ["colspan → HTML", tableDoc(trow(thc("A"), thc("B")), trow({ type: "tableCell", attrs: { colspan: 2 }, content: [p([t("wide")])] })), "html"],
+  ["resized columns → HTML", tableDoc(trow({ type: "tableHeader", attrs: { colwidth: [220] }, content: [p([t("A")])] }, thc("B")), trow(tc("1"), tc("2"))), "html"],
+] as Array<[string, JSONContent, string]>) {
+  const r = lossless(fixture);
+  if (!r.ok) fail(`${name} — LOSSY`);
+  else if (tier(r.md) !== want) fail(`${name} — expected ${want} tier, got ${tier(r.md)} (${r.md.slice(0, 60)})`);
+  else pass(name);
+}
+// The header separator is what makes it a table to every other markdown tool.
+{
+  const r = lossless(tableDoc(trow(thc("A"), thc("B")), trow(tc("1"), tc("2"))));
+  if (r.md.includes("| --- |")) pass("GFM table carries a header separator row");
+  else fail(`GFM table missing separator row: ${r.md.slice(0, 60)}`);
+}
+
 // ── 3. Schema-driven attr sweep ──────────────────────────────────────────────
 console.log("\n  ── schema-driven attr sweep (no attr silently dropped) ──");
 const schema = getSchema(ext);

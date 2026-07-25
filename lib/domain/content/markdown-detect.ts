@@ -34,6 +34,31 @@ export function isLikelyMarkdown(text: string): boolean {
   return strong >= 1 || inline >= 2;
 }
 
+/**
+ * Did this paste come from a ProseMirror/TipTap editor (ours or another tab's)?
+ *
+ * ProseMirror stamps its clipboard HTML with `data-pm-slice="<openStart>
+ * <openEnd> <context>"`, so its own parser can restore the slice exactly. When
+ * that marker is present the paste is ALREADY rich content — ProseMirror parses
+ * the HTML and the text/plain flavour is never used. Two reasons to bail out of
+ * the markdown path entirely:
+ *
+ *   • the hint's premise is false. "Pasted as plain text" is wrong — nothing was
+ *     flattened, so offering to "format it" is a nag about a problem that
+ *     doesn't exist. Copying a heading or a list out of one note and into
+ *     another made it fire on every paste.
+ *   • under "Always format" it's destructive. That path pre-empts the real
+ *     paste and re-parses the text/plain flavour instead — turning a faithful
+ *     rich-content paste into a lossy round-trip through markdown, silently.
+ *
+ * Deliberately narrow: only ProseMirror's own marker. Plenty of sources (VS
+ * Code, GitHub, a docs site) put markdown-ish text on the clipboard WITH a
+ * text/html flavour, and those are exactly the pastes the hint is for.
+ */
+export function isProseMirrorClipboardHtml(html: string | null | undefined): boolean {
+  return !!html && html.includes("data-pm-slice");
+}
+
 // ── Local paste preferences (client UI prefs, no backend) ────────────────────
 const DISMISS_KEY = "notes:markdown-paste-hint-dismissed";
 const AUTO_FORMAT_KEY = "notes:markdown-paste-auto-format";
