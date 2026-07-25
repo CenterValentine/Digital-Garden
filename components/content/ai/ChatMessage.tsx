@@ -983,14 +983,20 @@ export const ChatMessage = memo(function ChatMessage({
         ))}
 
         {/* Durable write receipts — every AI tool that persists content
-            declares both the written node and its effective tree location. */}
-        {writeReceipts.map(({ toolCallId, receipt }, index) => (
-          <ContentWriteReceiptCard
-            key={`${toolCallId}-${receipt.contentId}-${index}`}
-            receipt={receipt}
-            midRunPaneOpen={midRunPaneOpen}
-          />
-        ))}
+            declares both the written node and its effective tree location.
+            Flow + wrap as compact chips (smoke finding) rather than a
+            full-width vertical stack. */}
+        {writeReceipts.length > 0 && (
+          <div className="my-1 flex flex-wrap gap-1.5">
+            {writeReceipts.map(({ toolCallId, receipt }, index) => (
+              <ContentWriteReceiptCard
+                key={`${toolCallId}-${receipt.contentId}-${index}`}
+                receipt={receipt}
+                midRunPaneOpen={midRunPaneOpen}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Deck proposals — Session 2: interactive card with POST commit */}
         {deckProposals.map((payload, i) => (
@@ -2716,7 +2722,6 @@ function ContentWriteReceiptCard({
       : receipt.location.kind === "folder"
         ? `in ${receipt.location.title}`
         : `in ${receipt.location.title}`;
-  const subline = `${operation} ${receipt.noun} · ${location}`;
   const tooltipText = `${operation} ${receipt.noun} "${receipt.title}" ${location}. Click to ${midRunPaneOpen ? "open in a split pane" : "open"}; right-click for options.`;
   const noun = receipt.noun.toLowerCase();
   const ReceiptIcon =
@@ -2754,17 +2759,15 @@ function ContentWriteReceiptCard({
           event.preventDefault();
           setMenuPos({ x: event.clientX, y: event.clientY });
         }}
-        className="group inline-flex max-w-full items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-3 py-2 text-left text-sm transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
+        className="group inline-flex max-w-[220px] items-center gap-1.5 rounded-md border border-emerald-500/25 bg-emerald-500/[0.07] px-2 py-1 text-left text-xs transition-colors hover:border-emerald-500/45 hover:bg-emerald-500/[0.11]"
         title={tooltipText}
       >
-        <ReceiptIcon className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
-        <span className="flex min-w-0 flex-col">
-          <span className="truncate font-medium text-gray-900 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
-            {receipt.title}
-          </span>
-          <span className="truncate text-[11px] text-emerald-700/80 dark:text-emerald-300/75">
-            {subline}
-          </span>
+        <ReceiptIcon className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" />
+        {/* Compact single-line chip (smoke finding: the old two-line cards
+            ate the panel). The operation + location moved to the tooltip;
+            the icon + green tone already signal "AI wrote this". */}
+        <span className="truncate font-medium text-gray-800 group-hover:text-emerald-800 dark:text-gray-100 dark:group-hover:text-emerald-300">
+          {receipt.title}
         </span>
       </button>
       {menuPos && (
