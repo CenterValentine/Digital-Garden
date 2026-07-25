@@ -18,6 +18,7 @@ import {
   ModelRouteNotices,
 } from "../ai/ModelSwitchDivider";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
+import { ModelPinToggle } from "../ai/ModelPinToggle";
 
 /** Compact token formatting for the header meter (v3.1 R5). */
 function formatTokenCount(n: number): string {
@@ -240,7 +241,7 @@ function ChatViewerInner({
     modelId,
     handleModelChange,
     modelPinned,
-    unpinModel,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,
@@ -935,21 +936,7 @@ function ChatViewerInner({
               disabled={isActive}
               contributors={mixed.contributors as AIProviderId[]}
             />
-            {/* Pin badge/release (AI 3.4) — a pick here pins via the engine's
-                wrapped handleModelChange, so the release control must exist
-                on this surface too, not only in the sidebar panel. */}
-            {/* Never disabled: unpinning mid-stream is harmless (affects the
-                next turn) and a dead-looking button reads as "unpin broken". */}
-            {modelPinned ? (
-              <button
-                type="button"
-                onClick={unpinModel}
-                title="Your model pick is fixed for this chat and overrides any playbook model directives. Unpin to let playbooks route models per phase."
-                className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
-              >
-                Pinned · unpin
-              </button>
-            ) : null}
+            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}

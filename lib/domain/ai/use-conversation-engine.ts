@@ -364,13 +364,13 @@ export interface UseConversationEngineResult {
   modelId: string;
   handleModelChange: ReturnType<typeof useModelSelection>["handleChange"];
   /**
-   * Whether the user's model pick is pinned for this conversation (AI 3.4).
-   * Pinned ⇒ the pick wins over playbook phase directives. Set implicitly by
-   * `handleModelChange`; cleared by `unpinModel`.
+   * Whether the model is pinned for this conversation (AI 3.4). Pinned ⇒ the
+   * selected model wins over playbook phase directives. Toggled explicitly
+   * via `setModelPinned` (the footer pin control).
    */
   modelPinned: boolean;
-  /** Release the model pin so playbook phase directives can route again. */
-  unpinModel: () => void;
+  /** Pin/unpin the current model for this conversation. */
+  setModelPinned: (pinned: boolean) => void;
 
   // ── suggestions ──
   mentionResults: SuggestionItem[];
@@ -703,19 +703,12 @@ export function useConversationEngine({
     },
     [modelPinKey, modelPinAltKey],
   );
-  // The picker calls this — a user model change is an explicit pick, so it
-  // pins. Internal re-seeds use the raw `handleModelChange` and never pin.
-  const handleModelChangePinned = useCallback(
-    (...args: Parameters<typeof handleModelChange>) => {
-      handleModelChange(...args);
-      persistModelPin(true);
-    },
-    [handleModelChange, persistModelPin],
-  );
-  const unpinModel = useCallback(
-    () => persistModelPin(false),
-    [persistModelPin],
-  );
+  // Pin is now an EXPLICIT toggle, not a side effect of picking a model
+  // (smoke finding: auto-pin-on-change was undiscoverable — a user in a
+  // rooted-playbook chat who never re-picked saw no pin control at all, and
+  // silently pinning on every switch was itself surprising). The picker uses
+  // the raw handleModelChange; the footer pin button drives setModelPinned.
+  const setModelPinned = persistModelPin;
 
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
@@ -1733,11 +1726,9 @@ export function useConversationEngine({
     regenerateMessage,
     providerId,
     modelId,
-    // Expose the PINNING wrapper as handleModelChange so a user pick from the
-    // picker records the pin; internal re-seeds keep using the raw handler.
-    handleModelChange: handleModelChangePinned,
+    handleModelChange,
     modelPinned,
-    unpinModel,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,

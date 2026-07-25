@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-22
+last_updated: 2026-07-25
 ---
 
 # Sprint Backlog
@@ -7,6 +7,15 @@ last_updated: 2026-07-22
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Chat surface UX (surfaced during AI 3.4 smoke, 2026-07-25)
+
+These are **pre-existing** issues (not caused by AI 3.4 model routing) noticed while smoke-testing it.
+
+- **Expand-to-full-view drops inherited chat settings.** Expanding a sidebar side-chat to the full-page viewer loses the target-folder and context chips (e.g. sidebar shows an inherited "AI Playbook Tests" folder target; the expanded view shows "No target"). Root cause: `ChatPanel` and `ChatViewer` each hold their **own** `targetFolder`/`activeContextId` state seeded from **different** sources — the sidebar derives an *inherited* target from ambient open-content context (`targetInherited`), while the full-page viewer seeds from `initialTargetLocation` / a `/api/conversations/:id` fetch and never re-derives the inherited value. The **model pin and output-target DO carry** (both keyed by the shared `dg:*:conv:${conversationId}` localStorage key). Fix: make target-folder + context single-sourced across the two surfaces (server-persist the inherited target on selection, or have the viewer re-derive it), so expand is loss-less. Touches `components/content/ai/ChatPanel.tsx`, `components/content/viewer/ChatViewer.tsx` (both `targetFolder`/`targetInherited`), and `handleOpenInPage`.
+- **Side-chat delete is undiscoverable + tab rail crowding.** The only delete path for a side-chat tab is the right-click action menu (`SidebarChatTabs.tsx` — the visible tab `X` is "Unpin from this content", hover-gated, not delete). Users can't find how to delete a side-chat. Partial mitigation already shipped (2026-07-25): the footer control rail scrolls horizontally instead of clipping (`ChatInput.tsx`), and the tab strip already has `overflow-x-auto`. **Enhancement wanted:** condense the tab strip + footer control rail (model picker, target/output/pin chips, expand) into a denser, less cluttered layout, and surface an always-discoverable delete affordance for side-chats (visible close `X` or a kebab menu), not right-click-only.
 
 ---
 

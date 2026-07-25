@@ -28,6 +28,7 @@ import {
   ModelSwitchDivider,
   ModelRouteNotices,
 } from "./ModelSwitchDivider";
+import { ModelPinToggle } from "./ModelPinToggle";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
@@ -190,7 +191,7 @@ export function ChatPanel({
     modelId,
     handleModelChange,
     modelPinned,
-    unpinModel,
+    setModelPinned,
     mentionResults,
     handleMentionSearch,
     commandItems,
@@ -945,21 +946,7 @@ export function ChatPanel({
               contributors={mixed.contributors as AIProviderId[]}
               compact
             />
-            {/* Ungated from activePlaybook: rooted runs never set it, and a
-                pin silently suppresses phase directives server-side — the
-                badge must be visible wherever the pin is in effect. */}
-            {/* Never disabled: unpinning mid-stream is harmless (affects the
-                next turn) and a dead-looking button reads as "unpin broken". */}
-            {modelPinned ? (
-              <button
-                type="button"
-                onClick={unpinModel}
-                title="Your model pick is fixed for this chat and overrides any playbook model directives. Unpin to let playbooks route models per phase."
-                className="ml-1 shrink-0 rounded px-1.5 py-0.5 text-[10px] text-amber-700 hover:bg-amber-500/10 dark:text-amber-300"
-              >
-                Pinned · unpin
-              </button>
-            ) : null}
+            <ModelPinToggle pinned={modelPinned} onToggle={setModelPinned} />
             <ChatContextPicker
               value={activeContextId}
               onChange={handleContextChange}

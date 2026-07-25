@@ -21,11 +21,12 @@ somewhere to route. Each `[ ]` is a PR-checklist line.
       line, not a pill. (Placeholders backticked deliberately: raw
       angle-bracket placeholders parse as HTML tags in markdown renderers,
       and an unclosed `title` element swallows the rest of the document.)
-- [ ] **Pinned pick wins.** With a playbook attached, change the model in the
-      picker → a **"Pinned · unpin"** control appears; the next turn runs your
-      pick and the divider reads *"· by you"*; the playbook directive is NOT
-      applied. Click **unpin** → the following phase routes by the playbook
-      again.
+- [ ] **Pin toggle wins.** With a playbook active (attached OR rooted), click
+      the **pin toggle** next to the model picker → it turns amber "Pinned";
+      the next turn runs your selected model and the divider reads *"· by
+      you"*; the playbook directive is NOT applied. Click it again to unpin →
+      the following phase routes by the playbook again. (The toggle is always
+      visible — it does not require changing the model first.)
 - [ ] **Pin survives reload.** Pin a model, reload → still pinned (per-
       conversation localStorage), playbook still overridden until you unpin.
 - [ ] **Pin survives promotion.** Pin BEFORE the first send in a fresh chat,
