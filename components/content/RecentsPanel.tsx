@@ -27,7 +27,35 @@ import {
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
-const HISTORY_FILTER_KEY = "dg-panel-recents-show-history";
+// 3-state filter for the panel Recents: everything mixed, notes/files only, or
+// browser history only. Cycles on click. Defaults to "all" (mixed).
+type RecentsFilter = "all" | "recents" | "history";
+const RECENTS_FILTER_ORDER: RecentsFilter[] = ["all", "recents", "history"];
+const RECENTS_FILTER_LABEL: Record<RecentsFilter, string> = {
+  all: "All",
+  recents: "Notes & files",
+  history: "Browser history",
+};
+const RECENTS_FILTER_KEY = "dg-panel-recents-filter";
+
+// Unified list item so notes/files and browser pages can interleave by recency.
+type RecentsListItem =
+  | {
+      kind: "content";
+      key: string;
+      timestamp: number;
+      contentId: string;
+      title: string;
+      contentType?: string;
+    }
+  | {
+      kind: "history";
+      key: string;
+      timestamp: number;
+      url: string;
+      title: string;
+      favIconUrl: string | null;
+    };
 
 const TYPE_ICONS: Record<string, string> = {
   folder: "M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z",
@@ -77,7 +105,7 @@ export function RecentsPanel() {
   const inPanel = isPanelEmbedSurface();
 
   const [browserHistory, setBrowserHistory] = useState<PageHistoryEntry[]>([]);
-  const [showBrowserHistory, setShowBrowserHistory] = useState(true);
+  const [filterMode, setFilterMode] = useState<RecentsFilter>("all");
   const [failedFavicons, setFailedFavicons] = useState<Set<string>>(new Set());
 
   const recents = useMemo(() => {
@@ -107,10 +135,13 @@ export function RecentsPanel() {
   useEffect(() => {
     if (!inPanel) return;
     try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
-      setShowBrowserHistory(localStorage.getItem(HISTORY_FILTER_KEY) !== "false");
+      const stored = localStorage.getItem(RECENTS_FILTER_KEY);
+      if (stored === "all" || stored === "recents" || stored === "history") {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
+        setFilterMode(stored);
+      }
     } catch {
-      // Storage unavailable — keep the shown-by-default.
+      // Storage unavailable — keep the "all" default.
     }
     function onMessage(event: MessageEvent) {
       if (!isAllowedEmbedMessageOrigin(event.origin)) return;
@@ -128,20 +159,54 @@ export function RecentsPanel() {
 
   // Defense-in-depth: even though the extension already filters at record time,
   // re-apply the full capture policy at display (adds mailbox/auth-suffix guards).
-  const visibleHistory = useMemo(() => {
-    if (!inPanel || !showBrowserHistory) return [] as PageHistoryEntry[];
+  const filteredHistory = useMemo(() => {
+    if (!inPanel) return [] as PageHistoryEntry[];
     const origin = typeof window !== "undefined" ? window.location.origin : "";
     return browserHistory.filter(
       (entry) =>
         shouldCapturePage(entry.url, { appOrigins: origin ? [origin] : [] }).capture
     );
-  }, [inPanel, showBrowserHistory, browserHistory]);
+  }, [inPanel, browserHistory]);
 
-  function toggleShowHistory() {
-    setShowBrowserHistory((prev) => {
-      const next = !prev;
+  // Notes/files and browser pages merged into one recency-sorted list. The
+  // active filter decides which kinds are eligible before the sort.
+  const mergedItems = useMemo(() => {
+    const items: RecentsListItem[] = [];
+    if (filterMode !== "history") {
+      for (const item of recents) {
+        items.push({
+          kind: "content",
+          key: `c:${item.contentId}`,
+          timestamp: item.timestamp,
+          contentId: item.contentId,
+          title: item.title ?? "Untitled",
+          contentType: item.contentType,
+        });
+      }
+    }
+    if (filterMode !== "recents") {
+      for (const entry of filteredHistory) {
+        items.push({
+          kind: "history",
+          key: `h:${entry.normalizedUrl}`,
+          timestamp: new Date(entry.lastViewedAt).getTime(),
+          url: entry.url,
+          title: entry.title?.trim() || hostnameOf(entry.url),
+          favIconUrl: entry.favIconUrl,
+        });
+      }
+    }
+    return items.sort((a, b) => b.timestamp - a.timestamp);
+  }, [filterMode, recents, filteredHistory]);
+
+  function cycleFilter() {
+    setFilterMode((prev) => {
+      const next =
+        RECENTS_FILTER_ORDER[
+          (RECENTS_FILTER_ORDER.indexOf(prev) + 1) % RECENTS_FILTER_ORDER.length
+        ];
       try {
-        localStorage.setItem(HISTORY_FILTER_KEY, String(next));
+        localStorage.setItem(RECENTS_FILTER_KEY, next);
       } catch {
         // Non-fatal.
       }
@@ -192,31 +257,47 @@ export function RecentsPanel() {
     );
   }
 
-  // ── Panel embed: content recents + browser history + filter ────────────────
-  const isEmpty = recents.length === 0 && visibleHistory.length === 0;
+  // ── Panel embed: notes/files + browser history, mixed, with a cycling filter ─
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center justify-between px-3 py-1.5 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
         <span>Recents</span>
         <button
           type="button"
-          onClick={toggleShowHistory}
-          aria-pressed={showBrowserHistory}
-          className="rounded px-1.5 py-0.5 text-[11px] normal-case tracking-normal text-gray-500 transition-colors hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5"
+          onClick={cycleFilter}
+          title="Filter: All → Notes & files → Browser history"
+          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] normal-case tracking-normal text-gray-500 transition-colors hover:bg-black/5 dark:text-gray-400 dark:hover:bg-white/5"
         >
-          {showBrowserHistory ? "Hide history" : "Show history"}
+          <svg
+            className="h-3 w-3 shrink-0"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M3 4h18M6 8h12M9 12h6M11 16h2"
+            />
+          </svg>
+          {RECENTS_FILTER_LABEL[filterMode]}
         </button>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
-        {isEmpty ? (
+        {mergedItems.length === 0 ? (
           <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-            Recently viewed notes, files, and pages will appear here.
+            {filterMode === "history"
+              ? "Pages you visit will appear here."
+              : filterMode === "recents"
+                ? "Recently viewed notes and files will appear here."
+                : "Recently viewed notes, files, and pages will appear here."}
           </div>
         ) : (
-          <>
-            {recents.map((item) => (
+          mergedItems.map((item) =>
+            item.kind === "content" ? (
               <button
-                key={item.contentId}
+                key={item.key}
                 type="button"
                 onClick={() => setSelectedContentId(item.contentId)}
                 className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
@@ -235,71 +316,58 @@ export function RecentsPanel() {
                   />
                 </svg>
                 <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
-                  {item.title ?? "Untitled"}
+                  {item.title}
                 </span>
                 <span className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
                   {formatRelativeTime(item.timestamp)}
                 </span>
               </button>
-            ))}
-
-            {visibleHistory.length > 0 && (
-              <>
-                <div className="px-3 pb-1 pt-2 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  Browser history
-                </div>
-                {visibleHistory.map((entry) => {
-                  const showFavicon =
-                    entry.favIconUrl && !failedFavicons.has(entry.url);
-                  return (
-                    <button
-                      key={entry.normalizedUrl}
-                      type="button"
-                      onClick={() => requestOpenUrl(entry.url)}
-                      title={entry.url}
-                      className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
-                    >
-                      {showFavicon ? (
-                        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external favicon, not a project asset
-                        <img
-                          src={entry.favIconUrl ?? undefined}
-                          alt=""
-                          className="h-4 w-4 shrink-0 rounded-sm"
-                          onError={() =>
-                            setFailedFavicons((prev) => {
-                              const next = new Set(prev);
-                              next.add(entry.url);
-                              return next;
-                            })
-                          }
-                        />
-                      ) : (
-                        <svg
-                          className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d={GLOBE_ICON}
-                          />
-                        </svg>
-                      )}
-                      <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
-                        {entry.title?.trim() || hostnameOf(entry.url)}
-                      </span>
-                      <span className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
-                        {formatRelativeTime(new Date(entry.lastViewedAt).getTime())}
-                      </span>
-                    </button>
-                  );
-                })}
-              </>
-            )}
-          </>
+            ) : (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => requestOpenUrl(item.url)}
+                title={item.url}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/5"
+              >
+                {item.favIconUrl && !failedFavicons.has(item.url) ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- arbitrary external favicon, not a project asset
+                  <img
+                    src={item.favIconUrl}
+                    alt=""
+                    className="h-4 w-4 shrink-0 rounded-sm"
+                    onError={() =>
+                      setFailedFavicons((prev) => {
+                        const next = new Set(prev);
+                        next.add(item.url);
+                        return next;
+                      })
+                    }
+                  />
+                ) : (
+                  <svg
+                    className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d={GLOBE_ICON}
+                    />
+                  </svg>
+                )}
+                <span className="min-w-0 flex-1 truncate text-sm text-gray-800 dark:text-gray-200">
+                  {item.title}
+                </span>
+                <span className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500">
+                  {formatRelativeTime(item.timestamp)}
+                </span>
+              </button>
+            )
+          )
         )}
       </div>
     </div>
