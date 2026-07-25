@@ -305,15 +305,29 @@ stream needs a resumable-stream store (Redis-class).
   (Version framing: next milestone 3.4 = playbook-orchestrated model
   routing.)
 
-## T5 — Conversation title strategy for quick URL chats
+## T5 — Conversation title strategy for quick URL chats ✅ BUILT (2026-07-23)
 
 Deferred S3-time call: page title vs. first-message summary for chats
 opened from a URL.
 
-- Decide + implement the title source for quick/URL-opened chats
-  (first-message summary is the likely answer; confirm at build).
-- **Gate:** a URL-opened chat gets a meaningful title without manual
-  rename, consistent with sidebar-created chats.
+- **Decision: first-message summary** (the plan's likely answer). Root
+  cause of the gap: `POST /api/conversations/[id]/auto-title` returned
+  `title: null, skipped: true` on `no_route` / `NoRoutesAvailableError` /
+  `empty_response` — so a chat with no `chat-title-generation` feature
+  route configured (or a model failure) got NO title at all.
+- **Built:** the route now computes a deterministic `buildFirstMessageTitle`
+  (first ~8 words / 48 chars of the user's first message, markdown-stripped,
+  capitalized) and falls back to it whenever the AI path is unavailable or
+  yields nothing. The AI title stays preferred when a route is configured;
+  the response carries `source: "ai" | "first_message"`. Server-only change;
+  the existing client trigger (`use-conversation-binding.ts`, after the first
+  assistant turn) already applies whatever title comes back. Both surfaces
+  (sidebar + full-page/URL) share that binding, so titling is now consistent.
+- **Gate:** MET — a URL-opened chat gets a meaningful title without a manual
+  rename, even with zero AI config.
+- Page-title-for-page-rooted-chats (browser panel "Ask about this page") was
+  considered and left out: first-message summary is universal and simpler;
+  revisit only if page-rooted chats want the page's title specifically.
 
 ## T6 — Acquisition explainer (owner walkthrough)
 

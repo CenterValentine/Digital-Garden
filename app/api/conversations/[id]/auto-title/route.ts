@@ -18,7 +18,6 @@ import { prisma } from "@/lib/database/client";
 import {
   resolveFeatureRoute,
   executeWithFallback,
-  NoRoutesAvailableError,
 } from "@/lib/domain/ai/features";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { publishConversationEvent } from "@/lib/features/conversations/events";
@@ -76,105 +75,108 @@ export async function POST(request: NextRequest, context: RouteContext) {
         });
       }
 
-      // Resolve feature route. If nothing is configured AND no default
-      // suggestion matches the user's connections, silently skip.
-      const routes = await resolveFeatureRoute(
-        session.user.id,
-        "chat-title-generation",
-      );
-      if (routes.length === 0) {
+      // Deterministic fallback (T5): a concise title from the user's first
+      // message, so a URL-opened or sidebar chat ALWAYS gets a meaningful
+      // title without a manual rename — even when no `chat-title-generation`
+      // route is configured or the model call fails.
+      const fallbackTitle = buildFirstMessageTitle(extractText(userMsgs[0].parts));
+
+      const finalize = async (title: string, source: "ai" | "first_message") => {
+        await prisma.conversation.update({ where: { id }, data: { title } });
+        // Keep the backing chat ContentNode's title in sync (file tree +
+        // workspace tabs are ContentNode-driven) when archive-linked.
+        if (conv.archivedToContentNodeId) {
+          await prisma.contentNode.updateMany({
+            where: { id: conv.archivedToContentNodeId, ownerId: session.user.id },
+            data: { title },
+          });
+        }
+        publishConversationEvent(session.user.id, {
+          type: "conversation.updated",
+          conversationId: id,
+          title,
+          at: new Date().toISOString(),
+        });
+        logger.info({
+          layer: "ai",
+          event: "conv.auto_title",
+          summary: `auto-title set for ${id} (${source})`,
+          attrs: { conversation_id: id, title_chars: title.length, source },
+        });
         return NextResponse.json({
           success: true,
-          data: { title: null, skipped: true, reason: "no_route" },
+          data: { title, skipped: false, source },
+        });
+      };
+
+      // Prefer an AI-generated title when a route is configured; fall back to
+      // the deterministic first-message summary on ANY failure (no route
+      // configured, model error, or empty response).
+      let aiTitle = "";
+      try {
+        const routes = await resolveFeatureRoute(
+          session.user.id,
+          "chat-title-generation",
+        );
+        if (routes.length > 0) {
+          // Build a compact prompt from the first ~3 messages.
+          const conversationText = conv.messages
+            .map((m) => {
+              const text = extractText(m.parts);
+              if (!text) return null;
+              return `${m.role === "user" ? "User" : "Assistant"}: ${text.slice(0, 500)}`;
+            })
+            .filter(Boolean)
+            .join("\n\n");
+
+          const systemPrompt =
+            "You generate concise chat titles. Respond with ONLY a 3-5 word title in title case. No quotes, no punctuation, no markdown, no commentary.";
+
+          const generated = await withSpan(
+            { layer: "ai", name: "auto_title" },
+            { attrs: { conversation_id: id, route_count: routes.length } },
+            async () =>
+              executeWithFallback({
+                featureId: "chat-title-generation",
+                routes,
+                attempt: async ({ route }) => {
+                  const model = await resolveChatModelFromConnection(
+                    route.connection,
+                    route.modelId,
+                  );
+                  const { text } = await generateText({
+                    model,
+                    messages: [
+                      { role: "system", content: systemPrompt },
+                      { role: "user", content: conversationText },
+                    ],
+                    maxOutputTokens: 30,
+                  });
+                  return text;
+                },
+              }),
+          );
+          aiTitle = sanitizeTitle(generated);
+        }
+      } catch (aiError) {
+        // No route, or a model/connection failure — fall through to the
+        // deterministic fallback rather than leaving the chat untitled.
+        logger.warn({
+          layer: "ai",
+          event: "auto_title:ai_unavailable",
+          summary: `AI title unavailable for ${id} — using first-message fallback`,
+          error: aiError,
         });
       }
 
-      // Build a compact prompt from the first ~3 messages.
-      const conversationText = conv.messages
-        .map((m) => {
-          const text = extractText(m.parts);
-          if (!text) return null;
-          return `${m.role === "user" ? "User" : "Assistant"}: ${text.slice(0, 500)}`;
-        })
-        .filter(Boolean)
-        .join("\n\n");
-
-      const systemPrompt =
-        "You generate concise chat titles. Respond with ONLY a 3-5 word title in title case. No quotes, no punctuation, no markdown, no commentary.";
-
-      const generated = await withSpan(
-        { layer: "ai", name: "auto_title" },
-        {
-          attrs: {
-            conversation_id: id,
-            route_count: routes.length,
-          },
-        },
-        async () =>
-          executeWithFallback({
-            featureId: "chat-title-generation",
-            routes,
-            attempt: async ({ route }) => {
-              const model = await resolveChatModelFromConnection(
-                route.connection,
-                route.modelId,
-              );
-              const { text } = await generateText({
-                model,
-                messages: [
-                  { role: "system", content: systemPrompt },
-                  { role: "user", content: conversationText },
-                ],
-                maxOutputTokens: 30,
-              });
-              return text;
-            },
-          }),
-      );
-
-      const title = sanitizeTitle(generated);
+      const title = aiTitle || fallbackTitle;
       if (!title) {
         return NextResponse.json({
           success: true,
-          data: { title: null, skipped: true, reason: "empty_response" },
+          data: { title: null, skipped: true, reason: "no_content" },
         });
       }
-
-      await prisma.conversation.update({
-        where: { id },
-        data: { title },
-      });
-
-      // Keep the backing chat ContentNode's title in sync (file tree +
-      // workspace tabs are ContentNode-driven) when archive-linked.
-      if (conv.archivedToContentNodeId) {
-        await prisma.contentNode.updateMany({
-          where: {
-            id: conv.archivedToContentNodeId,
-            ownerId: session.user.id,
-          },
-          data: { title },
-        });
-      }
-
-      publishConversationEvent(session.user.id, {
-        type: "conversation.updated",
-        conversationId: id,
-        title,
-        at: new Date().toISOString(),
-      });
-
-      logger.info({
-        layer: "ai",
-        event: "conv.auto_title",
-        summary: `auto-title set for ${id}`,
-        attrs: { conversation_id: id, title_chars: title.length },
-      });
-
-      return NextResponse.json({
-        success: true,
-        data: { title, skipped: false },
-      });
+      return finalize(title, aiTitle ? "ai" : "first_message");
     } catch (error) {
       if (
         error instanceof Error &&
@@ -184,12 +186,6 @@ export async function POST(request: NextRequest, context: RouteContext) {
           { success: false, error: "Unauthorized" },
           { status: 401 },
         );
-      }
-      if (error instanceof NoRoutesAvailableError) {
-        return NextResponse.json({
-          success: true,
-          data: { title: null, skipped: true, reason: "no_route" },
-        });
       }
       logger.error({
         layer: "ai",
@@ -243,4 +239,29 @@ function sanitizeTitle(raw: string): string {
     t = t.slice(0, MAX_TITLE_CHARS).trim();
   }
   return t;
+}
+
+const FALLBACK_TITLE_WORDS = 8;
+const FALLBACK_TITLE_CHARS = 48;
+
+/**
+ * Deterministic first-message-summary title (T5). The AI title route is the
+ * preferred source, but a URL-opened / quick chat must still get a meaningful
+ * title with no AI config and no manual rename — so we distill the user's
+ * first message: strip markdown lead-ins + quotes, keep the first handful of
+ * words, cap the length, drop trailing punctuation, capitalize. Returns "" if
+ * there's nothing titlable.
+ */
+function buildFirstMessageTitle(text: string): string {
+  let t = text.replace(/\s+/g, " ").trim();
+  t = t.replace(/^#{1,6}\s+/, "").replace(/^[-*+]\s+/, "");
+  t = t.replace(/[`*"'“”‘’]/g, "").trim();
+  if (!t) return "";
+  let title = t.split(" ").slice(0, FALLBACK_TITLE_WORDS).join(" ");
+  if (title.length > FALLBACK_TITLE_CHARS) {
+    title = title.slice(0, FALLBACK_TITLE_CHARS).trim();
+  }
+  title = title.replace(/[.,!?:;]+$/, "").trim();
+  if (!title) return "";
+  return title.charAt(0).toUpperCase() + title.slice(1);
 }
