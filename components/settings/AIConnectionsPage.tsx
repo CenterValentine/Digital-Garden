@@ -472,7 +472,30 @@ function ConnectionForm({
         const data = await res.json().catch(() => null);
         throw new Error(data?.error ?? `${isEdit ? "Update" : "Create"} failed`);
       }
-      toast.success(isEdit ? "Connection updated" : "Connection added");
+      if (isEdit) {
+        toast.success("Connection updated");
+      } else {
+        // Registry-authoritative population (AI 3.5): tell the user whether we
+        // pulled the live model list, fell back to seed defaults, or the
+        // provider has no model-list API.
+        const data = await res.json().catch(() => null);
+        const populate = data?.modelsPopulate as
+          | { status?: "auto" | "seed" | "skipped"; count?: number }
+          | undefined;
+        if (populate?.status === "auto") {
+          toast.success(
+            `Connection added — loaded ${populate.count} model${
+              populate.count === 1 ? "" : "s"
+            } from the provider.`,
+          );
+        } else if (populate?.status === "seed") {
+          toast.warning(
+            "Connection added, but couldn't reach the provider — using default models. Open it and “Fetch from API” when ready.",
+          );
+        } else {
+          toast.success("Connection added");
+        }
+      }
       onDone();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");

@@ -19,14 +19,18 @@ the owner 2026-07-25 after AI 3.4 merged.
 
 ## Planned (owner-ordered 2026-07-25)
 
-### 3.5 — Registry-authoritative models  ← NEXT
+### 3.5 — Registry-authoritative models  ← IN PROGRESS
 Stop pre-installing model lists. On connection install (with a valid key),
-auto-fetch the model list from the provider registry; templates carry only
-provider metadata (endpoint, adapter, key hint). Plus a **monthly
-model-category cron** (realtime / audio / image / reasoning / …) — the one
-locally-maintained piece of model metadata the provider `/models` payload
-doesn't reliably give us. Extends 3.4's catalog-drift safety net
-([MODEL-CATALOG-FRESHNESS.md](../guides/ai/MODEL-CATALOG-FRESHNESS.md)).
+auto-fetch the model list from the provider registry and replace the
+template's seed models with it; seeds remain the fallback for
+no-model-list-API providers / fetch failures. Extends 3.4's catalog-drift
+safety net ([MODEL-CATALOG-FRESHNESS.md](../guides/ai/MODEL-CATALOG-FRESHNESS.md)).
+
+**Deferred to backlog (owner: "we can back log that"):** the **monthly
+model-category cron** (realtime / audio / image / reasoning / …). Categories
+are inferred at runtime today via `inferCapabilities` (id patterns); a
+periodically-refreshed authoritative category map is an enhancement, not a
+blocker — revisit if runtime inference proves too brittle.
 
 ### 3.6 — Playbook completeness
 The T3 deferrals as one release: SKILL.md import adapter · "unmark playbook"
