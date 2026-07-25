@@ -8,10 +8,21 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { clientLogger } from "@/lib/core/logger/client";
+import {
+  acquireUrlWithFallback,
+  type AcquireVia,
+} from "@/lib/domain/browser-extension/acquire-url";
+import type { AcquiredContent } from "@/lib/domain/ai/acquisition/types";
+
+const ACQUIRE_VIA_LABEL: Record<AcquireVia, string> = {
+  "server-fetch": "server fetch",
+  "sw-fetch": "your browser session",
+  "session-tab": "a background tab in your session",
+};
 
 interface ExternalLinkViewerProps {
   contentId: string;
@@ -61,6 +72,14 @@ export function ExternalLinkViewer({
   const [previewData, setPreviewData] = useState(preview.cached || null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  // B5: full-content acquisition (P1 server-fetch → P2/P3 via the extension).
+  const [isAcquiring, setIsAcquiring] = useState(false);
+  const [acquired, setAcquired] = useState<{
+    content: AcquiredContent;
+    via: AcquireVia;
+    usedExtension: boolean;
+  } | null>(null);
+  const [acquireError, setAcquireError] = useState<string | null>(null);
   const screenshotDataUrl =
     typeof captureMetadata?.screenshotDataUrl === "string"
       ? captureMetadata.screenshotDataUrl
@@ -79,6 +98,8 @@ export function ExternalLinkViewer({
   useEffect(() => {
     setPreviewData(preview.cached || null);
     setPreviewError(null);
+    setAcquired(null);
+    setAcquireError(null);
   }, [url, preview.cached]);
 
   const handleRefreshPreview = useCallback(
@@ -154,6 +175,34 @@ export function ExternalLinkViewer({
   const handleOpenLink = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
+
+  // B5: read the full page. Tries a server fetch first, then — if the extension
+  // is installed — escalates to a credentialed fetch / a background session tab
+  // in the user's own browser (the bot-hostile-page path). Works without the
+  // extension too; it just can't get past pages that block server fetches.
+  const handleAcquireContent = useCallback(async () => {
+    setIsAcquiring(true);
+    setAcquireError(null);
+    try {
+      const outcome = await acquireUrlWithFallback(url);
+      if (outcome.ok && outcome.content) {
+        const via = outcome.via ?? "server-fetch";
+        setAcquired({ content: outcome.content, via, usedExtension: outcome.usedExtension });
+        toast.success(`Read via ${ACQUIRE_VIA_LABEL[via]}`);
+      } else {
+        setAcquired(null);
+        const message = outcome.reason ?? "Couldn't read this page";
+        setAcquireError(message);
+        toast.error(message);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Couldn't read this page";
+      setAcquireError(message);
+      toast.error(message);
+    } finally {
+      setIsAcquiring(false);
+    }
+  }, [url]);
 
   // Check if we have any metadata at all
   const hasAnyMetadata = Boolean(
@@ -349,7 +398,7 @@ export function ExternalLinkViewer({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handleOpenLink}
           className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-lg text-sm font-medium text-primary transition-colors"
@@ -367,7 +416,50 @@ export function ExternalLinkViewer({
           />
           {isRefreshing ? "Refreshing..." : "Refresh Preview"}
         </button>
+        <button
+          onClick={handleAcquireContent}
+          disabled={isAcquiring}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 border border-gray-900/20 dark:border-white/15 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Read the full page text — falls back to your browser session for pages that block server fetches"
+        >
+          <BookOpen className={`h-4 w-4 ${isAcquiring ? "animate-pulse" : ""}`} />
+          {isAcquiring ? "Reading..." : "Read full content"}
+        </button>
       </div>
+
+      {/* Acquire error (B5) */}
+      {acquireError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{acquireError}</p>
+        </div>
+      )}
+
+      {/* Acquired full content (B5) */}
+      {acquired && (
+        <div
+          className="border border-white/10 rounded-lg p-4"
+          style={{
+            background: glass0.background,
+            backdropFilter: glass0.backdropFilter,
+          }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+              {acquired.content.title || "Extracted content"}
+            </h3>
+            <span className="inline-block shrink-0 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs text-blue-500">
+              via {ACQUIRE_VIA_LABEL[acquired.via]}
+            </span>
+          </div>
+          <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            Web content — informational only. ~{acquired.content.tokenEstimate} tokens
+            {acquired.content.truncated ? " · truncated" : ""}
+          </div>
+          <div className="max-h-96 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+            {acquired.content.content}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

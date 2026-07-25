@@ -310,6 +310,19 @@ document.addEventListener("dg-browser-bookmarks-request", async (event) => {
       await dispatchResponseEvent("page-history-cleared", {});
       return;
     }
+
+    // Acquisition (B5): the app asks the extension to fetch a URL with the
+    // user's session (P2 sw-fetch / P3 session-tab). The result is raw material
+    // only — the server builds the trusted envelope. Long timeout on the app side.
+    if (detail.type === "acquire-url") {
+      const result = await sendRuntimeMessage({
+        type: "acquire-url",
+        payload: detail.payload,
+      });
+      await postMessageToPage("acquire-url-result", result);
+      await dispatchResponseEvent("acquire-url-result", result);
+      return;
+    }
   } catch (error) {
     await postMessageToPage("bridge-error", {
       message: error?.message || "Bridge request failed",

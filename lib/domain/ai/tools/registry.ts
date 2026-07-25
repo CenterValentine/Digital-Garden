@@ -96,7 +96,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         if (!result.ok || !result.content) {
           // String result (not a throw) so the model relays the refusal
           // gracefully — registry convention (see notify_user).
-          return `Could not read the page: ${result.reason ?? "unknown error"}.`;
+          return (
+            `Could not read the page: ${result.reason ?? "unknown error"}. ` +
+            `If the user has the browser extension installed, they can open this ` +
+            `link in the app and click "Read full content" to fetch it with their ` +
+            `own browser session (which gets past pages that block server fetches).`
+          );
         }
         const c = result.content;
         // Bot-walled sites (Indeed, LinkedIn, …) return a challenge page —
@@ -106,8 +111,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return (
             `The page returned almost no readable content (${c.content.length} chars) — ` +
             `this site likely blocks automated access. Ask the user to either paste the ` +
-            `content directly, or try a direct/public version of the page (e.g. the ` +
-            `company's own careers page instead of a job-board aggregator).`
+            `content directly, open this link in the app and click "Read full content" ` +
+            `(which fetches it with their own browser session via the extension), or try ` +
+            `a direct/public version of the page (e.g. the company's own careers page ` +
+            `instead of a job-board aggregator).`
           );
         }
         // Settle-then-associate (AI v3 core S3, umbrella #14): a successful
