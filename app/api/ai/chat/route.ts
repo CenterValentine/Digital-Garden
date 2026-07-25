@@ -336,19 +336,23 @@ export async function POST(request: Request) {
               routingNode.notePayload.tiptapJson as JSONContent,
             );
             if (routingParsed.phases.length > 0) {
-              // Rooted execution injects all phases and gates on phase 0; an
-              // explicit attach uses the clamped client-derived active index.
-              routingActivePhaseIndex = routingExplicitPlaybookId
-                ? Math.min(
-                    Math.max(
-                      typeof body.activePhaseIndex === "number"
-                        ? body.activePhaseIndex
-                        : 0,
-                      0,
-                    ),
-                    routingParsed.phases.length - 1,
-                  )
-                : 0;
+              // The active phase is the client-derived index (count of
+              // approved phase_checkpoints) for BOTH modes — smoke finding:
+              // hardcoding 0 for rooted meant a `model:` directive on any
+              // phase past the first NEVER routed during rooted "run this
+              // playbook" execution, which is the primary flow. The index
+              // advances only across checkpoint-bounded turns, so a playbook
+              // must checkpoint between phases for the switch to land (a turn
+              // is atomic — one model).
+              routingActivePhaseIndex = Math.min(
+                Math.max(
+                  typeof body.activePhaseIndex === "number"
+                    ? body.activePhaseIndex
+                    : 0,
+                  0,
+                ),
+                routingParsed.phases.length - 1,
+              );
               routingPlaybookTitle = routingNode.title;
               phaseModelResolution = getPhaseModelDirective(
                 routingParsed,

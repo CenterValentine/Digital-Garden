@@ -31,15 +31,12 @@ export function ModelPinToggle({
       }
       className={
         pinned
-          ? "ml-1 inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-700 bg-amber-500/10 hover:bg-amber-500/20 dark:text-amber-300"
+          ? "ml-1 inline-flex shrink-0 items-center rounded px-1 py-0.5 text-amber-600 bg-amber-500/10 hover:bg-amber-500/20 dark:text-amber-300"
           : "ml-1 inline-flex shrink-0 items-center rounded px-1 py-0.5 text-gray-400 hover:text-gray-600 hover:bg-black/[0.04] dark:text-gray-500 dark:hover:text-gray-300 dark:hover:bg-white/5"
       }
     >
       {pinned ? (
-        <>
-          <Pin className="h-3 w-3 shrink-0" />
-          Pinned
-        </>
+        <Pin className="h-3.5 w-3.5 shrink-0 fill-current" />
       ) : (
         <PinOff className="h-3.5 w-3.5 shrink-0" />
       )}

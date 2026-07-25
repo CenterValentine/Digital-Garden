@@ -32,6 +32,7 @@ import {
   FolderOpen,
   FolderPlus,
   GitBranch,
+  Globe,
   GripVertical,
   Image as ImageIcon,
   ImagePlus,
@@ -603,6 +604,20 @@ export const ChatMessage = memo(function ChatMessage({
     return units;
   }, [message.parts]);
 
+  // Native-provider web search (Anthropic/OpenAI/Google big-provider tools)
+  // surfaces its sources as `source-url`/`source-document` parts rather than a
+  // `search_web` tool card — those parts are skipped by the unit renderer
+  // above, so the search was previously invisible. Count them so the message
+  // can show "Searched the web · N sources", matching the integrated-search
+  // tool-card count.
+  const webSourceCount = useMemo(() => {
+    let n = 0;
+    for (const part of message.parts) {
+      if (part.type === "source-url" || part.type === "source-document") n += 1;
+    }
+    return n;
+  }, [message.parts]);
+
   // NOTE: tree-refresh + content-updated dispatch for AI note writes
   // lives in `use-conversation-engine.ts` `onFinish` — fires exactly
   // once per AI completion. Putting that logic here (in the render
@@ -934,6 +949,19 @@ export const ChatMessage = memo(function ChatMessage({
 
           return null;
         })}
+
+        {/* Native-provider web search summary (AI 3.4 smoke finding): big
+            providers cite via source parts, not a search_web card, so show
+            how many sources the search consulted. */}
+        {webSourceCount > 0 && (
+          <div className="mt-1 inline-flex items-center gap-1.5 rounded-md bg-black/[0.03] px-2 py-1 text-[11px] text-gray-500 dark:bg-white/5 dark:text-gray-400">
+            <Globe className="h-3 w-3 shrink-0 opacity-70" />
+            <span>
+              Searched the web · {webSourceCount} source
+              {webSourceCount === 1 ? "" : "s"}
+            </span>
+          </div>
+        )}
 
         {/* Image cards — rendered at message level for reliability */}
         {imagePayloads.map((payload) => (
@@ -2422,11 +2450,48 @@ function ToolCallBubble({
             : "";
         if (phase) return `Phase checkpoint: ${phase}`;
       }
+      // Name the note being read (smoke finding: "Read a note" didn't say
+      // WHICH note). The getCurrentNote result is "Title: <title>\n…".
+      if (toolName === "getCurrentNote" && typeof result === "string") {
+        const m = result.match(/^Title:\s*(.+)$/m);
+        if (m?.[1]?.trim()) {
+          return `${isRunning ? "Reading" : "Read"} note: ${m[1].trim()}`;
+        }
+      }
+      // Web search: surface how many results/sources came back (integrated
+      // app-executed search returns untrustedWebResults).
+      if (
+        (toolName === "search_web" || toolName === "web_search") &&
+        result &&
+        typeof result === "object"
+      ) {
+        const r = result as { untrustedWebResults?: unknown };
+        if (Array.isArray(r.untrustedWebResults)) {
+          const n = r.untrustedWebResults.length;
+          return `Searched the web · ${n} result${n === 1 ? "" : "s"}`;
+        }
+      }
+      // Name the page being fetched by its domain.
+      if (
+        (toolName === "read_page" || toolName === "read_url") &&
+        args &&
+        typeof args === "object"
+      ) {
+        const url = (args as { url?: unknown }).url;
+        if (typeof url === "string" && url) {
+          try {
+            const host = new URL(url).hostname.replace(/^www\./, "");
+            return `${isRunning ? "Reading" : "Read"} page: ${host}`;
+          } catch {
+            /* not a parseable URL — fall through */
+          }
+        }
+      }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
       return toolActionLabel(toolName, isRunning || wasStopped);
     },
-    [toolName, isRunning, wasStopped, args],
+    [toolName, isRunning, wasStopped, args, result],
   );
 
   // True when this tool result is an edit payload (apply_diff, replace_document, insert_image).
