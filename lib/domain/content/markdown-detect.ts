@@ -11,6 +11,8 @@
  * blockquote) or two independent inline signals (link / bold / inline code).
  */
 
+import { containsTable } from "./markdown-tables";
+
 /** Does the pasted text look enough like Markdown to warrant a hint? */
 export function isLikelyMarkdown(text: string): boolean {
   if (!text || text.length < 4) return false;
@@ -24,7 +26,11 @@ export function isLikelyMarkdown(text: string): boolean {
   if (/(^|\n)\s{0,3}(```|~~~)/.test(text)) strong++; // fenced code
   if (countLines(/^\s*[-*+]\s+\S/) >= 2) strong++; // bullet list (2+ items)
   if (countLines(/^\s*\d+\.\s+\S/) >= 2) strong++; // ordered list (2+ items)
-  if (countLines(/^\s*\|.*\|\s*$/) >= 2) strong++; // table (2+ rows)
+  // Table: recognised by its delimiter row, not by counting `|…|` lines — GFM
+  // makes the outer pipes optional, so the old line-shape count missed every
+  // "Claim | Evidence" / "--- | ---" table (the shape GitHub, Claude and most
+  // docs tools emit) and left it pasted as literal text.
+  if (containsTable(text)) strong++;
 
   let inline = 0;
   if (/\[[^\]\n]+\]\([^)\s]+\)/.test(text)) inline++; // link

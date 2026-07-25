@@ -85,8 +85,23 @@ const CANDIDATE_PRETTY_TYPES = new Set<string>([
 
 let cachedTurndown: TurndownService | null = null;
 function getTurndown(): TurndownService {
-  if (cachedTurndown) return cachedTurndown;
-  const td = new TurndownService({
+  cachedTurndown ??= createTurndown();
+  return cachedTurndown;
+}
+
+/**
+ * Build the configured turndown service.
+ *
+ * `Service` is injectable because turndown ships two builds that differ in how
+ * they parse the HTML string: the browser one (what Turbopack bundles for the
+ * client, and what the source-view toggle actually runs) uses the DOM's
+ * `DOMParser`; the Node one uses domino. Our table rules walk that parsed tree,
+ * so the smoke test constructs a browser-build service and asserts both agree.
+ */
+export function createTurndown(
+  Service: typeof TurndownService = TurndownService,
+): TurndownService {
+  const td = new Service({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
     bulletListMarker: "-",
@@ -151,7 +166,6 @@ function getTurndown(): TurndownService {
     // the surrounding block elements add so the grid stays contiguous.
     replacement: (content) => `\n\n${content.replace(/\n{2,}/g, "\n").trim()}\n\n`,
   });
-  cachedTurndown = td;
   return td;
 }
 
