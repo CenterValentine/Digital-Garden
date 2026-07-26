@@ -97,17 +97,9 @@ P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection)
 
 ---
 
-## Browser Reach B3-A — workspaces in the panel (DEPRIORITIZED 2026-07-22)
+## Browser Reach B3-B — settle-then-associate + viewership (SHIPPED, PR #131, 2026-07-25)
 
-Dropped from the active B-series (owner call): the existing workspaces infra + `extensions/workplaces/` (WorkspaceSelector, workspace-store, ContentWorkspace API) already do the job, and users create sessions via existing affordances. The browser-specific value from the original 3.4/3.5 was pulled out into **B3-B** (settle-then-associate link affordance + browser-history-in-recents). Revisit only if browser-specific workspace UX becomes necessary.
-
-- [ ] Wire the panel's workspace chooser to list/switch real `ContentWorkspace`s (full-swap semantics). WorkspaceSelector already exists.
-- [ ] "Browser Sessions" as workspace items — auto-created, date/time-named, most-recent-active first; per-workspace target folder rides the `settings` JSON column (no schema change per C3).
-- [ ] Per-window active-workspace pointer (browser-side, keyed by `windowId`; app renders what the API returns).
-
-## Browser Reach B3-B — settle-then-associate + viewership (BUILT 2026-07-23, awaiting smoke test)
-
-Branch `feat/browser-reach-b3b-associations`. Gates green (typecheck + lint 0-err + full build + `pnpm extension:build`). NOT yet smoke-tested (owner deferred to after all building). Requires `pnpm extension:build` + reload the extension before testing.
+Merged via PR #131 (2026-07-25) and smoke-tested (settings card, browser-history capture, filter). Follow-on shipped in the same PR: Recents now interleaves notes/files + browser history under a **3-state cycling filter** (All / Notes & files / Browser history), replacing the earlier two-section Show/Hide toggle.
 
 Shipped:
 - **Capture policy** (`lib/domain/browser-extension/capture-policy.ts`) — pure `shouldCapturePage()` shared safety gate: blocks non-web schemes, browser-internal (Web Store), Digital Garden's own origins, mailboxes/auth/password-managers, and a user denylist. Applied at record time (extension) and display time (panel).
@@ -115,12 +107,23 @@ Shipped:
 - **Phase C — viewership → Recents**: the background records a capped, deduped page-history ring buffer to `chrome.storage.local` (record-time guards: navHistory on, not DG-origin, not denylisted). `RecentsPanel` gains a panel-only browser-history section behind a "Show/Hide history" filter (default shown in panel, absent in the app); clicking re-opens the URL in a new tab. Also fixed a dormant background bug: the catch-all `sendResponse` sat above `get-recent-viewed-tabs`/`send-note-to-tabs`, making both unreachable.
 - **Settings** — a "Capture & privacy" card in the browser-bookmarks extension settings page (killswitch, nav-history toggle, denylist editor, clear-history), stored in `chrome.storage` via the app↔extension bridge.
 
-⚠ **Deviation to confirm with owner**: browsing history lives in `chrome.storage` (never the server), because adding a server-side `PageView` table is blocked by the repo's schema guardrail (denied `Edit`/`Write` to `prisma/**` + `prisma` CLI) *and* the local DB's post-squash migration drift. Consequence: browser history is **panel-only** (not visible in the standalone app's Recents), and its toggle/filter live with the extension settings rather than general app settings. If owner wants app-side history visibility, that's the server-`PageView` follow-up — needs the schema guardrail lifted + the `MIGRATION-BASELINE-SQUASH.md` reconciliation.
+**Storage note**: browsing history lives in `chrome.storage` (never the server), so today it's panel-only and its controls sit with the extension settings. The schema guardrail that forced this has since been **lifted** (2026-07-25); owner scheduled the server-side unification as the FIRST task of B6 hardening (see followups).
 
 Followups:
-- [ ] Server-side `PageView` table (opt-in) for app-side Recents history visibility + cross-device sync. Needs schema change (guardrailed) + DB baseline reconciliation.
-- [ ] Refresh panel browser-history on visibility change (today it loads once per panel mount).
-- [ ] "a browser extension setting allows this default to be ON" — the killswitch default is currently a fixed OFF; a chrome.storage/popup override to flip the *default* is not yet wired.
+- [ ] **[B6 — first task, before other hardening] Server-side `PageView` → unify Recents across app + panel.** A server-persisted, opt-in page-view log gives the *standalone app's* Recents the same browser-history source the panel has today (plus cross-device sync). When it lands, apply the SAME mixed-list + 3-state cycling filter to the main-app Recents and **delete the `isPanelEmbedSurface()` isolation branch in `components/content/RecentsPanel.tsx`** — the app/panel fork collapses into one code path, and the panel's bridge-fetch (`requestPageHistory` + `page-history` message) becomes a normal authed API read. This is a net *removal* of access-code. Guardrail now lifted; still run the `MIGRATION-BASELINE-SQUASH.md` reconciliation and pick the app-side filter default (spec: browser-history OFF by default in the app, shown by default in the panel).
+- [ ] Refresh panel browser-history on visibility change (today it loads once per panel mount). Likely subsumed by the API-read above once history is server-side.
+- [ ] "a browser extension setting allows this default to be ON" — the killswitch default is a fixed OFF; a chrome.storage/popup override to flip the *default* is not yet wired.
+
+---
+
+## Browser Reach B5 followups (2026-07-25, branch `feat/browser-reach-b5-acquisition`)
+
+B5 (acquisition providers) shipped in that PR: P2 sw-fetch + P3 session-tab as remote providers, client-orchestrated P1→P2→P3 ladder, server builds the trusted envelope, "Read full content" on external-link nodes (with a press-and-hold quick-pick to force a provider), working in both the main app (page-bridge) and the side panel (panel-host channel). Two panel dialog-stacking fixes bundled.
+
+- [ ] **AI browser-acquisition tool (client-side, conditionally registered).** Let the chat AI read a bot-hostile page via the extension. Must be a *client-side* tool — the server chat route can't reach the extension: the client sends a `browserExtensionAvailable` flag per turn → the server registers `read_page_in_browser` ONLY when true; the tool has no server `execute`, so the AI SDK routes the call to the browser via `onToolCall` → run `acquireUrlVia(url, "session-tab")` → `addToolResult`. When the flag is false the tool is absent and the AI should decline with a CTA to reconnect the extension. Net-new client-tool plumbing (chat route flag + tool registry conditional + `use-conversation-engine.ts` `onToolCall` + system prompt). This is the "mid-stream chat escalation" deferred from B5's scope question.
+- [ ] Clearer quick-pick labels: "Browser session" → "Signed-in fetch" (P2), "Background tab" → "Signed-in tab" (P3) — the current labels don't convey the cookies-vs-JS distinction.
+- [ ] Cache acquired content onto the external node's payload so "Read full content" doesn't re-fetch each view (today `hydrateExternalPayload` caches garden-side, but the viewer re-fetches per open).
+- [ ] Quick-pick menu positioning in a short panel — the non-portaled dropdown may clip near the bottom; portal + flip if it surfaces.
 
 ---
 

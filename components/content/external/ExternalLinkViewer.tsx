@@ -8,10 +8,39 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ExternalLink, RefreshCw } from "lucide-react";
+import { ExternalLink, RefreshCw, BookOpen, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { clientLogger } from "@/lib/core/logger/client";
+import {
+  acquireUrlWithFallback,
+  acquireUrlVia,
+  isExtensionAcquireAvailable,
+  type AcquireVia,
+} from "@/lib/domain/browser-extension/acquire-url";
+
+// Press-and-hold quick-pick options. `needsExtension` ones (P2/P3) are disabled
+// when no extension is reachable — a server fetch is always available.
+const FETCH_OPTIONS: ReadonlyArray<{
+  key: "auto" | AcquireVia;
+  label: string;
+  hint: string;
+  needsExtension: boolean;
+}> = [
+  { key: "auto", label: "Auto", hint: "Fastest that works", needsExtension: false },
+  { key: "server-fetch", label: "Server fetch", hint: "No cookies · fastest", needsExtension: false },
+  { key: "sw-fetch", label: "Browser session", hint: "Your cookies", needsExtension: true },
+  { key: "session-tab", label: "Background tab", hint: "Full JS render", needsExtension: true },
+];
+
+const ACQUIRE_HOLD_MS = 450;
+import type { AcquiredContent } from "@/lib/domain/ai/acquisition/types";
+
+const ACQUIRE_VIA_LABEL: Record<AcquireVia, string> = {
+  "server-fetch": "server fetch",
+  "sw-fetch": "your browser session",
+  "session-tab": "a background tab in your session",
+};
 
 interface ExternalLinkViewerProps {
   contentId: string;
@@ -61,6 +90,20 @@ export function ExternalLinkViewer({
   const [previewData, setPreviewData] = useState(preview.cached || null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  // B5: full-content acquisition (P1 server-fetch → P2/P3 via the extension).
+  const [isAcquiring, setIsAcquiring] = useState(false);
+  const [acquired, setAcquired] = useState<{
+    content: AcquiredContent;
+    via: AcquireVia;
+    usedExtension: boolean;
+  } | null>(null);
+  const [acquireError, setAcquireError] = useState<string | null>(null);
+  // Press-and-hold quick-pick for "Read full content".
+  const [fetchMenuOpen, setFetchMenuOpen] = useState(false);
+  const holdTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+  const fetchMenuRef = useRef<HTMLDivElement | null>(null);
+  const extensionAvailable = isExtensionAcquireAvailable();
   const screenshotDataUrl =
     typeof captureMetadata?.screenshotDataUrl === "string"
       ? captureMetadata.screenshotDataUrl
@@ -79,6 +122,8 @@ export function ExternalLinkViewer({
   useEffect(() => {
     setPreviewData(preview.cached || null);
     setPreviewError(null);
+    setAcquired(null);
+    setAcquireError(null);
   }, [url, preview.cached]);
 
   const handleRefreshPreview = useCallback(
@@ -154,6 +199,77 @@ export function ExternalLinkViewer({
   const handleOpenLink = () => {
     window.open(url, "_blank", "noopener,noreferrer");
   };
+
+  // B5: read the full page. A short click runs the auto ladder (server fetch →
+  // credentialed fetch → background session tab, escalating past bot-hostile
+  // pages); press-and-hold (or the caret) opens a quick-pick to force one
+  // provider. Works without the extension too — server fetch only.
+  const runAcquire = useCallback(
+    async (choice: "auto" | AcquireVia) => {
+      setFetchMenuOpen(false);
+      setIsAcquiring(true);
+      setAcquireError(null);
+      try {
+        const outcome =
+          choice === "auto"
+            ? await acquireUrlWithFallback(url)
+            : await acquireUrlVia(url, choice);
+        if (outcome.ok && outcome.content) {
+          const via = outcome.via ?? "server-fetch";
+          setAcquired({ content: outcome.content, via, usedExtension: outcome.usedExtension });
+          toast.success(`Read via ${ACQUIRE_VIA_LABEL[via]}`);
+        } else {
+          setAcquired(null);
+          const message = outcome.reason ?? "Couldn't read this page";
+          setAcquireError(message);
+          toast.error(message);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Couldn't read this page";
+        setAcquireError(message);
+        toast.error(message);
+      } finally {
+        setIsAcquiring(false);
+      }
+    },
+    [url],
+  );
+
+  // Distinguish a tap (→ auto) from a hold (→ quick-pick menu).
+  const handleAcquirePointerDown = useCallback(() => {
+    longPressFiredRef.current = false;
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setFetchMenuOpen(true);
+    }, ACQUIRE_HOLD_MS);
+  }, []);
+
+  const handleAcquirePointerUp = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    // Released before the hold threshold → treat as a tap.
+    if (!longPressFiredRef.current && !isAcquiring) void runAcquire("auto");
+  }, [runAcquire, isAcquiring]);
+
+  const handleAcquirePointerCancel = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+
+  // Close the quick-pick on an outside click.
+  useEffect(() => {
+    if (!fetchMenuOpen) return;
+    const onDocPointerDown = (event: MouseEvent) => {
+      if (!fetchMenuRef.current?.contains(event.target as Node)) setFetchMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    return () => document.removeEventListener("mousedown", onDocPointerDown);
+  }, [fetchMenuOpen]);
 
   // Check if we have any metadata at all
   const hasAnyMetadata = Boolean(
@@ -349,7 +465,7 @@ export function ExternalLinkViewer({
       </div>
 
       {/* Action Buttons */}
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={handleOpenLink}
           className="flex items-center gap-2 px-4 py-2 bg-primary/20 hover:bg-primary/30 border border-primary/30 rounded-lg text-sm font-medium text-primary transition-colors"
@@ -367,7 +483,103 @@ export function ExternalLinkViewer({
           />
           {isRefreshing ? "Refreshing..." : "Refresh Preview"}
         </button>
+        <div ref={fetchMenuRef} className="relative inline-flex">
+          <button
+            type="button"
+            onPointerDown={handleAcquirePointerDown}
+            onPointerUp={handleAcquirePointerUp}
+            onPointerLeave={handleAcquirePointerCancel}
+            onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !isAcquiring) {
+                e.preventDefault();
+                void runAcquire("auto");
+              }
+            }}
+            disabled={isAcquiring}
+            className="flex select-none items-center gap-2 rounded-l-lg border border-gray-900/20 dark:border-white/15 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Read the full page — click for auto (server → your session), press and hold for options"
+          >
+            <BookOpen className={`h-4 w-4 ${isAcquiring ? "animate-pulse" : ""}`} />
+            {isAcquiring ? "Reading..." : "Read full content"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFetchMenuOpen((open) => !open)}
+            disabled={isAcquiring}
+            aria-label="Fetch options"
+            aria-haspopup="menu"
+            aria-expanded={fetchMenuOpen}
+            className="flex items-center rounded-r-lg border border-l-0 border-gray-900/20 dark:border-white/15 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 px-2 py-2 text-gray-900 dark:text-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+
+          {fetchMenuOpen && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full z-[60] mt-1 w-60 overflow-hidden rounded-lg border border-white/10 shadow-xl"
+              style={{
+                background: glass0.background,
+                backdropFilter: glass0.backdropFilter,
+              }}
+            >
+              {FETCH_OPTIONS.map((option) => {
+                const disabled = option.needsExtension && !extensionAvailable;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    role="menuitem"
+                    disabled={disabled}
+                    onClick={() => void runAcquire(option.key)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-800 transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
+                  >
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {disabled ? "needs extension" : option.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Acquire error (B5) */}
+      {acquireError && (
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
+          <p className="text-sm text-red-400">{acquireError}</p>
+        </div>
+      )}
+
+      {/* Acquired full content (B5) */}
+      {acquired && (
+        <div
+          className="border border-white/10 rounded-lg p-4"
+          style={{
+            background: glass0.background,
+            backdropFilter: glass0.backdropFilter,
+          }}
+        >
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <h3 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+              {acquired.content.title || "Extracted content"}
+            </h3>
+            <span className="inline-block shrink-0 rounded-full bg-blue-500/15 px-2 py-0.5 text-xs text-blue-500">
+              via {ACQUIRE_VIA_LABEL[acquired.via]}
+            </span>
+          </div>
+          <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+            Web content — informational only. ~{acquired.content.tokenEstimate} tokens
+            {acquired.content.truncated ? " · truncated" : ""}
+          </div>
+          <div className="max-h-96 overflow-y-auto whitespace-pre-wrap text-sm leading-relaxed text-gray-700 dark:text-gray-300">
+            {acquired.content.content}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

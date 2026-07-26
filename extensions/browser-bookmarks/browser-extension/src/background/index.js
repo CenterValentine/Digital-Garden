@@ -2079,6 +2079,280 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   pruneMruTab(tabId);
 });
 
+// ── Acquisition providers (BROWSER-REACH B5) ─────────────────────────────────
+// The extension is a *remote provider* for the app-side Acquisition Service: it
+// fetches a URL with the user's own session (cookies / JS rendering) that a
+// server-side fetch can't reach, and returns RAW material only. The server
+// builds the trusted AcquiredContent envelope — the extension never asserts
+// trust or provenance (it's untrusted input).
+//   P2 sw-fetch    — credentialed background fetch → raw HTML (server extracts).
+//   P3 session-tab — inactive tab + injected reader → readable extraction.
+// Every request clears a local policy gate first (SSRF/private-network block is
+// non-negotiable; the app-issued deny list + a per-window budget ride on top)
+// and shows a brief activity badge, so an automated fetch is never silent.
+
+const ACQUISITION_WINDOW_MS = 5 * 60 * 1000;
+const ACQUISITION_DEFAULT_MAX_PAGES = 10;
+const ACQUISITION_MAX_HTML_CHARS = 1_500_000;
+const ACQUISITION_TAB_LOAD_TIMEOUT_MS = 20_000;
+const ACQUISITION_TAB_SETTLE_MS = 1_500;
+const ACQUISITION_EXTRACT_TIMEOUT_MS = 12_000;
+const ACCEPTED_ACQUISITION_CONTENT_TYPES = [
+  "text/html",
+  "application/xhtml",
+  "text/plain",
+];
+
+// Rolling per-window budget (rate etiquette). Not persisted — a fresh SW starts
+// with a clean allowance; the app-issued `maxPages` caps it per 5-min window.
+let acquisitionBudget = { used: 0, windowStart: 0 };
+
+function isBlockedAcquisitionHost(hostname) {
+  if (!hostname) return true;
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "0.0.0.0" || host === "::1" || host === "[::1]")
+    return true;
+  if (
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".localdomain")
+  )
+    return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+  }
+  const v6 = host.replace(/^\[|\]$/g, "");
+  if (v6 === "::1") return true;
+  if (/^f[cd]/.test(v6)) return true; // fc00::/7 unique-local
+  if (/^fe[89ab]/.test(v6)) return true; // fe80::/10 link-local
+  return false;
+}
+
+// Local mirror of the server acquisition policy. The private-network block is
+// non-negotiable (no config re-enables it). The deny list + budget are the
+// app-issued policy passed on the request.
+function evaluateAcquisitionPolicy(url, policy, configDeny) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { allowed: false, reason: "invalid URL" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { allowed: false, reason: "only http/https URLs can be acquired" };
+  }
+  if (isBlockedAcquisitionHost(parsed.hostname)) {
+    return { allowed: false, reason: "blocked host (private network)" };
+  }
+  const requestDeny = policy && Array.isArray(policy.deny) ? policy.deny : [];
+  // An app-issued deny list wins; otherwise fall back to the user's own capture
+  // denylist (B3-B "Never capture these sites") so it governs acquisition too.
+  const deny =
+    requestDeny.length > 0
+      ? requestDeny
+      : Array.isArray(configDeny)
+        ? configDeny
+        : [];
+  if (matchesCaptureDenylist(url, deny)) {
+    return { allowed: false, reason: "this domain is on your deny list" };
+  }
+  const maxPages =
+    policy && typeof policy.maxPages === "number"
+      ? policy.maxPages
+      : ACQUISITION_DEFAULT_MAX_PAGES;
+  const now = Date.now();
+  if (now - acquisitionBudget.windowStart > ACQUISITION_WINDOW_MS) {
+    acquisitionBudget = { used: 0, windowStart: now };
+  }
+  if (acquisitionBudget.used >= maxPages) {
+    return {
+      allowed: false,
+      reason: `acquisition budget reached (${maxPages} per 5 min)`,
+    };
+  }
+  acquisitionBudget.used += 1;
+  return { allowed: true };
+}
+
+function setAcquisitionBadge(active) {
+  try {
+    if (active) {
+      void chrome.action.setBadgeBackgroundColor({ color: "#2563eb" });
+      void chrome.action.setBadgeText({ text: "…" });
+    } else {
+      void chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {
+    // Badge is best-effort.
+  }
+}
+
+async function acquireViaSwFetch(url) {
+  let response;
+  try {
+    response = await fetch(url, { credentials: "include", redirect: "follow" });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "fetch failed",
+    };
+  }
+  if (!response.ok) {
+    return { ok: false, reason: `fetch failed (${response.status})` };
+  }
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!ACCEPTED_ACQUISITION_CONTENT_TYPES.some((t) => contentType.includes(t))) {
+    return {
+      ok: false,
+      reason: `unsupported content type: ${contentType || "unknown"}`,
+    };
+  }
+  const rawHtml = (await response.text()).slice(0, ACQUISITION_MAX_HTML_CHARS);
+  return { ok: true, mode: "sw-fetch", url, finalUrl: response.url || url, rawHtml };
+}
+
+function waitForTabComplete(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const finish = (fn) => {
+      if (done) return;
+      done = true;
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      clearTimeout(timer);
+      fn();
+    };
+    const onUpdated = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        finish(resolve);
+      }
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new Error("page load timed out"))),
+      timeoutMs
+    );
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    // Guard: the tab may already be "complete" before the listener attached.
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime.lastError) return;
+      if (tab && tab.status === "complete") finish(resolve);
+    });
+  });
+}
+
+function sendTabExtract(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      reject(new Error("extraction timed out"));
+    }, timeoutMs);
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: "dg-extract-content", scope: "full" },
+      (response) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!response || !response.ok) {
+          reject(new Error(response?.error || "extraction failed"));
+        } else {
+          resolve(response.data);
+        }
+      }
+    );
+  });
+}
+
+// Extract from a tab, injecting the lightweight reader on demand if nothing is
+// listening yet (mirrors the panel host's sendExtractWithInjectFallback). Avoids
+// a redundant listener when the overlay content script already handles it.
+async function extractFromTabWithInjectFallback(tabId) {
+  try {
+    return await sendTabExtract(tabId, ACQUISITION_EXTRACT_TIMEOUT_MS);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (
+      /receiving end does not exist|could not establish connection/i.test(msg) &&
+      chrome.scripting
+    ) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dist/reader.js"],
+      });
+      return await sendTabExtract(tabId, ACQUISITION_EXTRACT_TIMEOUT_MS);
+    }
+    throw error;
+  }
+}
+
+async function acquireViaSessionTab(url) {
+  let tab;
+  try {
+    tab = await chrome.tabs.create({ url, active: false });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "couldn't open a tab",
+    };
+  }
+  const tabId = tab.id;
+  try {
+    await waitForTabComplete(tabId, ACQUISITION_TAB_LOAD_TIMEOUT_MS);
+    // Give client-rendered pages a moment to settle before extracting.
+    await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
+    const extracted = await extractFromTabWithInjectFallback(tabId);
+    let finalUrl = url;
+    try {
+      const current = await chrome.tabs.get(tabId);
+      if (current && current.url) finalUrl = current.url;
+    } catch {
+      // keep the request URL
+    }
+    return { ok: true, mode: "session-tab", url, finalUrl, extracted };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "session extraction failed",
+    };
+  } finally {
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch {
+      // tab may already be gone
+    }
+  }
+}
+
+async function handleAcquireUrl(payload) {
+  const url = payload && payload.url;
+  const mode = payload && payload.mode === "sw-fetch" ? "sw-fetch" : "session-tab";
+  if (!url) return { ok: false, reason: "no url provided" };
+  const config = await getConfig();
+  const configDeny =
+    config.capture && Array.isArray(config.capture.denylist)
+      ? config.capture.denylist
+      : [];
+  const decision = evaluateAcquisitionPolicy(url, payload && payload.policy, configDeny);
+  if (!decision.allowed) return { ok: false, reason: decision.reason };
+  setAcquisitionBadge(true);
+  try {
+    return mode === "sw-fetch"
+      ? await acquireViaSwFetch(url)
+      : await acquireViaSessionTab(url);
+  } finally {
+    setAcquisitionBadge(false);
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // sidePanel.open() must run before any await or the user-gesture context
   // that authorized it (launcher click → this message) is lost. Handle it
@@ -2458,6 +2732,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "clear-page-history") {
       await chrome.storage.local.remove(STORAGE_KEYS.pageHistory);
       sendResponse({ ok: true, data: [] });
+      return;
+    }
+    if (message.type === "acquire-url") {
+      // The inner result carries its own ok/reason (policy denials, budget,
+      // fetch failures); the outer envelope reports message-handling success.
+      sendResponse({ ok: true, data: await handleAcquireUrl(message.payload || {}) });
       return;
     }
 

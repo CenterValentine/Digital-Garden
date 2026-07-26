@@ -396,6 +396,28 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Acquisition (B5): the page-bridge content script doesn't run inside this
+  // iframe, so the panel embed can't reach the background directly — it asks the
+  // host to run the acquisition provider (P2 sw-fetch / P3 session-tab) and
+  // relays the raw result back as `acquire-url-result`.
+  if (data.type === "acquire-url" && data.payload?.url) {
+    void (async () => {
+      try {
+        const result = await sendRuntimeMessage({
+          type: "acquire-url",
+          payload: data.payload,
+        });
+        postToEmbed("acquire-url-result", result);
+      } catch (error) {
+        postToEmbed("acquire-url-result", {
+          ok: false,
+          reason: error instanceof Error ? error.message : "acquisition failed",
+        });
+      }
+    })();
+    return;
+  }
+
   // Pop-out: the panel asks for content to open as an overlay on the page.
   // A drag can't cross from this document into the page, so the panel offers
   // four quadrants instead and tells us which corner the user chose.
