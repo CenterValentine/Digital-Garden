@@ -265,6 +265,66 @@ function reTagTaskLists(html: string): string {
 
 const canon = (v: unknown): string => JSON.stringify(v);
 
+// ── Table column widths ──────────────────────────────────────────────────────
+// GFM has no syntax for column width, but `colwidth` is a real schema attribute
+// on every cell, so a resized table can't round-trip through plain GFM. Carry
+// the widths in a comment on the line after the table: markdown tools ignore
+// comments, the grid above stays editable as markdown, and reTagTableColwidths
+// puts them back on the way in.
+const COLWIDTH_COMMENT_OPEN = "<!--dg-cols:";
+
+/**
+ * Per-column pixel widths for a table node, or null when there's nothing to
+ * carry (no widths set, or a shape GFM can't express anyway).
+ *
+ * Reads the first row: prosemirror-tables writes the same width to every cell
+ * in a column, so a per-column list restores the whole grid. If a document ever
+ * holds per-cell widths that disagree, the restore won't match and
+ * self-verification drops the table to the HTML tier — no loss either way.
+ */
+function tableColumnWidths(table: JSONContent | undefined): number[] | null {
+  if (table?.type !== "table") return null;
+  const firstRow = (table.content ?? [])[0];
+  const cells = firstRow?.content ?? [];
+  if (cells.length === 0) return null;
+
+  const widths: number[] = [];
+  for (const cell of cells) {
+    // Merged cells span several columns and have no GFM form regardless.
+    if ((cell.attrs?.colspan ?? 1) !== 1) return null;
+    const colwidth = cell.attrs?.colwidth;
+    const width = Array.isArray(colwidth) ? colwidth[0] : null;
+    widths.push(typeof width === "number" && Number.isFinite(width) ? width : 0);
+  }
+
+  return widths.some((width) => width > 0) ? widths : null;
+}
+
+/**
+ * Parse side of the width sidecar: fold `<!--dg-cols:…-->` back into `colwidth`
+ * attributes on the cells of the table it follows, then drop the comment (
+ * generateJSON would ignore it anyway, losing the widths).
+ */
+function reTagTableColwidths(html: string): string {
+  return html.replace(
+    /(<table[\s\S]*?<\/table>)\s*<!--dg-cols:([\d,]+)-->/g,
+    (_match, table: string, spec: string) => {
+      const widths = spec.split(",").map((value) => Number.parseInt(value, 10));
+      return table.replace(/<tr(\s[^>]*)?>([\s\S]*?)<\/tr>/g, (_row, rowAttrs = "", cells: string) => {
+        let column = 0;
+        const patched = cells.replace(
+          /<(th|td)((?:\s[^>]*)?)>/g,
+          (cell, tag: string, attrs: string) => {
+            const width = widths[column++];
+            return width > 0 ? `<${tag}${attrs} colwidth="${width}">` : cell;
+          },
+        );
+        return `<tr${rowAttrs}>${patched}</tr>`;
+      });
+    },
+  );
+}
+
 /** Schema-canonical single-block form (what the editor would store). */
 function canonicalBlock(
   block: JSONContent,
@@ -344,6 +404,19 @@ function serializeBlock(
   try {
     const md = getTurndown().turndown(html).trim();
     if (md && roundTripsTo(md, canonical, extensions, bridge)) return md;
+
+    // Tier 1b — a resized table. `colwidth` is a schema attribute, so dragging a
+    // column border makes the plain GFM above fail self-verification and the
+    // whole table drops to raw HTML — which is what the source view showed for
+    // any table whose columns had been resized. Re-offer the same GFM with the
+    // widths carried in a sidecar comment so the grid stays readable AND the
+    // widths survive. Still verified: if the sidecar doesn't restore exactly,
+    // we fall through to the HTML tier as before.
+    const widths = tableColumnWidths(canonical);
+    if (md && widths) {
+      const withWidths = `${md}\n${COLWIDTH_COMMENT_OPEN}${widths.join(",")}-->`;
+      if (roundTripsTo(withWidths, canonical, extensions, bridge)) return withWidths;
+    }
   } catch {
     /* fall through */
   }
@@ -448,7 +521,9 @@ export function markdownToTiptapRich(
   bridge: HtmlBridge = defaultBridge,
 ): JSONContent {
   const html = applyBlockReTags(
-    reTagTaskLists(marked.parse(markdown, { async: false, gfm: true }) as string),
+    reTagTableColwidths(
+      reTagTaskLists(marked.parse(markdown, { async: false, gfm: true }) as string),
+    ),
   );
   const json = bridge.toJson(html, extensions);
   normalizeCodeBlocks(json);

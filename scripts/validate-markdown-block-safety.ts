@@ -160,7 +160,10 @@ for (const [name, fixture, want] of [
   // No GFM form — must fall back, never be reshaped into a lossy grid.
   ["headerless → HTML", tableDoc(trow(tc("A"), tc("B")), trow(tc("1"), tc("2"))), "html"],
   ["colspan → HTML", tableDoc(trow(thc("A"), thc("B")), trow({ type: "tableCell", attrs: { colspan: 2 }, content: [p([t("wide")])] })), "html"],
-  ["resized columns → HTML", tableDoc(trow({ type: "tableHeader", attrs: { colwidth: [220] }, content: [p([t("A")])] }, thc("B")), trow(tc("1"), tc("2"))), "html"],
+  // `colwidth` is a schema attr, so a resized table used to fail plain-GFM
+  // verification and drop the whole grid to raw HTML. It now keeps the GFM and
+  // carries the widths in a sidecar comment — still verified lossless.
+  ["resized columns → GFM + sidecar", tableDoc(trow({ type: "tableHeader", attrs: { colwidth: [437] }, content: [p([t("A")])] }, thc("B")), trow({ type: "tableCell", attrs: { colwidth: [437] }, content: [p([t("1")])] }, tc("2"))), "md"],
 ] as Array<[string, JSONContent, string]>) {
   const r = lossless(fixture);
   if (!r.ok) fail(`${name} — LOSSY`);
@@ -172,6 +175,27 @@ for (const [name, fixture, want] of [
   const r = lossless(tableDoc(trow(thc("A"), thc("B")), trow(tc("1"), tc("2"))));
   if (r.md.includes("| --- |")) pass("GFM table carries a header separator row");
   else fail(`GFM table missing separator row: ${r.md.slice(0, 60)}`);
+  // …and an UNRESIZED table must not carry a sidecar it doesn't need.
+  if (!r.md.includes("dg-cols:")) pass("plain table carries no width sidecar");
+  else fail(`plain table emitted a width sidecar: ${r.md.slice(0, 80)}`);
+}
+// Two resized tables in one document: each sidecar must bind to its own grid.
+{
+  const resized = (a: string, b: string, width: number): JSONContent =>
+    tableDoc(
+      trow({ type: "tableHeader", attrs: { colwidth: [width] }, content: [p([t(a)])] }, thc(b)),
+      trow({ type: "tableCell", attrs: { colwidth: [width] }, content: [p([t("1")])] }, tc("2")),
+    );
+  const both = doc(
+    ...(resized("A", "B", 200).content ?? []),
+    p([t("between")]),
+    ...(resized("C", "D", 350).content ?? []),
+  );
+  const r = lossless(both);
+  if (!r.ok) fail("two resized tables — LOSSY");
+  else if (!r.md.includes("dg-cols:200,0") || !r.md.includes("dg-cols:350,0")) {
+    fail(`two resized tables — sidecars crossed: ${r.md.slice(0, 120)}`);
+  } else pass("two resized tables keep separate width sidecars");
 }
 
 // ── 3. Schema-driven attr sweep ──────────────────────────────────────────────
