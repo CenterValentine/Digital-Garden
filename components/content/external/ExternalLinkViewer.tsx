@@ -8,14 +8,32 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ExternalLink, RefreshCw, BookOpen } from "lucide-react";
+import { ExternalLink, RefreshCw, BookOpen, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import { clientLogger } from "@/lib/core/logger/client";
 import {
   acquireUrlWithFallback,
+  acquireUrlVia,
+  isExtensionAcquireAvailable,
   type AcquireVia,
 } from "@/lib/domain/browser-extension/acquire-url";
+
+// Press-and-hold quick-pick options. `needsExtension` ones (P2/P3) are disabled
+// when no extension is reachable — a server fetch is always available.
+const FETCH_OPTIONS: ReadonlyArray<{
+  key: "auto" | AcquireVia;
+  label: string;
+  hint: string;
+  needsExtension: boolean;
+}> = [
+  { key: "auto", label: "Auto", hint: "Fastest that works", needsExtension: false },
+  { key: "server-fetch", label: "Server fetch", hint: "No cookies · fastest", needsExtension: false },
+  { key: "sw-fetch", label: "Browser session", hint: "Your cookies", needsExtension: true },
+  { key: "session-tab", label: "Background tab", hint: "Full JS render", needsExtension: true },
+];
+
+const ACQUIRE_HOLD_MS = 450;
 import type { AcquiredContent } from "@/lib/domain/ai/acquisition/types";
 
 const ACQUIRE_VIA_LABEL: Record<AcquireVia, string> = {
@@ -80,6 +98,12 @@ export function ExternalLinkViewer({
     usedExtension: boolean;
   } | null>(null);
   const [acquireError, setAcquireError] = useState<string | null>(null);
+  // Press-and-hold quick-pick for "Read full content".
+  const [fetchMenuOpen, setFetchMenuOpen] = useState(false);
+  const holdTimerRef = useRef<number | null>(null);
+  const longPressFiredRef = useRef(false);
+  const fetchMenuRef = useRef<HTMLDivElement | null>(null);
+  const extensionAvailable = isExtensionAcquireAvailable();
   const screenshotDataUrl =
     typeof captureMetadata?.screenshotDataUrl === "string"
       ? captureMetadata.screenshotDataUrl
@@ -176,33 +200,76 @@ export function ExternalLinkViewer({
     window.open(url, "_blank", "noopener,noreferrer");
   };
 
-  // B5: read the full page. Tries a server fetch first, then — if the extension
-  // is installed — escalates to a credentialed fetch / a background session tab
-  // in the user's own browser (the bot-hostile-page path). Works without the
-  // extension too; it just can't get past pages that block server fetches.
-  const handleAcquireContent = useCallback(async () => {
-    setIsAcquiring(true);
-    setAcquireError(null);
-    try {
-      const outcome = await acquireUrlWithFallback(url);
-      if (outcome.ok && outcome.content) {
-        const via = outcome.via ?? "server-fetch";
-        setAcquired({ content: outcome.content, via, usedExtension: outcome.usedExtension });
-        toast.success(`Read via ${ACQUIRE_VIA_LABEL[via]}`);
-      } else {
-        setAcquired(null);
-        const message = outcome.reason ?? "Couldn't read this page";
+  // B5: read the full page. A short click runs the auto ladder (server fetch →
+  // credentialed fetch → background session tab, escalating past bot-hostile
+  // pages); press-and-hold (or the caret) opens a quick-pick to force one
+  // provider. Works without the extension too — server fetch only.
+  const runAcquire = useCallback(
+    async (choice: "auto" | AcquireVia) => {
+      setFetchMenuOpen(false);
+      setIsAcquiring(true);
+      setAcquireError(null);
+      try {
+        const outcome =
+          choice === "auto"
+            ? await acquireUrlWithFallback(url)
+            : await acquireUrlVia(url, choice);
+        if (outcome.ok && outcome.content) {
+          const via = outcome.via ?? "server-fetch";
+          setAcquired({ content: outcome.content, via, usedExtension: outcome.usedExtension });
+          toast.success(`Read via ${ACQUIRE_VIA_LABEL[via]}`);
+        } else {
+          setAcquired(null);
+          const message = outcome.reason ?? "Couldn't read this page";
+          setAcquireError(message);
+          toast.error(message);
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "Couldn't read this page";
         setAcquireError(message);
         toast.error(message);
+      } finally {
+        setIsAcquiring(false);
       }
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Couldn't read this page";
-      setAcquireError(message);
-      toast.error(message);
-    } finally {
-      setIsAcquiring(false);
+    },
+    [url],
+  );
+
+  // Distinguish a tap (→ auto) from a hold (→ quick-pick menu).
+  const handleAcquirePointerDown = useCallback(() => {
+    longPressFiredRef.current = false;
+    if (holdTimerRef.current) window.clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = window.setTimeout(() => {
+      longPressFiredRef.current = true;
+      setFetchMenuOpen(true);
+    }, ACQUIRE_HOLD_MS);
+  }, []);
+
+  const handleAcquirePointerUp = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
     }
-  }, [url]);
+    // Released before the hold threshold → treat as a tap.
+    if (!longPressFiredRef.current && !isAcquiring) void runAcquire("auto");
+  }, [runAcquire, isAcquiring]);
+
+  const handleAcquirePointerCancel = useCallback(() => {
+    if (holdTimerRef.current) {
+      window.clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+  }, []);
+
+  // Close the quick-pick on an outside click.
+  useEffect(() => {
+    if (!fetchMenuOpen) return;
+    const onDocPointerDown = (event: MouseEvent) => {
+      if (!fetchMenuRef.current?.contains(event.target as Node)) setFetchMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocPointerDown);
+    return () => document.removeEventListener("mousedown", onDocPointerDown);
+  }, [fetchMenuOpen]);
 
   // Check if we have any metadata at all
   const hasAnyMetadata = Boolean(
@@ -416,15 +483,68 @@ export function ExternalLinkViewer({
           />
           {isRefreshing ? "Refreshing..." : "Refresh Preview"}
         </button>
-        <button
-          onClick={handleAcquireContent}
-          disabled={isAcquiring}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 border border-gray-900/20 dark:border-white/15 rounded-lg text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Read the full page text — falls back to your browser session for pages that block server fetches"
-        >
-          <BookOpen className={`h-4 w-4 ${isAcquiring ? "animate-pulse" : ""}`} />
-          {isAcquiring ? "Reading..." : "Read full content"}
-        </button>
+        <div ref={fetchMenuRef} className="relative inline-flex">
+          <button
+            type="button"
+            onPointerDown={handleAcquirePointerDown}
+            onPointerUp={handleAcquirePointerUp}
+            onPointerLeave={handleAcquirePointerCancel}
+            onContextMenu={(e) => e.preventDefault()}
+            onKeyDown={(e) => {
+              if ((e.key === "Enter" || e.key === " ") && !isAcquiring) {
+                e.preventDefault();
+                void runAcquire("auto");
+              }
+            }}
+            disabled={isAcquiring}
+            className="flex select-none items-center gap-2 rounded-l-lg border border-gray-900/20 dark:border-white/15 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 px-4 py-2 text-sm font-medium text-gray-900 dark:text-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+            title="Read the full page — click for auto (server → your session), press and hold for options"
+          >
+            <BookOpen className={`h-4 w-4 ${isAcquiring ? "animate-pulse" : ""}`} />
+            {isAcquiring ? "Reading..." : "Read full content"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFetchMenuOpen((open) => !open)}
+            disabled={isAcquiring}
+            aria-label="Fetch options"
+            aria-haspopup="menu"
+            aria-expanded={fetchMenuOpen}
+            className="flex items-center rounded-r-lg border border-l-0 border-gray-900/20 dark:border-white/15 bg-gray-900/10 hover:bg-gray-900/20 dark:bg-white/10 dark:hover:bg-white/15 px-2 py-2 text-gray-900 dark:text-gray-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+
+          {fetchMenuOpen && (
+            <div
+              role="menu"
+              className="absolute left-0 top-full z-[60] mt-1 w-60 overflow-hidden rounded-lg border border-white/10 shadow-xl"
+              style={{
+                background: glass0.background,
+                backdropFilter: glass0.backdropFilter,
+              }}
+            >
+              {FETCH_OPTIONS.map((option) => {
+                const disabled = option.needsExtension && !extensionAvailable;
+                return (
+                  <button
+                    key={option.key}
+                    type="button"
+                    role="menuitem"
+                    disabled={disabled}
+                    onClick={() => void runAcquire(option.key)}
+                    className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-sm text-gray-800 transition-colors hover:bg-black/5 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-200 dark:hover:bg-white/10"
+                  >
+                    <span className="font-medium">{option.label}</span>
+                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {disabled ? "needs extension" : option.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Acquire error (B5) */}

@@ -71,9 +71,10 @@ async function callAcquireApi(
 /**
  * True when the extension is reachable — via the page-bridge (a tab's top
  * frame) OR the panel-host channel (the side-panel iframe, where the page-bridge
- * content script can't run).
+ * content script can't run). Exported so UIs can hide extension-only fetch
+ * options (P2/P3) when there's no extension.
  */
-function extensionAvailable(): boolean {
+export function isExtensionAcquireAvailable(): boolean {
   return isPanelEmbedSurface() || isExtensionInstalled();
 }
 
@@ -108,7 +109,7 @@ export async function acquireUrlWithFallback(url: string): Promise<AcquireOutcom
   const p1Reason = p1.ok ? "the site returned little readable content" : p1.reason;
 
   // No extension reachable → return the best P1 had (content if any, else reason).
-  if (!extensionAvailable()) {
+  if (!isExtensionAcquireAvailable()) {
     return {
       ok: Boolean(p1.content),
       content: p1.content,
@@ -135,6 +136,44 @@ export async function acquireUrlWithFallback(url: string): Promise<AcquireOutcom
     ok: false,
     reason: p3.reason ?? p2.reason ?? p1Reason ?? "couldn't acquire this page",
     via: "session-tab",
+    usedExtension: true,
+  };
+}
+
+/**
+ * Run ONE specific provider, no escalation — powers the "Read full content"
+ * press-and-hold quick-pick so the user can force server-fetch / sw-fetch /
+ * session-tab directly. `server-fetch` never needs the extension; the other two
+ * short-circuit with a clear reason when it isn't reachable.
+ */
+export async function acquireUrlVia(
+  url: string,
+  via: AcquireVia
+): Promise<AcquireOutcome> {
+  if (via === "server-fetch") {
+    const p1 = await callAcquireApi({ url });
+    return {
+      ok: p1.ok,
+      content: p1.content,
+      reason: p1.ok ? undefined : p1.reason,
+      via: "server-fetch",
+      usedExtension: false,
+    };
+  }
+  if (!isExtensionAcquireAvailable()) {
+    return {
+      ok: false,
+      reason: "the browser extension isn't available on this surface",
+      via,
+      usedExtension: false,
+    };
+  }
+  const rung = await extensionRung(url, via === "sw-fetch" ? "sw-fetch" : "session-tab");
+  return {
+    ok: rung.ok,
+    content: rung.content,
+    reason: rung.ok ? undefined : rung.reason,
+    via,
     usedExtension: true,
   };
 }
