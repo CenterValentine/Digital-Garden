@@ -44,6 +44,7 @@ import {
   MessageCircle,
   User,
   Users,
+  BookMarked,
 } from "lucide-react";
 import { useLongPress } from "@/components/common/useLongPress";
 import { useContextMenuStore } from "@/state/context-menu-store";
@@ -436,6 +437,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           includeReferencedContent: data.folder?.includeReferencedContent || false, // Phase 2: Folder setting
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
+          isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
+          playbookDescription:
+            typeof data.note?.playbookDescription === "string"
+              ? data.note.playbookDescription
+              : "",
         },
         // Pass callbacks to context menu
         onRename: () => {
@@ -596,10 +602,22 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     >
       <div className="flex items-center gap-1">
         {getChevron()}
-        {/* Referenced rows get the OS-alias idiom: a small link badge on
-            the icon's corner — the semantic marker that reads the same
-            nested under a note or adjacent to primaries in a folder. */}
-        {data.role === "referenced" ? (
+        {/* Corner badges use the OS-alias idiom: a small glyph on the icon's
+            corner. Playbook takes precedence over the referenced marker — a
+            note that's both is more usefully surfaced as a playbook. Both share
+            the referenced badge's formatting; only the glyph differs (v3.6). */}
+        {data.note?.playbook ? (
+          <span data-file-icon className="relative inline-flex">
+            {getIcon()}
+            <span
+              aria-hidden
+              title="Playbook"
+              className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-indigo-400 dark:ring-white/15"
+            >
+              <BookMarked className="h-2 w-2" />
+            </span>
+          </span>
+        ) : data.role === "referenced" ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
             <span

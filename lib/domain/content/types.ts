@@ -65,11 +65,17 @@ export interface TreeNode {
     personId?: string;
   };
 
-  // Optional payload summaries
+  // Optional payload summaries. The tree API assigns the note's full
+  // `NotePayload.metadata` here, so playbook markers ride along (v3.6) — the
+  // file-tree badge + Mark/Unmark menu read them without an extra fetch.
   note?: {
     wordCount?: number;
     characterCount?: number;
     readingTime?: number;
+    /** Marked as a playbook (metadata.playbook). */
+    playbook?: boolean;
+    /** One-line description shown in the /playbook picker. */
+    playbookDescription?: string;
   };
   folder?: {
     viewMode: string;

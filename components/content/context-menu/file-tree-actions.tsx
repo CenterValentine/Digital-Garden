@@ -36,9 +36,12 @@ import {
   Captions,
   LampDesk,
   BookUp,
+  BookMarked,
+  BookMinus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
+import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -81,6 +84,8 @@ export interface FileTreeContext {
     includeReferencedContent?: boolean; // Phase 2: Folder setting
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
+    isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
+    playbookDescription?: string; // v3.6: seeds the edit-description dialog
   };
   /** Callbacks */
   onRename?: (id: string) => void; // Triggers inline edit mode
@@ -307,6 +312,70 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       ],
     });
     return sections;
+  }
+
+  // --- Playbook: Mark / Edit description / Unmark (v3.6; moved off the editor
+  // context menu). Any note-bearing content — a note, or a folder with a Notes
+  // payload — can become a playbook. State-aware via clickedNode.isPlaybook so
+  // the menu shows the right verb; editing the description opens a centered
+  // modal (a modal never grows the menu past the viewport, unlike an inline
+  // input). Mark/unmark just flag NotePayload.metadata; the file's title is the
+  // playbook name and its `##` sections are the phases.
+  if (
+    isSingleSelection &&
+    clickedId &&
+    clickedNode &&
+    (clickedNode.contentType === "note" || clickedNode.contentType === "folder")
+  ) {
+    const playbookTitle = clickedNode.title;
+    const contentId = clickedId;
+    const playbookActions: ContextMenuAction[] = clickedNode.isPlaybook
+      ? [
+          {
+            id: "edit-playbook-description",
+            label: "Edit Playbook Description…",
+            icon: <BookMarked className="h-4 w-4" />,
+            onClick: () =>
+              usePlaybookDialogStore.getState().openDialog({
+                contentId,
+                title: playbookTitle,
+                description: clickedNode.playbookDescription ?? "",
+                editing: true,
+              }),
+          },
+          {
+            id: "unmark-playbook",
+            label: "Unmark Playbook",
+            icon: <BookMinus className="h-4 w-4" />,
+            onClick: async () => {
+              try {
+                const res = await fetch(
+                  `/api/content/playbooks/mark?contentId=${encodeURIComponent(contentId)}`,
+                  { method: "DELETE", credentials: "include" },
+                );
+                if (!res.ok) throw new Error("request failed");
+                window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                toast.success("Unmarked — removed from the /playbook picker");
+              } catch {
+                toast.error("Failed to unmark playbook");
+              }
+            },
+          },
+        ]
+      : [
+          {
+            id: "mark-as-playbook",
+            label: "Mark as Playbook…",
+            icon: <BookMarked className="h-4 w-4" />,
+            onClick: () =>
+              usePlaybookDialogStore.getState().openDialog({
+                contentId,
+                title: playbookTitle,
+                editing: false,
+              }),
+          },
+        ];
+    sections.push({ title: "Playbook", actions: playbookActions });
   }
 
   // Section 2: Folder view mode (folder only, single selection)

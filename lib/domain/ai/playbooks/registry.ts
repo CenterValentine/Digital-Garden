@@ -41,6 +41,20 @@ export function withPlaybookMetadata(
   };
 }
 
+/**
+ * Remove the playbook markers from a metadata object (the "unmark" path).
+ * Returns the remaining metadata unchanged apart from the two flag keys — any
+ * other note metadata (word counts, imports, etc.) is preserved. May be `{}`.
+ */
+export function stripPlaybookMetadata(
+  metadata: Record<string, unknown> | null | undefined,
+): Record<string, unknown> {
+  const rest = { ...(metadata ?? {}) };
+  delete rest[PLAYBOOK_FLAG_KEY];
+  delete rest[PLAYBOOK_DESCRIPTION_KEY];
+  return rest;
+}
+
 /** Does this note's metadata mark it as a playbook? */
 export function isPlaybookMetadata(metadata: unknown): boolean {
   return (

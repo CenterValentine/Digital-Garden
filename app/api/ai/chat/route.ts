@@ -153,6 +153,7 @@ import type {
   ResolvedModelRoute,
 } from "@/lib/domain/ai/model-directive";
 import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import {
   configurePhaseCheckpointGate,
@@ -1138,6 +1139,9 @@ export async function POST(request: Request) {
           : null;
       if (explicitPlaybookId) {
         try {
+          // Editor extensions for LOSSLESS playbook rendering (v3.6) — built
+          // once per request, only on the playbook path.
+          const serverExtensions = getServerExtensions();
           const playbookNode = await prisma.contentNode.findFirst({
             where: {
               id: explicitPlaybookId,
@@ -1181,7 +1185,10 @@ export async function POST(request: Request) {
                 ...parsed.standingRules.references,
                 ...phase.references,
               ];
-              const phaseText = renderPlaybookSection(phase.content);
+              const phaseText = renderPlaybookSection(
+                phase.content,
+                serverExtensions,
+              );
               const referenceContext = await resolvePlaybookReferenceContext(
                 session.user.id,
                 allRefs,
@@ -1214,6 +1221,7 @@ export async function POST(request: Request) {
 
               const standingText = renderPlaybookSection(
                 parsed.standingRules.content,
+                serverExtensions,
               );
               playbookContext =
                 `\n\n## Active Playbook: "${playbookNode.title}"\n` +
@@ -1244,6 +1252,8 @@ export async function POST(request: Request) {
         }
       } else if (rootedPlaybookId) {
         try {
+          // Editor extensions for LOSSLESS playbook rendering (v3.6).
+          const serverExtensions = getServerExtensions();
           const rootedNode = await prisma.contentNode.findFirst({
             where: {
               id: rootedPlaybookId,
@@ -1268,6 +1278,7 @@ export async function POST(request: Request) {
 
             const standingText = renderPlaybookSection(
               parsed.standingRules.content,
+              serverExtensions,
             );
             const activePhase = parsed.phases[0];
             const allReferences = [
@@ -1282,7 +1293,10 @@ export async function POST(request: Request) {
             if (activePhase) {
               configurePhaseCheckpointGate(phaseCheckpointGate, {
                 phaseTitle: activePhase.title,
-                phaseText: renderPlaybookSection(activePhase.content),
+                phaseText: renderPlaybookSection(
+                  activePhase.content,
+                  serverExtensions,
+                ),
                 referenceContentIds:
                   referenceContext.activeReferenceContentIds,
                 researchToolsAvailable:
@@ -1297,7 +1311,7 @@ export async function POST(request: Request) {
             const phaseText = parsed.phases
               .map(
                 (phase, index) =>
-                  `### Phase ${index + 1}: ${phase.title}\n${renderPlaybookSection(phase.content)}`,
+                  `### Phase ${index + 1}: ${phase.title}\n${renderPlaybookSection(phase.content, serverExtensions)}`,
               )
               .join("\n\n");
             playbookContext =
