@@ -5,6 +5,7 @@
   "packageManager": "pnpm@10.25.0",
   "scripts": {
     "predev": "pnpm clean:traces",
+    "postinstall": "prisma generate",
     "dev": "tsx scripts/predev.ts && next dev --port 3015",
     "clean:traces": "tsx scripts/archive-traces.ts",
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
