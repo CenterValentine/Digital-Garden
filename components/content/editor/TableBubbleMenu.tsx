@@ -8,6 +8,7 @@
 "use client";
 
 import { BubbleMenu as TipTapBubbleMenu } from "@tiptap/react/menus";
+import { useEditorState } from "@tiptap/react";
 import type { Editor } from "@tiptap/core";
 import { CellSelection } from "@tiptap/pm/tables";
 import { NodeSelection, PluginKey } from "@tiptap/pm/state";
@@ -41,7 +42,50 @@ export interface TableBubbleMenuProps {
   editor: Editor | null;
 }
 
+/**
+ * Which table commands are available RIGHT NOW.
+ *
+ * This has to come from `useEditorState`, not from calling `editor.can()` in
+ * the render body. TipTap v3 defaults `shouldRerenderOnTransaction` to false
+ * (MarkdownEditor doesn't override it), so React does NOT re-render on a
+ * transaction — and moving the caret is only a transaction. `shouldShow` runs
+ * inside the ProseMirror plugin, so the menu itself always tracks the caret;
+ * the buttons rendered inside it did not, and kept whatever `disabled` value
+ * was computed the last time something else happened to re-render.
+ *
+ * That is the "round-tripped tables can't be manipulated" bug. Applying the
+ * markdown source view calls `setContent(json, { emitUpdate: false })` — no
+ * update event, so nothing re-renders — and clicking into the restored table
+ * is a selection-only transaction, so the menu appeared with every button
+ * frozen disabled from when the caret was outside the table. A freshly
+ * inserted table looked fine only because inserting it is a doc change, which
+ * fires onUpdate → setState → re-render while the caret is already inside it.
+ * The document was never the problem: the same table returns
+ * `can().addRowAfter() === true` throughout.
+ */
+function useTableCommandAvailability(editor: Editor | null) {
+  return useEditorState({
+    editor,
+    // The menu is hidden outside a table, so skip the probes entirely there
+    // rather than running seven state forks on every keystroke in the document.
+    selector: ({ editor: current }) => {
+      if (!current?.isActive("table")) return null;
+      return {
+        addRowBefore: current.can().addRowBefore(),
+        addRowAfter: current.can().addRowAfter(),
+        deleteRow: current.can().deleteRow(),
+        addColumnBefore: current.can().addColumnBefore(),
+        addColumnAfter: current.can().addColumnAfter(),
+        deleteColumn: current.can().deleteColumn(),
+        deleteTable: current.can().deleteTable(),
+      };
+    },
+  });
+}
+
 export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
+  const can = useTableCommandAvailability(editor);
+
   if (!editor) return null;
 
   return (
@@ -55,7 +99,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().addRowBefore().run()}
-        disabled={!editor.can().addRowBefore()}
+        disabled={!can?.addRowBefore}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Add row above"
         type="button"
@@ -66,7 +110,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().addRowAfter().run()}
-        disabled={!editor.can().addRowAfter()}
+        disabled={!can?.addRowAfter}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Add row below"
         type="button"
@@ -77,7 +121,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().deleteRow().run()}
-        disabled={!editor.can().deleteRow()}
+        disabled={!can?.deleteRow}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Delete row"
         type="button"
@@ -90,7 +134,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().addColumnBefore().run()}
-        disabled={!editor.can().addColumnBefore()}
+        disabled={!can?.addColumnBefore}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Add column left"
         type="button"
@@ -101,7 +145,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().addColumnAfter().run()}
-        disabled={!editor.can().addColumnAfter()}
+        disabled={!can?.addColumnAfter}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Add column right"
         type="button"
@@ -112,7 +156,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().deleteColumn().run()}
-        disabled={!editor.can().deleteColumn()}
+        disabled={!can?.deleteColumn}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-white/10 text-gray-300 disabled:opacity-30"
         title="Delete column"
         type="button"
@@ -125,7 +169,7 @@ export function TableBubbleMenu({ editor }: TableBubbleMenuProps) {
       <button
         onMouseDown={preventFocusLoss}
         onClick={() => editor.chain().deleteTable().run()}
-        disabled={!editor.can().deleteTable()}
+        disabled={!can?.deleteTable}
         className="rounded px-2 py-1 text-xs transition-colors hover:bg-red-500/20 text-red-400 disabled:opacity-30"
         title="Delete table"
         type="button"

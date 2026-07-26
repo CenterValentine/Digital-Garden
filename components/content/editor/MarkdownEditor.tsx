@@ -15,6 +15,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
+import type { WikiLinkClickTarget } from "@/lib/domain/editor/extensions/wiki-link";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { AiImageGenDialog } from "@/components/content/ai/AiImageGenDialog";
@@ -27,6 +28,7 @@ import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outlin
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import {
   isLikelyMarkdown,
+  isProseMirrorClipboardHtml,
   isMarkdownPasteHintDismissed,
   dismissMarkdownPasteHint,
   isMarkdownPasteAutoFormat,
@@ -169,7 +171,7 @@ export interface MarkdownEditorProps {
   /** Callback when outline changes (headings extracted) */
   onOutlineChange?: (outline: OutlineHeading[]) => void;
   /** Callback when a wiki-link is clicked */
-  onWikiLinkClick?: (targetTitle: string) => void;
+  onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
   fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
   /** Callback when a tag is clicked */
@@ -589,7 +591,16 @@ export function MarkdownEditor({
         //   • opted into "Always format" → convert immediately here, via the
         //     paste event (no clipboard permission needed);
         //   • otherwise warn with an explicit 3-choice toast, unless silenced.
-        if (text && isLikelyMarkdown(text)) {
+        //
+        // Neither applies to a paste that came FROM a ProseMirror editor: that
+        // content arrives as a rich slice, so nothing was flattened to warn
+        // about, and "Always format" would actively downgrade it by re-parsing
+        // the plain-text flavour instead. See isProseMirrorClipboardHtml().
+        const pastedAsRichSlice = isProseMirrorClipboardHtml(
+          event.clipboardData?.getData("text/html"),
+        );
+
+        if (text && !pastedAsRichSlice && isLikelyMarkdown(text)) {
           const pasted = text;
 
           if (isMarkdownPasteAutoFormat()) {

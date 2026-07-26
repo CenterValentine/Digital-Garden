@@ -186,10 +186,13 @@ export function createWikiLinkSuggestion(
         .deleteRange(range)
         .insertContent({
           type: "wikiLink",
+          // `targetId` is the durable pointer (survives renames); `targetTitle`
+          // is the label. `slug` used to be passed here too but the node never
+          // declared it, so ProseMirror stripped it — dropped rather than
+          // revived, since nothing resolves links by slug.
           attrs: {
             targetId: item.id,
             targetTitle: item.title,
-            slug: item.slug,
           },
         })
         .run();

@@ -140,6 +140,80 @@ console.log("\n  ── custom-block codecs (pretty markdown, not base64) ──
   else pass("callout → > [!warning] markdown");
 }
 
+// ── 2d. Tables (regression: every TipTap table used to leak as raw HTML) ─────
+// turndown-plugin-gfm converts a table only when its first row is a heading
+// row, and its check requires <tbody> to be the table's first child. TipTap
+// always renders <colgroup> first, so EVERY table — header row or not — was
+// `keep`-ed verbatim as HTML: still lossless, but the "markdown" source view
+// showed an HTML blob you can't edit as markdown. markdown-serialize.ts now
+// owns the table rules; these assert the SHAPE, not just losslessness, since
+// the regression was invisible to a lossless-only check.
+console.log("\n  ── tables (GFM where expressible, HTML where not) ──");
+const thc = (text: string): JSONContent => ({ type: "tableHeader", content: [p([t(text)])] });
+const trow = (...cells: JSONContent[]): JSONContent => ({ type: "tableRow", content: cells });
+const tableDoc = (...rows: JSONContent[]) => doc({ type: "table", content: rows });
+for (const [name, fixture, want] of [
+  ["header row → GFM", tableDoc(trow(thc("Claim"), thc("Evidence")), trow(tc("1.1M"), tc("Dashboard"))), "md"],
+  ["pipes in cells escaped", tableDoc(trow(thc("a|b"), thc("c")), trow(tc("x | y"), tc("z"))), "md"],
+  ["marks in cells", tableDoc(trow(thc("H")), trow({ type: "tableCell", content: [p([tm("b", ["bold"])])] })), "md"],
+  ["empty cell", tableDoc(trow(thc("A"), thc("B")), trow({ type: "tableCell", content: [{ type: "paragraph" }] }, tc("z"))), "md"],
+  // No GFM form — must fall back, never be reshaped into a lossy grid.
+  ["headerless → HTML", tableDoc(trow(tc("A"), tc("B")), trow(tc("1"), tc("2"))), "html"],
+  ["colspan → HTML", tableDoc(trow(thc("A"), thc("B")), trow({ type: "tableCell", attrs: { colspan: 2 }, content: [p([t("wide")])] })), "html"],
+] as Array<[string, JSONContent, string]>) {
+  const r = lossless(fixture);
+  if (!r.ok) fail(`${name} — LOSSY`);
+  else if (tier(r.md) !== want) fail(`${name} — expected ${want} tier, got ${tier(r.md)} (${r.md.slice(0, 60)})`);
+  else pass(name);
+}
+// The header separator is what makes it a table to every other markdown tool.
+{
+  const r = lossless(tableDoc(trow(thc("A"), thc("B")), trow(tc("1"), tc("2"))));
+  if (r.md.includes("| --- |")) pass("GFM table carries a header separator row");
+  else fail(`GFM table missing separator row: ${r.md.slice(0, 60)}`);
+}
+
+// ── 2e. The presentational-attribute exemption ───────────────────────────────
+// Column widths are the ONE deliberate exception to losslessness: `colwidth` is
+// view state, so it is dropped on a markdown round-trip rather than dragging the
+// whole grid down to raw HTML (see withoutPresentationalAttrs in
+// markdown-serialize.ts). Assert BOTH halves — the table survives as real
+// markdown AND the width is genuinely gone — so the exemption stays exactly this
+// wide. If someone adds an attribute to that list, the "everything else" check
+// below is what should start failing.
+console.log("\n  ── presentational attrs (column widths dropped, nothing else) ──");
+{
+  const stripWidths = (node: JSONContent): JSONContent => ({
+    ...node,
+    ...(node.attrs ? { attrs: { ...node.attrs, colwidth: null } } : {}),
+    ...(Array.isArray(node.content) ? { content: node.content.map(stripWidths) } : {}),
+  });
+  const anyWidth = (node: JSONContent): boolean =>
+    node.attrs?.colwidth != null || (node.content ?? []).some(anyWidth);
+
+  const before = norm(
+    tableDoc(
+      trow({ type: "tableHeader", attrs: { colwidth: [437] }, content: [p([t("A")])] }, thc("B")),
+      trow({ type: "tableCell", attrs: { colwidth: [437] }, content: [p([t("1")])] }, tc("2")),
+    ),
+  );
+  const md = toMd(before);
+  const after = toTiptap(md);
+
+  if (tier(md) !== "md") fail(`resized table — expected markdown, got ${tier(md)} (${md.slice(0, 60)})`);
+  else pass("resized table still serializes as a real markdown table");
+
+  if (!anyWidth(before)) fail("fixture bug: the 'before' table has no widths to drop");
+  else if (anyWidth(after)) fail("resized table — colwidth survived; the exemption is a no-op");
+  else pass("column widths are dropped on round-trip (presentational)");
+
+  if (canon(stripWidths(before).content) === canon(stripWidths(after).content)) {
+    pass("everything except the widths round-trips unchanged");
+  } else {
+    fail(`resized table lost more than widths:\n    before ${canon(stripWidths(before).content).slice(0, 160)}\n    after  ${canon(stripWidths(after).content).slice(0, 160)}`);
+  }
+}
+
 // ── 3. Schema-driven attr sweep ──────────────────────────────────────────────
 console.log("\n  ── schema-driven attr sweep (no attr silently dropped) ──");
 const schema = getSchema(ext);
@@ -167,6 +241,34 @@ for (const [type, base] of Object.entries(sample)) {
       const r = lossless(doc(fixture));
       if (r.ok) pass(`${type}.${attr}`);
       else fail(`${type}.${attr} — LOSSY (attr dropped)`);
+    } catch {
+      pass(`${type}.${attr} (skipped: invalid sentinel)`);
+    }
+  }
+}
+
+// ── 3b. Inline-node attr sweep ───────────────────────────────────────────────
+// The block sweep above only reaches top-level nodes, and registry enumeration
+// waves inline nodes through as "child-only, tested via parent" — which tested
+// the PARENT, never the inline node's own attrs. wikiLink's `targetId` (the
+// rename-durable link pointer, schema 1.13.0) was invisible to this gate until
+// it was added here: a paragraph carrying an inline node with each declared
+// attr set to a sentinel must survive the round-trip.
+console.log("\n  ── inline-node attr sweep (no inline attr silently dropped) ──");
+const inlineTypes = Object.entries(schema.nodes)
+  .filter(([name, type]) => type.isInline && name !== "text")
+  .map(([name]) => name);
+for (const type of inlineTypes) {
+  const specAttrs = schema.nodes[type]?.spec.attrs ?? {};
+  for (const [attr, def] of Object.entries(specAttrs)) {
+    const inline: JSONContent = {
+      type,
+      attrs: { [attr]: sentinel((def as { default?: unknown }).default) },
+    };
+    try {
+      const r = lossless(doc(p([t("before "), inline, t(" after")])));
+      if (r.ok) pass(`${type}.${attr}`);
+      else fail(`${type}.${attr} — LOSSY (inline attr dropped)`);
     } catch {
       pass(`${type}.${attr} (skipped: invalid sentinel)`);
     }

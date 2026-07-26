@@ -33,7 +33,7 @@ import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { Callout } from "./extensions/callout";
-import { WikiLink } from "./extensions/wiki-link";
+import { WikiLink, type WikiLinkClickTarget } from "./extensions/wiki-link";
 import { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
 import { Tag } from "./extensions/tag";
 import { PersonMention } from "./extensions/person-mention";
@@ -94,7 +94,7 @@ export interface EditorExtensionsOptions {
     };
   };
   /** Callback when a wiki-link is clicked */
-  onWikiLinkClick?: (targetTitle: string) => void;
+  onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
   fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
   /** Callback when a tag is clicked */

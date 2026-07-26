@@ -15,6 +15,7 @@ import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
+import { triggerBlobDownload } from "@/lib/core/download";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
@@ -77,6 +78,8 @@ import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import { extractOutline } from "@/lib/domain/content/outline-extractor";
 import { getViewerExtensions } from "@/lib/domain/editor/extensions-client";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
+import type { WikiLinkClickTarget } from "@/lib/domain/editor/extensions/wiki-link";
 import { SaveAsPageTemplateDialog } from "../dialogs/SaveAsPageTemplateDialog";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
 import { setDocumentDates } from "@/lib/domain/editor/extensions/inline-timestamp";
@@ -1208,63 +1211,58 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     setSourceDraft("");
   }, [selectedContentId]);
 
-  // Wiki-link click handler - navigate to note or folder by title
+  // Wiki-link click handler — resolves by stable id first, then by title.
+  // Renaming a note used to orphan every inbound link (title-only lookup, and
+  // a miss did nothing at all, which read as a dead click).
   const handleWikiLinkClick = useCallback(
-    async (targetTitle: string) => {
-      try {
-        const response = await tracedFetch(`/api/content/content?search=${encodeURIComponent(targetTitle)}`, {
-          credentials: "include",
+    async (target: WikiLinkClickTarget) => {
+      const { targetId, targetTitle, heal, markBroken } = target;
+
+      const resolved = await resolveWikiLinkTarget({ targetId, targetTitle });
+
+      if (!resolved) {
+        clientLogger.warn({
+          layer: "ui",
+          event: "wiki_link_lookup:no_match",
+          summary: "wiki-link target not found",
+          attrs: { target_title: targetTitle, target_id: targetId ?? undefined },
         });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          clientLogger.error({
-            layer: "fetch",
-            event: "wiki_link_lookup:failed",
-            summary: "failed to find content for wiki-link",
-            attrs: { target_title: targetTitle, status: response.status },
-          });
-          return;
-        }
-
-        const matchedContent = (result.data?.items as Array<{ id: string; title: string; contentType: string }> | undefined)?.find(
-          (item) => item.title.toLowerCase() === targetTitle.toLowerCase()
-        );
-
-        if (matchedContent) {
-          setSelectedContentId(matchedContent.id, {
-            title: matchedContent.title,
-            contentType: matchedContent.contentType,
-            paneId,
-          });
-        } else {
-          clientLogger.warn({
-            layer: "ui",
-            event: "wiki_link_lookup:no_match",
-            summary: "wiki-link target not found",
-            attrs: { target_title: targetTitle },
-          });
-        }
-      } catch (err) {
-        clientLogger.error({
-          layer: "fetch",
-          event: "wiki_link_lookup:caught",
-          summary: "error finding content for wiki-link",
-          attrs: { target_title: targetTitle },
-          error: err,
-        });
+        markBroken();
+        toast.error(`"${targetTitle}" not found`);
+        return;
       }
+
+      // Self-heal: the link resolved by title, so its id is missing or stale.
+      // Stamp the resolved id into the node — the link upgrades itself on first
+      // use and the next rename can't orphan it.
+      if (resolved.needsHeal) {
+        heal(resolved.id);
+      }
+
+      setSelectedContentId(resolved.id, {
+        title: resolved.title,
+        contentType: resolved.contentType,
+        paneId,
+      });
     },
     [paneId, setSelectedContentId]
   );
 
   // Handle wiki-link "Open" context menu action.
   // "Open in Pane" is handled directly in editor-actions.tsx via the pane submenu.
+  // No heal/markBroken here — the context menu has no handle on the node, so
+  // this path resolves but doesn't write back.
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const { targetTitle } = (e as CustomEvent<{ targetTitle: string }>).detail;
-      void handleWikiLinkClick(targetTitle);
+      const { targetId, targetTitle } = (
+        e as CustomEvent<{ targetId?: string | null; targetTitle: string }>
+      ).detail;
+      void handleWikiLinkClick({
+        targetId: targetId ?? null,
+        targetTitle,
+        heal: () => {},
+        markBroken: () => {},
+      });
     };
 
     window.addEventListener("open-wiki-link", handleOpen);
@@ -1550,12 +1548,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${noteTitle || "export"}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // A 200 with nothing in it is still a failed export — don't report
+      // success for a file the user will never find.
+      if (blob.size === 0) {
+        toast.error("Export produced an empty file");
+        return;
+      }
+      triggerBlobDownload(blob, `${noteTitle || "export"}.md`);
       toast.success("Exported as Markdown");
     } catch {
       toast.error("Export failed");
@@ -1640,12 +1639,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     }
 
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${noteTitle || "chat-export"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `${noteTitle || "chat-export"}.md`);
     toast.success("Chat exported as Markdown");
   }, [contentData, noteTitle]);
 

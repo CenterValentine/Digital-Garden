@@ -228,7 +228,10 @@ function findLinksInTipTap(
       const targetTitleAttr = n.attrs.targetTitle;
       const displayText = n.attrs.displayText;
 
+      // Id match first — a renamed target keeps its backlinks; the title
+      // comparison only still resolves links authored without an id.
       const isMatch =
+        n.attrs.targetId === targetId ||
         targetTitleAttr.toLowerCase() === targetTitle.toLowerCase() ||
         targetTitleAttr.toLowerCase() === targetSlug.toLowerCase();
 

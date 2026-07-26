@@ -14,8 +14,10 @@ import { useTemplateStore } from "@/state/template-store";
 import { useSnippetStore } from "@/state/snippet-store";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
 import { instantiateTemplateContent } from "@/lib/domain/editor/template-instantiation";
+import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
+import { triggerBlobDownload } from "@/lib/core/download";
 import { toast } from "sonner";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -566,20 +568,6 @@ function buildSnippetSaveMenu(
 }
 
 /**
- * Trigger a browser download from a Blob.
- */
-function triggerBlobDownload(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
-
-/**
  * Download an image — either from the server (via contentId) or directly from its URL.
  */
 async function downloadImage(src: string, contentId: string | null) {
@@ -605,33 +593,28 @@ async function downloadImage(src: string, contentId: string | null) {
   }
 }
 
-/** Resolve a wiki-link title to a content ID, then open in the given pane. */
-async function resolveWikiLinkAndOpen(targetTitle: string, paneId: WorkspacePaneId) {
+/**
+ * Resolve a wiki-link to a content ID, then open in the given pane.
+ * Shares `resolveWikiLinkTarget` with the click path so both surfaces resolve
+ * identically (stable id first, exact title second).
+ */
+async function resolveWikiLinkAndOpen(
+  ref: { targetId: string | null; targetTitle: string },
+  paneId: WorkspacePaneId,
+) {
   const { layoutMode, openContentInPane, setLayoutMode } = useContentStore.getState();
-  try {
-    const params = new URLSearchParams({ search: targetTitle, limit: "5" });
-    const res = await fetch(`/api/content/content?${params}`, { credentials: "include" });
-    if (!res.ok) { toast.error("Could not find note"); return; }
 
-    const data = await res.json() as {
-      data?: { items?: Array<{ id: string; title: string; contentType: string }> };
-    };
-    const items = data?.data?.items ?? [];
-    const match =
-      items.find((n) => n.title.toLowerCase() === targetTitle.toLowerCase()) ?? items[0];
-    if (!match) { toast.error(`"${targetTitle}" not found`); return; }
+  const match = await resolveWikiLinkTarget(ref);
+  if (!match) { toast.error(`"${ref.targetTitle}" not found`); return; }
 
-    const visible = new Set(getVisiblePaneIds(layoutMode));
-    if (!visible.has(paneId)) setLayoutMode("dual-vertical");
+  const visible = new Set(getVisiblePaneIds(layoutMode));
+  if (!visible.has(paneId)) setLayoutMode("dual-vertical");
 
-    openContentInPane(match.id, paneId, {
-      title: match.title,
-      contentType: match.contentType,
-      pin: true,
-    });
-  } catch {
-    toast.error("Failed to open note in pane");
-  }
+  openContentInPane(match.id, paneId, {
+    title: match.title,
+    contentType: match.contentType,
+    pin: true,
+  });
 }
 
 /**
@@ -649,6 +632,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   const wikiLinkEl = contextTarget?.closest?.('[data-type="wiki-link"]');
   if (wikiLinkEl) {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
+    const targetId = wikiLinkEl.getAttribute("data-target-id");
     if (targetTitle) {
       const { layoutMode } = useContentStore.getState();
       const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
@@ -667,7 +651,7 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
             label: "Open",
             onClick: () => {
               window.dispatchEvent(
-                new CustomEvent("open-wiki-link", { detail: { targetTitle } })
+                new CustomEvent("open-wiki-link", { detail: { targetId, targetTitle } })
               );
             },
           },
@@ -680,7 +664,9 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
                 ? getPaneLabel(layoutMode, pane.id)
                 : `${pane.fallback} (expand layout)`,
               icon: pane.icon,
-              onClick: () => { void resolveWikiLinkAndOpen(targetTitle, pane.id); },
+              onClick: () => {
+                void resolveWikiLinkAndOpen({ targetId, targetTitle }, pane.id);
+              },
             })),
           },
         ],

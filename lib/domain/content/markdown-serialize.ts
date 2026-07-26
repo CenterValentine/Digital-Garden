@@ -85,8 +85,23 @@ const CANDIDATE_PRETTY_TYPES = new Set<string>([
 
 let cachedTurndown: TurndownService | null = null;
 function getTurndown(): TurndownService {
-  if (cachedTurndown) return cachedTurndown;
-  const td = new TurndownService({
+  cachedTurndown ??= createTurndown();
+  return cachedTurndown;
+}
+
+/**
+ * Build the configured turndown service.
+ *
+ * `Service` is injectable because turndown ships two builds that differ in how
+ * they parse the HTML string: the browser one (what Turbopack bundles for the
+ * client, and what the source-view toggle actually runs) uses the DOM's
+ * `DOMParser`; the Node one uses domino. Our table rules walk that parsed tree,
+ * so the smoke test constructs a browser-build service and asserts both agree.
+ */
+export function createTurndown(
+  Service: typeof TurndownService = TurndownService,
+): TurndownService {
+  const td = new Service({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
     bulletListMarker: "-",
@@ -114,8 +129,116 @@ function getTurndown(): TurndownService {
       node.nodeName === "INPUT" && node.getAttribute("type") === "checkbox",
     replacement: () => "",
   });
-  cachedTurndown = td;
+  // TipTap tables need our own rules — the GFM plugin's don't fit its HTML:
+  //   • it only converts a table whose first row is a heading row, and that test
+  //     (isFirstTbody) demands <tbody> be the table's FIRST child. TipTap always
+  //     renders <colgroup> ahead of <tbody> for column sizing, so EVERY TipTap
+  //     table failed it and was `keep`-ed verbatim as raw HTML — the source view
+  //     showed an unreadable HTML blob instead of a table you can edit as
+  //     markdown, and the markdown we exported wasn't portable markdown at all.
+  //   • its cell() keeps the blank lines TipTap's <p>-wrapped cell content
+  //     produces (a GFM cell is one line) and never escapes `|` (a pipe in a
+  //     cell silently invents a column).
+  // addRule() unshifts, so these outrank both the plugin's rules and its TABLE
+  // keep(). Anything we get wrong here still cannot cause loss: serializeBlock
+  // only ships markdown that re-parses deep-equal, else it falls to the node's
+  // own HTML (tier 2) or a verbatim fence (tier 3) — which is exactly what a
+  // headerless table, merged cells, or a per-cell alignment does.
+  td.remove("colgroup");
+  td.addRule("dgTableCell", {
+    filter: ["th", "td"],
+    replacement: (content, node) => tableCell(content, node as Element),
+  });
+  td.addRule("dgTableRow", {
+    filter: "tr",
+    replacement: (content, node) => {
+      const table = closestTable(node);
+      if (!table || headerRowOf(table) !== node) return `\n${content}`;
+      const separator = elementChildren(node as Element)
+        .map((cell) => tableCell(alignmentBar(cell), cell))
+        .join("");
+      return `\n${content}\n${separator}`;
+    },
+  });
+  td.addRule("dgTable", {
+    filter: (node) => node.nodeName === "TABLE" && headerRowOf(node) !== null,
+    // Rows already carry their own leading newline; collapse the blank lines
+    // the surrounding block elements add so the grid stays contiguous.
+    replacement: (content) => `\n\n${content.replace(/\n{2,}/g, "\n").trim()}\n\n`,
+  });
   return td;
+}
+
+// ── GFM table helpers ────────────────────────────────────────────────────────
+// Written against bare DOM primitives (childNodes/parentNode/nodeName) because
+// turndown runs on the browser's DOM in the client and on its own domino DOM in
+// Node — `closest`, `table.rows` and friends aren't reliably present in both.
+
+/** Element (nodeType 1) children of `node`, in document order. */
+function elementChildren(node: Node): Element[] {
+  return Array.from(node.childNodes).filter(
+    (child): child is Element => child.nodeType === 1,
+  );
+}
+
+/** Nearest enclosing `<table>`, or null. */
+function closestTable(node: Node): Element | null {
+  let current: Node | null = node.parentNode;
+  while (current) {
+    if (current.nodeName === "TABLE") return current as Element;
+    current = current.parentNode;
+  }
+  return null;
+}
+
+/** The table's first `<tr>` in document order (through thead/tbody/tfoot). */
+function firstRowOf(table: Element): Element | null {
+  for (const child of elementChildren(table)) {
+    if (child.nodeName === "TR") return child;
+    if (child.nodeName === "THEAD" || child.nodeName === "TBODY" || child.nodeName === "TFOOT") {
+      const row = elementChildren(child).find((n) => n.nodeName === "TR");
+      if (row) return row;
+    }
+  }
+  return null;
+}
+
+/**
+ * The table's header row, or null when it has none. GFM has no way to express a
+ * headerless table, so those keep falling through to the raw-HTML tier.
+ */
+function headerRowOf(table: Element): Element | null {
+  const row = firstRowOf(table);
+  if (!row) return null;
+  const cells = elementChildren(row);
+  const allHeaders = cells.length > 0 && cells.every((cell) => cell.nodeName === "TH");
+  return allHeaders ? row : null;
+}
+
+/** `---` / `:--` / `--:` / `:-:` for the separator row, per the cell's align. */
+function alignmentBar(cell: Element): string {
+  switch ((cell.getAttribute("align") || "").toLowerCase()) {
+    case "left":
+      return ":--";
+    case "right":
+      return "--:";
+    case "center":
+      return ":-:";
+    default:
+      return "---";
+  }
+}
+
+/**
+ * One GFM cell. Flattens to a single line (TipTap wraps cell content in <p>,
+ * and a multi-block cell has no GFM form — flattening lets self-verification
+ * catch it and fence the table rather than quietly reshaping it) and escapes
+ * pipes so cell text can never invent a column.
+ */
+function tableCell(content: string, node: Element): string {
+  const text = content.trim().replace(/\s*\n+\s*/g, " ").replace(/\|/g, "\\|");
+  const first = node.parentNode ? elementChildren(node.parentNode)[0] === node : false;
+  return `${first ? "| " : " "}${text} |`;
 }
 
 /**
@@ -140,6 +263,43 @@ function reTagTaskLists(html: string): string {
   );
 }
 
+/**
+ * PRESENTATIONAL ATTRIBUTES — the one deliberate exemption from losslessness.
+ *
+ * Table column widths (`colwidth`, set by dragging a column border) are treated
+ * as view state, not content, and are DROPPED on a markdown round-trip: toggling
+ * a resized table through the source view returns it with auto-sized columns.
+ *
+ * This is a product decision, not an oversight. GFM has no column-width syntax,
+ * so the alternatives were to carry the widths in a sidecar comment the author
+ * has to look at, or to drop the whole grid to raw HTML — which is what used to
+ * happen, and made the source view unreadable for any table that had ever been
+ * resized. Comparing with widths normalised away buys back real markdown for
+ * every resized table at the cost of the widths themselves.
+ *
+ * Scope is deliberately one attribute on two node types. Everything else still
+ * has to round-trip deep-equal or it fences — do NOT grow this list to make an
+ * inconvenient block "work"; that's how a lossless system quietly stops being
+ * one.
+ */
+function withoutPresentationalAttrs(node: JSONContent): JSONContent {
+  const stripped: JSONContent = { ...node };
+
+  if (
+    (node.type === "tableCell" || node.type === "tableHeader") &&
+    node.attrs &&
+    node.attrs.colwidth != null
+  ) {
+    stripped.attrs = { ...node.attrs, colwidth: null };
+  }
+
+  if (Array.isArray(node.content)) {
+    stripped.content = node.content.map(withoutPresentationalAttrs);
+  }
+
+  return stripped;
+}
+
 const canon = (v: unknown): string => JSON.stringify(v);
 
 /** Schema-canonical single-block form (what the editor would store). */
@@ -152,7 +312,12 @@ function canonicalBlock(
   return (bridge.toJson(html, extensions).content ?? [])[0];
 }
 
-/** Does re-parsing `segment` yield a block deep-equal to `canonical`? */
+/**
+ * Does re-parsing `segment` yield a block deep-equal to `canonical`?
+ *
+ * Deep-equal apart from presentational attributes — see
+ * withoutPresentationalAttrs(), the single documented exemption.
+ */
 function roundTripsTo(
   segment: string,
   canonical: JSONContent,
@@ -160,7 +325,11 @@ function roundTripsTo(
   bridge: HtmlBridge,
 ): boolean {
   const reBlock = (markdownToTiptapRich(segment, extensions, bridge).content ?? [])[0];
-  return !!reBlock && canon(reBlock) === canon(canonical);
+  if (!reBlock) return false;
+  return (
+    canon(withoutPresentationalAttrs(reBlock)) ===
+    canon(withoutPresentationalAttrs(canonical))
+  );
 }
 
 /**

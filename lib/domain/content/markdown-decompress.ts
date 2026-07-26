@@ -15,14 +15,52 @@
  * It CANNOT recover a heading fused with its body with no marker
  * ("## Heading Body text with no break") — that information is genuinely lost.
  * Deliberately heuristic → opt-in only, never the default parse.
+ *
+ * Fenced code and GFM table rows are exempt from every transform here: their
+ * lines are literal / grid-structural, so a "repair" can only damage them.
  */
+
+import { tableLineFlags } from "./markdown-tables";
 
 export function decompressMarkdown(text: string): string {
   if (!text) return text;
-  return emphasizeLeadingLabels(normalizePasteFrontmatter(text))
-    .split("\n")
-    .flatMap((line) => decompressLine(line))
+
+  const prepared = emphasizeLeadingLabels(normalizePasteFrontmatter(text));
+  const lines = prepared.split("\n");
+  // Both passes below rewrite a line in isolation, which is wrong inside a
+  // fence (code is literal) and destructive inside a table (splitting a row on
+  // its "1. … 2. …" run breaks the grid — the pasted table came back as a
+  // half-row plus a stray ordered list). Neither construct can be judged
+  // line-by-line, so decide membership up front and skip those lines.
+  const inFence = fenceFlags(lines);
+  const inTable = tableLineFlags(lines);
+
+  return lines
+    .flatMap((line, index) =>
+      inFence[index] || inTable[index] ? [line] : decompressLine(line),
+    )
     .join("\n");
+}
+
+/**
+ * Per-line "inside a fenced code block" flags, fence markers included. Matches
+ * the opening marker's character so a ``` inside a ~~~ block doesn't close it.
+ */
+function fenceFlags(lines: string[]): boolean[] {
+  const flags: boolean[] = new Array(lines.length).fill(false);
+  let fence: "`" | "~" | null = null;
+
+  lines.forEach((line, index) => {
+    const marker = line.match(/^\s*(`{3,}|~{3,})/)?.[1]?.[0] as "`" | "~" | undefined;
+    if (marker && (fence === null || fence === marker)) {
+      flags[index] = true;
+      fence = fence === marker ? null : marker;
+      return;
+    }
+    flags[index] = fence !== null;
+  });
+
+  return flags;
 }
 
 /**
@@ -33,18 +71,21 @@ export function decompressMarkdown(text: string): string {
  * formatting do not match the beginning-of-line rule.
  */
 export function emphasizeLeadingLabels(text: string): string {
+  const lines = text.split("\n");
+  // A table cell that happens to read like a label ("Claim: | Evidence |") is
+  // cell text, not a label line — bolding it rewrites the pasted content.
+  const inTable = tableLineFlags(lines);
   let fence: "`" | "~" | null = null;
 
-  return text
-    .split("\n")
-    .map((line) => {
+  return lines
+    .map((line, index) => {
       const fenceMatch = line.match(/^\s*(`{3,}|~{3,})/);
       if (fenceMatch) {
         const marker = fenceMatch[1][0] as "`" | "~";
         fence = fence === marker ? null : fence ?? marker;
         return line;
       }
-      if (fence) return line;
+      if (fence || inTable[index]) return line;
 
       return line.replace(
         /^([A-Za-z][A-Za-z0-9 _/-]{0,60}:)(?=\s|$)/,

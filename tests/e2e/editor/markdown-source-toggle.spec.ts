@@ -45,6 +45,23 @@ test.describe("editor: markdown source-view toggle", () => {
     void page;
   });
 
+  /**
+   * Regression (2026-07-26): after toggling back from source view, the table
+   * bubble menu appeared with EVERY button disabled, so a round-tripped table
+   * couldn't be edited. The document was fine — `can().addRowAfter()` was true
+   * throughout. TipTap v3 defaults `shouldRerenderOnTransaction` to false, so
+   * React never re-rendered on the selection change, and `applySourceMode`
+   * passes `emitUpdate: false`, so nothing else re-rendered either; the buttons
+   * kept the `disabled` values computed while the caret was outside the table.
+   *
+   * Assert the ENABLED state and that a click mutates the table — a snapshot of
+   * the menu proves nothing, since the broken build rendered the same pixels
+   * modulo opacity.
+   */
+  test.skip("keeps table controls live after toggling back from source view", async ({ page }) => {
+    void page;
+  });
+
   test.skip("returns to rich text when navigating to another note mid-source-edit", async ({ page }) => {
     void page;
   });

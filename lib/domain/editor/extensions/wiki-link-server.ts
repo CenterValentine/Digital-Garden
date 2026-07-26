@@ -8,6 +8,14 @@ export const ServerWikiLink = Node.create({
 
   addAttributes() {
     return {
+      // Stable ContentNode id of the target — survives renames. See the client
+      // WikiLink extension for the full rationale.
+      targetId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-target-id"),
+        renderHTML: (attributes) =>
+          attributes.targetId ? { "data-target-id": attributes.targetId } : {},
+      },
       targetTitle: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-target-title"),

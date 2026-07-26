@@ -53,6 +53,15 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**July 25, 2026**: Wiki-links survive renames — `wikiLink.targetId` (TipTap schema 1.13.0, branch `minor-work/markdown-roundtrip-tables`)
+
+- Renaming a note silently orphaned every inbound `[[link]]`: the node stored only `targetTitle`, resolution was an exact title match, and a miss returned without navigating or saying anything (read as a dead click). The autocomplete had been passing the target's id all along — the node never declared the attribute, so ProseMirror stripped it.
+- `wikiLink` now carries a nullable `targetId` (client + server variants). Resolution is id-first with the exact-title search as a permanent fallback (hand-typed, AI-authored, and imported links have no id), shared by all three surfaces via `lib/domain/editor/wiki-link-resolve.ts`.
+- ID-less links self-heal: a successful title lookup stamps the resolved id onto every equivalent link in the document (attr-matched, not position-matched; skipped on read-only surfaces). No migration — the corpus converges as links get used. Backlinks (API route + browser-extension service) match on id too, so a rename no longer drops them.
+- A genuine miss now shows a toast and a transient `.wiki-link-broken` style — DOM-only, never written into the document, since a failed lookup can be transient.
+- Markdown round-trip unaffected: paragraphs with wiki-links already serialize at Tier 2 (node HTML), where `data-target-id` rides along and `parseHTML` reads it back — verified lossless for id/alias/legacy/metachar cases. The block-safety gate's attr sweep only reached top-level blocks and waved inline nodes through as "tested via parent", so an **inline-node attr sweep** was added; all 16 inline attrs pass.
+- Post-merge: **Hocuspocus redeploy required** (new attribute in the collab schema).
+
 **July 25, 2026**: AI 3.4 — playbook-orchestrated model routing on PR #132 (branch `feat/ai-v3.4-model-routing`; S1–S3 + 8-angle review fixes + 4 browser-smoke rounds + catalog-drift safety net; typecheck/lint/build/model-routing:check green)
 
 - A playbook phase declares its model via a structured `model:` line — a role (`scout`/`analyst`/`writer`/`coder`/`reviewer`/`archivist`), a vendor class (`gpt-5 series`, resolved deterministically), or an explicit `provider/model`. Resolution is deterministic — no runtime LLM router, no prose interpretation.

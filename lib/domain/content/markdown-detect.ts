@@ -11,6 +11,8 @@
  * blockquote) or two independent inline signals (link / bold / inline code).
  */
 
+import { containsTable } from "./markdown-tables";
+
 /** Does the pasted text look enough like Markdown to warrant a hint? */
 export function isLikelyMarkdown(text: string): boolean {
   if (!text || text.length < 4) return false;
@@ -24,7 +26,11 @@ export function isLikelyMarkdown(text: string): boolean {
   if (/(^|\n)\s{0,3}(```|~~~)/.test(text)) strong++; // fenced code
   if (countLines(/^\s*[-*+]\s+\S/) >= 2) strong++; // bullet list (2+ items)
   if (countLines(/^\s*\d+\.\s+\S/) >= 2) strong++; // ordered list (2+ items)
-  if (countLines(/^\s*\|.*\|\s*$/) >= 2) strong++; // table (2+ rows)
+  // Table: recognised by its delimiter row, not by counting `|…|` lines — GFM
+  // makes the outer pipes optional, so the old line-shape count missed every
+  // "Claim | Evidence" / "--- | ---" table (the shape GitHub, Claude and most
+  // docs tools emit) and left it pasted as literal text.
+  if (containsTable(text)) strong++;
 
   let inline = 0;
   if (/\[[^\]\n]+\]\([^)\s]+\)/.test(text)) inline++; // link
@@ -32,6 +38,31 @@ export function isLikelyMarkdown(text: string): boolean {
   if (/`[^`\n]+`/.test(text)) inline++; // inline code
 
   return strong >= 1 || inline >= 2;
+}
+
+/**
+ * Did this paste come from a ProseMirror/TipTap editor (ours or another tab's)?
+ *
+ * ProseMirror stamps its clipboard HTML with `data-pm-slice="<openStart>
+ * <openEnd> <context>"`, so its own parser can restore the slice exactly. When
+ * that marker is present the paste is ALREADY rich content — ProseMirror parses
+ * the HTML and the text/plain flavour is never used. Two reasons to bail out of
+ * the markdown path entirely:
+ *
+ *   • the hint's premise is false. "Pasted as plain text" is wrong — nothing was
+ *     flattened, so offering to "format it" is a nag about a problem that
+ *     doesn't exist. Copying a heading or a list out of one note and into
+ *     another made it fire on every paste.
+ *   • under "Always format" it's destructive. That path pre-empts the real
+ *     paste and re-parses the text/plain flavour instead — turning a faithful
+ *     rich-content paste into a lossy round-trip through markdown, silently.
+ *
+ * Deliberately narrow: only ProseMirror's own marker. Plenty of sources (VS
+ * Code, GitHub, a docs site) put markdown-ish text on the clipboard WITH a
+ * text/html flavour, and those are exactly the pastes the hint is for.
+ */
+export function isProseMirrorClipboardHtml(html: string | null | undefined): boolean {
+  return !!html && html.includes("data-pm-slice");
 }
 
 // ── Local paste preferences (client UI prefs, no backend) ────────────────────

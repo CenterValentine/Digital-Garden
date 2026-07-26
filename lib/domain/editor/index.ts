@@ -42,8 +42,13 @@ export {
 
 // Re-export individual extensions for advanced use cases
 export { SlashCommands } from "./commands/slash-commands";
-export { WikiLink } from "./extensions/wiki-link";
+export { WikiLink, type WikiLinkClickTarget } from "./extensions/wiki-link";
 export { createWikiLinkSuggestion } from "./extensions/wiki-link-suggestion";
+export {
+  resolveWikiLinkTarget,
+  type WikiLinkTargetRef,
+  type ResolvedWikiLinkTarget,
+} from "./wiki-link-resolve";
 export { Callout } from "./extensions/callout";
 export { Tag } from "./extensions/tag";
 export { TaskListInputRule } from "./extensions/task-list";

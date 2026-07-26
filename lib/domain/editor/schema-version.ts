@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.12.0";
+export const TIPTAP_SCHEMA_VERSION = "1.13.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.13.0",
+    date: "2026-07-25",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "wikiLink",
+        description:
+          "Add nullable `targetId` attr to wikiLink carrying the target's stable ContentNode id. The title was previously the only pointer, so renaming a note silently orphaned every inbound link (title-exact lookup missed, and the miss was a no-op). Resolution is now id-first with the title as fallback for links authored without one. Backward-compatible: existing nodes default targetId=null and render byte-identically; ID-less links self-heal on first successful click.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.12.0",
     date: "2026-06-11",
