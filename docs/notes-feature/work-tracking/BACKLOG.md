@@ -116,6 +116,17 @@ Followups:
 
 ---
 
+## Browser Reach B5 followups (2026-07-25, branch `feat/browser-reach-b5-acquisition`)
+
+B5 (acquisition providers) shipped in that PR: P2 sw-fetch + P3 session-tab as remote providers, client-orchestrated P1→P2→P3 ladder, server builds the trusted envelope, "Read full content" on external-link nodes (with a press-and-hold quick-pick to force a provider), working in both the main app (page-bridge) and the side panel (panel-host channel). Two panel dialog-stacking fixes bundled.
+
+- [ ] **AI browser-acquisition tool (client-side, conditionally registered).** Let the chat AI read a bot-hostile page via the extension. Must be a *client-side* tool — the server chat route can't reach the extension: the client sends a `browserExtensionAvailable` flag per turn → the server registers `read_page_in_browser` ONLY when true; the tool has no server `execute`, so the AI SDK routes the call to the browser via `onToolCall` → run `acquireUrlVia(url, "session-tab")` → `addToolResult`. When the flag is false the tool is absent and the AI should decline with a CTA to reconnect the extension. Net-new client-tool plumbing (chat route flag + tool registry conditional + `use-conversation-engine.ts` `onToolCall` + system prompt). This is the "mid-stream chat escalation" deferred from B5's scope question.
+- [ ] Clearer quick-pick labels: "Browser session" → "Signed-in fetch" (P2), "Background tab" → "Signed-in tab" (P3) — the current labels don't convey the cookies-vs-JS distinction.
+- [ ] Cache acquired content onto the external node's payload so "Read full content" doesn't re-fetch each view (today `hydrateExternalPayload` caches garden-side, but the viewer re-fetches per open).
+- [ ] Quick-pick menu positioning in a short panel — the non-portaled dropdown may clip near the bottom; portal + flip if it surfaces.
+
+---
+
 ## Extension Workflows Followups (2026-07-16, branch `feature/workflows-extension`, PR #111)
 
 Phases 0–4 built (see `EXTENSION-WORKFLOWS-PLAN.md`); P0–P2 smoke-passed live; n8n spoke merged in mid-build (browser dispatch of n8n workflows is live). Deferred by design:
