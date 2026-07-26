@@ -207,6 +207,34 @@ for (const [type, base] of Object.entries(sample)) {
   }
 }
 
+// ── 3b. Inline-node attr sweep ───────────────────────────────────────────────
+// The block sweep above only reaches top-level nodes, and registry enumeration
+// waves inline nodes through as "child-only, tested via parent" — which tested
+// the PARENT, never the inline node's own attrs. wikiLink's `targetId` (the
+// rename-durable link pointer, schema 1.13.0) was invisible to this gate until
+// it was added here: a paragraph carrying an inline node with each declared
+// attr set to a sentinel must survive the round-trip.
+console.log("\n  ── inline-node attr sweep (no inline attr silently dropped) ──");
+const inlineTypes = Object.entries(schema.nodes)
+  .filter(([name, type]) => type.isInline && name !== "text")
+  .map(([name]) => name);
+for (const type of inlineTypes) {
+  const specAttrs = schema.nodes[type]?.spec.attrs ?? {};
+  for (const [attr, def] of Object.entries(specAttrs)) {
+    const inline: JSONContent = {
+      type,
+      attrs: { [attr]: sentinel((def as { default?: unknown }).default) },
+    };
+    try {
+      const r = lossless(doc(p([t("before "), inline, t(" after")])));
+      if (r.ok) pass(`${type}.${attr}`);
+      else fail(`${type}.${attr} — LOSSY (inline attr dropped)`);
+    } catch {
+      pass(`${type}.${attr} (skipped: invalid sentinel)`);
+    }
+  }
+}
+
 // ── 4. Registry enumeration ──────────────────────────────────────────────────
 console.log("\n  ── registry enumeration (every block preserved) ──");
 const nodeNames = Array.from(new Set(

@@ -834,6 +834,22 @@ nav[class*="fixed"] {
   color: #FFD700;
 }
 
+/* Unresolvable wiki-link. Applied to the DOM only (never written into the
+   document) by the click handler when resolution finds nothing — a lookup can
+   fail for transient reasons, so this must not be a persisted fact. Cleared on
+   the next click attempt or the next editor redraw. */
+.ProseMirror .wiki-link.wiki-link-broken,
+.dark .ProseMirror .wiki-link.wiki-link-broken {
+  color: var(--color-danger, #b91c1c);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.75;
+}
+
+.dark .ProseMirror .wiki-link.wiki-link-broken {
+  color: #f87171;
+}
+
 /* M6: Slash Commands Menu */
 .slash-commands-menu {
   background: rgba(20, 20, 30, 0.95);

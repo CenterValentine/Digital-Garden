@@ -912,7 +912,8 @@ async function listNoteBacklinks(
     const matches = findLinksInTipTap(
       note.notePayload?.tiptapJson as JSONContent,
       target.slug,
-      target.title
+      target.title,
+      target.id
     );
     if (matches.length === 0) continue;
     backlinks.push({
@@ -932,7 +933,8 @@ async function listNoteBacklinks(
 function findLinksInTipTap(
   node: JSONContent | null | undefined,
   targetSlug: string,
-  targetTitle: string
+  targetTitle: string,
+  targetId: string
 ) {
   if (!node) return [];
   const matches: Array<{ linkText: string; context: string }> = [];
@@ -945,7 +947,10 @@ function findLinksInTipTap(
   function walk(n: JSONContent, parentContext = ""): void {
     if (n.type === "wikiLink" && n.attrs?.targetTitle) {
       const linkTarget = String(n.attrs.targetTitle).toLowerCase();
+      // Id match first — a renamed target keeps its backlinks; the title
+      // comparison only still resolves links authored without an id.
       if (
+        n.attrs.targetId === targetId ||
         linkTarget === targetTitle.toLowerCase() ||
         linkTarget === targetSlug.toLowerCase()
       ) {

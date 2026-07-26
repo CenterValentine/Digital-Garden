@@ -21,9 +21,32 @@ export interface WikiLinkSuggestionItem {
   slug: string;
 }
 
+/**
+ * What a wiki-link click hands to the app layer.
+ *
+ * `heal` and `markBroken` keep the ProseMirror/DOM specifics inside this
+ * extension: the app resolves the target asynchronously and reports back,
+ * without needing the editor view or the node position.
+ */
+export interface WikiLinkClickTarget {
+  /** Stable target id, when the link carries one. */
+  targetId: string | null;
+  /** The authored title — label, and fallback lookup key. */
+  targetTitle: string;
+  /**
+   * Persist a resolved id back into the clicked node. Called when resolution
+   * fell back to a title search, so the link upgrades itself in place and the
+   * next rename can't orphan it. No-op on read-only surfaces or if the node
+   * moved/changed under the async gap.
+   */
+  heal: (contentId: string) => void;
+  /** Flag the clicked link as unresolvable (transient visual state). */
+  markBroken: () => void;
+}
+
 export interface WikiLinkOptions {
   HTMLAttributes: Record<string, unknown>;
-  onClickLink?: (targetTitle: string) => void;
+  onClickLink?: (target: WikiLinkClickTarget) => void;
   suggestion?: Partial<import("@tiptap/suggestion").SuggestionOptions>;
 }
 
@@ -52,6 +75,30 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
   addAttributes() {
     return {
+      /**
+       * Stable ContentNode id of the link target, when known.
+       *
+       * The title is a LABEL, not a pointer — renaming a note used to orphan
+       * every inbound link because resolution was an exact title match. This
+       * attribute is the durable pointer; `targetTitle` stays as the human
+       * text and as the fallback for links authored without an id (typed by
+       * hand, AI-generated, imported markdown).
+       *
+       * Optional by design: absent renders no attribute at all, so pre-existing
+       * links serialize byte-identically and the markdown round-trip is unmoved.
+       */
+      targetId: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-target-id"),
+        renderHTML: (attributes) => {
+          if (!attributes.targetId) {
+            return {};
+          }
+          return {
+            "data-target-id": attributes.targetId,
+          };
+        },
+      },
       targetTitle: {
         default: null,
         parseHTML: (element) => element.getAttribute("data-target-title"),
@@ -224,7 +271,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         key: new PluginKey("wikiLinkInteraction"),
 
         props: {
-          handleClick(_view, _pos, event) {
+          handleClick(view, _pos, event) {
             // Only handle left-click; right-click must reach the contextmenu handler
             if (event.button !== 0) return false;
 
@@ -237,8 +284,62 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             const targetTitle = wikiLinkEl.getAttribute("data-target-title");
             if (!targetTitle || !options.onClickLink) return false;
 
+            const targetId = wikiLinkEl.getAttribute("data-target-id");
+
+            /**
+             * Stamp the resolved id onto every equivalent link in the document.
+             *
+             * Matched by attrs rather than by the clicked node's position:
+             * position math (posAtDOM) would silently no-op whenever it came
+             * back off-by-one, and the document may have shifted during the
+             * async lookup anyway. Attr-matching also heals duplicates — three
+             * links to the same renamed note are all fixed by one click.
+             *
+             * Only nodes carrying the SAME (missing or stale) id are touched;
+             * a link with a different non-null id points somewhere else and is
+             * left alone.
+             */
+            const heal = (contentId: string) => {
+              // Never mutate a document from a read-only surface (viewers,
+              // embeds) — the user didn't open it to edit it.
+              if (!view.editable || !contentId) return;
+
+              const { tr, doc } = view.state;
+              let changed = false;
+
+              doc.descendants((node, pos) => {
+                if (
+                  node.type.name !== "wikiLink" ||
+                  node.attrs.targetTitle !== targetTitle ||
+                  node.attrs.targetId === contentId ||
+                  // Same provenance as the clicked link: both blank, or both
+                  // holding the same stale id.
+                  (node.attrs.targetId ?? null) !== targetId
+                ) {
+                  return;
+                }
+                tr.setNodeMarkup(pos, undefined, {
+                  ...node.attrs,
+                  targetId: contentId,
+                });
+                changed = true;
+              });
+
+              if (changed) view.dispatch(tr);
+            };
+
+            // Transient DOM-only state: a failed lookup is not necessarily a
+            // permanent fact (offline, transport hiccup), so it must never be
+            // written into the document.
+            const markBroken = () => {
+              wikiLinkEl.classList.add("wiki-link-broken");
+            };
+
             event.preventDefault();
-            options.onClickLink(targetTitle);
+            // Each attempt starts clean — a link that failed while offline
+            // shouldn't stay marked once it resolves.
+            wikiLinkEl.classList.remove("wiki-link-broken");
+            options.onClickLink({ targetId, targetTitle, heal, markBroken });
             return true;
           },
 

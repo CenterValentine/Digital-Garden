@@ -15,6 +15,7 @@ import { useEditor, EditorContent } from "@tiptap/react";
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
 import { getEditorExtensions, getViewerExtensions } from "@/lib/domain/editor/extensions-client";
+import type { WikiLinkClickTarget } from "@/lib/domain/editor/extensions/wiki-link";
 import type { JSONContent } from "@tiptap/core";
 import { LinkDialog } from "./LinkDialog";
 import { AiImageGenDialog } from "@/components/content/ai/AiImageGenDialog";
@@ -170,7 +171,7 @@ export interface MarkdownEditorProps {
   /** Callback when outline changes (headings extracted) */
   onOutlineChange?: (outline: OutlineHeading[]) => void;
   /** Callback when a wiki-link is clicked */
-  onWikiLinkClick?: (targetTitle: string) => void;
+  onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
   fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
   /** Callback when a tag is clicked */

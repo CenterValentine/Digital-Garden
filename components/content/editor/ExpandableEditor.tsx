@@ -22,6 +22,7 @@ import { MarkdownEditor } from "./MarkdownEditor";
 import { ReadAloudButton } from "@/components/content/tts/ReadAloudButton";
 import { useNotesPanelStore } from "@/state/notes-panel-store";
 import type { JSONContent } from "@tiptap/core";
+import type { WikiLinkClickTarget } from "@/lib/domain/editor/extensions/wiki-link";
 
 interface ExpandableEditorProps {
   /** ID of the content node this editor is attached to */
@@ -44,7 +45,7 @@ interface ExpandableEditorProps {
   /** Read-only mode */
   readOnly?: boolean;
   /** Callback when a wiki-link is clicked */
-  onWikiLinkClick?: (targetTitle: string) => void;
+  onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
   fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
   /** Fetch tags for tag autocomplete */
