@@ -1004,45 +1004,9 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
     });
   }
 
-  // --- Mark as Playbook (AI v3.2 T3) ---
-  // Hand-authoring path: the note's `##` sections already parse as phases
-  // (lib/domain/ai/playbooks/parse.ts). This just marks it discoverable in
-  // chat's /playbook picker via NotePayload.metadata.
-  sections.push({
-    actions: [
-      {
-        id: "mark-as-playbook",
-        label: "Mark as Playbook",
-        inlineInput: {
-          placeholder: "One-line description (shown in the /playbook picker)…",
-          inputLabel: "Mark as Playbook",
-          autoFocus: true,
-          onSubmit: async (description) => {
-            const entry = Object.entries(
-              useEditorInstanceStore.getState().editorsByContentId,
-            ).find(([, ed]) => Boolean(ed));
-            const contentId = entry?.[0];
-            if (!contentId) {
-              toast.error("No note open to mark");
-              return;
-            }
-            try {
-              const res = await fetch("/api/content/playbooks/mark", {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contentId, description }),
-              });
-              if (!res.ok) throw new Error("request failed");
-              toast.success("Marked as playbook — attach it from any chat with /playbook");
-            } catch {
-              toast.error("Failed to mark as playbook");
-            }
-          },
-        },
-      },
-    ],
-  });
+  // Playbook Mark/Unmark moved to the FILE-TREE context menu in v3.6 (with a
+  // playbook badge on the tree icon + a centered description modal). It's no
+  // longer in the editor menu.
 
   // --- Dev tools (local development only) ---
   if (process.env.NODE_ENV === "development") {

@@ -20,6 +20,7 @@ import { fileTreeActionProvider } from "./context-menu/file-tree-actions";
 import { editorActionProvider } from "./context-menu/editor-actions";
 import { FolderAssistantDialog } from "./dialogs/FolderAssistantDialog";
 import { ImportSkillDialog } from "./dialogs/ImportSkillDialog";
+import { PlaybookDescriptionDialog } from "./dialogs/PlaybookDescriptionDialog";
 import { ImagePreviewHost } from "./viewer/ImagePreviewHost";
 
 interface ResizablePanelsProps {
@@ -191,6 +192,7 @@ export function ResizablePanels({ children }: ResizablePanelsProps) {
 
     {/* Import Skill as Playbook dialog (opened from the file-tree context menu) */}
     <ImportSkillDialog />
+      <PlaybookDescriptionDialog />
 
     {/* Global image preview lightbox (chat images) */}
     <ImagePreviewHost />

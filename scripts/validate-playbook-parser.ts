@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import type { JSONContent } from "@tiptap/core";
 
 import { parsePlaybook } from "@/lib/domain/ai/playbooks/parse";
-import { renderPlaybookSection } from "@/lib/domain/ai/playbooks/render";
+import { renderPlaybookSectionPlain } from "@/lib/domain/ai/playbooks/render";
 import {
   bindPlaybookToLatestUserMessage,
   createPlaybookMessageAttachmentPart,
@@ -56,7 +56,7 @@ assert.deepEqual(
   ["Surface facts", "Read between the lines"],
 );
 assert.equal(
-  renderPlaybookSection(structured.standingRules.content),
+  renderPlaybookSectionPlain(structured.standingRules.content),
   "Use current sources.",
 );
 assert.deepEqual(structured.phases[1].references, [
@@ -85,9 +85,9 @@ assert.deepEqual(
   pastedSkill.phases.map((phase) => phase.title),
   ["Phase A: Surface facts", "Phase B: Read between the lines"],
 );
-assert.equal(renderPlaybookSection(pastedSkill.standingRules.content), "");
+assert.equal(renderPlaybookSectionPlain(pastedSkill.standingRules.content), "");
 assert.equal(
-  renderPlaybookSection(pastedSkill.phases[0].content),
+  renderPlaybookSectionPlain(pastedSkill.phases[0].content),
   "Find the product and funding.\nDone when: both are answered.",
 );
 assert.deepEqual(pastedSkill.phases[1].references, [
@@ -102,7 +102,7 @@ assert.equal(unsectioned.phaseLevel, null);
 assert.equal(unsectioned.phases.length, 1);
 assert.equal(unsectioned.phases[0].title, "Instructions");
 assert.equal(
-  renderPlaybookSection(unsectioned.phases[0].content),
+  renderPlaybookSectionPlain(unsectioned.phases[0].content),
   "Research the subject, then summarize the evidence.",
 );
 

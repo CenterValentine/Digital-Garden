@@ -1,5 +1,5 @@
 import type { ParsedPlaybook, PlaybookSection } from "./parse";
-import { renderPlaybookSection } from "./render";
+import { renderPlaybookSectionPlain } from "./render";
 
 export type RelativeOutputLocation =
   | "under_chat"
@@ -91,8 +91,10 @@ export function extractOutputDirectivesFromText(
 }
 
 function extractFromSection(section: PlaybookSection): PlaybookOutputDirective[] {
+  // Plain text is sufficient (and extension-free): directive scanning only
+  // regexes for "output … under chat/content" prose, never table/callout detail.
   return extractOutputDirectivesFromText(
-    renderPlaybookSection(section.content),
+    renderPlaybookSectionPlain(section.content),
     section.title || undefined,
   );
 }

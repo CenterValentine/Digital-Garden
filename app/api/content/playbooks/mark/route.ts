@@ -13,7 +13,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { withPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
+import {
+  isPlaybookMetadata,
+  stripPlaybookMetadata,
+  withPlaybookMetadata,
+} from "@/lib/domain/ai/playbooks/registry";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
 const ROUTE_PATH = "/api/content/playbooks/mark";
@@ -89,6 +93,81 @@ export async function POST(request: NextRequest) {
       });
       return NextResponse.json(
         { success: false, error: { message: "Failed to mark as playbook" } },
+        { status: 500 },
+      );
+    }
+  });
+}
+
+/**
+ * DELETE /api/content/playbooks/mark?contentId=… — the "unmark" path.
+ * Strips the playbook markers from NotePayload.metadata while preserving any
+ * other metadata. Idempotent: unmarking something that isn't a playbook (or has
+ * no payload row) succeeds with `wasPlaybook: false` rather than erroring.
+ */
+export async function DELETE(request: NextRequest) {
+  return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
+    try {
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => requireAuth(),
+      );
+
+      const contentId = request.nextUrl.searchParams.get("contentId");
+      if (!contentId) {
+        return NextResponse.json(
+          { success: false, error: { message: "contentId is required" } },
+          { status: 400 },
+        );
+      }
+
+      const node = await prisma.contentNode.findFirst({
+        where: {
+          id: contentId,
+          ownerId: session.user.id,
+          contentType: { in: ["note", "folder"] },
+          deletedAt: null,
+        },
+        select: { id: true, notePayload: { select: { metadata: true } } },
+      });
+      if (!node) {
+        return NextResponse.json(
+          { success: false, error: { message: "Note or folder not found" } },
+          { status: 404 },
+        );
+      }
+
+      const metadata =
+        (node.notePayload?.metadata as Record<string, unknown> | null) ?? null;
+      // Nothing to strip — no payload row, or not actually marked. Idempotent success.
+      if (!node.notePayload || !isPlaybookMetadata(metadata)) {
+        return NextResponse.json({ success: true, wasPlaybook: false });
+      }
+
+      await prisma.notePayload.update({
+        where: { contentId: node.id },
+        data: {
+          metadata: stripPlaybookMetadata(metadata) as unknown as Prisma.InputJsonValue,
+        },
+      });
+
+      return NextResponse.json({ success: true, wasPlaybook: true });
+    } catch (error) {
+      if (error instanceof Error && error.message === "Authentication required") {
+        return NextResponse.json(
+          { success: false, error: { message: "Unauthorized" } },
+          { status: 401 },
+        );
+      }
+      logger.error({
+        layer: "ai",
+        event: "playbooks_unmark:caught",
+        summary: "failed to unmark playbook",
+        error,
+      });
+      return NextResponse.json(
+        { success: false, error: { message: "Failed to unmark playbook" } },
         { status: 500 },
       );
     }

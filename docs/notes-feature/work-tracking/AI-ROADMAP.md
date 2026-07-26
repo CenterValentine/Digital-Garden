@@ -16,27 +16,45 @@ the owner 2026-07-25 after AI 3.4 merged.
 | 3.2.2 | Prompt-cache foundation | #129 |
 | 3.3 | T4 resumable streams (live re-attach) | #130 |
 | 3.4 | Playbook-orchestrated model routing + catalog-drift safety net | #132 |
+| 3.5 | Registry-authoritative model population (auto-fetch on install) | #133 |
+
+**3.5 deferral (owner: "we can back log that"):** the **monthly model-category
+cron** (realtime / audio / image / reasoning / …). Categories are inferred at
+runtime today via `inferCapabilities` (id patterns); a periodically-refreshed
+authoritative category map is an enhancement, not a blocker.
 
 ## Planned (owner-ordered 2026-07-25)
 
-### 3.5 — Registry-authoritative models  ← IN PROGRESS
-Stop pre-installing model lists. On connection install (with a valid key),
-auto-fetch the model list from the provider registry and replace the
-template's seed models with it; seeds remain the fallback for
-no-model-list-API providers / fetch failures. Extends 3.4's catalog-drift
-safety net ([MODEL-CATALOG-FRESHNESS.md](../guides/ai/MODEL-CATALOG-FRESHNESS.md)).
+### 3.6 — Playbook completeness  ← BUILT (pre-PR, branch `feat/ai-v3.6-playbook-completeness`)
+Scope correction from the original T3-deferral list: the **SKILL.md import
+adapter already shipped with T3** (`playbooks/import/skill-md.ts` +
+`ImportSkillDialog`) and is **already lossless on the way in** — `markdownToTiptap`
+was rewired to `markdownToTiptapRich` in T2. So 3.6 reduced to two real items:
 
-**Deferred to backlog (owner: "we can back log that"):** the **monthly
-model-category cron** (realtime / audio / image / reasoning / …). Categories
-are inferred at runtime today via `inferCapabilities` (id patterns); a
-periodically-refreshed authoritative category map is an enhancement, not a
-blocker — revisit if runtime inference proves too brittle.
-
-### 3.6 — Playbook completeness
-The T3 deferrals as one release: SKILL.md import adapter · "unmark playbook"
-affordance · upgrade the playbook renderer (`playbooks/render.ts`) from its
-scoped temporary renderer to the **lossless T2 serializer** (the "revisit once
-T2 lands" note — T2 has landed).
+- **Lossless phase rendering (headline).** `playbooks/render.ts` no longer
+  hand-rolls plain text (which garbled tables into a cell-dump, dropped link
+  URLs, and dropped callout framing). `renderPlaybookSection(nodes, extensions)`
+  now runs the section through the **T2 self-verifying serializer**
+  (`markdown-serialize.ts`), so tables, callouts (`> [!note]`), links, and nested
+  marks reach the model intact. `[[wiki-links]]` are preserved via a ⟦⟧ sentinel
+  pre-pass (they'd otherwise serialize as raw `<span>` HTML). The old plain
+  renderer is kept as `renderPlaybookSectionPlain` for directive-scanning
+  (`output-directives.ts`) and as the serializer-failure fallback. Extensions are
+  injected (module stays `extensions-server`-free / tsx-safe); the chat route
+  passes `getServerExtensions()` into all 5 call sites.
+- **Playbook lifecycle moved to the file tree.** Mark / Edit-description /
+  Unmark now live in the **file-tree context menu** (removed from the editor
+  menu). It's **state-aware** — the tree API already ships `notePayload.metadata`
+  on each node, so the menu shows "Mark as Playbook…" vs "Edit Playbook
+  Description…" + "Unmark Playbook" per the node's real state. Available for any
+  note-bearing content (note or folder with a Notes payload). A **playbook badge**
+  (a `BookMarked` corner glyph, same formatting as the referenced-content link
+  badge) marks playbook files in the tree at a glance. The description is edited
+  in a **centered modal** (`PlaybookDescriptionDialog`) — the playbook name is the
+  file name; only the one-line description is editable — replacing the old inline
+  menu input that grew the context menu past the viewport. Server: `DELETE
+  /api/content/playbooks/mark?contentId=…` + `stripPlaybookMetadata` (idempotent,
+  preserves other metadata); mark/edit reuse the idempotent POST upsert.
 
 ### 3.7 — Resource governance
 The **enforcement** half of agentic discipline (we shipped the observability —
