@@ -17,6 +17,7 @@ import { instantiateTemplateContent } from "@/lib/domain/editor/template-instant
 import { resolveWikiLinkTarget } from "@/lib/domain/editor/wiki-link-resolve";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import { clipboardBlockedGuidance } from "@/lib/domain/content/markdown-detect";
+import { triggerBlobDownload } from "@/lib/core/download";
 import { toast } from "sonner";
 import {
   BOTTOM_LEFT_PANE_ID,
@@ -564,20 +565,6 @@ function buildSnippetSaveMenu(
   });
 
   return items;
-}
-
-/**
- * Trigger a browser download from a Blob.
- */
-function triggerBlobDownload(blob: Blob, fileName: string) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
 }
 
 /**

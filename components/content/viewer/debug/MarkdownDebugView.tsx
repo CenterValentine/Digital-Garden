@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import type { JSONContent } from "@tiptap/core";
 import { MarkdownConverter } from "@/lib/domain/export/converters/markdown";
 import { clientLogger } from "@/lib/core/logger/client";
+import { triggerBlobDownload } from "@/lib/core/download";
 
 interface MarkdownDebugViewProps {
   content: JSONContent;
@@ -108,12 +109,7 @@ export function MarkdownDebugView({ content, title }: MarkdownDebugViewProps) {
 
   const downloadMarkdown = () => {
     const blob = new Blob([markdown], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `${title}.md`);
     toast.success("Downloaded markdown file");
   };
 

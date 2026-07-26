@@ -15,6 +15,7 @@ import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
+import { triggerBlobDownload } from "@/lib/core/download";
 import { ContentToolbar } from "../toolbar";
 import { ToolDebugPanel } from "../toolbar/ToolDebugPanel";
 import type { ContentType as ToolContentType } from "@/lib/domain/tools";
@@ -1547,12 +1548,13 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         return;
       }
       const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${noteTitle || "export"}.md`;
-      a.click();
-      URL.revokeObjectURL(url);
+      // A 200 with nothing in it is still a failed export — don't report
+      // success for a file the user will never find.
+      if (blob.size === 0) {
+        toast.error("Export produced an empty file");
+        return;
+      }
+      triggerBlobDownload(blob, `${noteTitle || "export"}.md`);
       toast.success("Exported as Markdown");
     } catch {
       toast.error("Export failed");
@@ -1637,12 +1639,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     }
 
     const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${noteTitle || "chat-export"}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
+    triggerBlobDownload(blob, `${noteTitle || "chat-export"}.md`);
     toast.success("Chat exported as Markdown");
   }, [contentData, noteTitle]);
 
