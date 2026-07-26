@@ -88,7 +88,7 @@ function Body({
       window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       toast.success(
         editing
-          ? "Playbook description updated"
+          ? "Playbook details updated"
           : "Marked as playbook — attach it from any chat with /playbook",
       );
       onClose();
@@ -103,7 +103,7 @@ function Body({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <BookMarked className="h-4 w-4 text-indigo-400" />
-          {editing ? "Edit Playbook Description" : "Mark as Playbook"}
+          {editing ? "Edit Playbook Details" : "Mark as Playbook"}
         </DialogTitle>
       </DialogHeader>
 

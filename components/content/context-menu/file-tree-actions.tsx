@@ -284,19 +284,10 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           label: "Add",
           icon: <Plus className="h-4 w-4" />,
           submenu: newMenuItems.map(mapMenuItem),
-          divider: true,
-        },
-        {
-          // Import an Anthropic SKILL.md as a marked playbook note (AI v3.2
-          // T3, P5-import). Uses the same resolved `targetId` as the Add
-          // submenu — folder → into it, file → sibling, empty → root.
-          id: "import-skill-playbook",
-          label: "Import Skill as Playbook…",
-          icon: <BookUp className="h-4 w-4" />,
-          onClick: () => useImportSkillStore.getState().openDialog(targetId),
         },
       ],
     });
+    // "Import Skill as Playbook…" moved to the Playbook section below (v3.6).
   }
 
   if (isPeopleMount) {
@@ -314,26 +305,29 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     return sections;
   }
 
-  // --- Playbook: Mark / Edit description / Unmark (v3.6; moved off the editor
-  // context menu). Any note-bearing content — a note, or a folder with a Notes
-  // payload — can become a playbook. State-aware via clickedNode.isPlaybook so
-  // the menu shows the right verb; editing the description opens a centered
-  // modal (a modal never grows the menu past the viewport, unlike an inline
-  // input). Mark/unmark just flag NotePayload.metadata; the file's title is the
-  // playbook name and its `##` sections are the phases.
-  if (
-    isSingleSelection &&
-    clickedId &&
-    clickedNode &&
-    (clickedNode.contentType === "note" || clickedNode.contentType === "folder")
-  ) {
-    const playbookTitle = clickedNode.title;
-    const contentId = clickedId;
-    const playbookActions: ContextMenuAction[] = clickedNode.isPlaybook
-      ? [
+  // --- Playbook (v3.6; consolidated off the editor context menu) ---
+  // Import Skill turns a pasted SKILL.md into a marked playbook note.
+  // Mark / Edit / Unmark act on a single note (or folder with a Notes payload);
+  // state-aware via clickedNode.isPlaybook so the menu shows the right verb.
+  // Editing details opens a centered modal — a modal never grows the menu past
+  // the viewport, unlike an inline input. The file's title is the playbook name
+  // and its `##` sections are the phases.
+  {
+    const playbookActions: ContextMenuAction[] = [];
+
+    if (
+      isSingleSelection &&
+      clickedId &&
+      clickedNode &&
+      (clickedNode.contentType === "note" || clickedNode.contentType === "folder")
+    ) {
+      const playbookTitle = clickedNode.title;
+      const contentId = clickedId;
+      if (clickedNode.isPlaybook) {
+        playbookActions.push(
           {
-            id: "edit-playbook-description",
-            label: "Edit Playbook Description…",
+            id: "edit-playbook-details",
+            label: "Edit Playbook Details…",
             icon: <BookMarked className="h-4 w-4" />,
             onClick: () =>
               usePlaybookDialogStore.getState().openDialog({
@@ -361,21 +355,42 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
               }
             },
           },
-        ]
-      : [
-          {
-            id: "mark-as-playbook",
-            label: "Mark as Playbook…",
-            icon: <BookMarked className="h-4 w-4" />,
-            onClick: () =>
-              usePlaybookDialogStore.getState().openDialog({
-                contentId,
-                title: playbookTitle,
-                editing: false,
-              }),
-          },
-        ];
-    sections.push({ title: "Playbook", actions: playbookActions });
+        );
+      } else {
+        playbookActions.push({
+          id: "mark-as-playbook",
+          label: "Mark as Playbook…",
+          icon: <BookMarked className="h-4 w-4" />,
+          onClick: () =>
+            usePlaybookDialogStore.getState().openDialog({
+              contentId,
+              title: playbookTitle,
+              editing: false,
+            }),
+        });
+      }
+    }
+
+    // Import Skill — available wherever new content can be created (single
+    // selection or empty space). Same target rule as the Add submenu:
+    // folder → into it, file/note → sibling, empty → root.
+    if (isSingleSelection || !clickedId) {
+      const importTarget: string | null = !clickedId
+        ? null
+        : isFolder
+          ? clickedId
+          : clickedNode?.parentId ?? null;
+      playbookActions.push({
+        id: "import-skill-playbook",
+        label: "Import Skill as Playbook…",
+        icon: <BookUp className="h-4 w-4" />,
+        onClick: () => useImportSkillStore.getState().openDialog(importTarget),
+      });
+    }
+
+    if (playbookActions.length > 0) {
+      sections.push({ title: "Playbook", actions: playbookActions });
+    }
   }
 
   // Section 2: Folder view mode (folder only, single selection)
