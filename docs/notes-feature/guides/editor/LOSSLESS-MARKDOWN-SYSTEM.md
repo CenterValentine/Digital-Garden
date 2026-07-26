@@ -61,6 +61,31 @@ The CI gate (`markdown:blocks:check`) is the same check applied to a battery of
 constructs + every registered block + a schema-driven attribute sweep, run in
 CI. It is the durable proof.
 
+### 2a. The one exemption: presentational attributes
+
+`withoutPresentationalAttrs()` in `markdown-serialize.ts` normalises a short list
+of attributes away from **both sides** of the deep-equal check. Today that list
+is exactly one entry: **`colwidth` on `tableCell` / `tableHeader`** — the pixel
+widths you get by dragging a column border.
+
+Why it exists: GFM has no column-width syntax, so before this exemption a table
+whose columns had ever been resized failed the check and dropped to the raw-HTML
+tier. The source view showed a wall of `<table style="min-width: 487px">…` that
+no one can edit as markdown. The exemption buys a real markdown table for every
+resized table; the price is that **toggling a resized table through source view
+returns it with auto-sized columns**. Widths are otherwise untouched — they
+persist through normal editing, autosave, collaboration and reload; only the
+markdown round-trip drops them.
+
+**Do not grow this list to make an inconvenient block "work".** Every entry is
+content the system has stopped protecting, and the invariant above degrades to
+"lossless except for a list you have to go read." An attribute belongs here only
+if it is genuinely view state (not authored content), markdown genuinely can't
+express it, and the HTML-tier fallback it would otherwise trigger is worse for
+the author than losing it. The gate asserts both halves — that widths *are*
+dropped and that *nothing else* is — so a widened list shows up as a failing
+"everything except the widths round-trips unchanged" check, not as silent decay.
+
 ---
 
 ## 3. The tiered ladder
