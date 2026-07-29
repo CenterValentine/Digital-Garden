@@ -159,6 +159,18 @@ content-script reads), so a **Phase-2 spike** validates bundle size + MV3
 offscreen lifecycle (under parallel sessions + SW restarts) + maintenance before
 we commit. Both engines carry the same `debugger` permission + banner — neutral.
 
+**Where the engine runs (bundle placement — the key to the size concern).**
+playwright-crx lives in a **lazily-created offscreen document** — *never* a
+content script (so it never loads per page) and *never* the service worker (which
+stays light for fast MV3 cold-starts). The offscreen doc is created on session
+start, drives the debuggee tab(s) over CDP, and is torn down when sessions end.
+So the heavy bundle's cost is only: disk/install size (once), init time (per
+session-start), memory (only while sessions are active) — normal browsing pays
+nothing but on-disk size. **Code-split** it into its own chunk so the SW /
+content-script / panel bundles are unaffected; measure the real size in the spike.
+The `BrowserActuator` interface means a too-heavy result is escapable — swap to a
+lean raw-CDP actuator (only the primitives we need) without touching agent/tools.
+
 **The debugger banner.** `chrome.debugger` shows a non-hideable "extension started
 debugging this browser" info bar (a Chrome security feature). Mitigation: attach
 only during an *active* co-browse session, detach the instant it ends; frame the
