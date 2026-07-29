@@ -143,6 +143,15 @@ So the actuation engine must be CDP-based.
 **Recommendation:** raw CDP for the MVP (thin typed wrappers in
 `src/agentic/cdp/`), reassess `playwright-crx` when navigation complexity grows.
 
+**Reference frameworks (checked 2026-07).** The mature agentic stacks — Stagehand
+(TypeScript, on Playwright), Browser Use (Python; moved to direct CDP; ~89%
+WebVoyager SOTA), Skyvern — all assume a Node/Playwright or Python runtime, **not
+a Chrome extension**, so none drops in wholesale. `playwright-crx` runs the
+Playwright API *inside* an extension over CDP (Stagehand could potentially layer
+on it — evaluate at Phase 2). We reuse their **accessibility-tree + DOM
+action-selection pattern** on our existing AI-SDK loop, not their runtimes;
+vision stacks (Anthropic Computer Use) inform the D-TGT fallback.
+
 **The debugger banner.** `chrome.debugger` shows a non-hideable "extension started
 debugging this browser" info bar (a Chrome security feature). Mitigation: attach
 only during an *active* co-browse session, detach the instant it ends; frame the
@@ -167,8 +176,9 @@ Every act flows through one protocol so co-browsing + audit are unavoidable:
 
 1. **Agent proposes** an action (tool call): `{sessionId, kind, target(a11y ref /
    selector), value?, criticality}`.
-2. **Classifier** stamps criticality from the hardcoded floor list (agent may
-   *escalate*, never downgrade — decision D-CRIT).
+2. **Classifier** stamps criticality from **sensitivity detection** (next
+   section) — the deterministic floor; the agent may *escalate*, never downgrade
+   (D-CRIT). Navigation and pagination are not gated; a *sensitive submission* is.
 3. **Non-critical** → executes immediately (visible); **critical/comms** →
    **co-browsing checkpoint**: the agent *pauses*; a `needsApproval` card renders
    the exact action (target, value, destination, a screenshot/preview); OS
@@ -182,6 +192,40 @@ Every act flows through one protocol so co-browsing + audit are unavoidable:
 Transport reuses the bridges with new message types (`agentic-act`,
 `agentic-checkpoint`, `agentic-result`); parallel sessions are disambiguated by
 `sessionId` throughout.
+
+---
+
+## Sensitivity detection — what actually triggers the gate
+
+The gate is **not** "any act." Navigation and pagination — clicking *Next* /
+*Load more*, scrolling, expanding to reach the end of an incomplete read —
+iterate **freely** (getting to a different place on a page is not a risk). The
+gate fires on a **sensitive submission**, detected deterministically first, with
+the LLM as an **escalator, never a downgrader** (D-CRIT). Signals, cheapest-first:
+
+- **PII / payment fields (primary, reliable).** The **HTML `autocomplete`
+  vocabulary** (W3C/WHATWG standard) is the clean signal — a field carrying
+  `name`, `email`, `tel`, `street-address`, `postal-code`, `cc-number`, `cc-exp`,
+  `cc-csc`, `password`, etc. Backed by input `type` (`email|tel|password`) and
+  name/id heuristics when `autocomplete` is absent. This is exactly what browsers
+  and password managers key on — we reuse the *standard*, not a bespoke detector.
+- **Consent / contractual language.** A checkbox beside "I agree / authorize /
+  verify / consent / accept the terms" (excluding pure cookie banners) →
+  sensitive. Heuristic on label text near required checkboxes.
+- **Communications drafts.** A compose surface with a pending draft → sensitive +
+  waiver (D4). Signal: a registered **`beforeunload` handler** (the "Leave site?"
+  warning Gmail installs for unsaved drafts), readable via CDP
+  `DOMDebugger.getEventListeners(window)`. A *Send* in that context never fires
+  without the gate.
+- **LLM escalator.** The agent may additionally flag an action sensitive from
+  context — it can only *raise* the gate, never skip a deterministically-detected
+  one, so prompt injection can't argue an action out of its gate.
+
+**Default when uncertain = gated.** Friction drops only where safety is
+*ascertainable* (clearly-benign navigation); anything submission-like that isn't
+clearly benign is gated. **No mature drop-in "sensitive-form gate" library
+exists** — the detector is a small deterministic ruleset over the `autocomplete`
+standard + `beforeunload` + consent keywords (reuse the standard, don't reinvent).
 
 ---
 
@@ -259,11 +303,11 @@ real side effects; co-browsing is the mitigation.
 | Tier | Examples | Governance |
 |---|---|---|
 | Read | fetch/extract a page | Acquisition policy + budget (auto) |
-| Navigate | click a link, paginate, scroll | visible; auto/light |
-| Act — non-critical | fill a field (no submit), filter, preview | visible; reversible |
-| **Act — critical** | **submit, log in, purchase, irreversible** | **co-browsing hard stop** |
-| **Act — communications** | send message/email/DM, connect, post | **waiver (D4) + co-browsing (D3)** |
-| Autonomous critical/comms | — | rare exception; post-hardening, opted-in only (D3) |
+| Navigate / iterate | click a link, "Next" / "Load more", scroll, expand — reach the end of a read | **free** (safety ascertainable — no submission) |
+| Act — non-critical | fill a field (no submit); a *non-sensitive* submit (search, filter, sort) | visible; reversible; not gated |
+| **Act — sensitive submission** | **submit a form carrying PII / consent / payment; log in; purchase** (detected — see Sensitivity detection) | **co-browsing hard stop** |
+| **Act — communications** | send message / email / DM, connect, post | **waiver (D4) + co-browsing (D3)** |
+| Autonomous sensitive/comms | — | rare exception; post-hardening, opted-in only (D3) |
 
 ---
 
@@ -356,8 +400,11 @@ real side effects; co-browsing is the mitigation.
 
 - **D-ENG** (Phase 2): raw CDP for the MVP, `playwright-crx` optional later — OK?
 - **D-TGT** (Phase 2): accessibility-tree-first, vision fallback deferred — OK?
-- **D-CRIT** (Phase 3): hardcoded critical *floor* list, agent may escalate never
-  downgrade — OK? What's on the floor list (submit, login, purchase, upload, …)?
+- **D-CRIT** (Phase 3): **sensitivity detection** is the deterministic floor
+  (`autocomplete`-PII + consent checkbox + `beforeunload`/draft), LLM
+  escalator-only. The gate fires on a *sensitive submission* — not every submit;
+  benign submits (search / filter) run free; uncertain → gated. OK? What is
+  always-on the floor (PII fields, payment, password, consent checkbox, email-send)?
 - **D-GRAN** (Phase 3): per-action approval by default; is "approve this batch /
   this domain this session" allowed, and if so, bounded how?
 - **D-OBJ** (Phase 1): objective-boundary = agent-proposes / user-confirms — OK?
