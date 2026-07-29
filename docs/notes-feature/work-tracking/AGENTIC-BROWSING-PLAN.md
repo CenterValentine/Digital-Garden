@@ -143,11 +143,21 @@ So the actuation engine must be CDP-based.
 | Option | Pros | Cons | Call |
 |---|---|---|---|
 | Content-script synthetic events | zero dep, no banner | untrusted events, **no file upload**, fragile | reads only |
-| **Raw `chrome.debugger` + CDP** | full trusted control, file upload, no dep | verbose, we own the wrappers | **MVP recommendation** |
-| `playwright-crx` (Playwright in-extension over CDP) | locators, auto-wait, mature API | large dep + bundle, extra abstraction | optional ergonomic layer (evaluate at Phase 2) |
+| Raw `chrome.debugger` + CDP | full control, no dep, native MV3 fit | we hand-roll actionability / waiting / frames (**flaky risk**) | **fallback + low-level escape hatch** |
+| **`playwright-crx`** (Playwright in-extension over CDP) | actionability engine (wait/retry/frames/shadow-DOM), `ariaSnapshot`, `setInputFiles`; `newCDPSession()` keeps raw CDP available | large bundle, offscreen-doc MV3 model, single-maintainer (v0.15.0) | **preferred for interaction (Phase 2), pending spike** |
 
-**Recommendation:** raw CDP for the MVP (thin typed wrappers in
-`src/agentic/cdp/`), reassess `playwright-crx` when navigation complexity grows.
+**Recommendation (revised).** `playwright-crx` is the **preferred** interaction
+engine for Phase 2+: its actionability engine (wait-for-visible/stable/enabled,
+retries, frame/shadow-DOM traversal, `ariaSnapshot`) is exactly the
+flaky-automation surface raw CDP would force us to reimplement, and its
+`newCDPSession()` still exposes raw CDP for anything it doesn't wrap (e.g.
+`DOMDebugger.getEventListeners` for the draft signal). Guard the bet: (1) put all
+interaction behind a thin **`BrowserActuator`** interface (click/type/upload/
+snapshot/navigate) so raw CDP stays a drop-in fallback; (2) **pin the version**
+(single-maintainer); (3) it doesn't bind until Phase 2 (Phases 0–1 are
+content-script reads), so a **Phase-2 spike** validates bundle size + MV3
+offscreen lifecycle (under parallel sessions + SW restarts) + maintenance before
+we commit. Both engines carry the same `debugger` permission + banner — neutral.
 
 **The debugger banner.** `chrome.debugger` shows a non-hideable "extension started
 debugging this browser" info bar (a Chrome security feature). Mitigation: attach
@@ -301,10 +311,12 @@ standard + `beforeunload` + consent keywords (reuse the standard, don't reinvent
 - **Manifest permissions to add:** `debugger` (CDP — significant; enables the
   banner), `notifications` (OS checkpoints). Already have `tabs`, `scripting`,
   `cookies`, `<all_urls>`, `sidePanel`.
-- **npm dependencies:** **none required for the MVP** (raw CDP). Optional later:
-  `playwright-crx` (ergonomics), a vision/set-of-marks helper if D-TGT fallback
-  is built. Agent loop reuses the AI SDK — **no new agent framework** (browser-use
-  / Nanobrowser inform the *pattern*, not the code; they're Python/standalone).
+- **npm dependencies:** **none for Phases 0–1** (content-script reads).
+  **`playwright-crx` from Phase 2** as the interaction engine, behind the
+  swappable `BrowserActuator` interface (raw CDP is the fallback); a
+  vision/set-of-marks helper only if the D-TGT fallback is built. Agent loop
+  reuses the AI SDK — **no new agent framework** (browser-use / Nanobrowser inform
+  the *pattern*, not the code; they're Python/standalone).
 
 ---
 
@@ -383,8 +395,9 @@ real side effects; co-browsing is the mitigation.
 - **Components:** CDP executor (Input/Accessibility/Page) in `src/agentic/cdp/`;
   `navigate` tool family; a11y-tree target resolution (D-TGT); synthetic cursor
   overlay (rides B4); session+tab manager + teleport; interrupt control.
-- **Libs/perms/data:** **add `debugger` permission**; evaluate `playwright-crx`
-  here. No Prisma change.
+- **Libs/perms/data:** **add `debugger` permission**; **`playwright-crx`** as the
+  interaction engine behind the `BrowserActuator` interface (spike bundle / MV3
+  offscreen lifecycle / maintenance first; raw CDP fallback). No Prisma change.
 - **Decisions:** D-ENG (raw CDP vs playwright-crx); D-TGT (a11y vs +vision).
 - **Gate:** "page through these results and collect them" → multi-page nav in a
   visible tab, cursor glides, you can interrupt; still read/navigate only.
@@ -437,7 +450,10 @@ real side effects; co-browsing is the mitigation.
 
 ## Consolidated open decisions (your call — needed to lock the plan)
 
-- **D-ENG** (Phase 2): raw CDP for the MVP, `playwright-crx` optional later — OK?
+- **D-ENG** (Phase 2): `playwright-crx` as the **preferred** interaction engine
+  behind a swappable `BrowserActuator` interface, validated by a Phase-2 spike
+  (bundle / MV3 offscreen lifecycle / maintenance); raw CDP as the fallback +
+  low-level escape hatch (`newCDPSession()`). OK, or do you want raw-CDP-first?
 - **D-TGT** (Phase 2): accessibility-tree-first, vision fallback deferred — OK?
 - **D-CRIT** (Phase 3): **sensitivity detection** is the deterministic floor
   (`autocomplete`-PII + consent checkbox + `beforeunload`/draft), LLM
