@@ -5,6 +5,7 @@
 ![React 19](https://img.shields.io/badge/React-19-149eca)
 ![TypeScript strict](https://img.shields.io/badge/TypeScript-strict%2C%20no%20any-3178c6)
 ![AI SDK v6](https://img.shields.io/badge/AI%20SDK-v6-000)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 An Obsidian-class knowledge IDE that grew into an **AI automation platform**: agentic chat with a
 typed tool registry, reusable agent playbooks, durable workflows with an n8n spoke, resumable AI
@@ -291,8 +292,7 @@ Labeled honestly — nothing below is shipped yet:
 
 ## License & contact
 
-License: not yet selected — all rights reserved for now. If you want to build on something here,
-[reach out](https://davidvalentine.org/contact).
+[MIT](LICENSE). If you want to build on something here, [reach out](https://davidvalentine.org/contact).
 
 Built and maintained by [David Valentine](https://davidvalentine.org) ·
 [Request a demo](https://davidvalentine.org/demo)

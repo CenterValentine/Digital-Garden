@@ -74,7 +74,7 @@ summary:
 
 | Decision | State | Date |
 |---|---|---|
-| License | **TBD** — README says "all rights reserved for now"; owner choosing MIT vs. source-available | 2026-07-29 |
+| License | **MIT** — `LICENSE` file + README badge added | 2026-07-29 |
 | Tier-3 live demo account | **Deferred** — video-first strategy instead | 2026-07-29 |
 | Video demo | Placeholder page live at /demo ("still growing" + custom-demo CTA via /contact) | 2026-07-29 |
 | MCP | Plan-first: design doc (Workstream G) before implementation; first slice = read-only server | 2026-07-29 |

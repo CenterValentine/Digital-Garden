@@ -27,6 +27,10 @@ audience: recruiters, hiring managers, engineering peers
 >   HTTP via mcp-handler, PAT→OAuth 2.1 auth ladder, M1 read-only slice; client: AI SDK MCP
 >   client with namespacing + injection defenses); README wired to all three + figure slots
 >   added to FEATURES.md (sync run ✅).
+> - **2026-07-29 — License decided: MIT.** Added `LICENSE` (MIT, copyright David
+>   Valentine 2025-2026) + README badge + license section rewrite. Maintenance
+>   guide's standing-decisions table updated. No owner decisions remain open
+>   from §5 below except the ones already marked deferred.
 > - **Next:** S3 — owner captures the 14 figures + records video (deferred until after release).
 >   S4 — showcase seed vault + MCP M1.
 
@@ -149,7 +153,7 @@ S1 alone converts the repo from "invisible AI" to "legible AI." Ship it first; e
 
 ## 5. Owner decisions needed (non-blocking for S1 except license)
 
-1. **License** — MIT vs. source-available vs. all-rights-reserved-but-viewable. (Blocks the LICENSE file only; README can ship with "License: TBD" removed and section omitted.)
+1. ~~**License** — MIT vs. source-available vs. all-rights-reserved-but-viewable.~~ **Decided 2026-07-29: MIT.**
 2. **Tier 3 live demo** — go/no-go on a seeded demo account (recommend: defer).
 3. **Video** — owner narration vs. captioned screen-capture only.
 4. **Repo rename?** — `Digital-Garden` is fine; only revisit if positioning shifts.
