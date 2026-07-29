@@ -129,6 +129,8 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { createWorkflowTools } from "@/lib/domain/ai/tools";
+import { readPageInBrowserTool } from "@/lib/domain/ai/tools/registry";
+import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -305,6 +307,9 @@ export async function POST(request: Request) {
       // (review fix — a pinned playbook conversation paid a DB round-trip
       // + full TipTap parse per turn just to discard the result).
       const modelPinned = body.modelPinned === true;
+      // Agentic Browsing Phase 0: the client reports whether the browser
+      // extension is reachable this turn; gates the client-executed read tool.
+      const browserExtensionAvailable = body.browserExtensionAvailable === true;
       const routingPlaybookId = modelPinned
         ? null
         : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
@@ -930,6 +935,12 @@ export async function POST(request: Request) {
         // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
         ...createWorkflowTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
+        // Agentic Browsing Phase 0: a CLIENT-executed read tool (no server
+        // `execute`) — registered only when the client reports the browser
+        // extension is reachable, so the model can't call it otherwise.
+        ...(browserExtensionAvailable
+          ? { [READ_PAGE_IN_BROWSER]: readPageInBrowserTool }
+          : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -1557,6 +1568,7 @@ export async function POST(request: Request) {
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
+          hasBrowserReadTool: READ_PAGE_IN_BROWSER in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches

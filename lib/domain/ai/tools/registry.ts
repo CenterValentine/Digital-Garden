@@ -54,6 +54,22 @@ import {
 } from "./output-placement";
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
+import {
+  READ_PAGE_IN_BROWSER_DESCRIPTION,
+  readPageInBrowserInputSchema,
+} from "./read-page-in-browser";
+
+/**
+ * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
+ * registers it only when the client reports the browser extension is available;
+ * the model's tool call then streams to the browser, where the chat engine's
+ * `onToolCall` runs the acquisition and returns the result. Needs no
+ * `ToolExecuteContext`, so it lives outside `createBaseTools`.
+ */
+export const readPageInBrowserTool = tool({
+  description: READ_PAGE_IN_BROWSER_DESCRIPTION,
+  inputSchema: readPageInBrowserInputSchema,
+});
 
 /**
  * Create the base AI tools, bound to a specific user's context.

@@ -30,6 +30,11 @@ import {
   type UIMessage,
   type FileUIPart,
 } from "ai";
+import {
+  acquireUrlWithFallback,
+  isExtensionAcquireAvailable,
+} from "@/lib/domain/browser-extension/acquire-url";
+import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -483,6 +488,43 @@ export interface ActivePlaybook {
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
   phaseIndex: number;
   phaseCount: number;
+}
+
+/**
+ * Auto-resume predicate for the client-executed `read_page_in_browser` tool
+ * (Agentic Browsing Phase 0). The server stops the stream at the tool call (no
+ * server `execute`); once `onToolCall` supplies the result via `addToolResult`,
+ * the loop must re-POST so the model can use it.
+ *
+ * Deliberately TARGETED to our tool only (the last step contains a resolved
+ * `read_page_in_browser`), NOT the SDK's
+ * `lastAssistantMessageIsCompleteWithToolCalls`: that also fires when a normal
+ * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
+ * which would defeat that bound and risk a runaway loop.
+ */
+function lastMessageHasResolvedBrowserRead({
+  messages,
+}: {
+  messages: UIMessage[];
+}): boolean {
+  const message = messages[messages.length - 1];
+  if (!message || message.role !== "assistant") return false;
+  const lastStepStart = message.parts.reduce(
+    (last, part, index) => (part.type === "step-start" ? index : last),
+    -1,
+  );
+  const browserReadParts = message.parts
+    .slice(lastStepStart + 1)
+    .filter(
+      (part) => part.type === `tool-${READ_PAGE_IN_BROWSER}`,
+    ) as Array<{ state?: string }>;
+  return (
+    browserReadParts.length > 0 &&
+    browserReadParts.every(
+      (part) =>
+        part.state === "output-available" || part.state === "output-error",
+    )
+  );
 }
 
 export function useConversationEngine({
@@ -971,10 +1013,62 @@ export function useConversationEngine({
     messages: initialMessages,
     experimental_throttle: 100,
     // Resume the tool loop automatically once every pending needsApproval
-    // request on the last assistant message has been answered (AI v3 core
-    // S1). Without this, an approval response would sit in client state and
-    // never re-trigger the server.
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    // request on the last assistant message has been answered (AI v3 core S1),
+    // OR once the client-executed read_page_in_browser tool has a result
+    // (Agentic Browsing Phase 0). Without this, either would sit in client
+    // state and never re-trigger the server.
+    sendAutomaticallyWhen: (options) =>
+      lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+      lastMessageHasResolvedBrowserRead(options),
+    // Client-executed tools (no server `execute`): the model's tool call is
+    // streamed to the browser; run it here and post the result back. Phase 0:
+    // read_page_in_browser reads a page in the user's own session.
+    onToolCall: async ({ toolCall }) => {
+      if (toolCall.toolName !== READ_PAGE_IN_BROWSER) return;
+      const { url } = (toolCall.input ?? {}) as { url?: string };
+      if (!url) {
+        chat.addToolResult({
+          tool: READ_PAGE_IN_BROWSER,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: "no url provided",
+        });
+        return;
+      }
+      try {
+        const outcome = await acquireUrlWithFallback(url);
+        if (outcome.ok && outcome.content) {
+          const c = outcome.content;
+          chat.addToolResult({
+            tool: READ_PAGE_IN_BROWSER,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: c.url,
+              title: c.title,
+              siteName: c.siteName,
+              via: outcome.via,
+              usedExtension: outcome.usedExtension,
+              // Trust-labeled field name is load-bearing (prompt-injection
+              // defense) — mirror read_page's `untrustedWebContent`.
+              untrustedWebContent: c.content,
+            },
+          });
+        } else {
+          chat.addToolResult({
+            tool: READ_PAGE_IN_BROWSER,
+            toolCallId: toolCall.toolCallId,
+            output: `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}.`,
+          });
+        }
+      } catch (err) {
+        chat.addToolResult({
+          tool: READ_PAGE_IN_BROWSER,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: err instanceof Error ? err.message : "browser read failed",
+        });
+      }
+    },
     onError: (err) => {
       if (onError) {
         onError(err);
@@ -1155,6 +1249,9 @@ export function useConversationEngine({
       // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
       // and playbook phase directives are ignored for this conversation.
       modelPinned,
+      // Agentic Browsing Phase 0: is the browser extension reachable right now?
+      // Gates the client-executed read_page_in_browser tool. Read at send time.
+      browserExtensionAvailable: isExtensionAcquireAvailable(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1560,6 +1657,8 @@ export function useConversationEngine({
           // resolver baseline is consulted, so a flag that lives only in
           // the resolver never reaches the server after a real send.
           modelPinned,
+          // Agentic Browsing Phase 0 — same per-call-body requirement as above.
+          browserExtensionAvailable: isExtensionAcquireAvailable(),
         },
       },
     );
