@@ -38,14 +38,20 @@ tailor the résumé → apply (act, co-browsed) → track in the garden.
 - **D2 — Read and Act are separate layers.** *Acquisition* (read, no side effects,
   `untrusted-web`) and *Actuation* (side-effectful) have different safety models
   and are never conflated. Liberal on reads; conservative on acts.
-- **D3 — Co-browsing is the rule; autonomy the rare exception.** The user
-  authorizes every *critical* action before it executes (form submission above
-  all). A safety rail while the product hardens; post-hardening it may become
-  *removable* in explicitly-opted-in environments, but removal will **never be the
-  default**.
-- **D4 — Waivers gate high-risk classes.** Communications first (messages, emails,
-  connection requests, posts): explicit, user-authorized informed consent *on top
-  of* co-browsing (D3), before the class is enabled.
+- **D3 — Free where safe, gated where sensitive.** The agent reads, navigates,
+  and iterates *freely* wherever safety is ascertainable (no sensitive
+  submission). Co-browsing is **narrow and targeted, not "approve every move"**:
+  the user authorizes each **sensitive submission** (PII / consent / payment,
+  login, purchase) and each **communication** *before* it executes. That
+  authorization is a safety rail while the product hardens — post-hardening it may
+  become *removable* in explicitly-opted-in environments, but **never by
+  default**; autonomy over sensitive actions is the rare exception, not the rule.
+- **D4 — Waivers gate high-risk classes.** Some classes carry consequences that
+  reach *beyond the user's own data* — **communications** (messages, emails,
+  connection requests, posts) send content to other people and are the first such
+  class. Enabling one requires a **waiver**: a one-time, user-authorized informed
+  consent that the class is on. The waiver *enables the capability*; per-action
+  co-browsing (D3) still governs each individual use.
 - **D5 — Standalone subsystem now; Trellis is a future *initiator*, never the
   home.** Scheduling/hub orchestration is deferred until workflows hardens.
 - **D6 — Full audit.** Every read and act appends to a generated ledger note; an
@@ -143,20 +149,53 @@ So the actuation engine must be CDP-based.
 **Recommendation:** raw CDP for the MVP (thin typed wrappers in
 `src/agentic/cdp/`), reassess `playwright-crx` when navigation complexity grows.
 
-**Reference frameworks (checked 2026-07).** The mature agentic stacks — Stagehand
-(TypeScript, on Playwright), Browser Use (Python; moved to direct CDP; ~89%
-WebVoyager SOTA), Skyvern — all assume a Node/Playwright or Python runtime, **not
-a Chrome extension**, so none drops in wholesale. `playwright-crx` runs the
-Playwright API *inside* an extension over CDP (Stagehand could potentially layer
-on it — evaluate at Phase 2). We reuse their **accessibility-tree + DOM
-action-selection pattern** on our existing AI-SDK loop, not their runtimes;
-vision stacks (Anthropic Computer Use) inform the D-TGT fallback.
-
 **The debugger banner.** `chrome.debugger` shows a non-hideable "extension started
 debugging this browser" info bar (a Chrome security feature). Mitigation: attach
 only during an *active* co-browse session, detach the instant it ends; frame the
 banner in-product as the visible sign the agent is driving (consistent with D1's
 visibility promise).
+
+### Where we sit vs. the mature stacks (checked 2026-07)
+
+Agentic browsing splits into **two categories** that are easy to conflate:
+- **Automation frameworks** — Playwright, Stagehand (TS on Playwright), Browser
+  Use (Python; moved to direct CDP; ~89% WebVoyager SOTA), Skyvern, Browserbase.
+  Developer tools that **launch a dedicated or cloud browser** for autonomous
+  automation at scale — *not* the user's everyday session.
+- **Agentic-browser products** — Perplexity Comet, The Browser Company's Dia,
+  Nanobrowser (extension). Agents that drive the **user's own browser**. This is
+  our category.
+
+Every stack runs the same **perceive → decide → act** loop, differing on two
+axes: **perception** (DOM / accessibility-tree vs vision / screenshot) and
+**runtime** (a launched/cloud browser vs the user's real one).
+
+| Stack | Perception | Runtime | Fit for us |
+|---|---|---|---|
+| Playwright + LLM | DOM / a11y | launches its own browser | pattern yes, runtime no |
+| Stagehand | DOM / a11y (NL→action) | Playwright / Browserbase | ergonomics *if* via `playwright-crx` |
+| Browser Use | DOM + vision | own CDP process (Python) | pattern yes; wrong language/runtime |
+| Computer Use / CUA | vision | VM / sandbox screen | fallback pattern only; model-locked |
+| **Ours** | **a11y + DOM (vision fallback)** | **user's real browser (`chrome.debugger`/CDP)** | — |
+
+**Our position is deliberately the product category, not the framework one.** We
+optimize for *supervised action in the user's own logged-in, visible browser*
+(D1) — auth for free, co-browsing, the user watches. The frameworks optimize for
+*autonomous scale in isolated/cloud browsers*. So we **borrow their perception
+pattern** (a11y-tree + DOM — mainstream, deterministic, token-efficient) and
+their **execution primitive** (CDP — the same protocol Playwright uses under the
+hood, and the one Browser Use migrated to in 2026), **reuse our own AI-SDK agent
+loop** (identical loop shape), and add **bespoke governance** (co-browsing,
+sensitivity gating, ledger, garden-ownership) that none of them have — because
+none is built for "the user watches their own browser get driven and approves the
+sensitive moments." That gap *is* the product.
+
+**Why not adopt one wholesale:** their runtime layer assumes a Node/Python process
+that *launches* a browser; an MV3 extension has neither — the browser is the
+user's Chrome via `chrome.debugger`. `playwright-crx` is the only bridge that
+repackages Playwright to run *inside* an extension over CDP — the sole path to
+Stagehand-like ergonomics against the user's browser, at the cost of a large
+in-extension dependency (evaluate maintenance + bundle at Phase 2).
 
 ### Target identification (decision D-TGT)
 - **Primary: accessibility tree** (`Accessibility.getFullAXTree`) — semantic,
