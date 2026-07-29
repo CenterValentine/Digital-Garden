@@ -26,6 +26,7 @@
     "publishing:schema:check": "tsx scripts/validate-publishing-schema.ts",
     "publishing:audit:defaults": "tsx scripts/audit-publishing-defaults.ts",
     "publishing:audit:themes": "tsx scripts/audit-publishing-themes.ts",
+    "showcase:figures": "tsx scripts/sync-showcase-figures.ts",
     "db:seed": "tsx prisma/seed.ts",
     "db:target": "tsx scripts/check-db-target.ts",
     "preflight": "bash scripts/preflight.sh",

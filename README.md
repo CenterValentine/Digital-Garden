@@ -1,435 +1,298 @@
-# Digital Garden - Content IDE
-
-A modern, Obsidian-inspired knowledge management system built with Next.js 16. Combines rich text editing, multi-cloud storage, hierarchical file organization, and an elegant glass-morphism UI.
-
-## Features
-
-### Core Functionality
-- **Panel-Based Layout** - Resizable left/right sidebars with persistent state
-- **Rich Text Editor** - TipTap-powered editor with markdown shortcuts, tables, code blocks
-- **File Tree** - Drag-and-drop file organization with react-arborist
-- **Multi-Cloud Storage** - Support for Cloudflare R2, AWS S3, and Vercel Blob
-- **Search & Tags** - Full-text search with tag filtering and backlink tracking
-- **Custom Extensions** - Wiki-links `[[Note Title]]`, callouts, slash commands, task lists
-
-### Content Types
-- **Notes** - Rich markdown content with TipTap JSON
-- **Files** - Images, PDFs, videos, audio, office documents
-- **Code** - Syntax-highlighted code snippets (50+ languages)
-- **HTML** - Rendered HTML content
-
-### Design System
-- **Liquid Glass** - Glass-morphism design with blur effects and semi-transparent surfaces
-- **Unified Tokens** - Consistent design tokens for surfaces, intents, and motion
-- **Dark Mode** - Full dark mode support via next-themes
-
-## Tech Stack
-
-### Framework & Core
-- **Next.js 16.0.8** - App Router with React Server Components
-- **React 19.2.1** - Latest React with concurrent features
-- **TypeScript 5** - Strict mode type safety
-- **Turbopack** - Fast development builds
-
-### Database & ORM
-- **PostgreSQL** - Primary database (Neon, local, or Prisma Postgres)
-- **Prisma 7.2.0** - Type-safe database client with migrations
-- **ContentNode v2.0** - Hybrid polymorphic content architecture
-
-### UI & State
-- **Tailwind CSS 4** - Utility-first styling with custom design tokens
-- **Radix UI** - Accessible, unstyled component primitives
-- **Zustand 5.0.2** - Lightweight state management with persistence
-- **Allotment 1.20.3** - Resizable panel layout (3.2KB gzipped)
-- **react-arborist 3.4.0** - Virtualized file tree with drag-and-drop
-
-### Rich Text
-- **TipTap 3.15.3** - Extensible rich text editor framework
-- **lowlight 3.3.0** - Syntax highlighting (50+ languages)
-- **Custom Extensions** - Wiki-links, callouts, slash commands, task lists
-
-### Storage
-- **@aws-sdk/client-s3** - S3 and R2 storage integration
-- **@vercel/blob** - Vercel Blob storage
-- **Multi-provider abstraction** - Unified API across storage backends
-
-## Getting Started
-
-### Prerequisites
-
-- **Node.js 20+** - Required for Next.js 16
-- **pnpm** - Package manager (or npm/yarn/bun)
-- **PostgreSQL** - Database (local or cloud-hosted)
-
-### Installation
-
-```bash
-# 1. Clone the repository
-git clone <repository-url>
-cd Digital-Garden
-
-# 2. Install dependencies
-pnpm install
-
-# 3. Set up environment variables
-cp .env.example .env.local
-# Edit .env.local with your database URL and other credentials
-```
-
-### Environment Variables
-
-Required variables for `.env.local`:
-
-```bash
-# Database
-DATABASE_URL="postgresql://user:password@host:5432/database"
-
-# Storage Encryption
-STORAGE_ENCRYPTION_KEY="your-32-byte-hex-key-here"
-
-# Optional: Google OAuth
-GOOGLE_CLIENT_ID="your-google-client-id"
-GOOGLE_CLIENT_SECRET="your-google-client-secret"
-
-# Optional: Storage Providers (configure at least one)
-# Cloudflare R2
-R2_ACCESS_KEY_ID="your-r2-access-key"
-R2_SECRET_ACCESS_KEY="your-r2-secret-key"
-R2_BUCKET_NAME="your-bucket-name"
-R2_REGION="auto"
-R2_ENDPOINT="https://your-account-id.r2.cloudflarestorage.com"
-
-# AWS S3
-AWS_ACCESS_KEY_ID="your-aws-access-key"
-AWS_SECRET_ACCESS_KEY="your-aws-secret-key"
-AWS_BUCKET_NAME="your-bucket-name"
-AWS_REGION="us-east-1"
-
-# Vercel Blob
-BLOB_READ_WRITE_TOKEN="your-vercel-blob-token"
-```
-
-### Database Setup
-
-```bash
-# 1. Generate Prisma client
-npx prisma generate
-
-# 2. Run migrations
-npx prisma migrate deploy
-
-# 3. (Optional) Seed test data
-pnpm db:seed
-
-# 4. (Optional) Open Prisma Studio to view data
-npx prisma studio
-```
-
-### Development
-
-```bash
-# Start development server
-pnpm dev
-
-# Open http://localhost:3000
-```
-
-### Production Build
-
-```bash
-# Build for production
-pnpm build
-
-# Start production server
-pnpm start
-```
-
-### Other Commands
-
-```bash
-# Run linter
-pnpm lint
-
-# Generate design tokens
-pnpm build:tokens
-
-# Database operations
-pnpm db:seed              # Seed test data
-npx prisma generate       # Regenerate Prisma client
-npx prisma migrate dev    # Create new migration
-npx prisma studio         # Open database GUI
-
-```
-
-## Hocuspocus Collaboration
-The Next.js app can remain on Vercel, but the Hocuspocus process should run on a long-lived Node host like Railway or Google Cloud Run to maintain persistent WebSocket connections.
-
-For google cloud run, you can use a `cloudbuild.hocuspocus.yaml` configuration to build and deploy the Hocuspocus service.
-
-```bash
-gcloud builds submit --config=cloudbuild.hocuspocus.yaml .
-
-## Project Structure
-
-```
-Digital-Garden/
-├── app/                          # Next.js App Router
-│   ├── (authenticated)/          # Protected routes
-│   │   └── content/             # Content IDE routes
-│   │       ├── page.tsx         # Main content IDE page
-│   │       └── [id]/            # Individual content pages
-│   ├── api/                     # API routes
-│   │   └── content/             # Content API endpoints
-│   │       ├── route.ts         # List/create content
-│   │       ├── [id]/            # Individual content operations
-│   │       ├── tree/            # Hierarchical tree
-│   │       ├── upload/          # File upload (initiate/finalize)
-│   │       ├── storage/         # Storage provider config
-│   │       ├── search/          # Full-text search
-│   │       ├── backlinks/       # Backlink tracking
-│   │       └── tags/            # Tag management
-│   └── globals.css              # Global styles + design tokens
-├── components/
-│   └── content/                 # Content IDE components
-│       ├── headers/             # Panel headers
-│       ├── left-sidebar/        # File tree, search
-│       ├── right-sidebar/       # Outline, backlinks, tags
-│       ├── editor/              # TipTap editor
-│       └── viewers/             # File type viewers
-├── lib/
-│   ├── content/                 # Content utilities
-│   │   ├── api-types.ts        # API type definitions
-│   │   └── utils.ts            # Helper functions
-│   ├── design-system/          # Design tokens
-│   │   ├── surfaces.ts         # Glass-0/1/2 levels
-│   │   ├── intents.ts          # Semantic colors
-│   │   └── motion.ts           # Animation rules
-│   ├── editor/                 # TipTap extensions
-│   │   ├── extensions.ts       # Extension configs
-│   │   ├── wiki-link-node.ts   # Wiki-link extension
-│   │   ├── callout-extension.ts # Callout blocks
-│   │   └── slash-commands.tsx  # Slash command menu
-│   ├── storage/                # Storage providers
-│   │   ├── factory.ts          # Provider factory
-│   │   ├── r2-provider.ts      # Cloudflare R2
-│   │   ├── s3-provider.ts      # AWS S3
-│   │   └── vercel-provider.ts  # Vercel Blob
-│   └── generated/
-│       └── prisma/             # Generated Prisma client
-├── stores/                      # Zustand state stores
-│   ├── panel-store.ts          # Panel layout state
-│   ├── content-store.ts        # Selected content state
-│   ├── tree-state-store.ts     # Tree expand/collapse
-│   ├── context-menu-store.ts   # Right-click menu
-│   ├── editor-stats-store.ts   # Word count, reading time
-│   └── outline-store.ts        # Document outline
-├── prisma/
-│   ├── schema.prisma           # Database schema
-│   ├── migrations/             # Migration history
-│   └── seed.ts                 # Seed script
-├── docs/
-│   └── notes-feature/          # Comprehensive documentation
-│       ├── 00-index.md         # Documentation index
-│       ├── 01-architecture.md  # System architecture
-│       ├── 03-database-design.md # ContentNode v2.0
-│       └── ...                 # 90+ documentation files
-└── archive/                    # Archived applications
-    ├── web-amino/              # Amino acid learning platform
-    └── open-notes/             # Documentation repository
-```
-
-## Architecture Highlights
-
-### ContentNode v2.0 - Hybrid Polymorphism
-
-A single `ContentNode` table acts as a universal container for all content types. Each leaf node has exactly one typed payload relation:
-
-- **NotePayload** - Rich text content (TipTap JSON + markdown)
-- **FilePayload** - Binary files with storage metadata
-- **HtmlPayload** - Rendered HTML content
-- **CodePayload** - Code snippets with syntax highlighting
-
-### Multi-Cloud Storage System
-
-Provider abstraction layer supports multiple cloud storage backends with encrypted credential storage:
-
-- **Cloudflare R2** - Primary (S3-compatible, no egress fees)
-- **AWS S3** - Traditional cloud storage
-- **Vercel Blob** - Vercel-native storage
-
-### Server/Client Component Split
-
-Maximizes server-side rendering for instant visual feedback, progressively enhances with client interactivity:
-
-- **Server Components** - Panel headers, borders, layout structure, skeleton states
-- **Client Components** - Interactive file tree, resizable panels, drag-and-drop handlers
-
-### Design System - Liquid Glass
-
-Three token categories generated via style-dictionary:
-
-- **Surfaces** - Glass-0/1/2 blur levels for glassmorphism effects
-- **Intents** - Semantic colors (primary, danger, success, warning, info)
-- **Motion** - Conservative animation rules
-
-## Documentation
-
-Comprehensive documentation is available in [`docs/notes-feature/`](docs/notes-feature/):
-
-- **[00-index.md](docs/notes-feature/00-index.md)** - Documentation index (start here)
-- **[IMPLEMENTATION-STATUS.md](docs/notes-feature/IMPLEMENTATION-STATUS.md)** - Current milestone progress
-- **[01-architecture.md](docs/notes-feature/01-architecture.md)** - System architecture
-- **[03-database-design.md](docs/notes-feature/03-database-design.md)** - Database schema
-- **[04-api-specification.md](docs/notes-feature/04-api-specification.md)** - API routes
-- **[CLAUDE.md](CLAUDE.md)** - AI assistant development guide
-
-See [`docs/notes-feature/00-index.md`](docs/notes-feature/00-index.md) for the complete documentation catalog (90+ files).
-
-## Database Management
-
-### Critical Rules
-
-- ✅ Use `npx prisma db push` for development (fast, no data loss)
-- ✅ Use `npx prisma migrate dev` only for production-ready changes
-- ✅ Always run `npx prisma generate` after schema changes
-- ❌ Never use `npx prisma migrate reset` in production (deletes all data!)
-
-### Common Workflows
-
-```bash
-# Making schema changes in development
-npx prisma db push          # Push changes directly (no migration file)
-npx prisma generate         # Regenerate client
-
-# Creating a production migration
-npx prisma migrate dev --name descriptive_name --create-only
-# Review SQL in prisma/migrations/
-npx prisma migrate deploy   # Deploy to production
-
-# Seeding test data
-pnpm db:seed
-
-# Viewing data
-npx prisma studio           # Opens GUI at http://localhost:5555
-```
-
-See [`docs/notes-feature/PRISMA-DATABASE-GUIDE.md`](docs/notes-feature/PRISMA-DATABASE-GUIDE.md) for comprehensive database management guidance.
-
-## Key Features
-
-### Wiki-Links
-
-Link between notes using `[[Note Title]]` or `[[slug|Display Text]]` syntax. Autocomplete suggests existing notes as you type.
-
-### Callouts
-
-Create Obsidian-style callouts with 6 types:
-
-```markdown
-> [!note] Title
-> Content here
-
-> [!tip] Pro Tip
-> Helpful information
-
-> [!warning] Watch Out
-> Important warning
-
-> [!danger] Critical
-> Dangerous operation
-
-> [!info] FYI
-> Additional information
-
-> [!success] Done
-> Successful completion
-```
-
-### Slash Commands
-
-Press `/` in the editor to open the command menu:
-
-- Headings (H1-H3)
-- Code blocks
-- Tables
-- Callouts
-- Task lists
-- Blockquotes
-- Dividers
-
-### Task Lists
-
-Auto-format `- [ ]` to task lists:
-
-```markdown
-- [ ] Todo item
-- [x] Completed item
-```
-
-### Drag-and-Drop Upload
-
-Drag files directly into the file tree or editor to upload. Supports images, PDFs, office documents, videos, and audio.
-
-## Deployment
-
-### Vercel (Recommended)
-
-```bash
-# 1. Install Vercel CLI
-pnpm add -g vercel
-
-# 2. Link project
-vercel link
-
-# 3. Set environment variables
-vercel env add DATABASE_URL
-vercel env add STORAGE_ENCRYPTION_KEY
-# ... add other variables
-
-# 4. Deploy
-vercel --prod
-```
-
-### Other Platforms
-
-The application can be deployed to any platform supporting Next.js 16:
-
-- **Docker** - See Next.js Docker documentation
-- **AWS** - Use AWS Amplify or EC2
-- **Railway** - One-click deployment
-- **DigitalOcean** - App Platform
-
-Ensure all environment variables are configured and database migrations are run before deployment.
-
-## Contributing
-
-Contributions are welcome! Please follow these guidelines:
-
-1. Read [`docs/notes-feature/00-index.md`](docs/notes-feature/00-index.md) for architecture overview
-2. Check [`CLAUDE.md`](CLAUDE.md) for development patterns and conventions
-3. Follow TypeScript strict mode (no `any` types)
-4. Use inline SVG for server component icons (not `lucide-react`)
-5. Test that server components render without JavaScript
-6. Update documentation for any architectural changes
-
-## License
-
-[Your License Here]
-
-## Acknowledgments
-
-- **Obsidian** - Inspiration for the note-taking experience
-- **Novel** - TipTap-based rich text editor
-- **react-arborist** - Virtualized tree component
-- **Radix UI** - Accessible component primitives
-- **Vercel** - Hosting and deployment platform
-
-## Support
-
-For issues, questions, or feature requests, please open an issue on GitHub or contact the maintainers.
+# Digital Garden — an AI-native knowledge IDE
+
+[![Quality Gates](https://github.com/CenterValentine/Digital-Garden/actions/workflows/quality.yml/badge.svg)](https://github.com/CenterValentine/Digital-Garden/actions/workflows/quality.yml)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black)
+![React 19](https://img.shields.io/badge/React-19-149eca)
+![TypeScript strict](https://img.shields.io/badge/TypeScript-strict%2C%20no%20any-3178c6)
+![AI SDK v6](https://img.shields.io/badge/AI%20SDK-v6-000)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
+An Obsidian-class knowledge IDE that grew into an **AI automation platform**: agentic chat with a
+typed tool registry, reusable agent playbooks, durable workflows with an n8n spoke, resumable AI
+streams, multimodal pipelines (TTS · STT · image), real-time Y.js collaboration, and a publishing
+system that renders my actual personal site.
+
+**[Live site →](https://davidvalentine.org)** rendered by this repo's publishing system ·
+**[Video demo →](https://davidvalentine.org/demo)** ·
+**[Feature inventory →](docs/FEATURES.md)** ·
+**[Deployment →](docs/DEPLOYMENT.md)** ·
+**[Documentation →](docs/notes-feature/00-START-HERE.md)**
+
+<!-- fig:1-1 -->
+<sub>📷 <b>Fig 1-1</b> · <i>Three-panel Content IDE (hero)</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:1-1 -->
+
+Solo-built, production-deployed, and used daily — this is my working environment for notes,
+research capture, my published site, and the agentic systems that run my own job search.
 
 ---
 
-Built with ❤️ using Next.js 16 and React 19
+## AI & agentic systems
 
+Every AI capability here is a first-class subsystem with typed contracts, CI gates, and fallback
+behavior — not a chat window bolted onto a notes app. The table maps each capability to where it
+lives in the code.
 
+| Capability | What's built | Where |
+|---|---|---|
+| **Tool-calling orchestration** | Server-side tool registry with a client-safe metadata split (no Prisma in the client bundle); editor, flashcard, and workflow tool families; canonical output-placement so agent output lands *in documents*, not just chat | [`lib/domain/ai/tools/`](lib/domain/ai/tools/) |
+| **Multi-model routing + fallback** | Per-feature model routes with fallback chains (`executeWithFallback`), registry-authoritative model catalog, per-model constraints | [`lib/domain/ai/features/`](lib/domain/ai/features/) |
+| **Agent playbooks** | Notes/folders marked as reusable playbooks; progressive-disclosure injection (agents load steps as needed, not all upfront); discoverable via a `search_playbooks` tool; checkpoint gating | [`lib/domain/ai/playbooks/`](lib/domain/ai/playbooks/) |
+| **Durable workflows** | Visual workflow builder (React Flow) with trigger system and run history, plus an n8n spoke — outbound webhooks and inbound callbacks for jobs that outlive a request | [`extensions/workflows/`](extensions/workflows/) |
+| **Resumable streaming** | AI responses stream over SSE and survive a page reload mid-generation (Upstash-backed resumable streams) | [`lib/domain/ai/resumable/`](lib/domain/ai/resumable/) |
+| **Resource governance** | Per-run ledger, tool-output compaction to control context growth, dangling-tool-call repair, prompt caching | [`lib/domain/ai/run-ledger.ts`](lib/domain/ai/run-ledger.ts), [`compact-tool-outputs.ts`](lib/domain/ai/compact-tool-outputs.ts) |
+| **Grounded generation** | Folder Studio: folder-scoped agentic chat grounded in attached context docs with auto-context assembly | [`extensions/studio/`](extensions/studio/) |
+| **Multimodal pipelines** | TTS generation + storage catalog (read-aloud player), speech-to-text, AI image generation, AI-mediated media injection into notes | [`lib/domain/ai/speech/`](lib/domain/ai/speech/), [`transcribe/`](lib/domain/ai/transcribe/), [`image/`](lib/domain/ai/image/) |
+| **Agentic browser reach** | Chrome extension as a content-acquisition provider: service-worker fetch → session-tab ladder, client-mediated with a server-built trust envelope; capture-policy safety gates | [`lib/domain/ai/acquisition/`](lib/domain/ai/acquisition/) |
+| **Provider abstraction (BYOK)** | Anthropic · OpenAI · Google · Groq · Mistral · xAI provider factories behind one interface, encrypted key storage, gateway routing | [`lib/domain/ai/providers/`](lib/domain/ai/providers/) |
+| **MCP interoperability** | 🔭 **Planned** — MCP server exposing garden tools/resources to external agents + MCP client consuming external servers in the chat tool loop (design doc in progress) | — |
+
+### How an AI request flows
+
+```mermaid
+flowchart LR
+  U["Chat / editor / extension surface"] --> R["Feature router<br/>per-feature model routes"]
+  R --> F["Fallback chain<br/>executeWithFallback"]
+  F --> P["Provider factories<br/>Anthropic · OpenAI · Google · Groq · Mistral · xAI"]
+  F --> T["Tool loop<br/>server tool registry"]
+  T --> PB["Playbooks<br/>progressive disclosure"]
+  T --> OP["Output placement<br/>into notes + references"]
+  F --> S["Resumable SSE stream<br/>survives page reload"]
+  S --> L["Run ledger + persistence<br/>conversation tables"]
+```
+
+<!-- fig:2-1 -->
+<sub>📷 <b>Fig 2-1</b> · <i>AI chat executing tools</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-1 -->
+
+**Playbooks** turn the agent from a chatbot into an operator: any note or folder can be marked as
+a playbook, and agents discover and execute them with steps injected progressively — my job-search
+playbook runs this way daily (Fig 2-2). **Workflows** cover the durable side: multi-step
+automations built on a visual canvas, executed through triggers and an n8n spoke with callback
+verification (Fig 2-3). **Folder Studio** scopes an agent to a folder's content with attached
+context documents — grounded answers, not vibes (Fig 2-4).
+
+<!-- fig:2-2 -->
+<sub>📷 <b>Fig 2-2</b> · <i>Playbook run (progressive disclosure)</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-2 -->
+<!-- fig:2-3 -->
+<sub>📷 <b>Fig 2-3</b> · <i>Workflow canvas + run history</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-3 -->
+<!-- fig:2-4 -->
+<sub>📷 <b>Fig 2-4</b> · <i>Folder Studio grounded chat</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-4 -->
+
+Infrastructure details that usually get skipped: streams are **resumable** — reload the page
+mid-generation and the response keeps going (Fig 2-5); every run is metered in a ledger; tool
+outputs are compacted to keep context windows honest; and models are **user-configurable per
+feature** with BYOK keys stored encrypted (Fig 2-7). Text-to-speech, transcription, and image
+generation run as first-class pipelines with storage-backed catalogs (Fig 2-6).
+
+<!-- fig:2-5 -->
+<sub>📷 <b>Fig 2-5</b> · <i>Resumable stream surviving a reload</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-5 -->
+<!-- fig:2-6 -->
+<sub>📷 <b>Fig 2-6</b> · <i>Read-aloud TTS player</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-6 -->
+<!-- fig:2-7 -->
+<sub>📷 <b>Fig 2-7</b> · <i>Model routing & BYOK connections</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:2-7 -->
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TD
+  subgraph Clients
+    B["Browser app"]
+    X["Chrome extension<br/>side panel · capture · acquisition"]
+  end
+  subgraph Vercel
+    N["Next.js 16 app<br/>RSC + API routes + AI domain"]
+  end
+  subgraph CloudRun["Google Cloud Run"]
+    H["Hocuspocus<br/>Y.js collaboration server"]
+  end
+  subgraph HomeServer["Home server · Cloudflare Tunnel"]
+    N8["n8n<br/>workflow spoke"]
+  end
+  PG[("PostgreSQL<br/>Neon prod · Docker dev")]
+  ST[("Object storage<br/>R2 · S3 · Vercel Blob")]
+  AI["AI providers<br/>Anthropic · OpenAI · Google · …"]
+
+  B --> N
+  X --> N
+  B <-->|"WebSocket"| H
+  N --> PG
+  H --> PG
+  N --> ST
+  N <-->|"webhooks + callbacks"| N8
+  N --> AI
+```
+
+**ContentNode v2.0** — one polymorphic table is the universal container: folders form the
+hierarchy; leaves attach exactly one typed payload (`NotePayload` TipTap JSON, `FilePayload`
+binary + storage metadata, `CodePayload`, `HtmlPayload`, `ExternalPayload` with Open Graph
+metadata). Soft delete, display ordering, and full-text search live on the container, so every
+content type inherits them.
+
+**Real-time collaboration** — TipTap documents sync through Y.js CRDTs via a Hocuspocus server on
+Cloud Run. Presence survives Vercel's serverless split by persisting awareness state to Postgres.
+A CI gate (`collab:schema:check`) statically verifies that every editor extension has a
+server-safe variant registered with the collaboration server — schema drift between client and
+collab server fails the build, because at runtime it would corrupt documents.
+
+**Extension system** — features ship as 10 first-party extension modules
+(`daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`,
+`browser-bookmarks`, `studio`, `workflows`), each owning its manifest, client/server runtimes,
+components, and state. Disabled extensions disappear through registry filters — shared UI has no
+per-feature conditionals.
+
+---
+
+## Feature tour
+
+### The editor
+
+TipTap-based, with a custom block inventory: wiki-links with autocomplete (`[[Note Title]]`),
+Obsidian-style callouts, tabs/columns/accordions, Mermaid and Excalidraw blocks with collaborative
+sub-documents, inline tags and timestamps, slash commands, and a schema-versioning system with
+migration support. Unknown node types round-trip as explicit placeholders instead of being
+silently dropped.
+
+<!-- fig:1-2 -->
+<sub>📷 <b>Fig 1-2</b> · <i>Sixty-second tour</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:1-2 -->
+<!-- fig:3-1 -->
+<sub>📷 <b>Fig 3-1</b> · <i>Block library breadth</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:3-1 -->
+<!-- fig:3-2 -->
+<sub>📷 <b>Fig 3-2</b> · <i>Live collaboration</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:3-2 -->
+
+### Publishing
+
+Notes compose into public pages from a registry of publishing blocks (hero, cards, galleries,
+pricing, testimonials, …), rendered server-side with light/dark theming and per-block Playwright
+visual regression. [davidvalentine.org](https://davidvalentine.org) is this pipeline in
+production (Fig 4-2).
+
+<!-- fig:4-1 -->
+<sub>📷 <b>Fig 4-1</b> · <i>Publishing composer → live page</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:4-1 -->
+<!-- fig:4-2 -->
+<sub>📷 <b>Fig 4-2</b> · <i>davidvalentine.org, rendered by this repo</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:4-2 -->
+
+### Browser extension
+
+A Chrome extension embeds the garden in a side panel, captures pages under explicit
+capture-policy safety gates, and acts as an **acquisition provider**: when the app needs a page's
+full content, it climbs a ladder from service-worker fetch to session-tab extraction — with the
+server building the trusted envelope (Fig 5-1).
+
+<!-- fig:5-1 -->
+<sub>📷 <b>Fig 5-1</b> · <i>Browser extension side panel & acquisition</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
+<!-- /fig:5-1 -->
+
+### And also
+
+Flashcards with FSRS spaced repetition · daily/periodic notes with activity summaries · people +
+workplace entities with mentions · full-text search with tag filtering and backlinks · multi-cloud
+file storage with two-phase presigned uploads · an RSVP speed reader · export to Markdown/HTML/JSON
+with metadata sidecars.
+
+---
+
+## Engineering practice
+
+The part that doesn't screenshot well but matters most:
+
+- **Quality gates, in order:** `pnpm typecheck` → `pnpm lint` (warning-count ratchet — new
+  warnings fail CI) → `pnpm build` → browser smoke test.
+- **CI on every PR** ([workflows](.github/workflows/)): lint + typecheck (`quality.yml`),
+  collaboration schema coverage (`collaboration-hardening.yml`), and publishing schema +
+  per-block visual regression (`publishing-visual.yml`).
+- **Static drift detectors** as CI gates: collab-schema coverage, publishing `Server*` variants,
+  Zod-default vs. render-fallback drift, dark-mode CSS coverage audits.
+- **React Compiler lint rules enforced** — compiler diagnostics are treated as bug reports, and
+  they've caught real ones (stale callbacks, StrictMode-unsafe ref writes, render impurity).
+- **AI-assisted development, documented:** [`CLAUDE.md`](CLAUDE.md) and [`AGENTS.md`](AGENTS.md)
+  encode the repo's conventions for agentic coding tools — the same discipline the product's own
+  agents get held to.
+- 90+ architecture and workflow documents under [`docs/`](docs/notes-feature/00-START-HERE.md),
+  130+ merged PRs in sprint format.
+
+---
+
+## Quickstart
+
+Prerequisites: Node 20+, pnpm, Docker (for local Postgres).
+
+```bash
+git clone https://github.com/CenterValentine/Digital-Garden.git
+cd Digital-Garden
+pnpm install
+cp .env.example .env.local
+pnpm db:local:up
+npx prisma generate
+npx prisma migrate deploy
+pnpm db:seed
+pnpm dev
+```
+
+The app runs at **http://localhost:3015**. Required env vars: `DATABASE_URL` (use `localhost`,
+not `127.0.0.1`, for the Docker Postgres) and `STORAGE_ENCRYPTION_KEY` (32-byte hex). AI features
+need at least one provider key (BYOK — configured in-app). Live collaboration in dev needs the
+local Hocuspocus server in a second terminal:
+
+```bash
+pnpm dev:collab
+```
+
+with `NEXT_PUBLIC_HOCUSPOCUS_URL=ws://localhost:1234` in `.env.local`. Full production builds
+need a larger Node heap: `NODE_OPTIONS='--max-old-space-size=8192' pnpm build`.
+
+## Deployment topology
+
+Three services deploy independently:
+
+| Service | Platform | How |
+|---|---|---|
+| Next.js app | Vercel | `vercel --prod` (build skips local-only gates; migrations run manually via `npx prisma migrate deploy`) |
+| Hocuspocus (collab) | Google Cloud Run | `gcloud builds submit --config cloudbuild.hocuspocus.yaml .` — **must be redeployed after schema-changing merges**, or unknown blocks degrade to placeholders |
+| n8n (workflow spoke) | Any long-lived host | Self-hosted (here: a home server behind a Cloudflare Tunnel, no inbound ports) |
+
+Postgres (Neon in production) and object storage (Cloudflare R2 primary; S3/Vercel Blob
+supported) are managed services. Full guide — env reference, migration baseline caveats, the
+Hocuspocus redeploy rules, and post-deploy verification: **[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)**.
+
+---
+
+## Roadmap
+
+Labeled honestly — nothing below is shipped yet:
+
+- 🔭 **MCP server + client** — expose the garden's tools, content, and playbooks to external
+  agents over the Model Context Protocol, and consume external MCP servers inside the chat tool
+  loop. Design of record: [MCP-PLAN.md](docs/notes-feature/work-tracking/MCP-PLAN.md) — first
+  slice is a read-only server demoable from Claude Desktop.
+- 🔭 **Playbook completeness** — SKILL.md import, richer playbook lifecycle.
+- 🔭 **Resource budgets** — enforced per-run token/step budgets on top of the existing run ledger.
+- 🔭 **Conversation memory** — long-horizon memory bank across chat sessions.
+
+## Documentation & showcase upkeep
+
+- Start here: [`docs/notes-feature/00-START-HERE.md`](docs/notes-feature/00-START-HERE.md)
+- Figures in this README are managed by a registry + sync script — see
+  [`docs/media/figures/FIGURES.md`](docs/media/figures/FIGURES.md). Drop a correctly-named media
+  file in that folder, run `pnpm showcase:figures`, and it appears here automatically.
+- Showcase maintenance guide: [`docs/notes-feature/guides/showcase/SHOWCASE-MAINTENANCE.md`](docs/notes-feature/guides/showcase/SHOWCASE-MAINTENANCE.md)
+
+## License & contact
+
+[MIT](LICENSE). If you want to build on something here, [reach out](https://davidvalentine.org/contact).
+
+Built and maintained by [David Valentine](https://davidvalentine.org) ·
+[Request a demo](https://davidvalentine.org/demo)

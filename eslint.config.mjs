@@ -116,6 +116,7 @@ const eslintConfig = defineConfig([
     "app/.well-known/workflow/**",
     // Local git worktree copies of the same repo.
     ".claude/worktrees/**",
+    ".codex/worktrees/**",
     ".worktrees/**",
     // Playwright artifacts.
     "test-results/**",
