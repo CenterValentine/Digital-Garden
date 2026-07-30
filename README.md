@@ -9,8 +9,8 @@
 
 An Obsidian-class knowledge IDE that grew into an **AI automation platform**: agentic chat with a
 typed tool registry, reusable agent playbooks, durable workflows with an n8n spoke, resumable AI
-streams, multimodal pipelines (TTS · STT · image), real-time Y.js collaboration, and a publishing
-system that renders my actual personal site.
+streams, multimodal pipelines (TTS · STT · image), real-time multiplayer editing — multiple people
+in the same document at once, live — and a publishing system that renders my actual personal site.
 
 **[Live site →](https://davidvalentine.org)** rendered by this repo's publishing system ·
 **[Video demo →](https://davidvalentine.org/demo)** ·
@@ -41,10 +41,10 @@ lives in the code.
 | **Durable workflows** | Visual workflow builder (React Flow) with trigger system and run history, plus an n8n spoke — outbound webhooks and inbound callbacks for jobs that outlive a request | [`extensions/workflows/`](extensions/workflows/) |
 | **Resumable streaming** | AI responses stream over SSE and survive a page reload mid-generation (Upstash-backed resumable streams) | [`lib/domain/ai/resumable/`](lib/domain/ai/resumable/) |
 | **Resource governance** | Per-run ledger, tool-output compaction to control context growth, dangling-tool-call repair, prompt caching | [`lib/domain/ai/run-ledger.ts`](lib/domain/ai/run-ledger.ts), [`compact-tool-outputs.ts`](lib/domain/ai/compact-tool-outputs.ts) |
-| **Grounded generation** | Folder Studio: folder-scoped agentic chat grounded in attached context docs with auto-context assembly | [`extensions/studio/`](extensions/studio/) |
+| **Grounded learning studio** | Folder Studio: a NotebookLM-parallel studio, minus the source-curation step — any folder's *existing* notes are the source corpus (auto-context assembly, no separate upload/select ritual). Grounded chat plus three generation shelves: Create (reports, flashcards, mind maps, audio/video overviews, slide decks, infographics), Practice (quizzes, oral exams, teach-it-back, study plans), Analyze (glossaries, comparisons, prerequisites) | [`extensions/studio/`](extensions/studio/) |
 | **Multimodal pipelines** | TTS generation + storage catalog (read-aloud player), speech-to-text, AI image generation, AI-mediated media injection into notes | [`lib/domain/ai/speech/`](lib/domain/ai/speech/), [`transcribe/`](lib/domain/ai/transcribe/), [`image/`](lib/domain/ai/image/) |
 | **Agentic browser reach** | Chrome extension as a content-acquisition provider: service-worker fetch → session-tab ladder, client-mediated with a server-built trust envelope; capture-policy safety gates | [`lib/domain/ai/acquisition/`](lib/domain/ai/acquisition/) |
-| **Provider abstraction (BYOK)** | Anthropic · OpenAI · Google · Groq · Mistral · xAI provider factories behind one interface, encrypted key storage, gateway routing | [`lib/domain/ai/providers/`](lib/domain/ai/providers/) |
+| **Provider abstraction (BYOK)** | Dedicated factories for Anthropic · OpenAI · Google · Groq · Mistral · xAI · DeepSeek behind one interface, plus a generic OpenAI-compatible connection type covering Moonshot (Kimi), Fireworks, Together, OpenRouter, Ollama, and any other OpenAI-compatible endpoint. Encrypted key storage, gateway routing | [`lib/domain/ai/providers/`](lib/domain/ai/providers/) |
 | **MCP interoperability** | 🔭 **Planned** — MCP server exposing garden tools/resources to external agents + MCP client consuming external servers in the chat tool loop (design doc in progress) | — |
 
 ### How an AI request flows
@@ -53,7 +53,7 @@ lives in the code.
 flowchart LR
   U["Chat / editor / extension surface"] --> R["Feature router<br/>per-feature model routes"]
   R --> F["Fallback chain<br/>executeWithFallback"]
-  F --> P["Provider factories<br/>Anthropic · OpenAI · Google · Groq · Mistral · xAI"]
+  F --> P["Provider factories<br/>Anthropic · OpenAI · Google · Groq · Mistral · xAI · DeepSeek<br/>+ OpenAI-compatible (Kimi, Fireworks, …)"]
   F --> T["Tool loop<br/>server tool registry"]
   T --> PB["Playbooks<br/>progressive disclosure"]
   T --> OP["Output placement<br/>into notes + references"]
@@ -69,8 +69,11 @@ flowchart LR
 a playbook, and agents discover and execute them with steps injected progressively — my job-search
 playbook runs this way daily (Fig 2-2). **Workflows** cover the durable side: multi-step
 automations built on a visual canvas, executed through triggers and an n8n spoke with callback
-verification (Fig 2-3). **Folder Studio** scopes an agent to a folder's content with attached
-context documents — grounded answers, not vibes (Fig 2-4).
+verification (Fig 2-3). **Folder Studio** is the NotebookLM-parallel piece: point it at a folder
+and its *existing* notes become the grounding corpus — no separate source-upload step — then chat,
+or generate study material across three shelves: Create (reports, flashcards, mind maps, audio/video
+overviews, slide decks, infographics), Practice (quizzes, oral exams, teach-it-back, study plans),
+and Analyze (glossaries, comparisons, prerequisites) (Fig 2-4).
 
 <!-- fig:2-2 -->
 <sub>📷 <b>Fig 2-2</b> · <i>Playbook run (progressive disclosure)</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
@@ -119,7 +122,7 @@ flowchart TD
   end
   PG[("PostgreSQL<br/>Neon prod · Docker dev")]
   ST[("Object storage<br/>R2 · S3 · Vercel Blob")]
-  AI["AI providers<br/>Anthropic · OpenAI · Google · …"]
+  AI["AI providers<br/>Anthropic · OpenAI · Google · DeepSeek · Kimi · …"]
 
   B --> N
   X --> N
@@ -137,11 +140,13 @@ binary + storage metadata, `CodePayload`, `HtmlPayload`, `ExternalPayload` with 
 metadata). Soft delete, display ordering, and full-text search live on the container, so every
 content type inherits them.
 
-**Real-time collaboration** — TipTap documents sync through Y.js CRDTs via a Hocuspocus server on
-Cloud Run. Presence survives Vercel's serverless split by persisting awareness state to Postgres.
-A CI gate (`collab:schema:check`) statically verifies that every editor extension has a
-server-safe variant registered with the collaboration server — schema drift between client and
-collab server fails the build, because at runtime it would corrupt documents.
+**Real-time multiplayer editing** — multiple people can open and edit the same note at the same
+time, live, with each other's cursors and selections visible (Fig 3-2) — powered by Y.js CRDTs
+synced through a Hocuspocus server on Cloud Run. Presence survives Vercel's serverless split by
+persisting awareness state to Postgres. A CI gate (`collab:schema:check`) statically verifies that
+every editor extension has a server-safe variant registered with the collaboration server — schema
+drift between client and collab server fails the build, because at runtime it would corrupt
+documents that multiple people are editing simultaneously.
 
 **Extension system** — features ship as 10 first-party extension modules
 (`daily-notes`, `flashcards`, `people`, `workplaces`, `calendar`, `publishing`, `speed-reader`,
@@ -156,10 +161,10 @@ per-feature conditionals.
 ### The editor
 
 TipTap-based, with a custom block inventory: wiki-links with autocomplete (`[[Note Title]]`),
-Obsidian-style callouts, tabs/columns/accordions, Mermaid and Excalidraw blocks with collaborative
-sub-documents, inline tags and timestamps, slash commands, and a schema-versioning system with
-migration support. Unknown node types round-trip as explicit placeholders instead of being
-silently dropped.
+Obsidian-style callouts, tabs/columns/accordions, and multiplayer-editable Mermaid and Excalidraw
+blocks — several people can sketch on the same diagram at once — plus inline tags and timestamps,
+slash commands, and a schema-versioning system with migration support. Unknown node types
+round-trip as explicit placeholders instead of being silently dropped.
 
 <!-- fig:1-2 -->
 <sub>📷 <b>Fig 1-2</b> · <i>Sixty-second tour</i> — <a href="docs/media/figures/FIGURES.md">media pending</a></sub>
