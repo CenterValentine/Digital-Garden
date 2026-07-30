@@ -26,6 +26,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
+import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
@@ -55,7 +56,8 @@ interface LeftSidebarContentProps {
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
   } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
-  onFileDrop?: (files: File[]) => void;
+  /** `parentId` is the folder the files were dropped into (`null` = root). */
+  onFileDrop?: (files: File[], parentId: string | null) => void;
   onAddPeopleTarget?: (parentId: string | null) => void;
   /** Opens the AI image generation dialog targeting the given parent folder. */
   onCreateAiImage?: (parentId: string | null) => void;
@@ -89,15 +91,6 @@ function parsePeopleVirtualParentId(parentId: string | null): Pick<CreateTarget,
   };
 }
 
-function findTreeNode(nodes: TreeNode[], id: string): TreeNode | null {
-  for (const node of nodes) {
-    if (node.id === id) return node;
-    const found = node.children ? findTreeNode(node.children, id) : null;
-    if (found) return found;
-  }
-  return null;
-}
-
 function patchTreeNodeTitle(
   nodes: TreeNode[],
   contentId: string,
@@ -129,7 +122,7 @@ function getCreateTarget(parentId: string | null, treeData: TreeNode[]): CreateT
     };
   }
 
-  const parentNode = parentId ? findTreeNode(treeData, parentId) : null;
+  const parentNode = parentId ? findTreeNodeById(treeData, parentId) : null;
 
   return {
     treeParentId: parentId,
@@ -521,6 +514,20 @@ export function LeftSidebarContent({
     };
   }, []);
 
+  // Imperative expand request from outside the tree (e.g. after an upload
+  // lands in a collapsed folder). react-arborist only reads initialOpenState
+  // on mount, so persisting to the store isn't enough — the tree needs the
+  // same expandNodeId path inline creation uses.
+  useEffect(() => {
+    const handleExpandRequest = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string | null }>).detail?.id;
+      if (id) setExpandNodeId(id);
+    };
+
+    window.addEventListener("dg:tree-expand", handleExpandRequest);
+    return () => window.removeEventListener("dg:tree-expand", handleExpandRequest);
+  }, []);
+
   useEffect(() => {
     const handleCreateFromTemplate = (
       event: CustomEvent<{
@@ -537,7 +544,7 @@ export function LeftSidebarContent({
       if (parentId === null) {
         const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
         if (treeSelectedIds.length === 1) {
-          const selectedNode = findTreeNode(treeData, treeSelectedIds[0]);
+          const selectedNode = findTreeNodeById(treeData, treeSelectedIds[0]);
           if (selectedNode) {
             parentId =
               selectedNode.contentType === "folder"
@@ -734,7 +741,7 @@ export function LeftSidebarContent({
     // Resolve every dragged node. If any can't be found we bail before
     // touching the optimistic tree.
     const dragged = dragIds
-      .map((id) => ({ id, node: findTreeNode(originalTree, id) }))
+      .map((id) => ({ id, node: findTreeNodeById(originalTree, id) }))
       .filter((x): x is { id: string; node: TreeNode } => x.node !== null);
     if (dragged.length !== dragIds.length) {
       toast.error("Failed to move item", {

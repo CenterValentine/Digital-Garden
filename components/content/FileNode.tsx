@@ -110,6 +110,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // 3. Multi-selected: Part of multi-selection (subtle)
   const isActive = data.id === selectedContentId;
   const isOpenInTab = openContentIds.includes(data.id);
+  // External (OS file) drag destination — selector returns a boolean so only
+  // the rows whose target status flips re-render as the pointer moves.
+  const isExternalDropTarget = useTreeDragStore(
+    (state) => state.externalDropTargetId === data.id,
+  );
   const isSelected = node.isSelected;
   const tree = node.tree;
   const isMultiSelected = isSelected && tree.selectedNodes && tree.selectedNodes.length > 1;
@@ -541,6 +546,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (node.state.willReceiveDrop && isFolder) {
       return "bg-primary/30 ring-1 ring-primary/50"; // Drop target
     }
+    if (isExternalDropTarget) {
+      return "bg-primary/30 ring-1 ring-primary/50"; // External file drop target
+    }
     if (isActive) {
       return "bg-primary/20 text-primary font-medium"; // Active in panel (brightest)
     }
@@ -560,6 +568,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     <div
       ref={dragHandle}
       style={style}
+      // Row identity for pointer hit-testing during external file drags
+      // (react-arborist's row wrapper carries no id attribute).
+      data-tree-node-id={data.id}
       className={`
         touch-callout-none
         flex items-center gap-2 px-2 py-1 cursor-pointer

@@ -492,19 +492,20 @@ export function FileTree({
 
     // Find the node by ID and open it imperatively
     const node = tree.visibleNodes?.find((n: NodeApi<TreeNode>) => n.id === expandNodeId);
+    if (!node) return;
 
-    if (node && !node.isOpen) {
+    if (!node.isOpen) {
       // Open the node imperatively via react-arborist API
       node.open();
 
       // Also update Zustand store to persist the state
       setExpanded(expandNodeId, true);
-
-      // Notify parent that expansion is complete
-      if (onExpandComplete) {
-        onExpandComplete();
-      }
     }
+
+    // Clear the request either way — a node that was already open still
+    // satisfies it, and leaving the id set would swallow the next request
+    // for the same node.
+    onExpandComplete?.();
   }, [expandNodeId, onExpandComplete, setExpanded]);
 
   // Auto-trigger edit mode when editingNodeId changes (for inline creation)
