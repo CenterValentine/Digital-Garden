@@ -164,6 +164,50 @@ export function calculateMenuPosition({
   };
 }
 
+export interface UpwardMenuAnchor {
+  /** CSS `left` (px). Left-aligned to the trigger, flipped to stay on-screen. */
+  left: number;
+  /** CSS `bottom` (px, from viewport bottom). Pins the menu's bottom edge. */
+  bottom: number;
+  /** Cap so a tall menu scrolls (overflow-y-auto) instead of running off-screen. */
+  maxHeight: number;
+}
+
+/**
+ * Anchor a menu ABOVE a trigger, hugging the trigger's top edge.
+ *
+ * Unlike {@link calculateMenuPosition}, which anchors the menu's TOP and
+ * therefore needs the menu height up front (guess too tall and an
+ * upward-flipped menu floats away from its trigger, leaving a gap), this pins
+ * the menu's BOTTOM to just above the trigger via CSS `bottom` and lets it
+ * grow upward. A 2-item menu hugs the trigger exactly as tightly as a 20-item
+ * one — no height guess, no gap. Intended for bottom-of-screen composer
+ * pickers that open upward.
+ */
+export function anchorMenuAbove(
+  triggerRect: { left: number; top: number; right: number },
+  menuWidth: number,
+  { gap = 4, viewportPadding = 8 }: { gap?: number; viewportPadding?: number } = {},
+): UpwardMenuAnchor {
+  const viewportWidth = window.innerWidth;
+  const viewportHeight = window.innerHeight;
+
+  // Horizontal: left-align to the trigger; if that clips the right edge, shift
+  // so the menu's right edge lines up with the trigger's right edge instead.
+  let left = triggerRect.left;
+  if (left + menuWidth + viewportPadding > viewportWidth) {
+    left = triggerRect.right - menuWidth;
+  }
+  left = Math.max(viewportPadding, left);
+
+  // Vertical: bottom edge sits `gap` px above the trigger top; cap the height
+  // to the room above so it scrolls rather than overflowing the viewport top.
+  const bottom = Math.max(viewportPadding, viewportHeight - triggerRect.top + gap);
+  const maxHeight = Math.max(120, triggerRect.top - gap - viewportPadding);
+
+  return { left, bottom, maxHeight };
+}
+
 /**
  * Calculate submenu position (positioned to the right of parent menu item)
  *
