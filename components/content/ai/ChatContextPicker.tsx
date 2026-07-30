@@ -20,6 +20,7 @@ import {
   useEffect,
   useCallback,
 } from "react";
+import { createPortal } from "react-dom";
 import {
   SlidersHorizontal,
   ChevronUp,
@@ -30,6 +31,7 @@ import {
   X,
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { anchorMenuAbove } from "@/lib/core/menu-positioning";
 import { toast } from "sonner";
 import {
   CHAT_CONTEXT_BODY_MAX,
@@ -56,6 +58,15 @@ export function ChatContextPicker({
   compact = false,
 }: ChatContextPickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // Menu is portaled to <body> (position:fixed) so the composer's
+  // overflow-x-auto control rail can't clip its upward dropdown. menuRef is
+  // the portaled node — outside-click must treat it as "inside" too.
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuPos, setMenuPos] = useState<{
+    left: number;
+    bottom: number;
+    maxHeight: number;
+  } | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [contexts, setContexts] = useState<ChatContextView[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -92,9 +103,10 @@ export function ChatContextPicker({
   useEffect(() => {
     if (!isOpen) return;
     const onMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
       if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
+        !containerRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
       ) {
         setIsOpen(false);
         setDraft(null);
@@ -119,6 +131,20 @@ export function ChatContextPicker({
     },
     [onChange],
   );
+
+  const toggleOpen = useCallback(() => {
+    if (disabled) return;
+    if (isOpen) {
+      setIsOpen(false);
+      setDraft(null);
+      return;
+    }
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMenuPos(anchorMenuAbove(rect, 288));
+    }
+    setIsOpen(true);
+  }, [disabled, isOpen]);
 
   const handleSave = useCallback(async () => {
     if (!draft) return;
@@ -180,8 +206,20 @@ export function ChatContextPicker({
 
   return (
     <div ref={containerRef} className="relative">
-      {isOpen && (
-        <div className="absolute bottom-full left-0 z-50 mb-1 w-72 overflow-hidden rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl">
+      {isOpen &&
+        menuPos &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              left: menuPos.left,
+              bottom: menuPos.bottom,
+              width: 288,
+              maxHeight: menuPos.maxHeight,
+            }}
+            className="z-[130] overflow-hidden rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl"
+          >
           {draft ? (
             // ── Form view (create / edit) ──
             <div className="p-2.5">
@@ -344,13 +382,14 @@ export function ChatContextPicker({
               </div>
             </div>
           )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       {/* Trigger chip */}
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen((o) => !o)}
+        onClick={toggleOpen}
         disabled={disabled}
         className={cn(
           "flex items-center gap-1.5 px-2.5 py-1.5 text-[11px] transition-colors",
