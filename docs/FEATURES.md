@@ -20,10 +20,10 @@ the full inventory.
 | Output placement | ✅ | Canonical modules place agent output *into documents* — bot outputs nest under chats as movable references | `lib/domain/ai/output-target.ts`, `tools/output-placement.ts` |
 | Playbooks | ✅ | Notes/folders marked as reusable agent procedures; progressive-disclosure injection; `search_playbooks` discovery; checkpoint gating | `lib/domain/ai/playbooks/` |
 | Multi-model routing + fallback | ✅ | Per-feature routes, fallback chains, registry-authoritative model catalog, per-model constraints | `lib/domain/ai/features/`, `model-route-resolver.ts` |
-| Provider abstraction (BYOK) | ✅ | Anthropic · OpenAI · Google · Groq · Mistral · xAI factories; encrypted key storage; env-key fallbacks | `lib/domain/ai/providers/` |
+| Provider abstraction (BYOK) | ✅ | Dedicated factories: Anthropic · OpenAI · Google · Groq · Mistral · xAI · DeepSeek. Plus a generic OpenAI-compatible connection type for Moonshot (Kimi), Fireworks, Together, OpenRouter, Ollama, and any other OpenAI-compatible endpoint; encrypted key storage; env-key fallbacks | `lib/domain/ai/providers/` |
 | Resumable streaming | ✅ | SSE responses survive page reload mid-generation (Upstash-backed) | `lib/domain/ai/resumable/` |
 | Resource governance | ✅ / 🔭 | Shipped: per-run ledger, tool-output compaction, dangling-tool repair, prompt caching. Planned: enforced per-run token/step budgets | `run-ledger.ts`, `compact-tool-outputs.ts` |
-| Folder Studio (grounded chat) | ✅ | Folder-scoped agents grounded in attached Context docs with auto-context assembly; Create/Practice/Analyze shelves | `extensions/studio/` |
+| Folder Studio (grounded learning) | ✅ | NotebookLM-parallel studio — grounded in a folder's *existing* notes (no separate source-curation step). Create shelf: reports, flashcards, mind maps, audio/video overviews, slide decks, infographics. Practice shelf: quizzes, oral exams, teach-it-back, study plans. Analyze shelf: glossaries, comparisons, prerequisites | `extensions/studio/` |
 | Folder assist | ✅ | AI operations over folder contents from the tree | `lib/domain/ai/folder-assist/` |
 | Chat contexts | ✅ | Custom-instruction presets per conversation | `app/api/ai/` + chat UI |
 | Follow-up suggestions | ✅ | Model-generated next-step chips after responses | `lib/domain/ai/follow-ups.ts` |
@@ -71,7 +71,7 @@ flowchart LR
 | Wiki-links | ✅ | `[[Note Title]]` / `[[slug\|Display]]`, autocomplete, click-through, backlink tracking | `extensions/wiki-link.ts` |
 | Callouts | ✅ | Obsidian syntax, 6 types | `extensions/callout.ts` |
 | Block library | ✅ | Section headers, cards, accordions, tabs, columns, pull quotes, TOC, daily/weekly summaries | `extensions/blocks/` |
-| Diagram blocks | ✅ | Excalidraw + Mermaid + diagrams.net, each collaboration-aware via Y.js sub-documents | `lib/domain/visualization/` |
+| Diagram blocks | ✅ | Excalidraw + Mermaid + diagrams.net, each multiplayer-editable — several people can sketch on the same diagram at once via Y.js sub-documents | `lib/domain/visualization/` |
 | Inline atoms | ✅ | Tags (colored pills), person mentions, clickable timestamps w/ picker | `extensions/tag.ts`, `inline-timestamp.ts` |
 | Slash commands | ✅ | `/` insertion menu | `commands/slash-commands.tsx` |
 | Schema versioning | ✅ | Semver'd TipTap schema + migration hooks; MAJOR bumps require migrations | `schema-version.ts` |
@@ -85,7 +85,7 @@ flowchart LR
 
 | Feature | Status | Notes | Code |
 |---|---|---|---|
-| Real-time co-editing | ✅ | Y.js CRDTs via Hocuspocus (Cloud Run); TipTap binding | `lib/domain/collaboration/` |
+| Real-time multiplayer editing | ✅ | Multiple people can edit the same note simultaneously, live, with visible cursors/selections — Y.js CRDTs via Hocuspocus (Cloud Run); TipTap binding | `lib/domain/collaboration/` |
 | Presence | ✅ | Awareness persisted to Postgres (survives serverless split); two-tier staleness | collaboration runtime |
 | Availability ladder | ✅ | canonical → localFallback → plainFallback client states; explicit connection lifecycle | `runtime.ts` |
 | Sleep mode | ✅ | Deliberate idle/hidden disconnects as a cost control | collaboration runtime |

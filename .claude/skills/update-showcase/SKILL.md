@@ -37,3 +37,9 @@ Operational checklist:
 
 Do not open a standalone docs-only PR for this; bundle with the next feature/chore PR unless the
 user asks otherwise.
+
+**PR title/body for wording-only tweaks:** keep it generic ("docs: README copy pass") — don't
+narrate the specific rewording rationale or cite verification steps in the PR body. See the
+maintenance guide's "PR bodies for showcase-content-only changes stay generic" note. Exception:
+PRs that promote a `🔭 Planned` item to shipped, or add a genuinely new claim, still need a real
+descriptive PR — the honesty rule (evidence-linked claims) always outranks subtlety.

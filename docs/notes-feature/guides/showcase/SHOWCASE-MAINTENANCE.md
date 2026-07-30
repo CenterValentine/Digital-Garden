@@ -32,6 +32,16 @@ infrastructure (routing, fallback, streaming, governance) → multimodal pipelin
 else. Non-AI features earn README space by demonstrating engineering depth (collab CRDTs, CI
 gates), not by completeness.
 
+**PR bodies for showcase-content-only changes stay generic ("don't show the man behind the
+curtain").** This is a deliberate exception to the repo's usual detailed sprint-format PR
+convention. The showcase's own commit/PR history is something a technical reviewer might read —
+a PR body that narrates *why* a capability description was reworded, or cites "verified against
+X before writing the marketing copy," makes the curation visible in a way that undercuts it.
+Keep the title and body to one or two plain lines (e.g. "docs: README copy pass"). This applies
+only to wording/positioning tweaks with no functional change; PRs that add real capability
+(new figures, a shipped feature promoted from 🔭, a new doc) still get a normal descriptive PR —
+the honesty rule always wins over subtlety when a claim's truth is at stake.
+
 ## The update ritual ("update the showcase")
 
 1. **Diff reality against the README.** Find what shipped since the last showcase update:
