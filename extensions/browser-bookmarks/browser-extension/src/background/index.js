@@ -2097,6 +2097,14 @@ const ACQUISITION_MAX_HTML_CHARS = 1_500_000;
 const ACQUISITION_TAB_LOAD_TIMEOUT_MS = 20_000;
 const ACQUISITION_TAB_SETTLE_MS = 1_500;
 const ACQUISITION_EXTRACT_TIMEOUT_MS = 12_000;
+// Settle-then-extract: a flat delay guesses wrong on client-rendered pages
+// (extract too early → nav/footer chrome only). Instead we poll-extract and
+// stop once Readability succeeds or the content length stabilizes (hydration
+// finished), capped by a max budget so a hostile page can't hang the read.
+const ACQUISITION_SETTLE_MAX_MS = 8_000; // total hydration-poll budget
+const ACQUISITION_SETTLE_POLL_MS = 700; // gap between re-extractions
+const ACQUISITION_SETTLE_STABLE_DELTA = 48; // chars: "content stopped growing"
+const ACQUISITION_SETTLE_MIN_CHARS = 400; // don't call a near-empty page "stable"
 const ACCEPTED_ACQUISITION_CONTENT_TYPES = [
   "text/html",
   "application/xhtml",
@@ -2294,6 +2302,51 @@ async function extractFromTabWithInjectFallback(tabId) {
   }
 }
 
+// Poll-extract until the page has hydrated. A flat delay guesses wrong on
+// client-rendered pages — extract too early and you photograph nav/footer
+// chrome before the main content renders. Instead we re-extract on an interval
+// and stop as soon as Readability finds an article, or the extracted content
+// length stabilizes (hydration done), capped by ACQUISITION_SETTLE_MAX_MS.
+// The page-side extractor stays synchronous; the polling lives here.
+async function settleAndExtract(tabId) {
+  const deadline = Date.now() + ACQUISITION_SETTLE_MAX_MS;
+  // A small initial grace so first paint / hydration can begin before we look.
+  await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
+  let best = null;
+  let lastLen = -1;
+  let stable = 0;
+  while (Date.now() < deadline) {
+    let extracted = null;
+    try {
+      extracted = await extractFromTabWithInjectFallback(tabId);
+    } catch {
+      // The page may still be navigating/hydrating; retry after the poll gap.
+    }
+    if (extracted) {
+      // Readability found a real article — the best we can do, stop now.
+      if (extracted.quality === "readable" && (extracted.content?.length || 0) > 0) {
+        return extracted;
+      }
+      const len = extracted.content?.length || 0;
+      if (!best || len > (best.content?.length || 0)) best = extracted;
+      // Content stopped growing across two polls → treat hydration as done.
+      if (
+        len >= ACQUISITION_SETTLE_MIN_CHARS &&
+        Math.abs(len - lastLen) <= ACQUISITION_SETTLE_STABLE_DELTA
+      ) {
+        if (++stable >= 2) return best;
+      } else {
+        stable = 0;
+      }
+      lastLen = len;
+    }
+    await new Promise((r) => setTimeout(r, ACQUISITION_SETTLE_POLL_MS));
+  }
+  // Budget exhausted: return the best we saw, or make one final attempt so a
+  // genuine extraction failure still surfaces its real error to the caller.
+  return best ?? (await extractFromTabWithInjectFallback(tabId));
+}
+
 async function acquireViaSessionTab(url) {
   let tab;
   try {
@@ -2307,9 +2360,10 @@ async function acquireViaSessionTab(url) {
   const tabId = tab.id;
   try {
     await waitForTabComplete(tabId, ACQUISITION_TAB_LOAD_TIMEOUT_MS);
-    // Give client-rendered pages a moment to settle before extracting.
-    await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
-    const extracted = await extractFromTabWithInjectFallback(tabId);
+    // Poll-extract until the page hydrates (see settleAndExtract) rather than a
+    // flat delay + single shot, which photographed client-rendered pages before
+    // their main content rendered (returned nav/footer chrome only).
+    const extracted = await settleAndExtract(tabId);
     let finalUrl = url;
     try {
       const current = await chrome.tabs.get(tabId);
