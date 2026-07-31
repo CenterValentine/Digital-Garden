@@ -460,6 +460,127 @@ real side effects; co-browsing is the mitigation.
 
 ---
 
+## Phase 1 — Build Spec (scoped 2026-07-31, recon-backed)
+
+**Shape: rides the existing AI-SDK tool loop; no bespoke controller.** The
+"research loop" is the model looping over the registered read tool + a new
+`extract_structured` tool under a gated **research methodology** system-prompt,
+bounded by a per-run budget + a raised step cap. Everything downstream reuses
+machinery that already exists — the net-new surface is one prompt section and
+two tools.
+
+**Recon confirmed the write path is 100% reuse** (`lib/domain/ai/`):
+`createNote` (`registry.ts:638`, markdown→TipTap, `needsApproval`, Prisma
+create) · `resolveToolOutputPlacement` (`tools/output-placement.ts:22`) ·
+`upsertRunLedger` (`run-ledger.ts:58` — a **working** per-run ledger note keyed
+by `runKey`, append-only markdown in `NotePayload.metadata`) ·
+`markdownToTiptap` with **real GFM table → TipTap `table` node** support
+(`content/markdown.ts:52`, `editor/extensions-server.ts:129`) ·
+`addAutoAssociation(...,"tool-call")` (`features/conversations/associations.ts:219`).
+So the ledger-per-objective, the structured table, and the landing are all
+existing primitives.
+
+### The run boundary = a research-plan card (resolves D-OBJ)
+New `propose_research_run` tool, `needsApproval: true` (reuses the AI-SDK HITL
+pattern `createNote`/`phase_checkpoint` already use). Before any reading the
+agent proposes:
+```
+{ objective, sources[], autoFollowDepth, pageBudget,
+  target: OutputTarget, ledger: { runKey? | "new", label } }
+```
+User approves / edits / declines; on approval the tool returns the locked run
+config and the loop proceeds. This one card fixes **cost** (pageBudget),
+**destination** (target), and **audit home** (ledger runKey) up front — the
+Phase-1 analogue of Phase 3's per-action checkpoint, at *run* granularity. It is
+where "one ledger per objective; same-flavor together" lives: the agent proposes
+an existing `runKey` (append) or `"new"`.
+
+### Read primitive = whichever read tool is registered
+Browser sidebar (extension present) → `read_page_in_browser` (self-escalates P1
+direct → P3 session-tab, so it covers cheap *and* hostile pages). App surface
+(no extension) → server `read_page` (P1–P2, public only). The methodology prompt
+says "read the page"; the model uses the tool it has. Reading hostile pages in a
+research run is therefore a browser-sidebar capability, consistent with D1.
+
+### `extract_structured` tool (resolves D-SCHEMA)
+New server tool mirroring the `generateObject` pattern (`follow-ups.ts:137`,
+`folder-assist/service.ts:296`), cheap model resolved via
+`resolvePrimaryRoute(userId, "tool-result-extraction")` (as
+`acquisition/extract-relevant.ts:37`). Input `{ content, schema? }`. **Schema =
+both, agent-inferred by default, user-supplied overrides:** named columns
+(objective or user) are honored exactly; else the agent passes an inferred set.
+Output = structured rows the model accumulates and later renders as a GFM table.
+
+### Governors (breadth/depth + budget caps)
+- **Per-run page budget** (plan card, default ~12), enforced at the read
+  boundary on *both* paths: (a) browser reads — a **client-side per-run counter**
+  in `use-conversation-engine.ts` `onToolCall`, seeded from the approved budget,
+  returns `output-error` "budget reached" when spent (the server has no `execute`
+  to gate a client tool, so this is the only place it can live); (b) server reads
+  — raise the ctx `createAcquisitionBudget` (`acquisition/types.ts:79`, today a
+  hard 5/turn) to the run budget. Spent → reads refuse → model synthesizes what
+  it has.
+- **Auto-follow depth: default 1** (seed index → into items); deeper only if the
+  objective needs it. Depth *guides*; the page budget is the hard cap.
+- **Step cap raised for research mode:** `stopWhen: stepCountIs(researchMode ?
+  ~24 : 7/8)` per server leg (today's cap is `route.ts:1565`). Browser-read runs
+  span multiple legs via the resume predicate — each leg re-bounded — so the
+  per-run *page* budget, not the step cap, is the true run bound.
+- **Backstop:** the extension's existing 10-pages/5-min rate limit stays a hard
+  ceiling.
+
+### Roll-up (all reused)
+On synthesis: (1) resolve destination via `resolveToolOutputPlacement(ctx,
+parentId?, location?)` = the plan-card `target`; (2) build the body — prose
+synthesis + a **GFM markdown table** of the rows — via `markdownToTiptap`;
+(3) persist via `createNote` (or a `contentNode.create` mirroring it);
+(4) append the run to the **objective ledger** via `upsertRunLedger(..., {
+runKey })` — pages read + synthesis, keyed by the per-objective `runKey`;
+(5) `addAutoAssociation(...,"tool-call")` for each created node.
+
+### Enablement (contextual, not a global toggle)
+`propose_research_run` + `extract_structured` register when a read tool is
+available AND the surface opts in (same predicate as the browser tools). The
+agent invokes `propose_research_run` for research-shaped requests; the card is
+the cost gate. `hasResearchTools` flag on `SystemPromptContext`
+(`system-prompt.ts` near `:114`), set from `"extract_structured" in tools`
+(`route.ts:1566-1600`), drives the methodology section co-located with the
+`hasBrowserReadTool` branch (`:225`).
+
+### Files
+- **New:** `extract_structured` + `propose_research_run` (`tools/registry.ts`);
+  research methodology section + `hasResearchTools` (`system-prompt.ts`,
+  `tools/types.ts`); client-side per-run read budget
+  (`use-conversation-engine.ts`); a research-plan approval-card component
+  (client).
+- **Modified:** `app/api/ai/chat/route.ts` — conditional research-tool
+  registration, raised step cap + acquisition budget in research mode, thread the
+  approved run config into ctx.
+- **Reused unchanged:** `run-ledger.ts`, `tools/output-placement.ts`,
+  `output-target.ts`, `content/markdown*.ts`, `associations.ts`.
+
+### Libs / perms / data
+**None new.** No npm dep, no permission, **no Prisma change** (ledger is
+`NotePayload.metadata`; `ConversationAssociation` exists). Matches the roadmap's
+"Phase 1: none new."
+
+### Gate (unchanged)
+"research these 3 boards for X" → N pages read (within budget, auditable) → a
+synthesized note + a structured table, landed in the chosen place, with a full
+per-objective ledger of every page read.
+
+### Sub-decisions to confirm before build (P1-a…c)
+- **P1-a Budget placement:** OK to enforce the per-run *browser*-read budget
+  client-side in the engine (the only place that can gate a client tool), with
+  the server `read_page` ctx budget raised in parallel? (Alt: route all research
+  reads through a server wrapper — heavier, loses browser reads.)
+- **P1-b Plan card mechanism:** reuse the existing `needsApproval` HITL
+  approval-card for the research-plan card, or a lighter bespoke inline confirm?
+- **P1-c Research step cap:** fixed ~24 per leg, or tie it to the page budget
+  (e.g. budget×2) so a bigger run gets proportionally more steps?
+
+---
+
 ## Consolidated open decisions (your call — needed to lock the plan)
 
 - **D-ENG** (Phase 2): `playwright-crx` as the **preferred** interaction engine
@@ -474,9 +595,14 @@ real side effects; co-browsing is the mitigation.
   always-on the floor (PII fields, payment, password, consent checkbox, email-send)?
 - **D-GRAN** (Phase 3): per-action approval by default; is "approve this batch /
   this domain this session" allowed, and if so, bounded how?
-- **D-OBJ** (Phase 1): objective-boundary = agent-proposes / user-confirms — OK?
-- **D-SCHEMA** (Phase 1): structured-extraction schema user-supplied, agent-inferred,
-  or both?
+- **D-OBJ** (Phase 1): objective-boundary = agent-proposes / user-confirms.
+  **RESOLVED → the research-plan card** (see Phase 1 Build Spec); one card fixes
+  objective + budget + target + ledger before any read.
+- **D-SCHEMA** (Phase 1): structured-extraction schema. **RESOLVED → both,
+  agent-inferred by default, user-supplied overrides** (see `extract_structured`
+  in the Build Spec).
+- **auto-follow depth** (Phase 1): **RESOLVED → default 1, hard-capped by the
+  per-run page budget** (depth guides, budget bounds).
 - **D-WAIVER** (Phase 5): waiver scope — class / domain / session? Durable table vs
   device-local settings?
 - **D-BANNER** (Phase 2): accept the `chrome.debugger` banner as the visible
