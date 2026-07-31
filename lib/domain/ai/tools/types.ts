@@ -97,4 +97,11 @@ export interface ToolExecuteContext {
     contentNodeId?: string;
     filename?: string;
   }>;
+  /**
+   * Agentic Browsing Phase 1: the approved per-run page budget when a research
+   * run is active this turn. Raises the server-read acquisition budget above the
+   * default so a multi-page research loop isn't strangled by the per-turn cap.
+   * Undefined outside a research run (default cap applies).
+   */
+  researchPageBudget?: number;
 }

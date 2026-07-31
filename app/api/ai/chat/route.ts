@@ -310,6 +310,49 @@ export async function POST(request: Request) {
       // Agentic Browsing Phase 0: the client reports whether the browser
       // extension is reachable this turn; gates the client-executed read tool.
       const browserExtensionAvailable = body.browserExtensionAvailable === true;
+      // Agentic Browsing Phase 1: derive the active research run's page budget
+      // from the conversation history — the propose_research_run result always
+      // rides in body.messages, whereas a client body flag can't reliably reach
+      // the auto-resume legs (they replay the user turn's snapshotted body).
+      // Non-null = research mode → raises the step cap (budget-derived, P1-c) and
+      // the server-read acquisition budget for this turn. Clamped so a client
+      // can't request an unbounded run. Null outside a research run → default caps.
+      const researchPageBudget = ((): number | null => {
+        const msgs = (body as { messages?: unknown }).messages;
+        if (!Array.isArray(msgs)) return null;
+        let budget: number | null = null;
+        for (const m of msgs) {
+          const parts = (m as { parts?: unknown }).parts;
+          if (!Array.isArray(parts)) continue;
+          for (const part of parts) {
+            const p = part as {
+              type?: string;
+              state?: string;
+              output?: { ok?: boolean; pageBudget?: number };
+            };
+            if (
+              p.type === "tool-propose_research_run" &&
+              p.state === "output-available"
+            ) {
+              const b = p.output?.pageBudget;
+              if (
+                p.output?.ok &&
+                typeof b === "number" &&
+                Number.isFinite(b) &&
+                b > 0
+              ) {
+                budget = Math.min(Math.floor(b), 40);
+              }
+            } else if (
+              p.type === "tool-record_research_findings" &&
+              p.state === "output-available"
+            ) {
+              budget = null; // run closed → back to default caps
+            }
+          }
+        }
+        return budget;
+      })();
       const routingPlaybookId = modelPinned
         ? null
         : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
@@ -928,6 +971,9 @@ export async function POST(request: Request) {
         playbookOutputDirectives,
         phaseCheckpointGate,
         attachedMedia,
+        // Agentic Browsing Phase 1: raises the server-read acquisition budget
+        // for a research turn (undefined outside a research run → default cap).
+        researchPageBudget: researchPageBudget ?? undefined,
       };
       const allTools = {
         ...createBaseTools(toolCtx),
@@ -1562,13 +1608,25 @@ export async function POST(request: Request) {
         //   → propose_deck (child) → propose_cards → final text = 5 steps,
         //   with headroom for an optional search_decks or get_deck call.
         // Base chat (no flashcards, no document) typically needs 2-3 steps.
-        stopWhen: stepCountIs(editableContentId ? 8 : 7),
+        // Agentic Browsing Phase 1 (P1-c): in a research run the step cap is
+        // DERIVED from the approved page budget (budget×2 + overhead for
+        // extract/synthesis), so a run sized for N pages always has the steps to
+        // finish N pages. The page budget is the depth lever; this is the safety
+        // ceiling that follows it. Outside a research run, the normal 7/8 cap.
+        stopWhen: stepCountIs(
+          researchPageBudget != null
+            ? researchPageBudget * 2 + 4
+            : editableContentId
+              ? 8
+              : 7,
+        ),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
           hasBrowserReadTool: READ_PAGE_IN_BROWSER in tools,
+          hasResearchTools: "extract_structured" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches

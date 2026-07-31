@@ -136,6 +136,7 @@ const orderedPrompt = buildSystemPrompt({
   hasWebSearch: false,
   hasCheckpointTool: false,
   hasBrowserReadTool: false,
+  hasResearchTools: false,
   runtimeProviderName: "OpenAI",
   runtimeModelId: "gpt-4o",
   openWorkflowTitle: undefined,

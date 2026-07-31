@@ -527,6 +527,44 @@ function lastMessageHasResolvedBrowserRead({
   );
 }
 
+/**
+ * Agentic Browsing Phase 1 — derive the CURRENTLY-ACTIVE research run's page
+ * budget from the message history, or null if none is active. A run opens on an
+ * approved `propose_research_run` result and closes on a `record_research_findings`
+ * result; the latest un-closed proposal wins. Used to seed the client-side
+ * per-run budget lazily on the first read (before `onFinish` has run), and to
+ * detect closure — so the budget is scoped strictly to an active run and never
+ * touches a normal one-off read.
+ */
+function deriveActiveResearchRun(
+  messages: UIMessage[],
+): { pageBudget: number } | null {
+  let active: { pageBudget: number } | null = null;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (
+        p.type === "tool-propose_research_run" &&
+        p.state === "output-available"
+      ) {
+        const out = p.output as
+          | { ok?: boolean; pageBudget?: number }
+          | undefined;
+        if (out?.ok && typeof out.pageBudget === "number" && out.pageBudget > 0) {
+          active = { pageBudget: out.pageBudget };
+        }
+      } else if (
+        p.type === "tool-record_research_findings" &&
+        p.state === "output-available"
+      ) {
+        active = null; // run closed by its findings write
+      }
+    }
+  }
+  return active;
+}
+
 export function useConversationEngine({
   conversationKey,
   contentId,
@@ -1006,6 +1044,16 @@ export function useConversationEngine({
     [providerId, modelId],
   );
 
+  // Agentic Browsing Phase 1 — client-side per-run page budget. Non-null ONLY
+  // while a research run is active (opened by an approved propose_research_run,
+  // closed by record_research_findings or the next user turn). A ref, not state:
+  // it's read at send-time and mutated per read without needing a re-render.
+  // Fail-open by construction — when null, the budget path is never entered, so
+  // a normal one-off read is completely untouched.
+  const researchRunRef = useRef<{ pageBudget: number; pagesUsed: number } | null>(
+    null,
+  );
+
   // ── useChat ──
   const chat = useChat({
     transport: chatTransport,
@@ -1035,9 +1083,31 @@ export function useConversationEngine({
         });
         return;
       }
+      // Agentic Browsing Phase 1 — per-run page budget (client-side; the server
+      // has no `execute` to gate a client tool). Lazily hydrate from the approved
+      // research plan in history so even the FIRST read is bounded (onFinish may
+      // not have observed the plan yet). Null run = normal read, budget skipped.
+      if (researchRunRef.current === null) {
+        const active = deriveActiveResearchRun(chat.messages);
+        if (active) {
+          researchRunRef.current = { pageBudget: active.pageBudget, pagesUsed: 0 };
+        }
+      }
+      const run = researchRunRef.current;
+      if (run && run.pagesUsed >= run.pageBudget) {
+        // Soft stop, not an error: tell the model to wrap up with what it has.
+        chat.addToolResult({
+          tool: READ_PAGE_IN_BROWSER,
+          toolCallId: toolCall.toolCallId,
+          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+        });
+        return;
+      }
       try {
         const outcome = await acquireUrlWithFallback(url);
         if (outcome.ok && outcome.content) {
+          // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
+          if (run) run.pagesUsed += 1;
           const c = outcome.content;
           chat.addToolResult({
             tool: READ_PAGE_IN_BROWSER,
@@ -1083,6 +1153,19 @@ export function useConversationEngine({
         finishReason?: string;
         isAbort?: boolean;
       };
+      // Agentic Browsing Phase 1 — close the client-side research budget when its
+      // findings are recorded (precise signal: a record_research_findings result
+      // in the finished message). The next-user-turn backstop in handleSend
+      // covers a run the model never closed. onToolCall owns opening + counting;
+      // this only clears — so it can never mid-run reset the page count.
+      const closedResearchRun = (e.message?.parts ?? []).some((part) => {
+        const p = part as { type?: string; state?: string };
+        return (
+          p.type === "tool-record_research_findings" &&
+          p.state === "output-available"
+        );
+      });
+      if (closedResearchRun) researchRunRef.current = null;
       const isAbort = e.isAbort === true;
       const streamedMessages = e.messages ?? [];
       const finalMessages = isAbort
@@ -1531,6 +1614,10 @@ export function useConversationEngine({
     // A fresh user send has no buffered backlog — clear the resume flag so
     // this turn types normally (and un-stick the no-stream 204 case).
     streamStartedViaResumeRef.current = false;
+    // Agentic Browsing Phase 1 — a fresh user turn ends any prior research run
+    // (backstop for a run the model never closed via record_research_findings),
+    // so this turn's reads are never charged to a stale budget.
+    researchRunRef.current = null;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
