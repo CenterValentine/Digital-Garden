@@ -522,10 +522,17 @@ Output = structured rows the model accumulates and later renders as a GFM table.
   it has.
 - **Auto-follow depth: default 1** (seed index → into items); deeper only if the
   objective needs it. Depth *guides*; the page budget is the hard cap.
-- **Step cap raised for research mode:** `stopWhen: stepCountIs(researchMode ?
-  ~24 : 7/8)` per server leg (today's cap is `route.ts:1565`). Browser-read runs
-  span multiple legs via the resume predicate — each leg re-bounded — so the
-  per-run *page* budget, not the step cap, is the true run bound.
+- **Step cap = a function of the page budget (P1-c resolved).** Not a fixed
+  number: `stopWhen: stepCountIs(researchMode ? pageBudget * 2 + 4 : 7/8)` per
+  server leg (today's cap is `route.ts:1565`). The step cap is a *safety
+  ceiling*, not the depth lever — deriving it from the budget means a run you
+  sized (and paid) for N pages always has the steps to finish N pages, and a
+  small run doesn't carry a needlessly high ceiling. Browser-read runs span
+  multiple legs via the resume predicate — each leg re-bounded — so the per-run
+  *page* budget, not the step cap, is the true run bound. **Cost note:** the real
+  driver is accumulating context × steps (each step re-sends prior read content),
+  so `extract_structured` produces compact rows and the loop is prompted to lean
+  on rows rather than re-reading raw pages; the page budget caps total context.
 - **Backstop:** the extension's existing 10-pages/5-min rate limit stays a hard
   ceiling.
 
@@ -569,15 +576,24 @@ the cost gate. `hasResearchTools` flag on `SystemPromptContext`
 synthesized note + a structured table, landed in the chosen place, with a full
 per-objective ledger of every page read.
 
-### Sub-decisions to confirm before build (P1-a…c)
-- **P1-a Budget placement:** OK to enforce the per-run *browser*-read budget
-  client-side in the engine (the only place that can gate a client tool), with
-  the server `read_page` ctx budget raised in parallel? (Alt: route all research
-  reads through a server wrapper — heavier, loses browser reads.)
-- **P1-b Plan card mechanism:** reuse the existing `needsApproval` HITL
-  approval-card for the research-plan card, or a lighter bespoke inline confirm?
-- **P1-c Research step cap:** fixed ~24 per leg, or tie it to the page budget
-  (e.g. budget×2) so a bigger run gets proportionally more steps?
+### Sub-decisions — RESOLVED (owner, 2026-07-31)
+- **P1-a Budget placement → client-side, run-scoped, fail-open.** The per-run
+  budget lives in the engine's `onToolCall` and only exists while a research run
+  is active (set on plan-card approval, cleared when the turn settles to
+  `status: "ready"`). No active run → the budget path isn't entered → **normal
+  reads are untouched**. Fail-open (lost run = unbudgeted, never falsely blocked),
+  soft-stop (budget reached → "synthesize what you have", not a crash), and only
+  *successful* reads decrement. Server `read_page` ctx budget raised in parallel.
+- **P1-b Plan-card mechanism → reuse `needsApproval` now.** The rich/previewable
+  approval-card overhaul is backlogged (BACKLOG 2026-07-31) and benefits every
+  HITL surface; not a Phase 1 blocker.
+- **P1-c Step cap → derived from the page budget** (`pageBudget * 2 + 4`), not a
+  fixed number. Budget is the depth lever; step cap is the safety ceiling that
+  follows it.
+- **Budget surface:** per-run field in the plan card (adjust on a dime); static
+  default in `settings/ai`; later a quick "depth" gauge in the **AI 3.8 chat
+  control panel** / **3.7 resource governance** (both already roadmapped) — no
+  rework, same number.
 
 ---
 

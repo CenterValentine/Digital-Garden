@@ -26,6 +26,30 @@ last_updated: 2026-07-25
 
 ---
 
+## Approval cards → rich, previewable (needsApproval overhaul) (2026-07-31)
+
+**Future overhaul — not now.** Today's `needsApproval` HITL cards render the
+thing-being-approved as flat text/JSON blocks. Overhaul so an approval **previews
+what it's approving** with content-type-appropriate affordances, so the user can
+tell *from presentation* what the action is and what it will produce:
+
+- **Rich-text / TipTap preview** when the payload is note content — render the
+  proposed TipTap (as it will look), not raw markdown/JSON.
+- **File-attachment affordance** for generated files — clicking the attachment
+  chip opens a preview (mirror the composer's attachment chip).
+- **Structured field previews** — e.g. a research-plan card showing objective /
+  sources / budget / target / ledger as organized, scannable fields (not a JSON
+  dump); a form-fill checkpoint showing the filled fields.
+- **Principle:** steer away from flat blocks of text; the approval should be
+  self-explanatory and let the user preview results readily before deciding.
+
+Surfaced while scoping **Agentic Browsing Phase 1** (its research-plan card
+reuses `needsApproval`). The same overhaul benefits `createNote`,
+`phase_checkpoint`, and the future co-browsing action checkpoints
+(`AGENTIC-BROWSING-PLAN.md` Phases 3–5), so it's a shared-surface investment.
+
+---
+
 ## AI model handling (surfaced during Browser Reach B2, 2026-07-21 — AI-core, do after browser core)
 
 - [x] **AI v3.2.2 prompt-cache foundation** — stable OpenAI cache keys,
