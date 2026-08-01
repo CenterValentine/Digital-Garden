@@ -406,7 +406,11 @@ real side effects; co-browsing is the mitigation.
   session-owned tab; user watching; no critical acts.
 - **Components:** CDP executor (Input/Accessibility/Page) in `src/agentic/cdp/`;
   `navigate` tool family; a11y-tree target resolution (D-TGT); synthetic cursor
-  overlay (rides B4); session+tab manager + teleport; interrupt control.
+  overlay (rides B4); session+tab manager + teleport; interrupt control;
+  **read-completion tab launcher** — consent-gated visible-tab fallback for a
+  read even a background session tab can't load (the lightest read-only slice;
+  toggle-able from app + sidebar settings; decline → continue without; see the
+  Phase 1 smoke-test outcomes note).
 - **Libs/perms/data:** **add `debugger` permission**; **`playwright-crx`** as the
   interaction engine behind the `BrowserActuator` interface (spike bundle / MV3
   offscreen lifecycle / maintenance first; raw CDP fallback). No Prisma change.
@@ -594,6 +598,33 @@ per-objective ledger of every page read.
   default in `settings/ai`; later a quick "depth" gauge in the **AI 3.8 chat
   control panel** / **3.7 resource governance** (both already roadmapped) — no
   rework, same number.
+
+### Smoke-test outcomes (2026-08-01) — validated + refinements
+First multi-source run (HN + lobste.rs + reddit → comparison table) cleared the
+gate: plan card → reads → `extract_structured` → synthesis note **with a real
+table** → ledger + reference chips. Two refinements applied from it:
+- **`extract_structured` now infers interpretive columns.** It was leaving
+  columns like `topic` blank because the prompt said "use `""` for a column not
+  present". Now: FACTUAL columns verbatim-or-blank (never invented), INTERPRETIVE
+  columns (topic/category/summary) inferred from the item's content.
+- **Approval-card field labels humanized** (camelCase → "Spaced Label") in the
+  generic renderer (`ChatMessage.tsx`) — helps every approval card. Per-field
+  TOOLTIPS (from each tool's zod `.describe()`) remain part of the backlogged
+  rich-approval overhaul (needs the descriptions threaded to the client).
+
+**Deferred → Phase 2: read-completion tab launcher (owner request, 2026-08-01).**
+When a source can't be read (bot-blocked, device-blocked like the tester's
+Reddit, or the background session tab fails), offer a consent affordance to
+**auto-launch the URL in a VISIBLE tab to finish the read** — approve → open +
+read via the extension; **decline → continue without that resource** (partial
+result, acknowledged). Toggle-able from **BOTH** the app and the browser-sidebar
+settings. This is a Phase 2 primitive (visible, session-owned tabs — the lightest,
+read-only slice of supervised navigation), so it lands in Phase 2, not Phase 1.
+Until then a failed research read degrades gracefully (the agent flags which
+sources failed + suggests the extension). NOTE: in the browser **sidebar** the
+loop already escalates blocked reads to the extension's *background* session tab
+(`read_page_in_browser`); the launcher is the escalation BEYOND that, for pages
+even a background tab can't load (aggressive bot-detection / device blocks).
 
 ---
 

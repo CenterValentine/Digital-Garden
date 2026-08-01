@@ -48,6 +48,12 @@ reuses `needsApproval`). The same overhaul benefits `createNote`,
 `phase_checkpoint`, and the future co-browsing action checkpoints
 (`AGENTIC-BROWSING-PLAN.md` Phases 3–5), so it's a shared-surface investment.
 
+**Shipped so far (2026-08-01, from the Phase 1 smoke test):** the generic
+approval renderer now **humanizes field labels** (camelCase → "Spaced Label",
+`ChatMessage.tsx`). Still pending here: per-field **tooltips** (thread each
+tool's zod `.describe()` text to the client so a value's meaning is hoverable)
+and the richer per-tool previews above.
+
 ---
 
 ## AI model handling (surfaced during Browser Reach B2, 2026-07-21 — AI-core, do after browser core)

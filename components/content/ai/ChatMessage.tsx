@@ -2149,6 +2149,16 @@ function ApprovalRawJson({ args }: { args: unknown }) {
   );
 }
 
+/** camelCase / snake_case tool-arg key → a human "Spaced Label". */
+function humanizeApprovalKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 /** Labeled key→value rows for shallow primitive args. */
 function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
   if (fields.length === 0) return null;
@@ -2156,7 +2166,7 @@ function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
     <div className="mx-3 mb-1.5 space-y-0.5">
       {fields.map(([label, value]) => (
         <div key={label} className="flex gap-2 text-[11px]">
-          <span className="shrink-0 w-20 text-gray-500 dark:text-gray-500">
+          <span className="shrink-0 w-28 text-gray-500 dark:text-gray-500">
             {label}
           </span>
           <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
@@ -2283,7 +2293,10 @@ function ApprovalPreview({
       typeof value === "boolean"
     ) {
       const text = String(value);
-      fields.push([key, text.length > 140 ? `${text.slice(0, 140)}…` : text]);
+      fields.push([
+        humanizeApprovalKey(key),
+        text.length > 140 ? `${text.slice(0, 140)}…` : text,
+      ]);
     }
   }
   const hasComplexArgs = Object.values(a).some(
