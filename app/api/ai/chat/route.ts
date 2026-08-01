@@ -129,8 +129,12 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { createWorkflowTools } from "@/lib/domain/ai/tools";
-import { readPageInBrowserTool } from "@/lib/domain/ai/tools/registry";
+import {
+  readPageInBrowserTool,
+  openTabAndReadTool,
+} from "@/lib/domain/ai/tools/registry";
 import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -985,7 +989,14 @@ export async function POST(request: Request) {
         // `execute`) — registered only when the client reports the browser
         // extension is reachable, so the model can't call it otherwise.
         ...(browserExtensionAvailable
-          ? { [READ_PAGE_IN_BROWSER]: readPageInBrowserTool }
+          ? {
+              [READ_PAGE_IN_BROWSER]: readPageInBrowserTool,
+              // Agentic Browsing Phase 2a — read-completion launcher (visible
+              // tab). Also client-executed; the extension gates the actual open
+              // on the user's "open a tab to read blocked pages" setting, so a
+              // disabled launcher returns a relayable CTA, never opens a tab.
+              [OPEN_TAB_AND_READ]: openTabAndReadTool,
+            }
           : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
@@ -1626,6 +1637,7 @@ export async function POST(request: Request) {
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
           hasBrowserReadTool: READ_PAGE_IN_BROWSER in tools,
+          hasTabLauncher: OPEN_TAB_AND_READ in tools,
           hasResearchTools: "extract_structured" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground

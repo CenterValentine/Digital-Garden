@@ -30,6 +30,10 @@ const DEFAULT_CONFIG = {
     autoAssociate: false,
     navHistory: true,
     denylist: [],
+    // Agentic Browsing read-completion launcher: when ON, the assistant may
+    // open a VISIBLE foreground tab to read a page a background session tab
+    // can't (bot/device-blocked). OFF by default — standing consent is opt-in.
+    allowTabLaunch: false,
   },
 };
 
@@ -2347,10 +2351,12 @@ async function settleAndExtract(tabId) {
   return best ?? (await extractFromTabWithInjectFallback(tabId));
 }
 
-async function acquireViaSessionTab(url) {
+async function acquireViaSessionTab(url, visible = false) {
   let tab;
   try {
-    tab = await chrome.tabs.create({ url, active: false });
+    // A VISIBLE (foreground) tab clears many soft bot-blocks a background tab
+    // can't — used by the read-completion launcher (gated in handleAcquireUrl).
+    tab = await chrome.tabs.create({ url, active: !!visible });
   } catch (error) {
     return {
       ok: false,
@@ -2391,6 +2397,21 @@ async function handleAcquireUrl(payload) {
   const mode = payload && payload.mode === "sw-fetch" ? "sw-fetch" : "session-tab";
   if (!url) return { ok: false, reason: "no url provided" };
   const config = await getConfig();
+  // Read-completion launcher: a VISIBLE foreground tab is only opened when the
+  // user has turned it on in Browser Bookmarks settings (standing consent). The
+  // SSRF / private-network / denylist policy gate below still runs either way —
+  // `visible` only changes how the tab opens, never whether the URL is allowed.
+  const visible = payload && payload.visible === true;
+  if (
+    visible &&
+    !(config.capture && config.capture.allowTabLaunch === true)
+  ) {
+    return {
+      ok: false,
+      reason:
+        "Opening a tab to read blocked pages is turned off. Turn on \"Open a tab to read blocked pages\" in Browser Bookmarks settings → Capture & privacy to allow it.",
+    };
+  }
   const configDeny =
     config.capture && Array.isArray(config.capture.denylist)
       ? config.capture.denylist
@@ -2401,7 +2422,7 @@ async function handleAcquireUrl(payload) {
   try {
     return mode === "sw-fetch"
       ? await acquireViaSwFetch(url)
-      : await acquireViaSessionTab(url);
+      : await acquireViaSessionTab(url, visible);
   } finally {
     setAcquisitionBadge(false);
   }
@@ -2749,6 +2770,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           autoAssociate: capture.autoAssociate === true,
           navHistory: capture.navHistory !== false,
           denylist: Array.isArray(capture.denylist) ? capture.denylist : [],
+          allowTabLaunch: capture.allowTabLaunch === true,
         },
       });
       return;
@@ -2773,6 +2795,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             : Array.isArray(prev.denylist)
               ? prev.denylist
               : [],
+          allowTabLaunch:
+            typeof patch.allowTabLaunch === "boolean"
+              ? patch.allowTabLaunch
+              : prev.allowTabLaunch === true,
         },
       };
       await saveConfig(next);

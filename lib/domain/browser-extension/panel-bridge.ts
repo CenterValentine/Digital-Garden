@@ -237,7 +237,8 @@ const PANEL_ACQUIRE_TIMEOUT_MS = 35_000;
  */
 export function requestPanelAcquire(
   url: string,
-  mode: ExtensionAcquireMode
+  mode: ExtensionAcquireMode,
+  visible?: boolean
 ): Promise<ExtensionAcquireResult> {
   return new Promise((resolve) => {
     if (!isPanelEmbedSurface()) {
@@ -269,7 +270,12 @@ export function requestPanelAcquire(
     );
     window.addEventListener("message", onMessage);
     window.parent.postMessage(
-      { v: 1, source: "dg-panel-embed", type: "acquire-url", payload: { url, mode } },
+      {
+        v: 1,
+        source: "dg-panel-embed",
+        type: "acquire-url",
+        payload: { url, mode, visible: visible === true },
+      },
       "*"
     );
   });

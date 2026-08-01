@@ -229,7 +229,13 @@ export default function BrowserBookmarksSettingsPage() {
     autoAssociate: boolean;
     navHistory: boolean;
     denylist: string[];
-  }>({ autoAssociate: false, navHistory: true, denylist: [] });
+    allowTabLaunch: boolean;
+  }>({
+    autoAssociate: false,
+    navHistory: true,
+    denylist: [],
+    allowTabLaunch: false,
+  });
   const [newDenylistEntry, setNewDenylistEntry] = useState("");
   const hasShownLoadError = useRef(false);
   const hasShownBridgeError = useRef(false);
@@ -581,12 +587,14 @@ export default function BrowserBookmarksSettingsPage() {
           autoAssociate?: boolean;
           navHistory?: boolean;
           denylist?: string[];
+          allowTabLaunch?: boolean;
         }>("get-capture-settings", "capture-settings");
         if (cancelled) return;
         setCapture({
           autoAssociate: settings?.autoAssociate === true,
           navHistory: settings?.navHistory !== false,
           denylist: Array.isArray(settings?.denylist) ? settings.denylist : [],
+          allowTabLaunch: settings?.allowTabLaunch === true,
         });
       } catch {
         // Bridge not ready — leave conservative defaults; the card is disabled.
@@ -598,7 +606,12 @@ export default function BrowserBookmarksSettingsPage() {
   }, [bridgeState.status]);
 
   async function persistCapture(
-    patch: Partial<{ autoAssociate: boolean; navHistory: boolean; denylist: string[] }>
+    patch: Partial<{
+      autoAssociate: boolean;
+      navHistory: boolean;
+      denylist: string[];
+      allowTabLaunch: boolean;
+    }>
   ) {
     const next = { ...capture, ...patch };
     setCapture(next); // optimistic — settings edits are human-paced and sequential
@@ -1115,6 +1128,27 @@ export default function BrowserBookmarksSettingsPage() {
                 Powers the Recents browser-history list in the side panel. Stored only in
                 this browser; it never reaches Digital Garden&apos;s servers and never
                 becomes a note.
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/5 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={capture.allowTabLaunch}
+              onChange={(event) =>
+                void persistCapture({ allowTabLaunch: event.target.checked })
+              }
+              className="mt-1"
+            />
+            <div className="min-w-0">
+              <div className="font-medium">Open a tab to read blocked pages</div>
+              <div className="text-xs text-muted-foreground">
+                When the assistant can&apos;t read a page a normal way (bot- or
+                device-blocked), let it open that page in a visible tab, read it,
+                and continue. Off by default. When off, the assistant simply skips
+                the blocked page. The same private-network / denylist protections
+                always apply.
               </div>
             </div>
           </label>

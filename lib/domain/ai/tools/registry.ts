@@ -60,6 +60,10 @@ import {
   READ_PAGE_IN_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
 } from "./read-page-in-browser";
+import {
+  OPEN_TAB_AND_READ_DESCRIPTION,
+  openTabAndReadInputSchema,
+} from "./open-tab-and-read";
 
 /**
  * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
@@ -71,6 +75,18 @@ import {
 export const readPageInBrowserTool = tool({
   description: READ_PAGE_IN_BROWSER_DESCRIPTION,
   inputSchema: readPageInBrowserInputSchema,
+});
+
+/**
+ * `open_tab_and_read` — CLIENT-EXECUTED (no server `execute`). Read-completion
+ * launcher (Agentic Browsing Phase 2a): opens a VISIBLE tab to read a page a
+ * normal read couldn't load. Registered only when the extension is reachable;
+ * the extension itself gates the actual tab-open on the user's setting, so a
+ * disabled launcher comes back as a relayable CTA rather than opening anything.
+ */
+export const openTabAndReadTool = tool({
+  description: OPEN_TAB_AND_READ_DESCRIPTION,
+  inputSchema: openTabAndReadInputSchema,
 });
 
 /**

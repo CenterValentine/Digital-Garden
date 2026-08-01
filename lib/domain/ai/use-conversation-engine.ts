@@ -32,9 +32,11 @@ import {
 } from "ai";
 import {
   acquireUrlWithFallback,
+  launchTabAndRead,
   isExtensionAcquireAvailable,
 } from "@/lib/domain/browser-extension/acquire-url";
 import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -516,7 +518,9 @@ function lastMessageHasResolvedBrowserRead({
   const browserReadParts = message.parts
     .slice(lastStepStart + 1)
     .filter(
-      (part) => part.type === `tool-${READ_PAGE_IN_BROWSER}`,
+      (part) =>
+        part.type === `tool-${READ_PAGE_IN_BROWSER}` ||
+        part.type === `tool-${OPEN_TAB_AND_READ}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -1072,11 +1076,18 @@ export function useConversationEngine({
     // streamed to the browser; run it here and post the result back. Phase 0:
     // read_page_in_browser reads a page in the user's own session.
     onToolCall: async ({ toolCall }) => {
-      if (toolCall.toolName !== READ_PAGE_IN_BROWSER) return;
+      // Two client-executed read tools: read_page_in_browser (escalates
+      // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
+      // used only after a normal read failed). Both share the budget + result
+      // plumbing below.
+      const isBrowserRead = toolCall.toolName === READ_PAGE_IN_BROWSER;
+      const isTabLaunch = toolCall.toolName === OPEN_TAB_AND_READ;
+      if (!isBrowserRead && !isTabLaunch) return;
+      const toolName = toolCall.toolName;
       const { url } = (toolCall.input ?? {}) as { url?: string };
       if (!url) {
         chat.addToolResult({
-          tool: READ_PAGE_IN_BROWSER,
+          tool: toolName,
           toolCallId: toolCall.toolCallId,
           state: "output-error",
           errorText: "no url provided",
@@ -1084,9 +1095,9 @@ export function useConversationEngine({
         return;
       }
       // Agentic Browsing Phase 1 — per-run page budget (client-side; the server
-      // has no `execute` to gate a client tool). Lazily hydrate from the approved
-      // research plan in history so even the FIRST read is bounded (onFinish may
-      // not have observed the plan yet). Null run = normal read, budget skipped.
+      // has no `execute` to gate a client tool). Applies to BOTH client read
+      // tools. Lazily hydrate from the approved research plan in history so even
+      // the FIRST read is bounded. Null run = normal read, budget skipped.
       if (researchRunRef.current === null) {
         const active = deriveActiveResearchRun(chat.messages);
         if (active) {
@@ -1097,20 +1108,22 @@ export function useConversationEngine({
       if (run && run.pagesUsed >= run.pageBudget) {
         // Soft stop, not an error: tell the model to wrap up with what it has.
         chat.addToolResult({
-          tool: READ_PAGE_IN_BROWSER,
+          tool: toolName,
           toolCallId: toolCall.toolCallId,
           output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
         });
         return;
       }
       try {
-        const outcome = await acquireUrlWithFallback(url);
+        const outcome = isTabLaunch
+          ? await launchTabAndRead(url)
+          : await acquireUrlWithFallback(url);
         if (outcome.ok && outcome.content) {
           // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
           if (run) run.pagesUsed += 1;
           const c = outcome.content;
           chat.addToolResult({
-            tool: READ_PAGE_IN_BROWSER,
+            tool: toolName,
             toolCallId: toolCall.toolCallId,
             output: {
               url: c.url,
@@ -1125,14 +1138,16 @@ export function useConversationEngine({
           });
         } else {
           chat.addToolResult({
-            tool: READ_PAGE_IN_BROWSER,
+            tool: toolName,
             toolCallId: toolCall.toolCallId,
-            output: `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}.`,
+            output: isTabLaunch
+              ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
+              : `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}.`,
           });
         }
       } catch (err) {
         chat.addToolResult({
-          tool: READ_PAGE_IN_BROWSER,
+          tool: toolName,
           toolCallId: toolCall.toolCallId,
           state: "output-error",
           errorText: err instanceof Error ? err.message : "browser read failed",

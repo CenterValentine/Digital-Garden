@@ -160,7 +160,7 @@ export interface ExtensionAcquireResult {
  */
 export async function requestExtensionAcquire(
   url: string,
-  opts: { mode: ExtensionAcquireMode }
+  opts: { mode: ExtensionAcquireMode; visible?: boolean }
 ): Promise<ExtensionAcquireResult> {
   if (!isExtensionInstalled()) {
     return { ok: false, reason: "extension not available" };
@@ -169,7 +169,9 @@ export async function requestExtensionAcquire(
     return await requestBridgeResponse<ExtensionAcquireResult>(
       "acquire-url",
       "acquire-url-result",
-      { url, mode: opts.mode },
+      // `visible` (read-completion launcher) asks the extension to open a
+      // foreground tab; the extension gates it on its own setting + policy.
+      { url, mode: opts.mode, visible: opts.visible === true },
       ACQUIRE_TIMEOUT_MS
     );
   } catch (error) {
