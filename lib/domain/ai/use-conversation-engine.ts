@@ -1134,6 +1134,16 @@ export function useConversationEngine({
               // Trust-labeled field name is load-bearing (prompt-injection
               // defense) — mirror read_page's `untrustedWebContent`.
               untrustedWebContent: c.content,
+              // Nudge the escalation right in the result (more reliable than the
+              // system prompt alone): a THIN browser read is usually a block /
+              // challenge page, and open_tab_and_read (visible tab) often clears
+              // it. Not added for the launcher itself (already the strongest read).
+              ...(isBrowserRead && c.content.trim().length < 800
+                ? {
+                    readHint:
+                      "This came back very thin — likely a block or challenge page, not the real content. If you need this page, call open_tab_and_read to open it in a VISIBLE tab (a stronger read that clears many blocks a background read can't), then continue.",
+                  }
+                : {}),
             },
           });
         } else {
@@ -1142,7 +1152,7 @@ export function useConversationEngine({
             toolCallId: toolCall.toolCallId,
             output: isTabLaunch
               ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
-              : `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}.`,
+              : `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}. If you need this page, call open_tab_and_read to open it in a VISIBLE tab — it clears many blocks a background read can't.`,
           });
         }
       } catch (err) {
