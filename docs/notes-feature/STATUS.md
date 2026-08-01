@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-24
+last_updated: 2026-08-01
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -42,7 +42,7 @@ before planning and executing. There may be additions or modifications.
 **Theme**: Additive multi-tenant schema, tenancy helper module, backfill
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-18-multi-tenancy.md` (+ `MULTI-TENANCY-PLAN.md`)
 
-**Other in-flight worktrees** (parallel): Epoch 19 — Flashcards FSRS (`flashcards-fsrs`); `ai-chat-polish`; `ai-flashcards-tools`; `mobile-webview-spike`; `speed-reader`.
+**Other in-flight worktrees** (parallel): Epoch 19 — Flashcards FSRS (`flashcards-fsrs`); `ai-chat-polish`; `ai-flashcards-tools`; `mobile-webview-spike`; `speed-reader`; **Agentic Browsing** (`feat/agentic-browsing` — Phase 0 + hardening + Phase 1 shipped, PR pending; `AGENTIC-BROWSING-PLAN.md`).
 
 ### Next (booked, not started): Epoch 13 — People + Collaboration
 **Duration**: 6 sprints (58–63) — Foundations · People View + Mount UX · Tree Policy Hardening · Person Mentions · Hocuspocus Collaboration · Share + Media Prototype
@@ -52,6 +52,14 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 1, 2026**: Agentic Browsing Phase 0 + hardening + Phase 1 — the browser read tool becomes a research agent (branch `feat/agentic-browsing`; typecheck/lint/build green; owner-validated smoke tests; PR pending rebase after #142)
+
+- **Phase 0** (`read_page_in_browser`): the first client-executed chat tool (no server `execute`) — the model's tool call streams to the browser, `onToolCall` runs `acquireUrlWithFallback` in the user's **own** session, the result posts back via `addToolResult` + a *targeted* resume predicate (scoped to this tool so it can't defeat the `stopWhen` bound). Registered only when the extension is reachable; declines with a CTA otherwise. Reads login-walled / bot-blocked / JS-heavy pages a server fetch can't.
+- **Phase 0 hardening**: the extension's session-tab extraction waited a flat 1.5s then extracted once → nav/footer chrome on JS-hydrated pages. Now a **settle-then-extract poll loop** (re-extract until Readability succeeds or content length stabilizes, 8s cap) + a **main-landmark tier** (`main`/`[role=main]`/`article` before full-body). LinkedIn validation deferred (pathological anti-automation — job pane never renders into a backgrounded tab).
+- **Phase 1** (multi-step research loop): `propose_research_run` (a `needsApproval` plan card fixing objective / budget / target / ledger up front), `extract_structured` (cheap-model `generateObject` → structured rows, infers interpretive columns), `record_research_findings` (per-objective ledger). Rides the existing AI-SDK tool loop under a gated research-methodology prompt. **Per-run page budget** enforced client-side (run-scoped, fail-open, soft-stop, count-only-successful) + server-side budget derived from the plan result in `body.messages` (raises the step cap + acquisition budget). ~90% reuse: `createNote` (GFM→TipTap table), `upsertRunLedger`, output-placement, associations. **No new libs / perms / Prisma.**
+- Fixed en route: composer provider/model/context menus clipped by the `overflow-x-auto` control rail (portal + `anchorMenuAbove`, **PR #142**); `web_search_preview`+gpt-4 silent-hang diagnosed (gating fix backlogged).
+- Full spec + phase roadmap: `work-tracking/AGENTIC-BROWSING-PLAN.md`. Deferred: read-completion tab launcher → Phase 2; rich approval-card previews (tooltips/TipTap/file) → backlog.
 
 **July 25, 2026**: Wiki-links survive renames — `wikiLink.targetId` (TipTap schema 1.13.0, branch `minor-work/markdown-roundtrip-tables`)
 

@@ -1,6 +1,10 @@
 ---
 title: Agentic Browsing Plan — extension-executed, co-browsing-governed, tool-based
-status: architecture draft 2026-07-29 (owner review pending); build not started (Phase 0 next)
+status: >
+  Phase 0 (read tool) + Phase 0 hardening (settle-then-extract) + Phase 1
+  (multi-step research loop) SHIPPED on feat/agentic-browsing, owner-validated
+  2026-08-01. PR pending (rebase after PR #142 merges). Phase 2 (supervised nav +
+  read-completion tab launcher) next.
 owner: centervalentine
 extends: >
   BROWSER-REACH-PLAN.md B4–B6 (P4 supervised-nav, P5 CDP agent, executor spoke).
