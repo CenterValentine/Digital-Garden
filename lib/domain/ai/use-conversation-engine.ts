@@ -1115,9 +1115,26 @@ export function useConversationEngine({
         return;
       }
       try {
-        const outcome = isTabLaunch
+        let outcome = isTabLaunch
           ? await launchTabAndRead(url)
           : await acquireUrlWithFallback(url);
+        // Deterministic escalation (Phase 2a): if a background read (not the
+        // launcher itself) came back blocked or too thin, and we're NOT in a
+        // research run, auto-retry in a VISIBLE tab instead of hoping the model
+        // chooses to. The extension still gates the open on the user's setting
+        // (refused → keep the original), so a tab only opens when they've opted
+        // in; suppressed in research runs so a multi-source run can't pop a stack
+        // of tabs (there the model escalates explicitly via open_tab_and_read).
+        if (isBrowserRead && !researchRunRef.current) {
+          const currentLen = outcome.content?.content?.trim().length ?? 0;
+          if (!outcome.ok || currentLen < 800) {
+            const launched = await launchTabAndRead(url);
+            const launchedLen = launched.content?.content?.trim().length ?? 0;
+            if (launched.ok && launchedLen > currentLen) {
+              outcome = launched;
+            }
+          }
+        }
         if (outcome.ok && outcome.content) {
           // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
           if (run) run.pagesUsed += 1;
