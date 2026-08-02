@@ -35,7 +35,7 @@ import {
   launchTabAndRead,
   isExtensionAcquireAvailable,
 } from "@/lib/domain/browser-extension/acquire-url";
-import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
@@ -519,7 +519,7 @@ function lastMessageHasResolvedBrowserRead({
     .slice(lastStepStart + 1)
     .filter(
       (part) =>
-        part.type === `tool-${READ_PAGE_IN_BROWSER}` ||
+        part.type === `tool-${READ_PAGE_HEADLESS_OR_BROWSER}` ||
         part.type === `tool-${OPEN_TAB_AND_READ}`,
     ) as Array<{ state?: string }>;
   return (
@@ -1080,7 +1080,7 @@ export function useConversationEngine({
       // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
       // used only after a normal read failed). Both share the budget + result
       // plumbing below.
-      const isBrowserRead = toolCall.toolName === READ_PAGE_IN_BROWSER;
+      const isBrowserRead = toolCall.toolName === READ_PAGE_HEADLESS_OR_BROWSER;
       const isTabLaunch = toolCall.toolName === OPEN_TAB_AND_READ;
       if (!isBrowserRead && !isTabLaunch) return;
       const toolName = toolCall.toolName;

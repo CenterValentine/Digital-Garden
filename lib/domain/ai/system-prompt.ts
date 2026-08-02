@@ -111,7 +111,7 @@ export interface SystemPromptContext {
   hasWebSearch: boolean;
   /** True when phase_checkpoint is attached (AI v3 S4d playbook runtime). */
   hasCheckpointTool: boolean;
-  /** True when read_page_in_browser is attached (Agentic Browsing Phase 0). */
+  /** True when read_page_headless_or_browser is attached (Agentic Browsing Phase 0). */
   hasBrowserReadTool: boolean;
   /**
    * True when open_tab_and_read is attached (Agentic Browsing Phase 2a — the
@@ -231,20 +231,26 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   }
   if (ctx.hasWebSearch) {
     sections.push(
-      "You have a `search_web` tool that searches the live web and returns cited results. Use it whenever the user asks about current events, weather, prices, recent releases, or anything after your training data — do NOT claim you lack real-time access; search instead. Always carry the citations into your answer. You also have `read_page` for reading a specific URL the user provides.",
+      "You have a `search_web` tool that searches the live web and returns cited results. Use it whenever the user asks about current events, weather, prices, recent releases, or anything after your training data — do NOT claim you lack real-time access; search instead. Always carry the citations into your answer." +
+        // The read tool is described below when the extension is present (where
+        // `read_page` is dropped in favor of the single deterministic reader);
+        // only name `read_page` here when that section won't run.
+        (ctx.hasBrowserReadTool
+          ? ""
+          : " You also have `read_page` for reading a specific URL the user provides."),
     );
   }
   if (ctx.hasBrowserReadTool) {
-    // ONE read tool does the whole ladder in code (owner feedback: three tools =
-    // inconsistent model choice; `read_page` the server-only tool is a dead end
-    // that can't escalate). `read_page_in_browser` already does server-fetch
-    // FIRST, then escalates in-code — so make it the single read-a-URL tool.
+    // ONE read tool does the whole ladder in code (owner: three tools = the
+    // model chose inconsistently, and server-only `read_page` was a dead end
+    // that can't escalate). The route drops `read_page` while the extension is
+    // present, so `read_page_headless_or_browser` is the single reader.
     const parts = [
-      "To read a specific web page, use `read_page_in_browser`. It does the whole read for you in ONE call: a fast server fetch first, and if that's blocked or comes back thin it automatically escalates into the user's own browser session — a background tab" +
+      "To read a specific web page, use `read_page_headless_or_browser` — it is your single read tool and it does the whole read in ONE call: a fast headless server fetch first, and if that's blocked or comes back thin it automatically escalates into the user's own browser session — a background tab" +
         (ctx.hasTabLauncher
           ? ", then (when they've enabled it) a VISIBLE tab that clears many bot-blocks and challenge pages"
           : "") +
-        ". You do NOT climb rungs yourself, and you do NOT need `read_page` for a URL when this tool is available — it already includes the server fetch.",
+        ". You do NOT choose or climb rungs — the tool handles the whole ladder for you.",
     ];
     if (ctx.hasTabLauncher) {
       parts.push(

@@ -57,7 +57,7 @@ import {
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
 import {
-  READ_PAGE_IN_BROWSER_DESCRIPTION,
+  READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
 } from "./read-page-in-browser";
 import {
@@ -73,7 +73,7 @@ import {
  * `ToolExecuteContext`, so it lives outside `createBaseTools`.
  */
 export const readPageInBrowserTool = tool({
-  description: READ_PAGE_IN_BROWSER_DESCRIPTION,
+  description: READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   inputSchema: readPageInBrowserInputSchema,
 });
 

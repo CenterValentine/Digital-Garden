@@ -133,7 +133,7 @@ import {
   readPageInBrowserTool,
   openTabAndReadTool,
 } from "@/lib/domain/ai/tools/registry";
-import { READ_PAGE_IN_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
@@ -990,7 +990,7 @@ export async function POST(request: Request) {
         // extension is reachable, so the model can't call it otherwise.
         ...(browserExtensionAvailable
           ? {
-              [READ_PAGE_IN_BROWSER]: readPageInBrowserTool,
+              [READ_PAGE_HEADLESS_OR_BROWSER]: readPageInBrowserTool,
               // Agentic Browsing Phase 2a — read-completion launcher (visible
               // tab). Also client-executed; the extension gates the actual open
               // on the user's "open a tab to read blocked pages" setting, so a
@@ -1005,7 +1005,16 @@ export async function POST(request: Request) {
       > }).toolConfig ?? {};
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
-          ([id]) => toolConfig[id]?.enabled !== false,
+          ([id]) =>
+            toolConfig[id]?.enabled !== false &&
+            // Agentic Browsing (deterministic reads): when the extension is
+            // reachable, `read_page_headless_or_browser` is the SINGLE reader —
+            // it does a headless server fetch first, then escalates into the
+            // browser (background → visible) in code. Drop the server-only
+            // `read_page` so the model can't pick a path that can't escalate;
+            // one tool, one deterministic ladder, no routing decision to get
+            // wrong. (`open_tab_and_read` stays for an explicit visible-tab ask.)
+            !(browserExtensionAvailable && id === "read_page"),
         ),
       );
 
@@ -1636,7 +1645,7 @@ export async function POST(request: Request) {
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
-          hasBrowserReadTool: READ_PAGE_IN_BROWSER in tools,
+          hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
           hasTabLauncher: OPEN_TAB_AND_READ in tools,
           hasResearchTools: "extract_structured" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
