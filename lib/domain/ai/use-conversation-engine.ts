@@ -1125,6 +1125,9 @@ export function useConversationEngine({
         // (refused → keep the original), so a tab only opens when they've opted
         // in; suppressed in research runs so a multi-source run can't pop a stack
         // of tabs (there the model escalates explicitly via open_tab_and_read).
+        // Surface what the escalation did so the model can NARRATE it (owner:
+        // "I can't tell if the read attempt happened before the tab open").
+        let escalationNote: string | undefined;
         if (isBrowserRead && !researchRunRef.current) {
           const currentLen = outcome.content?.content?.trim().length ?? 0;
           if (!outcome.ok || currentLen < 800) {
@@ -1132,6 +1135,17 @@ export function useConversationEngine({
             const launchedLen = launched.content?.content?.trim().length ?? 0;
             if (launched.ok && launchedLen > currentLen) {
               outcome = launched;
+              escalationNote =
+                "A normal read came back blocked/thin, so I opened a VISIBLE tab and read it there.";
+            } else if (
+              launched.reason &&
+              /turned off|Browser Bookmarks/i.test(launched.reason)
+            ) {
+              escalationNote =
+                "A normal read was blocked, and opening a tab to read blocked pages is turned off in the user's Browser Bookmarks settings.";
+            } else if (launched.reason || launched.ok) {
+              escalationNote =
+                "A normal read was blocked, so I also opened a VISIBLE tab — but the page still couldn't be read (likely a human-verification captcha, which no tool can pass).";
             }
           }
         }
@@ -1151,16 +1165,9 @@ export function useConversationEngine({
               // Trust-labeled field name is load-bearing (prompt-injection
               // defense) — mirror read_page's `untrustedWebContent`.
               untrustedWebContent: c.content,
-              // Nudge the escalation right in the result (more reliable than the
-              // system prompt alone): a THIN browser read is usually a block /
-              // challenge page, and open_tab_and_read (visible tab) often clears
-              // it. Not added for the launcher itself (already the strongest read).
-              ...(isBrowserRead && c.content.trim().length < 800
-                ? {
-                    readHint:
-                      "This came back very thin — likely a block or challenge page, not the real content. If you need this page, call open_tab_and_read to open it in a VISIBLE tab (a stronger read that clears many blocks a background read can't), then continue.",
-                  }
-                : {}),
+              // The escalation summary (if any) — the model relays it so the user
+              // sees the steps (normal read → visible-tab open) it actually took.
+              ...(escalationNote ? { escalationNote } : {}),
             },
           });
         } else {
@@ -1169,7 +1176,7 @@ export function useConversationEngine({
             toolCallId: toolCall.toolCallId,
             output: isTabLaunch
               ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
-              : `Could not read the page in the browser: ${outcome.reason ?? "unknown error"}. If you need this page, call open_tab_and_read to open it in a VISIBLE tab — it clears many blocks a background read can't.`,
+              : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`,
           });
         }
       } catch (err) {
