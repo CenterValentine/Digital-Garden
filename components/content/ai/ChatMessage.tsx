@@ -2149,6 +2149,18 @@ function ApprovalRawJson({ args }: { args: unknown }) {
   );
 }
 
+/** Bare hostname (no www.) from a tool call's `url` arg, or "" if absent/bad. */
+function hostFromToolArgs(args: unknown): string {
+  if (!args || typeof args !== "object") return "";
+  const url = (args as { url?: unknown }).url;
+  if (typeof url !== "string" || !url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
 /** camelCase / snake_case tool-arg key → a human "Spaced Label". */
 function humanizeApprovalKey(key: string): string {
   return key
@@ -2505,6 +2517,27 @@ function ToolCallBubble({
             /* not a parseable URL — fall through */
           }
         }
+      }
+      // Agentic Browsing — the single reader and the explicit launcher: express
+      // the ACTION taken (headless fetch vs. a background browser tab vs.
+      // escalated to a VISIBLE tab) so the chip shows what actually happened,
+      // not just the tool name.
+      if (toolName === "read_page_headless_or_browser") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        if (isRunning) return `Reading page${suffix}`;
+        const r =
+          result && typeof result === "object"
+            ? (result as { via?: string; escalationNote?: string })
+            : null;
+        if (r?.escalationNote) return `Read page — opened a browser tab${suffix}`;
+        if (r?.via === "session-tab") return `Read page in a browser tab${suffix}`;
+        return `Read page (headless)${suffix}`;
+      }
+      if (toolName === "open_tab_and_read") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a browser tab${suffix}`;
       }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
