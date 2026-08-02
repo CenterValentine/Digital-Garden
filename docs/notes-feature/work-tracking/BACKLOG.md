@@ -150,10 +150,22 @@ Followups:
 
 B5 (acquisition providers) shipped in that PR: P2 sw-fetch + P3 session-tab as remote providers, client-orchestrated P1→P2→P3 ladder, server builds the trusted envelope, "Read full content" on external-link nodes (with a press-and-hold quick-pick to force a provider), working in both the main app (page-bridge) and the side panel (panel-host channel). Two panel dialog-stacking fixes bundled.
 
-- [ ] **AI browser-acquisition tool (client-side, conditionally registered).** Let the chat AI read a bot-hostile page via the extension. Must be a *client-side* tool — the server chat route can't reach the extension: the client sends a `browserExtensionAvailable` flag per turn → the server registers `read_page_in_browser` ONLY when true; the tool has no server `execute`, so the AI SDK routes the call to the browser via `onToolCall` → run `acquireUrlVia(url, "session-tab")` → `addToolResult`. When the flag is false the tool is absent and the AI should decline with a CTA to reconnect the extension. Net-new client-tool plumbing (chat route flag + tool registry conditional + `use-conversation-engine.ts` `onToolCall` + system prompt). This is the "mid-stream chat escalation" deferred from B5's scope question.
+- [x] ~~**AI browser-acquisition tool (client-side, conditionally registered).**~~ — SHIPPED as **Agentic Browsing Phase 0** (2026-07-29), then hardened + grown into a research agent (Phase 1) and a deterministic reader + launcher (Phase 2a). The first client-executed chat tool: `browserExtensionAvailable` flag per turn → conditional registration → no server `execute` → `onToolCall` runs `acquireUrlWithFallback` → `addToolResult`; declines with a CTA when absent. Renamed `read_page_in_browser` → `read_page_headless_or_browser`. Full spec + followups now live in `AGENTIC-BROWSING-PLAN.md` (see the Agentic Browsing followups section below).
 - [ ] Clearer quick-pick labels: "Browser session" → "Signed-in fetch" (P2), "Background tab" → "Signed-in tab" (P3) — the current labels don't convey the cookies-vs-JS distinction.
 - [ ] Cache acquired content onto the external node's payload so "Read full content" doesn't re-fetch each view (today `hydrateExternalPayload` caches garden-side, but the viewer re-fetches per open).
 - [ ] Quick-pick menu positioning in a short panel — the non-portaled dropdown may clip near the bottom; portal + flip if it surfaces.
+
+---
+
+## Agentic Browsing Followups (2026-08-01, branch `feat/agentic-browsing`)
+
+Phase 0 + hardening + Phase 1 (research loop) + Phase 2a (launcher + one deterministic reader) shipped; full spec + phase roadmap in `AGENTIC-BROWSING-PLAN.md`. Deferred by owner during the build:
+
+- [ ] **[after Phase 2b] Layer #2 — in-chat read-mode toggle.** A composer control that biases the reader's default; per owner it **defaults to opening the browser** (visible tab) rather than a headless fetch, for the interactive scraping experience. Sits on top of the deterministic reader (the code still owns the ladder; the toggle only moves the default entry rung). Deferred until the ladder is proven through Phase 2b.
+- [ ] **[after Phase 2b] Layer #3 — live per-phase step display.** The read chip is action-expressive *after the fact* (it reads the result's `via`/`escalationNote`), but a tool call is atomic, so the intermediate rungs (headless → background → visible) are invisible *while they run*. Layer #3 threads a progress channel through the acquire ladder so the chip shows the current rung as it happens — **build shared with Phase 2b's navigation-step UI** (same "what is the agent doing right now" surface). This is the "show what phase it's in when it's in that phase, or when the first phase fails" ask.
+- [ ] **LinkedIn-grade extraction validation on a fair target.** Phase 0 hardening's settle-then-extract + main-landmark tier is confirmed live, but the original test target (LinkedIn job pages) is pathological (anti-automation + auth SPA never renders into a backgrounded tab). Validate rich extraction against a fair target (Greenhouse / Lever / news / Reddit) before the read-tool PR.
+- [ ] **`web_search_preview` + gpt-4 silent-hang model-gating.** The OpenAI `web_search_preview` tool isn't supported on `gpt-4` and hangs the turn silently (surfaced during Phase 1 smoke testing; worked around by switching to GPT-4o). Gate the tool off for unsupported models with a clear signal instead of a hang.
+- Rich, previewable approval cards (the research-plan card + future co-browsing checkpoints) are tracked in the **needsApproval overhaul** item above — a shared HITL-surface investment, not agentic-browsing-specific.
 
 ---
 

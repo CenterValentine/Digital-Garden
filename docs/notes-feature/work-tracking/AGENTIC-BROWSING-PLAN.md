@@ -1,10 +1,13 @@
 ---
 title: Agentic Browsing Plan — extension-executed, co-browsing-governed, tool-based
 status: >
-  Phase 0 (read tool) + Phase 0 hardening (settle-then-extract) + Phase 1
-  (multi-step research loop) SHIPPED on feat/agentic-browsing, owner-validated
-  2026-08-01. PR pending (rebase after PR #142 merges). Phase 2 (supervised nav +
-  read-completion tab launcher) next.
+  Phase 0 + hardening + Phase 1 (research loop) + Phase 2a (read-completion
+  launcher + ONE deterministic reader `read_page_headless_or_browser`) SHIPPED on
+  feat/agentic-browsing, owner-validated (2026-08-01). PR pending (rebase after
+  PR #142). Phase 2b (supervised navigation: CDP executor + navigate tools +
+  playwright-crx spike) NEXT — opens with D-ENG/D-TGT/D-BANNER. Deferred to after
+  2b: layer #2 (in-chat read-mode toggle, defaults to opening the browser) +
+  layer #3 (live per-phase step display, shared with 2b nav steps).
 owner: centervalentine
 extends: >
   BROWSER-REACH-PLAN.md B4–B6 (P4 supervised-nav, P5 CDP agent, executor spoke).
@@ -405,20 +408,38 @@ real side effects; co-browsing is the mitigation.
 - **Gate:** "research these 3 boards for X" → N pages → synthesized note + a
   structured table, landed in a chosen place, full ledger.
 
-### Phase 2 — Supervised navigation (P4)
+### Phase 2a — Read-completion launcher + one deterministic reader  *(SHIPPED 2026-08-01)*
+- **What shipped:** the read-completion **tab launcher** (`open_tab_and_read`) — a
+  consent-gated VISIBLE-tab read for pages a background tab can't load, gated on
+  the Browser Bookmarks `capture.allowTabLaunch` setting and reusing the existing
+  acquisition policy gate (SSRF/private-net) so `visible` only changes *how* the
+  tab opens, never *whether* the URL is allowed. Then, to make reads CONSISTENT
+  (owner: the model kept picking the server-only `read_page` dead end), collapsed
+  to **one deterministic reader** `read_page_headless_or_browser`: the route drops
+  `read_page` when the extension is present, so the CODE (not the model) runs the
+  whole ladder — headless fetch → background tab → visible tab (auto when the
+  setting is on) — in ONE call. `open_tab_and_read` stays for an EXPLICIT "open a
+  tab" request. Action-expressive chips ("Read page (headless)" / "opened a
+  browser tab") + an `escalationNote` the model narrates give visibility. No new
+  permission (rides the existing extension acquire). Principle: **the model
+  decides WHETHER to read; the code decides HOW.**
+- **Deferred (owner, after 2b):** **layer #2** — an in-chat read-mode toggle
+  (defaults to opening the browser); **layer #3** — live per-phase step display
+  (the chip shows the current rung *as it runs* via a progress channel through
+  the acquire ladder — build shared with 2b's nav-step UI).
+
+### Phase 2b — Supervised navigation (P4)  *(NEXT)*
 - **Goal:** agent navigates (click/paginate/expand/scroll) in a visible,
   session-owned tab; user watching; no critical acts.
 - **Components:** CDP executor (Input/Accessibility/Page) in `src/agentic/cdp/`;
   `navigate` tool family; a11y-tree target resolution (D-TGT); synthetic cursor
-  overlay (rides B4); session+tab manager + teleport; interrupt control;
-  **read-completion tab launcher** — consent-gated visible-tab fallback for a
-  read even a background session tab can't load (the lightest read-only slice;
-  toggle-able from app + sidebar settings; decline → continue without; see the
-  Phase 1 smoke-test outcomes note).
+  overlay (rides B4); session+tab manager + teleport; interrupt control; **live
+  step display (layer #3 — shared with reads)**.
 - **Libs/perms/data:** **add `debugger` permission**; **`playwright-crx`** as the
   interaction engine behind the `BrowserActuator` interface (spike bundle / MV3
   offscreen lifecycle / maintenance first; raw CDP fallback). No Prisma change.
-- **Decisions:** D-ENG (raw CDP vs playwright-crx); D-TGT (a11y vs +vision).
+- **Decisions:** D-ENG (raw CDP vs playwright-crx); D-TGT (a11y vs +vision);
+  D-BANNER (accept the chrome.debugger banner).
 - **Gate:** "page through these results and collect them" → multi-page nav in a
   visible tab, cursor glides, you can interrupt; still read/navigate only.
 
