@@ -4,10 +4,12 @@ status: >
   Phase 0 + hardening + Phase 1 (research loop) + Phase 2a (read-completion
   launcher + ONE deterministic reader `read_page_headless_or_browser`) SHIPPED on
   feat/agentic-browsing, owner-validated (2026-08-01). PR pending (rebase after
-  PR #142). Phase 2b (supervised navigation: CDP executor + navigate tools +
-  playwright-crx spike) NEXT — opens with D-ENG/D-TGT/D-BANNER. Deferred to after
-  2b: layer #2 (in-chat read-mode toggle, defaults to opening the browser) +
-  layer #3 (live per-phase step display, shared with 2b nav steps).
+  PR #142). Phase 2b (supervised navigation) NEXT — spike done + **D-ENG RESOLVED
+  → raw CDP first behind BrowserActuator** (playwright-crx deferred to form-fill);
+  still open: D-TGT, D-BANNER. Interaction reliability is held to a two-category
+  standard (Category A cross-frame / Category B actionability — see plan §). Deferred
+  to after 2b: layer #2 (in-chat read-mode toggle, defaults to opening the browser)
+  + layer #3 (live per-phase step display, shared with 2b nav steps).
 owner: centervalentine
 extends: >
   BROWSER-REACH-PLAN.md B4–B6 (P4 supervised-nav, P5 CDP agent, executor spoke).
@@ -150,39 +152,117 @@ So the actuation engine must be CDP-based.
 | Option | Pros | Cons | Call |
 |---|---|---|---|
 | Content-script synthetic events | zero dep, no banner | untrusted events, **no file upload**, fragile | reads only |
-| Raw `chrome.debugger` + CDP | full control, no dep, native MV3 fit | we hand-roll actionability / waiting / frames (**flaky risk**) | **fallback + low-level escape hatch** |
-| **`playwright-crx`** (Playwright in-extension over CDP) | actionability engine (wait/retry/frames/shadow-DOM), `ariaSnapshot`, `setInputFiles`; `newCDPSession()` keeps raw CDP available | large bundle, offscreen-doc MV3 model, single-maintainer (v0.15.0) | **preferred for interaction (Phase 2), pending spike** |
+| **Raw `chrome.debugger` + CDP** | full control, no dep, native MV3 fit, trusted input; a11y-first targeting sidesteps most of the "flaky" surface | we own a **bounded** actionability pipeline (not the exotic long-tail) | **PRIMARY — locked for Phase 2b (2026-08-01)** |
+| `playwright-crx` (Playwright in-extension over CDP) | actionability engine (wait/retry/frames/shadow-DOM), `ariaSnapshot`, `setInputFiles`; `newCDPSession()` keeps raw CDP available | 51 MB unpacked, offscreen-doc MV3 model, single-maintainer, **dormant ~11 mo** (last release v0.15.0 Jun-2025) | **deferred `BrowserActuator` swap for the form-fill / hard-acting phases** |
 
-**Recommendation (revised).** `playwright-crx` is the **preferred** interaction
-engine for Phase 2+: its actionability engine (wait-for-visible/stable/enabled,
-retries, frame/shadow-DOM traversal, `ariaSnapshot`) is exactly the
-flaky-automation surface raw CDP would force us to reimplement, and its
-`newCDPSession()` still exposes raw CDP for anything it doesn't wrap (e.g.
-`DOMDebugger.getEventListeners` for the draft signal). Guard the bet: (1) put all
-interaction behind a thin **`BrowserActuator`** interface (click/type/upload/
-snapshot/navigate) so raw CDP stays a drop-in fallback; (2) **pin the version**
-(single-maintainer); (3) it doesn't bind until Phase 2 (Phases 0–1 are
-content-script reads), so a **Phase-2 spike** validates bundle size + MV3
-offscreen lifecycle (under parallel sessions + SW restarts) + maintenance before
-we commit. Both engines carry the same `debugger` permission + banner — neutral.
+**Recommendation (revised 2026-08-01, post-spike — reverses the earlier lean).**
+**Raw CDP is the LOCKED primary engine, built behind the `BrowserActuator`
+interface; `playwright-crx` is the deferred swap for the form-fill / hard-acting
+phases.** The [playwright-crx spike](#) found three things that flipped the prior
+"playwright-crx preferred" call: (1) **maintenance** — dormant ~11 months (no
+commit since Sep-2025), single maintainer, tracking fast-moving upstreams
+(Playwright + Chrome), so as the *primary* engine it's a standing liability; (2)
+**weight** — 51 MB unpacked → forces offscreen + code-split complexity for a
+Phase-2b slice that doesn't need it; (3) **lifecycle** — the MV3 SW-suspend hazard
+that most justified playwright-crx is now **solved by Chrome itself** (an active
+`chrome.debugger` session keeps the SW alive), and that keepalive helps raw CDP
+equally. Phase 2b needs only a **narrow, supervised, read/navigate-dominant** CDP
+surface (`Page.navigate`, `Input.dispatch*`, `Accessibility.getFullAXTree`,
+`Runtime.evaluate`), which raw CDP covers with **trusted** input and zero
+dependency risk. What we consciously defer — Playwright's hardened actionability
+for *unattended acting on hostile SPAs* — is exactly the **form-fill phase**,
+which is the `BrowserActuator` swap trigger. See **Interaction reliability** below
+for the two failure categories this engine choice must design against, and the
+band-aid pipeline that keeps the raw-CDP actionability layer bounded.
 
-**Where the engine runs (bundle placement — the key to the size concern).**
-playwright-crx lives in a **lazily-created offscreen document** — *never* a
-content script (so it never loads per page) and *never* the service worker (which
-stays light for fast MV3 cold-starts). The offscreen doc is created on session
-start, drives the debuggee tab(s) over CDP, and is torn down when sessions end.
-So the heavy bundle's cost is only: disk/install size (once), init time (per
-session-start), memory (only while sessions are active) — normal browsing pays
-nothing but on-disk size. **Code-split** it into its own chunk so the SW /
-content-script / panel bundles are unaffected; measure the real size in the spike.
-The `BrowserActuator` interface means a too-heavy result is escapable — swap to a
-lean raw-CDP actuator (only the primitives we need) without touching agent/tools.
+**Where playwright-crx would run *when swapped in* (bundle placement).** It lives
+in a **lazily-created offscreen document** — *never* a content script (never loads
+per page) and *never* the service worker (stays light for fast MV3 cold-starts).
+Created on session start, drives the debuggee tab(s) over CDP, torn down when
+sessions end; **code-split** into its own chunk. Normal browsing pays only on-disk
+size. Raw CDP (the locked primary) needs **no offscreen doc for the 2b MVP** — the
+debugger-keepalive covers the SW lifecycle during an active session, with a
+`runtime.connect()` port as belt-and-suspenders for long multi-step runs.
 
 **The debugger banner.** `chrome.debugger` shows a non-hideable "extension started
 debugging this browser" info bar (a Chrome security feature). Mitigation: attach
 only during an *active* co-browse session, detach the instant it ends; frame the
 banner in-product as the visible sign the agent is driving (consistent with D1's
 visibility promise).
+
+### Interaction reliability — two failure categories to design against (raw CDP)
+
+> **Read this before debugging any "the agent clicked the wrong thing / didn't
+> act / read nothing" issue.** Choosing raw CDP as the primary engine (see D-ENG)
+> means we own the reliability scaffolding Playwright would otherwise give us.
+> The failure surface is **two categories**. Every interaction fix, regression,
+> or new nav capability should be reasoned about in these terms. When a category
+> starts dominating our bugs on *unattended* acting, that's the signal to swap in
+> `playwright-crx` behind `BrowserActuator` (see the swap triggers at the end).
+
+**Category A — Cross-origin iframes (OOPIF).** The target isn't in the top
+document; it's in a child frame with its own execution context and coordinate
+origin. **Where it bites (broader than just "apply forms"):**
+- **Embedded-ATS job boards** — Greenhouse (`boards.greenhouse.io`) / Lever
+  (`jobs.lever.co`) are iframed into `company.com/careers`, so the **job list,
+  each expanded description, and pagination** are all cross-frame. This is the
+  north-star use case, so cross-frame handling is needed at the **read/navigate**
+  layer, not only at submit.
+- **Consent / CMP walls** (OneTrust, TrustArc, Sourcepoint, Quantcast) — usually a
+  cross-origin frame; the agent often *must* click "Accept/Reject" **inside it**
+  just to reach content. Pure navigation, nowhere near a form.
+- **Captcha / challenge frames** (reCAPTCHA, Turnstile) — always cross-origin, but
+  here we **detect and hand off to the human** (Phase 2a visible-tab escalation),
+  we don't act. Needs cross-frame *reading*, not acting.
+- **Embedded viewers / search widgets / comment threads** (PDF/Scribd, Algolia,
+  Disqus) — cross-frame *reads*.
+
+*How hard it bites — the read/act split:* **cross-frame reading is easy** —
+`Target.setAutoAttach({autoAttach:true, flatten:true})` surfaces every child frame
+over one connection (routed by `sessionId`); call `Accessibility.getFullAXTree`
+per frame and stitch. **Cross-frame acting is the real work** — input is dispatched
+at the **root** viewport in **root coordinates** (the compositor routes the hit
+into the iframe), but a deep element's `DOM.getBoxModel` returns **frame-local**
+coords, so you must translate frame-local → root (sum iframe offsets across
+nesting). ~100–150 lines Playwright gives free via `frameLocator()`. **Severity:
+medium-high for job boards** (the embedded-ATS pattern is guaranteed) but
+**bounded** — attach once per frame, then operate within it; not a per-action tax.
+
+**Category B — Actionability (the scaffolding around a trusted dispatch).** The
+trusted `Input.*` event is identical to Playwright's; what differs is the
+*re-resolve / wait / hit-test / scroll* scaffolding around it. Known misses on
+naive "resolve box once → dispatch," and the band-aid that squashes each:
+
+| Failure mode | Trigger | Band-aid (all raw CDP) |
+|---|---|---|
+| Target outside viewport / **nested scroll container** | result #40; item in a scrollable modal | **`DOM.scrollIntoViewIfNeeded(backendNodeId)`** — one native call, walks scroll-parents itself (same primitive Playwright uses) |
+| **Detached / re-created** element (SPA re-render) → stale `backendNodeId` | React/Vue re-render on filter/hover | **`resolveFresh(role,name)`** — re-read AX tree + re-match immediately before each action; never cache a node-id/coord |
+| **Moving target** / layout shift between read and act | lazy image / cookie banner shoves list down → click lands on wrong element | resolveFresh + **2-frame box stability** check |
+| **Covered / overlay** (login gradient, chat bubble on top) | LinkedIn/Indeed "sign in to see more" wall | **prepare-to-act gate**: `DOM.getNodeForLocation(x,y)` hit-test — is the node at the point my target (or child)? |
+| **Degenerate** (0×0, `visibility:hidden`, `pointer-events:none`) | collapsed regions | same gate: non-zero box + AX `hidden`/`ignored` flags (already parsed) |
+| **Virtualized lists** (react-window) — row #200 not in DOM until scrolled | LinkedIn, large boards; "collect all results" | **scroll-collect loop** = scrollIntoViewIfNeeded/step-scroll → settle (Phase-0 loop) → re-read AX → dedupe by semantic key → repeat to a cap. *Composed of the above, not new machinery.* |
+| **Collapsed accordions / disclosures** hide content | `<details>`, ARIA `aria-expanded=false` | **expand-collapsed pre-scrape pass** — AX exposes `expanded` **as a property**, so detection is a field read; expansion is a normal trusted click + settle + re-read. One of the *most* reliably-nailable cases. |
+
+**The consolidating design: one pre-flight pipeline, not a fix-per-mode.** Route
+*every* action (click/hover/type) through
+`resolveFresh → scrollIntoViewIfNeeded → prepare-to-act gate → dispatch`. Because
+click, hover, and type all resolve+prepare identically, that single pipeline buys
+viewport/nested-scroll + detach + layout-shift + covered + degenerate handling
+across all three. A11y-first targeting is what makes it cheap: accordion
+`expanded` and element `hidden`/`ignored` are **AX-tree properties we already
+parse**, not pixel heuristics. *Honest residual:* `scrollIntoViewIfNeeded` won't
+beat deliberate scroll-jacking; the gate *detects* an overlay but *dismissing* it
+is separate logic; `resolveFresh` needs a stable semantic key (duplicate role+name
+→ nth-index / nearby-text disambiguator).
+
+**`BrowserActuator` swap triggers → playwright-crx.** Keep these OUT of the
+raw-CDP layer (they need per-keystroke event fidelity or Playwright's hardened
+frame engine); when they start dominating, swap: **rich text editors**
+(ProseMirror/Draft.js/Quill — deprioritized per owner), **controlled/masked
+`<input>`s** (React state desync on bulk `insertText`), **autocomplete/combobox**
+(needs real `keydown` to fire the async listbox), **cross-frame *acting*** on
+deeply-nested OOPIFs, and the **exotic unattended long-tail**. All concentrate in
+the form-fill / apply phases — the natural swap point.
 
 ### Where we sit vs. the mature stacks (checked 2026-07)
 
@@ -330,12 +410,13 @@ standard + `beforeunload` + consent keywords (reuse the standard, don't reinvent
 - **Manifest permissions to add:** `debugger` (CDP — significant; enables the
   banner), `notifications` (OS checkpoints). Already have `tabs`, `scripting`,
   `cookies`, `<all_urls>`, `sidePanel`.
-- **npm dependencies:** **none for Phases 0–1** (content-script reads).
-  **`playwright-crx` from Phase 2** as the interaction engine, behind the
-  swappable `BrowserActuator` interface (raw CDP is the fallback); a
-  vision/set-of-marks helper only if the D-TGT fallback is built. Agent loop
-  reuses the AI SDK — **no new agent framework** (browser-use / Nanobrowser inform
-  the *pattern*, not the code; they're Python/standalone).
+- **npm dependencies:** **none through Phase 2b** — Phases 0–1 are content-script
+  reads; Phase 2b runs on **raw `chrome.debugger`/CDP (native, no npm dep)**.
+  **`playwright-crx` is deferred to the form-fill / hard-acting phases**, dropped
+  in behind the swappable `BrowserActuator` interface then (D-ENG resolved
+  2026-08-01); a vision/set-of-marks helper only if the D-TGT fallback is built.
+  Agent loop reuses the AI SDK — **no new agent framework** (browser-use /
+  Nanobrowser inform the *pattern*, not the code; they're Python/standalone).
 
 ---
 
@@ -431,15 +512,31 @@ real side effects; co-browsing is the mitigation.
 ### Phase 2b — Supervised navigation (P4)  *(NEXT)*
 - **Goal:** agent navigates (click/paginate/expand/scroll) in a visible,
   session-owned tab; user watching; no critical acts.
-- **Components:** CDP executor (Input/Accessibility/Page) in `src/agentic/cdp/`;
-  `navigate` tool family; a11y-tree target resolution (D-TGT); synthetic cursor
-  overlay (rides B4); session+tab manager + teleport; interrupt control; **live
-  step display (layer #3 — shared with reads)**.
-- **Libs/perms/data:** **add `debugger` permission**; **`playwright-crx`** as the
-  interaction engine behind the `BrowserActuator` interface (spike bundle / MV3
-  offscreen lifecycle / maintenance first; raw CDP fallback). No Prisma change.
-- **Decisions:** D-ENG (raw CDP vs playwright-crx); D-TGT (a11y vs +vision);
-  D-BANNER (accept the chrome.debugger banner).
+- **Components:** raw-CDP executor (Input/Accessibility/Page) in `src/agentic/cdp/`
+  behind the `BrowserActuator` interface; the **actionability pipeline**
+  (`resolveFresh → scrollIntoViewIfNeeded → prepare-to-act gate → dispatch`) that
+  every action routes through; **cross-frame (OOPIF) support** via
+  `Target.setAutoAttach({flatten:true})` (read-first: per-frame `getFullAXTree`;
+  root-coordinate translation for acting); the **expand-collapsed** + **scroll-
+  collect** passes; `navigate` tool family; a11y-tree target resolution (D-TGT);
+  synthetic cursor overlay (rides B4); session+tab manager + teleport; interrupt
+  control; **live step display (layer #3 — shared with reads)**. The two failure
+  categories in **Interaction reliability** are the **standard this phase upholds**
+  — every nav capability is measured against Category A (cross-frame) + Category B
+  (actionability).
+- **Libs/perms/data:** **add `debugger` permission** (+ `notifications` for
+  checkpoints); **raw CDP = no npm dependency and no offscreen doc for the MVP**
+  (Chrome's debugger-keepalive covers the SW lifecycle; `runtime.connect()` port as
+  belt-and-suspenders). `playwright-crx` is NOT added here — it's the deferred
+  form-fill-phase swap behind `BrowserActuator`. No Prisma change.
+- **Decisions:** **D-ENG RESOLVED → raw CDP first** (behind `BrowserActuator`;
+  playwright-crx deferred). Still open: D-TGT (a11y vs +vision), D-BANNER (accept
+  the chrome.debugger banner).
+- **De-risk (step one):** before wiring the tools, build + prove the actionability
+  pipeline against **three deliberately-hard real pages** — an embedded
+  Greenhouse/Lever board (cross-frame + pagination), a virtualized list
+  (scroll-collect), and a consent-walled site (cross-frame click). Clears them →
+  the "surprise miss" risk for 2b's action set is measured, not asserted.
 - **Gate:** "page through these results and collect them" → multi-page nav in a
   visible tab, cursor glides, you can interrupt; still read/navigate only.
 
@@ -655,10 +752,16 @@ even a background tab can't load (aggressive bot-detection / device blocks).
 
 ## Consolidated open decisions (your call — needed to lock the plan)
 
-- **D-ENG** (Phase 2): `playwright-crx` as the **preferred** interaction engine
-  behind a swappable `BrowserActuator` interface, validated by a Phase-2 spike
-  (bundle / MV3 offscreen lifecycle / maintenance); raw CDP as the fallback +
-  low-level escape hatch (`newCDPSession()`). OK, or do you want raw-CDP-first?
+- **D-ENG** (Phase 2): **RESOLVED (2026-08-01) → raw CDP FIRST**, built behind the
+  swappable `BrowserActuator` interface; `playwright-crx` deferred to the
+  form-fill / hard-acting phases. The spike reversed the earlier "playwright-crx
+  preferred" lean: it's dormant ~11 mo + 51 MB, and the MV3-lifecycle problem it
+  best solved is now handled by Chrome (active `chrome.debugger` sessions keep the
+  SW alive). Owner: *"we will put Playwright in at some point"* — the interaction
+  cases in **Interaction reliability** (Category A cross-frame + Category B
+  actionability) are the ones to be prepared for; each is the swap signal. See
+  that section for the raw-CDP band-aid pipeline that keeps the actionability layer
+  bounded for supervised 2b nav.
 - **D-TGT** (Phase 2): accessibility-tree-first, vision fallback deferred — OK?
 - **D-CRIT** (Phase 3): **sensitivity detection** is the deterministic floor
   (`autocomplete`-PII + consent checkbox + `beforeunload`/draft), LLM
