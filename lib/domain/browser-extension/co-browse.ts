@@ -98,6 +98,11 @@ export function coBrowseScroll(opts?: {
   return requestCoBrowse("scroll", { ...(opts ?? {}) });
 }
 
+/** Auto scroll-collect a long/virtualized list in one call (dedup by role+name+value). */
+export function coBrowseCollect(): Promise<CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string }>> {
+  return requestCoBrowse("collect");
+}
+
 /** Inject the on-page countdown overlay (T1) — returns immediately; engine sleeps. */
 export function coBrowseShowTimer(seconds: number, label?: string): Promise<CoBrowseResult> {
   return requestCoBrowse("show-timer", { seconds, ...(label ? { label } : {}) });

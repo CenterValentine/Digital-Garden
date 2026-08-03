@@ -58,11 +58,13 @@ export type CoBrowseOpenInput = z.infer<typeof coBrowseOpenInputSchema>;
 
 export const coBrowseActInputSchema = z.object({
   action: z
-    .enum(["read", "click", "hover", "type", "navigate", "scroll", "wait", "back", "reveal"])
+    .enum(["read", "click", "hover", "type", "navigate", "scroll", "collect", "wait", "back", "reveal"])
     .describe(
       "read = re-snapshot the page; click/hover/type = act on a target chosen from " +
         "the snapshot by role+name; navigate = go to a new url in the SAME tab; " +
-        "scroll = scroll to reveal lazy/virtualized content; wait = pause for " +
+        "scroll = scroll one step to reveal lazy/virtualized content; collect = " +
+        "auto-scroll the WHOLE list and return every item in one call (use for long / " +
+        "virtualized lists instead of scrolling repeatedly); wait = pause for " +
         "`seconds` while showing an on-page countdown so the user reviews THIS page " +
         "(for timed iteration); back = go back to the previous page (undo a " +
         "navigation); reveal = bring the driven tab to the foreground so the user " +

@@ -11,7 +11,7 @@
 // rich editors, controlled/masked inputs, autocomplete key-sequences.
 
 import { send, frameOffset } from "./executor.js";
-import { getA11ySnapshot } from "./snapshot.js";
+import { getA11ySnapshot, currentUrl } from "./snapshot.js";
 
 // resolveFresh: re-read the AX tree and re-match by role+name RIGHT NOW — never
 // act on a cached backendDOMNodeId (kills the detach / re-render Category-B miss,
@@ -166,6 +166,39 @@ export async function scroll({ direction = "down", to } = {}) {
     typeof v.scrollHeight === "number" &&
     v.scrollY + v.innerHeight >= v.scrollHeight - 5;
   return { ok: true, atBottom };
+}
+
+// Slice 3d — AUTOMATIC scroll-collect: gather a long / virtualized list in ONE
+// call so the model doesn't have to scroll-and-re-read manually. Snapshot →
+// scroll → settle → snapshot → dedupe, until the page bottoms out or the set
+// stops growing (or a scroll cap). Dedupe by a STABLE semantic key (role+name+
+// value) — NOT group/backendDOMNodeId, which change as virtualized rows recycle.
+export async function collectAll({ maxScrolls = 20 } = {}) {
+  const seen = new Map();
+  const absorb = (nodes) => {
+    for (const n of nodes || []) {
+      const key = `${n.role}|${n.name}|${n.value ?? ""}`;
+      if (!seen.has(key)) seen.set(key, n);
+    }
+  };
+  let lastSize = -1;
+  let stable = 0;
+  for (let i = 0; i < maxScrolls; i++) {
+    absorb(await getA11ySnapshot());
+    const res = await scroll({ direction: "down" });
+    await new Promise((r) => setTimeout(r, 550)); // let lazy rows render
+    if (res.atBottom) {
+      absorb(await getA11ySnapshot()); // one more after reaching the end
+      break;
+    }
+    if (seen.size === lastSize) {
+      if (++stable >= 2) break; // set stopped growing across 2 scrolls
+    } else {
+      stable = 0;
+      lastSize = seen.size;
+    }
+  }
+  return { nodes: [...seen.values()], url: await currentUrl() };
 }
 
 // Basic text entry: focus (click) then insertText. Good enough for plain inputs /

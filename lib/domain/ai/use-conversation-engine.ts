@@ -51,6 +51,7 @@ import {
   coBrowseHover,
   coBrowseType,
   coBrowseScroll,
+  coBrowseCollect,
   coBrowseBack,
   coBrowseReveal,
   coBrowseShowTimer,
@@ -1238,6 +1239,17 @@ export function useConversationEngine({
                 waited: seconds,
                 note: `Paused ${seconds}s for the user to review the page.`,
               },
+            });
+            return;
+          }
+          // collect — auto scroll-collect the whole list in one call (Slice 3d).
+          // Returns the merged, deduped set directly (not a fresh single snapshot).
+          if (action === "collect") {
+            const collected = await coBrowseCollect();
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: { action: "collect", ...coBrowseSnapshotOutput(collected) },
             });
             return;
           }
