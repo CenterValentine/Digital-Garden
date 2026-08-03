@@ -88,6 +88,14 @@ export function coBrowseType(target: CoBrowseTarget, text: string): Promise<CoBr
   return requestCoBrowse("type", { ...target, text });
 }
 
+/** Scroll the page to reveal lazy/virtualized content. Returns `atBottom`. */
+export function coBrowseScroll(opts?: {
+  direction?: "down" | "up";
+  to?: "bottom" | "top";
+}): Promise<CoBrowseResult<{ atBottom: boolean }>> {
+  return requestCoBrowse("scroll", { ...(opts ?? {}) });
+}
+
 // ── Session / tab manager (Slice 5b) ─────────────────────────────────────────
 
 /** One open tab's metadata (for "pick a tab" and metadata resolution). */

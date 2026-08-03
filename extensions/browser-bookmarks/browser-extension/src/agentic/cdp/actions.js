@@ -104,6 +104,30 @@ export async function hover(target) {
   return { ok: true, x, y };
 }
 
+// Scroll the page to reveal lazy / virtualized content (R2 "assess & adapt"). A
+// viewport-step scroll via the page's own scroller; the caller re-snapshots after
+// to see what newly rendered. `to:"bottom"|"top"` jumps to an end. Returns
+// `atBottom` so the agent knows when there's nothing left to reveal.
+export async function scroll({ direction = "down", to } = {}) {
+  const expr =
+    to === "bottom"
+      ? "window.scrollTo(0, document.body.scrollHeight)"
+      : to === "top"
+        ? "window.scrollTo(0, 0)"
+        : `window.scrollBy(0, ${direction === "up" ? -900 : 900})`;
+  const evalResult = await send("Runtime.evaluate", {
+    expression: `(function(){ ${expr}; return { scrollY: Math.round(window.scrollY), scrollHeight: document.body.scrollHeight, innerHeight: window.innerHeight }; })()`,
+    returnByValue: true,
+  });
+  const v = (evalResult && evalResult.result && evalResult.result.value) || {};
+  const atBottom =
+    typeof v.scrollY === "number" &&
+    typeof v.innerHeight === "number" &&
+    typeof v.scrollHeight === "number" &&
+    v.scrollY + v.innerHeight >= v.scrollHeight - 5;
+  return { ok: true, atBottom };
+}
+
 // Basic text entry: focus (click) then insertText. Good enough for plain inputs /
 // search boxes; controlled/masked inputs + rich editors need per-keystroke fidelity
 // and are a playwright-crx swap trigger. Appends at the cursor (no clear yet).

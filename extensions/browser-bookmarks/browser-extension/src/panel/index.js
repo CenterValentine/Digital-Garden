@@ -41,6 +41,7 @@ const CO_BROWSE_OPS = new Set([
   "click",
   "hover",
   "type",
+  "scroll",
   // Slice 5b session/tab manager
   "open",
   "reveal",

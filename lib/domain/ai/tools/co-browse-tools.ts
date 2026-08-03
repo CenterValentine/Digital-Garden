@@ -58,11 +58,21 @@ export type CoBrowseOpenInput = z.infer<typeof coBrowseOpenInputSchema>;
 
 export const coBrowseActInputSchema = z.object({
   action: z
-    .enum(["read", "click", "hover", "type", "navigate"])
+    .enum(["read", "click", "hover", "type", "navigate", "scroll"])
     .describe(
       "read = re-snapshot the page; click/hover/type = act on a target chosen from " +
-        "the snapshot by role+name; navigate = go to a new url in the SAME tab.",
+        "the snapshot by role+name; navigate = go to a new url in the SAME tab; " +
+        "scroll = scroll to reveal lazy/virtualized content (then the snapshot shows " +
+        "what newly rendered).",
     ),
+  direction: z
+    .enum(["down", "up"])
+    .optional()
+    .describe("Scroll direction (default down). For action=scroll."),
+  to: z
+    .enum(["bottom", "top"])
+    .optional()
+    .describe("Jump to bottom/top instead of a step. For action=scroll."),
   role: z
     .string()
     .optional()

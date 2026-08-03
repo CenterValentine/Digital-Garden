@@ -2603,6 +2603,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return;
     }
+    if (message.type === "cobrowse-scroll") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.scroll(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "scroll failed" });
+      }
+      return;
+    }
     // ── Session / tab manager (Slice 5b) ──────────────────────────────────
     if (message.type === "cobrowse-open") {
       try {

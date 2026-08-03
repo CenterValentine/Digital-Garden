@@ -50,6 +50,7 @@ import {
   coBrowseClick,
   coBrowseHover,
   coBrowseType,
+  coBrowseScroll,
   type CoBrowseNode,
 } from "@/lib/domain/browser-extension/co-browse";
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
@@ -1150,6 +1151,8 @@ export function useConversationEngine({
           name?: string;
           nth?: number;
           text?: string;
+          direction?: "down" | "up";
+          to?: "bottom" | "top";
         };
         try {
           if (toolName === CO_BROWSE_OPEN) {
@@ -1194,6 +1197,8 @@ export function useConversationEngine({
             res = input.url
               ? await coBrowseNavigate(input.url)
               : { ok: false, error: "navigate needs a url" };
+          else if (action === "scroll")
+            res = await coBrowseScroll({ direction: input.direction, to: input.to });
           else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
           if (!res.ok) {
             chat.addToolResult({
