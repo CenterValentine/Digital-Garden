@@ -1,5 +1,5 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
-import * as cobrowse from "../agentic/cdp/executor.js";
+import * as cobrowse from "../agentic/cdp/index.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -1889,6 +1889,23 @@ chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "toggle-cobrowse-dev") toggleCoBrowseDev(tab);
 });
 
+// DEV-ONLY co-browse console harness (Slice 2/3). Call from the service-worker
+// console: `await self.__dgCobrowse.attach()` (active tab) → `await
+// self.__dgCobrowse.snapshot()` → `self.__dgCobrowse.detach()`. Remove before
+// the Phase 2b PR; the real path routes via the trust-gated panel-bridge.
+self.__dgCobrowse = {
+  attach: async (tabId) => {
+    if (typeof tabId !== "number") {
+      const tabs = await chrome.tabs.query({ active: true });
+      tabId = (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
+    }
+    return cobrowse.attach(tabId);
+  },
+  detach: () => cobrowse.detach(),
+  status: () => cobrowse.getSession(),
+  snapshot: () => cobrowse.getA11ySnapshot(),
+};
+
 // sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
 // async listener returns a promise immediately and Chrome no longer treats
 // the call as gesture-initiated (the panel silently fails to open / closes).
@@ -2535,6 +2552,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true, data: await cobrowse.send("Page.navigate", { url }) });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "navigate failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-snapshot") {
+      try {
+        sendResponse({ ok: true, data: { nodes: await cobrowse.getA11ySnapshot() } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
       }
       return;
     }
