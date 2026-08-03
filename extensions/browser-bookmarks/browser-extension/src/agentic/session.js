@@ -9,22 +9,46 @@
 // These are chrome.tabs operations (background-context), layered on the cdp
 // executor. URL policy (SSRF/private-net) is gated by the caller before `open`.
 
-import { attach, detach, getSession, send } from "./cdp/index.js";
+import { attach, detach, getSession } from "./cdp/index.js";
+
+// Resolve once `tabId` finishes loading (status "complete") or after a cap — so we
+// attach to a LOADED tab, never one mid-initial-navigation.
+function waitForTabComplete(tabId, timeoutMs = 15000) {
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      clearTimeout(timer);
+      resolve();
+    };
+    const onUpdated = (id, info) => {
+      if (id === tabId && info.status === "complete") finish();
+    };
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    // Guard: it may already be "complete" before the listener attached.
+    chrome.tabs.get(tabId, (t) => {
+      if (!chrome.runtime.lastError && t && t.status === "complete") finish();
+    });
+    const timer = setTimeout(finish, timeoutMs);
+  });
+}
 
 // Open a NEW tab the agent owns and attach to it (the default topology). Replaces
 // any current session — the agent works one target at a time. Caller SSRF-gates
-// the URL first. `active:true` (default) foregrounds it so the user sees the
-// agent start; focus emulation (in attach) keeps it live if they switch away.
+// the URL first. `active:true` (default) foregrounds it so the user sees the agent
+// start; focus emulation (in attach) keeps it live if they switch away.
 //
-// Open the tab BLANK, attach to the stable target, THEN navigate under debugger
-// control. Attaching to a tab that's mid-initial-navigation races the load's
-// commit (observed: blank page + "Not Secure"), so we let the nav happen after
-// attach — the standard automation pattern. URL is already policy-gated upstream.
+// Let the browser load the page NATIVELY, then attach to the LOADED tab — the two
+// things already proven to work (manual navigation + attaching an open tab). This
+// sidesteps the debugger racing the initial navigation (which blanked the page) and
+// the CDP-navigate-a-blank-tab quirk. URL is policy-gated upstream.
 export async function openAndAttach(url, { active = true } = {}) {
   if (getSession()) await detach();
-  const tab = await chrome.tabs.create({ url: "about:blank", active });
+  const tab = await chrome.tabs.create({ url, active });
+  await waitForTabComplete(tab.id);
   const data = await attach(tab.id);
-  await send("Page.navigate", { url });
   return { ...data, tabId: tab.id, opened: true };
 }
 
