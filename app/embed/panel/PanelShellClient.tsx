@@ -455,6 +455,13 @@ export function PanelShellClient({
             ? String(data.payload.faviconUrl)
             : undefined,
         });
+        // Also publish the lightweight current-page (url+title) to the store so the
+        // conversation engine's current-page hint knows what page the user is on —
+        // even without a full capture/attach. Powers "summarize this page".
+        usePanelPageContextStore.getState().setCurrentPage({
+          url: String(data.payload.url),
+          title: String(data.payload.title ?? ""),
+        });
       }
 
       // B3-B capture settings (killswitch + denylist) from chrome.storage.
