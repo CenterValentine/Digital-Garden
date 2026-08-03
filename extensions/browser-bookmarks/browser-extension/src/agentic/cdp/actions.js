@@ -36,6 +36,13 @@ export async function resolveFresh({ role, name, nth } = {}) {
   }
   const chosen = nth == null ? matches[0] : matches[nth];
   if (!chosen) throw new Error(`nth=${nth} out of range (${matches.length} matches)`);
+  // Cross-frame (OOPIF) nodes are readable now (3c-1) but not yet actionable —
+  // acting needs frame-local→root coordinate translation (Slice 3c-2).
+  if (chosen.sessionId) {
+    throw new Error(
+      `target is inside a cross-origin iframe (${chosen.frameUrl || "child frame"}) — cross-frame acting lands in Slice 3c-2; it's readable in the snapshot now`,
+    );
+  }
   return chosen.backendDOMNodeId;
 }
 

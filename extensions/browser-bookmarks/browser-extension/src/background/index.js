@@ -1903,6 +1903,7 @@ self.__dgCobrowse = {
   },
   detach: () => cobrowse.detach(),
   status: () => cobrowse.getSession(),
+  frames: () => cobrowse.getChildSessions(),
   snapshot: () => cobrowse.getA11ySnapshot(),
   click: (role, name, nth) => cobrowse.click({ role, name, nth }),
   hover: (role, name, nth) => cobrowse.hover({ role, name, nth }),

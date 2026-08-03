@@ -8,7 +8,7 @@
 // boundaries natively, which is exactly why a11y-first targeting sidesteps
 // Playwright's shadow-piercing selectors (Category B, resolved cheaply).
 
-import { send } from "./executor.js";
+import { send, getChildSessions } from "./executor.js";
 
 // Roles the agent can act on. Deliberately broad but not exhaustive.
 const INTERACTABLE_ROLES = new Set([
@@ -59,17 +59,38 @@ function normalize(node) {
   };
 }
 
-// The full interactable+named node list for the active session's page. Nodes
-// without a backendDOMNodeId are kept for orientation but can't be acted on until
-// resolveFresh maps them (Slice 3b). Cross-frame (OOPIF) stitching is Slice 3c.
-export async function getA11ySnapshot() {
-  const result = await send("Accessibility.getFullAXTree");
+async function collectFrame(out, sessionId, frameUrl) {
+  let result;
+  try {
+    result = await send("Accessibility.getFullAXTree", undefined, sessionId);
+  } catch {
+    return; // frame may be mid-navigation / detached — skip it, don't fail the snapshot
+  }
   const nodes = (result && result.nodes) || [];
-  const out = [];
   for (const node of nodes) {
     if (node.ignored) continue;
     const normalized = normalize(node);
-    if (normalized) out.push(normalized);
+    if (!normalized) continue;
+    // Tag cross-frame nodes so resolveFresh can gate acting on them (3c-2) while
+    // they're still READABLE now (3c-1).
+    if (sessionId) {
+      normalized.sessionId = sessionId;
+      if (frameUrl) normalized.frameUrl = frameUrl;
+    }
+    out.push(normalized);
+  }
+}
+
+// The full interactable+named node list for the active session's page, stitched
+// across the top frame AND every cross-origin (OOPIF) child frame (Slice 3c-1) —
+// so an embedded Greenhouse/Lever board's content is visible, not a black box.
+// Nodes without a backendDOMNodeId are kept for orientation; cross-frame nodes
+// carry `sessionId`/`frameUrl` and are read-only until 3c-2 (coordinate translation).
+export async function getA11ySnapshot() {
+  const out = [];
+  await collectFrame(out, undefined, undefined); // top frame
+  for (const frame of getChildSessions()) {
+    await collectFrame(out, frame.sessionId, frame.url);
   }
   return out;
 }

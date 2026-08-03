@@ -28,6 +28,18 @@ let session = null; // { tabId: number, startedAt: number } | null
 // are the SAME lifecycle event, funnelled through here.
 let onSessionEnd = null; // (reason: string, tabId: number) => void
 
+// Cross-frame (OOPIF, Category A): cross-origin iframes are isolated targets —
+// Accessibility.getFullAXTree can't cross the security boundary from the root
+// session, so each needs its OWN protocol session. Flat auto-attach exposes each
+// as a child session addressed by `sessionId`. This map is sessionId → frame info;
+// reading stitches AX across them (Slice 3c-1), acting across them (frame-local→
+// root coordinate translation) is Slice 3c-2.
+const childSessions = new Map(); // sessionId -> { targetId, type, url }
+
+export function getChildSessions() {
+  return [...childSessions.entries()].map(([sessionId, info]) => ({ sessionId, ...info }));
+}
+
 function attachDebugger(target, version) {
   return new Promise((resolve, reject) => {
     chrome.debugger.attach(target, version, () => {
@@ -86,12 +98,23 @@ export async function attach(tabId) {
   }
   await attachDebugger({ tabId }, PROTOCOL_VERSION);
   session = { tabId, startedAt: Date.now() };
+  childSessions.clear();
   for (const domain of DOMAINS_ON_ATTACH) {
     try {
       await sendCommand({ tabId }, domain);
     } catch (error) {
       console.warn("[DG cobrowse] enable failed", domain, error);
     }
+  }
+  // Expose cross-origin (OOPIF) frames as child sessions (see childSessions).
+  try {
+    await sendCommand({ tabId }, "Target.setAutoAttach", {
+      autoAttach: true,
+      waitForDebuggerOnStart: false,
+      flatten: true,
+    });
+  } catch (error) {
+    console.warn("[DG cobrowse] setAutoAttach failed", error);
   }
   return { tabId, alreadyAttached: false };
 }
@@ -102,14 +125,19 @@ export async function detach() {
   if (!session) return { detached: false };
   const { tabId } = session;
   session = null;
+  childSessions.clear();
   await detachDebugger({ tabId });
   return { detached: true, tabId };
 }
 
 // The single CDP primitive every later slice builds on. Throws if no session.
-export async function send(method, params) {
+// Pass a child `sessionId` (from getChildSessions) to target a cross-origin frame.
+export async function send(method, params, sessionId) {
   if (!session) throw new Error("No active co-browse session — attach first.");
-  return sendCommand({ tabId: session.tabId }, method, params);
+  const target = sessionId
+    ? { tabId: session.tabId, sessionId }
+    : { tabId: session.tabId };
+  return sendCommand(target, method, params);
 }
 
 // Cancel on the banner ("canceled_by_user"), the tab closing ("target_closed"),
@@ -119,6 +147,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   if (session && source && source.tabId === session.tabId) {
     const endedTab = session.tabId;
     session = null;
+    childSessions.clear();
     if (onSessionEnd) {
       try {
         onSessionEnd(reason, endedTab);
@@ -126,5 +155,39 @@ chrome.debugger.onDetach.addListener((source, reason) => {
         console.warn("[DG cobrowse] session-end handler threw", error);
       }
     }
+  }
+});
+
+// Cross-frame discovery: with flat auto-attach on, each cross-origin (OOPIF) frame
+// arrives as `Target.attachedToTarget` carrying its own `sessionId`. Record it,
+// enable perception domains on that child session, and recurse auto-attach so
+// nested OOPIFs surface too. `Target.detachedFromTarget` removes it.
+chrome.debugger.onEvent.addListener((source, method, params) => {
+  if (!session || !source || source.tabId !== session.tabId) return;
+  if (method === "Target.attachedToTarget") {
+    const sessionId = params && params.sessionId;
+    const info = params && params.targetInfo;
+    if (!sessionId || !info) return;
+    childSessions.set(sessionId, { targetId: info.targetId, type: info.type, url: info.url });
+    (async () => {
+      for (const domain of DOMAINS_ON_ATTACH) {
+        try {
+          await sendCommand({ tabId: session.tabId, sessionId }, domain);
+        } catch {
+          // a non-document target (worker, etc.) may not support a domain — fine
+        }
+      }
+      try {
+        await sendCommand({ tabId: session.tabId, sessionId }, "Target.setAutoAttach", {
+          autoAttach: true,
+          waitForDebuggerOnStart: false,
+          flatten: true,
+        });
+      } catch {
+        // best-effort recursion for nested OOPIFs
+      }
+    })();
+  } else if (method === "Target.detachedFromTarget") {
+    if (params && params.sessionId) childSessions.delete(params.sessionId);
   }
 });
