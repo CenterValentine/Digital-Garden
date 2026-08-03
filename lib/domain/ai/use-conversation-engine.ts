@@ -37,7 +37,11 @@ import {
 } from "@/lib/domain/browser-extension/acquire-url";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
-import { CO_BROWSE_OPEN, CO_BROWSE_ACT } from "@/lib/domain/ai/tools/co-browse-tools";
+import {
+  CO_BROWSE_OPEN,
+  CO_BROWSE_ACT,
+  READ_CURRENT_PAGE,
+} from "@/lib/domain/ai/tools/co-browse-tools";
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
@@ -48,6 +52,7 @@ import {
   coBrowseType,
   type CoBrowseNode,
 } from "@/lib/domain/browser-extension/co-browse";
+import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -538,7 +543,8 @@ function lastMessageHasResolvedBrowserRead({
         // Co-browse tools (Slice 5c) are client-executed the same way — resume the
         // loop after their result so the model can act → look → act.
         part.type === `tool-${CO_BROWSE_OPEN}` ||
-        part.type === `tool-${CO_BROWSE_ACT}`,
+        part.type === `tool-${CO_BROWSE_ACT}` ||
+        part.type === `tool-${READ_CURRENT_PAGE}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -1212,6 +1218,43 @@ export function useConversationEngine({
             toolCallId: toolCall.toolCallId,
             state: "output-error",
             errorText: err instanceof Error ? err.message : "co-browse failed",
+          });
+        }
+        return;
+      }
+      // R1 — read the page the user is ALREADY on (the current tab), via the
+      // panel's content-script capture: no new tab, no re-fetch, no debugger
+      // banner. Distinct from read_page (refetches a URL) and co_browse_open
+      // (opens a fresh tab). For "summarize this page".
+      if (toolCall.toolName === READ_CURRENT_PAGE) {
+        try {
+          const captured = await capturePageContent("full");
+          if (!captured.ok || !captured.content) {
+            chat.addToolResult({
+              tool: READ_CURRENT_PAGE,
+              toolCallId: toolCall.toolCallId,
+              output: `Couldn't read the current page: ${captured.error ?? "no readable content"}.`,
+            });
+            return;
+          }
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: captured.url,
+              title: captured.title,
+              siteName: captured.siteName,
+              via: "current-tab",
+              // Trust-labeled (prompt-injection defense) — mirrors read_page.
+              untrustedWebContent: captured.content,
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "read current page failed",
           });
         }
         return;

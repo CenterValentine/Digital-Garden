@@ -342,6 +342,69 @@ export function requestCoBrowse<T = unknown>(
   });
 }
 
+/** Readable content of the tab the user is currently on (R1: "read the page I'm on"). */
+export interface CapturedPageContent {
+  ok: boolean;
+  url?: string;
+  title?: string;
+  siteName?: string;
+  content?: string;
+  error?: string;
+}
+
+/**
+ * Read the CURRENT tab's readable content via the panel's content-script capture
+ * (Readability) — the page already open + authenticated in front of the user, NO
+ * re-fetch and NO new tab (and no debugger banner; this is a pure read). Promise
+ * round-trip: post `capture-page`, resolve on `page-content` / reject-shape on
+ * `page-content-error`. Only meaningful in the panel embed.
+ */
+export function capturePageContent(scope = "full"): Promise<CapturedPageContent> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, error: "reading the current page is only available in the side panel" });
+      return;
+    }
+    let settled = false;
+    const finish = (result: CapturedPageContent) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object" || data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "page-content") {
+        const p = data.payload ?? {};
+        finish({
+          ok: true,
+          url: typeof p.url === "string" ? p.url : undefined,
+          title: typeof p.title === "string" ? p.title : undefined,
+          siteName: typeof p.siteName === "string" ? p.siteName : undefined,
+          content: typeof p.content === "string" ? p.content : "",
+        });
+      } else if (data.type === "page-content-error") {
+        finish({
+          ok: false,
+          error: typeof data.payload?.message === "string" ? data.payload.message : "couldn't read this page",
+        });
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, error: "reading the current page timed out" }),
+      20_000,
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope } },
+      "*",
+    );
+  });
+}
+
 /** Decode a data: URL into a File for the chat's attachment path. */
 export function dataUrlToFile(dataUrl: string, filename: string): File | null {
   try {

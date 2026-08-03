@@ -2539,6 +2539,31 @@ function ToolCallBubble({
         const suffix = host ? `: ${host}` : "";
         return `${isRunning ? "Opening" : "Opened"} a browser tab${suffix}`;
       }
+      // R1 — read the CURRENT tab (no new tab). Host comes from the result (the
+      // tool takes no url arg), making the "no new tab" behavior visible.
+      if (toolName === "read_current_page") {
+        let host = "";
+        try {
+          const r = result as { url?: string } | null;
+          if (r?.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+        } catch {
+          // best-effort host label
+        }
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
+      }
+      if (toolName === "co_browse_open") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a co-browse tab${suffix}`;
+      }
+      if (toolName === "co_browse_act") {
+        const action =
+          args && typeof args === "object"
+            ? (args as { action?: string }).action
+            : undefined;
+        return `Co-browsing${action ? ` (${action})` : ""}`;
+      }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
       return toolActionLabel(toolName, isRunning || wasStopped);

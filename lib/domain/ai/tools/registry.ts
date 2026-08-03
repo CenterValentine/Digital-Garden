@@ -69,6 +69,8 @@ import {
   coBrowseOpenInputSchema,
   CO_BROWSE_ACT_DESCRIPTION,
   coBrowseActInputSchema,
+  READ_CURRENT_PAGE_DESCRIPTION,
+  readCurrentPageInputSchema,
 } from "./co-browse-tools";
 
 /**
@@ -110,6 +112,17 @@ export const coBrowseOpenTool = tool({
 export const coBrowseActTool = tool({
   description: CO_BROWSE_ACT_DESCRIPTION,
   inputSchema: coBrowseActInputSchema,
+});
+
+/**
+ * `read_current_page` — CLIENT-EXECUTED (no server `execute`), Slice 5c R1. Reads
+ * the tab the user is already on via the panel's content-script capture (no new
+ * tab, no re-fetch, no debugger banner). Registered only when co-browse is
+ * available; the engine's onToolCall runs the capture.
+ */
+export const readCurrentPageTool = tool({
+  description: READ_CURRENT_PAGE_DESCRIPTION,
+  inputSchema: readCurrentPageInputSchema,
 });
 
 /**

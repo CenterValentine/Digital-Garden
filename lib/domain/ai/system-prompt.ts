@@ -125,6 +125,8 @@ export interface SystemPromptContext {
    * methodology — open a tab, read its a11y snapshot, act by role+name, re-read.
    */
   hasCoBrowseTools: boolean;
+  /** True when read_current_page is attached (Slice 5c R1) — read the current tab. */
+  hasReadCurrentPage: boolean;
   /**
    * True when the research tools (propose_research_run / extract_structured /
    * record_research_findings) are attached (Agentic Browsing Phase 1). Turns on
@@ -333,8 +335,11 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   // claiming it can't see the page. The full CONTENT is not here — the model
   // fetches it via its read tool (or co-browse) when needed.
   if (ctx.currentPageHint) {
+    const howToRead = ctx.hasReadCurrentPage
+      ? "use `read_current_page` — it reads the tab already open in front of them (no new tab, no re-fetch)"
+      : "read it with your read tool";
     sections.push(
-      `The user is currently viewing "${ctx.currentPageHint.title || ctx.currentPageHint.url}" (${ctx.currentPageHint.url}) in their browser, beside this panel. If they say "this page", "the page I'm on/viewing", or ask you to summarize or act on it WITHOUT giving a URL, that is the page they mean — read it with your read tool (or co-browse it) to get its contents, then answer. Do NOT reply that you can't see the page: you have its URL and can read it.`,
+      `The user is currently viewing "${ctx.currentPageHint.title || ctx.currentPageHint.url}" (${ctx.currentPageHint.url}) in their browser, beside this panel. If they say "this page", "the page I'm on/viewing", or ask you to summarize or act on it WITHOUT giving a URL, that is the page they mean — to get its contents, ${howToRead}, then answer. Do NOT reply that you can't see the page: you can read it.`,
     );
   }
   // Untrusted page content goes LAST, after all trusted instructions, so its
