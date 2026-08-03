@@ -10,7 +10,7 @@
 // in-page DOM APIs where they're ergonomic. Deferred to the playwright-crx swap:
 // rich editors, controlled/masked inputs, autocomplete key-sequences.
 
-import { send } from "./executor.js";
+import { send, frameOffset } from "./executor.js";
 import { getA11ySnapshot } from "./snapshot.js";
 
 // resolveFresh: re-read the AX tree and re-match by role+name RIGHT NOW — never
@@ -36,46 +36,51 @@ export async function resolveFresh({ role, name, nth } = {}) {
   }
   const chosen = nth == null ? matches[0] : matches[nth];
   if (!chosen) throw new Error(`nth=${nth} out of range (${matches.length} matches)`);
-  // Cross-frame (OOPIF) nodes are readable now (3c-1) but not yet actionable —
-  // acting needs frame-local→root coordinate translation (Slice 3c-2).
-  if (chosen.sessionId) {
-    throw new Error(
-      `target is inside a cross-origin iframe (${chosen.frameUrl || "child frame"}) — cross-frame acting lands in Slice 3c-2; it's readable in the snapshot now`,
-    );
-  }
-  return chosen.backendDOMNodeId;
+  // sessionId is set for cross-frame (OOPIF) nodes → the pipeline resolves/scrolls
+  // in that child session and translates the click to root coords (Slice 3c-2).
+  return { backendDOMNodeId: chosen.backendDOMNodeId, sessionId: chosen.sessionId };
 }
 
 // Scroll the element into view (the native primitive walks nested scroll parents
 // itself), then hit-test at its LIVE center: is the topmost element there the
 // target or a descendant? If not, it's covered. Returns trusted-input coords.
-async function scrollAndHitTest(backendNodeId) {
-  await send("DOM.scrollIntoViewIfNeeded", { backendNodeId }).catch(() => {
+async function scrollAndHitTest(backendNodeId, sessionId) {
+  await send("DOM.scrollIntoViewIfNeeded", { backendNodeId }, sessionId).catch(() => {
     // hidden / no layout box — let the hit-test report the specific reason
   });
-  const resolved = await send("DOM.resolveNode", { backendNodeId });
+  const resolved = await send("DOM.resolveNode", { backendNodeId }, sessionId);
   const objectId = resolved && resolved.object && resolved.object.objectId;
   if (!objectId) throw new Error("could not resolve element (detached?)");
-  const evalResult = await send("Runtime.callFunctionOn", {
-    objectId,
-    returnByValue: true,
-    functionDeclaration: `function () {
-      const r = this.getBoundingClientRect();
-      if (!r.width || !r.height) return { ok: false, reason: "element has zero size (hidden/collapsed)" };
-      const x = r.left + r.width / 2, y = r.top + r.height / 2;
-      const top = document.elementFromPoint(x, y);
-      const hit = top === this || (top && this.contains(top));
-      return { ok: !!hit, x, y, reason: hit ? "" : "element is covered by another element" };
-    }`,
-  });
+  const evalResult = await send(
+    "Runtime.callFunctionOn",
+    {
+      objectId,
+      returnByValue: true,
+      functionDeclaration: `function () {
+        const r = this.getBoundingClientRect();
+        if (!r.width || !r.height) return { ok: false, reason: "element has zero size (hidden/collapsed)" };
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        const top = document.elementFromPoint(x, y);
+        const hit = top === this || (top && this.contains(top));
+        return { ok: !!hit, x, y, reason: hit ? "" : "element is covered by another element" };
+      }`,
+    },
+    sessionId,
+  );
   const v = evalResult && evalResult.result && evalResult.result.value;
   if (!v || !v.ok) throw new Error(v ? v.reason : "hit-test failed");
-  return { x: v.x, y: v.y };
+  return { x: v.x, y: v.y }; // frame-local coords
 }
 
+// resolve → scroll → hit-test in the element's OWN frame, then translate a
+// cross-frame element's frame-local center to ROOT coords (add the owning iframe
+// offsets) so the trusted Input we dispatch on the root session lands correctly.
 async function preflight(target) {
-  const backendNodeId = await resolveFresh(target);
-  return { backendNodeId, ...(await scrollAndHitTest(backendNodeId)) };
+  const { backendDOMNodeId, sessionId } = await resolveFresh(target);
+  const local = await scrollAndHitTest(backendDOMNodeId, sessionId);
+  if (!sessionId) return local;
+  const off = await frameOffset(sessionId);
+  return { x: local.x + off.x, y: local.y + off.y };
 }
 
 function mouse(type, x, y, extra) {

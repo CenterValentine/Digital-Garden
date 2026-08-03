@@ -130,14 +130,52 @@ export async function detach() {
   return { detached: true, tabId };
 }
 
+function targetOf(sessionId) {
+  return sessionId ? { tabId: session.tabId, sessionId } : { tabId: session.tabId };
+}
+
 // The single CDP primitive every later slice builds on. Throws if no session.
 // Pass a child `sessionId` (from getChildSessions) to target a cross-origin frame.
 export async function send(method, params, sessionId) {
   if (!session) throw new Error("No active co-browse session — attach first.");
-  const target = sessionId
-    ? { tabId: session.tabId, sessionId }
-    : { tabId: session.tabId };
-  return sendCommand(target, method, params);
+  return sendCommand(targetOf(sessionId), method, params);
+}
+
+// The top-left of a child frame's viewport in ROOT coordinates — the sum of the
+// owning <iframe> element offsets from this frame up to the top (Slice 3c-2). For
+// trusted cross-frame input we dispatch at (frameOffset + frame-local coords) on
+// the ROOT session and let the compositor route the hit into the frame.
+// DOM.getFrameOwner runs on each PARENT session (frameId == the OOPIF's targetId).
+export async function frameOffset(sessionId) {
+  let x = 0;
+  let y = 0;
+  let sid = sessionId;
+  const seen = new Set();
+  while (sid && !seen.has(sid)) {
+    seen.add(sid);
+    const info = childSessions.get(sid);
+    if (!info) break;
+    const parentSid = info.parentSessionId; // undefined ⇒ parent is the top frame
+    const owner = await sendCommand(targetOf(parentSid), "DOM.getFrameOwner", {
+      frameId: info.targetId,
+    });
+    const resolved = await sendCommand(targetOf(parentSid), "DOM.resolveNode", {
+      backendNodeId: owner.backendNodeId,
+    });
+    const objectId = resolved && resolved.object && resolved.object.objectId;
+    if (!objectId) throw new Error("cross-frame: could not resolve the iframe element");
+    const rect = await sendCommand(targetOf(parentSid), "Runtime.callFunctionOn", {
+      objectId,
+      returnByValue: true,
+      functionDeclaration:
+        "function () { const r = this.getBoundingClientRect(); return { x: r.left + this.clientLeft, y: r.top + this.clientTop }; }",
+    });
+    const v = (rect && rect.result && rect.result.value) || { x: 0, y: 0 };
+    x += v.x;
+    y += v.y;
+    sid = parentSid;
+  }
+  return { x, y };
 }
 
 // Cancel on the banner ("canceled_by_user"), the tab closing ("target_closed"),
@@ -168,7 +206,12 @@ chrome.debugger.onEvent.addListener((source, method, params) => {
     const sessionId = params && params.sessionId;
     const info = params && params.targetInfo;
     if (!sessionId || !info) return;
-    childSessions.set(sessionId, { targetId: info.targetId, type: info.type, url: info.url });
+    childSessions.set(sessionId, {
+      targetId: info.targetId,
+      type: info.type,
+      url: info.url,
+      parentSessionId: source.sessionId, // undefined when the parent is the top frame
+    });
     (async () => {
       for (const domain of DOMAINS_ON_ATTACH) {
         try {
