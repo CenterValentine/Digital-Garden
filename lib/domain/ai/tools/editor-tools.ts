@@ -118,6 +118,44 @@ function emptyParagraph(): JSONContent {
 }
 
 /**
+ * When Zod rejects an attr because a string was expected but the model supplied
+ * an array/object, JSON-encode that field and return the patched attrs. Many
+ * blocks store structured lists as JSON strings (featureList.items,
+ * pricingCard.features, gallery images…), and models naturally pass arrays —
+ * this meets them there. Returns null if nothing was coercible.
+ */
+function coerceJsonStringAttrs(
+  attrs: Record<string, unknown>,
+  err: unknown
+): Record<string, unknown> | null {
+  const issues =
+    err && typeof err === "object" && "issues" in err
+      ? (err as { issues: Array<{ code?: string; expected?: string; path?: unknown[] }> })
+          .issues
+      : null;
+  if (!Array.isArray(issues)) return null;
+
+  let changed = false;
+  const out = { ...attrs };
+  for (const issue of issues) {
+    if (
+      issue?.code === "invalid_type" &&
+      issue?.expected === "string" &&
+      Array.isArray(issue?.path) &&
+      issue.path.length === 1
+    ) {
+      const key = issue.path[0] as string;
+      const v = out[key];
+      if (Array.isArray(v) || (v !== null && typeof v === "object")) {
+        out[key] = JSON.stringify(v);
+        changed = true;
+      }
+    }
+  }
+  return changed ? out : null;
+}
+
+/**
  * Recursively validate a block spec and build its TipTap JSON node. Validates
  * attrs against each block's own schema (rejecting unknown keys, filling
  * defaults + a fresh blockId), and for container blocks assembles the children
@@ -150,15 +188,21 @@ function buildBlockNode(
   }
 
   let parsedAttrs: Record<string, unknown>;
+  const rawAttrs = { ...(spec.attrs ?? {}), blockType: spec.blockType };
   try {
-    parsedAttrs = def.attrsSchema.parse({
-      ...(spec.attrs ?? {}),
-      blockType: spec.blockType,
-    }) as Record<string, unknown>;
+    parsedAttrs = def.attrsSchema.parse(rawAttrs) as Record<string, unknown>;
   } catch (err) {
-    return {
-      error: `Invalid attributes for "${spec.blockType}". Valid fields: ${settable.join(", ")}.\n${err instanceof Error ? err.message : String(err)}`,
-    };
+    // Retry once with array/object → JSON-string coercion for attrs that the
+    // block stores as JSON strings (the model naturally passes arrays).
+    const coerced = coerceJsonStringAttrs(rawAttrs, err);
+    try {
+      if (!coerced) throw err;
+      parsedAttrs = def.attrsSchema.parse(coerced) as Record<string, unknown>;
+    } catch (finalErr) {
+      return {
+        error: `Invalid attributes for "${spec.blockType}". Valid fields: ${settable.join(", ")}.\n${finalErr instanceof Error ? finalErr.message : String(finalErr)}`,
+      };
+    }
   }
 
   const isContainer = getBlockAuthoringMode(spec.blockType) === "container";
