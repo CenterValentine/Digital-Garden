@@ -1904,6 +1904,9 @@ self.__dgCobrowse = {
   detach: () => cobrowse.detach(),
   status: () => cobrowse.getSession(),
   snapshot: () => cobrowse.getA11ySnapshot(),
+  click: (role, name, nth) => cobrowse.click({ role, name, nth }),
+  hover: (role, name, nth) => cobrowse.hover({ role, name, nth }),
+  type: (role, name, text, nth) => cobrowse.type({ role, name, nth }, text),
 };
 
 // sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
@@ -2560,6 +2563,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true, data: { nodes: await cobrowse.getA11ySnapshot() } });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-click") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.click(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "click failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-hover") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.hover(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "hover failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-type") {
+      try {
+        const { text, ...target } = message.payload || {};
+        sendResponse({ ok: true, data: await cobrowse.type(target, text) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "type failed" });
       }
       return;
     }
