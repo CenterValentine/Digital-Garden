@@ -1,4 +1,5 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
+import * as cobrowse from "../agentic/cdp/executor.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -2428,6 +2429,17 @@ async function handleAcquireUrl(payload) {
   }
 }
 
+// Agentic co-browse: when a CDP session ends for ANY reason — the user clicking
+// "Cancel" on Chrome's debugging infobar (D-BANNER's Stop), the tab closing, or
+// devtools taking the target — broadcast it so any open app surface can drop its
+// co-browse indicator. Best-effort: sendMessage rejects when nobody's listening.
+cobrowse.setSessionEndHandler((reason, tabId) => {
+  console.info("[DG cobrowse] session ended", reason, tabId);
+  chrome.runtime
+    .sendMessage({ type: "cobrowse-session-ended", payload: { reason, tabId } })
+    .catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // sidePanel.open() must run before any await or the user-gesture context
   // that authorized it (launcher click → this message) is lost. Handle it
@@ -2455,6 +2467,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
+      return;
+    }
+
+    // ── Agentic co-browse (Phase 2b) — raw CDP executor lifecycle ──────────
+    // Semantic operations only (attach/detach/status/navigate); there is NO
+    // generic "run any CDP command" passthrough reachable from a page message —
+    // each capability is its own validated handler (later slices add snapshot,
+    // click, scroll as their own types). The debuggee defaults to the SENDER's
+    // tab; an explicit payload.tabId lets the panel drive another tab.
+    if (message.type === "cobrowse-attach") {
+      try {
+        const tabId = message.payload?.tabId ?? sender.tab?.id;
+        sendResponse({ ok: true, data: await cobrowse.attach(tabId) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "attach failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-detach") {
+      sendResponse({ ok: true, data: await cobrowse.detach() });
+      return;
+    }
+    if (message.type === "cobrowse-status") {
+      sendResponse({ ok: true, data: { session: cobrowse.getSession() } });
+      return;
+    }
+    if (message.type === "cobrowse-navigate") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network / denylist gate reads run — `Page.navigate`
+        // must not become an open redirect into internal hosts.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        sendResponse({ ok: true, data: await cobrowse.send("Page.navigate", { url }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "navigate failed" });
+      }
       return;
     }
     // Tab-scoped open-panel persistence: notes stay open as the user navigates

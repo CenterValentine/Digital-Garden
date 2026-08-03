@@ -762,7 +762,10 @@ even a background tab can't load (aggressive bot-detection / device blocks).
   actionability) are the ones to be prepared for; each is the swap signal. See
   that section for the raw-CDP band-aid pipeline that keeps the actionability layer
   bounded for supervised 2b nav.
-- **D-TGT** (Phase 2): accessibility-tree-first, vision fallback deferred — OK?
+- **D-TGT** (Phase 2): **RESOLVED (2026-08-02) → accessibility-tree-first, vision
+  fallback deferred.** The band-aid pipeline depends on it (accordion `expanded`,
+  element `hidden`/`ignored` are AX properties); vision is a clean later add behind
+  the same target-resolver.
 - **D-CRIT** (Phase 3): **sensitivity detection** is the deterministic floor
   (`autocomplete`-PII + consent checkbox + `beforeunload`/draft), LLM
   escalator-only. The gate fires on a *sensitive submission* — not every submit;
@@ -780,8 +783,11 @@ even a background tab can't load (aggressive bot-detection / device blocks).
   per-run page budget** (depth guides, budget bounds).
 - **D-WAIVER** (Phase 5): waiver scope — class / domain / session? Durable table vs
   device-local settings?
-- **D-BANNER** (Phase 2): accept the `chrome.debugger` banner as the visible
-  "agent is driving" signal — OK?
+- **D-BANNER** (Phase 2): **RESOLVED (2026-08-02) → accepted.** The
+  `chrome.debugger` "…is debugging this browser" infobar stands as the visible
+  "agent is driving" signal, paired with our own in-app co-browsing indicator +
+  one-click Stop (detach + dismiss). Attach only during an active co-browse
+  session; detach the instant it ends.
 
 ## Explicitly out of scope (recorded)
 
