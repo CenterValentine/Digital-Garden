@@ -1864,52 +1864,9 @@ function openAiChatPanel(tab) {
     .catch(() => {});
 }
 
-// DEV-ONLY co-browse validation harness (Slice 2). Toggles a CDP session on the
-// active tab from a keyboard command — an extension-trust gesture a page can't
-// synthesize — so we can eyeball the D-BANNER lifecycle (attach → infobar → Stop
-// → gone) before the trust-gated app-side trigger lands in Slice 5. Remove before
-// the Phase 2b PR; the real trigger routes via the panel-bridge, not this.
-async function toggleCoBrowseDev(tab) {
-  const tabId = tab?.id;
-  if (typeof tabId !== "number") return;
-  try {
-    if (cobrowse.isAttached(tabId)) {
-      await cobrowse.detach();
-      console.info("[DG cobrowse] dev toggle → detached", tabId);
-    } else {
-      await cobrowse.attach(tabId);
-      console.info("[DG cobrowse] dev toggle → attached; banner should now show", tabId);
-    }
-  } catch (error) {
-    console.warn("[DG cobrowse] dev toggle failed", error);
-  }
-}
-
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "open-ai-chat") openAiChatPanel(tab);
-  if (command === "toggle-cobrowse-dev") toggleCoBrowseDev(tab);
 });
-
-// DEV-ONLY co-browse console harness (Slice 2/3). Call from the service-worker
-// console: `await self.__dgCobrowse.attach()` (active tab) → `await
-// self.__dgCobrowse.snapshot()` → `self.__dgCobrowse.detach()`. Remove before
-// the Phase 2b PR; the real path routes via the trust-gated panel-bridge.
-self.__dgCobrowse = {
-  attach: async (tabId) => {
-    if (typeof tabId !== "number") {
-      const tabs = await chrome.tabs.query({ active: true });
-      tabId = (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
-    }
-    return cobrowse.attach(tabId);
-  },
-  detach: () => cobrowse.detach(),
-  status: () => cobrowse.getSession(),
-  frames: () => cobrowse.getChildSessions(),
-  snapshot: () => cobrowse.getA11ySnapshot(),
-  click: (role, name, nth) => cobrowse.click({ role, name, nth }),
-  hover: (role, name, nth) => cobrowse.hover({ role, name, nth }),
-  type: (role, name, text, nth) => cobrowse.type({ role, name, nth }, text),
-};
 
 // sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
 // async listener returns a promise immediately and Chrome no longer treats
