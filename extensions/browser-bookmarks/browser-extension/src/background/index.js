@@ -1,5 +1,6 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
 import * as cobrowse from "../agentic/cdp/index.js";
+import * as cobrowseSession from "../agentic/session.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -2599,6 +2600,55 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: true, data: await cobrowse.type(target, text) });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "type failed" });
+      }
+      return;
+    }
+    // ── Session / tab manager (Slice 5b) ──────────────────────────────────
+    if (message.type === "cobrowse-open") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network gate as reads/navigate before we open+drive.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        const active = message.payload?.active !== false;
+        sendResponse({ ok: true, data: await cobrowseSession.openAndAttach(url, { active }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "open failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-reveal") {
+      try {
+        sendResponse({ ok: true, data: await cobrowseSession.revealSession() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "reveal failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-list-tabs") {
+      try {
+        sendResponse({ ok: true, data: { tabs: await cobrowseSession.listTabs() } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "list-tabs failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-resolve-tab") {
+      try {
+        const candidates = await cobrowseSession.resolveTab(message.payload?.query);
+        sendResponse({ ok: true, data: { candidates } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "resolve-tab failed" });
       }
       return;
     }

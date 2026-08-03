@@ -44,7 +44,8 @@ function attachDebugger(target, version) {
   return new Promise((resolve, reject) => {
     chrome.debugger.attach(target, version, () => {
       const err = chrome.runtime.lastError;
-      err ? reject(new Error(err.message)) : resolve();
+      if (err) reject(new Error(err.message));
+      else resolve();
     });
   });
 }
@@ -64,7 +65,8 @@ function sendCommand(target, method, params) {
   return new Promise((resolve, reject) => {
     chrome.debugger.sendCommand(target, method, params || {}, (result) => {
       const err = chrome.runtime.lastError;
-      err ? reject(new Error(`${method}: ${err.message}`)) : resolve(result);
+      if (err) reject(new Error(`${method}: ${err.message}`));
+      else resolve(result);
     });
   });
 }
@@ -115,6 +117,16 @@ export async function attach(tabId) {
     });
   } catch (error) {
     console.warn("[DG cobrowse] setAutoAttach failed", error);
+  }
+  // Keep the bound tab rendering as if focused even when it's backgrounded — the
+  // TOPOLOGY "switch away and it keeps working" requirement. Without this, an
+  // agent-owned tab goes visibilityState:hidden the moment the user looks
+  // elsewhere and hits the Phase-0 lazy-render wall. Best-effort (not every build
+  // supports it); validate on a hostile site before relying on it.
+  try {
+    await sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true });
+  } catch (error) {
+    console.warn("[DG cobrowse] focus emulation unavailable", error);
   }
   return { tabId, alreadyAttached: false };
 }

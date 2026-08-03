@@ -85,3 +85,44 @@ export function coBrowseHover(target: CoBrowseTarget): Promise<CoBrowseResult<{ 
 export function coBrowseType(target: CoBrowseTarget, text: string): Promise<CoBrowseResult> {
   return requestCoBrowse("type", { ...target, text });
 }
+
+// ── Session / tab manager (Slice 5b) ─────────────────────────────────────────
+
+/** One open tab's metadata (for "pick a tab" and metadata resolution). */
+export interface CoBrowseTab {
+  tabId: number;
+  title: string;
+  url: string;
+  favIconUrl: string | null;
+  active: boolean;
+  windowId: number;
+}
+
+/**
+ * Open a NEW agent-owned tab and drive it (the default topology). Foregrounds it
+ * by default so the user sees the agent start; focus emulation keeps it live if
+ * they switch away. Replaces any current session.
+ */
+export function coBrowseOpen(url: string, opts?: { active?: boolean }): Promise<CoBrowseResult<{ tabId: number }>> {
+  return requestCoBrowse("open", { url, active: opts?.active !== false });
+}
+
+/** Teleport the bound tab (and its window) to the foreground — "show me." */
+export function coBrowseReveal(): Promise<CoBrowseResult<{ tabId: number }>> {
+  return requestCoBrowse("reveal");
+}
+
+/** All open http(s) tabs (metadata) — backs an explicit "pick a tab." */
+export function coBrowseListTabs(): Promise<CoBrowseResult<{ tabs: CoBrowseTab[] }>> {
+  return requestCoBrowse("list-tabs");
+}
+
+/**
+ * Lean tab-metadata resolution — "which tab did you mean?" Ranked candidates the
+ * agent PROPOSES; the user approves before attaching (coBrowseAttach(tabId)).
+ */
+export function coBrowseResolveTab(
+  query: string
+): Promise<CoBrowseResult<{ candidates: (CoBrowseTab & { score: number })[] }>> {
+  return requestCoBrowse("resolve-tab", { query });
+}

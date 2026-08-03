@@ -30,6 +30,10 @@ import {
   coBrowseClick,
   coBrowseHover,
   coBrowseType,
+  coBrowseOpen,
+  coBrowseReveal,
+  coBrowseListTabs,
+  coBrowseResolveTab,
 } from "@/lib/domain/browser-extension/co-browse";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
@@ -222,6 +226,10 @@ export function PanelShellClient({
       hover: (role?: string, name?: string, nth?: number) => coBrowseHover({ role, name, nth }),
       type: (role: string | undefined, name: string | undefined, text: string, nth?: number) =>
         coBrowseType({ role, name, nth }, text),
+      open: (url: string, active?: boolean) => coBrowseOpen(url, { active }),
+      reveal: () => coBrowseReveal(),
+      listTabs: () => coBrowseListTabs(),
+      resolveTab: (query: string) => coBrowseResolveTab(query),
     };
   }, []);
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
