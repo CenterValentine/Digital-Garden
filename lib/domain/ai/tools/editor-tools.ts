@@ -32,6 +32,60 @@ import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
+import type { Extensions } from "@tiptap/core";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { getAllBlocks } from "@/lib/domain/blocks/registry";
+import {
+  getAuthorableBlocks,
+  getBlockAuthoringMode,
+  effectiveAiDescription,
+} from "@/lib/domain/blocks/ai-authoring";
+import { builderNodesToTipTap } from "@/lib/domain/blocks/builder-to-tiptap";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import type { BuilderNode } from "@/lib/domain/blocks/builder-types";
+import type { BlockDefinition } from "@/lib/domain/blocks/types";
+
+/**
+ * Memoized authorable-block catalog for the `insert_block` tool. The block
+ * registry is static after module load, so this is computed once. Calling
+ * `getServerExtensions()` does double duty: it triggers the block registration
+ * side effects (so `getAllBlocks()` is populated) AND yields the exact server
+ * extension set the sanitizer needs.
+ */
+let insertBlockCatalog: {
+  blocks: BlockDefinition[];
+  description: string;
+  extensions: Extensions;
+} | null = null;
+
+function getInsertBlockCatalog() {
+  if (insertBlockCatalog) return insertBlockCatalog;
+  const extensions = getServerExtensions();
+  // Phase 1 offers leaf blocks (attrs-only). Container blocks (columns, tabs,
+  // accordion…) need nested children — deferred to Phase 2.
+  const blocks = getAuthorableBlocks(getAllBlocks()).filter(
+    (b) => getBlockAuthoringMode(b.type) !== "container"
+  );
+  const list = blocks
+    .map((b) => {
+      const keys = Object.keys(b.attrsSchema.shape).filter(
+        (k) => k !== "blockId" && k !== "blockType"
+      );
+      const attrHint = keys.length ? ` — attrs: ${keys.join(", ")}` : "";
+      return `- ${b.type}: ${effectiveAiDescription(b)}${attrHint}`;
+    })
+    .join("\n");
+  const description = [
+    "Insert a rich content block at the end of the open note. Provide the block `blockType` and its `attrs` as a JSON object; omitted attributes use sensible defaults.",
+    "Most blocks carry their text in attributes (a hero's headline, a CTA's primaryLabel, a stat's value) — put that text in `attrs`, not elsewhere.",
+    "Use EXACTLY the attribute names listed after each block (`attrs: …`); unknown names are rejected, not silently ignored.",
+    "",
+    "Available block types:",
+    list,
+  ].join("\n");
+  insertBlockCatalog = { blocks, description, extensions };
+  return insertBlockCatalog;
+}
 
 /**
  * Create editor tools bound to user + document context.
@@ -267,6 +321,98 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
             node.id,
+            "updated",
+            "note",
+          )),
+        });
+      },
+    }),
+
+    // ─── Insert Block (Client-Side) ─────────────────────────
+    // Returns a payload carrying a fully server-validated TipTap block node.
+    // The client inserts it at the end of the document with animation.
+    insert_block: tool({
+      description: getInsertBlockCatalog().description,
+      inputSchema: z.object({
+        blockType: z
+          .string()
+          .describe("The block type to insert — one of the Available block types listed above."),
+        attrs: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("The block's attributes as a JSON object (fields relevant to this block type). Omitted fields use defaults."),
+      }),
+      execute: async ({ blockType, attrs }) => {
+        const result = await loadNote();
+        if ("error" in result) return result.error;
+        const { node: noteNode } = result;
+
+        const { blocks, extensions } = getInsertBlockCatalog();
+        const def = blocks.find((b) => b.type === blockType);
+        if (!def) {
+          return `Unknown or unsupported block type "${blockType}". Choose one of: ${blocks
+            .map((b) => b.type)
+            .join(", ")}`;
+        }
+
+        // Reject unknown attribute names rather than letting Zod silently strip
+        // them (which falls through to defaults with no signal to the model).
+        const validKeys = new Set(Object.keys(def.attrsSchema.shape));
+        const unknownKeys = Object.keys(attrs ?? {}).filter(
+          (k) => !validKeys.has(k)
+        );
+        if (unknownKeys.length > 0) {
+          const settable = [...validKeys].filter(
+            (k) => k !== "blockId" && k !== "blockType"
+          );
+          return `Unknown attribute(s) for "${blockType}": ${unknownKeys.join(", ")}. Valid attributes are: ${settable.join(", ")}. Re-call insert_block using these exact names.`;
+        }
+
+        // Validate + fill the model-supplied attrs against the block's own schema.
+        let parsedAttrs: Record<string, unknown>;
+        try {
+          parsedAttrs = def.attrsSchema.parse({
+            ...(attrs ?? {}),
+            blockType,
+          }) as Record<string, unknown>;
+        } catch (err) {
+          const fields = Object.keys(def.attrsSchema.shape).filter(
+            (k) => k !== "blockId" && k !== "blockType"
+          );
+          const detail = err instanceof Error ? err.message : String(err);
+          return `Invalid attributes for "${blockType}". Valid fields: ${fields.join(", ")}.\n${detail}`;
+        }
+
+        // Build the canonical TipTap node (fresh blockId + container scaffolding).
+        const builderNode: BuilderNode = {
+          id: parsedAttrs.blockId as string,
+          blockType,
+          attrs: parsedAttrs,
+          children: [],
+        };
+        const [tipTapNode] = builderNodesToTipTap([builderNode]);
+
+        // Safety net: prove the node is a registered, valid server-side type
+        // (also catches a model inventing an unregistered block).
+        const sanitized = sanitizeTipTapJsonWithExtensions(
+          { type: "doc", content: [tipTapNode as unknown as JSONContent] },
+          extensions
+        );
+        const finalNode = sanitized.json.content?.[0];
+        if (!finalNode || finalNode.type !== blockType) {
+          return `The "${blockType}" block could not be built as valid content — it may be unavailable in this editor build.`;
+        }
+
+        return JSON.stringify({
+          __editPayload: true,
+          type: "insert_block",
+          node: finalNode,
+          blockType,
+          documentTitle: noteNode.title,
+          action: `Inserted ${def.label} block into "${noteNode.title}"`,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            noteNode.id,
             "updated",
             "note",
           )),

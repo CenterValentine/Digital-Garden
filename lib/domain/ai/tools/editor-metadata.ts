@@ -13,6 +13,7 @@ export const EDITOR_TOOL_IDS = [
   "apply_diff",
   "replace_document",
   "insert_image",
+  "insert_block",
   "plan",
   "ask_user",
   "finish_with_summary",
@@ -48,6 +49,10 @@ export const EDITOR_TOOL_METADATA: Record<
   insert_image: {
     name: "Insert Image",
     description: "Insert an image from a URL into the document",
+  },
+  insert_block: {
+    name: "Insert Block",
+    description: "Insert a rich content block (hero, callout, card, stat, …) into the document",
   },
   plan: {
     name: "Plan Edits",
