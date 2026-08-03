@@ -53,6 +53,18 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**August 3, 2026**: Agentic Browsing **Phase 2b — supervised co-browsing** (branch `feat/agentic-browsing`; typecheck/lint/prompt-cache/build green; owner-validated live on a real jobs board; PR opened)
+
+The AI can now DRIVE a tab in the user's own browser while they watch — read/click/hover/type/navigate/scroll, across same-frame and cross-origin (OOPIF) pages, under co-browsing governance.
+
+- **Interaction engine** (raw `chrome.debugger`/CDP, D-ENG): a11y-tree snapshot targeting (role+name+`group`), the actionability pipeline (resolveFresh → `scrollIntoViewIfNeeded` → hit-test → trusted `Input.*`), and cross-frame read + act (frame-local→root coordinate translation). Validated on Indeed, a cross-origin widget, and a LinkedIn board.
+- **AI tools** (client-executed, no server `execute`, trust-gated to the side-panel embed): `co_browse_open`, `co_browse_act` (read/click/hover/type/navigate/scroll/collect/wait/back/reveal), and `read_current_page` (reads the tab you're already on — no new tab). The engine's `onToolCall` drives the extension through the panel bridge (never the open page-bridge, so a web page can't attach the debugger).
+- **Session/tab manager + control**: agent-owned-tab topology, `back`/`reveal`, an in-app co-browse **indicator + Stop** (the reliable cross-browser "agent is driving / halt it" signal, since the debugger banner is subtle in some browsers).
+- **Timed iteration**: `wait` with an on-page countdown overlay + page-behavior classification (current URL in every snapshot → new-page vs in-place) so it can spend N seconds per item and reliably return to the list. Automatic `collect` gathers whole virtualized lists.
+- **Context-awareness**: the panel chat knows the page you're viewing (lightweight hint) and reads it on request.
+- **Composes with playbooks**: a "job fit" analysis per posting is authored content (`/`-attach a playbook note + `@`-mention your résumé) — no new code.
+- **Deferred (own follow-ups):** Slice 4 hostile-target de-risk (may trigger a playwright-crx swap), per-item playbook checkpoints; both in BACKLOG.
+
 **August 1, 2026**: Agentic Browsing **Phase 2a** — read-completion launcher + one deterministic reader (branch `feat/agentic-browsing`; typecheck/lint/prompt-cache/build green; owner-validated)
 
 - **Read-completion launcher** (`open_tab_and_read`): when a read is blocked, the assistant opens the page in a VISIBLE foreground tab (the user's own session), reads it, and continues. Consent = one opt-in switch in **Browser Bookmarks → Capture & privacy** (`capture.allowTabLaunch`, off by default); the extension enforces it and — per the security review — the `visible` path still runs the SSRF/private-network policy gate (`visible` only changes *how* the tab opens, never *whether* the URL is allowed). Rode almost entirely on Phase 0's acquire rails: one `visible` boolean threaded through 5 hops + one gate.
