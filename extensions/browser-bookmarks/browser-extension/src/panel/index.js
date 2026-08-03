@@ -28,6 +28,33 @@ let appOrigin = null;
 let frameReady = false;
 let pendingPageContext = null;
 
+// Co-browse ops the panel embed may relay to the background (Slice 5a). An
+// allow-list so a compromised embed can't invoke arbitrary `cobrowse-*` (or
+// worse) background handlers by constructing the op string.
+const CO_BROWSE_OPS = new Set([
+  "attach",
+  "detach",
+  "status",
+  "frames",
+  "snapshot",
+  "navigate",
+  "click",
+  "hover",
+  "type",
+  "scroll",
+  "collect",
+  // Slice 5b session/tab manager
+  "open",
+  "reveal",
+  "list-tabs",
+  "resolve-tab",
+  // T1 timed iteration
+  "show-timer",
+  "clear-timer",
+  // T2 navigation awareness
+  "back",
+]);
+
 function sendRuntimeMessage(message) {
   return new Promise((resolve, reject) => {
     chrome.runtime.sendMessage(message, (response) => {
@@ -418,6 +445,33 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Agentic co-browse (Phase 2b, Slice 5a): the panel embed drives the
+  // background's chrome.debugger engine THROUGH the host — the trust-gated
+  // channel (the exact-origin + source check at the top of this listener),
+  // deliberately NOT the open page-bridge (so a web page can't attach the
+  // debugger). Relay `cobrowse-<op>` to the background, post the result back
+  // correlated by id. The op is allow-listed so the embed can't reach arbitrary
+  // background message types by constructing the op string.
+  if (data.type === "cobrowse" && data.payload && typeof data.payload.op === "string") {
+    const { id, op, args } = data.payload;
+    void (async () => {
+      if (!CO_BROWSE_OPS.has(op)) {
+        postToEmbed("cobrowse-result", { id, result: { ok: false, error: `unknown co-browse op: ${op}` } });
+        return;
+      }
+      try {
+        const result = await sendRuntimeMessage({ type: `cobrowse-${op}`, payload: args || {} });
+        postToEmbed("cobrowse-result", { id, result: { ok: true, data: result } });
+      } catch (error) {
+        postToEmbed("cobrowse-result", {
+          id,
+          result: { ok: false, error: error instanceof Error ? error.message : "co-browse failed" },
+        });
+      }
+    })();
+    return;
+  }
+
   // Pop-out: the panel asks for content to open as an overlay on the page.
   // A drag can't cross from this document into the page, so the panel offers
   // four quadrants instead and tells us which corner the user chose.
@@ -535,6 +589,15 @@ reloadBtn.addEventListener("click", () => void boot());
 // so "Ask AI about this page" can switch views over it instead of calling
 // sidePanel.open() again (which would toggle the panel shut). Connect once per
 // panel document (not per boot()).
+// Relay the co-browse session-end broadcast (Slice 5d) to the embed so the app
+// drops its in-app co-browse indicator when the session ends OUT OF BAND — the
+// user clicks Cancel on the debugger banner, or the driven tab closes.
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "cobrowse-session-ended") {
+    postToEmbed("cobrowse-session-ended", message.payload || {});
+  }
+});
+
 let panelPort = null;
 try {
   panelPort = chrome.runtime.connect({ name: "dg-panel" });

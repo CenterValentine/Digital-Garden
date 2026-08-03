@@ -12,7 +12,8 @@
     "contextMenus",
     "alarms",
     "scripting",
-    "sidePanel"
+    "sidePanel",
+    "debugger"
   ],
   "side_panel": {
     "default_path": "panel.html"

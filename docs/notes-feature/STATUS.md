@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-24
+last_updated: 2026-08-01
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -42,7 +42,7 @@ before planning and executing. There may be additions or modifications.
 **Theme**: Additive multi-tenant schema, tenancy helper module, backfill
 **Detailed Plan**: `docs/notes-feature/work-tracking/epochs/epoch-18-multi-tenancy.md` (+ `MULTI-TENANCY-PLAN.md`)
 
-**Other in-flight worktrees** (parallel): Epoch 19 — Flashcards FSRS (`flashcards-fsrs`); `ai-chat-polish`; `ai-flashcards-tools`; `mobile-webview-spike`; `speed-reader`.
+**Other in-flight worktrees** (parallel): Epoch 19 — Flashcards FSRS (`flashcards-fsrs`); `ai-chat-polish`; `ai-flashcards-tools`; `mobile-webview-spike`; `speed-reader`; **Agentic Browsing** (`feat/agentic-browsing` — Phase 0 + hardening + Phase 1 shipped, PR pending; `AGENTIC-BROWSING-PLAN.md`).
 
 ### Next (booked, not started): Epoch 13 — People + Collaboration
 **Duration**: 6 sprints (58–63) — Foundations · People View + Mount UX · Tree Policy Hardening · Person Mentions · Hocuspocus Collaboration · Share + Media Prototype
@@ -52,6 +52,33 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 3, 2026**: Agentic Browsing **Phase 2b — supervised co-browsing** (branch `feat/agentic-browsing`; typecheck/lint/prompt-cache/build green; owner-validated live on a real jobs board; PR opened)
+
+The AI can now DRIVE a tab in the user's own browser while they watch — read/click/hover/type/navigate/scroll, across same-frame and cross-origin (OOPIF) pages, under co-browsing governance.
+
+- **Interaction engine** (raw `chrome.debugger`/CDP, D-ENG): a11y-tree snapshot targeting (role+name+`group`), the actionability pipeline (resolveFresh → `scrollIntoViewIfNeeded` → hit-test → trusted `Input.*`), and cross-frame read + act (frame-local→root coordinate translation). Validated on Indeed, a cross-origin widget, and a LinkedIn board.
+- **AI tools** (client-executed, no server `execute`, trust-gated to the side-panel embed): `co_browse_open`, `co_browse_act` (read/click/hover/type/navigate/scroll/collect/wait/back/reveal), and `read_current_page` (reads the tab you're already on — no new tab). The engine's `onToolCall` drives the extension through the panel bridge (never the open page-bridge, so a web page can't attach the debugger).
+- **Session/tab manager + control**: agent-owned-tab topology, `back`/`reveal`, an in-app co-browse **indicator + Stop** (the reliable cross-browser "agent is driving / halt it" signal, since the debugger banner is subtle in some browsers).
+- **Timed iteration**: `wait` with an on-page countdown overlay + page-behavior classification (current URL in every snapshot → new-page vs in-place) so it can spend N seconds per item and reliably return to the list. Automatic `collect` gathers whole virtualized lists.
+- **Context-awareness**: the panel chat knows the page you're viewing (lightweight hint) and reads it on request.
+- **Composes with playbooks**: a "job fit" analysis per posting is authored content (`/`-attach a playbook note + `@`-mention your résumé) — no new code.
+- **Deferred (own follow-ups):** Slice 4 hostile-target de-risk (may trigger a playwright-crx swap), per-item playbook checkpoints; both in BACKLOG.
+
+**August 1, 2026**: Agentic Browsing **Phase 2a** — read-completion launcher + one deterministic reader (branch `feat/agentic-browsing`; typecheck/lint/prompt-cache/build green; owner-validated)
+
+- **Read-completion launcher** (`open_tab_and_read`): when a read is blocked, the assistant opens the page in a VISIBLE foreground tab (the user's own session), reads it, and continues. Consent = one opt-in switch in **Browser Bookmarks → Capture & privacy** (`capture.allowTabLaunch`, off by default); the extension enforces it and — per the security review — the `visible` path still runs the SSRF/private-network policy gate (`visible` only changes *how* the tab opens, never *whether* the URL is allowed). Rode almost entirely on Phase 0's acquire rails: one `visible` boolean threaded through 5 hops + one gate.
+- **One deterministic reader** (`read_page_headless_or_browser`, renamed from `read_page_in_browser`): smoke-testing showed the model inconsistently choosing among three read tools — including server-only `read_page`, a dead end that can't escalate. Fixed structurally — the route **drops `read_page` when the extension is present**, so there's ONE reader and the **code** runs the whole ladder (headless fetch → background tab → visible tab when enabled) in one call. Principle: *the model decides WHETHER to read; the code decides HOW.* `open_tab_and_read` stays for an explicit "open a tab" request.
+- **Visibility:** action-expressive chips ("Read page (headless): host" / "Read page — opened a browser tab: host") + an `escalationNote` the model narrates. Deferred (after Phase 2b): an in-chat read-mode toggle (layer #2) + a live per-phase step display (layer #3, shared with 2b nav steps).
+- No new libs/perms/Prisma. Full spec: `work-tracking/AGENTIC-BROWSING-PLAN.md` (Phase 2a). **Phase 2b (supervised navigation)** is next — opens with D-ENG/D-TGT/D-BANNER + the playwright-crx spike.
+
+**August 1, 2026**: Agentic Browsing Phase 0 + hardening + Phase 1 — the browser read tool becomes a research agent (branch `feat/agentic-browsing`; typecheck/lint/build green; owner-validated smoke tests; PR pending rebase after #142)
+
+- **Phase 0** (`read_page_in_browser`): the first client-executed chat tool (no server `execute`) — the model's tool call streams to the browser, `onToolCall` runs `acquireUrlWithFallback` in the user's **own** session, the result posts back via `addToolResult` + a *targeted* resume predicate (scoped to this tool so it can't defeat the `stopWhen` bound). Registered only when the extension is reachable; declines with a CTA otherwise. Reads login-walled / bot-blocked / JS-heavy pages a server fetch can't.
+- **Phase 0 hardening**: the extension's session-tab extraction waited a flat 1.5s then extracted once → nav/footer chrome on JS-hydrated pages. Now a **settle-then-extract poll loop** (re-extract until Readability succeeds or content length stabilizes, 8s cap) + a **main-landmark tier** (`main`/`[role=main]`/`article` before full-body). LinkedIn validation deferred (pathological anti-automation — job pane never renders into a backgrounded tab).
+- **Phase 1** (multi-step research loop): `propose_research_run` (a `needsApproval` plan card fixing objective / budget / target / ledger up front), `extract_structured` (cheap-model `generateObject` → structured rows, infers interpretive columns), `record_research_findings` (per-objective ledger). Rides the existing AI-SDK tool loop under a gated research-methodology prompt. **Per-run page budget** enforced client-side (run-scoped, fail-open, soft-stop, count-only-successful) + server-side budget derived from the plan result in `body.messages` (raises the step cap + acquisition budget). ~90% reuse: `createNote` (GFM→TipTap table), `upsertRunLedger`, output-placement, associations. **No new libs / perms / Prisma.**
+- Fixed en route: composer provider/model/context menus clipped by the `overflow-x-auto` control rail (portal + `anchorMenuAbove`, **PR #142**); `web_search_preview`+gpt-4 silent-hang diagnosed (gating fix backlogged).
+- Full spec + phase roadmap: `work-tracking/AGENTIC-BROWSING-PLAN.md`. Deferred: read-completion tab launcher → Phase 2; rich approval-card previews (tooltips/TipTap/file) → backlog.
 
 **July 25, 2026**: Wiki-links survive renames — `wikiLink.targetId` (TipTap schema 1.13.0, branch `minor-work/markdown-roundtrip-tables`)
 

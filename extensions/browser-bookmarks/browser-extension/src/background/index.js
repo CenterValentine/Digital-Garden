@@ -1,4 +1,6 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
+import * as cobrowse from "../agentic/cdp/index.js";
+import * as cobrowseSession from "../agentic/session.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -30,6 +32,10 @@ const DEFAULT_CONFIG = {
     autoAssociate: false,
     navHistory: true,
     denylist: [],
+    // Agentic Browsing read-completion launcher: when ON, the assistant may
+    // open a VISIBLE foreground tab to read a page a background session tab
+    // can't (bot/device-blocked). OFF by default — standing consent is opt-in.
+    allowTabLaunch: false,
   },
 };
 
@@ -2097,6 +2103,14 @@ const ACQUISITION_MAX_HTML_CHARS = 1_500_000;
 const ACQUISITION_TAB_LOAD_TIMEOUT_MS = 20_000;
 const ACQUISITION_TAB_SETTLE_MS = 1_500;
 const ACQUISITION_EXTRACT_TIMEOUT_MS = 12_000;
+// Settle-then-extract: a flat delay guesses wrong on client-rendered pages
+// (extract too early → nav/footer chrome only). Instead we poll-extract and
+// stop once Readability succeeds or the content length stabilizes (hydration
+// finished), capped by a max budget so a hostile page can't hang the read.
+const ACQUISITION_SETTLE_MAX_MS = 8_000; // total hydration-poll budget
+const ACQUISITION_SETTLE_POLL_MS = 700; // gap between re-extractions
+const ACQUISITION_SETTLE_STABLE_DELTA = 48; // chars: "content stopped growing"
+const ACQUISITION_SETTLE_MIN_CHARS = 400; // don't call a near-empty page "stable"
 const ACCEPTED_ACQUISITION_CONTENT_TYPES = [
   "text/html",
   "application/xhtml",
@@ -2294,10 +2308,57 @@ async function extractFromTabWithInjectFallback(tabId) {
   }
 }
 
-async function acquireViaSessionTab(url) {
+// Poll-extract until the page has hydrated. A flat delay guesses wrong on
+// client-rendered pages — extract too early and you photograph nav/footer
+// chrome before the main content renders. Instead we re-extract on an interval
+// and stop as soon as Readability finds an article, or the extracted content
+// length stabilizes (hydration done), capped by ACQUISITION_SETTLE_MAX_MS.
+// The page-side extractor stays synchronous; the polling lives here.
+async function settleAndExtract(tabId) {
+  const deadline = Date.now() + ACQUISITION_SETTLE_MAX_MS;
+  // A small initial grace so first paint / hydration can begin before we look.
+  await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
+  let best = null;
+  let lastLen = -1;
+  let stable = 0;
+  while (Date.now() < deadline) {
+    let extracted = null;
+    try {
+      extracted = await extractFromTabWithInjectFallback(tabId);
+    } catch {
+      // The page may still be navigating/hydrating; retry after the poll gap.
+    }
+    if (extracted) {
+      // Readability found a real article — the best we can do, stop now.
+      if (extracted.quality === "readable" && (extracted.content?.length || 0) > 0) {
+        return extracted;
+      }
+      const len = extracted.content?.length || 0;
+      if (!best || len > (best.content?.length || 0)) best = extracted;
+      // Content stopped growing across two polls → treat hydration as done.
+      if (
+        len >= ACQUISITION_SETTLE_MIN_CHARS &&
+        Math.abs(len - lastLen) <= ACQUISITION_SETTLE_STABLE_DELTA
+      ) {
+        if (++stable >= 2) return best;
+      } else {
+        stable = 0;
+      }
+      lastLen = len;
+    }
+    await new Promise((r) => setTimeout(r, ACQUISITION_SETTLE_POLL_MS));
+  }
+  // Budget exhausted: return the best we saw, or make one final attempt so a
+  // genuine extraction failure still surfaces its real error to the caller.
+  return best ?? (await extractFromTabWithInjectFallback(tabId));
+}
+
+async function acquireViaSessionTab(url, visible = false) {
   let tab;
   try {
-    tab = await chrome.tabs.create({ url, active: false });
+    // A VISIBLE (foreground) tab clears many soft bot-blocks a background tab
+    // can't — used by the read-completion launcher (gated in handleAcquireUrl).
+    tab = await chrome.tabs.create({ url, active: !!visible });
   } catch (error) {
     return {
       ok: false,
@@ -2307,9 +2368,10 @@ async function acquireViaSessionTab(url) {
   const tabId = tab.id;
   try {
     await waitForTabComplete(tabId, ACQUISITION_TAB_LOAD_TIMEOUT_MS);
-    // Give client-rendered pages a moment to settle before extracting.
-    await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
-    const extracted = await extractFromTabWithInjectFallback(tabId);
+    // Poll-extract until the page hydrates (see settleAndExtract) rather than a
+    // flat delay + single shot, which photographed client-rendered pages before
+    // their main content rendered (returned nav/footer chrome only).
+    const extracted = await settleAndExtract(tabId);
     let finalUrl = url;
     try {
       const current = await chrome.tabs.get(tabId);
@@ -2337,6 +2399,21 @@ async function handleAcquireUrl(payload) {
   const mode = payload && payload.mode === "sw-fetch" ? "sw-fetch" : "session-tab";
   if (!url) return { ok: false, reason: "no url provided" };
   const config = await getConfig();
+  // Read-completion launcher: a VISIBLE foreground tab is only opened when the
+  // user has turned it on in Browser Bookmarks settings (standing consent). The
+  // SSRF / private-network / denylist policy gate below still runs either way —
+  // `visible` only changes how the tab opens, never whether the URL is allowed.
+  const visible = payload && payload.visible === true;
+  if (
+    visible &&
+    !(config.capture && config.capture.allowTabLaunch === true)
+  ) {
+    return {
+      ok: false,
+      reason:
+        "Opening a tab to read blocked pages is turned off. Turn on \"Open a tab to read blocked pages\" in Browser Bookmarks settings → Capture & privacy to allow it.",
+    };
+  }
   const configDeny =
     config.capture && Array.isArray(config.capture.denylist)
       ? config.capture.denylist
@@ -2347,11 +2424,31 @@ async function handleAcquireUrl(payload) {
   try {
     return mode === "sw-fetch"
       ? await acquireViaSwFetch(url)
-      : await acquireViaSessionTab(url);
+      : await acquireViaSessionTab(url, visible);
   } finally {
     setAcquisitionBadge(false);
   }
 }
+
+// Resolve the tab a co-browse session should attach to when the caller gives no
+// explicit tabId AND there's no sender tab (the side panel isn't a tab). Default:
+// the active http(s) tab in the user's window. The Slice 5b session manager will
+// layer the real topology on top (agent-owned tab, metadata resolution, etc.).
+async function resolveCoBrowseTab() {
+  const tabs = await chrome.tabs.query({ active: true });
+  return (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
+}
+
+// Agentic co-browse: when a CDP session ends for ANY reason — the user clicking
+// "Cancel" on Chrome's debugging infobar (D-BANNER's Stop), the tab closing, or
+// devtools taking the target — broadcast it so any open app surface can drop its
+// co-browse indicator. Best-effort: sendMessage rejects when nobody's listening.
+cobrowse.setSessionEndHandler((reason, tabId) => {
+  console.info("[DG cobrowse] session ended", reason, tabId);
+  chrome.runtime
+    .sendMessage({ type: "cobrowse-session-ended", payload: { reason, tabId } })
+    .catch(() => {});
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // sidePanel.open() must run before any await or the user-gesture context
@@ -2380,6 +2477,180 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
+      return;
+    }
+
+    // ── Agentic co-browse (Phase 2b) — raw CDP executor lifecycle ──────────
+    // Semantic operations only (attach/detach/status/navigate); there is NO
+    // generic "run any CDP command" passthrough reachable from a page message —
+    // each capability is its own validated handler (later slices add snapshot,
+    // click, scroll as their own types). The debuggee defaults to the SENDER's
+    // tab; an explicit payload.tabId lets the panel drive another tab.
+    if (message.type === "cobrowse-attach") {
+      try {
+        const tabId =
+          message.payload?.tabId ?? sender.tab?.id ?? (await resolveCoBrowseTab());
+        sendResponse({ ok: true, data: await cobrowse.attach(tabId) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "attach failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-detach") {
+      sendResponse({ ok: true, data: await cobrowse.detach() });
+      return;
+    }
+    if (message.type === "cobrowse-status") {
+      sendResponse({ ok: true, data: { session: cobrowse.getSession() } });
+      return;
+    }
+    if (message.type === "cobrowse-navigate") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network / denylist gate reads run — `Page.navigate`
+        // must not become an open redirect into internal hosts.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        sendResponse({ ok: true, data: await cobrowse.send("Page.navigate", { url }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "navigate failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-snapshot") {
+      try {
+        const [nodes, url] = await Promise.all([
+          cobrowse.getA11ySnapshot(),
+          cobrowse.currentUrl(),
+        ]);
+        sendResponse({ ok: true, data: { nodes, url } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-click") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.click(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "click failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-hover") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.hover(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "hover failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-type") {
+      try {
+        const { text, ...target } = message.payload || {};
+        sendResponse({ ok: true, data: await cobrowse.type(target, text) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "type failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-scroll") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.scroll(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "scroll failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-show-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.showTimer(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "show-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-clear-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.clearTimer() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "clear-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-back") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.back() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "back failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-collect") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.collectAll(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "collect failed" });
+      }
+      return;
+    }
+    // ── Session / tab manager (Slice 5b) ──────────────────────────────────
+    if (message.type === "cobrowse-open") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network gate as reads/navigate before we open+drive.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        const active = message.payload?.active !== false;
+        sendResponse({ ok: true, data: await cobrowseSession.openAndAttach(url, { active }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "open failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-reveal") {
+      try {
+        sendResponse({ ok: true, data: await cobrowseSession.revealSession() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "reveal failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-list-tabs") {
+      try {
+        sendResponse({ ok: true, data: { tabs: await cobrowseSession.listTabs() } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "list-tabs failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-resolve-tab") {
+      try {
+        const candidates = await cobrowseSession.resolveTab(message.payload?.query);
+        sendResponse({ ok: true, data: { candidates } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "resolve-tab failed" });
+      }
       return;
     }
     // Tab-scoped open-panel persistence: notes stay open as the user navigates
@@ -2695,6 +2966,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           autoAssociate: capture.autoAssociate === true,
           navHistory: capture.navHistory !== false,
           denylist: Array.isArray(capture.denylist) ? capture.denylist : [],
+          allowTabLaunch: capture.allowTabLaunch === true,
         },
       });
       return;
@@ -2719,6 +2991,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             : Array.isArray(prev.denylist)
               ? prev.denylist
               : [],
+          allowTabLaunch:
+            typeof patch.allowTabLaunch === "boolean"
+              ? patch.allowTabLaunch
+              : prev.allowTabLaunch === true,
         },
       };
       await saveConfig(next);

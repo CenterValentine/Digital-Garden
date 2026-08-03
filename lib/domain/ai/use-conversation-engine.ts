@@ -30,6 +30,40 @@ import {
   type UIMessage,
   type FileUIPart,
 } from "ai";
+import {
+  acquireUrlWithFallback,
+  launchTabAndRead,
+  isExtensionAcquireAvailable,
+} from "@/lib/domain/browser-extension/acquire-url";
+import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import {
+  CO_BROWSE_OPEN,
+  CO_BROWSE_ACT,
+  READ_CURRENT_PAGE,
+} from "@/lib/domain/ai/tools/co-browse-tools";
+import {
+  isCoBrowseAvailable,
+  coBrowseOpen,
+  coBrowseSnapshot,
+  coBrowseNavigate,
+  coBrowseClick,
+  coBrowseHover,
+  coBrowseType,
+  coBrowseScroll,
+  coBrowseCollect,
+  coBrowseBack,
+  coBrowseReveal,
+  coBrowseShowTimer,
+  coBrowseClearTimer,
+  type CoBrowseNode,
+} from "@/lib/domain/browser-extension/co-browse";
+import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
+import {
+  markCoBrowseActive,
+  beginCoBrowseWait,
+  endCoBrowseWait,
+} from "@/state/co-browse-store";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -45,7 +79,10 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
-import { getAttachedPageContext } from "@/state/panel-page-context-store";
+import {
+  getAttachedPageContext,
+  getCurrentPageHint,
+} from "@/state/panel-page-context-store";
 import {
   DEFAULT_OUTPUT_TARGET,
   createOutputTargetMessagePart,
@@ -483,6 +520,136 @@ export interface ActivePlaybook {
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
   phaseIndex: number;
   phaseCount: number;
+}
+
+/**
+ * Auto-resume predicate for the client-executed `read_page_in_browser` tool
+ * (Agentic Browsing Phase 0). The server stops the stream at the tool call (no
+ * server `execute`); once `onToolCall` supplies the result via `addToolResult`,
+ * the loop must re-POST so the model can use it.
+ *
+ * Deliberately TARGETED to our tool only (the last step contains a resolved
+ * `read_page_in_browser`), NOT the SDK's
+ * `lastAssistantMessageIsCompleteWithToolCalls`: that also fires when a normal
+ * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
+ * which would defeat that bound and risk a runaway loop.
+ */
+function lastMessageHasResolvedBrowserRead({
+  messages,
+}: {
+  messages: UIMessage[];
+}): boolean {
+  const message = messages[messages.length - 1];
+  if (!message || message.role !== "assistant") return false;
+  const lastStepStart = message.parts.reduce(
+    (last, part, index) => (part.type === "step-start" ? index : last),
+    -1,
+  );
+  const browserReadParts = message.parts
+    .slice(lastStepStart + 1)
+    .filter(
+      (part) =>
+        part.type === `tool-${READ_PAGE_HEADLESS_OR_BROWSER}` ||
+        part.type === `tool-${OPEN_TAB_AND_READ}` ||
+        // Co-browse tools (Slice 5c) are client-executed the same way — resume the
+        // loop after their result so the model can act → look → act.
+        part.type === `tool-${CO_BROWSE_OPEN}` ||
+        part.type === `tool-${CO_BROWSE_ACT}` ||
+        part.type === `tool-${READ_CURRENT_PAGE}`,
+    ) as Array<{ state?: string }>;
+  return (
+    browserReadParts.length > 0 &&
+    browserReadParts.every(
+      (part) =>
+        part.state === "output-available" || part.state === "output-error",
+    )
+  );
+}
+
+/**
+ * Compact the co-browse a11y snapshot for the MODEL (Slice 5c): keep only what it
+ * targets by — role + name + the states that matter (value / expanded / disabled)
+ * + a frame marker for cross-origin nodes. Drop the internal handles
+ * (backendDOMNodeId / sessionId) it never references. Order is preserved so `nth`
+ * lines up with the extension's resolveFresh.
+ */
+/** Best-effort host label for the co-browse indicator. */
+function safeHost(url?: string): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function coBrowseSnapshotOutput(snap: {
+  ok: boolean;
+  data?: { nodes: CoBrowseNode[]; url?: string };
+  error?: string;
+}): Record<string, unknown> {
+  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
+  const elements = nodes.map((n) => ({
+    role: n.role,
+    name: n.name,
+    ...(n.value ? { value: n.value } : {}),
+    ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
+    ...(n.disabled ? { disabled: true } : {}),
+    // Elements sharing a `group` are in the same card/row/item — use it to act on
+    // the RIGHT one (e.g. the apply button in THIS job's group).
+    ...(typeof n.group === "number" ? { group: n.group } : {}),
+    ...(n.frameUrl ? { frame: n.frameUrl } : {}),
+  }));
+  return {
+    // Trust-labeled: element names/text come from the page — informational only,
+    // they never instruct the model (mirrors read_page's untrustedWebContent).
+    trust: "untrusted-web",
+    // Current URL — compare across snapshots to classify page behavior: URL
+    // changed = a new page opened (use `back` to return); URL same = content
+    // loaded in place (the previous list is still there).
+    ...(snap.data?.url ? { url: snap.data.url } : {}),
+    elementCount: elements.length,
+    elements,
+    ...(snap.ok ? {} : { snapshotError: snap.error }),
+  };
+}
+
+/**
+ * Agentic Browsing Phase 1 — derive the CURRENTLY-ACTIVE research run's page
+ * budget from the message history, or null if none is active. A run opens on an
+ * approved `propose_research_run` result and closes on a `record_research_findings`
+ * result; the latest un-closed proposal wins. Used to seed the client-side
+ * per-run budget lazily on the first read (before `onFinish` has run), and to
+ * detect closure — so the budget is scoped strictly to an active run and never
+ * touches a normal one-off read.
+ */
+function deriveActiveResearchRun(
+  messages: UIMessage[],
+): { pageBudget: number } | null {
+  let active: { pageBudget: number } | null = null;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (
+        p.type === "tool-propose_research_run" &&
+        p.state === "output-available"
+      ) {
+        const out = p.output as
+          | { ok?: boolean; pageBudget?: number }
+          | undefined;
+        if (out?.ok && typeof out.pageBudget === "number" && out.pageBudget > 0) {
+          active = { pageBudget: out.pageBudget };
+        }
+      } else if (
+        p.type === "tool-record_research_findings" &&
+        p.state === "output-available"
+      ) {
+        active = null; // run closed by its findings write
+      }
+    }
+  }
+  return active;
 }
 
 export function useConversationEngine({
@@ -964,6 +1131,16 @@ export function useConversationEngine({
     [providerId, modelId],
   );
 
+  // Agentic Browsing Phase 1 — client-side per-run page budget. Non-null ONLY
+  // while a research run is active (opened by an approved propose_research_run,
+  // closed by record_research_findings or the next user turn). A ref, not state:
+  // it's read at send-time and mutated per read without needing a re-render.
+  // Fail-open by construction — when null, the budget path is never entered, so
+  // a normal one-off read is completely untouched.
+  const researchRunRef = useRef<{ pageBudget: number; pagesUsed: number } | null>(
+    null,
+  );
+
   // ── useChat ──
   const chat = useChat({
     transport: chatTransport,
@@ -971,10 +1148,305 @@ export function useConversationEngine({
     messages: initialMessages,
     experimental_throttle: 100,
     // Resume the tool loop automatically once every pending needsApproval
-    // request on the last assistant message has been answered (AI v3 core
-    // S1). Without this, an approval response would sit in client state and
-    // never re-trigger the server.
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    // request on the last assistant message has been answered (AI v3 core S1),
+    // OR once the client-executed read_page_in_browser tool has a result
+    // (Agentic Browsing Phase 0). Without this, either would sit in client
+    // state and never re-trigger the server.
+    sendAutomaticallyWhen: (options) =>
+      lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+      lastMessageHasResolvedBrowserRead(options),
+    // Client-executed tools (no server `execute`): the model's tool call is
+    // streamed to the browser; run it here and post the result back. Phase 0:
+    // read_page_in_browser reads a page in the user's own session.
+    onToolCall: async ({ toolCall }) => {
+      // Agentic Browsing Phase 2b Slice 5c — client-executed co-browse tools. The
+      // model opens a tab and acts on it; we drive the extension's chrome.debugger
+      // engine via the panel bridge (co-browse.ts) and return the FRESH a11y
+      // snapshot so it can act → look → act.
+      if (
+        toolCall.toolName === CO_BROWSE_OPEN ||
+        toolCall.toolName === CO_BROWSE_ACT
+      ) {
+        const toolName = toolCall.toolName;
+        const input = (toolCall.input ?? {}) as {
+          url?: string;
+          action?: string;
+          role?: string;
+          name?: string;
+          nth?: number;
+          text?: string;
+          direction?: "down" | "up";
+          to?: "bottom" | "top";
+          seconds?: number;
+          label?: string;
+        };
+        try {
+          if (toolName === CO_BROWSE_OPEN) {
+            if (!input.url) {
+              chat.addToolResult({
+                tool: toolName,
+                toolCallId: toolCall.toolCallId,
+                state: "output-error",
+                errorText: "no url provided",
+              });
+              return;
+            }
+            const opened = await coBrowseOpen(input.url);
+            if (!opened.ok) {
+              chat.addToolResult({
+                tool: toolName,
+                toolCallId: toolCall.toolCallId,
+                output: `Could not open the page: ${opened.error ?? "unknown error"}.`,
+              });
+              return;
+            }
+            markCoBrowseActive(safeHost(input.url)); // 5d: light the in-app indicator
+            const snap = await coBrowseSnapshot();
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
+                ...coBrowseSnapshotOutput(snap),
+              },
+            });
+            return;
+          }
+          // CO_BROWSE_ACT — read / click / hover / type / navigate / scroll / wait /
+          // back on the bound tab.
+          const action = input.action;
+          // wait — pause for the user to REVIEW this page, with an on-page
+          // countdown overlay (T1, timed iteration). The extension only injects
+          // the self-removing overlay and returns fast; the SLEEP happens here so
+          // the bridge round-trip isn't held open for the whole minute. No page
+          // change and no re-snapshot — it's a pure pause.
+          if (action === "wait") {
+            const seconds = Math.max(1, Math.min(3600, Math.round(input.seconds ?? 60)));
+            const label = input.label ?? null;
+            await coBrowseShowTimer(seconds, label ?? undefined);
+            beginCoBrowseWait(seconds, label);
+            try {
+              await new Promise((r) => setTimeout(r, seconds * 1000));
+            } finally {
+              endCoBrowseWait();
+              await coBrowseClearTimer().catch(() => {});
+            }
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                action: "wait",
+                waited: seconds,
+                note: `Paused ${seconds}s for the user to review the page.`,
+              },
+            });
+            return;
+          }
+          // collect — auto scroll-collect the whole list in one call (Slice 3d).
+          // Returns the merged, deduped set directly (not a fresh single snapshot).
+          if (action === "collect") {
+            const collected = await coBrowseCollect();
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: { action: "collect", ...coBrowseSnapshotOutput(collected) },
+            });
+            return;
+          }
+          const target = { role: input.role, name: input.name, nth: input.nth };
+          let res: { ok: boolean; error?: string };
+          if (action === "read") res = { ok: true };
+          else if (action === "click") res = await coBrowseClick(target);
+          else if (action === "hover") res = await coBrowseHover(target);
+          else if (action === "type") res = await coBrowseType(target, input.text ?? "");
+          else if (action === "navigate")
+            res = input.url
+              ? await coBrowseNavigate(input.url)
+              : { ok: false, error: "navigate needs a url" };
+          else if (action === "scroll")
+            res = await coBrowseScroll({ direction: input.direction, to: input.to });
+          else if (action === "back") res = await coBrowseBack();
+          else if (action === "reveal") res = await coBrowseReveal();
+          else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
+          if (!res.ok) {
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: `Action "${action}" failed: ${res.error ?? "unknown error"}. Read the page again and adapt — don't repeat the same action blindly.`,
+            });
+            return;
+          }
+          if (action === "navigate") markCoBrowseActive(safeHost(input.url)); // 5d: update indicator host
+          // Let a click/navigation settle before re-snapshotting so the model sees
+          // the RESULT, not a mid-transition page. Navigation (incl. back) needs longer.
+          await new Promise((r) =>
+            setTimeout(r, action === "navigate" || action === "back" ? 1200 : 500),
+          );
+          const snap = await coBrowseSnapshot();
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output: { action, ...coBrowseSnapshotOutput(snap) },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "co-browse failed",
+          });
+        }
+        return;
+      }
+      // R1 — read the page the user is ALREADY on (the current tab), via the
+      // panel's content-script capture: no new tab, no re-fetch, no debugger
+      // banner. Distinct from read_page (refetches a URL) and co_browse_open
+      // (opens a fresh tab). For "summarize this page".
+      if (toolCall.toolName === READ_CURRENT_PAGE) {
+        try {
+          const captured = await capturePageContent("full");
+          if (!captured.ok || !captured.content) {
+            chat.addToolResult({
+              tool: READ_CURRENT_PAGE,
+              toolCallId: toolCall.toolCallId,
+              output: `Couldn't read the current page: ${captured.error ?? "no readable content"}.`,
+            });
+            return;
+          }
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: captured.url,
+              title: captured.title,
+              siteName: captured.siteName,
+              via: "current-tab",
+              // Trust-labeled (prompt-injection defense) — mirrors read_page.
+              untrustedWebContent: captured.content,
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "read current page failed",
+          });
+        }
+        return;
+      }
+      // Two client-executed read tools: read_page_in_browser (escalates
+      // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
+      // used only after a normal read failed). Both share the budget + result
+      // plumbing below.
+      const isBrowserRead = toolCall.toolName === READ_PAGE_HEADLESS_OR_BROWSER;
+      const isTabLaunch = toolCall.toolName === OPEN_TAB_AND_READ;
+      if (!isBrowserRead && !isTabLaunch) return;
+      const toolName = toolCall.toolName;
+      const { url } = (toolCall.input ?? {}) as { url?: string };
+      if (!url) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: "no url provided",
+        });
+        return;
+      }
+      // Agentic Browsing Phase 1 — per-run page budget (client-side; the server
+      // has no `execute` to gate a client tool). Applies to BOTH client read
+      // tools. Lazily hydrate from the approved research plan in history so even
+      // the FIRST read is bounded. Null run = normal read, budget skipped.
+      if (researchRunRef.current === null) {
+        const active = deriveActiveResearchRun(chat.messages);
+        if (active) {
+          researchRunRef.current = { pageBudget: active.pageBudget, pagesUsed: 0 };
+        }
+      }
+      const run = researchRunRef.current;
+      if (run && run.pagesUsed >= run.pageBudget) {
+        // Soft stop, not an error: tell the model to wrap up with what it has.
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+        });
+        return;
+      }
+      try {
+        let outcome = isTabLaunch
+          ? await launchTabAndRead(url)
+          : await acquireUrlWithFallback(url);
+        // Deterministic escalation (Phase 2a): if a background read (not the
+        // launcher itself) came back blocked or too thin, and we're NOT in a
+        // research run, auto-retry in a VISIBLE tab instead of hoping the model
+        // chooses to. The extension still gates the open on the user's setting
+        // (refused → keep the original), so a tab only opens when they've opted
+        // in; suppressed in research runs so a multi-source run can't pop a stack
+        // of tabs (there the model escalates explicitly via open_tab_and_read).
+        // Surface what the escalation did so the model can NARRATE it (owner:
+        // "I can't tell if the read attempt happened before the tab open").
+        let escalationNote: string | undefined;
+        if (isBrowserRead && !researchRunRef.current) {
+          const currentLen = outcome.content?.content?.trim().length ?? 0;
+          if (!outcome.ok || currentLen < 800) {
+            const launched = await launchTabAndRead(url);
+            const launchedLen = launched.content?.content?.trim().length ?? 0;
+            if (launched.ok && launchedLen > currentLen) {
+              outcome = launched;
+              escalationNote =
+                "A normal read came back blocked/thin, so I opened a VISIBLE tab and read it there.";
+            } else if (
+              launched.reason &&
+              /turned off|Browser Bookmarks/i.test(launched.reason)
+            ) {
+              escalationNote =
+                "A normal read was blocked, and opening a tab to read blocked pages is turned off in the user's Browser Bookmarks settings.";
+            } else if (launched.reason || launched.ok) {
+              escalationNote =
+                "A normal read was blocked, so I also opened a VISIBLE tab — but the page still couldn't be read (likely a human-verification captcha, which no tool can pass).";
+            }
+          }
+        }
+        if (outcome.ok && outcome.content) {
+          // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
+          if (run) run.pagesUsed += 1;
+          const c = outcome.content;
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: c.url,
+              title: c.title,
+              siteName: c.siteName,
+              via: outcome.via,
+              usedExtension: outcome.usedExtension,
+              // Trust-labeled field name is load-bearing (prompt-injection
+              // defense) — mirror read_page's `untrustedWebContent`.
+              untrustedWebContent: c.content,
+              // The escalation summary (if any) — the model relays it so the user
+              // sees the steps (normal read → visible-tab open) it actually took.
+              ...(escalationNote ? { escalationNote } : {}),
+            },
+          });
+        } else {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output: isTabLaunch
+              ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
+              : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`,
+          });
+        }
+      } catch (err) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: err instanceof Error ? err.message : "browser read failed",
+        });
+      }
+    },
     onError: (err) => {
       if (onError) {
         onError(err);
@@ -989,6 +1461,19 @@ export function useConversationEngine({
         finishReason?: string;
         isAbort?: boolean;
       };
+      // Agentic Browsing Phase 1 — close the client-side research budget when its
+      // findings are recorded (precise signal: a record_research_findings result
+      // in the finished message). The next-user-turn backstop in handleSend
+      // covers a run the model never closed. onToolCall owns opening + counting;
+      // this only clears — so it can never mid-run reset the page count.
+      const closedResearchRun = (e.message?.parts ?? []).some((part) => {
+        const p = part as { type?: string; state?: string };
+        return (
+          p.type === "tool-record_research_findings" &&
+          p.state === "output-available"
+        );
+      });
+      if (closedResearchRun) researchRunRef.current = null;
       const isAbort = e.isAbort === true;
       const streamedMessages = e.messages ?? [];
       const finalMessages = isAbort
@@ -1145,6 +1630,9 @@ export function useConversationEngine({
       // where the shell attaches what the extension captured. Read at send
       // time so the freshest capture rides the turn.
       pageContext: getAttachedPageContext(),
+      // Lightweight current-page hint (url+title) so the model knows what page the
+      // user is viewing even without the attach toggle — for "summarize this page".
+      currentPage: getCurrentPageHint(),
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
@@ -1155,6 +1643,11 @@ export function useConversationEngine({
       // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
       // and playbook phase directives are ignored for this conversation.
       modelPinned,
+      // Agentic Browsing Phase 0: is the browser extension reachable right now?
+      // Gates the client-executed read_page_in_browser tool. Read at send time.
+      browserExtensionAvailable: isExtensionAcquireAvailable(),
+      // Slice 5c: co-browse is trust-gated to the side panel — true only there.
+      coBrowseAvailable: isCoBrowseAvailable(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1434,6 +1927,10 @@ export function useConversationEngine({
     // A fresh user send has no buffered backlog — clear the resume flag so
     // this turn types normally (and un-stick the no-stream 204 case).
     streamStartedViaResumeRef.current = false;
+    // Agentic Browsing Phase 1 — a fresh user turn ends any prior research run
+    // (backstop for a run the model never closed via record_research_findings),
+    // so this turn's reads are never charged to a stale budget.
+    researchRunRef.current = null;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
@@ -1550,6 +2047,7 @@ export function useConversationEngine({
           // Lives on the explicit send body because that becomes the
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
+          currentPage: getCurrentPageHint(),
           // Attached playbook (AI v3.2 T3).
           playbookId: activePlaybookId,
           activePhaseIndex: resolvedPhaseIndex,
@@ -1560,6 +2058,10 @@ export function useConversationEngine({
           // resolver baseline is consulted, so a flag that lives only in
           // the resolver never reaches the server after a real send.
           modelPinned,
+          // Agentic Browsing Phase 0 — same per-call-body requirement as above.
+          browserExtensionAvailable: isExtensionAcquireAvailable(),
+          // Slice 5c co-browse gate — same per-call-body requirement.
+          coBrowseAvailable: isCoBrowseAvailable(),
         },
       },
     );
@@ -1596,6 +2098,7 @@ export function useConversationEngine({
       mentionedContentIds: [] as string[],
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
+      currentPage: getCurrentPageHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,

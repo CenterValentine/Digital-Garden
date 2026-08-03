@@ -129,6 +129,20 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { createWorkflowTools } from "@/lib/domain/ai/tools";
+import {
+  readPageInBrowserTool,
+  openTabAndReadTool,
+  coBrowseOpenTool,
+  coBrowseActTool,
+  readCurrentPageTool,
+} from "@/lib/domain/ai/tools/registry";
+import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import {
+  CO_BROWSE_OPEN,
+  CO_BROWSE_ACT,
+  READ_CURRENT_PAGE,
+} from "@/lib/domain/ai/tools/co-browse-tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -305,6 +319,56 @@ export async function POST(request: Request) {
       // (review fix — a pinned playbook conversation paid a DB round-trip
       // + full TipTap parse per turn just to discard the result).
       const modelPinned = body.modelPinned === true;
+      // Agentic Browsing Phase 0: the client reports whether the browser
+      // extension is reachable this turn; gates the client-executed read tool.
+      const browserExtensionAvailable = body.browserExtensionAvailable === true;
+      // Agentic Browsing Phase 2b Slice 5c: co-browse is trust-gated to the side
+      // panel (the client sends true only from the /embed/panel surface); gates
+      // the client-executed co_browse_* tools.
+      const coBrowseAvailable = body.coBrowseAvailable === true;
+      // Agentic Browsing Phase 1: derive the active research run's page budget
+      // from the conversation history — the propose_research_run result always
+      // rides in body.messages, whereas a client body flag can't reliably reach
+      // the auto-resume legs (they replay the user turn's snapshotted body).
+      // Non-null = research mode → raises the step cap (budget-derived, P1-c) and
+      // the server-read acquisition budget for this turn. Clamped so a client
+      // can't request an unbounded run. Null outside a research run → default caps.
+      const researchPageBudget = ((): number | null => {
+        const msgs = (body as { messages?: unknown }).messages;
+        if (!Array.isArray(msgs)) return null;
+        let budget: number | null = null;
+        for (const m of msgs) {
+          const parts = (m as { parts?: unknown }).parts;
+          if (!Array.isArray(parts)) continue;
+          for (const part of parts) {
+            const p = part as {
+              type?: string;
+              state?: string;
+              output?: { ok?: boolean; pageBudget?: number };
+            };
+            if (
+              p.type === "tool-propose_research_run" &&
+              p.state === "output-available"
+            ) {
+              const b = p.output?.pageBudget;
+              if (
+                p.output?.ok &&
+                typeof b === "number" &&
+                Number.isFinite(b) &&
+                b > 0
+              ) {
+                budget = Math.min(Math.floor(b), 40);
+              }
+            } else if (
+              p.type === "tool-record_research_findings" &&
+              p.state === "output-available"
+            ) {
+              budget = null; // run closed → back to default caps
+            }
+          }
+        }
+        return budget;
+      })();
       const routingPlaybookId = modelPinned
         ? null
         : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
@@ -923,6 +987,9 @@ export async function POST(request: Request) {
         playbookOutputDirectives,
         phaseCheckpointGate,
         attachedMedia,
+        // Agentic Browsing Phase 1: raises the server-read acquisition budget
+        // for a research turn (undefined outside a research run → default cap).
+        researchPageBudget: researchPageBudget ?? undefined,
       };
       const allTools = {
         ...createBaseTools(toolCtx),
@@ -930,6 +997,32 @@ export async function POST(request: Request) {
         // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
         ...createWorkflowTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
+        // Agentic Browsing Phase 0: a CLIENT-executed read tool (no server
+        // `execute`) — registered only when the client reports the browser
+        // extension is reachable, so the model can't call it otherwise.
+        ...(browserExtensionAvailable
+          ? {
+              [READ_PAGE_HEADLESS_OR_BROWSER]: readPageInBrowserTool,
+              // Agentic Browsing Phase 2a — read-completion launcher (visible
+              // tab). Also client-executed; the extension gates the actual open
+              // on the user's "open a tab to read blocked pages" setting, so a
+              // disabled launcher returns a relayable CTA, never opens a tab.
+              [OPEN_TAB_AND_READ]: openTabAndReadTool,
+            }
+          : {}),
+        // Agentic Browsing Phase 2b Slice 5c: CLIENT-executed co-browse tools (no
+        // server `execute`). Registered only when the chat is in the trust-gated
+        // side panel with the extension present; the engine's onToolCall drives
+        // the chrome.debugger interaction engine via the panel bridge.
+        ...(coBrowseAvailable
+          ? {
+              [CO_BROWSE_OPEN]: coBrowseOpenTool,
+              [CO_BROWSE_ACT]: coBrowseActTool,
+              // R1: read the tab the user is already on (content-script capture,
+              // no new tab / no re-fetch) — distinct from read_page and co_browse_open.
+              [READ_CURRENT_PAGE]: readCurrentPageTool,
+            }
+          : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -937,7 +1030,16 @@ export async function POST(request: Request) {
       > }).toolConfig ?? {};
       const tools = Object.fromEntries(
         Object.entries(allTools).filter(
-          ([id]) => toolConfig[id]?.enabled !== false,
+          ([id]) =>
+            toolConfig[id]?.enabled !== false &&
+            // Agentic Browsing (deterministic reads): when the extension is
+            // reachable, `read_page_headless_or_browser` is the SINGLE reader —
+            // it does a headless server fetch first, then escalates into the
+            // browser (background → visible) in code. Drop the server-only
+            // `read_page` so the model can't pick a path that can't escalate;
+            // one tool, one deterministic ladder, no routing decision to get
+            // wrong. (`open_tab_and_read` stays for an explicit visible-tab ask.)
+            !(browserExtensionAvailable && id === "read_page"),
         ),
       );
 
@@ -1455,6 +1557,23 @@ export async function POST(request: Request) {
         });
       }
 
+      // Lightweight current-page hint (url+title) — always present when the panel
+      // is on a page, regardless of the attach toggle. Lets the model know WHAT
+      // page the user is viewing and read it on demand (the full content is behind
+      // its read tool, not pushed unless the user attaches).
+      const rawCurrentPage = body.currentPage;
+      const currentPageHint =
+        rawCurrentPage &&
+        typeof rawCurrentPage === "object" &&
+        typeof rawCurrentPage.url === "string" &&
+        rawCurrentPage.url.trim()
+          ? {
+              url: rawCurrentPage.url,
+              title:
+                typeof rawCurrentPage.title === "string" ? rawCurrentPage.title : "",
+            }
+          : null;
+
       const toolsActive = Object.keys(tools).length > 0;
       const validatedPlaybookId = attachedPlaybookResolved
         ? explicitPlaybookId
@@ -1551,12 +1670,28 @@ export async function POST(request: Request) {
         //   → propose_deck (child) → propose_cards → final text = 5 steps,
         //   with headroom for an optional search_decks or get_deck call.
         // Base chat (no flashcards, no document) typically needs 2-3 steps.
-        stopWhen: stepCountIs(editableContentId ? 8 : 7),
+        // Agentic Browsing Phase 1 (P1-c): in a research run the step cap is
+        // DERIVED from the approved page budget (budget×2 + overhead for
+        // extract/synthesis), so a run sized for N pages always has the steps to
+        // finish N pages. The page budget is the depth lever; this is the safety
+        // ceiling that follows it. Outside a research run, the normal 7/8 cap.
+        stopWhen: stepCountIs(
+          researchPageBudget != null
+            ? researchPageBudget * 2 + 4
+            : editableContentId
+              ? 8
+              : 7,
+        ),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
           hasWebSearch: "search_web" in tools,
           hasCheckpointTool: "phase_checkpoint" in tools,
+          hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
+          hasTabLauncher: OPEN_TAB_AND_READ in tools,
+          hasCoBrowseTools: CO_BROWSE_OPEN in tools,
+          hasReadCurrentPage: READ_CURRENT_PAGE in tools,
+          hasResearchTools: "extract_structured" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches
@@ -1585,6 +1720,7 @@ export async function POST(request: Request) {
           checkpointIntegritySection:
             renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,
+          currentPageHint,
         }),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.

@@ -7,6 +7,7 @@ import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
+import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
@@ -194,6 +195,7 @@ export function PanelShellClient({
       pageChatPendingRef.current = true;
     }
   }, []);
+
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
   // Quick access (Associated Content) starts collapsed: expanding it is what
@@ -417,6 +419,13 @@ export function PanelShellClient({
             ? String(data.payload.faviconUrl)
             : undefined,
         });
+        // Also publish the lightweight current-page (url+title) to the store so the
+        // conversation engine's current-page hint knows what page the user is on —
+        // even without a full capture/attach. Powers "summarize this page".
+        usePanelPageContextStore.getState().setCurrentPage({
+          url: String(data.payload.url),
+          title: String(data.payload.title ?? ""),
+        });
       }
 
       // B3-B capture settings (killswitch + denylist) from chrome.storage.
@@ -501,6 +510,9 @@ export function PanelShellClient({
         flexDirection: "column",
       }}
     >
+      {/* Co-browse indicator + Stop (5d) — above both views, visible whenever a
+          session is driving a tab. Renders nothing when inactive. */}
+      <CoBrowseIndicator />
       {/* Slim view switcher — app chrome, not extension chrome */}
       <div
         role="tablist"

@@ -20,6 +20,9 @@
 import { Readability, isProbablyReaderable } from "@mozilla/readability";
 
 const MAX_CHARS = 100_000;
+// Minimum text inside a <main>/[role=main]/<article> landmark before we trust
+// it over the full body — avoids returning an empty shell's stray label.
+const MAIN_LANDMARK_MIN_CHARS = 200;
 
 function normalize(text) {
   return (text || "")
@@ -112,7 +115,22 @@ function extractFull() {
       }
     }
   } catch {
-    // Fall through to raw innerText.
+    // Fall through to landmark / raw innerText.
+  }
+  // Non-article / SPA pages: Readability often won't classify an app shell as
+  // readerable, but the real content still lives inside the page's main
+  // landmark. Prefer it over the whole body so nav/header/footer chrome (and
+  // language pickers, cookie bars, etc.) don't drown the signal.
+  try {
+    const landmark = document.querySelector("main, [role='main'], article");
+    const landmarkText = landmark
+      ? normalize(landmark.innerText || landmark.textContent || "")
+      : "";
+    if (landmarkText.length >= MAIN_LANDMARK_MIN_CHARS) {
+      return { ...meta, content: landmarkText, quality: "raw", scope: "full" };
+    }
+  } catch {
+    // Fall through to full-body innerText.
   }
   const content = normalize(
     document.body?.innerText || document.body?.textContent || ""

@@ -2149,6 +2149,28 @@ function ApprovalRawJson({ args }: { args: unknown }) {
   );
 }
 
+/** Bare hostname (no www.) from a tool call's `url` arg, or "" if absent/bad. */
+function hostFromToolArgs(args: unknown): string {
+  if (!args || typeof args !== "object") return "";
+  const url = (args as { url?: unknown }).url;
+  if (typeof url !== "string" || !url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/** camelCase / snake_case tool-arg key → a human "Spaced Label". */
+function humanizeApprovalKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 /** Labeled key→value rows for shallow primitive args. */
 function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
   if (fields.length === 0) return null;
@@ -2156,7 +2178,7 @@ function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
     <div className="mx-3 mb-1.5 space-y-0.5">
       {fields.map(([label, value]) => (
         <div key={label} className="flex gap-2 text-[11px]">
-          <span className="shrink-0 w-20 text-gray-500 dark:text-gray-500">
+          <span className="shrink-0 w-28 text-gray-500 dark:text-gray-500">
             {label}
           </span>
           <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
@@ -2283,7 +2305,10 @@ function ApprovalPreview({
       typeof value === "boolean"
     ) {
       const text = String(value);
-      fields.push([key, text.length > 140 ? `${text.slice(0, 140)}…` : text]);
+      fields.push([
+        humanizeApprovalKey(key),
+        text.length > 140 ? `${text.slice(0, 140)}…` : text,
+      ]);
     }
   }
   const hasComplexArgs = Object.values(a).some(
@@ -2492,6 +2517,52 @@ function ToolCallBubble({
             /* not a parseable URL — fall through */
           }
         }
+      }
+      // Agentic Browsing — the single reader and the explicit launcher: express
+      // the ACTION taken (headless fetch vs. a background browser tab vs.
+      // escalated to a VISIBLE tab) so the chip shows what actually happened,
+      // not just the tool name.
+      if (toolName === "read_page_headless_or_browser") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        if (isRunning) return `Reading page${suffix}`;
+        const r =
+          result && typeof result === "object"
+            ? (result as { via?: string; escalationNote?: string })
+            : null;
+        if (r?.escalationNote) return `Read page — opened a browser tab${suffix}`;
+        if (r?.via === "session-tab") return `Read page in a browser tab${suffix}`;
+        return `Read page (headless)${suffix}`;
+      }
+      if (toolName === "open_tab_and_read") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a browser tab${suffix}`;
+      }
+      // R1 — read the CURRENT tab (no new tab). Host comes from the result (the
+      // tool takes no url arg), making the "no new tab" behavior visible.
+      if (toolName === "read_current_page") {
+        let host = "";
+        try {
+          const r = result as { url?: string } | null;
+          if (r?.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+        } catch {
+          // best-effort host label
+        }
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
+      }
+      if (toolName === "co_browse_open") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a co-browse tab${suffix}`;
+      }
+      if (toolName === "co_browse_act") {
+        const action =
+          args && typeof args === "object"
+            ? (args as { action?: string }).action
+            : undefined;
+        return `Co-browsing${action ? ` (${action})` : ""}`;
       }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.

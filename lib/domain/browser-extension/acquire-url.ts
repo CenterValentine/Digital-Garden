@@ -86,10 +86,11 @@ export function isExtensionAcquireAvailable(): boolean {
 async function extensionRung(
   url: string,
   mode: ExtensionAcquireMode,
+  opts: { visible?: boolean } = {},
 ): Promise<{ ok: boolean; content?: AcquiredContent; reason?: string }> {
   const material = isPanelEmbedSurface()
-    ? await requestPanelAcquire(url, mode)
-    : await requestExtensionAcquire(url, { mode });
+    ? await requestPanelAcquire(url, mode, opts.visible)
+    : await requestExtensionAcquire(url, { mode, visible: opts.visible });
   if (!material.ok) {
     return { ok: false, reason: material.reason ?? "extension could not fetch this page" };
   }
@@ -174,6 +175,35 @@ export async function acquireUrlVia(
     content: rung.content,
     reason: rung.ok ? undefined : rung.reason,
     via,
+    usedExtension: true,
+  };
+}
+
+/**
+ * Read-completion launcher (Agentic Browsing Phase 2a): open the URL in a
+ * VISIBLE foreground tab and read it — the escalation BEYOND a background
+ * session tab, for pages even that can't load (aggressive bot-detection). No P1
+ * fallback: this is called only after a normal read has already failed. The
+ * extension gates it on the user's "open a tab to read blocked pages" setting
+ * and returns a reason (a CTA to enable it) when off. The server's acquisition
+ * policy (SSRF / private-network) still applies — `visible` only changes how the
+ * tab opens, never whether the URL is allowed.
+ */
+export async function launchTabAndRead(url: string): Promise<AcquireOutcome> {
+  if (!isExtensionAcquireAvailable()) {
+    return {
+      ok: false,
+      reason: "the browser extension isn't available on this surface",
+      via: "session-tab",
+      usedExtension: false,
+    };
+  }
+  const rung = await extensionRung(url, "session-tab", { visible: true });
+  return {
+    ok: rung.ok,
+    content: rung.content,
+    reason: rung.ok ? undefined : rung.reason,
+    via: "session-tab",
     usedExtension: true,
   };
 }
