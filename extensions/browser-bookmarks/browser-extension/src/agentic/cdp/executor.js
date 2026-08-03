@@ -118,16 +118,14 @@ export async function attach(tabId) {
   } catch (error) {
     console.warn("[DG cobrowse] setAutoAttach failed", error);
   }
-  // Keep the bound tab rendering as if focused even when it's backgrounded — the
-  // TOPOLOGY "switch away and it keeps working" requirement. Without this, an
-  // agent-owned tab goes visibilityState:hidden the moment the user looks
-  // elsewhere and hits the Phase-0 lazy-render wall. Best-effort (not every build
-  // supports it); validate on a hostile site before relying on it.
-  try {
-    await sendCommand({ tabId }, "Emulation.setFocusEmulationEnabled", { enabled: true });
-  } catch (error) {
-    console.warn("[DG cobrowse] focus emulation unavailable", error);
-  }
+  // NOTE: Emulation.setFocusEmulationEnabled (to keep a backgrounded tab rendering
+  // as focused — the "switch away and it keeps working" idea) is DISABLED. In
+  // Vivaldi it left Accessibility.getFullAXTree returning an empty tree (snapshot
+  // → 0 nodes), isolated by comparison: Slice 3a snapshotted a *backgrounded* tab
+  // fine (548 nodes) without it. The session still stays BOUND to a backgrounded
+  // tab (the debugger binds to the tabId; a backgrounded tab returns a full AX
+  // tree), so "don't babysit" holds for the common case. Revisit a Vivaldi-safe
+  // visibility fix ONLY for genuinely visibility-gated sites, validated first.
   return { tabId, alreadyAttached: false };
 }
 
