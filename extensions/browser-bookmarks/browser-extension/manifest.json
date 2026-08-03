@@ -24,6 +24,12 @@
         "default": "Alt+Shift+A"
       },
       "description": "Ask the Digital Garden AI about this page"
+    },
+    "toggle-cobrowse-dev": {
+      "suggested_key": {
+        "default": "Alt+Shift+C"
+      },
+      "description": "DEV: toggle agentic co-browse (CDP attach/detach) on the current tab"
     }
   },
   "host_permissions": ["<all_urls>"],

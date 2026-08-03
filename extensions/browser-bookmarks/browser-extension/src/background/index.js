@@ -1863,8 +1863,30 @@ function openAiChatPanel(tab) {
     .catch(() => {});
 }
 
+// DEV-ONLY co-browse validation harness (Slice 2). Toggles a CDP session on the
+// active tab from a keyboard command — an extension-trust gesture a page can't
+// synthesize — so we can eyeball the D-BANNER lifecycle (attach → infobar → Stop
+// → gone) before the trust-gated app-side trigger lands in Slice 5. Remove before
+// the Phase 2b PR; the real trigger routes via the panel-bridge, not this.
+async function toggleCoBrowseDev(tab) {
+  const tabId = tab?.id;
+  if (typeof tabId !== "number") return;
+  try {
+    if (cobrowse.isAttached(tabId)) {
+      await cobrowse.detach();
+      console.info("[DG cobrowse] dev toggle → detached", tabId);
+    } else {
+      await cobrowse.attach(tabId);
+      console.info("[DG cobrowse] dev toggle → attached; banner should now show", tabId);
+    }
+  } catch (error) {
+    console.warn("[DG cobrowse] dev toggle failed", error);
+  }
+}
+
 chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "open-ai-chat") openAiChatPanel(tab);
+  if (command === "toggle-cobrowse-dev") toggleCoBrowseDev(tab);
 });
 
 // sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
