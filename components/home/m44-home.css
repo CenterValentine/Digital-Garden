@@ -1,57 +1,16 @@
 /* AUTO-EXTRACTED from design_handoff_personal_home/m44-connected.html.
-   Served via <link> from PersonalHomeShell so it is scoped to the home
-   route only. Do not hand-edit — re-run scripts/extract-m44.mjs. */
+   Imported by PersonalHomeShell. Global selectors (*, html, body, :root,
+   html[data-theme]) from the standalone prototype are stripped by
+   stripGlobalLeak() below — their scoped equivalent lives permanently in
+   app/globals.css's `.personal-home` block. Do not hand-edit — re-run
+   scripts/extract-m44.mjs. */
 
 /* ── home-mock.css (shared identity kit) ── */
 /* home-mock.css — shared identity kit for the davidvalentine.org home-page
    composition mockups. Tokens + tree hooks + chrome, lifted from the live
    home so every mockup is pixel-true; each mockup file adds only its own
    layout on top. Self-contained (no home-base dependency). */
-:root{ --serif:"Newsreader",Georgia,serif; --mono:"JetBrains Mono",ui-monospace,monospace; }
 
-html[data-theme="light"]{
-  --bg:#f1eadd; --bg-grad:
-    radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
-    radial-gradient(120% 120% at 50% 122%, rgba(120,96,52,.11), transparent 55%);
-  --text:#272320; --text-soft:#6a6256; --rule:#d4c9b4;
-  --branch-shoot:#272320; --branch-root:#a9742a;
-  --node-shoot:#24415f; --node-root:#a9742a;
-  --node-fill:#f1eadd; --label:#272320; --label-halo:#f1eadd;
-  --accent:#24415f; --accent-warm:#a9742a;
-  --glow-shoot:none; --glow-root:none;
-}
-html[data-theme="dark"]{
-  --bg:#0c100e; --bg-grad:
-    radial-gradient(120% 80% at 50% 32%, rgba(138,215,160,.08), transparent 55%),
-    radial-gradient(140% 120% at 50% 36%, #16201a 0%, #0c100e 58%, #080a09 100%);
-  --text:#efe7d4; --text-soft:#a9a48f; --rule:#232c24;
-  --branch-shoot:#8ad7a0; --branch-root:#e3a44a;
-  --node-shoot:#8ad7a0; --node-root:#e3a44a;
-  --node-fill:#0c100e; --label:#efe7d4; --label-halo:#0c100e;
-  --accent:#8ad7a0; --accent-warm:#e3a44a;
-  --glow-shoot:drop-shadow(0 0 4px rgba(138,215,160,.75));
-  --glow-root:drop-shadow(0 0 4px rgba(227,164,74,.7));
-}
-*{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{
-  background:var(--bg);
-  background-image:
-    radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
-    radial-gradient(120% 120% at 50% 122%, rgba(120,96,52,.11), transparent 55%);
-  color:var(--text);font-family:var(--serif);-webkit-font-smoothing:antialiased;
-  min-height:100vh;overflow:hidden;transition:background-color .5s ease,color .5s ease;
-}
-/* dark-mode gradient on its own layer so it CROSSFADES (opacity) instead of snapping — symmetric day↔night */
-body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:-1;
-  background:
-    radial-gradient(120% 80% at 50% 32%, rgba(138,215,160,.08), transparent 55%),
-    radial-gradient(140% 120% at 50% 36%, #16201a 0%, #0c100e 58%, #080a09 100%);
-  opacity:0;transition:opacity .5s ease}
-html[data-theme="dark"] body::before{opacity:1}
-body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:0;
-  background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.16) 2px 3px);transition:opacity .5s}
-html[data-theme="dark"] body::after{opacity:.5}
 
 /* ---------- chrome bits (used à la carte per mockup) ---------- */
 .tag{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-warm);display:block;margin-bottom:4px}
@@ -141,7 +100,6 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
 
 /* ── m44-connected.html main <style> ── */
   /* full-page: fill the viewport instead of the fixed 1280×820 canvas frame */
-  html,body{height:100%;margin:0}
   .stage{position:fixed;inset:0;width:100%;height:100%;overflow:hidden}
 
   /* ---- topbar (fixed above everything) ---- */
@@ -535,13 +493,11 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
   #leafView.open{visibility:visible;opacity:1;transform:none;
     transition:transform .62s cubic-bezier(.2,.72,.2,1),opacity .42s ease,visibility 0s linear 0s}
   .leaf-top{display:flex;align-items:center;justify-content:space-between;gap:20px;
-    padding:22px clamp(20px,5vw,56px) 0;position:relative;z-index:55}
-  .leaf-back{display:inline-flex;align-items:center;gap:10px;cursor:pointer;
-    font-family:var(--mono);font-size:18px;letter-spacing:.1em;text-transform:uppercase;
-    color:#ffff00 !important;background:#ff00ff !important;
-    padding:12px 24px;border:4px solid #ff0000 !important;border-radius:8px;
-    font-weight:900;transition:background .2s,color .2s;z-index:9999;position:relative}
-  .leaf-back:hover{background:var(--accent-warm);color:var(--bg)}
+    padding:22px clamp(20px,5vw,56px) 0}
+  .leaf-back{display:inline-flex;align-items:center;gap:10px;background:none;border:0;cursor:pointer;
+    font-family:var(--mono);font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--text);
+    padding:9px 14px;border:1px solid var(--rule);border-radius:999px;transition:background .2s,color .2s}
+  .leaf-back:hover{background:var(--text);color:var(--bg)}
   .leaf-crumb{font-family:var(--mono);font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--text-soft)}
   .leaf-crumb b{color:var(--accent-warm)}
   .leaf-stage{flex:1;display:grid;grid-template-columns:minmax(0,1fr) minmax(330px,460px);
@@ -549,7 +505,7 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
     padding:6px clamp(20px,5vw,56px) clamp(16px,3vh,32px)}
   .leaf-holder{height:100%;min-height:0;display:flex;align-items:center;justify-content:center}
   .leaf-panel{display:flex;flex-direction:column;min-height:0;max-height:100%}
-  .leaf-panel .ptag{font-family:var(--mono);font-size:22px !important;letter-spacing:.2em;text-transform:uppercase;color:#ff00ff !important;background:#00ff00 !important;padding:8px 16px;border:3px dashed #ff0000}
+  .leaf-panel .ptag{font-family:var(--mono);font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-warm)}
   .leaf-panel h2{font-weight:400;font-size:clamp(28px,3.4vw,44px);line-height:1.02;letter-spacing:-.02em;margin:5px 0 6px}
   .leaf-panel h2 em{font-style:italic;color:var(--accent-warm)}
   .leaf-panel .pintro{font-size:15px;line-height:1.55;color:var(--text-soft);max-width:46ch;margin-bottom:14px}
@@ -596,11 +552,6 @@ html[data-theme="dark"] .cur{display:inline-block;box-shadow:0 0 6px var(--accen
   .lf-ray{stroke:var(--text-soft);fill:none;stroke-linecap:round}
   .lf-pappus{stroke:var(--text-soft);fill:none;stroke-linecap:round;stroke-width:.6}
   .lf-seed{fill:var(--text)}
-
-  /* ── Dandelion seed-head (garden-plants.js renderDandelion) ── */
-  .ray{stroke:var(--text-soft);fill:none;stroke-linecap:round}
-  .pappus{stroke:var(--text-soft);fill:none;stroke-linecap:round;stroke-width:.6}
-  .seed{fill:var(--accent-warm)}
 
   /* ── GardenLeaf SVG hooks ── */
   .gl-svg{width:100%;height:100%;max-height:78vh;display:block;overflow:visible;--leaf-accent:var(--accent)}

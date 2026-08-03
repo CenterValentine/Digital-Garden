@@ -29,16 +29,59 @@ function between(s, startMarker, endMarker, from = 0) {
 // ── CSS: main style block + edit-override block, after the shared home-mock kit
 const mainStyle = between(html, "<style>\n", "</style>").text;
 const overrideStyle = between(html, '<style id="__om-edit-overrides">', "</style>").text;
-const css =
+
+// The design prototype is a standalone HTML file, so its stylesheet styles
+// *,html,body and :root/html[data-theme] directly. This app imports the CSS
+// as a module (see PersonalHomeShell), which ships it with the whole /
+// route's bundle regardless of which dispatcher branch renders — so those
+// global selectors leak onto every page and, worse, html[data-theme] beats
+// the core design system's `:root`/`.dark` rules on specificity, silently
+// overriding shared tokens like --accent app-wide. Strip them here; the
+// scoped equivalent (background, tokens, reset) lives permanently in
+// app/globals.css's `.personal-home` block instead — see that block's
+// comment for the pairing. Fails loudly if the prototype's structure drifts
+// enough that a pattern no longer matches, rather than silently reintroducing
+// the leak.
+function stripGlobalLeak(css) {
+  const patterns = [
+    [/:root\{\s*--serif:[^}]*\}\n?/, "root serif/mono vars"],
+    [/html\[data-theme="light"\]\{[^}]*\}\n?/, "light theme vars"],
+    [/html\[data-theme="dark"\]\{[^}]*\}\n?/, "dark theme vars"],
+    [/\*\{box-sizing:border-box;margin:0;padding:0\}\n?/, "universal reset"],
+    [/html,body\{height:100%\}\n?/, "html,body height (home-mock)"],
+    [/body\{\s*background:var\(--bg\)[^}]*\}\n?/, "body base rule"],
+    [/\/\* dark-mode gradient[^\n]*\*\/\n?/, "body::before comment"],
+    [/body::before\{[^}]*\}\n?/, "body::before"],
+    [/html\[data-theme="dark"\] body::before\{opacity:1\}\n?/, "body::before dark"],
+    [/body::after\{[^}]*\}\n?/, "body::after"],
+    [/html\[data-theme="dark"\] body::after\{opacity:\.5\}\n?/, "body::after dark"],
+    [/[ \t]*html,body\{height:100%;margin:0\}\n/, "html,body height (main style)"],
+  ];
+  let out = css;
+  for (const [re, label] of patterns) {
+    if (!re.test(out)) throw new Error(`stripGlobalLeak: pattern not found (${label}) — prototype structure changed, update extract-m44.mjs`);
+    out = out.replace(re, "");
+  }
+  if (/(^|\n)\s*\*\{|(^|\n)\s*body\{|(^|\n)\s*body::|html\[data-theme="[a-z]+"\]\{[^}]*--(accent|text|bg|rule)\b/.test(out)) {
+    throw new Error("stripGlobalLeak: a global/leaking rule survived stripping — inspect output before writing");
+  }
+  return out;
+}
+
+const css = stripGlobalLeak(
   `/* AUTO-EXTRACTED from design_handoff_personal_home/m44-connected.html.\n` +
-  `   Served via <link> from PersonalHomeShell so it is scoped to the home\n` +
-  `   route only. Do not hand-edit — re-run scripts/extract-m44.mjs. */\n\n` +
+  `   Imported by PersonalHomeShell. Global selectors (*, html, body, :root,\n` +
+  `   html[data-theme]) from the standalone prototype are stripped by\n` +
+  `   stripGlobalLeak() below — their scoped equivalent lives permanently in\n` +
+  `   app/globals.css's \`.personal-home\` block. Do not hand-edit — re-run\n` +
+  `   scripts/extract-m44.mjs. */\n\n` +
   `/* ── home-mock.css (shared identity kit) ── */\n${homeMock}\n` +
   `/* ── m44-connected.html main <style> ── */\n${mainStyle}\n` +
   `/* ── m44-connected.html edit overrides ── */\n${overrideStyle}\n` +
   `/* ── overlay sections stay hidden until the (unshipped) leaf/DNA engines\n` +
   `      load and flip inline visibility; keeps them from flashing as raw text ── */\n` +
-  `#leafView,#dnaView,#resumeView{visibility:hidden}\n`;
+  `#leafView,#dnaView,#resumeView{visibility:hidden}\n`
+);
 writeFileSync("components/home/m44-home.css", css);
 
 // ── Body scaffold: <body> … up to the first engine <script src>

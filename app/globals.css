@@ -7583,11 +7583,36 @@ mark {
    Token scope + day↔night crossfade for the m44 garden experience and the
    (personal) page routes. Driven by html[data-theme] which both the IDE
    theme script and PersonalHomeShell's __setTheme set. See
-   components/home/PersonalHomeShell.tsx and lib/personal/. */
+   components/home/PersonalHomeShell.tsx and lib/personal/.
+
+   This block is the SOLE owner of "personal home root styling" — the
+   m44-connected.html design prototype originally targeted *, html, body
+   directly, but PersonalHomeShell imports its CSS as a module, so those
+   selectors would ship with every `/` response (see app/page.tsx) and,
+   worse, html[data-theme] beats a bare :root/.dark on specificity, silently
+   overriding shared tokens like --accent app-wide. scripts/extract-m44.mjs
+   strips those selectors at generation time; their equivalents live here,
+   scoped to `.personal-home` only.
+
+   `.personal-home` is ALSO the shared class on the other personal-site
+   pages (About/Résumé/etc, see components/personal/personal-pages.css),
+   which layer `.personal-page` on top and are normal scrolling documents —
+   NOT the fixed-viewport m44 garden. Rules below that would break that
+   (overflow:hidden, the box-model reset) use `:not(.personal-page)` so they
+   apply only to the garden home. */
 .personal-home {
   --serif: var(--font-newsreader, "Newsreader", Georgia, serif);
   --mono:  var(--font-jetbrains-mono, "JetBrains Mono", ui-monospace, monospace);
   --hand:  var(--font-caveat, "Caveat", cursive);
+}
+
+/* Scoped reset for the garden's internal layout math (border-box sizing +
+   zeroed default margins) — the prototype's own `*{...}` reset, rescoped. */
+.personal-home:not(.personal-page),
+.personal-home:not(.personal-page) * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
 .personal-home[data-theme="light"],
@@ -7647,11 +7672,21 @@ html[data-theme="dark"] .personal-home {
    Light gradient always on the surface; dark gradient fades in via ::before
    so BOTH directions animate smoothly. */
 .personal-home {
+  color: var(--ph-text);
+  font-family: var(--serif);
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
   background-color: var(--ph-bg);
   background-image:
     radial-gradient(120% 90% at 50% 6%, rgba(255,255,255,.5), transparent 60%),
     radial-gradient(120% 120% at 50% 122%, rgba(120,96,52,.11), transparent 55%);
   transition: background-color .5s ease, color .5s ease;
+}
+/* The m44 garden is a fixed full-viewport experience with its own internal
+   .scroller — the outer page must not also scroll. About/Résumé/etc are
+   normal documents that need to, hence :not(.personal-page). */
+.personal-home:not(.personal-page) {
+  overflow: hidden;
 }
 .personal-home::before {
   content: "";
