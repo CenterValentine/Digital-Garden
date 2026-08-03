@@ -63,7 +63,10 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
-import { getAttachedPageContext } from "@/state/panel-page-context-store";
+import {
+  getAttachedPageContext,
+  getCurrentPageHint,
+} from "@/state/panel-page-context-store";
 import {
   DEFAULT_OUTPUT_TARGET,
   createOutputTargetMessagePart,
@@ -1508,6 +1511,9 @@ export function useConversationEngine({
       // where the shell attaches what the extension captured. Read at send
       // time so the freshest capture rides the turn.
       pageContext: getAttachedPageContext(),
+      // Lightweight current-page hint (url+title) so the model knows what page the
+      // user is viewing even without the attach toggle — for "summarize this page".
+      currentPage: getCurrentPageHint(),
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
@@ -1922,6 +1928,7 @@ export function useConversationEngine({
           // Lives on the explicit send body because that becomes the
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
+          currentPage: getCurrentPageHint(),
           // Attached playbook (AI v3.2 T3).
           playbookId: activePlaybookId,
           activePhaseIndex: resolvedPhaseIndex,
@@ -1972,6 +1979,7 @@ export function useConversationEngine({
       mentionedContentIds: [] as string[],
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
+      currentPage: getCurrentPageHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,

@@ -1549,6 +1549,23 @@ export async function POST(request: Request) {
         });
       }
 
+      // Lightweight current-page hint (url+title) — always present when the panel
+      // is on a page, regardless of the attach toggle. Lets the model know WHAT
+      // page the user is viewing and read it on demand (the full content is behind
+      // its read tool, not pushed unless the user attaches).
+      const rawCurrentPage = body.currentPage;
+      const currentPageHint =
+        rawCurrentPage &&
+        typeof rawCurrentPage === "object" &&
+        typeof rawCurrentPage.url === "string" &&
+        rawCurrentPage.url.trim()
+          ? {
+              url: rawCurrentPage.url,
+              title:
+                typeof rawCurrentPage.title === "string" ? rawCurrentPage.title : "",
+            }
+          : null;
+
       const toolsActive = Object.keys(tools).length > 0;
       const validatedPlaybookId = attachedPlaybookResolved
         ? explicitPlaybookId
@@ -1694,6 +1711,7 @@ export async function POST(request: Request) {
           checkpointIntegritySection:
             renderPhaseCheckpointGateInstruction(phaseCheckpointGate),
           pageContextSection,
+          currentPageHint,
         }),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.

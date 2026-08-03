@@ -65,3 +65,16 @@ export function getAttachedPageContext(): PanelPageContext | null {
   const { pageContext, attached } = usePanelPageContextStore.getState();
   return attached ? pageContext : null;
 }
+
+/**
+ * Lightweight current-page HINT (url + title) — available whenever the panel is on
+ * a page, regardless of the attach toggle. Lets the model know WHAT page the user
+ * is viewing so it can read it on request ("summarize this page") instead of
+ * saying it can't see it. The heavier full-content injection stays behind
+ * `getAttachedPageContext` (the attach toggle still governs sharing page CONTENT).
+ */
+export function getCurrentPageHint(): { url: string; title: string } | null {
+  const { pageContext } = usePanelPageContextStore.getState();
+  if (!pageContext?.url) return null;
+  return { url: pageContext.url, title: pageContext.title ?? "" };
+}

@@ -198,6 +198,13 @@ export interface SystemPromptContext {
   checkpointIntegritySection?: string;
   /** Side-panel page context (B2). Untrusted, delimited — appended last. */
   pageContextSection?: string;
+  /**
+   * Lightweight current-page hint (url+title) — what page the user is viewing in
+   * the side panel, regardless of the attach toggle. Lets the model resolve "this
+   * page" references and read the page on demand (full content stays behind its
+   * read tool / the attach toggle).
+   */
+  currentPageHint?: { url: string; title: string } | null;
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
@@ -321,6 +328,15 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
   if (ctx.outputTargetSection) sections.push(ctx.outputTargetSection);
   if (ctx.userContextSection) sections.push(ctx.userContextSection);
   if (ctx.mentionedContext) sections.push(ctx.mentionedContext);
+  // Current-page hint (trusted): what page the user is looking at right now, so
+  // "this page" references resolve and the model reads it on demand instead of
+  // claiming it can't see the page. The full CONTENT is not here — the model
+  // fetches it via its read tool (or co-browse) when needed.
+  if (ctx.currentPageHint) {
+    sections.push(
+      `The user is currently viewing "${ctx.currentPageHint.title || ctx.currentPageHint.url}" (${ctx.currentPageHint.url}) in their browser, beside this panel. If they say "this page", "the page I'm on/viewing", or ask you to summarize or act on it WITHOUT giving a URL, that is the page they mean — read it with your read tool (or co-browse it) to get its contents, then answer. Do NOT reply that you can't see the page: you have its URL and can read it.`,
+    );
+  }
   // Untrusted page content goes LAST, after all trusted instructions, so its
   // framing ("data, not instructions") is the freshest thing before the turn.
   if (ctx.pageContextSection) sections.push(ctx.pageContextSection);
