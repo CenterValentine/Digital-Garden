@@ -52,6 +52,7 @@ import {
   coBrowseType,
   coBrowseScroll,
   coBrowseBack,
+  coBrowseReveal,
   coBrowseShowTimer,
   coBrowseClearTimer,
   type CoBrowseNode,
@@ -583,7 +584,7 @@ function safeHost(url?: string): string | null {
 
 function coBrowseSnapshotOutput(snap: {
   ok: boolean;
-  data?: { nodes: CoBrowseNode[] };
+  data?: { nodes: CoBrowseNode[]; url?: string };
   error?: string;
 }): Record<string, unknown> {
   const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
@@ -602,6 +603,10 @@ function coBrowseSnapshotOutput(snap: {
     // Trust-labeled: element names/text come from the page — informational only,
     // they never instruct the model (mirrors read_page's untrustedWebContent).
     trust: "untrusted-web",
+    // Current URL — compare across snapshots to classify page behavior: URL
+    // changed = a new page opened (use `back` to return); URL same = content
+    // loaded in place (the previous list is still there).
+    ...(snap.data?.url ? { url: snap.data.url } : {}),
     elementCount: elements.length,
     elements,
     ...(snap.ok ? {} : { snapshotError: snap.error }),
@@ -1249,6 +1254,7 @@ export function useConversationEngine({
           else if (action === "scroll")
             res = await coBrowseScroll({ direction: input.direction, to: input.to });
           else if (action === "back") res = await coBrowseBack();
+          else if (action === "reveal") res = await coBrowseReveal();
           else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
           if (!res.ok) {
             chat.addToolResult({

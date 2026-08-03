@@ -136,3 +136,15 @@ export async function getA11ySnapshot() {
   }
   return out;
 }
+
+// The bound tab's current top-frame URL — so the agent can classify page behavior
+// (URL changed = new page → use `back` to return; URL same = in-place, the list is
+// still there) across snapshots. Best-effort.
+export async function currentUrl() {
+  try {
+    const r = await send("Runtime.evaluate", { expression: "location.href", returnByValue: true });
+    return (r && r.result && typeof r.result.value === "string" && r.result.value) || "";
+  } catch {
+    return "";
+  }
+}

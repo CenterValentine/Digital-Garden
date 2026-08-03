@@ -2572,7 +2572,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "cobrowse-snapshot") {
       try {
-        sendResponse({ ok: true, data: { nodes: await cobrowse.getA11ySnapshot() } });
+        const [nodes, url] = await Promise.all([
+          cobrowse.getA11ySnapshot(),
+          cobrowse.currentUrl(),
+        ]);
+        sendResponse({ ok: true, data: { nodes, url } });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
       }

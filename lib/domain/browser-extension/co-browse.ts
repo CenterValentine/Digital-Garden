@@ -63,8 +63,10 @@ export function coBrowseStatus(): Promise<CoBrowseResult<{ session: unknown }>> 
   return requestCoBrowse("status");
 }
 
-/** The interactable + orientation a11y snapshot, stitched across frames. */
-export function coBrowseSnapshot(): Promise<CoBrowseResult<{ nodes: CoBrowseNode[] }>> {
+/** The interactable + orientation a11y snapshot (+ current url), stitched across frames. */
+export function coBrowseSnapshot(): Promise<
+  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string }>
+> {
   return requestCoBrowse("snapshot");
 }
 
