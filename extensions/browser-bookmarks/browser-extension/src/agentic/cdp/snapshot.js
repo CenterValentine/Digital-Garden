@@ -59,7 +59,25 @@ function normalize(node) {
   };
 }
 
-async function collectFrame(out, sessionId, frameUrl) {
+// Fine-grained CONTAINER roles: the nearest one up the tree groups related
+// elements — a job card + its apply button, a story row + its comments link.
+// Deliberately NOT coarse landmarks (main/list/nav/region) — those would lump the
+// whole page into one useless group. A node with no such ancestor (top-level nav /
+// page chrome) simply gets no `group`. This restores the relational structure the
+// FLAT snapshot loses, which is what let the model mis-associate elements.
+const GROUPING_ROLES = new Set([
+  "row",
+  "listitem",
+  "article",
+  "gridcell",
+  "cell",
+  "group",
+  "figure",
+  "form",
+  "tabpanel",
+]);
+
+async function collectFrame(out, groupState, sessionId, frameUrl) {
   let result;
   try {
     result = await send("Accessibility.getFullAXTree", undefined, sessionId);
@@ -67,10 +85,33 @@ async function collectFrame(out, sessionId, frameUrl) {
     return; // frame may be mid-navigation / detached — skip it, don't fail the snapshot
   }
   const nodes = (result && result.nodes) || [];
+  const byId = new Map();
+  for (const n of nodes) byId.set(n.nodeId, n);
+  // Nearest grouping-container ancestor → a compact group number shared across the
+  // whole snapshot, so elements in the same card/row carry the same `group`.
+  const groupFor = new Map(); // ancestor nodeId -> group number
+  const resolveGroup = (node) => {
+    let cur = node.parentId ? byId.get(node.parentId) : undefined;
+    while (cur) {
+      const role = cur.role && cur.role.value;
+      if (GROUPING_ROLES.has(role)) {
+        let g = groupFor.get(cur.nodeId);
+        if (g === undefined) {
+          g = ++groupState.counter;
+          groupFor.set(cur.nodeId, g);
+        }
+        return g;
+      }
+      cur = cur.parentId ? byId.get(cur.parentId) : undefined;
+    }
+    return undefined;
+  };
   for (const node of nodes) {
     if (node.ignored) continue;
     const normalized = normalize(node);
     if (!normalized) continue;
+    const group = resolveGroup(node);
+    if (group !== undefined) normalized.group = group;
     // Tag cross-frame nodes so resolveFresh can gate acting on them (3c-2) while
     // they're still READABLE now (3c-1).
     if (sessionId) {
@@ -84,13 +125,14 @@ async function collectFrame(out, sessionId, frameUrl) {
 // The full interactable+named node list for the active session's page, stitched
 // across the top frame AND every cross-origin (OOPIF) child frame (Slice 3c-1) —
 // so an embedded Greenhouse/Lever board's content is visible, not a black box.
-// Nodes without a backendDOMNodeId are kept for orientation; cross-frame nodes
-// carry `sessionId`/`frameUrl` and are read-only until 3c-2 (coordinate translation).
+// Each node carries a `group` (nearest container) so related elements cluster;
+// cross-frame nodes carry `sessionId`/`frameUrl`.
 export async function getA11ySnapshot() {
   const out = [];
-  await collectFrame(out, undefined, undefined); // top frame
+  const groupState = { counter: 0 };
+  await collectFrame(out, groupState, undefined, undefined); // top frame
   for (const frame of getChildSessions()) {
-    await collectFrame(out, frame.sessionId, frame.url);
+    await collectFrame(out, groupState, frame.sessionId, frame.url);
   }
   return out;
 }

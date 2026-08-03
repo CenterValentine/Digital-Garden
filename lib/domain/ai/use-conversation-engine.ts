@@ -565,6 +565,9 @@ function coBrowseSnapshotOutput(snap: {
     ...(n.value ? { value: n.value } : {}),
     ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
     ...(n.disabled ? { disabled: true } : {}),
+    // Elements sharing a `group` are in the same card/row/item — use it to act on
+    // the RIGHT one (e.g. the apply button in THIS job's group).
+    ...(typeof n.group === "number" ? { group: n.group } : {}),
     ...(n.frameUrl ? { frame: n.frameUrl } : {}),
   }));
   return {

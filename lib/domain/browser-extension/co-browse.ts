@@ -36,6 +36,8 @@ export interface CoBrowseNode {
   focusable?: boolean;
   level?: number;
   interactable?: boolean;
+  /** Nearest container (card/row/listitem) — elements sharing it belong together. */
+  group?: number;
   /** Set when the node lives in a cross-origin (OOPIF) child frame. */
   sessionId?: string;
   frameUrl?: string;
