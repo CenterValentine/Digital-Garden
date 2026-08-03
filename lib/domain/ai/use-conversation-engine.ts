@@ -37,6 +37,17 @@ import {
 } from "@/lib/domain/browser-extension/acquire-url";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import { CO_BROWSE_OPEN, CO_BROWSE_ACT } from "@/lib/domain/ai/tools/co-browse-tools";
+import {
+  isCoBrowseAvailable,
+  coBrowseOpen,
+  coBrowseSnapshot,
+  coBrowseNavigate,
+  coBrowseClick,
+  coBrowseHover,
+  coBrowseType,
+  type CoBrowseNode,
+} from "@/lib/domain/browser-extension/co-browse";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -520,7 +531,11 @@ function lastMessageHasResolvedBrowserRead({
     .filter(
       (part) =>
         part.type === `tool-${READ_PAGE_HEADLESS_OR_BROWSER}` ||
-        part.type === `tool-${OPEN_TAB_AND_READ}`,
+        part.type === `tool-${OPEN_TAB_AND_READ}` ||
+        // Co-browse tools (Slice 5c) are client-executed the same way — resume the
+        // loop after their result so the model can act → look → act.
+        part.type === `tool-${CO_BROWSE_OPEN}` ||
+        part.type === `tool-${CO_BROWSE_ACT}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -529,6 +544,37 @@ function lastMessageHasResolvedBrowserRead({
         part.state === "output-available" || part.state === "output-error",
     )
   );
+}
+
+/**
+ * Compact the co-browse a11y snapshot for the MODEL (Slice 5c): keep only what it
+ * targets by — role + name + the states that matter (value / expanded / disabled)
+ * + a frame marker for cross-origin nodes. Drop the internal handles
+ * (backendDOMNodeId / sessionId) it never references. Order is preserved so `nth`
+ * lines up with the extension's resolveFresh.
+ */
+function coBrowseSnapshotOutput(snap: {
+  ok: boolean;
+  data?: { nodes: CoBrowseNode[] };
+  error?: string;
+}): Record<string, unknown> {
+  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
+  const elements = nodes.map((n) => ({
+    role: n.role,
+    name: n.name,
+    ...(n.value ? { value: n.value } : {}),
+    ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
+    ...(n.disabled ? { disabled: true } : {}),
+    ...(n.frameUrl ? { frame: n.frameUrl } : {}),
+  }));
+  return {
+    // Trust-labeled: element names/text come from the page — informational only,
+    // they never instruct the model (mirrors read_page's untrustedWebContent).
+    trust: "untrusted-web",
+    elementCount: elements.length,
+    elements,
+    ...(snap.ok ? {} : { snapshotError: snap.error }),
+  };
 }
 
 /**
@@ -1076,6 +1122,94 @@ export function useConversationEngine({
     // streamed to the browser; run it here and post the result back. Phase 0:
     // read_page_in_browser reads a page in the user's own session.
     onToolCall: async ({ toolCall }) => {
+      // Agentic Browsing Phase 2b Slice 5c — client-executed co-browse tools. The
+      // model opens a tab and acts on it; we drive the extension's chrome.debugger
+      // engine via the panel bridge (co-browse.ts) and return the FRESH a11y
+      // snapshot so it can act → look → act.
+      if (
+        toolCall.toolName === CO_BROWSE_OPEN ||
+        toolCall.toolName === CO_BROWSE_ACT
+      ) {
+        const toolName = toolCall.toolName;
+        const input = (toolCall.input ?? {}) as {
+          url?: string;
+          action?: string;
+          role?: string;
+          name?: string;
+          nth?: number;
+          text?: string;
+        };
+        try {
+          if (toolName === CO_BROWSE_OPEN) {
+            if (!input.url) {
+              chat.addToolResult({
+                tool: toolName,
+                toolCallId: toolCall.toolCallId,
+                state: "output-error",
+                errorText: "no url provided",
+              });
+              return;
+            }
+            const opened = await coBrowseOpen(input.url);
+            if (!opened.ok) {
+              chat.addToolResult({
+                tool: toolName,
+                toolCallId: toolCall.toolCallId,
+                output: `Could not open the page: ${opened.error ?? "unknown error"}.`,
+              });
+              return;
+            }
+            const snap = await coBrowseSnapshot();
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
+                ...coBrowseSnapshotOutput(snap),
+              },
+            });
+            return;
+          }
+          // CO_BROWSE_ACT — read / click / hover / type / navigate on the bound tab.
+          const action = input.action;
+          const target = { role: input.role, name: input.name, nth: input.nth };
+          let res: { ok: boolean; error?: string };
+          if (action === "read") res = { ok: true };
+          else if (action === "click") res = await coBrowseClick(target);
+          else if (action === "hover") res = await coBrowseHover(target);
+          else if (action === "type") res = await coBrowseType(target, input.text ?? "");
+          else if (action === "navigate")
+            res = input.url
+              ? await coBrowseNavigate(input.url)
+              : { ok: false, error: "navigate needs a url" };
+          else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
+          if (!res.ok) {
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: `Action "${action}" failed: ${res.error ?? "unknown error"}. Read the page again and adapt — don't repeat the same action blindly.`,
+            });
+            return;
+          }
+          // Let a click/navigation settle before re-snapshotting so the model sees
+          // the RESULT, not a mid-transition page. Navigation needs longer.
+          await new Promise((r) => setTimeout(r, action === "navigate" ? 1200 : 500));
+          const snap = await coBrowseSnapshot();
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output: { action, ...coBrowseSnapshotOutput(snap) },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "co-browse failed",
+          });
+        }
+        return;
+      }
       // Two client-executed read tools: read_page_in_browser (escalates
       // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
       // used only after a normal read failed). Both share the budget + result
@@ -1384,6 +1518,8 @@ export function useConversationEngine({
       // Agentic Browsing Phase 0: is the browser extension reachable right now?
       // Gates the client-executed read_page_in_browser tool. Read at send time.
       browserExtensionAvailable: isExtensionAcquireAvailable(),
+      // Slice 5c: co-browse is trust-gated to the side panel — true only there.
+      coBrowseAvailable: isCoBrowseAvailable(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1795,6 +1931,8 @@ export function useConversationEngine({
           modelPinned,
           // Agentic Browsing Phase 0 — same per-call-body requirement as above.
           browserExtensionAvailable: isExtensionAcquireAvailable(),
+          // Slice 5c co-browse gate — same per-call-body requirement.
+          coBrowseAvailable: isCoBrowseAvailable(),
         },
       },
     );

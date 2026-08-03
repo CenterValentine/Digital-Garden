@@ -64,6 +64,12 @@ import {
   OPEN_TAB_AND_READ_DESCRIPTION,
   openTabAndReadInputSchema,
 } from "./open-tab-and-read";
+import {
+  CO_BROWSE_OPEN_DESCRIPTION,
+  coBrowseOpenInputSchema,
+  CO_BROWSE_ACT_DESCRIPTION,
+  coBrowseActInputSchema,
+} from "./co-browse-tools";
 
 /**
  * `read_page_in_browser` — CLIENT-EXECUTED (no server `execute`). The chat route
@@ -87,6 +93,23 @@ export const readPageInBrowserTool = tool({
 export const openTabAndReadTool = tool({
   description: OPEN_TAB_AND_READ_DESCRIPTION,
   inputSchema: openTabAndReadInputSchema,
+});
+
+/**
+ * `co_browse_open` / `co_browse_act` — CLIENT-EXECUTED (no server `execute`),
+ * Agentic Browsing Phase 2b Slice 5c. Registered only when the client reports
+ * co-browse is available (the chat is in the trust-gated side panel with the
+ * extension present). The model's calls stream to the browser, where the engine's
+ * `onToolCall` drives the chrome.debugger interaction engine via `co-browse.ts`.
+ */
+export const coBrowseOpenTool = tool({
+  description: CO_BROWSE_OPEN_DESCRIPTION,
+  inputSchema: coBrowseOpenInputSchema,
+});
+
+export const coBrowseActTool = tool({
+  description: CO_BROWSE_ACT_DESCRIPTION,
+  inputSchema: coBrowseActInputSchema,
 });
 
 /**

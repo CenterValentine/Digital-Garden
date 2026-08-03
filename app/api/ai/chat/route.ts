@@ -132,9 +132,12 @@ import { createWorkflowTools } from "@/lib/domain/ai/tools";
 import {
   readPageInBrowserTool,
   openTabAndReadTool,
+  coBrowseOpenTool,
+  coBrowseActTool,
 } from "@/lib/domain/ai/tools/registry";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import { CO_BROWSE_OPEN, CO_BROWSE_ACT } from "@/lib/domain/ai/tools/co-browse-tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -314,6 +317,10 @@ export async function POST(request: Request) {
       // Agentic Browsing Phase 0: the client reports whether the browser
       // extension is reachable this turn; gates the client-executed read tool.
       const browserExtensionAvailable = body.browserExtensionAvailable === true;
+      // Agentic Browsing Phase 2b Slice 5c: co-browse is trust-gated to the side
+      // panel (the client sends true only from the /embed/panel surface); gates
+      // the client-executed co_browse_* tools.
+      const coBrowseAvailable = body.coBrowseAvailable === true;
       // Agentic Browsing Phase 1: derive the active research run's page budget
       // from the conversation history — the propose_research_run result always
       // rides in body.messages, whereas a client body flag can't reliably reach
@@ -998,6 +1005,16 @@ export async function POST(request: Request) {
               [OPEN_TAB_AND_READ]: openTabAndReadTool,
             }
           : {}),
+        // Agentic Browsing Phase 2b Slice 5c: CLIENT-executed co-browse tools (no
+        // server `execute`). Registered only when the chat is in the trust-gated
+        // side panel with the extension present; the engine's onToolCall drives
+        // the chrome.debugger interaction engine via the panel bridge.
+        ...(coBrowseAvailable
+          ? {
+              [CO_BROWSE_OPEN]: coBrowseOpenTool,
+              [CO_BROWSE_ACT]: coBrowseActTool,
+            }
+          : {}),
       };
       const toolConfig = (aiSettings as { toolConfig?: Record<
         string,
@@ -1647,6 +1664,7 @@ export async function POST(request: Request) {
           hasCheckpointTool: "phase_checkpoint" in tools,
           hasBrowserReadTool: READ_PAGE_HEADLESS_OR_BROWSER in tools,
           hasTabLauncher: OPEN_TAB_AND_READ in tools,
+          hasCoBrowseTools: CO_BROWSE_OPEN in tools,
           hasResearchTools: "extract_structured" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
