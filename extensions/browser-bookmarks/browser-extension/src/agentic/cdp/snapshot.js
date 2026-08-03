@@ -10,12 +10,22 @@
 
 import { send } from "./executor.js";
 
-// Roles the agent can act on. Deliberately broad but not exhaustive; the snapshot
-// ALSO keeps any *named* node (headings, etc.) for orientation/context.
+// Roles the agent can act on. Deliberately broad but not exhaustive.
 const INTERACTABLE_ROLES = new Set([
   "button", "link", "textbox", "searchbox", "checkbox", "radio", "combobox",
   "listbox", "option", "menuitem", "menuitemcheckbox", "menuitemradio", "tab",
   "switch", "slider", "spinbutton", "treeitem", "disclosuretriangle",
+]);
+
+// Structural / landmark roles kept purely for ORIENTATION (where am I on the
+// page). Everything NOT in these two sets — StaticText, ListMarker, generic,
+// decorative image, paragraph — is dropped: it's reading content, and reading is
+// the Phase 0/1 tools' job, not the action-targeting snapshot's. Allowlist, not
+// denylist, so new noisy roles don't silently bloat the snapshot.
+const ORIENTATION_ROLES = new Set([
+  "heading", "navigation", "banner", "main", "contentinfo", "complementary",
+  "region", "search", "form", "article", "dialog", "alertdialog", "alert",
+  "status", "tablist",
 ]);
 
 function propValue(node, name) {
@@ -28,7 +38,8 @@ function normalize(node) {
   const role = node.role && node.role.value;
   const name = ((node.name && node.name.value) || "").trim();
   const interactable = INTERACTABLE_ROLES.has(role);
-  if (!interactable && !name) return null; // drop unnamed structural noise
+  // Keep only action targets + the orientation skeleton; drop leaf text/markers.
+  if (!interactable && !ORIENTATION_ROLES.has(role)) return null;
 
   const expanded = propValue(node, "expanded"); // true | false | undefined
   return {
