@@ -167,6 +167,8 @@ registerBlock({
   type: "statsTable",
   label: "Stats Table",
   description: "Vertical key/value list for case study outcomes and mixed-unit metrics",
+  aiHint:
+    "A vertical key/value list of outcomes or metrics (supports mixed units) — good for case-study results. For one hero metric use statBlock; for a horizontal KPI row use metricsStrip.",
   iconName: "Table2",
   family: "content",
   group: "publishing",

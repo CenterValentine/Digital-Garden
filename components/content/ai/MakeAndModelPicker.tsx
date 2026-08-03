@@ -21,9 +21,11 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { ChevronUp, ChevronDown, MoreHorizontal, Sparkles, AlertCircle, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { anchorMenuAbove } from "@/lib/core/menu-positioning";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { lookupTemplate } from "@/lib/features/ai-connections/templates";
 import { compareModelRecency } from "@/lib/domain/ai/model-popularity";
@@ -35,6 +37,16 @@ import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import type { AIProviderId } from "@/lib/domain/ai/types";
 import { MixedProviderChip } from "./MixedProviderChip";
 import { ProviderIcon } from "./ProviderIcon";
+
+// Both dropdowns are portaled to <body> (position:fixed) so the composer's
+// horizontally-scrolling control rail (overflow-x-auto, which the CSS spec
+// forces overflow-y to `auto` alongside) can't clip them. anchorMenuAbove
+// pins each menu's BOTTOM to the trigger top so short lists hug the chip
+// (no float-away gap). Widths match the old min-w-* values.
+const MORE_MENU_WIDTH = 240;
+const MODEL_MENU_WIDTH = 260;
+
+type MenuPos = { left: number; bottom: number; maxHeight: number };
 
 /** Subset of the Connection summary we need for availability checks. */
 interface ConnSummary {
@@ -132,6 +144,12 @@ export function MakeAndModelPicker({
   const resolvedTheme = useResolvedTheme();
   const moreRef = useRef<HTMLDivElement>(null);
   const modelRef = useRef<HTMLDivElement>(null);
+  // Portaled-menu nodes — outside-click must treat these as "inside" too,
+  // since they live under <body>, not under moreRef/modelRef.
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const [moreMenuPos, setMoreMenuPos] = useState<MenuPos | null>(null);
+  const [modelMenuPos, setModelMenuPos] = useState<MenuPos | null>(null);
 
   // Connections feed the picker's availability gating. Empty list means
   // we can't verify anything — the gate falls back to "everything
@@ -378,10 +396,18 @@ export function MakeAndModelPicker({
     if (!moreOpen && !modelOpen) return;
     const handler = (e: MouseEvent) => {
       const target = e.target as Node;
-      if (moreOpen && moreRef.current && !moreRef.current.contains(target)) {
+      if (
+        moreOpen &&
+        !moreRef.current?.contains(target) &&
+        !moreMenuRef.current?.contains(target)
+      ) {
         setMoreOpen(false);
       }
-      if (modelOpen && modelRef.current && !modelRef.current.contains(target)) {
+      if (
+        modelOpen &&
+        !modelRef.current?.contains(target) &&
+        !modelMenuRef.current?.contains(target)
+      ) {
         setModelOpen(false);
         setNotice(null);
       }
@@ -400,6 +426,37 @@ export function MakeAndModelPicker({
       document.removeEventListener("keydown", keyHandler);
     };
   }, [moreOpen, modelOpen]);
+
+  // Toggle helpers snapshot the trigger rect at open-time and run it through
+  // calculateMenuPosition (flip + shift to stay on-screen). Anchored to the
+  // wrapper divs (moreRef/modelRef) which, now that the menus are portaled
+  // out, tightly wrap just their trigger buttons.
+  const toggleMore = useCallback(() => {
+    if (disabled) return;
+    if (moreOpen) {
+      setMoreOpen(false);
+      return;
+    }
+    const rect = moreRef.current?.getBoundingClientRect();
+    if (rect) {
+      setMoreMenuPos(anchorMenuAbove(rect, MORE_MENU_WIDTH));
+    }
+    setMoreOpen(true);
+  }, [disabled, moreOpen]);
+
+  const toggleModel = useCallback(() => {
+    if (disabled) return;
+    setNotice(null);
+    if (modelOpen) {
+      setModelOpen(false);
+      return;
+    }
+    const rect = modelRef.current?.getBoundingClientRect();
+    if (rect) {
+      setModelMenuPos(anchorMenuAbove(rect, MODEL_MENU_WIDTH));
+    }
+    setModelOpen(true);
+  }, [disabled, modelOpen]);
 
   const handleMakeClick = useCallback(
     (newProviderId: string) => {
@@ -448,11 +505,23 @@ export function MakeAndModelPicker({
               ? (providerId as AIProviderId)
               : null
           }
-          onClick={() => !disabled && setMoreOpen(!moreOpen)}
+          onClick={toggleMore}
         />
 
-        {moreOpen && (
-          <div className="absolute bottom-full left-0 mb-1 min-w-[220px] rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden">
+        {moreOpen &&
+          moreMenuPos &&
+          createPortal(
+            <div
+              ref={moreMenuRef}
+              style={{
+                position: "fixed",
+                left: moreMenuPos.left,
+                bottom: moreMenuPos.bottom,
+                width: MORE_MENU_WIDTH,
+                maxHeight: moreMenuPos.maxHeight,
+              }}
+              className="z-[130] overflow-y-auto rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl"
+            >
             {overflowProviders.map((p) => {
               const isActive = p.id === providerId;
               // Count this provider's models that a Connection can
@@ -506,8 +575,9 @@ export function MakeAndModelPicker({
                 </button>
               );
             })}
-          </div>
-        )}
+            </div>,
+            document.body,
+          )}
       </div>
 
       {/* Vertical divider */}
@@ -517,11 +587,7 @@ export function MakeAndModelPicker({
       <div ref={modelRef} className="relative">
         <button
           type="button"
-          onClick={() => {
-            if (disabled) return;
-            setNotice(null);
-            setModelOpen(!modelOpen);
-          }}
+          onClick={toggleModel}
           disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={modelOpen}
@@ -549,11 +615,22 @@ export function MakeAndModelPicker({
           />
         </button>
 
-        {modelOpen && activeProvider && (
+        {modelOpen &&
+          activeProvider &&
+          modelMenuPos &&
+          createPortal(
           <div
+            ref={modelMenuRef}
             role="listbox"
             aria-label={`${activeProvider.name} models`}
-            className="absolute bottom-full left-0 mb-1 min-w-[260px] rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl z-50 overflow-hidden"
+            style={{
+              position: "fixed",
+              left: modelMenuPos.left,
+              bottom: modelMenuPos.bottom,
+              width: MODEL_MENU_WIDTH,
+              maxHeight: modelMenuPos.maxHeight,
+            }}
+            className="z-[130] overflow-y-auto rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-[#1a1a1a] shadow-xl"
           >
             <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium border-b border-black/5 dark:border-white/5">
               {activeProvider.name}
@@ -634,8 +711,9 @@ export function MakeAndModelPicker({
                 </Link>
               </div>
             )}
-          </div>
-        )}
+          </div>,
+            document.body,
+          )}
       </div>
 
       {/* Mixed-provider chip — only when conversation has used 2+ providers */}

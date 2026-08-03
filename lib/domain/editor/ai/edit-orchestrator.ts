@@ -26,6 +26,7 @@ import type { JSONContent } from "@tiptap/core";
 import { TextSelection } from "@tiptap/pm/state";
 import { findTextInDoc } from "./text-search";
 import { markdownToTiptap } from "@/lib/domain/content/markdown";
+import { useBlockStore } from "@/state/block-store";
 
 // ─── Types ───────────────────────────────────────────────────
 
@@ -58,7 +59,22 @@ export interface InsertImagePayload {
   toolCallId?: string;
 }
 
-export type EditPayload = ApplyDiffPayload | ReplaceDocumentPayload | InsertImagePayload;
+export interface InsertBlockPayload {
+  __editPayload: true;
+  type: "insert_block";
+  /** A fully-formed, server-validated TipTap block node ready to insert. */
+  node: JSONContent;
+  blockType: string;
+  documentTitle: string;
+  action: string;
+  toolCallId?: string;
+}
+
+export type EditPayload =
+  | ApplyDiffPayload
+  | ReplaceDocumentPayload
+  | InsertImagePayload
+  | InsertBlockPayload;
 
 export interface EditResult {
   success: boolean;
@@ -145,6 +161,38 @@ export function parseEditPayload(toolResult: string): EditPayload | null {
   return null;
 }
 
+/**
+ * Process-wide guard: a given tool call's payload must apply at most once.
+ * `toolCallId`s are globally unique, so this protects against every double-apply
+ * path — React StrictMode double-invoke, component re-mount, effect re-run, or a
+ * second orchestrator instance — that a per-instance/per-mount guard would miss.
+ * (Non-idempotent edits like insert_block otherwise duplicate; idempotent ones
+ * like apply_diff hid the same bug.)
+ */
+const appliedToolCallIds = new Set<string>();
+
+/**
+ * Second guard, for *content*: a model (notably GPT-family, which emits parallel
+ * tool calls) can fire two identical `insert_block` calls in one turn — distinct
+ * `toolCallId`s, same block — which the id guard above cannot catch because the
+ * calls are genuinely separate. Dedupe by block content (node type + attrs, minus
+ * the per-call `blockId`) within a short window, so a redundant duplicate is
+ * dropped while a deliberate later re-insert of the same block still works.
+ */
+const recentBlockInserts = new Map<string, number>();
+const BLOCK_DEDUP_WINDOW_MS = 8000;
+
+function blockContentSignature(payload: InsertBlockPayload): string {
+  const attrs = { ...((payload.node?.attrs as Record<string, unknown>) ?? {}) };
+  delete attrs.blockId; // freshly generated per call — must be excluded
+  const canonical = Object.keys(attrs)
+    .sort()
+    .map((k) => `${k}=${JSON.stringify(attrs[k])}`)
+    .join("&");
+  const nodeType = (payload.node as { type?: string } | undefined)?.type ?? "";
+  return `${nodeType}::${canonical}`;
+}
+
 // ─── Orchestrator ────────────────────────────────────────────
 
 export class AiEditOrchestrator {
@@ -168,6 +216,20 @@ export class AiEditOrchestrator {
 
   /** Enqueue an edit payload for processing */
   enqueue(payload: EditPayload): void {
+    // Idempotency: never apply the same tool call's edit twice.
+    if (payload.toolCallId) {
+      if (appliedToolCallIds.has(payload.toolCallId)) return;
+      appliedToolCallIds.add(payload.toolCallId);
+    }
+    // Content dedupe: drop a redundant identical block from parallel/repeat
+    // model tool calls (distinct toolCallIds, same block content).
+    if (payload.type === "insert_block") {
+      const sig = blockContentSignature(payload);
+      const now = Date.now();
+      const last = recentBlockInserts.get(sig);
+      if (last !== undefined && now - last < BLOCK_DEDUP_WINDOW_MS) return;
+      recentBlockInserts.set(sig, now);
+    }
     this.queue.push(payload);
     if (!this.processing) {
       this.processQueue();
@@ -232,6 +294,8 @@ export class AiEditOrchestrator {
       result = await this.executeReplaceDocument(payload);
     } else if (payload.type === "insert_image") {
       result = await this.executeInsertImage(payload);
+    } else if (payload.type === "insert_block") {
+      result = await this.executeInsertBlock(payload);
     } else {
       return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
     }
@@ -395,6 +459,68 @@ export class AiEditOrchestrator {
         success: false,
         action: payload.action,
         error: err instanceof Error ? err.message : "Unknown error during image insertion",
+      };
+    }
+  }
+
+  private async executeInsertBlock(payload: InsertBlockPayload): Promise<EditResult> {
+    const editor = this.getEditor();
+    if (!editor) {
+      return { success: false, action: payload.action, error: "Editor not available" };
+    }
+
+    try {
+      // Lock editor for block insertion
+      this.lockEditor();
+
+      // Insert at end of document (before trailing doc boundary)
+      const insertPos = editor.state.doc.content.size - 1;
+
+      // Scroll to end
+      editor.chain().setTextSelection(insertPos).scrollIntoView().run();
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+      await sleep(CURSOR_ARRIVAL_DELAY);
+
+      // Insert the pre-validated block node. `updateSelection: false` places the
+      // block WITHOUT selecting it, so a bot insert doesn't fire the block's
+      // selectNode() → Properties panel (which would yank the right rail off the
+      // chat). A human placing a block via slash/drag still selects it and gets
+      // the panel through those separate code paths.
+      const sizeBefore = editor.state.doc.content.size;
+      editor.commands.insertContentAt(insertPos, payload.node, {
+        updateSelection: false,
+      });
+      const growth = editor.state.doc.content.size - sizeBefore;
+
+      // Mark the inserted range as AI content (no-op if the block has no text)
+      if (growth > 0) {
+        this.applyAiHighlight(editor, insertPos, insertPos + growth);
+      }
+
+      // A bot insert must not leave the block *selected*: a selected block makes
+      // RightSidebar swap the rail to the Properties panel (node-view-factory
+      // selectNode() → block-store → RightSidebar activeTab), yanking focus off
+      // the chat. `updateSelection:false` isn't sufficient — the atom still
+      // resolves to a NodeSelection — so collapse to a caret and clear the
+      // block-selection store. Human placement (slash/drag/click) never goes
+      // through the orchestrator, so it still opens the panel as expected.
+      try {
+        editor.commands.setTextSelection(
+          Math.min(insertPos, editor.state.doc.content.size - 1)
+        );
+      } catch {
+        /* best-effort selection collapse */
+      }
+      useBlockStore.getState().clearSelection();
+
+      await sleep(SETTLE_DELAY);
+
+      return { success: true, action: payload.action };
+    } catch (err) {
+      return {
+        success: false,
+        action: payload.action,
+        error: err instanceof Error ? err.message : "Unknown error during block insertion",
       };
     }
   }

@@ -60,6 +60,8 @@ registerBlock({
   type: "faqAccordion",
   label: "FAQ",
   description: "Question/answer accordion — uses native <details> for zero-JS collapsing",
+  aiHint:
+    "A list of question/answer pairs, each expanding to reveal its answer. Use specifically for FAQs. For a general collapsible section that is not Q&A, use accordion.",
   iconName: "HelpCircle",
   family: "content",
   group: "publishing",

@@ -32,6 +32,228 @@ import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
 import type { ToolExecuteContext } from "./types";
+import type { Extensions } from "@tiptap/core";
+import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
+import { getAllBlocks } from "@/lib/domain/blocks/registry";
+import {
+  getAuthorableBlocks,
+  getBlockAuthoringMode,
+  effectiveAiDescription,
+} from "@/lib/domain/blocks/ai-authoring";
+import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import type { BlockDefinition } from "@/lib/domain/blocks/types";
+
+/**
+ * Memoized authorable-block catalog for the `insert_block` tool. The block
+ * registry is static after module load, so this is computed once. Calling
+ * `getServerExtensions()` does double duty: it triggers the block registration
+ * side effects (so `getAllBlocks()` is populated) AND yields the exact server
+ * extension set the sanitizer needs.
+ */
+let insertBlockCatalog: {
+  blocks: BlockDefinition[];
+  description: string;
+  extensions: Extensions;
+} | null = null;
+
+function getInsertBlockCatalog() {
+  if (insertBlockCatalog) return insertBlockCatalog;
+  const extensions = getServerExtensions();
+  // Phase 2: all authorable blocks, including containers (which accept a nested
+  // `content` array of child blocks).
+  const blocks = getAuthorableBlocks(getAllBlocks());
+  const list = blocks
+    .map((b) => {
+      const keys = Object.keys(b.attrsSchema.shape).filter(
+        (k) => k !== "blockId" && k !== "blockType"
+      );
+      const attrHint = keys.length ? ` — attrs: ${keys.join(", ")}` : "";
+      const containerHint =
+        getBlockAuthoringMode(b.type) === "container"
+          ? " [container: takes a `content` array of child blocks]"
+          : "";
+      return `- ${b.type}: ${effectiveAiDescription(b)}${attrHint}${containerHint}`;
+    })
+    .join("\n");
+  const description = [
+    "Insert a rich content block at the end of the open note. Provide the block `blockType` and its `attrs` as a JSON object; omitted attributes use sensible defaults.",
+    "Most blocks carry their text in attributes (a hero's headline, a CTA's primaryLabel, a stat's value) — put that text in `attrs`, not elsewhere.",
+    "Use EXACTLY the attribute names listed after each block (`attrs: …`); unknown names are rejected, not silently ignored.",
+    "Container blocks (marked [container]) take a `content` array of child blocks: for columns/blockColumns each child becomes one column (provide 2–4); for tabs each becomes one tab; for accordion/cardPanel/listContainer the children stack in order. Non-container blocks must omit `content`.",
+    "",
+    "Available block types:",
+    list,
+  ].join("\n");
+  insertBlockCatalog = { blocks, description, extensions };
+  return insertBlockCatalog;
+}
+
+/** A block the model wants to author; containers may carry nested `content`. */
+interface BlockSpec {
+  blockType: string;
+  attrs?: Record<string, unknown>;
+  content?: BlockSpec[];
+}
+
+/** Recursive Zod schema for a block spec (the tool input + its `content` items). */
+const blockSpecSchema: z.ZodType<BlockSpec> = z.lazy(() =>
+  z.object({
+    blockType: z.string(),
+    attrs: z.record(z.string(), z.unknown()).optional(),
+    content: z.array(blockSpecSchema).optional(),
+  })
+);
+
+/** Two-level containers → their registry-less wrapper child node. */
+const CONTAINER_WRAPPER: Record<string, string> = {
+  columns: "column",
+  blockColumns: "blockColumn",
+  tabs: "tabPanel",
+};
+
+const MAX_CONTAINER_DEPTH = 4;
+
+function emptyParagraph(): JSONContent {
+  return { type: "paragraph" };
+}
+
+/**
+ * When Zod rejects an attr because a string was expected but the model supplied
+ * an array/object, JSON-encode that field and return the patched attrs. Many
+ * blocks store structured lists as JSON strings (featureList.items,
+ * pricingCard.features, gallery images…), and models naturally pass arrays —
+ * this meets them there. Returns null if nothing was coercible.
+ */
+function coerceJsonStringAttrs(
+  attrs: Record<string, unknown>,
+  err: unknown
+): Record<string, unknown> | null {
+  const issues =
+    err && typeof err === "object" && "issues" in err
+      ? (err as { issues: Array<{ code?: string; expected?: string; path?: unknown[] }> })
+          .issues
+      : null;
+  if (!Array.isArray(issues)) return null;
+
+  let changed = false;
+  const out = { ...attrs };
+  for (const issue of issues) {
+    if (
+      issue?.code === "invalid_type" &&
+      issue?.expected === "string" &&
+      Array.isArray(issue?.path) &&
+      issue.path.length === 1
+    ) {
+      const key = issue.path[0] as string;
+      const v = out[key];
+      if (Array.isArray(v) || (v !== null && typeof v === "object")) {
+        out[key] = JSON.stringify(v);
+        changed = true;
+      }
+    }
+  }
+  return changed ? out : null;
+}
+
+/**
+ * Recursively validate a block spec and build its TipTap JSON node. Validates
+ * attrs against each block's own schema (rejecting unknown keys, filling
+ * defaults + a fresh blockId), and for container blocks assembles the children
+ * into the block's content model — synthesizing the wrapper nodes
+ * (column/blockColumn/tabPanel) that the registry doesn't expose, one per child.
+ * Built directly as TipTap JSON (not via the drag-builder converter) so every
+ * container — including blockColumns — is handled uniformly.
+ */
+function buildBlockNode(
+  spec: BlockSpec,
+  blocks: BlockDefinition[],
+  depth: number
+): { node: JSONContent } | { error: string } {
+  const def = blocks.find((b) => b.type === spec.blockType);
+  if (!def) {
+    return {
+      error: `Unknown or unsupported block type "${spec.blockType}". Choose one of: ${blocks
+        .map((b) => b.type)
+        .join(", ")}`,
+    };
+  }
+
+  const validKeys = new Set(Object.keys(def.attrsSchema.shape));
+  const settable = [...validKeys].filter((k) => k !== "blockId" && k !== "blockType");
+  const unknownKeys = Object.keys(spec.attrs ?? {}).filter((k) => !validKeys.has(k));
+  if (unknownKeys.length > 0) {
+    return {
+      error: `Unknown attribute(s) for "${spec.blockType}": ${unknownKeys.join(", ")}. Valid attributes are: ${settable.join(", ")}. Re-call using these exact names.`,
+    };
+  }
+
+  let parsedAttrs: Record<string, unknown>;
+  const rawAttrs = { ...(spec.attrs ?? {}), blockType: spec.blockType };
+  try {
+    parsedAttrs = def.attrsSchema.parse(rawAttrs) as Record<string, unknown>;
+  } catch (err) {
+    // Retry once with array/object → JSON-string coercion for attrs that the
+    // block stores as JSON strings (the model naturally passes arrays).
+    const coerced = coerceJsonStringAttrs(rawAttrs, err);
+    try {
+      if (!coerced) throw err;
+      parsedAttrs = def.attrsSchema.parse(coerced) as Record<string, unknown>;
+    } catch (finalErr) {
+      return {
+        error: `Invalid attributes for "${spec.blockType}". Valid fields: ${settable.join(", ")}.\n${finalErr instanceof Error ? finalErr.message : String(finalErr)}`,
+      };
+    }
+  }
+
+  const isContainer = getBlockAuthoringMode(spec.blockType) === "container";
+  const specChildren = spec.content ?? [];
+
+  if (specChildren.length > 0 && !isContainer) {
+    return {
+      error: `Block "${spec.blockType}" does not accept nested content. Only container blocks (${Object.keys(
+        CONTAINER_WRAPPER
+      ).join(", ")}, accordion, cardPanel, listContainer) take a "content" array.`,
+    };
+  }
+  if (specChildren.length > 0 && depth >= MAX_CONTAINER_DEPTH) {
+    return { error: `Nested blocks are too deep (max ${MAX_CONTAINER_DEPTH} levels).` };
+  }
+
+  const childNodes: JSONContent[] = [];
+  for (const childSpec of specChildren) {
+    const built = buildBlockNode(childSpec, blocks, depth + 1);
+    if ("error" in built) return built;
+    childNodes.push(built.node);
+  }
+
+  const node: JSONContent = { type: spec.blockType, attrs: parsedAttrs };
+  if (!isContainer) return { node };
+
+  const wrapper = CONTAINER_WRAPPER[spec.blockType];
+  if (wrapper === "column" || wrapper === "blockColumn") {
+    // One column per child. Empty → two blank columns (valid default layout).
+    const cols = childNodes.length > 0 ? childNodes : [emptyParagraph(), emptyParagraph()];
+    if (cols.length < 2 || cols.length > 4) {
+      return {
+        error: `"${spec.blockType}" needs 2–4 child blocks (one per column); received ${cols.length}.`,
+      };
+    }
+    parsedAttrs.columnCount = cols.length;
+    node.content = cols.map((c) => ({ type: wrapper, content: [c] }));
+  } else if (wrapper === "tabPanel") {
+    const tabs = childNodes.length > 0 ? childNodes : [emptyParagraph(), emptyParagraph()];
+    node.content = tabs.map((c, i) => ({
+      type: "tabPanel",
+      attrs: { label: `Tab ${i + 1}` },
+      content: [c],
+    }));
+  } else {
+    // block+ containers (accordion, cardPanel, listContainer).
+    node.content = childNodes.length > 0 ? childNodes : [emptyParagraph()];
+  }
+
+  return { node };
+}
 
 /**
  * Create editor tools bound to user + document context.
@@ -267,6 +489,64 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
             node.id,
+            "updated",
+            "note",
+          )),
+        });
+      },
+    }),
+
+    // ─── Insert Block (Client-Side) ─────────────────────────
+    // Returns a payload carrying a fully server-validated TipTap block node.
+    // The client inserts it at the end of the document with animation.
+    insert_block: tool({
+      description: getInsertBlockCatalog().description,
+      inputSchema: z.object({
+        blockType: z
+          .string()
+          .describe("The block type to insert — one of the Available block types listed above."),
+        attrs: z
+          .record(z.string(), z.unknown())
+          .optional()
+          .describe("The block's attributes as a JSON object (fields relevant to this block type). Omitted fields use defaults."),
+        content: z
+          .array(blockSpecSchema)
+          .optional()
+          .describe("Container blocks only. An array of child blocks: columns/blockColumns → one child per column (2–4); tabs → one child per tab; accordion/cardPanel/listContainer → children stack in order. Omit for non-container blocks."),
+      }),
+      execute: async ({ blockType, attrs, content }) => {
+        const result = await loadNote();
+        if ("error" in result) return result.error;
+        const { node: noteNode } = result;
+
+        const { blocks, extensions } = getInsertBlockCatalog();
+
+        // Validate + build the (possibly nested) block tree.
+        const built = buildBlockNode({ blockType, attrs, content }, blocks, 0);
+        if ("error" in built) return built.error;
+
+        // Safety net: prove the node is a registered, valid server-side type
+        // (also catches a model inventing an unregistered block).
+        const sanitized = sanitizeTipTapJsonWithExtensions(
+          { type: "doc", content: [built.node] },
+          extensions
+        );
+        const finalNode = sanitized.json.content?.[0];
+        if (!finalNode || finalNode.type !== blockType) {
+          return `The "${blockType}" block could not be built as valid content — it may be unavailable in this editor build.`;
+        }
+
+        const label = blocks.find((b) => b.type === blockType)?.label ?? blockType;
+        return JSON.stringify({
+          __editPayload: true,
+          type: "insert_block",
+          node: finalNode,
+          blockType,
+          documentTitle: noteNode.title,
+          action: `Inserted ${label} block into "${noteNode.title}"`,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            noteNode.id,
             "updated",
             "note",
           )),

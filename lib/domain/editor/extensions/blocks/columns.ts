@@ -42,6 +42,8 @@ registerBlock({
   type: "columns",
   label: "Columns",
   description: "Multi-column layout (2-4 columns)",
+  aiHint:
+    "Side-by-side columns of inline/text content (2–4). Use for short parallel passages of text. To place full blocks (cards, images, callouts) side by side, use blockColumns instead.",
   iconName: "Columns3",
   family: "layout",
   group: "container",

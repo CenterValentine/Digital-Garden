@@ -108,6 +108,8 @@ registerBlock({
   type: "timeline",
   label: "Timeline",
   description: "Ordered chronology of events — 10 visual variants",
+  aiHint:
+    "A chronological sequence of dated events (history, roadmap) — each entry has a date and description. For an ordered how-to whose steps are not dated, use processSteps instead.",
   iconName: "GitCommitHorizontal",
   family: "content",
   group: "publishing",

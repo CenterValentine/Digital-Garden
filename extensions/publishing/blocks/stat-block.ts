@@ -47,6 +47,8 @@ registerBlock({
   type: "statBlock",
   label: "Stat Block",
   description: "Single large metric display with optional animation",
+  aiHint:
+    "One prominent metric: a single big number with a label. For a horizontal row of several metrics use metricsStrip; for a vertical key/value list use statsTable.",
   iconName: "Hash",
   family: "content",
   group: "publishing",

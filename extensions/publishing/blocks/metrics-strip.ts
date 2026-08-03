@@ -71,6 +71,8 @@ registerBlock({
   type: "metricsStrip",
   label: "Metrics Strip",
   description: "Horizontal row of metrics and KPIs",
+  aiHint:
+    "A horizontal row of several KPIs/metrics shown together. For a single hero metric use statBlock; for a vertical key/value list of outcomes use statsTable.",
   iconName: "BarChart2",
   family: "content",
   group: "publishing",

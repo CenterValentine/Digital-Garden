@@ -49,6 +49,8 @@ registerBlock({
   type: "listContainer",
   label: "List",
   description: "Styled list with layout options",
+  aiHint:
+    "A styled list with special layout options (e.g. multi-column or card layout). Prefer an ordinary markdown bullet/numbered list for normal lists; reach for this only when the list needs a distinct visual layout.",
   iconName: "List",
   family: "content",
   group: "text",

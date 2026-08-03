@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-25
+last_updated: 2026-08-03
 ---
 
 # Sprint Backlog
@@ -7,6 +7,16 @@ last_updated: 2026-07-25
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## AI Block Authoring — follow-ups (2026-08-03, after the insert_block feature wraps)
+
+The `insert_block` tool (Phases 0–2, branch `feat/ai-block-authoring`) lets the AI **create** rich editor/publishing blocks — leaf blocks plus containers (columns/tabs/accordion/cardPanel/listContainer) with nested content. Surfaced during smoke-testing; pick up **after** the current AI-blocks work ships:
+
+- [ ] **AI block EDITING (`update_block` tool).** Today the AI can only insert blocks — it has no way to modify an existing block's attributes. Asked to "rename these feature titles", it falls back to `apply_diff` (text edits), which can't touch block attrs, so it fails. Needs a tool that targets an existing block by `blockId` and patches its attrs (validated against the block schema, same as insert) — likely a `__editPayload` variant applied by the orchestrator via `updateAttributes` at the block's position. This is the "memory-edit-like" functionality; the natural Phase 3 of the feature. Owner-requested docket (2026-08-03).
+- [ ] **List-item sub-shape hints (fixes "undefined" item titles).** JSON-string list attrs (`featureList.items`, `pricingCard.features`, gallery images…) hold arrays of objects with a specific shape (`{title, description, icon?}`). The array→JSON-string coercion makes them parse, but the model guesses the object KEYS, so a wrong key (`name` vs `title`) renders as "undefined". Surface each list attr's item shape — via a `get_block_schema` tool (progressive disclosure) and/or documenting the shape in the attr's Zod `.describe()`.
+- [ ] **Phase 2b container richness.** Allow prose children (paragraph/heading with text) inside containers — currently only registered blocks can be children, so "a card with a paragraph of prose" isn't expressible. Plus custom tab labels (tabs auto-label "Tab 1/2" today).
 
 ---
 

@@ -42,6 +42,8 @@ registerBlock({
   type: "blockColumns",
   label: "Block Column",
   description: "Multi-column layout for inserting blocks (2-4 columns)",
+  aiHint:
+    "Side-by-side columns that each hold full blocks — cards, images, callouts, etc. (2–4). Use for block-level multi-column layouts; for simple parallel text use columns instead.",
   iconName: "LayoutGrid",
   family: "layout",
   group: "container",
