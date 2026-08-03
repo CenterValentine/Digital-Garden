@@ -42,6 +42,8 @@ registerBlock({
   ttsSkip: true, // AI form input — not narratable prose
   label: "AI Prompt",
   description: "AI-powered input with snippet context",
+  aiHint:
+    "An interactive form control that runs an AI prompt with snippet context — a live widget, not narrative content. Only insert when the user explicitly wants an in-document AI prompt input.",
   iconName: "Sparkles",
   family: "form",
   group: "input",

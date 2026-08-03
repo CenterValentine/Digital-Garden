@@ -31,6 +31,8 @@
     "preflight": "bash scripts/preflight.sh",
     "markdown:smoke": "tsx scripts/markdown-roundtrip-smoke.ts",
     "markdown:blocks:check": "tsx scripts/validate-markdown-block-safety.ts",
+    "blocks:catalog": "tsx scripts/generate-block-catalog.ts",
+    "blocks:catalog:check": "tsx scripts/generate-block-catalog.ts --check",
     "notes:regen": "tsx scripts/regen-degraded-notes.ts",
     "db:local:up": "docker compose up -d postgres",
     "db:local:down": "docker compose down",

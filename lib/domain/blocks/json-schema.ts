@@ -10,6 +10,11 @@
 import { toJSONSchema } from "zod";
 import type { ZodObject, ZodRawShape } from "zod";
 import type { BlockDefinition } from "./types";
+import {
+  effectiveAiDescription,
+  getBlockAuthoringMode,
+  type BlockAuthoringMode,
+} from "./ai-authoring";
 
 /**
  * Convert a Zod block attrs schema to JSON Schema.
@@ -31,7 +36,8 @@ export function generateBlockCatalog(
   return blocks.map((def) => ({
     type: def.type,
     label: def.label,
-    description: def.description,
+    description: effectiveAiDescription(def),
+    authoringMode: getBlockAuthoringMode(def.type),
     family: def.family,
     group: def.group,
     atom: def.atom,
@@ -43,7 +49,10 @@ export function generateBlockCatalog(
 export interface BlockCatalogEntry {
   type: string;
   label: string;
+  /** Model-facing text: the block's `aiHint` when set, else `description`. */
   description: string;
+  /** How a model should author this block (full / container / seed / …). */
+  authoringMode: BlockAuthoringMode;
   family: string;
   group: string;
   atom: boolean;

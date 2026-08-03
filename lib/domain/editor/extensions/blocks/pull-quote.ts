@@ -43,6 +43,8 @@ registerBlock({
   type: "pullQuote",
   label: "Pull Quote",
   description: "Highlighted quote with 7 visual styles",
+  aiHint:
+    "Visually emphasizes a short phrase or sentence pulled from THIS document — an editorial highlight with no external source. For a quotation attributed to a named person, use testimonialCard instead.",
   iconName: "Quote",
   family: "content",
   group: "text",
