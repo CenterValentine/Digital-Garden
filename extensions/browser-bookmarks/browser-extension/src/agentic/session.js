@@ -9,16 +9,22 @@
 // These are chrome.tabs operations (background-context), layered on the cdp
 // executor. URL policy (SSRF/private-net) is gated by the caller before `open`.
 
-import { attach, detach, getSession } from "./cdp/index.js";
+import { attach, detach, getSession, send } from "./cdp/index.js";
 
 // Open a NEW tab the agent owns and attach to it (the default topology). Replaces
 // any current session — the agent works one target at a time. Caller SSRF-gates
 // the URL first. `active:true` (default) foregrounds it so the user sees the
 // agent start; focus emulation (in attach) keeps it live if they switch away.
+//
+// Open the tab BLANK, attach to the stable target, THEN navigate under debugger
+// control. Attaching to a tab that's mid-initial-navigation races the load's
+// commit (observed: blank page + "Not Secure"), so we let the nav happen after
+// attach — the standard automation pattern. URL is already policy-gated upstream.
 export async function openAndAttach(url, { active = true } = {}) {
   if (getSession()) await detach();
-  const tab = await chrome.tabs.create({ url, active });
+  const tab = await chrome.tabs.create({ url: "about:blank", active });
   const data = await attach(tab.id);
+  await send("Page.navigate", { url });
   return { ...data, tabId: tab.id, opened: true };
 }
 
