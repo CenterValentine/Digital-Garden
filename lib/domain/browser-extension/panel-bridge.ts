@@ -281,6 +281,67 @@ export function requestPanelAcquire(
   });
 }
 
+const CO_BROWSE_TIMEOUT_MS = 30_000;
+let coBrowseSeq = 0;
+
+/** Result envelope from a co-browse op relayed through the panel host. */
+export interface CoBrowseResult<T = unknown> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Agentic co-browse (Phase 2b, Slice 5a). The interaction engine lives in the
+ * extension's background service worker (chrome.debugger + CDP); the panel embed
+ * drives it THROUGH the panel host — the only trust-gated app→extension channel
+ * (exact-origin + source-checked in the host). It is deliberately NOT reachable
+ * from the open page-bridge content script (which runs on every web page), so a
+ * random page can't trigger a debugger attach. Promise round-trip correlated by
+ * `id`, so an out-of-band `status` poll can't be mistaken for an action's reply.
+ * Resolves `ok:false` outside the panel so callers can degrade.
+ */
+export function requestCoBrowse<T = unknown>(
+  op: string,
+  args?: Record<string, unknown>
+): Promise<CoBrowseResult<T>> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, error: "co-browse is only available in the side panel" });
+      return;
+    }
+    const id = ++coBrowseSeq;
+    let settled = false;
+    const finish = (result: CoBrowseResult<T>) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "cobrowse-result" && data.payload?.id === id) {
+        finish(
+          (data.payload.result ?? { ok: false, error: "empty result" }) as CoBrowseResult<T>
+        );
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, error: "the extension took too long" }),
+      CO_BROWSE_TIMEOUT_MS
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "cobrowse", payload: { id, op, args: args ?? {} } },
+      "*"
+    );
+  });
+}
+
 /** Decode a data: URL into a File for the chat's attachment path. */
 export function dataUrlToFile(dataUrl: string, filename: string): File | null {
   try {

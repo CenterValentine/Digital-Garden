@@ -2472,6 +2472,15 @@ async function handleAcquireUrl(payload) {
   }
 }
 
+// Resolve the tab a co-browse session should attach to when the caller gives no
+// explicit tabId AND there's no sender tab (the side panel isn't a tab). Default:
+// the active http(s) tab in the user's window. The Slice 5b session manager will
+// layer the real topology on top (agent-owned tab, metadata resolution, etc.).
+async function resolveCoBrowseTab() {
+  const tabs = await chrome.tabs.query({ active: true });
+  return (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
+}
+
 // Agentic co-browse: when a CDP session ends for ANY reason — the user clicking
 // "Cancel" on Chrome's debugging infobar (D-BANNER's Stop), the tab closing, or
 // devtools taking the target — broadcast it so any open app surface can drop its
@@ -2521,7 +2530,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // tab; an explicit payload.tabId lets the panel drive another tab.
     if (message.type === "cobrowse-attach") {
       try {
-        const tabId = message.payload?.tabId ?? sender.tab?.id;
+        const tabId =
+          message.payload?.tabId ?? sender.tab?.id ?? (await resolveCoBrowseTab());
         sendResponse({ ok: true, data: await cobrowse.attach(tabId) });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "attach failed" });

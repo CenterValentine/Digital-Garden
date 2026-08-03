@@ -21,6 +21,16 @@ import {
   OVERLAY_CORNERS,
   type CaptureSettings,
 } from "@/lib/domain/browser-extension/panel-bridge";
+import {
+  coBrowseAttach,
+  coBrowseDetach,
+  coBrowseStatus,
+  coBrowseSnapshot,
+  coBrowseNavigate,
+  coBrowseClick,
+  coBrowseHover,
+  coBrowseType,
+} from "@/lib/domain/browser-extension/co-browse";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
@@ -193,6 +203,26 @@ export function PanelShellClient({
     if (params.get("intent") === "ask-about-page") {
       pageChatPendingRef.current = true;
     }
+  }, []);
+
+  // DEV-ONLY co-browse harness (Slice 5a validation): drive the full trust-gated
+  // app → panel-host → background → CDP path from the panel embed's console —
+  // `await window.__dgCoBrowseApp.attach()` → `.snapshot()` → `.click("link")`.
+  // Proves the relay + the gate (off-panel it resolves "only in the side panel").
+  // Remove before the Phase 2b PR.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    (window as unknown as { __dgCoBrowseApp?: unknown }).__dgCoBrowseApp = {
+      attach: (tabId?: number) => coBrowseAttach(tabId),
+      detach: () => coBrowseDetach(),
+      status: () => coBrowseStatus(),
+      snapshot: () => coBrowseSnapshot(),
+      navigate: (url: string) => coBrowseNavigate(url),
+      click: (role?: string, name?: string, nth?: number) => coBrowseClick({ role, name, nth }),
+      hover: (role?: string, name?: string, nth?: number) => coBrowseHover({ role, name, nth }),
+      type: (role: string | undefined, name: string | undefined, text: string, nth?: number) =>
+        coBrowseType({ role, name, nth }, text),
+    };
   }, []);
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
   const [treeCollapsed, setTreeCollapsed] = useState(false);
