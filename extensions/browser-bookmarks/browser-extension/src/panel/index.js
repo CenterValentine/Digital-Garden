@@ -583,6 +583,15 @@ reloadBtn.addEventListener("click", () => void boot());
 // so "Ask AI about this page" can switch views over it instead of calling
 // sidePanel.open() again (which would toggle the panel shut). Connect once per
 // panel document (not per boot()).
+// Relay the co-browse session-end broadcast (Slice 5d) to the embed so the app
+// drops its in-app co-browse indicator when the session ends OUT OF BAND — the
+// user clicks Cancel on the debugger banner, or the driven tab closes.
+chrome.runtime.onMessage.addListener((message) => {
+  if (message?.type === "cobrowse-session-ended") {
+    postToEmbed("cobrowse-session-ended", message.payload || {});
+  }
+});
+
 let panelPort = null;
 try {
   panelPort = chrome.runtime.connect({ name: "dg-panel" });

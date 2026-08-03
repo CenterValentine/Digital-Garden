@@ -7,6 +7,7 @@ import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
+import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
@@ -546,6 +547,9 @@ export function PanelShellClient({
         flexDirection: "column",
       }}
     >
+      {/* Co-browse indicator + Stop (5d) — above both views, visible whenever a
+          session is driving a tab. Renders nothing when inactive. */}
+      <CoBrowseIndicator />
       {/* Slim view switcher — app chrome, not extension chrome */}
       <div
         role="tablist"

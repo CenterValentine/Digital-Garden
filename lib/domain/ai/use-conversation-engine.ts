@@ -54,6 +54,7 @@ import {
   type CoBrowseNode,
 } from "@/lib/domain/browser-extension/co-browse";
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
+import { markCoBrowseActive } from "@/state/co-browse-store";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -563,6 +564,16 @@ function lastMessageHasResolvedBrowserRead({
  * (backendDOMNodeId / sessionId) it never references. Order is preserved so `nth`
  * lines up with the extension's resolveFresh.
  */
+/** Best-effort host label for the co-browse indicator. */
+function safeHost(url?: string): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
 function coBrowseSnapshotOutput(snap: {
   ok: boolean;
   data?: { nodes: CoBrowseNode[] };
@@ -1174,6 +1185,7 @@ export function useConversationEngine({
               });
               return;
             }
+            markCoBrowseActive(safeHost(input.url)); // 5d: light the in-app indicator
             const snap = await coBrowseSnapshot();
             chat.addToolResult({
               tool: toolName,
@@ -1208,6 +1220,7 @@ export function useConversationEngine({
             });
             return;
           }
+          if (action === "navigate") markCoBrowseActive(safeHost(input.url)); // 5d: update indicator host
           // Let a click/navigation settle before re-snapshotting so the model sees
           // the RESULT, not a mid-transition page. Navigation needs longer.
           await new Promise((r) => setTimeout(r, action === "navigate" ? 1200 : 500));
