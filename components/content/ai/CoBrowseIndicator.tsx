@@ -10,14 +10,39 @@
  * which has no side panel and thus no co-browse session).
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useCoBrowseStore, markCoBrowseInactive } from "@/state/co-browse-store";
 import { coBrowseDetach, coBrowseReveal } from "@/lib/domain/browser-extension/co-browse";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
+function fmt(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s < 10 ? "0" : ""}${s}`;
+}
+
 export function CoBrowseIndicator() {
   const active = useCoBrowseStore((s) => s.active);
   const host = useCoBrowseStore((s) => s.host);
+  const waitUntil = useCoBrowseStore((s) => s.waitUntil);
+  const waitLabel = useCoBrowseStore((s) => s.waitLabel);
+
+  // Tick once a second while a timed-review wait is running, so the panel shows
+  // the same countdown as the on-page overlay.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!waitUntil) return;
+    const tick = () => setNow(Date.now());
+    // Deferred first tick (not a synchronous setState-in-effect) so the count is
+    // fresh when a new wait starts, then once a second.
+    const t0 = setTimeout(tick, 0);
+    const iv = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(t0);
+      clearInterval(iv);
+    };
+  }, [waitUntil]);
+  const remaining = waitUntil ? Math.max(0, Math.ceil((waitUntil - now) / 1000)) : 0;
 
   // Drop the indicator when the session ends OUT OF BAND — the user clicks Cancel
   // on the debugger banner, or the driven tab closes. The extension broadcasts
@@ -56,7 +81,9 @@ export function CoBrowseIndicator() {
         <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
       </span>
       <span className="min-w-0 flex-1 truncate font-medium">
-        Co-browsing{host ? ` — ${host}` : ""}
+        {waitUntil
+          ? `⏱ ${waitLabel ? `${waitLabel} — ` : ""}${fmt(remaining)} left`
+          : `Co-browsing${host ? ` — ${host}` : ""}`}
       </span>
       <button
         type="button"

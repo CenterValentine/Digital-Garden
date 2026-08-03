@@ -104,6 +104,46 @@ export async function hover(target) {
   return { ok: true, x, y };
 }
 
+// Inject a self-updating "browsing timer" overlay on the page (T1) — the user
+// watches it count down while reviewing this page during a timed iteration. It
+// runs its OWN interval and removes itself when time is up, so this returns
+// immediately (the bridge round-trip must not block for the whole wait; the
+// caller/engine owns the actual sleep). `label` prefixes the countdown.
+export async function showTimer({ seconds = 60, label } = {}) {
+  const s = Math.max(1, Math.min(3600, Math.round(seconds)));
+  const prefix = typeof label === "string" && label ? `${label} — ` : "";
+  const expr = `(function(){
+    var id='dg-cobrowse-timer';
+    var old=document.getElementById(id); if(old&&old.__dgIv){clearInterval(old.__dgIv);} if(old){old.remove();}
+    var el=document.createElement('div'); el.id=id;
+    el.style.cssText='position:fixed;top:12px;right:12px;z-index:2147483647;background:rgba(180,83,9,.96);color:#fff;font:600 13px/1 system-ui,-apple-system,sans-serif;padding:9px 13px;border-radius:9999px;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.2px';
+    document.documentElement.appendChild(el);
+    var left=${s};
+    function fmt(n){var m=Math.floor(n/60),x=n%60;return m+':'+(x<10?'0':'')+x;}
+    function tick(){ el.textContent=${JSON.stringify(prefix)}+fmt(Math.max(0,left))+' left'; if(left<=0){clearInterval(el.__dgIv); el.remove(); return;} left--; }
+    tick(); el.__dgIv=setInterval(tick,1000);
+    return true;
+  })()`;
+  await send("Runtime.evaluate", { expression: expr });
+  return { ok: true, seconds: s };
+}
+
+// Go BACK to the previous page (T2) — undo a navigation, e.g. return to a list
+// after viewing one item's detail page.
+export async function back() {
+  await send("Runtime.evaluate", { expression: "history.back(); true" });
+  return { ok: true };
+}
+
+// Remove the timer overlay early (e.g. the wait was cut short).
+export async function clearTimer() {
+  await send("Runtime.evaluate", {
+    expression:
+      "(function(){var e=document.getElementById('dg-cobrowse-timer'); if(e){if(e.__dgIv)clearInterval(e.__dgIv); e.remove();} return true;})()",
+  }).catch(() => {});
+  return { ok: true };
+}
+
 // Scroll the page to reveal lazy / virtualized content (R2 "assess & adapt"). A
 // viewport-step scroll via the page's own scroller; the caller re-snapshots after
 // to see what newly rendered. `to:"bottom"|"top"` jumps to an end. Returns

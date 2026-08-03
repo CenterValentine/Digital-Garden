@@ -18,15 +18,26 @@ interface CoBrowseState {
   active: boolean;
   /** Host of the driven page (for the indicator label), or null. */
   host: string | null;
+  /** Epoch ms when the current timed-review wait ends, or null (T1). */
+  waitUntil: number | null;
+  /** Short label for the current wait (e.g. the item name), or null. */
+  waitLabel: string | null;
   start: (host: string | null) => void;
   stop: () => void;
+  beginWait: (seconds: number, label: string | null) => void;
+  endWait: () => void;
 }
 
 export const useCoBrowseStore = create<CoBrowseState>((set) => ({
   active: false,
   host: null,
+  waitUntil: null,
+  waitLabel: null,
   start: (host) => set({ active: true, host }),
-  stop: () => set({ active: false, host: null }),
+  stop: () => set({ active: false, host: null, waitUntil: null, waitLabel: null }),
+  beginWait: (seconds, label) =>
+    set({ waitUntil: Date.now() + seconds * 1000, waitLabel: label }),
+  endWait: () => set({ waitUntil: null, waitLabel: null }),
 }));
 
 /** Non-hook flag (engine runs outside React render). */
@@ -36,4 +47,12 @@ export function markCoBrowseActive(host: string | null): void {
 
 export function markCoBrowseInactive(): void {
   useCoBrowseStore.getState().stop();
+}
+
+export function beginCoBrowseWait(seconds: number, label: string | null): void {
+  useCoBrowseStore.getState().beginWait(seconds, label);
+}
+
+export function endCoBrowseWait(): void {
+  useCoBrowseStore.getState().endWait();
 }

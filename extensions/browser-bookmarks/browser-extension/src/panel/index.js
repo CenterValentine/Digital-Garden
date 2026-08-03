@@ -47,6 +47,11 @@ const CO_BROWSE_OPS = new Set([
   "reveal",
   "list-tabs",
   "resolve-tab",
+  // T1 timed iteration
+  "show-timer",
+  "clear-timer",
+  // T2 navigation awareness
+  "back",
 ]);
 
 function sendRuntimeMessage(message) {

@@ -2611,6 +2611,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       return;
     }
+    if (message.type === "cobrowse-show-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.showTimer(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "show-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-clear-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.clearTimer() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "clear-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-back") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.back() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "back failed" });
+      }
+      return;
+    }
     // ── Session / tab manager (Slice 5b) ──────────────────────────────────
     if (message.type === "cobrowse-open") {
       try {

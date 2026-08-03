@@ -96,6 +96,21 @@ export function coBrowseScroll(opts?: {
   return requestCoBrowse("scroll", { ...(opts ?? {}) });
 }
 
+/** Inject the on-page countdown overlay (T1) — returns immediately; engine sleeps. */
+export function coBrowseShowTimer(seconds: number, label?: string): Promise<CoBrowseResult> {
+  return requestCoBrowse("show-timer", { seconds, ...(label ? { label } : {}) });
+}
+
+/** Remove the on-page countdown overlay early. */
+export function coBrowseClearTimer(): Promise<CoBrowseResult> {
+  return requestCoBrowse("clear-timer");
+}
+
+/** Go back to the previous page (undo a navigation). */
+export function coBrowseBack(): Promise<CoBrowseResult> {
+  return requestCoBrowse("back");
+}
+
 // ── Session / tab manager (Slice 5b) ─────────────────────────────────────────
 
 /** One open tab's metadata (for "pick a tab" and metadata resolution). */

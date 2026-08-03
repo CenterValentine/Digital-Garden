@@ -51,10 +51,17 @@ import {
   coBrowseHover,
   coBrowseType,
   coBrowseScroll,
+  coBrowseBack,
+  coBrowseShowTimer,
+  coBrowseClearTimer,
   type CoBrowseNode,
 } from "@/lib/domain/browser-extension/co-browse";
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
-import { markCoBrowseActive } from "@/state/co-browse-store";
+import {
+  markCoBrowseActive,
+  beginCoBrowseWait,
+  endCoBrowseWait,
+} from "@/state/co-browse-store";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -1164,6 +1171,8 @@ export function useConversationEngine({
           text?: string;
           direction?: "down" | "up";
           to?: "bottom" | "top";
+          seconds?: number;
+          label?: string;
         };
         try {
           if (toolName === CO_BROWSE_OPEN) {
@@ -1197,8 +1206,36 @@ export function useConversationEngine({
             });
             return;
           }
-          // CO_BROWSE_ACT — read / click / hover / type / navigate on the bound tab.
+          // CO_BROWSE_ACT — read / click / hover / type / navigate / scroll / wait /
+          // back on the bound tab.
           const action = input.action;
+          // wait — pause for the user to REVIEW this page, with an on-page
+          // countdown overlay (T1, timed iteration). The extension only injects
+          // the self-removing overlay and returns fast; the SLEEP happens here so
+          // the bridge round-trip isn't held open for the whole minute. No page
+          // change and no re-snapshot — it's a pure pause.
+          if (action === "wait") {
+            const seconds = Math.max(1, Math.min(3600, Math.round(input.seconds ?? 60)));
+            const label = input.label ?? null;
+            await coBrowseShowTimer(seconds, label ?? undefined);
+            beginCoBrowseWait(seconds, label);
+            try {
+              await new Promise((r) => setTimeout(r, seconds * 1000));
+            } finally {
+              endCoBrowseWait();
+              await coBrowseClearTimer().catch(() => {});
+            }
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                action: "wait",
+                waited: seconds,
+                note: `Paused ${seconds}s for the user to review the page.`,
+              },
+            });
+            return;
+          }
           const target = { role: input.role, name: input.name, nth: input.nth };
           let res: { ok: boolean; error?: string };
           if (action === "read") res = { ok: true };
@@ -1211,6 +1248,7 @@ export function useConversationEngine({
               : { ok: false, error: "navigate needs a url" };
           else if (action === "scroll")
             res = await coBrowseScroll({ direction: input.direction, to: input.to });
+          else if (action === "back") res = await coBrowseBack();
           else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
           if (!res.ok) {
             chat.addToolResult({
@@ -1222,8 +1260,10 @@ export function useConversationEngine({
           }
           if (action === "navigate") markCoBrowseActive(safeHost(input.url)); // 5d: update indicator host
           // Let a click/navigation settle before re-snapshotting so the model sees
-          // the RESULT, not a mid-transition page. Navigation needs longer.
-          await new Promise((r) => setTimeout(r, action === "navigate" ? 1200 : 500));
+          // the RESULT, not a mid-transition page. Navigation (incl. back) needs longer.
+          await new Promise((r) =>
+            setTimeout(r, action === "navigate" || action === "back" ? 1200 : 500),
+          );
           const snap = await coBrowseSnapshot();
           chat.addToolResult({
             tool: toolName,
