@@ -532,11 +532,19 @@ real side effects; co-browsing is the mitigation.
 - **Decisions:** **D-ENG RESOLVED → raw CDP first** (behind `BrowserActuator`;
   playwright-crx deferred). Still open: D-TGT (a11y vs +vision), D-BANNER (accept
   the chrome.debugger banner).
-- **De-risk (step one):** before wiring the tools, build + prove the actionability
-  pipeline against **three deliberately-hard real pages** — an embedded
-  Greenhouse/Lever board (cross-frame + pagination), a virtualized list
-  (scroll-collect), and a consent-walled site (cross-frame click). Clears them →
-  the "surprise miss" risk for 2b's action set is measured, not asserted.
+- **De-risk (step one) — ✅ core validated (Slice 4, `feat/agentic-slice-4`, 2026-08-04):**
+  drove the actionability pipeline directly against deliberately-hard real pages.
+  **Cross-frame acting is PROVEN** — clicking a control inside a live OOPIF opened
+  it (`frameOffset` frame-local→root translation works on raw CDP), retiring the
+  engine's biggest unknown. Matching validated on two sites with opposite structures
+  (LinkedIn title-leading `button`s → starts-with tier; Greenhouse company-leading
+  `link`s → substring tier) via a 3-tier matcher; captcha detect-and-pause + frame
+  skipping landed. `collect` dedup+termination confirmed. **No `playwright-crx` swap
+  trigger hit — every miss was raw-CDP-fixable; the deferral now holds on evidence.**
+  Not-yet-run (lower risk, deferable): a true *embedded* board's pagination (same
+  proven `frameOffset` mechanism) and a consent-wall cross-frame dismiss (re-proof
+  of cross-frame acting). The "surprise miss" risk for 2b's action set is measured,
+  not asserted.
 - **Gate:** "page through these results and collect them" → multi-page nav in a
   visible tab, cursor glides, you can interrupt; still read/navigate only.
 

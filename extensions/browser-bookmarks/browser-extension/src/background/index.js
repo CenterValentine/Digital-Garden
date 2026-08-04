@@ -2533,7 +2533,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           cobrowse.getA11ySnapshot(),
           cobrowse.currentUrl(),
         ]);
-        sendResponse({ ok: true, data: { nodes, url } });
+        // captchaDetected rides alongside so the model can pause and hand to the
+        // user; the captcha frame's own nodes are already excluded from `nodes`.
+        const { captchaDetected } = cobrowse.detectChallenges();
+        sendResponse({ ok: true, data: { nodes, url, captchaDetected } });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
       }

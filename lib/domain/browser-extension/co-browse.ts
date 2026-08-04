@@ -63,9 +63,14 @@ export function coBrowseStatus(): Promise<CoBrowseResult<{ session: unknown }>> 
   return requestCoBrowse("status");
 }
 
-/** The interactable + orientation a11y snapshot (+ current url), stitched across frames. */
+/**
+ * The interactable + orientation a11y snapshot (+ current url), stitched across
+ * frames. `captchaDetected` is true when a captcha/anti-bot challenge frame is
+ * attached — its nodes are excluded from `nodes`, and the model is told to pause
+ * and hand to the user (captcha = detect + human, never act).
+ */
 export function coBrowseSnapshot(): Promise<
-  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string }>
+  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean }>
 > {
   return requestCoBrowse("snapshot");
 }

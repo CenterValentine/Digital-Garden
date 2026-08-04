@@ -585,7 +585,7 @@ function safeHost(url?: string): string | null {
 
 function coBrowseSnapshotOutput(snap: {
   ok: boolean;
-  data?: { nodes: CoBrowseNode[]; url?: string };
+  data?: { nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean };
   error?: string;
 }): Record<string, unknown> {
   const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
@@ -610,6 +610,9 @@ function coBrowseSnapshotOutput(snap: {
     ...(snap.data?.url ? { url: snap.data.url } : {}),
     elementCount: elements.length,
     elements,
+    // A captcha / anti-bot challenge frame is present. Its nodes are deliberately
+    // excluded above — STOP and hand to the user; no tool can (or should) solve it.
+    ...(snap.data?.captchaDetected ? { captchaDetected: true } : {}),
     ...(snap.ok ? {} : { snapshotError: snap.error }),
   };
 }

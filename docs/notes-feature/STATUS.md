@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-01
+last_updated: 2026-08-04
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,15 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 4, 2026**: Agentic Browsing **Slice 4 — hostile-target de-risk** (branch `feat/agentic-slice-4`; extension build/typecheck/prompt-cache/lint green; owner-validated live; PR-ready)
+
+Drove the raw-CDP co-browse pipeline directly against deliberately-hard real pages (LinkedIn, a Greenhouse board, a live cross-origin widget) so the "surprise miss" risk is *measured, not asserted*. Four target-agnostic resolve/perception fixes, and — the headline — **cross-frame acting proven on raw CDP** (the engine's biggest unknown).
+
+- **3-tier name matching** (exact → starts-with → substring, whitespace-normalized; Playwright `getByRole` name semantics + a starts-with tier for concatenated names) — validated on two sites with opposite structures: LinkedIn cards are title-leading `button`s (starts-with tier, which also dodges the destructive `Dismiss` sibling), Greenhouse cards are company-leading `link`s (substring tier). Same matcher, both resolve.
+- **Cross-frame acting proven**: clicking a control *inside* a live OOPIF (Forethought widget) opened it — the `frameOffset` frame-local→root translation works. This retires the risk that hedged `playwright-crx`; the deferral now holds on evidence.
+- **Robustness**: fail-loud snapshot with no session; skip worker + captcha/challenge frames; **captcha detect-and-pause** (`captchaDetected` → the model stops and hands to the user). Role/destructive-sibling guidance added to the co-browse prompt + tool description.
+- No `playwright-crx` swap trigger hit — every miss was raw-CDP-fixable.
 
 **August 3, 2026**: Agentic Browsing **Phase 2b — supervised co-browsing** (branch `feat/agentic-browsing`; typecheck/lint/prompt-cache/build green; owner-validated live on a real jobs board; PR opened)
 
