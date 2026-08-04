@@ -97,7 +97,11 @@ export const coBrowseActInputSchema = z.object({
   name: z
     .string()
     .optional()
-    .describe("Target's accessible name from the snapshot (exact). For click/hover/type."),
+    .describe(
+      "Target's accessible name from the snapshot. Matched case-insensitively: " +
+        "exact first, else substring — so the visible label works even when the full " +
+        "accessible name is decorated (badges, appended company/status). For click/hover/type.",
+    ),
   nth: z
     .number()
     .int()

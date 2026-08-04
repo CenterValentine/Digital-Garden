@@ -13,25 +13,55 @@
 import { send, frameOffset } from "./executor.js";
 import { getA11ySnapshot, currentUrl } from "./snapshot.js";
 
+// Normalize an accessible name the way the platform/Playwright does: collapse ALL
+// internal whitespace (newlines, tabs, double-spaces from concatenated card text)
+// to single spaces, trim, lowercase. `trim()` alone only strips the ends — decorated
+// names carry internal whitespace, so that must collapse too.
+const normName = (s) => (s || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+// Match nodes by role (+ optional accessible name) in THREE tiers of decreasing
+// precision — the first tier that yields any hit wins:
+//   1. EXACT (normalized) — precise; the only tier when `exact:true`.
+//   2. STARTS-WITH — the target label leads the accessible name. This is the tier
+//      that matters on real pages: sites concatenate the whole card into one node's
+//      name (LinkedIn makes each job card a single button named
+//      "Solutions Engineer … Dismiss Solutions Engineer job … Posted 1mo ago"), and
+//      the meaningful label leads. Preferring starts-with also excludes the
+//      DESTRUCTIVE sibling — "Dismiss Solutions Engineer job" contains the title but
+//      doesn't START with it, so targeting "Solutions Engineer" can't hit Dismiss.
+//   3. SUBSTRING — last resort; the label sits mid-name.
+// All tiers are whitespace-normalized + case-insensitive (Playwright getByRole
+// name semantics, extended with the starts-with tier for concatenated names).
+// Shared by resolveFresh (act) AND the dev-harness find (preview) so the two can't
+// drift — a "surprise miss" the preview can't reproduce would be its own bug.
+export function matchByRoleName(nodes, { role, name, exact } = {}) {
+  const want = normName(name);
+  const byRole = (nodes || []).filter(
+    (n) => n.backendDOMNodeId != null && (!role || n.role === role),
+  );
+  if (!want) return byRole;
+  const exactHits = byRole.filter((n) => normName(n.name) === want);
+  if (exactHits.length || exact) return exactHits;
+  const prefixHits = byRole.filter((n) => normName(n.name).startsWith(want));
+  if (prefixHits.length) return prefixHits;
+  return byRole.filter((n) => normName(n.name).includes(want));
+}
+
 // resolveFresh: re-read the AX tree and re-match by role+name RIGHT NOW — never
 // act on a cached backendDOMNodeId (kills the detach / re-render Category-B miss,
 // and re-derives coordinates so a layout shift can't misplace the click).
 // Duplicate role+name is the flagged residual → caller disambiguates with `nth`.
-export async function resolveFresh({ role, name, nth } = {}) {
-  const wantName = (name || "").trim().toLowerCase();
+export async function resolveFresh({ role, name, nth, exact } = {}) {
   const nodes = await getA11ySnapshot();
-  const matches = nodes.filter(
-    (n) =>
-      n.backendDOMNodeId != null &&
-      (!role || n.role === role) &&
-      (!wantName || (n.name || "").trim().toLowerCase() === wantName),
-  );
+  const matches = matchByRoleName(nodes, { role, name, exact });
   if (matches.length === 0) {
-    throw new Error(`no element matching role=${role || "*"} name="${name || ""}"`);
+    throw new Error(
+      `no element matching role=${role || "*"} name~="${name || ""}" (tried exact then substring — run find() to see available names)`,
+    );
   }
   if (matches.length > 1 && nth == null) {
     throw new Error(
-      `ambiguous: ${matches.length} match role=${role || "*"} name="${name || ""}" — pass nth (0-based)`,
+      `ambiguous: ${matches.length} match role=${role || "*"} name~="${name || ""}" — pass nth (0-based), or use find() to pick`,
     );
   }
   const chosen = nth == null ? matches[0] : matches[nth];
