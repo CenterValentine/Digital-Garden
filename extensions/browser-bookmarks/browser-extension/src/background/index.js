@@ -1868,66 +1868,6 @@ chrome.commands.onCommand.addListener((command, tab) => {
   if (command === "open-ai-chat") openAiChatPanel(tab);
 });
 
-// DEV-ONLY co-browse de-risk harness (Slice 4). Drives the raw CDP pipeline
-// DIRECTLY from the service-worker console — bypassing the AI/tool layer — so the
-// actionability pipeline can be PROVEN against deliberately-hard real pages
-// (embedded ATS board, virtualized list, consent wall) and every miss is measured,
-// not asserted (plan §"Interaction reliability"). Remove before the Slice 4 PR;
-// the real path routes via the trust-gated panel-bridge + co_browse_* tools.
-//
-// Usage from the SW console (chrome://extensions → service worker → inspect):
-//   await self.__dgCobrowse.attach()                  // active http(s) tab
-//   await self.__dgCobrowse.frames()                  // OOPIF child sessions (Category A)
-//   (await self.__dgCobrowse.snapshot()).length       // stitched interactable node count
-//   self.__dgCobrowse.find("button", "Accept")        // NON-acting: list matches + index for nth
-//   await self.__dgCobrowse.click("button", "Accept") // trusted click (pass nth if ambiguous)
-//   await self.__dgCobrowse.collect()                 // scroll-collect a virtualized list
-//   await self.__dgCobrowse.detach()
-self.__dgCobrowse = {
-  attach: async (tabId) => {
-    if (typeof tabId !== "number") {
-      const tabs = await chrome.tabs.query({ active: true });
-      tabId = (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
-    }
-    return cobrowse.attach(tabId);
-  },
-  detach: () => cobrowse.detach(),
-  status: () => cobrowse.getSession(),
-  frames: () => cobrowse.getChildSessions(),
-  url: () => cobrowse.currentUrl(),
-  // Captcha/anti-bot challenge frames currently attached → { captchaDetected, frames }.
-  // Their nodes are excluded from snapshot(); this is the detect-and-pause signal.
-  challenges: () => cobrowse.detectChallenges(),
-  snapshot: () => cobrowse.getA11ySnapshot(),
-  // NON-acting disambiguation preview: every node matching role (+ optional name),
-  // each with its 0-based index → the nth to pass click/hover/type. Uses the SAME
-  // matcher as resolveFresh (exact-then-substring, whitespace-normalized) so the
-  // preview reproduces exactly what a click will resolve. Also surfaces `group`
-  // (relatedness) and `frameUrl` (which OOPIF a cross-frame target lives in), the
-  // two facts that make a "surprise miss" legible before you act.
-  find: async (role, name) => {
-    const nodes = await cobrowse.getA11ySnapshot();
-    return cobrowse
-      .matchByRoleName(nodes, { role, name })
-      .map((n, i) => ({
-        nth: i,
-        role: n.role,
-        name: n.name,
-        ...(n.value != null ? { value: n.value } : {}),
-        ...(n.expanded != null ? { expanded: n.expanded } : {}),
-        ...(n.disabled ? { disabled: true } : {}),
-        ...(n.group != null ? { group: n.group } : {}),
-        ...(n.frameUrl ? { frameUrl: n.frameUrl } : {}),
-      }));
-  },
-  click: (role, name, nth) => cobrowse.click({ role, name, nth }),
-  hover: (role, name, nth) => cobrowse.hover({ role, name, nth }),
-  type: (role, name, text, nth) => cobrowse.type({ role, name, nth }, text),
-  scroll: (opts) => cobrowse.scroll(opts || {}),
-  collect: (opts) => cobrowse.collectAll(opts || {}),
-  back: () => cobrowse.back(),
-};
-
 // sidePanel.open() must be called from a SYNCHRONOUS gesture handler — an
 // async listener returns a promise immediately and Chrome no longer treats
 // the call as gesture-initiated (the panel silently fails to open / closes).
