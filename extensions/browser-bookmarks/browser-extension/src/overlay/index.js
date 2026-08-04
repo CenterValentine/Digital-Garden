@@ -4348,9 +4348,8 @@ const ttsq = {
   host: null,
   shadow: null,
   ui: null, // cached element refs, populated in ttsPlayerMount
-  items: [], // arrival order: { id, engine, label, mimeType, base64, text, duration }
+  items: [], // arrival order: { id, engine, label, mimeType, base64, text, buffer, failed }
   currentId: null, // id of the item loaded in the transport
-  audio: null, // HTMLAudioElement for the current cloud item
   utt: null, // current SpeechSynthesisUtterance (kept so handlers can be detached on stop)
   rate: 1, // persists across reads so the chosen speed sticks
   playing: false, // audio actively producing sound (not paused, not ended)
@@ -4358,6 +4357,25 @@ const ttsq = {
   loading: false, // transient bar spinner while the first read synthesizes
   expanded: false, // queue list open/closed
   seq: 0, // monotonic id source
+
+  // ── Web Audio transport ──
+  // Cloud audio is played through an AudioContext rather than `new Audio(dataUri)`.
+  // CSP governs resource loads *by URL*: a page serving `default-src 'self'` with
+  // no `media-src` (news.ycombinator.com, GitHub, most news sites) refuses a
+  // `data:` media URI outright, and elements a content script injects load under
+  // the PAGE's CSP, not the extension's. `blob:` is refused for the same reason.
+  // decodeAudioData takes the bytes we already hold in memory — no URL, nothing
+  // for CSP to match — so HD playback survives on every site.
+  //
+  // The cost is manual bookkeeping: an AudioBufferSourceNode is single-use and
+  // has no pause/seek/currentTime. `offset` + `startedAt` reconstruct the play
+  // head, and pause/seek/rate-change all stop the node and start a fresh one.
+  ctx: null, // shared AudioContext (created lazily, on first read)
+  node: null, // current AudioBufferSourceNode — discarded after every stop
+  offset: 0, // seconds into the buffer where the current node was started
+  startedAt: 0, // ctx.currentTime at that moment
+  stopping: false, // suppresses node.onended during a deliberate stop
+  ticker: null, // setInterval — Web Audio has no `timeupdate` event
 };
 
 function dgTtsLabel(str) {
@@ -4388,6 +4406,130 @@ function ttsItemById(id) {
 
 function ttsIndexOfCurrent() {
   return ttsq.items.findIndex((i) => i.id === ttsq.currentId);
+}
+
+// ── Web Audio transport primitives ──────────────────────────────
+// See the `ctx` comment on ttsq for why playback doesn't use <audio>.
+
+function ttsAudioContext() {
+  if (!ttsq.ctx) {
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return null;
+    ttsq.ctx = new Ctor();
+  }
+  // Autoplay policy parks a fresh context in "suspended" until a user gesture.
+  // Every entry point here is click-driven, so resuming inline is legitimate.
+  if (ttsq.ctx.state === "suspended") ttsq.ctx.resume().catch(() => {});
+  return ttsq.ctx;
+}
+
+function ttsBase64ToBytes(b64) {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// Decoded PCM is cached on the item, so stepping back through the queue replays
+// instantly instead of re-decoding. decodeAudioData detaches the ArrayBuffer it
+// is handed, which is why a fresh one is built from base64 on every call.
+function ttsDecode(item) {
+  if (item.buffer) return Promise.resolve(item.buffer);
+  const ctx = ttsAudioContext();
+  if (!ctx) return Promise.reject(new Error("Web Audio unavailable"));
+  if (!item.base64) return Promise.reject(new Error("No audio data"));
+  return ctx.decodeAudioData(ttsBase64ToBytes(item.base64).buffer).then((buf) => {
+    item.buffer = buf;
+    item.duration = buf.duration;
+    return buf;
+  });
+}
+
+function ttsStartNode(item, offset) {
+  const ctx = ttsAudioContext();
+  if (!ctx || !item.buffer) return;
+  const node = ctx.createBufferSource();
+  node.buffer = item.buffer;
+  node.playbackRate.value = ttsq.rate;
+  node.connect(ctx.destination);
+  node.onended = () => {
+    if (ttsq.stopping) return; // pause / seek / rate change — not a completion
+    ttsOnItemEnded();
+  };
+  ttsq.node = node;
+  ttsq.offset = offset;
+  ttsq.startedAt = ctx.currentTime;
+  node.start(0, offset);
+  ttsq.playing = true;
+  ttsq.userPaused = false;
+  ttsStartTicker();
+  ttsNotifyPlaying();
+}
+
+// `stopping` matters: node.stop() fires onended exactly like a natural finish,
+// and without the guard every pause would advance the queue.
+function ttsStopNode() {
+  ttsStopTicker();
+  if (!ttsq.node) return;
+  ttsq.stopping = true;
+  try {
+    ttsq.node.onended = null;
+    ttsq.node.stop();
+    ttsq.node.disconnect();
+  } catch (_e) {
+    void _e;
+  }
+  ttsq.node = null;
+  ttsq.stopping = false;
+}
+
+// Play head = where this node started + how long it has been running, scaled by
+// rate. Rate changes restart the node so this stays a single multiplication.
+function ttsElapsed() {
+  const item = ttsItemById(ttsq.currentId);
+  if (!item || !item.buffer) return 0;
+  const dur = item.buffer.duration;
+  if (!ttsq.playing || !ttsq.ctx) return Math.min(Math.max(ttsq.offset, 0), dur);
+  const t = ttsq.offset + (ttsq.ctx.currentTime - ttsq.startedAt) * ttsq.rate;
+  return Math.min(Math.max(t, 0), dur);
+}
+
+function ttsStartTicker() {
+  ttsStopTicker();
+  ttsq.ticker = window.setInterval(ttsUpdateTime, 200);
+}
+
+function ttsStopTicker() {
+  if (ttsq.ticker) {
+    window.clearInterval(ttsq.ticker);
+    ttsq.ticker = null;
+  }
+}
+
+function ttsFailureReason(error) {
+  const name = error && error.name ? error.name : "";
+  const msg = error && error.message ? error.message : String(error || "");
+  if (name === "EncodingError") return "Audio could not be decoded";
+  if (name === "NotAllowedError") return "Browser blocked playback";
+  if (msg.includes("Web Audio unavailable")) return "Web Audio unavailable here";
+  if (msg.includes("No audio data")) return "No audio returned";
+  return msg || "Playback failed";
+}
+
+// A playback failure is NOT a completion. Aliasing this to ttsOnItemEnded (as
+// the first cut did) made every failure advance the queue, and since the cause
+// was environmental the next item failed identically — the queue burned to its
+// newest entry in milliseconds and the player looked frozen. Stop here, keep
+// the item selected, and put the reason on screen.
+function ttsOnItemError(item, error) {
+  const reason = ttsFailureReason(error);
+  console.warn("[DG Overlay] Read-aloud playback failed:", reason, error);
+  if (item) item.failed = reason;
+  ttsStopCurrent();
+  ttsq.playing = false;
+  ttsq.userPaused = false;
+  ttsNotifyEnded();
+  ttsRender();
 }
 
 function ttsPlayerStyles() {
@@ -4427,6 +4569,10 @@ function ttsPlayerStyles() {
     .dgp-engine { flex: none; font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 6px; border-radius: 999px; background: rgba(255,255,255,0.14); color: rgba(255,255,255,0.8); }
     .dgp-engine[data-engine="webspeech"] { background: rgba(251,191,36,0.2); color: #fcd34d; }
     .dgp-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,0.9); }
+    .dgp-title[data-failed="true"] { color: #fca5a5; }
+    .dgp-fallback { height: 26px; padding: 0 10px; font-size: 11px; font-weight: 600; white-space: nowrap; background: rgba(251,191,36,0.18); color: #fcd34d; }
+    .dgp-fallback:hover { background: rgba(251,191,36,0.28); }
+    .dgp-fallback[hidden] { display: none; }
     .dgp-seek { display: none; align-items: center; gap: 8px; }
     .dgp-seek[data-seekable="true"] { display: flex; }
     .dgp-range { flex: 1; height: 3px; min-width: 70px; cursor: pointer; accent-color: #fff; }
@@ -4453,6 +4599,8 @@ function ttsPlayerStyles() {
     .dgp-row-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: rgba(255,255,255,0.9); font-size: 12px; }
     .dgp-row-badge { flex: none; font-size: 8px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 1px 5px; border-radius: 999px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.6); }
     .dgp-row-badge[data-engine="webspeech"] { background: rgba(251,191,36,0.18); color: #fcd34d; }
+    .dgp-row-badge[data-engine="failed"] { background: rgba(248,113,113,0.2); color: #fca5a5; }
+    .dgp-row[data-failed="true"] .dgp-row-title { color: #fca5a5; }
     .dgp-row-del { flex: none; width: 22px; height: 22px; border-radius: 6px; color: rgba(255,255,255,0.5); background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
     .dgp-row-del:hover { color: #f87171; background: rgba(248,113,113,0.14); }
     .dgp-empty { padding: 14px 12px; text-align: center; font-size: 12px; color: rgba(255,255,255,0.4); }
@@ -4461,6 +4609,13 @@ function ttsPlayerStyles() {
 
 function ttsPlayerMount() {
   if (ttsq.host) return ttsq;
+  // Reloading the extension (dev) or an auto-update (production) kills the old
+  // content script but leaves its injected DOM on the page. `ttsq` is per-
+  // context while the DOM is shared, so the guard above can't see that corpse:
+  // it renders normally, holds no live listeners, and sits on top of the player
+  // we're about to mount. Evict it — a stale queue isn't worth a dead player.
+  const stale = document.getElementById(DG_TTS_PLAYER_ID);
+  if (stale) stale.remove();
   const host = document.createElement("div");
   host.id = DG_TTS_PLAYER_ID;
   const shadow = host.attachShadow({ mode: "open" });
@@ -4479,6 +4634,7 @@ function ttsPlayerMount() {
           <div class="dgp-label"><span class="dgp-engine" data-engine="cloud">HD</span><span class="dgp-title">Reading…</span></div>
           <div class="dgp-seek" data-seekable="false"><input class="dgp-range" type="range" min="0" max="100" value="0" step="0.1" aria-label="Seek" /><span class="dgp-time">0:00 / 0:00</span></div>
         </div>
+        <button class="dgp-btn dgp-fallback" type="button" hidden>Use system voice</button>
         <button class="dgp-btn dgp-rate" type="button" aria-label="Playback speed">1×</button>
         <button class="dgp-btn dgp-toggle" type="button" aria-label="Toggle queue">${DG_TTS_ICON_LIST}<span>0</span></button>
         <button class="dgp-btn dgp-close" type="button" aria-label="Hide player">×</button>
@@ -4496,6 +4652,7 @@ function ttsPlayerMount() {
     playBtn: q(".dgp-play"),
     nextBtn: q(".dgp-next"),
     rateBtn: q(".dgp-rate"),
+    fallbackBtn: q(".dgp-fallback"),
     toggleBtn: q(".dgp-toggle"),
     closeBtn: q(".dgp-close"),
     clearBtn: q(".dgp-clear"),
@@ -4517,8 +4674,27 @@ function ttsPlayerMount() {
     ttsq.expanded = !ttsq.expanded;
     ttsRender();
   });
+  // Opt-in only. The system voice is a markedly worse listen than the cloud
+  // voice, so a failure never silently downgrades to it — the user asks.
+  ttsq.ui.fallbackBtn.addEventListener("click", () => {
+    const item = ttsItemById(ttsq.currentId);
+    if (!item || !item.text) return;
+    item.engine = "webspeech";
+    item.failed = null;
+    ttsSpeakWebSpeech(item);
+    ttsRender();
+  });
+  // A source node can't seek: stop it and start a fresh one at the new offset.
   ttsq.ui.range.addEventListener("input", () => {
-    if (ttsq.audio) ttsq.audio.currentTime = Number(ttsq.ui.range.value);
+    const item = ttsItemById(ttsq.currentId);
+    if (!item || !item.buffer) return;
+    const target = Number(ttsq.ui.range.value);
+    const wasPlaying = ttsq.playing;
+    ttsStopNode();
+    ttsq.offset = target;
+    ttsq.playing = false;
+    if (wasPlaying) ttsStartNode(item, target);
+    ttsUpdateTime();
   });
   ttsq.ui.list.addEventListener("click", (e) => {
     const del = e.target.closest("[data-del]");
@@ -4548,20 +4724,31 @@ function ttsRender() {
     ttsq.ui.playBtn.innerHTML = ttsq.playing ? DG_TTS_ICON_PAUSE : DG_TTS_ICON_PLAY;
     ttsq.ui.playBtn.setAttribute("aria-label", ttsq.playing ? "Pause" : "Play");
     ttsq.ui.playBtn.disabled = ttsq.items.length === 0;
-    ttsq.ui.title.textContent = cur ? cur.label : ttsq.items.length ? "Ready" : "Reading…";
+    ttsq.ui.title.textContent = cur
+      ? cur.failed
+        ? `⚠ ${cur.failed}`
+        : cur.label
+      : ttsq.items.length
+        ? "Ready"
+        : "Reading…";
   }
+  ttsq.ui.title.setAttribute("data-failed", cur && cur.failed ? "true" : "false");
   ttsq.ui.engine.textContent = cur && cur.engine === "webspeech" ? "Offline" : "HD";
   ttsq.ui.engine.setAttribute("data-engine", cur ? cur.engine : "cloud");
 
-  // Seek is meaningful only for a live cloud <audio> with a known duration
-  const seekable = !!(
+  // Manual escape hatch, shown only once this item has actually failed.
+  ttsq.ui.fallbackBtn.hidden = !(
     cur &&
-    cur.engine === "cloud" &&
-    ttsq.audio &&
-    Number.isFinite(ttsq.audio.duration) &&
-    ttsq.audio.duration > 0
+    cur.failed &&
+    cur.text &&
+    "speechSynthesis" in window
   );
+
+  // Seek needs a decoded buffer — duration comes from the AudioBuffer, not a
+  // media element, so it's known the moment decoding resolves.
+  const seekable = !!(cur && cur.engine === "cloud" && cur.buffer && cur.buffer.duration > 0);
   ttsq.ui.seek.setAttribute("data-seekable", seekable ? "true" : "false");
+  if (seekable) ttsq.ui.range.max = String(cur.buffer.duration);
 
   // Prev = older (index-1), Next = newer (index+1)
   ttsq.ui.prevBtn.disabled = !(idx > 0);
@@ -4582,9 +4769,9 @@ function ttsRender() {
     const isCur = it.id === ttsq.currentId;
     const icon = isCur && ttsq.playing ? DG_TTS_ICON_PAUSE : DG_TTS_ICON_PLAY;
     html +=
-      `<div class="dgp-row" data-id="${it.id}" data-current="${isCur}">` +
+      `<div class="dgp-row" data-id="${it.id}" data-current="${isCur}" data-failed="${it.failed ? "true" : "false"}">` +
       `<span class="dgp-row-icon">${icon}</span>` +
-      `<span class="dgp-row-badge" data-engine="${it.engine || "cloud"}">${it.engine === "webspeech" ? "Off" : "HD"}</span>` +
+      `<span class="dgp-row-badge" data-engine="${it.failed ? "failed" : it.engine || "cloud"}">${it.failed ? "!" : it.engine === "webspeech" ? "Off" : "HD"}</span>` +
       `<span class="dgp-row-title">${dgEscapeHtml(it.label)}</span>` +
       `<button class="dgp-row-del" type="button" data-del="${it.id}" aria-label="Delete from queue">${DG_TTS_ICON_TRASH}</button>` +
       `</div>`;
@@ -4593,10 +4780,13 @@ function ttsRender() {
 }
 
 function ttsUpdateTime() {
-  if (!ttsq.ui || !ttsq.audio) return;
-  const cur = ttsq.audio.currentTime || 0;
-  const dur = Number.isFinite(ttsq.audio.duration) ? ttsq.audio.duration : 0;
-  ttsq.ui.range.value = String(Math.min(cur, dur || cur));
+  if (!ttsq.ui) return;
+  const item = ttsItemById(ttsq.currentId);
+  const dur = item && item.buffer ? item.buffer.duration : 0;
+  if (!dur) return;
+  const cur = ttsElapsed();
+  ttsq.ui.range.max = String(dur);
+  ttsq.ui.range.value = String(cur);
   ttsq.ui.time.textContent = `${dgFmtTime(cur)} / ${dgFmtTime(dur)}`;
 }
 
@@ -4611,22 +4801,7 @@ function ttsNotifyEnded() {
 // Stop the current item WITHOUT advancing or reporting end. Handlers are
 // detached first so the pause/cancel doesn't re-enter the advance logic.
 function ttsStopCurrent() {
-  if (ttsq.audio) {
-    ttsq.audio.onplay =
-      ttsq.audio.onpause =
-      ttsq.audio.onended =
-      ttsq.audio.onerror =
-      ttsq.audio.onloadedmetadata =
-      ttsq.audio.ontimeupdate =
-        null;
-    try {
-      ttsq.audio.pause();
-    } catch (_e) {
-      void _e;
-    }
-    ttsq.audio.src = "";
-    ttsq.audio = null;
-  }
+  ttsStopNode();
   if (ttsq.utt) {
     ttsq.utt.onstart = ttsq.utt.onend = ttsq.utt.onerror = ttsq.utt.onpause = ttsq.utt.onresume = null;
     ttsq.utt = null;
@@ -4639,7 +4814,7 @@ function ttsStopCurrent() {
 
 function ttsSpeakWebSpeech(item) {
   if (!("speechSynthesis" in window) || !item || !item.text) {
-    ttsOnItemEnded();
+    ttsOnItemError(item, new Error("No speech synthesis available"));
     return;
   }
   const synth = window.speechSynthesis;
@@ -4662,7 +4837,13 @@ function ttsSpeakWebSpeech(item) {
     ttsRender();
   };
   utt.onend = ttsOnItemEnded;
-  utt.onerror = ttsOnItemEnded;
+  // "canceled"/"interrupted" are our own stop()/cancel() coming back around —
+  // real failures are everything else, and they must not advance the queue.
+  utt.onerror = (event) => {
+    const kind = event && event.error;
+    if (kind === "canceled" || kind === "interrupted") return;
+    ttsOnItemError(item, new Error(`Speech synthesis failed (${kind || "unknown"})`));
+  };
   ttsq.utt = utt;
   synth.speak(utt);
 }
@@ -4674,38 +4855,23 @@ function ttsPlayItem(id) {
   ttsq.currentId = id;
   ttsq.userPaused = false;
   ttsq.loading = false;
+  ttsq.offset = 0;
+  item.failed = null;
 
   if (item.engine === "cloud") {
-    const audio = new Audio(`data:${item.mimeType || "audio/mpeg"};base64,${item.base64}`);
-    audio.playbackRate = ttsq.rate;
-    ttsq.audio = audio;
-    audio.onloadedmetadata = () => {
-      if (Number.isFinite(audio.duration) && audio.duration > 0) {
-        item.duration = audio.duration;
-        ttsq.ui.range.max = String(audio.duration);
-      }
-      ttsRender();
-      ttsUpdateTime();
-    };
-    audio.ontimeupdate = ttsUpdateTime;
-    audio.onplay = () => {
-      ttsq.playing = true;
-      ttsq.userPaused = false;
-      ttsRender();
-      ttsNotifyPlaying();
-    };
-    audio.onpause = () => {
-      if (audio.ended) return; // 'ended' handles finish; ignore its trailing pause
-      ttsq.playing = false;
-      ttsRender();
-    };
-    audio.onended = ttsOnItemEnded;
-    audio.onerror = ttsOnItemEnded;
-    audio.play().catch((error) => {
-      console.warn("[DG Overlay] TTS playback failed", error);
-      ttsq.playing = false;
-      ttsRender();
-    });
+    ttsDecode(item)
+      .then(() => {
+        // A newer read (or a queue jump) landed while we were decoding — that
+        // one owns the transport now.
+        if (ttsq.currentId !== id) return;
+        ttsStartNode(item, 0);
+        ttsRender();
+        ttsUpdateTime();
+      })
+      .catch((error) => {
+        if (ttsq.currentId !== id) return;
+        ttsOnItemError(item, error);
+      });
   } else {
     ttsSpeakWebSpeech(item);
   }
@@ -4736,16 +4902,19 @@ function ttsTogglePlay() {
     return;
   }
   if (item.engine === "cloud") {
-    if (ttsq.audio && !ttsq.audio.ended) {
-      if (ttsq.audio.paused) {
-        ttsq.userPaused = false;
-        ttsq.audio.play().catch(() => {});
-      } else {
-        ttsq.userPaused = true;
-        ttsq.audio.pause();
-      }
+    if (ttsq.playing && ttsq.node) {
+      // Pause = capture the play head, drop the node. Resume rebuilds one.
+      ttsq.offset = ttsElapsed();
+      ttsStopNode();
+      ttsq.playing = false;
+      ttsq.userPaused = true;
+      ttsNotifyEnded();
+      ttsRender();
+    } else if (item.buffer && ttsq.offset > 0 && ttsq.offset < item.buffer.duration) {
+      ttsStartNode(item, ttsq.offset);
+      ttsRender();
     } else {
-      ttsPlayItem(item.id); // fresh or finished → (re)load and play
+      ttsPlayItem(item.id); // fresh, finished, or failed → (re)decode and play
     }
   } else if ("speechSynthesis" in window) {
     const synth = window.speechSynthesis;
@@ -4774,10 +4943,14 @@ function ttsGoNext() {
 function ttsCycleRate() {
   const i = DG_TTS_RATES.indexOf(ttsq.rate);
   ttsq.rate = DG_TTS_RATES[(i + 1) % DG_TTS_RATES.length];
-  if (ttsq.audio) {
-    ttsq.audio.playbackRate = ttsq.rate; // free — retimes the buffer, no re-fetch
+  const cur = ttsItemById(ttsq.currentId);
+  if (ttsq.node && ttsq.playing && cur) {
+    // Restarting rather than just setting playbackRate keeps ttsElapsed()'s
+    // single `(now - startedAt) * rate` term honest across a rate change.
+    const at = ttsElapsed();
+    ttsStopNode();
+    ttsStartNode(cur, at);
   } else if (ttsq.utt && "speechSynthesis" in window && window.speechSynthesis.speaking) {
-    const cur = ttsItemById(ttsq.currentId);
     if (cur) ttsSpeakWebSpeech(cur); // rate is locked at speak() time → re-speak
   }
   ttsRender();
@@ -4868,7 +5041,7 @@ chrome.runtime.onMessage.addListener((message) => {
       label: dgTtsLabel(message.preview),
       mimeType: message.mimeType || "audio/mpeg",
       base64: message.audioBase64,
-      text: "",
+      text: message.text || "", // enables the manual system-voice retry
     });
   } else if (message.type === "dg-tts-fallback") {
     ttsAddReadyItem({
@@ -4880,9 +5053,10 @@ chrome.runtime.onMessage.addListener((message) => {
   } else if (message.type === "dg-tts-stop") {
     // Manual "Stop reading" from the native menu → pause; keep the session
     // queue intact. The background already retired the menu item.
-    if (ttsq.audio && !ttsq.audio.paused) {
+    if (ttsq.node && ttsq.playing) {
+      ttsq.offset = ttsElapsed(); // resume picks up here, not from the start
       ttsq.userPaused = true;
-      ttsq.audio.pause();
+      ttsStopNode();
     } else if ("speechSynthesis" in window && window.speechSynthesis.speaking) {
       ttsq.userPaused = true;
       window.speechSynthesis.pause();

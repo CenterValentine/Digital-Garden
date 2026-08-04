@@ -177,6 +177,24 @@ Phase 0 + hardening + Phase 1 (research loop) + Phase 2a (launcher + one determi
 - [ ] **[nice-to-have] PWA → extension co-browse handoff.** Co-browse is trust-gated to the extension's side-panel embed (`isPanelEmbedSurface`), which a standalone **PWA window doesn't have** (no side panel; not part of the browser tab strip; `chrome.debugger` drives browser tabs, not a PWA window). So co-browse is correctly UNAVAILABLE in the PWA and fails safe (the `co_browse_*` / `read_current_page` tools simply don't register — `coBrowseAvailable:false`). A future nicety: when the user asks to co-browse from the PWA, **hand off** to the browser — open/focus a regular browser window with the extension side panel and carry the conversation over. Owner: nice to have, not necessary now (co-browsing arguably belongs in the browser context anyway).
 - [ ] **`web_search_preview` + gpt-4 silent-hang model-gating.** The OpenAI `web_search_preview` tool isn't supported on `gpt-4` and hangs the turn silently (surfaced during Phase 1 smoke testing; worked around by switching to GPT-4o). Gate the tool off for unsupported models with a clear signal instead of a hang.
 - Rich, previewable approval cards (the research-plan card + future co-browsing checkpoints) are tracked in the **needsApproval overhaul** item above — a shared HITL-surface investment, not agentic-browsing-specific.
+---
+
+## Read-Aloud Playback Constraints (2026-08-04, fixed on `feat/tone-system-and-extension-tts`)
+
+**Do not reintroduce `new Audio("data:...")` for extension read-aloud.** Content scripts inject into the page's DOM, so any element they add loads subresources under the **page's** CSP, not the extension's. A site serving `default-src 'self'` with no `media-src` (news.ycombinator.com, GitHub, most news sites) refuses a `data:` media URI outright — and `blob:` for the same reason. Playback now goes through Web Audio (`decodeAudioData` → `AudioBufferSourceNode`), which never mints a URL and so has no CSP surface.
+
+Cost of that choice, for whoever touches the transport next: a source node is single-use with no pause/seek/currentTime, so `ttsq.offset` + `ttsq.startedAt` reconstruct the play head and pause/seek/rate-change each stop the node and start a fresh one. `ttsq.stopping` suppresses `onended` during those deliberate stops — without it, every pause advances the queue.
+
+Related invariant: **a playback error is not a completion.** The original code aliased `audio.onerror = ttsOnItemEnded`, so a CSP refusal advanced the queue; the next item failed identically and the queue burned to its newest entry in ~10ms, presenting as a frozen player with no diagnostics. `ttsOnItemError` now stops, flags the item, and surfaces the reason.
+
+- [ ] **Offscreen document for playback** — not needed now that Web Audio works everywhere, but `chrome.offscreen` (reason `AUDIO_PLAYBACK`) remains the fallback if we ever need a real media element (streaming long-form audio, native seek, media-session integration). Cost is message-passing the whole transport across contexts, since the player UI stays in the page.
+- [ ] **Orphaned-content-script DOM** — `ttsPlayerMount` now evicts a stale `#dg-tts-player-host` before mounting. Extension reload (dev) and auto-update (production) both kill the content script while leaving its injected DOM on the page: it renders normally, holds no live listeners, and sits on top of the new player. Any future page-injected UI in this extension needs the same guard.
+
+---
+
+## Browser Extension Ideas (2026-07-29)
+
+- [ ] **Agentic browser-tab teleportation** — from the extension's browser chat, the user asks the agent to take them to a tab they have open ("take me to the Stripe dashboard tab"). The agent reviews all open tabs (`chrome.tabs.query` → title/URL/favicon inventory) and activates the best match (`chrome.tabs.update(tabId, { active: true })` + `chrome.windows.update(windowId, { focused: true })` for cross-window jumps). If the request doesn't narrow to one tab, the agent either asks a clarifying question or renders the likely candidates as clickable rows in chat — each row messages the service worker to activate its tab (raw links/JS can't switch tabs; activation must go through the extension's privileged context). Architecture: same client-mediated AI-tool lane as the B5 acquisition provider (server can't reach the browser, so the tool is registered client-side and executed via the panel-host/page-bridge channel); pairs naturally with the deferred "AI browser-acquisition tool" followup from PR #136. Needs the `tabs` permission (full title/URL access — capture-policy/privacy-gate considerations from B3-B apply). Possible v2: fuzzy match against Recents/history so "that article about FSRS" resolves even after the tab was closed (reopen instead of switch).
 
 ---
 

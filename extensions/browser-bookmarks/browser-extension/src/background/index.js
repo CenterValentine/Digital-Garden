@@ -1761,6 +1761,11 @@ async function readAloudSelection(tabId, selectionText) {
       audioBase64: base64,
       mimeType,
       preview,
+      // Carried alongside the audio so the overlay can offer the system voice
+      // as a manual retry if decoding fails — without a second round trip to
+      // the TTS proxy. The content script already has this text (it's the
+      // user's own selection), so this discloses nothing new to the page.
+      text,
     });
   } catch (error) {
     console.warn(
