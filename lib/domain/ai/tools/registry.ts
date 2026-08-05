@@ -622,9 +622,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
           );
-          return { ok: true, recorded: itemKey, status, ledgerNodeId: ledger.contentNodeId };
+          return {
+            ok: true,
+            recorded: itemKey,
+            status,
+            ledgerNodeId: ledger.contentNodeId,
+            // Continuation directive after EVERY item — the run must not stall
+            // here (observed live: model recorded 1 item then asked "shall I
+            // continue?"). This is a server tool so the model keeps going in the
+            // same turn; push it to the next item, not to the user.
+            next: "Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you write the roll-up (createNote) and call record_iteration_findings.",
+          };
         } catch (error) {
-          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue; reconcile in the roll-up.` };
+          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
         }
       },
     }),
