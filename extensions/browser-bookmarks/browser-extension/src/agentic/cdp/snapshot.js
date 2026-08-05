@@ -8,7 +8,7 @@
 // boundaries natively, which is exactly why a11y-first targeting sidesteps
 // Playwright's shadow-piercing selectors (Category B, resolved cheaply).
 
-import { send, getChildSessions, getSession, ensureSession } from "./executor.js";
+import { send, getChildSessions, getSession, ensureSession, NO_SESSION_MESSAGE } from "./executor.js";
 
 // Roles the agent can act on. Deliberately broad but not exhaustive.
 const INTERACTABLE_ROLES = new Set([
@@ -197,7 +197,7 @@ export async function getA11ySnapshot() {
   // recovery inside the loop would silently return []).
   if (!getSession()) {
     await ensureSession();
-    if (!getSession()) throw new Error("No active co-browse session — attach first.");
+    if (!getSession()) throw new Error(NO_SESSION_MESSAGE);
   }
   const out = [];
   const groupState = { counter: 0 };

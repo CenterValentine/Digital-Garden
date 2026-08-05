@@ -101,7 +101,7 @@ export async function attach(tabId) {
   await attachDebugger({ tabId }, PROTOCOL_VERSION);
   session = { tabId, startedAt: Date.now() };
   childSessions.clear();
-  persistSession(tabId); // survive MV3 SW eviction (see ensureSession)
+  persistSessionTab(tabId); // survive MV3 SW eviction / app reload (see ensureSession)
   for (const domain of DOMAINS_ON_ATTACH) {
     try {
       await sendCommand({ tabId }, domain);
@@ -133,7 +133,7 @@ export async function attach(tabId) {
 // Our in-app Stop → detach → banner disappears. Idempotent; clears state first
 // so a racing send() fails fast rather than hitting a half-torn-down session.
 export async function detach() {
-  clearSession(); // intentional end — do not auto-recover
+  clearSessionTab(); // intentional end — do not auto-recover
   if (!session) return { detached: false };
   const { tabId } = session;
   session = null;
@@ -151,44 +151,33 @@ export async function detach() {
 // tabId in chrome.storage.session (survives SW restarts within the browser
 // session) and transparently re-attach on the next op, so co-browse survives the
 // eviction instead of dead-ending the run.
-const SESSION_KEY = "dgCoBrowseSession"; // { tabId, at } — at = last-active ms
-// Recover ONLY a session that was active within this window. This is the safety
-// bound: it heals an eviction that just happened during an ACTIVE co-browse, but
-// NEVER silently resurrects an idle/abandoned session into a later or different
-// chat. Starting a fresh co-browse is co_browse_open's job (it opens a new tab),
-// so recovery is strictly for continuing a session the user was just using.
-const RECOVERY_WINDOW_MS = 30 * 60 * 1000;
-let lastActivityWrite = 0; // in-memory throttle for the activity stamp
-
-function persistSession(tabId) {
+// The driven tab id, persisted so co-browse survives an MV3 SW eviction or an app
+// reload (both wipe the in-memory `session` var + drop the debugger). The
+// persistence boundary is NATURAL, not a timer: chrome.storage.session survives SW
+// eviction + app reload, but is CLEARED on a browser/device restart — and a closed
+// tab fails chrome.tabs.get below. Those are exactly the two legitimate "abandon
+// it" cases; anything else (the tab is still open) stays recoverable however long
+// ago, because a session IS its tab.
+const SESSION_KEY = "dgCoBrowseTabId";
+function persistSessionTab(tabId) {
   try {
-    const now = Date.now();
-    chrome.storage.session.set({ [SESSION_KEY]: { tabId, at: now } });
-    lastActivityWrite = now;
+    chrome.storage.session.set({ [SESSION_KEY]: tabId });
   } catch {
     // storage.session unavailable (older Chromium) — recovery is best-effort.
   }
 }
-// Refresh the activity stamp during a LIVE session (throttled) so a long
-// co-browse stays recoverable across an eviction — without a storage write per op.
-function touchSession(tabId) {
-  if (Date.now() - lastActivityWrite < 60000) return;
-  persistSession(tabId);
-}
-function clearSession() {
+function clearSessionTab() {
   try {
     chrome.storage.session.remove(SESSION_KEY);
   } catch {
     /* best-effort */
   }
-  lastActivityWrite = 0;
 }
-async function readSession() {
+async function readSessionTab() {
   try {
     const got = await chrome.storage.session.get(SESSION_KEY);
-    const s = got && got[SESSION_KEY];
-    if (s && typeof s.tabId === "number" && typeof s.at === "number") return s;
-    return null;
+    const id = got && got[SESSION_KEY];
+    return typeof id === "number" ? id : null;
   } catch {
     return null;
   }
@@ -196,26 +185,23 @@ async function readSession() {
 
 let recovering = null; // de-dupe concurrent recovery attempts
 
-// Ensure an in-memory session, recovering one lost to SW eviction by re-attaching
-// to the persisted tab — but ONLY if it was active recently (RECOVERY_WINDOW_MS),
-// so an abandoned session never auto-attaches to a new chat. Returns the session,
-// or null if there's nothing safe to recover. Idempotent + concurrency-safe.
+// Recover a session lost to SW eviction / app reload by re-attaching to the SAME
+// tab — valid as long as that tab is still OPEN (chrome.tabs.get), regardless of
+// how long ago. Returns the session, or null if there is genuinely nothing open to
+// recover (the record was cleared by a browser restart, or the tab was closed) —
+// in which case the caller starts a fresh session instead of stalling.
 export async function ensureSession() {
   if (session) return session;
   if (recovering) return recovering;
   recovering = (async () => {
     try {
-      const saved = await readSession();
-      if (!saved) return null;
-      if (Date.now() - saved.at > RECOVERY_WINDOW_MS) {
-        clearSession(); // stale — the user moved on; do not resurrect it
-        return null;
-      }
-      await chrome.tabs.get(saved.tabId); // confirm the tab still exists (throws if gone)
-      await attach(saved.tabId); // re-establishes the debugger + session (banner reappears)
+      const tabId = await readSessionTab();
+      if (tabId == null) return null;
+      await chrome.tabs.get(tabId); // still open? (throws if the tab is gone)
+      await attach(tabId); // re-establishes the debugger + session (banner reappears)
       return session;
     } catch {
-      clearSession();
+      clearSessionTab();
       return null;
     } finally {
       recovering = null;
@@ -234,11 +220,16 @@ function targetOf(sessionId) {
 export async function send(method, params, sessionId) {
   if (!session) {
     await ensureSession();
-    if (!session) throw new Error("No active co-browse session — attach first.");
+    if (!session) throw new Error(NO_SESSION_MESSAGE);
   }
-  touchSession(session.tabId); // keep the recovery window fresh during activity
   return sendCommand(targetOf(sessionId), method, params);
 }
+
+// Actionable no-session message (recovery already tried + failed): the previous
+// co-browse tab is genuinely gone, so tell the model to START FRESH rather than
+// stall. It has co_browse_open; "attach" is not a tool it can call.
+export const NO_SESSION_MESSAGE =
+  "No active co-browse session — the previous co-browse tab is gone (e.g. the browser was restarted or the tab was closed). Start a new session by opening the page with co_browse_open, then continue.";
 
 // The top-left of a child frame's viewport in ROOT coordinates — the sum of the
 // owning <iframe> element offsets from this frame up to the top (Slice 3c-2). For
@@ -285,7 +276,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
     const endedTab = session.tabId;
     session = null;
     childSessions.clear();
-    clearSession(); // authoritative end (banner cancel / tab closed) — no recovery
+    clearSessionTab(); // authoritative end (banner cancel / tab closed) — no recovery
     if (onSessionEnd) {
       try {
         onSessionEnd(reason, endedTab);
