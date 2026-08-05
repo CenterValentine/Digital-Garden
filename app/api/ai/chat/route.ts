@@ -371,6 +371,42 @@ export async function POST(request: Request) {
         }
         return budget;
       })();
+      // Per-item iteration (spec) — same shape as researchPageBudget: an active
+      // iteration (approved propose_item_iteration, not yet closed by
+      // record_iteration_findings) raises the step cap so the loop has room to
+      // process ALL its items in the run. Without this the default 7/8-step cap
+      // ends the turn after ~1 item, even though the client item budget allows N.
+      const itemIterationBudget = ((): number | null => {
+        const msgs = (body as { messages?: unknown }).messages;
+        if (!Array.isArray(msgs)) return null;
+        let budget: number | null = null;
+        for (const m of msgs) {
+          const parts = (m as { parts?: unknown }).parts;
+          if (!Array.isArray(parts)) continue;
+          for (const part of parts) {
+            const p = part as {
+              type?: string;
+              state?: string;
+              output?: { ok?: boolean; itemBudget?: number };
+            };
+            if (
+              p.type === "tool-propose_item_iteration" &&
+              p.state === "output-available"
+            ) {
+              const b = p.output?.itemBudget;
+              if (p.output?.ok && typeof b === "number" && Number.isFinite(b) && b > 0) {
+                budget = Math.min(Math.floor(b), 40);
+              }
+            } else if (
+              p.type === "tool-record_iteration_findings" &&
+              p.state === "output-available"
+            ) {
+              budget = null; // run closed → back to default caps
+            }
+          }
+        }
+        return budget;
+      })();
       const routingPlaybookId = modelPinned
         ? null
         : (routingExplicitPlaybookId ?? routingRootedPlaybookId);
@@ -1704,11 +1740,17 @@ export async function POST(request: Request) {
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
         stopWhen: stepCountIs(
-          researchPageBudget != null
-            ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7,
+          itemIterationBudget != null
+            ? // Each item ≈ read + record (+ optional re-read); +8 overhead for
+              // list_tabs / propose / roll-up createNote / record_iteration_findings.
+              // The client item budget is the true limiter (soft-stops new items);
+              // this is the safety ceiling that must not cut off before it.
+              itemIterationBudget * 4 + 8
+            : researchPageBudget != null
+              ? researchPageBudget * 2 + 4
+              : editableContentId
+                ? 8
+                : 7,
         ),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
