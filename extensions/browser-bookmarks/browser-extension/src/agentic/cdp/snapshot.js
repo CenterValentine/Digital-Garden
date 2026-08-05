@@ -103,12 +103,38 @@ function isChallengeFrame(url) {
   return CHALLENGE_FRAME_PATTERNS.some((p) => u.includes(p));
 }
 
-// Which currently-attached child frames are captcha/challenge frames — a pure URL
-// read over getChildSessions (no AX call). Callers surface `captchaDetected` to the
-// model so it can STOP and hand to the user instead of trying to solve a captcha.
+// ACTIVE, user-facing challenge frames — a NARROWER set than the suppression list
+// above. This is what raises `captchaDetected` (which HALTS the run), so it must
+// match only a challenge actually presented to the user, NOT the ambient,
+// invisible bot-scoring frames many sites load on every page. The false positive
+// this fixes (observed live): LinkedIn loads reCAPTCHA Enterprise's `anchor` frame
+// ambiently on jobs pages — no challenge shown — which halted a co-browse run.
+// reCAPTCHA: `bframe` is the challenge popup; `anchor`/api.js/webworker are
+// ambient. hCaptcha / FunCaptcha / DataDome challenge frames are interactive by
+// nature. Ambient scorers (PerimeterX, Turnstile-managed, reCAPTCHA v3) are
+// excluded here — their nodes are still suppressed above, they just don't HALT.
+const ACTIVE_CHALLENGE_PATTERNS = [
+  "/recaptcha/api2/bframe",
+  "/recaptcha/enterprise/bframe",
+  "hcaptcha.com/captcha",
+  "arkoselabs.com",
+  "funcaptcha.com",
+  "captcha-delivery.com", // DataDome interactive challenge
+];
+
+function isActiveChallengeFrame(url) {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return ACTIVE_CHALLENGE_PATTERNS.some((p) => u.includes(p));
+}
+
+// Which currently-attached child frames are ACTIVE captcha challenges — a pure URL
+// read over getChildSessions (no AX call). Callers surface `captchaDetected` so the
+// model STOPS and hands to the user. Uses the NARROW active-challenge test (not the
+// broad suppression list) so ambient bot-scoring frames don't falsely halt a run.
 export function detectChallenges() {
   const frames = getChildSessions()
-    .filter((f) => isChallengeFrame(f.url))
+    .filter((f) => isActiveChallengeFrame(f.url))
     .map((f) => f.url);
   return { captchaDetected: frames.length > 0, frames };
 }
