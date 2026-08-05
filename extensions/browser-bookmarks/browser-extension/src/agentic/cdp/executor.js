@@ -101,6 +101,7 @@ export async function attach(tabId) {
   await attachDebugger({ tabId }, PROTOCOL_VERSION);
   session = { tabId, startedAt: Date.now() };
   childSessions.clear();
+  persistSessionTab(tabId); // survive MV3 SW eviction (see ensureSession)
   for (const domain of DOMAINS_ON_ATTACH) {
     try {
       await sendCommand({ tabId }, domain);
@@ -132,6 +133,7 @@ export async function attach(tabId) {
 // Our in-app Stop → detach → banner disappears. Idempotent; clears state first
 // so a racing send() fails fast rather than hitting a half-torn-down session.
 export async function detach() {
+  clearSessionTab(); // intentional end — do not auto-recover
   if (!session) return { detached: false };
   const { tabId } = session;
   session = null;
@@ -140,14 +142,77 @@ export async function detach() {
   return { detached: true, tabId };
 }
 
+// ── Session persistence + recovery (MV3 SW-eviction resilience) ───────────────
+// The active co-browse session lives in the `session` module var, which an MV3
+// service-worker eviction wipes — AND the eviction drops the debugger attachment
+// too. Symptom (observed live): a co_browse op returns "No active co-browse
+// session" even right after a successful open, because the SW cycled between the
+// two messages (e.g. while the user reloaded the app). We persist the driven
+// tabId in chrome.storage.session (survives SW restarts within the browser
+// session) and transparently re-attach on the next op, so co-browse survives the
+// eviction instead of dead-ending the run.
+const SESSION_TAB_KEY = "dgCoBrowseTabId";
+function persistSessionTab(tabId) {
+  try {
+    chrome.storage.session.set({ [SESSION_TAB_KEY]: tabId });
+  } catch {
+    // storage.session unavailable (older Chromium) — recovery is best-effort.
+  }
+}
+function clearSessionTab() {
+  try {
+    chrome.storage.session.remove(SESSION_TAB_KEY);
+  } catch {
+    /* best-effort */
+  }
+}
+async function readSessionTab() {
+  try {
+    const got = await chrome.storage.session.get(SESSION_TAB_KEY);
+    const id = got && got[SESSION_TAB_KEY];
+    return typeof id === "number" ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+let recovering = null; // de-dupe concurrent recovery attempts
+
+// Ensure an in-memory session, recovering one lost to SW eviction by re-attaching
+// to the persisted tab. Returns the session, or null if there's nothing to
+// recover (no stored tab, or the tab was closed). Idempotent + concurrency-safe.
+export async function ensureSession() {
+  if (session) return session;
+  if (recovering) return recovering;
+  recovering = (async () => {
+    try {
+      const tabId = await readSessionTab();
+      if (tabId == null) return null;
+      await chrome.tabs.get(tabId); // confirm the tab still exists (throws if gone)
+      await attach(tabId); // re-establishes the debugger + session (banner reappears)
+      return session;
+    } catch {
+      clearSessionTab();
+      return null;
+    } finally {
+      recovering = null;
+    }
+  })();
+  return recovering;
+}
+
 function targetOf(sessionId) {
   return sessionId ? { tabId: session.tabId, sessionId } : { tabId: session.tabId };
 }
 
-// The single CDP primitive every later slice builds on. Throws if no session.
-// Pass a child `sessionId` (from getChildSessions) to target a cross-origin frame.
+// The single CDP primitive every later slice builds on. Self-heals a session lost
+// to SW eviction (ensureSession) before failing. Pass a child `sessionId` (from
+// getChildSessions) to target a cross-origin frame.
 export async function send(method, params, sessionId) {
-  if (!session) throw new Error("No active co-browse session — attach first.");
+  if (!session) {
+    await ensureSession();
+    if (!session) throw new Error("No active co-browse session — attach first.");
+  }
   return sendCommand(targetOf(sessionId), method, params);
 }
 
@@ -196,6 +261,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
     const endedTab = session.tabId;
     session = null;
     childSessions.clear();
+    clearSessionTab(); // authoritative end (banner cancel / tab closed) — no recovery
     if (onSessionEnd) {
       try {
         onSessionEnd(reason, endedTab);

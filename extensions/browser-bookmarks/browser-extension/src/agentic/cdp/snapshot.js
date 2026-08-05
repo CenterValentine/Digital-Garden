@@ -8,7 +8,7 @@
 // boundaries natively, which is exactly why a11y-first targeting sidesteps
 // Playwright's shadow-piercing selectors (Category B, resolved cheaply).
 
-import { send, getChildSessions, getSession } from "./executor.js";
+import { send, getChildSessions, getSession, ensureSession } from "./executor.js";
 
 // Roles the agent can act on. Deliberately broad but not exhaustive.
 const INTERACTABLE_ROLES = new Set([
@@ -190,11 +190,15 @@ async function collectFrame(out, groupState, sessionId, frameUrl) {
 // Each node carries a `group` (nearest container) so related elements cluster;
 // cross-frame nodes carry `sessionId`/`frameUrl`.
 export async function getA11ySnapshot() {
-  // Fail LOUD with no session. An empty snapshot when nothing is attached is a lie
-  // that reads as "no matches found" — it masked a forgot-to-attach during Slice 4
-  // de-risk, burning a debugging round. The AI path always attaches first, so this
-  // only ever fires for genuine misuse (or a session that ended mid-flight).
-  if (!getSession()) throw new Error("No active co-browse session — attach first.");
+  // Self-heal a session lost to SW eviction (ensureSession re-attaches to the
+  // persisted tab), then fail LOUD if there's genuinely nothing. An empty snapshot
+  // when nothing is attached is a lie that reads as "no matches found" — the guard
+  // must throw here (collectFrame swallows per-frame errors, so relying on send()'s
+  // recovery inside the loop would silently return []).
+  if (!getSession()) {
+    await ensureSession();
+    if (!getSession()) throw new Error("No active co-browse session — attach first.");
+  }
   const out = [];
   const groupState = { counter: 0 };
   await collectFrame(out, groupState, undefined, undefined); // top frame

@@ -75,12 +75,12 @@ export function CoBrowseIndicator() {
   };
 
   return (
-    <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-100">
+    <div className="flex items-center gap-2 border-b border-amber-400 bg-amber-100 px-3 py-1.5 text-xs text-amber-950 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
       <span className="relative flex h-2 w-2 shrink-0">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-600 opacity-75 dark:bg-amber-500" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-600 dark:bg-amber-500" />
       </span>
-      <span className="min-w-0 flex-1 truncate font-medium">
+      <span className="min-w-0 flex-1 truncate font-semibold">
         {waitUntil
           ? `⏱ ${waitLabel ? `${waitLabel} — ` : ""}${fmt(remaining)} left`
           : `Co-browsing${host ? ` — ${host}` : ""}`}
@@ -88,7 +88,7 @@ export function CoBrowseIndicator() {
       <button
         type="button"
         onClick={() => void coBrowseReveal()}
-        className="shrink-0 rounded px-1.5 py-0.5 font-medium hover:bg-amber-500/20"
+        className="shrink-0 rounded border border-amber-500/50 px-1.5 py-0.5 font-medium text-amber-900 hover:bg-amber-500/20 dark:border-amber-400/40 dark:text-amber-100"
       >
         Show me
       </button>
