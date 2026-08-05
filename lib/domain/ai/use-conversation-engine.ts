@@ -1525,6 +1525,17 @@ export function useConversationEngine({
           // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
           if (run) run.pagesUsed += 1;
           const c = outcome.content;
+          // During an item iteration, a read that comes back near-empty (a search
+          // page, a 404, a stub) is still an ATTEMPTED item. Nudge the model to
+          // record it as unreadable BEFORE moving on — otherwise it silently skips
+          // it and the ledger under-counts (observed live: a 190-char page dropped
+          // from a 10-item run). Structural backstop to the prompt's "record every
+          // attempt" rule.
+          const thin = (c.content?.trim().length ?? 0) < 500;
+          const iterationNote =
+            iteration && thin
+              ? "This page has no substantial job description (near-empty). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+              : undefined;
           chat.addToolResult({
             tool: toolName,
             toolCallId: toolCall.toolCallId,
@@ -1540,15 +1551,22 @@ export function useConversationEngine({
               // The escalation summary (if any) — the model relays it so the user
               // sees the steps (normal read → visible-tab open) it actually took.
               ...(escalationNote ? { escalationNote } : {}),
+              ...(iterationNote ? { iterationNote } : {}),
             },
           });
         } else {
           chat.addToolResult({
             tool: toolName,
             toolCallId: toolCall.toolCallId,
-            output: isTabLaunch
-              ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
-              : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`,
+            output:
+              (isTabLaunch
+                ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
+                : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`) +
+              // A failed read during an iteration is still an attempted item —
+              // record it, don't silently skip (keeps the ledger complete).
+              (iteration
+                ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                : ""),
           });
         }
       } catch (err) {
