@@ -56,6 +56,8 @@ import {
 } from "./output-placement";
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
+import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
+import { logger } from "@/lib/core/logger";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -1466,6 +1468,34 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
           },
         });
+
+        // Realign the collaborative Y.Doc with the payload we just wrote.
+        // updateNote writes NotePayload directly (bypassing collab), so for a
+        // collab-enabled note a stale-but-non-empty CollaborationDocument wins at
+        // bootstrap and the AI's edit stays INVISIBLE in the open editor — the
+        // NotePayload↔Y.Doc seam (DB-confirmed live). Guarded to notes that
+        // ALREADY have a collab doc: that's the only case divergence can happen
+        // (a note with no collab doc seeds fresh FROM NotePayload on first open),
+        // so we never enable collab on a note that wasn't. Non-fatal: NotePayload
+        // is the durable source of truth, so a reseed failure can't fail the write.
+        try {
+          const hasCollabDoc = await prisma.collaborationDocument.findUnique({
+            where: { contentId },
+            select: { contentId: true },
+          });
+          if (hasCollabDoc) {
+            await reseedCollaborationDocumentFromNote(prisma, contentId);
+          }
+        } catch (error) {
+          logger.error({
+            layer: "ai",
+            event: "update_note:reseed_failed",
+            summary: "failed to reseed collaboration doc after updateNote write",
+            attrs: { content_id: contentId },
+            error,
+          });
+        }
+
         return JSON.stringify({
           __notePayload: true,
           kind: "updated",
