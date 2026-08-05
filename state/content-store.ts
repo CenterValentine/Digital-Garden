@@ -274,6 +274,28 @@ function getActiveTab(state: Pick<ContentState, "activePaneId" | "panes" | "tabs
   return getPaneActiveTab(state, state.activePaneId);
 }
 
+/**
+ * The garden content the user is actively VIEWING — the focused pane's active tab
+ * — as a lightweight hint for the chat: contentId + title, ONLY for text-bearing
+ * content (note/folder, what getCurrentNote can read). The internal twin of
+ * getCurrentPageHint (which serves the external co-browse page): this lets the
+ * sidebar chat resolve "this doc / this note / the page I'm viewing" without the
+ * user naming it. Returns null when nothing readable is focused, and harmlessly
+ * null in the embed panel (default store, no panes). Read at chat send-time.
+ */
+export function getActiveViewedContentHint(): {
+  contentId: string;
+  title: string;
+} | null {
+  const state = useContentStore.getState();
+  const activeTab = getActiveTab(state);
+  if (!activeTab?.contentId) return null;
+  const type = activeTab.contentType;
+  // Only note/folder are readable as text via getCurrentNote; skip image/pdf/etc.
+  if (type && type !== "note" && type !== "folder") return null;
+  return { contentId: activeTab.contentId, title: activeTab.title?.trim() || "" };
+}
+
 function getPaneActiveTab(
   state: Pick<ContentState, "panes" | "tabs">,
   paneId: WorkspacePaneId

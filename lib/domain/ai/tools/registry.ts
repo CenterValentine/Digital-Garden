@@ -1394,7 +1394,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
         "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "RENAME RULE: do NOT set the `title` argument unless the user EXPLICITLY asks to rename (e.g. 'rename this to X'). Mentioning a topic or theme is NOT a rename request. NEVER set `title` when the target is the user's open chat — renaming a chat while updating its notes is wrong.",
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update.",
       inputSchema: z.object({
         contentId: z
           .string()
@@ -1408,16 +1408,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Full new markdown content for the notes. This replaces the current notes; if the user wants to append, include the existing content in this string.",
           ),
-        title: z
-          .string()
-          .min(1)
-          .max(255)
-          .optional()
-          .describe(
-            "New title for the content. ONLY set this if the user explicitly asked to rename. NEVER set when updating a chat's notes.",
-          ),
       }),
-      execute: async ({ contentId, content, title }) => {
+      execute: async ({ contentId, content }) => {
         // Allow updateNote against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
@@ -1434,13 +1426,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
         }
 
-        // Hard rename-guard: never rename when the target IS the active
-        // chat. This protects against the AI inferring a title from the
-        // user's update prompt and silently rewriting the chat's name.
-        const isUpdatingActiveChat =
-          ctx.chatContentId !== undefined && contentId === ctx.chatContentId;
-        const titleToApply = isUpdatingActiveChat ? undefined : title;
-
+        // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
+        // lives in the separate `renameNote` tool.) The former `title` argument
+        // was removed after it caused a silent rename: the model serialized this
+        // tool's own "do NOT … rename" guard text into the title field
+        // ("/do-not-rename/"). No title param = nothing to bleed in.
         const conversion = markdownToTiptapResult(content);
         const tiptapJson = conversion.json;
         const searchText = extractSearchTextFromTipTap(tiptapJson);
@@ -1476,19 +1466,66 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
           },
         });
-        if (titleToApply) {
-          await prisma.contentNode.update({
-            where: { id: contentId },
-            data: { title: titleToApply },
-          });
-        }
-
         return JSON.stringify({
           __notePayload: true,
           kind: "updated",
           contentId: existing.id,
-          title: titleToApply ?? existing.title,
+          title: existing.title, // unchanged — updateNote never renames
           wordCount,
+          targetKind: existing.contentType,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            existing.id,
+            "updated",
+            existing.contentType === "note" ? "note" : "notes",
+          )),
+        });
+      },
+    }),
+
+    // Explicit, standalone RENAME. Split out from updateNote (2026-08-05): a
+    // title argument on a content-update tool let the model rename as a side
+    // effect — and worse, it serialized updateNote's own "do NOT … rename" guard
+    // text into the title ("/do-not-rename/"). Renaming is now its own deliberate
+    // action the user must ask for; content updates can't touch the title.
+    renameNote: tool({
+      description:
+        "Rename (retitle) an existing note, chat, folder, or other content the user owns. " +
+        "Use ONLY when the user EXPLICITLY asks to rename or retitle something (e.g. 'rename this to X', 'call this note Y'). " +
+        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use updateNote for content). Mentioning a topic or theme is NOT a rename request.",
+      inputSchema: z.object({
+        contentId: z
+          .string()
+          .uuid()
+          .describe("UUID of the content to rename."),
+        title: z
+          .string()
+          .min(1)
+          .max(255)
+          .describe("The new title, exactly as the user asked. Do not invent or decorate it."),
+      }),
+      execute: async ({ contentId, title }) => {
+        const newTitle = title.trim();
+        if (!newTitle) {
+          return "A non-empty title is required to rename.";
+        }
+        const existing = await prisma.contentNode.findFirst({
+          where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+          select: { id: true, title: true, contentType: true },
+        });
+        if (!existing) {
+          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+        }
+        await prisma.contentNode.update({
+          where: { id: contentId },
+          data: { title: newTitle },
+        });
+        return JSON.stringify({
+          __notePayload: true,
+          kind: "renamed",
+          contentId: existing.id,
+          title: newTitle,
+          previousTitle: existing.title,
           targetKind: existing.contentType,
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,

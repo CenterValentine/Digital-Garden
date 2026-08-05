@@ -85,6 +85,7 @@ import {
   getAttachedPageContext,
   getCurrentPageHint,
 } from "@/state/panel-page-context-store";
+import { getActiveViewedContentHint } from "@/state/content-store";
 import {
   DEFAULT_OUTPUT_TARGET,
   createOutputTargetMessagePart,
@@ -1745,6 +1746,10 @@ export function useConversationEngine({
       // Lightweight current-page hint (url+title) so the model knows what page the
       // user is viewing even without the attach toggle — for "summarize this page".
       currentPage: getCurrentPageHint(),
+      // The garden doc the user is actively viewing (focused tab) — lets the chat
+      // resolve "this note/doc" without the user naming it (internal twin of
+      // currentPage). Null in the embed panel and when nothing readable is focused.
+      viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
@@ -2160,6 +2165,10 @@ export function useConversationEngine({
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
           currentPage: getCurrentPageHint(),
+          // The garden doc the user is actively viewing (focused tab) — lets the
+          // chat resolve "this note/doc" without the user naming it (internal twin
+          // of currentPage). Null in the embed panel / when nothing readable.
+          viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
           playbookId: activePlaybookId,
           activePhaseIndex: resolvedPhaseIndex,
@@ -2211,6 +2220,10 @@ export function useConversationEngine({
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
       currentPage: getCurrentPageHint(),
+      // The garden doc the user is actively viewing (focused tab) — lets the chat
+      // resolve "this note/doc" without the user naming it (internal twin of
+      // currentPage). Null in the embed panel and when nothing readable is focused.
+      viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,

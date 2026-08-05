@@ -1578,6 +1578,23 @@ export async function POST(request: Request) {
                 typeof rawCurrentPage.title === "string" ? rawCurrentPage.title : "",
             }
           : null;
+      // The garden doc the user is actively VIEWING (focused content tab) — the
+      // internal twin of currentPage. Lets the model resolve "this note/doc"
+      // without the user naming it, and read it with getCurrentNote(contentId).
+      const rawViewedContent = body.viewedContent;
+      const viewedContentHint =
+        rawViewedContent &&
+        typeof rawViewedContent === "object" &&
+        typeof rawViewedContent.contentId === "string" &&
+        rawViewedContent.contentId.trim()
+          ? {
+              contentId: rawViewedContent.contentId,
+              title:
+                typeof rawViewedContent.title === "string"
+                  ? rawViewedContent.title
+                  : "",
+            }
+          : null;
 
       const toolsActive = Object.keys(tools).length > 0;
       const validatedPlaybookId = attachedPlaybookResolved
@@ -1658,6 +1675,12 @@ export async function POST(request: Request) {
         promptCachePolicy.providerOptions,
       );
 
+      // Turn start — for the generation-duration shown in the assistant avatar
+      // tooltip (attached on `finish` in messageMetadata below). Anchored here so
+      // it spans the whole turn (reasoning + tools + text), matching the wall
+      // time the user waited.
+      const turnStartMs = Date.now();
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
@@ -1699,6 +1722,7 @@ export async function POST(request: Request) {
           hasResearchTools: "extract_structured" in tools,
           hasListTabs: LIST_TABS in tools,
           hasItemIteration: "propose_item_iteration" in tools,
+          viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches
@@ -1998,6 +2022,9 @@ export async function POST(request: Request) {
                 outputTokens: part.totalUsage?.outputTokens,
                 totalTokens: part.totalUsage?.totalTokens,
               },
+              // Generation wall time for the avatar tooltip (persisted with the
+              // message, so it survives reload alongside usage).
+              durationMs: Date.now() - turnStartMs,
               finishReason: part.finishReason,
             };
           }

@@ -88,9 +88,10 @@ function chatContentSection(contentId: string): string {
   return `\
 ## Chat Notes Panel (this chat's ID: ${contentId})
 This chat has an attached notes panel (a TipTap editor keyed to this chat's contentId).
-- To write to the notes panel: updateNote({ contentId: "${contentId}", content: "..." }). Never set title — that renames the chat.
+- To write to the notes panel: updateNote({ contentId: "${contentId}", content: "..." }). updateNote changes content only; it never renames.
 - To create a separate new note: use createNote. Omit parentId unless the user explicitly names a destination; the configured output-target preset is enforced by the tool runtime.
-- To edit a different note by name: use searchNotes to find its id, then updateNote with that id.\
+- To edit a different note by name: use searchNotes to find its id, then updateNote with that id.
+- Only if the user EXPLICITLY asks to rename/retitle something: use renameNote (title only). Never rename as a side effect of a content update.\
 `;
 }
 
@@ -219,6 +220,13 @@ export interface SystemPromptContext {
    * read tool / the attach toggle).
    */
   currentPageHint?: { url: string; title: string } | null;
+  /**
+   * The garden doc the user is actively VIEWING (focused content tab) — the
+   * internal twin of currentPageHint. Lets the model resolve "this note/doc"
+   * without the user naming it, and read it on demand via getCurrentNote. Empty
+   * when nothing readable is focused (and always in the embed panel).
+   */
+  viewedContentHint?: { contentId: string; title: string } | null;
 }
 
 export function buildSystemPrompt(ctx: SystemPromptContext): string {
@@ -378,6 +386,13 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
       : "read it with your read tool";
     sections.push(
       `The user is currently viewing "${ctx.currentPageHint.title || ctx.currentPageHint.url}" (${ctx.currentPageHint.url}) in their browser, beside this panel. If they say "this page", "the page I'm on/viewing", or ask you to summarize or act on it WITHOUT giving a URL, that is the page they mean — to get its contents, ${howToRead}, then answer. Do NOT reply that you can't see the page: you can read it.`,
+    );
+  }
+  // The garden doc open beside the chat (internal twin of currentPageHint). The
+  // model has getCurrentNote — it just needs to know WHICH note the user means.
+  if (ctx.viewedContentHint) {
+    sections.push(
+      `The user is currently viewing the note "${ctx.viewedContentHint.title || "(untitled)"}" in their garden, open beside this chat. If they say "this note", "this doc", "the page/document I'm viewing", or ask you to summarize or act on it WITHOUT naming or attaching it, that is the note they mean — read its full contents with \`getCurrentNote\` (contentId "${ctx.viewedContentHint.contentId}"), then answer. Do NOT reply that you can't see it: you can read it.`,
     );
   }
   // Untrusted page content goes LAST, after all trusted instructions, so its

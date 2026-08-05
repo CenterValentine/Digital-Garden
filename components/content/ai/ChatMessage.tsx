@@ -559,6 +559,27 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // Whether to show a persistent "still working" cue at the END of a streaming
+  // assistant turn. True while streaming, no tool is running, AND the tail of the
+  // message isn't ACTIVELY producing visible output (growing text / non-empty
+  // reasoning). That captures every "model is thinking, nothing moving" gap —
+  // the pre-first-token phase (parts hold only an invisible `step-start`) AND the
+  // long reasoning AFTER a tool result (tool cards are visible, but nothing new
+  // is streaming). Reasoning models sit in these gaps for MINUTES, so a
+  // persistent animated cue is what separates "thinking" from "frozen". Running
+  // tools have their own ThinkingIndicator above, so they're excluded here.
+  const showWorking = useMemo(() => {
+    if (!isStreaming || !isAssistant || hasRunningTools) return false;
+    const last = message.parts[message.parts.length - 1] as
+      | { type?: string; text?: string }
+      | undefined;
+    const lastType = last?.type;
+    const lastActivelyStreaming =
+      (lastType === "text" && (last?.text ?? "").length > 0) ||
+      (lastType === "reasoning" && (last?.text ?? "").trim().length > 0);
+    return !lastActivelyStreaming;
+  }, [isStreaming, isAssistant, hasRunningTools, message.parts]);
+
   // Coalesce text runs into single render units (v3 ship fix, 2026-07-18):
   // provider-native web-search answers stream as MANY text parts — the
   // provider emits a new part per cited span, so bubble-per-part produced
@@ -1020,12 +1041,11 @@ export const ChatMessage = memo(function ChatMessage({
           <ThinkingIndicator />
         )}
 
-        {/* Fallback: streaming indicator when parts is empty */}
-        {isStreaming &&
-          isAssistant &&
-          message.parts.length === 0 && (
-            <StreamingIndicator indicator={theme.streamingIndicator} />
-          )}
+        {/* Persistent "working" cue for every thinking gap in the turn — the
+            pre-first-token phase AND the long reasoning after a tool result
+            (where cards are visible but nothing is streaming). Shows elapsed
+            time so a multi-minute reasoning model reads as alive, not frozen. */}
+        {showWorking && <WorkingIndicator />}
 
         {/* Hover actions — icon-only, with tooltip + aria-label for a11y.
             Copy on every message; edit (user); regenerate + branch
@@ -1672,6 +1692,24 @@ function extractUsage(metadata: Record<string, unknown> | undefined): UsageShape
   };
 }
 
+/** The turn's generation wall time (ms), persisted on finish (see the route). */
+function extractDurationMs(
+  metadata: Record<string, unknown> | undefined,
+): number | undefined {
+  const d = (metadata as { durationMs?: unknown } | undefined)?.durationMs;
+  return typeof d === "number" && Number.isFinite(d) && d >= 0 ? d : undefined;
+}
+
+/** Human duration: "0.8s", "12s", "1m 05s". */
+function formatDuration(ms: number): string {
+  const totalSec = ms / 1000;
+  if (totalSec < 1) return `${ms}ms`;
+  if (totalSec < 60) return `${totalSec < 10 ? totalSec.toFixed(1) : Math.round(totalSec)}s`;
+  const m = Math.floor(totalSec / 60);
+  const s = Math.round(totalSec % 60);
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
 function AssistantAvatar({
   providerId,
   modelId,
@@ -1695,6 +1733,7 @@ function AssistantAvatar({
   const providerName = provider?.name ?? "AI assistant";
   const modelName = model?.name ?? modelId ?? null;
   const usage = useMemo(() => extractUsage(metadata), [metadata]);
+  const durationMs = useMemo(() => extractDurationMs(metadata), [metadata]);
 
   useEffect(() => {
     // One-shot SSR/hydration boundary marker so we only render the
@@ -1793,8 +1832,29 @@ function AssistantAvatar({
                     </span>
                   </span>
                 )}
+                {durationMs != null && (
+                  <span title="Generation time">
+                    <span className="text-gray-500">took</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {formatDuration(durationMs)}
+                    </span>
+                  </span>
+                )}
               </div>
             )}
+            {/* Duration alone (no token usage reported by the provider) still
+                shows, so the turn's cost-in-time is always visible. */}
+            {(!usage || (usage.inputTokens == null && usage.outputTokens == null)) &&
+              durationMs != null && (
+                <div className="mt-1 flex items-center gap-2 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                  <span title="Generation time">
+                    <span className="text-gray-500">took</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {formatDuration(durationMs)}
+                    </span>
+                  </span>
+                </div>
+              )}
           </div>,
           document.body,
         )}
@@ -2209,6 +2269,7 @@ function ApprovalPreview({
   if (
     toolName === "createNote" ||
     toolName === "updateNote" ||
+    toolName === "renameNote" ||
     toolName === "create_docx"
   ) {
     const title = str("title") ?? str("fileName") ?? "(untitled)";
@@ -2741,6 +2802,8 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   searchNotes: ["Searching your notes", "Searched your notes"],
   getCurrentNote: ["Reading a note", "Read a note"],
   createNote: ["Creating a note", "Created a note"],
+  updateNote: ["Updating a note", "Updated a note"],
+  renameNote: ["Renaming", "Renamed"],
   generate_image: ["Generating an image", "Generated an image"],
 };
 
@@ -3329,6 +3392,52 @@ function StreamingIndicator({
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:300ms]" />
+    </div>
+  );
+}
+
+/**
+ * Working indicator — the persistent "the model is thinking" cue shown in every
+ * gap of a streaming turn (before the first token, and during the long reasoning
+ * after a tool result). Counts up elapsed seconds so a slow reasoning model
+ * (gpt-5-pro can take minutes) visibly reads as ALIVE rather than frozen — the
+ * ticking number is the proof of life a static spinner can't give. The timer is
+ * scoped to the current thinking segment (it mounts/unmounts with the gap), which
+ * is exactly the "is it still going right now?" signal the user needs.
+ */
+function WorkingIndicator() {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - start) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, []);
+  const mm = Math.floor(elapsed / 60);
+  const ss = elapsed % 60;
+  // Hold the time back for the first few seconds so quick replies don't flash a
+  // pointless "0:01"; once it's clearly a wait, the counter reassures.
+  const showTime = elapsed >= 3;
+  return (
+    <div
+      className="inline-flex items-center gap-2 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 px-3.5 py-2 text-xs text-gray-500"
+      aria-live="polite"
+      aria-label={`Working${showTime ? `, ${elapsed} seconds elapsed` : ""}`}
+    >
+      <BrainCircuit className="h-3.5 w-3.5 animate-pulse" />
+      <span>Working</span>
+      <span className="inline-flex gap-0.5" aria-hidden>
+        <span className="animate-bounce [animation-delay:0ms]">.</span>
+        <span className="animate-bounce [animation-delay:150ms]">.</span>
+        <span className="animate-bounce [animation-delay:300ms]">.</span>
+      </span>
+      {showTime && (
+        <span className="tabular-nums text-gray-500/70">
+          {mm}:{ss.toString().padStart(2, "0")}
+        </span>
+      )}
     </div>
   );
 }
