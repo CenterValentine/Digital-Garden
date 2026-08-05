@@ -532,7 +532,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                   `**Objective (per item):** ${objective}\n\n` +
                   `**Source:** ${source} · **Budget:** ${itemBudget} of ${normalized.length} items\n\n` +
                   `**Checklist:**\n${normalized
-                    .map((n) => `- [ ] ${n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}`)
+                    .map(
+                      (n) =>
+                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}`,
+                    )
                     .join("\n")}`,
                 runTitle: label,
                 next: "Process items in order; record every item; reconcile at the end.",
@@ -573,11 +576,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
     // (a silent skip is the failure mode that breaks "all documented").
     record_item_result: tool({
       description:
-        "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently.",
+        "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently. ALWAYS pass the item's `url` so the ledger links to the source page (the user can click through, and a follow-up run can revisit it).",
       inputSchema: z.object({
         ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
         itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
         itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        url: z
+          .string()
+          .max(600)
+          .optional()
+          .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
         status: z
           .enum(["done", "unreadable", "blocked"])
           .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
@@ -586,13 +594,19 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
         artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
       }),
-      execute: async ({ ledgerRunKey, itemKey, itemLabel, status, qualified, fitPercent, verdict, artifactTitle }) => {
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle }) => {
         const placement = resolveToolOutputPlacement(ctx);
         if (!placement.parentId && !placement.ownedByNoteId) {
           return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
         }
+        // Prefer an explicit url; fall back to itemKey when it IS a url (url-tier
+        // stable key). A linked heading makes the runbook click-through-able and
+        // lets a round-2 run re-read the source pages.
+        const linkUrl = url?.trim() || (/^https?:\/\//.test(itemKey) ? itemKey : "");
+        const label = itemLabel ?? itemKey;
+        const heading = linkUrl ? `[${label}](${linkUrl})` : `**${label}**`;
         const line =
-          `**${itemLabel ?? itemKey}** — ${status}` +
+          `${heading} — ${status}` +
           (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
           (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
           (verdict ? `\n\n${verdict}` : "");
