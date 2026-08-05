@@ -24,6 +24,30 @@ import { z } from "zod/v4";
 export const CO_BROWSE_OPEN = "co_browse_open";
 export const CO_BROWSE_ACT = "co_browse_act";
 export const READ_CURRENT_PAGE = "read_current_page";
+export const LIST_TABS = "list_tabs";
+
+export const listTabsInputSchema = z.object({
+  filter: z
+    .string()
+    .max(100)
+    .optional()
+    .describe(
+      "Case-insensitive substring to narrow the list by title or URL (e.g. " +
+        "\"greenhouse\", \"jobs\"). Request the NARROWEST slice that covers the ask.",
+    ),
+});
+export type ListTabsInput = z.infer<typeof listTabsInputSchema>;
+
+// Privacy-gated by DESCRIPTION (per-item iteration spec, Enumeration sources):
+// the user's open tabs are a sensitive surface, so this tool activates only on an
+// explicit ask — it is never an ambient recon step.
+export const LIST_TABS_DESCRIPTION =
+  "List the user's OPEN BROWSER TABS (title + URL only). Use this ONLY when the " +
+  "user explicitly asks you to work through their open tabs (\"go through my " +
+  "tabs\", \"each job I have open\") — never call it uninvited; their tabs are " +
+  "private. Pass `filter` to request the narrowest relevant slice. To then read " +
+  "an individual tab's page, use read_page with that tab's URL (it reads in the " +
+  "user's own session; no tab switching needed).";
 
 export const readCurrentPageInputSchema = z.object({
   purpose: z

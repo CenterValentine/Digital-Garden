@@ -2564,6 +2564,28 @@ function ToolCallBubble({
             : undefined;
         return `Co-browsing${action ? ` (${action})` : ""}`;
       }
+      // Per-item iteration (spec): human labels for the loop's bookkeeping so the
+      // run reads as a checklist advancing, not raw tool names.
+      if (toolName === "list_tabs") {
+        const n = (result as { count?: number } | null)?.count;
+        return isRunning
+          ? "Looking through your open tabs"
+          : `Looked through your open tabs${typeof n === "number" ? ` (${n} matched)` : ""}`;
+      }
+      if (toolName === "propose_item_iteration") {
+        return "Proposed a per-item run";
+      }
+      if (toolName === "record_item_result") {
+        const label =
+          args && typeof args === "object"
+            ? (args as { itemLabel?: string; itemKey?: string }).itemLabel ??
+              (args as { itemKey?: string }).itemKey
+            : undefined;
+        return `Recorded item${label ? `: ${label}` : ""}`;
+      }
+      if (toolName === "record_iteration_findings") {
+        return "Closed the run (reconciliation recorded)";
+      }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
       return toolActionLabel(toolName, isRunning || wasStopped);

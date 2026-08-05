@@ -71,6 +71,8 @@ import {
   coBrowseActInputSchema,
   READ_CURRENT_PAGE_DESCRIPTION,
   readCurrentPageInputSchema,
+  LIST_TABS_DESCRIPTION,
+  listTabsInputSchema,
 } from "./co-browse-tools";
 
 /**
@@ -123,6 +125,18 @@ export const coBrowseActTool = tool({
 export const readCurrentPageTool = tool({
   description: READ_CURRENT_PAGE_DESCRIPTION,
   inputSchema: readCurrentPageInputSchema,
+});
+
+/**
+ * `list_tabs` — CLIENT-EXECUTED (no server `execute`), per-item iteration spec
+ * "Enumeration sources". Surfaces the user's open tabs (lean title+URL) so a
+ * tabs-as-curation iteration can enumerate them. Registered only when co-browse
+ * is available; privacy-gated by description (explicit ask only). The engine's
+ * onToolCall runs coBrowseListTabs through the trust-gated panel bridge.
+ */
+export const listTabsTool = tool({
+  description: LIST_TABS_DESCRIPTION,
+  inputSchema: listTabsInputSchema,
 });
 
 /**
@@ -425,6 +439,228 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: false,
             note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}).`,
           };
+        }
+      },
+    }),
+    // ── Per-item playbook iteration (level-2 controller; see the spec) ──────
+    // The HARNESS owns the loop; the playbook is the per-item unit. The ledger —
+    // not the model's memory — is the loop's authoritative state: one row per
+    // item, so "all N processed, none dropped" is a checkable claim. Mirrors the
+    // research-run trio (propose → per-step record → findings close); the client
+    // engine enforces the item budget the same way it enforces page budget.
+    propose_item_iteration: tool({
+      description:
+        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached playbook) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), or given URLs. " +
+        "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with a roll-up (createNote) + record_iteration_findings. " +
+        "Skip this tool for a single item — just run the analysis directly.",
+      needsApproval: true,
+      inputSchema: z.object({
+        objective: z
+          .string()
+          .min(1)
+          .max(400)
+          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit playbook; document >75% matches\")."),
+        source: z
+          .enum(["list-page", "open-tabs", "urls"])
+          .describe("Where the items were enumerated from."),
+        items: z
+          .array(
+            z.object({
+              label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
+              url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
+            }),
+          )
+          .min(1)
+          .max(60)
+          .describe("The enumerated items, in processing order."),
+        itemCap: z
+          .number()
+          .int()
+          .min(1)
+          .max(40)
+          .describe("Max items to process this run (propose sensibly; the user can adjust before approving)."),
+        ledgerLabel: z
+          .string()
+          .max(120)
+          .optional()
+          .describe("Short label for the run's ledger; omit to derive from the objective."),
+      }),
+      execute: async ({ objective, source, items, itemCap, ledgerLabel }) => {
+        const label = (ledgerLabel ?? objective).trim();
+        const ledgerRunKey =
+          "iterate:" +
+          (label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60) || "items");
+        // Tiered stable key (spec Q2): the item's own URL when present (tier
+        // "url" — survives list re-renders/reshuffles), else a label slug (tier
+        // "label" — weaker; the tier is recorded so weak keys stay visible).
+        const seen = new Set<string>();
+        const normalized = items.map((it) => {
+          const base = it.url?.trim()
+            ? it.url.trim()
+            : it.label
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 80) || "item";
+          let key = base;
+          for (let n = 2; seen.has(key); n++) key = `${base}~${n}`;
+          seen.add(key);
+          return {
+            key,
+            keyTier: it.url?.trim() ? ("url" as const) : ("label" as const),
+            label: it.label,
+            ...(it.url?.trim() ? { url: it.url.trim() } : {}),
+          };
+        });
+        const itemBudget = Math.min(itemCap, normalized.length);
+        let ledgerNodeId: string | null = null;
+        const placement = resolveToolOutputPlacement(ctx);
+        if (placement.parentId || placement.ownedByNoteId) {
+          try {
+            const ledger = await upsertRunLedger(
+              ctx.userId,
+              placement.parentId,
+              {
+                phase: "Iteration plan",
+                summary:
+                  `**Objective (per item):** ${objective}\n\n` +
+                  `**Source:** ${source} · **Budget:** ${itemBudget} of ${normalized.length} items\n\n` +
+                  `**Checklist:**\n${normalized
+                    .map((n) => `- [ ] ${n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}`)
+                    .join("\n")}`,
+                runTitle: label,
+                next: "Process items in order; record every item; reconcile at the end.",
+              },
+              { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+            );
+            ledgerNodeId = ledger.contentNodeId;
+            if (ctx.conversationId) {
+              void addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                ledgerNodeId,
+                "tool-call",
+              ).catch(() => null);
+            }
+          } catch {
+            // Ledger is best-effort — the run can still proceed without it.
+          }
+        }
+        return {
+          ok: true,
+          ledgerRunKey,
+          ledgerNodeId,
+          objective,
+          source,
+          itemBudget,
+          items: normalized,
+          nextAction:
+            `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/playbook applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
+            `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, write the roll-up (createNote: a short summary + a markdown table of items/verdicts) and close with record_iteration_findings. ` +
+            `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
+        };
+      },
+    }),
+    // Per-item record — the checklist advance. One call per item, every item,
+    // including failures: an unreadable item is RECORDED, never silently skipped
+    // (a silent skip is the failure mode that breaks "all documented").
+    record_item_result: tool({
+      description:
+        "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
+        itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
+        itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        status: z
+          .enum(["done", "unreadable", "blocked"])
+          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+        qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
+        fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
+        verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
+        artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+      }),
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, status, qualified, fitPercent, verdict, artifactTitle }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        if (!placement.parentId && !placement.ownedByNoteId) {
+          return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
+        }
+        const line =
+          `**${itemLabel ?? itemKey}** — ${status}` +
+          (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
+          (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
+          (verdict ? `\n\n${verdict}` : "");
+        try {
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: `Item: ${(itemLabel ?? itemKey).slice(0, 80)}`,
+              summary: line,
+              artifacts: artifactTitle ? [artifactTitle] : undefined,
+              next: "Next pending item (or reconcile if none remain).",
+            },
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          return { ok: true, recorded: itemKey, status, ledgerNodeId: ledger.contentNodeId };
+        } catch (error) {
+          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue; reconcile in the roll-up.` };
+        }
+      },
+    }),
+    // Close the iteration — the reconciliation record. Clears the client-side
+    // item budget (the engine watches for this result, as with research runs).
+    record_iteration_findings: tool({
+      description:
+        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger. Call AFTER the roll-up note (createNote), passing the ledgerRunKey from propose_item_iteration.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
+        resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
+        processedCount: z.number().int().min(0).describe("Items actually processed (recorded)."),
+        qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
+        unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
+        rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+      }),
+      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        if (!placement.parentId && !placement.ownedByNoteId) {
+          return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
+        }
+        const summary =
+          resultSummary.trim() +
+          `\n\n**Processed:** ${processedCount}` +
+          (typeof qualifiedCount === "number" ? ` · **Qualified:** ${qualifiedCount}` : "") +
+          (unreadableItems?.length
+            ? `\n\n**Unreadable/blocked (${unreadableItems.length}):**\n${unreadableItems.map((u) => `- ${u}`).join("\n")}`
+            : "");
+        try {
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: "Reconciliation",
+              summary,
+              artifacts: rollupTitle ? [rollupTitle] : undefined,
+              next: "Run complete.",
+              tokensSoFar: ctx.runTokens?.total,
+            },
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          if (ctx.conversationId) {
+            void addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              ledger.contentNodeId,
+              "tool-call",
+            ).catch(() => null);
+          }
+          return { ok: true, ledgerNodeId: ledger.contentNodeId };
+        } catch (error) {
+          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}).` };
         }
       },
     }),

@@ -135,6 +135,7 @@ import {
   coBrowseOpenTool,
   coBrowseActTool,
   readCurrentPageTool,
+  listTabsTool,
 } from "@/lib/domain/ai/tools/registry";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
@@ -142,6 +143,7 @@ import {
   CO_BROWSE_OPEN,
   CO_BROWSE_ACT,
   READ_CURRENT_PAGE,
+  LIST_TABS,
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
@@ -1021,6 +1023,9 @@ export async function POST(request: Request) {
               // R1: read the tab the user is already on (content-script capture,
               // no new tab / no re-fetch) — distinct from read_page and co_browse_open.
               [READ_CURRENT_PAGE]: readCurrentPageTool,
+              // Per-item iteration spec, Enumeration sources: the user's open
+              // tabs (lean title+URL; explicit-ask-gated by description).
+              [LIST_TABS]: listTabsTool,
             }
           : {}),
       };
@@ -1692,6 +1697,8 @@ export async function POST(request: Request) {
           hasCoBrowseTools: CO_BROWSE_OPEN in tools,
           hasReadCurrentPage: READ_CURRENT_PAGE in tools,
           hasResearchTools: "extract_structured" in tools,
+          hasListTabs: LIST_TABS in tools,
+          hasItemIteration: "propose_item_iteration" in tools,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches

@@ -41,6 +41,7 @@ import {
   CO_BROWSE_OPEN,
   CO_BROWSE_ACT,
   READ_CURRENT_PAGE,
+  LIST_TABS,
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import {
   isCoBrowseAvailable,
@@ -56,6 +57,7 @@ import {
   coBrowseReveal,
   coBrowseShowTimer,
   coBrowseClearTimer,
+  coBrowseListTabs,
   type CoBrowseNode,
 } from "@/lib/domain/browser-extension/co-browse";
 import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
@@ -555,7 +557,8 @@ function lastMessageHasResolvedBrowserRead({
         // loop after their result so the model can act → look → act.
         part.type === `tool-${CO_BROWSE_OPEN}` ||
         part.type === `tool-${CO_BROWSE_ACT}` ||
-        part.type === `tool-${READ_CURRENT_PAGE}`,
+        part.type === `tool-${READ_CURRENT_PAGE}` ||
+        part.type === `tool-${LIST_TABS}`,
     ) as Array<{ state?: string }>;
   return (
     browserReadParts.length > 0 &&
@@ -649,6 +652,49 @@ function deriveActiveResearchRun(
         p.state === "output-available"
       ) {
         active = null; // run closed by its findings write
+      }
+    }
+  }
+  return active;
+}
+
+/**
+ * Per-item iteration (level-2 controller; see the iteration spec) — derive the
+ * CURRENTLY-ACTIVE iteration's item budget AND how many items are already
+ * recorded, straight from history. Opens on an approved `propose_item_iteration`
+ * result; every `record_item_result` counts against the budget; closes on
+ * `record_iteration_findings`. Recomputed from messages (not a mutable counter)
+ * because items are recorded by a SERVER tool — onToolCall never sees those
+ * calls, so a client-side increment would drift. The scan is the source of truth.
+ */
+function deriveActiveItemIteration(
+  messages: UIMessage[],
+): { itemBudget: number; itemsRecorded: number } | null {
+  let active: { itemBudget: number; itemsRecorded: number } | null = null;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (
+        p.type === "tool-propose_item_iteration" &&
+        p.state === "output-available"
+      ) {
+        const out = p.output as { ok?: boolean; itemBudget?: number } | undefined;
+        if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
+          active = { itemBudget: out.itemBudget, itemsRecorded: 0 };
+        }
+      } else if (
+        p.type === "tool-record_item_result" &&
+        p.state === "output-available" &&
+        active
+      ) {
+        const out = p.output as { ok?: boolean } | undefined;
+        if (out?.ok !== false) active.itemsRecorded += 1;
+      } else if (
+        p.type === "tool-record_iteration_findings" &&
+        p.state === "output-available"
+      ) {
+        active = null; // run closed by its reconciliation write
       }
     }
   }
@@ -1338,6 +1384,55 @@ export function useConversationEngine({
         }
         return;
       }
+      // list_tabs — tabs-as-curation enumeration (iteration spec, Enumeration
+      // sources). Lean title+URL only; the optional filter narrows client-side so
+      // the model sees the smallest slice that covers the ask. Privacy gate lives
+      // in the tool DESCRIPTION (explicit ask only) — by the time a call arrives
+      // here the model has judged the user asked for their tabs.
+      if (toolCall.toolName === LIST_TABS) {
+        const { filter } = (toolCall.input ?? {}) as { filter?: string };
+        try {
+          const res = await coBrowseListTabs();
+          if (!res.ok || !res.data) {
+            chat.addToolResult({
+              tool: LIST_TABS,
+              toolCallId: toolCall.toolCallId,
+              output: `Couldn't list tabs: ${res.error ?? "extension unavailable"}.`,
+            });
+            return;
+          }
+          const want = (filter ?? "").trim().toLowerCase();
+          const tabs = res.data.tabs
+            .filter((t) => /^https?:/.test(t.url))
+            .filter(
+              (t) =>
+                !want ||
+                t.title.toLowerCase().includes(want) ||
+                t.url.toLowerCase().includes(want),
+            )
+            .slice(0, 60)
+            .map((t) => ({ title: t.title, url: t.url }));
+          chat.addToolResult({
+            tool: LIST_TABS,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              count: tabs.length,
+              ...(want ? { filter: want } : {}),
+              tabs,
+              note:
+                "Tab titles/URLs are the user's own browser state. To read one, use read_page with its URL. Each tab's URL is its stable item key.",
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: LIST_TABS,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "list tabs failed",
+          });
+        }
+        return;
+      }
       // Two client-executed read tools: read_page_in_browser (escalates
       // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
       // used only after a normal read failed). Both share the budget + result
@@ -1373,6 +1468,20 @@ export function useConversationEngine({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
           output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+        });
+        return;
+      }
+      // Per-item iteration budget (level-2 controller). Recomputed from history
+      // each time — items are recorded by a SERVER tool, so a client counter
+      // would drift; the message scan IS the source of truth. Enforced at the
+      // read tools only (a read is how the NEXT item starts) so mid-item acting
+      // is never broken. Fail-open: no active iteration → path skipped entirely.
+      const iteration = deriveActiveItemIteration(chat.messages);
+      if (iteration && iteration.itemsRecorded >= iteration.itemBudget) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
         });
         return;
       }
