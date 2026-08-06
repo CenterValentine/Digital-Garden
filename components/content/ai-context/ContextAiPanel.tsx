@@ -2,17 +2,17 @@
  * AI sub-tab of the Context hub — per-node agentic metadata (Phase 2).
  *
  * Renders the Context doc from /api/studio/metadata/:nodeId with the
- * ownership contract visible: AI sections regenerate freely, Role & Strategy
- * arrives as a proposal to accept/dismiss, Directives are yours alone and
+ * ownership contract visible: AI sections (summary, structure, role &
+ * strategy, signals) regenerate freely; Directives are yours alone and
  * autosave (2s debounce, REST last-write-wins — deliberately not
  * collaborative). Staleness badges appear when sources changed since the
- * last generation.
+ * last generation. The accept/dismiss proposal flow was retired 2026-08-06.
  */
 
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, RefreshCw, Sparkles, X } from "lucide-react";
+import { ChevronDown, RefreshCw, Sparkles } from "lucide-react";
 import { useContentStore } from "@/state/content-store";
 import {
   AiContextUnconfiguredBanner,
@@ -148,11 +148,14 @@ export function ContextAiPanel() {
     error: string | null;
     showAiBanner?: boolean;
   } | null>(null);
-  const [busy, setBusy] = useState<"generate" | "proposal" | null>(null);
+  const [busy, setBusy] = useState<"generate" | null>(null);
   const [draft, setDraft] = useState<{ forNodeId: string; text: string } | null>(
     null
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // Mode ladder is collapsed by default (owner UX call: full list cost too
+  // much rail space) — the trigger row shows the current rung.
+  const [modeOpen, setModeOpen] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchView = useCallback((nodeId: string) => {
@@ -247,23 +250,6 @@ export function ContextAiPanel() {
       .finally(() => setBusy(null));
   };
 
-  const handleProposal = (action: "accept" | "dismiss") => {
-    if (!selectedContentId || busy) return;
-    const nodeId = selectedContentId;
-    setBusy("proposal");
-    fetch(`/api/studio/metadata/${nodeId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roleStrategyAction: action }),
-    })
-      .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error);
-        setResult({ forNodeId: nodeId, data: body.data, error: null });
-      })
-      .catch(() => undefined)
-      .finally(() => setBusy(null));
-  };
 
   if (!selectedContentId) {
     return (
@@ -278,7 +264,6 @@ export function ContextAiPanel() {
     draft?.forNodeId === selectedContentId
       ? draft.text
       : (view?.sections.directives ?? "");
-  const proposal = view?.sectionsMeta["role-strategy"]?.proposal;
 
   return (
     <div className="scrollbar-hide h-full overflow-y-auto px-3 py-3">
@@ -315,19 +300,30 @@ export function ContextAiPanel() {
           through the same write path. */}
       {view && (
         <div className="mt-2 rounded-lg border border-black/10 px-3 py-2 dark:border-white/10">
-          <div className="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            aria-expanded={modeOpen}
+            onClick={() => setModeOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2"
+          >
             <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
               Context mode
             </span>
-            {view.contextMode === null && (
+            <span className="flex items-center gap-1.5">
               <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                Inherited → {MODE_LABELS[view.resolvedMode]}
+                {view.contextMode === null
+                  ? `Inherit → ${MODE_LABELS[view.resolvedMode]}`
+                  : MODE_LABELS[view.contextMode]}
               </span>
-            )}
-          </div>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-gray-400 transition-transform ${modeOpen ? "rotate-180" : ""}`}
+              />
+            </span>
+          </button>
           {/* Vertical ladder list (owner UX call 2026-08-06): the wrap-prone
               pill row misread in the narrow rail. One row per rung, hint
               inline — the ordered ladder stays visible, nothing wraps. */}
+          {modeOpen && (
           <div
             role="radiogroup"
             aria-label="Context mode"
@@ -354,6 +350,7 @@ export function ContextAiPanel() {
                         const body = await res.json();
                         if (!res.ok || !body.success) throw new Error(body.error);
                         setResult({ forNodeId: nodeId, data: body.data, error: null });
+                        setModeOpen(false);
                       })
                       .catch(() => fetchView(nodeId));
                   }}
@@ -392,6 +389,7 @@ export function ContextAiPanel() {
               );
             })}
           </div>
+          )}
           {view.resolvedMode === "OPT_OUT" && (
             <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
               Off — no auto-updates, no Generate, excluded from folder roll-ups,
@@ -403,12 +401,16 @@ export function ContextAiPanel() {
 
       <div className="mt-3 space-y-2.5">
         {(view ? SECTIONS_BY_MODE[view.resolvedMode] : SECTION_ORDER).map((kind) => {
-          const owner = view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
+          const rawOwner =
+            view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
+          // Proposal flow retired: rows written before 2026-08-06 may still
+          // carry ai-proposed provenance — render them as plain AI.
+          const owner = rawOwner === "ai-proposed" ? "ai" : rawOwner;
           const badge = OWNER_BADGES[owner];
           const text = view?.sections[kind] ?? "";
           const isDirectives = kind === "directives";
           const showStale =
-            view?.stale && (owner === "ai" || owner === "ai-proposed") && text;
+            view?.stale && owner === "ai" && text;
 
           return (
             <section
@@ -463,34 +465,6 @@ export function ContextAiPanel() {
                 </p>
               )}
 
-              {kind === "role-strategy" && proposal && (
-                <div className="mt-2 rounded-md border border-blue-400/30 bg-blue-500/[0.04] px-2.5 py-2 dark:bg-blue-400/[0.06]">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-blue-500 dark:text-blue-400">
-                    Proposed update
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-300">
-                    {proposal}
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleProposal("accept")}
-                      disabled={busy !== null}
-                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-blue-400/40 text-xs text-blue-600 hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
-                    >
-                      <Check className="h-3 w-3" /> Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleProposal("dismiss")}
-                      disabled={busy !== null}
-                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-black/15 text-xs text-gray-500 hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/[0.06]"
-                    >
-                      <X className="h-3 w-3" /> Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
             </section>
           );
         })}

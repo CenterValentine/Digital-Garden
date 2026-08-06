@@ -4,13 +4,13 @@
  * GET  /api/studio/metadata/:nodeId
  *   → { success, data: MetadataView }
  * PUT  /api/studio/metadata/:nodeId
- *   body: { directives?: string; roleStrategyAction?: "accept" | "dismiss" }
+ *   body: { directives?: string; contextMode?: ContextMode | null; contextOptOut?: boolean }
  *   → { success, data: MetadataView }
  *
  * Last-write-wins by design (this surface is deliberately not collaborative).
- * Only human-ownable operations go through PUT: directives text, and
- * accepting/dismissing the pending Role & Strategy proposal. AI sections are
- * written exclusively by the generate route.
+ * Only human-ownable operations go through PUT: directives text, the context
+ * mode, and the legacy opt-out boolean. AI sections are written exclusively
+ * by the generate route (the proposal flow was retired — plan D18).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,7 +21,6 @@ import { getUserSettings } from "@/lib/features/settings";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import {
   getMetadataForNode,
-  resolveRoleStrategyProposal,
   saveDirectives,
   setContextMode,
   setContextOptOut,
@@ -43,7 +42,6 @@ const ROUTE_PATH = "/api/studio/metadata/[nodeId]";
 
 interface PutBody {
   directives?: string;
-  roleStrategyAction?: "accept" | "dismiss";
   /** Privacy toggle: AI context stops reading this node. */
   contextOptOut?: boolean;
   /**
@@ -113,13 +111,6 @@ export async function PUT(
       let view = null;
       if (typeof body.directives === "string") {
         view = await saveDirectives(session.user.id, nodeId, body.directives);
-      }
-      if (body.roleStrategyAction === "accept" || body.roleStrategyAction === "dismiss") {
-        view = await resolveRoleStrategyProposal(
-          session.user.id,
-          nodeId,
-          body.roleStrategyAction
-        );
       }
       if (typeof body.contextOptOut === "boolean") {
         view = await setContextOptOut(

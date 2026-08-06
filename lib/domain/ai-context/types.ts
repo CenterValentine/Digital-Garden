@@ -69,8 +69,12 @@ export interface SourceContentResolver {
  * Ownership of a metadata section, which governs whether the generator may
  * overwrite it:
  *  - `ai`          → regenerated freely
- *  - `ai-proposed` → regenerated as a diff the human confirms
  *  - `human`       → never machine-written; the AI reads it only
+ *
+ * `ai-proposed` (regenerate-as-a-diff-the-human-confirms) is RETIRED (owner
+ * call 2026-08-06 during smoke: "just go with whatever the AI comes up
+ * with"). The union keeps the literal so rows written before retirement
+ * still parse; renderers normalize it to `ai`.
  */
 export type MetadataSectionOwner = "ai" | "ai-proposed" | "human";
 
@@ -96,7 +100,7 @@ export const METADATA_SECTION_OWNERS: Record<
 > = {
   summary: "ai",
   structure: "ai",
-  "role-strategy": "ai-proposed",
+  "role-strategy": "ai",
   directives: "human",
   // Gaps / ambiguities / misalignment notes — generated only for nodes whose
   // resolved contextMode is ENHANCED (plan D10); pruned on downgrade (D8).

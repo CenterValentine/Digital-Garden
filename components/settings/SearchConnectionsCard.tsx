@@ -120,7 +120,10 @@ export function SearchConnectionsCard() {
   const isUpdate = rows.some((r) => r.provider === provider);
 
   return (
-    <div className="space-y-4">
+    <div
+      className="rounded-xl border border-black/10 p-4 space-y-4 dark:border-white/10"
+      style={{ background: glass0.background }}
+    >
       <div>
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Web Search</h2>
         <p className="mt-1 text-sm text-gray-400">

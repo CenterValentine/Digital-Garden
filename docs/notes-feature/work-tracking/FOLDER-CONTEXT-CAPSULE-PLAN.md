@@ -59,6 +59,7 @@ Three coupled workstreams:
 | D15 | **Write-back loop** — ambiguities the AI resolves mid-run are proposed into the folder's `role-strategy` section via the existing `ai-proposed` → human-confirm machinery | Context that learns, not just describes. No new plumbing |
 | D16 | **SWR semantics confirmed** — a gate refresh is durable and shared: first mention heals for every later consumer (same playbook run, other sessions). Concurrent calls single-flight via a **refresh mutex** (sweep B2 — note: gen-lock is the anti-feedback-loop rule, *not* a mutex) | Mentions become a demand-driven indexing schedule; the nightly sweep mops up what usage never touched |
 | D17 | **Runtime frugality nudge** — the capsule preamble and `read_folder_context` description carry a single light-touch economy line (read what the request needs; budget reads with the index's token estimates). Prudence, not prohibition — no hard caps | Owner call 2026-08-06: one word like "frugal" saves tokens long-run; heavy instruction would harm the cases where depth is warranted |
+| D18 | **Proposal flow RETIRED** (smoke-round owner call 2026-08-06): role-strategy is plain `ai`-owned — generation writes it directly; no accept/dismiss. Amends D15: the write-back loop now applies resolutions directly instead of proposing them. Legacy `ai-proposed` provenance renders as the AI badge | "Just go with whatever the AI comes up with" — one pill, no review queue |
 
 ---
 

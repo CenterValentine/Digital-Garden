@@ -11,9 +11,9 @@
 
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Plus, Trash2, AlertCircle, Check, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Trash2, AlertCircle, Check, ArrowUp, ArrowDown, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/glass/button";
 import { getSurfaceStyles } from "@/lib/design/system";
@@ -155,73 +155,74 @@ export default function AIFeatureRoutingPage({ embedded }: AIFeatureRoutingPageP
       ) : (
         <>
           <ul className="space-y-3">
-            {FEATURE_REGISTRY.map((feature) => {
-              const entries = routes[feature.id] ?? [];
-              // Remount on entries-change rather than useEffect-syncing
-              // local state — avoids the React Compiler's setState-in-
-              // effect cascade rule.
-              const remountKey = `${feature.id}::${JSON.stringify(entries)}`;
-              return (
-                <Fragment key={remountKey}>
+            {FEATURE_REGISTRY.filter((f) => !f.id.startsWith("role-")).map(
+              (feature) => {
+                const entries = routes[feature.id] ?? [];
+                // Remount on entries-change rather than useEffect-syncing
+                // local state — avoids the React Compiler's setState-in-
+                // effect cascade rule.
+                const remountKey = `${feature.id}::${JSON.stringify(entries)}`;
+                return (
                   <FeatureRow
+                    key={remountKey}
                     feature={feature}
                     connections={connections}
                     entries={entries}
                     onSave={(next) => void handleSetRoutes(feature.id, next)}
                     glass0={glass0}
+                    footer={
+                      feature.id === "follow-ups" ? (
+                        /* Steering lives INSIDE the Suggested Follow-ups
+                           card as a true fieldset (owner call 2026-08-06) —
+                           the model route and its prompt are one config. */
+                        <fieldset className="rounded-lg border border-black/10 px-3 pb-2.5 pt-1 dark:border-white/10">
+                          <legend className="px-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+                            Follow-up steering
+                          </legend>
+                          <p className="text-[11px] leading-snug text-gray-500">
+                            Free-form guidance appended to the generator&apos;s
+                            prompt. Example: &ldquo;Focus on next experiments
+                            and pitfalls to watch for.&rdquo;
+                          </p>
+                          <textarea
+                            value={followUpsPrompt}
+                            onChange={(e) =>
+                              setFollowUpsPrompt(e.target.value.slice(0, 600))
+                            }
+                            rows={2}
+                            maxLength={600}
+                            placeholder="What should the follow-up suggestions focus on?"
+                            className="mt-1.5 w-full resize-y rounded-md border border-black/10 bg-black/[0.04] px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-blue-400/40 focus:outline-none dark:border-white/10 dark:bg-black/20 dark:text-white dark:placeholder:text-gray-500"
+                          />
+                          <div className="mt-1 flex items-center justify-between gap-3">
+                            <span className="text-[11px] text-gray-500">
+                              {followUpsPrompt.length}/600 characters
+                            </span>
+                            {followUpsPromptDirty && (
+                              <Button
+                                size="sm"
+                                onClick={() => void saveFollowUpsPrompt()}
+                                disabled={savingFollowUpsPrompt}
+                              >
+                                <Check className="h-3.5 w-3.5 mr-1" />
+                                {savingFollowUpsPrompt ? "Saving…" : "Save"}
+                              </Button>
+                            )}
+                          </div>
+                        </fieldset>
+                      ) : undefined
+                    }
                   />
-                  {feature.id === "follow-ups" && (
-                    <>
-          {/* Follow-ups steering — free-form prompt appended to the
-              generator's system instructions. Sits alongside the
-              follow-ups feature row above because the model lives there
-              but the prompt's value belongs in user settings. */}
-          <li
-            className="rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3"
-            style={{ background: glass0.background }}
-          >
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                Follow-up steering
-              </h3>
-              <p className="mt-1 text-xs text-gray-500">
-                Optional free-form guidance appended to the follow-up
-                generator&apos;s prompt. Example: &ldquo;Focus on next
-                experiments and pitfalls to watch for. Skip rephrasings of
-                the last assistant turn.&rdquo;
-              </p>
-            </div>
-            <textarea
-              value={followUpsPrompt}
-              onChange={(e) =>
-                setFollowUpsPrompt(e.target.value.slice(0, 600))
-              }
-              rows={3}
-              maxLength={600}
-              placeholder="What should the follow-up suggestions focus on?"
-              className="w-full resize-y rounded-md border border-black/10 dark:border-white/10 bg-black/[0.04] px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 dark:bg-black/20 dark:text-white dark:placeholder:text-gray-500 focus:border-blue-400/40 focus:outline-none"
+                );
+              },
+            )}
+            <PlaybookRolesGroup
+              features={FEATURE_REGISTRY.filter((f) => f.id.startsWith("role-"))}
+              routes={routes}
+              connections={connections}
+              onSave={handleSetRoutes}
+              glass0={glass0}
             />
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[11px] text-gray-500">
-                {followUpsPrompt.length}/600 characters
-              </span>
-              {followUpsPromptDirty && (
-                <Button
-                  size="sm"
-                  onClick={() => void saveFollowUpsPrompt()}
-                  disabled={savingFollowUpsPrompt}
-                >
-                  <Check className="h-3.5 w-3.5 mr-1" />
-                  {savingFollowUpsPrompt ? "Saving…" : "Save"}
-                </Button>
-              )}
-            </div>
-          </li>
-                    </>
-                  )}
-                </Fragment>
-              );
-            })}
           </ul>
         </>
       )}
@@ -235,12 +236,18 @@ function FeatureRow({
   entries,
   onSave,
   glass0,
+  compact = false,
+  footer,
 }: {
   feature: FeatureSpec;
   connections: ConnectionView[];
   entries: RouteEntry[];
   onSave: (entries: RouteEntry[]) => void;
   glass0: ReturnType<typeof getSurfaceStyles>;
+  /** Dense variant for grouped rows: no description/chips, tighter padding. */
+  compact?: boolean;
+  /** Extra content at the card's bottom (e.g. the follow-ups steering fieldset). */
+  footer?: ReactNode;
 }) {
   const [local, setLocal] = useState<RouteEntry[]>(entries);
   // Parent remounts this row when `entries` changes (key prop above),
@@ -281,18 +288,28 @@ function FeatureRow({
   );
 
   return (
-    <li className="rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3" style={{ background: glass0.background }}>
+    <li
+      className={
+        compact
+          ? "rounded-lg border border-black/10 dark:border-white/10 p-3 space-y-2"
+          : "rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3"
+      }
+      style={compact ? undefined : { background: glass0.background }}
+    >
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-medium text-gray-900 dark:text-white">{feature.label}</h3>
             <code className="text-[10px] text-gray-500 font-mono">{feature.id}</code>
-            {feature.requiredCapabilities.map((cap) => (
-              <CapabilityChip key={cap} cap={cap} />
-            ))}
+            {!compact &&
+              feature.requiredCapabilities.map((cap) => (
+                <CapabilityChip key={cap} cap={cap} />
+              ))}
           </div>
-          <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
-          {feature.settingsHref && (
+          {!compact && (
+            <p className="mt-1 text-xs text-gray-500">{feature.description}</p>
+          )}
+          {!compact && feature.settingsHref && (
             <Link
               href={feature.settingsHref.href}
               className="mt-1 inline-block text-xs text-gold-primary underline underline-offset-2 hover:text-gold-primary/80"
@@ -367,6 +384,77 @@ function FeatureRow({
         options={compatibleOptions}
         onAdd={(entry) => update([...local, entry])}
       />
+      {footer}
+    </li>
+  );
+}
+
+/**
+ * The six playbook model roles (AI 3.4) grouped into ONE quiet card,
+ * collapsed by default — owner UX call 2026-08-06: six full-size cards were
+ * too conspicuous for config most users touch once.
+ */
+function PlaybookRolesGroup({
+  features,
+  routes,
+  connections,
+  onSave,
+  glass0,
+}: {
+  features: FeatureSpec[];
+  routes: Record<string, RouteEntry[]>;
+  connections: ConnectionView[];
+  onSave: (featureId: string, entries: RouteEntry[]) => Promise<void> | void;
+  glass0: ReturnType<typeof getSurfaceStyles>;
+}) {
+  const [open, setOpen] = useState(false);
+  const configured = features.filter(
+    (f) => (routes[f.id] ?? []).length > 0,
+  ).length;
+  return (
+    <li
+      className="rounded-xl border border-black/10 dark:border-white/10 p-4 space-y-3"
+      style={{ background: glass0.background }}
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <div className="min-w-0">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-white">
+            Playbook model roles
+          </h3>
+          <p className="mt-1 text-xs text-gray-500">
+            Per-phase model routing for playbooks (scout, analyst, writer,
+            coder, reviewer, archivist). {configured}/{features.length}{" "}
+            configured.
+          </p>
+        </div>
+        <ChevronDown
+          className={`h-4 w-4 shrink-0 text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+      {open && (
+        <ul className="space-y-2">
+          {features.map((feature) => {
+            const entries = routes[feature.id] ?? [];
+            const remountKey = `${feature.id}::${JSON.stringify(entries)}`;
+            return (
+              <FeatureRow
+                key={remountKey}
+                feature={feature}
+                connections={connections}
+                entries={entries}
+                onSave={(next) => void onSave(feature.id, next)}
+                glass0={glass0}
+                compact
+              />
+            );
+          })}
+        </ul>
+      )}
     </li>
   );
 }

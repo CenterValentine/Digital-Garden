@@ -1,10 +1,10 @@
 /**
  * Agentic metadata service — the Context doc behind the Context tab.
  *
- * Ownership contract (frozen in types.ts): summary/structure are AI-owned and
- * regenerated freely; role-strategy is AI-PROPOSED (generation writes a
- * proposal, a human accepts or dismisses it); directives are human-owned and
- * never machine-written. Persistence is REST last-write-wins by design — this
+ * Ownership contract (frozen in types.ts): summary/structure/role-strategy/
+ * signals are AI-owned and regenerated freely (the role-strategy proposal
+ * flow was retired — plan D18); directives are human-owned and never
+ * machine-written. Persistence is REST last-write-wins by design — this
  * surface is deliberately NOT collaborative and never joins publishing,
  * export, or the collab schema.
  *
@@ -452,51 +452,6 @@ export async function saveDirectives(
   return getMetadataForNode(userId, nodeId);
 }
 
-/** Accept or dismiss the pending Role & Strategy proposal. */
-export async function resolveRoleStrategyProposal(
-  userId: string,
-  nodeId: string,
-  action: "accept" | "dismiss"
-): Promise<MetadataView | null> {
-  const node = await loadOwnedNode(userId, nodeId);
-  if (!node) return null;
-
-  const record = await prisma.agenticMetadata.findUnique({ where: { nodeId } });
-  if (!record) return getMetadataForNode(userId, nodeId);
-
-  const sections = readSections(record.tiptapJson);
-  const meta: SectionsMeta = {
-    ...defaultMeta(),
-    ...(record.sectionsMeta as SectionsMeta),
-  };
-  const rs = meta["role-strategy"] ?? { owner: "ai-proposed" as const };
-
-  if (action === "accept" && rs.proposal) {
-    sections["role-strategy"] = rs.proposal;
-    meta["role-strategy"] = {
-      owner: "ai-proposed",
-      generatedAt: new Date().toISOString(),
-      model: rs.model,
-    };
-  } else {
-    meta["role-strategy"] = {
-      owner: "ai-proposed",
-      generatedAt: rs.generatedAt,
-      model: rs.model,
-    };
-  }
-
-  await upsertRecord(nodeId, sections, meta, {
-    sourceContentHash: record.sourceContentHash,
-    model: record.model,
-    generatedAt: record.generatedAt,
-    summaryHash: record.summaryHash,
-    contextDirty: record.contextDirty,
-    oneLiner: readOneLiner(record.tiptapJson),
-  });
-  return getMetadataForNode(userId, nodeId);
-}
-
 /**
  * Guidance sections for prompt assembly (tool prompts slot these in). Reads
  * the accepted Role & Strategy and the human Directives — never proposals.
@@ -678,13 +633,10 @@ export async function generateMetadataForNode(
   sections.structure = generated.structure;
   meta.summary = { owner: "ai", ...stamp };
   meta.structure = { owner: "ai", ...stamp };
-  meta["role-strategy"] = {
-    owner: "ai-proposed",
-    generatedAt: meta["role-strategy"]?.generatedAt,
-    model: meta["role-strategy"]?.model,
-    proposal: generated.roleStrategy,
-    proposedAt: now.toISOString(),
-  };
+  // Role & Strategy writes directly — the accept/dismiss proposal flow was
+  // retired (owner call 2026-08-06): the AI's read is applied as-is.
+  sections["role-strategy"] = generated.roleStrategy;
+  meta["role-strategy"] = { owner: "ai", ...stamp };
 
   // B8 write-time mode re-check: a downgrade that landed during the LLM call
   // must not re-plant signals — and any leftover signals from a prior

@@ -169,3 +169,35 @@ export const ALL_TOOL_METADATA: Record<
   ..._FLASHCARD_TOOL_METADATA,
   ..._WORKFLOW_TOOL_METADATA,
 };
+
+/**
+ * Tool groups for the settings UI (owner call 2026-08-06): the flat list
+ * grew past scannability. Sections mirror how the tool modules are already
+ * organized — the base set, then one section per contributing extension.
+ */
+export const TOOL_GROUPS: ReadonlyArray<{
+  label: string;
+  description: string;
+  ids: readonly string[];
+}> = [
+  {
+    label: "Core",
+    description: "Web, notes, folders, playbooks, media, and notifications.",
+    ids: BASE_TOOL_IDS,
+  },
+  {
+    label: "Editor",
+    description: "Reading and editing the open document.",
+    ids: _EDITOR_TOOL_IDS,
+  },
+  {
+    label: "Flashcards",
+    description: "Contributed by the Flashcards extension.",
+    ids: _FLASHCARD_TOOL_IDS,
+  },
+  {
+    label: "Workflows",
+    description: "Contributed by the Workflows extension.",
+    ids: _WORKFLOW_TOOL_IDS,
+  },
+];
