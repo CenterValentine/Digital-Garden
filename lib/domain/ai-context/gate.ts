@@ -93,7 +93,11 @@ async function checkCoverage(
   for (const child of visible) {
     const am = child.agenticMetadata;
     if (am?.generatedAt) anyCovered = true;
-    if (!am?.generatedAt || am.contextDirty) dirtyOrUncovered += 1;
+    // Row EXISTENCE means the engine has looked at this node — bare rows
+    // settle empty/unsupported leaves like chats and images (sweep B10).
+    // Only row absence or a set dirty bit is pending work; requiring
+    // generatedAt here kept chat-holding folders "stale" forever.
+    if (!am || am.contextDirty) dirtyOrUncovered += 1;
   }
 
   // REFERENCE folders have no roll-up work class: the folder's own row not
@@ -101,7 +105,7 @@ async function checkCoverage(
   // one-liners, so their coverage counts as usual.
   if (resolvedMode !== ContextMode.REFERENCE) {
     const am = folder?.agenticMetadata;
-    if (!am?.generatedAt || am.contextDirty) dirtyOrUncovered += 1;
+    if (!am || am.contextDirty) dirtyOrUncovered += 1;
   }
 
   return { clean: dirtyOrUncovered === 0, anyCovered };

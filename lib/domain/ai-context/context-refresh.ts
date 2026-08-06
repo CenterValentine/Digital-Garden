@@ -359,17 +359,41 @@ async function runRefresh(
 
   const resolver = createSourceContentResolver();
   const packable: Array<{ node: ScopeNode; text: string }> = [];
+  const emptyUncovered: string[] = [];
   for (const node of cappedLeaves) {
     const resolved = await resolver.resolve({
       id: node.id,
       contentType: node.contentType,
       title: node.title,
     });
-    // Uncovered + empty (images pre-vision-pass, blank notes): generating a
-    // "this is empty" summary wastes tokens and pollutes roll-ups — skip.
+    // Uncovered + empty (chats, images pre-vision-pass, blank notes):
+    // generating a "this is empty" summary wastes tokens and pollutes
+    // roll-ups — skip the LLM, but SETTLE the node with a bare row below.
     // Dirty + empty means content was REMOVED; regenerate honestly.
-    if (resolved.empty && !node.meta.exists) continue;
+    if (resolved.empty && !node.meta.exists) {
+      emptyUncovered.push(node.id);
+      continue;
+    }
     packable.push({ node, text: resolved.text });
+  }
+
+  // Sweep B10 (smoke find): a skip with no record is indistinguishable from
+  // "never visited", so folders holding chats/images read as uncovered
+  // FOREVER and every mention gate ended "stale". A bare row (dirty=false,
+  // no generatedAt) records "looked — nothing to say"; an edit that gives
+  // the node real content re-dirties it through the normal cascade.
+  if (emptyUncovered.length > 0) {
+    await prisma.agenticMetadata.createMany({
+      data: emptyUncovered.map((nodeId) => ({
+        nodeId,
+        tiptapJson: { version: 1, sections: {} },
+        sectionsMeta: {},
+        derivedText: "",
+        contextDirty: false,
+      })),
+      skipDuplicates: true,
+    });
+    stats.leavesDamped += emptyUncovered.length;
   }
 
   // Anchors: stored AI sections for covered work nodes (echo-verbatim
@@ -563,7 +587,24 @@ async function runRefresh(
       }
       if (!prompt) {
         const sourceText = await assembleSourceText(folder);
-        if (!sourceText.trim() && !folder.meta.exists) continue; // empty folder
+        if (!sourceText.trim() && !folder.meta.exists) {
+          // Empty folder — settle with a bare row (sweep B10), same rule as
+          // empty leaves: no record made the gate read it as pending forever.
+          await prisma.agenticMetadata.createMany({
+            data: [
+              {
+                nodeId: folder.id,
+                tiptapJson: { version: 1, sections: {} },
+                sectionsMeta: {},
+                derivedText: "",
+                contextDirty: false,
+              },
+            ],
+            skipDuplicates: true,
+          });
+          stats.foldersDamped += 1;
+          continue;
+        }
         const guidance = folderEnhanced
           ? await getGuidanceText(folder.id)
           : null;

@@ -313,6 +313,7 @@ wiki-link id-first resolution.
 | B6 | `resolvePrimaryRoute(ai-context-enhanced)` returns null when unconfigured | Enhanced folders silently never get signals | Fall back to the standard route's model + surface "configure enhanced route" in the rail; never silently skip | 2 |
 | B7 | Spend-ceiling check is TOCTOU across concurrent gates | Bounded overshoot (one capped batch each) | Accept & document; B2 covers the same-folder case, per-invocation caps bound the rest | — |
 | B8 | Downgrade prunes signals while an enhanced generation is in flight | Late write re-adds pruned signals | Write-time resolved-mode re-check before writing the signals section (same rule as B1) | 2 |
+| B10 | *(smoke find 2026-08-06)* Engine skipped empty/unsupported leaves (chats, images) and empty folders with NO record — indistinguishable from "never visited" | Folders holding chats read as uncovered forever: every mention gate drained, spent nothing, and ended "stale — serving best available" even right after a refresh | Skips settle a **bare metadata row** (dirty=false, no generatedAt = "looked, nothing to say"); gate coverage counts row absence or dirty bit as pending, not missing generatedAt. An edit that gives the node real content re-dirties it through the normal cascade | smoke |
 
 ## Risks
 
