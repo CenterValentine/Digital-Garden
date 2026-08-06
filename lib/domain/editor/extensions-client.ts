@@ -29,6 +29,7 @@ import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
 import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
 import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
+import { DGHeading } from "./extensions/heading";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -121,10 +122,9 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
   return [
     StarterKit.configure({
-      // Heading levels with markdown shortcuts (# ## ###)
-      heading: {
-        levels: [1, 2, 3, 4, 5, 6],
-      },
+      // Disabled: replaced by DGHeading (adds `collapsed` for heading folds).
+      // Markdown shortcuts (# ##) and keyboard shortcuts are inherited.
+      heading: false,
       // Disable default code block (we use CodeBlockLowlight)
       codeBlock: false,
       // Enable blockquote with > markdown shortcut
@@ -151,6 +151,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       link: false,
       undoRedo: collaboration ? false : {},
     }),
+
+    // Heading with `collapsed` attr (heading folds) — levels + markdown
+    // shortcuts (# ## ###) match the previous StarterKit config.
+    DGHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
 
     ...(collaboration
       ? [

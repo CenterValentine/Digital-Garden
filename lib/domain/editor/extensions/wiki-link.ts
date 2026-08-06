@@ -123,6 +123,28 @@ export const WikiLink = Node.create<WikiLinkOptions>({
           };
         },
       },
+      /**
+       * Derived slug of an in-document heading target ([[#Heading]]).
+       *
+       * Heading ids are LIVE slugs (lib/domain/content/heading-ids.ts):
+       * renaming a heading changes its slug, and the heading-link-integrity
+       * extension rewrites this attr in the same edit. A slug with no
+       * matching heading is decorated as broken (never rewritten away —
+       * restoring the heading un-breaks the link). Absent renders no
+       * attribute, so pre-existing links serialize byte-identically.
+       */
+      headingSlug: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-heading-slug"),
+        renderHTML: (attributes) => {
+          if (!attributes.headingSlug) {
+            return {};
+          }
+          return {
+            "data-heading-slug": attributes.headingSlug,
+          };
+        },
+      },
     };
   },
 

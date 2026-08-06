@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.13.0";
+export const TIPTAP_SCHEMA_VERSION = "1.14.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,31 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.14.0",
+    date: "2026-08-06",
+    changes: [
+      {
+        type: "modify",
+        target: "node",
+        name: "heading",
+        description:
+          "Add optional `collapsed` boolean attr (default false) via DGHeading, the stored half of heading folds: a collapsed heading hides its following siblings up to the next heading of equal-or-higher rank. The fold range is derived per edit; only the boolean persists (and syncs in collaboration). data-collapsed is emitted only when true, so non-collapsed headings serialize byte-identically to 1.13.0. Heading anchor ids are deliberately NOT stored — they are live slugs derived from heading text (lib/domain/content/heading-ids.ts).",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+      {
+        type: "modify",
+        target: "node",
+        name: "wikiLink",
+        description:
+          "Add optional `headingSlug` attr (default null) for in-document heading links ([[#Heading]]). Carries the derived slug of the target heading; the heading-link-integrity extension rewrites it when the heading is renamed and decorates it broken (non-destructively) when no heading matches. Absent renders no attribute — existing links serialize byte-identically.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.13.0",
     date: "2026-07-25",
