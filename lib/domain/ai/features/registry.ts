@@ -193,6 +193,27 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     },
   },
   {
+    // Signals tier of the AI-context engine (FOLDER-CONTEXT-CAPSULE-PLAN →
+    // D9/D10): gaps/misalignment generation for ENHANCED-mode nodes. STANDARD
+    // and below share the studio-metadata route. Unconfigured → the engine
+    // falls back to studio-metadata's model rather than silently skipping
+    // signals (sweep B6).
+    id: "ai-context-enhanced",
+    label: "AI Context — Enhanced Signals",
+    description:
+      "Generates the Signals section (gaps, ambiguities, directive misalignment) for folders and files set to Enhanced context mode. Negative-space reasoning — a mid-tier model pays off here; standard summaries stay on the Studio Context route.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-4-5",
+    },
+    settingsHref: {
+      label: "Configure Studio defaults",
+      href: "/settings/extensions/studio",
+    },
+  },
+  {
     id: "studio-generation",
     label: "Studio Artifact Generation",
     description:

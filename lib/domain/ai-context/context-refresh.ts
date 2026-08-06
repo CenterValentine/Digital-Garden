@@ -40,7 +40,11 @@ import {
   applyGeneratedSections,
   assembleSourceText,
   computeSourceHash,
+  getGuidanceText,
   getStoredAiSections,
+  resolveContextGenerationRoute,
+  ONE_LINER_DESC,
+  SIGNALS_DESC,
   type MetadataNodeShape,
 } from "./metadata";
 import { createSourceContentResolver } from "./source-resolver";
@@ -258,6 +262,28 @@ async function runRefresh(
     route.modelId
   );
 
+  // Enhanced-tier model, resolved lazily once per drain (plan D9). With the
+  // ai-context-enhanced route unconfigured this falls back to the standard
+  // route (sweep B6) — signals still generate, on the cheaper model.
+  let enhancedCache:
+    | { model: typeof model; modelId: string }
+    | null
+    | undefined;
+  const getEnhancedModel = async () => {
+    if (enhancedCache !== undefined) return enhancedCache;
+    const routing = await resolveContextGenerationRoute(userId, true);
+    enhancedCache = routing
+      ? {
+          model: await resolveChatModelFromConnection(
+            routing.route.connection,
+            routing.route.modelId
+          ),
+          modelId: routing.route.modelId,
+        }
+      : null;
+    return enhancedCache;
+  };
+
   const scope = await collectScope(userId, rootId);
   if (scope.length === 0) return { status: "skipped" };
 
@@ -363,10 +389,15 @@ async function runRefresh(
 
   // Packs group by PARENT FOLDER: only siblings share a call. Related
   // context sharpens each summary; unrelated branches never co-mingle
-  // (the chocolate/lye rule).
+  // (the chocolate/lye rule). Mode splits the group too — ENHANCED items
+  // run a different schema and (possibly) a different model (plan D9/D10),
+  // and mixing schemas in one call is not possible. UUID keys can't contain
+  // "|", so the composite key is unambiguous.
   const packGroups = new Map<string, typeof packable>();
   for (const item of packable) {
-    const key = item.node.parentId ?? "__rootless__";
+    const modeKey =
+      item.node.resolvedMode === ContextMode.ENHANCED ? "e" : "s";
+    const key = `${item.node.parentId ?? "__rootless__"}|${modeKey}`;
     const list = packGroups.get(key) ?? [];
     list.push(item);
     packGroups.set(key, list);
@@ -374,8 +405,13 @@ async function runRefresh(
 
   const changedByParent = new Map<string, ChangedChild[]>();
 
-  for (const [parentKey, group] of packGroups) {
+  for (const [groupKey, group] of packGroups) {
     if (stats.budgetStopped) break;
+    const parentKey = groupKey.slice(0, groupKey.lastIndexOf("|"));
+    const groupEnhanced = groupKey.endsWith("|e");
+    const groupModel = groupEnhanced ? await getEnhancedModel() : null;
+    const batchModel = groupModel?.model ?? model;
+    const batchModelId = groupModel?.modelId ?? route.modelId;
     const parentNode = scopeById.get(parentKey);
     const orientation = {
       title: parentNode?.title,
@@ -391,7 +427,13 @@ async function runRefresh(
       callsRemaining -= 1;
       stats.generationCalls += 1;
       try {
-        const results = await generateLeafBatch(model, batch, anchors, orientation);
+        const results = await generateLeafBatch(
+          batchModel,
+          batch,
+          anchors,
+          orientation,
+          groupEnhanced
+        );
         for (const { node } of batch) {
           const generated = results.get(node.id);
           if (!generated) {
@@ -401,7 +443,7 @@ async function runRefresh(
           const { changed } = await applyGeneratedSections(
             node,
             generated,
-            route.modelId,
+            batchModelId,
             readHashes.get(node.id) ?? (await computeSourceHash(node))
           );
           if (changed) {
@@ -494,14 +536,23 @@ async function runRefresh(
 
       const anchor = folderAnchors.get(folder.id);
       const changed = changedByParent.get(folder.id) ?? [];
+      const folderEnhanced = folder.resolvedMode === ContextMode.ENHANCED;
+      const folderModel = folderEnhanced ? await getEnhancedModel() : null;
 
       // Incremental patch mode — only when PROVEN single-delta: substituting
       // the one changed child's OLD signal must reproduce the stored hash,
       // i.e. nothing else moved since the last roll-up. Prevents silent
       // drift from patches that would miss earlier unapplied child changes.
+      // ENHANCED folders always take the full rebuild: signals reason over
+      // the whole child set, which a single-delta patch can't see.
       let prompt: string | null = null;
       const single = changed.length === 1 ? changed[0] : null;
-      if (single?.oldSummaryHash && anchor?.summary && folder.meta.exists) {
+      if (
+        !folderEnhanced &&
+        single?.oldSummaryHash &&
+        anchor?.summary &&
+        folder.meta.exists
+      ) {
         const priorHash = await computeSourceHash(
           folder,
           new Map([[single.childId, single.oldSummaryHash]])
@@ -513,21 +564,41 @@ async function runRefresh(
       if (!prompt) {
         const sourceText = await assembleSourceText(folder);
         if (!sourceText.trim() && !folder.meta.exists) continue; // empty folder
-        prompt = buildFolderPrompt(folder, sourceText, anchor);
+        const guidance = folderEnhanced
+          ? await getGuidanceText(folder.id)
+          : null;
+        prompt = buildFolderPrompt(folder, sourceText, anchor, guidance);
       }
 
       callsRemaining -= 1;
       stats.generationCalls += 1;
-      const { object } = await generateObject({
-        model,
-        schema: FolderSectionsSchema,
-        prompt,
-        temperature: 0,
-      });
+      let generatedFolder: {
+        summary: string;
+        structure: string;
+        oneLiner: string;
+        signals?: string;
+      };
+      if (folderEnhanced) {
+        const { object } = await generateObject({
+          model: folderModel?.model ?? model,
+          schema: EnhancedFolderSectionsSchema,
+          prompt,
+          temperature: 0,
+        });
+        generatedFolder = object;
+      } else {
+        const { object } = await generateObject({
+          model,
+          schema: FolderSectionsSchema,
+          prompt,
+          temperature: 0,
+        });
+        generatedFolder = object;
+      }
       const { changed: rollupChanged } = await applyGeneratedSections(
         folder,
-        object,
-        route.modelId,
+        generatedFolder,
+        folderEnhanced ? (folderModel?.modelId ?? route.modelId) : route.modelId,
         currentHash
       );
       if (rollupChanged) stats.foldersRefreshed += 1;
@@ -816,27 +887,39 @@ const FolderSectionsSchema = z.object({
     .describe(
       "How the content is organized — main parts and their flow, as short lines."
     ),
+  oneLiner: z.string().min(1).describe(ONE_LINER_DESC),
 });
 
+/** ENHANCED folders also produce signals (plan D10). */
+const EnhancedFolderSectionsSchema = FolderSectionsSchema.extend({
+  signals: z.string().describe(SIGNALS_DESC),
+});
+
+const leafItemShape = {
+  nodeId: z
+    .string()
+    .describe("The document's nodeId, copied exactly from the input."),
+  summary: z
+    .string()
+    .min(1)
+    .describe("2-4 sentences: what this document is about and what it covers."),
+  structure: z
+    .string()
+    .min(1)
+    .describe(
+      "How the document is organized — main parts/headings and their flow, as short lines."
+    ),
+  oneLiner: z.string().min(1).describe(ONE_LINER_DESC),
+};
+
 const LeafBatchSchema = z.object({
+  items: z.array(z.object(leafItemShape)),
+});
+
+/** ENHANCED leaves also produce per-document signals (plan D10). */
+const EnhancedLeafBatchSchema = z.object({
   items: z.array(
-    z.object({
-      nodeId: z
-        .string()
-        .describe("The document's nodeId, copied exactly from the input."),
-      summary: z
-        .string()
-        .min(1)
-        .describe(
-          "2-4 sentences: what this document is about and what it covers."
-        ),
-      structure: z
-        .string()
-        .min(1)
-        .describe(
-          "How the document is organized — main parts/headings and their flow, as short lines."
-        ),
-    })
+    z.object({ ...leafItemShape, signals: z.string().describe(SIGNALS_DESC) })
   ),
 });
 
@@ -852,12 +935,20 @@ const ANCHOR_RULE =
 function buildFolderPrompt(
   folder: ScopeNode,
   sourceText: string,
-  anchor?: { summary: string; structure: string }
+  anchor?: { summary: string; structure: string },
+  guidance?: { roleStrategy: string; directives: string } | null
 ): string {
+  const enhanced = folder.resolvedMode === ContextMode.ENHANCED;
   return [
     `You maintain a working "Context" document about one folder in a user's knowledge base.`,
     `Folder: "${folder.title}"`,
     `Summarize what this folder contains as a whole, based on its children's context below.`,
+    enhanced && guidance?.directives.trim()
+      ? `The user's standing directives for this folder (follow them, and flag content that conflicts with them in your signals):\n${guidance.directives.trim()}`
+      : "",
+    enhanced && guidance?.roleStrategy.trim()
+      ? `Accepted Role & Strategy for this folder (flag misalignment with the actual contents in your signals):\n${guidance.roleStrategy.trim()}`
+      : "",
     anchor?.summary
       ? `\nExisting summary:\n${anchor.summary}\nExisting structure:\n${anchor.structure}\n\n${ANCHOR_RULE}`
       : "",
@@ -900,9 +991,15 @@ function buildFolderPatchPrompt(
 async function generateLeafBatch(
   model: Parameters<typeof generateObject>[0]["model"],
   batch: Array<{ node: ScopeNode; text: string }>,
-  anchors: Map<string, { summary: string; structure: string }>,
-  orientation: { title?: string; summary?: string }
-): Promise<Map<string, { summary: string; structure: string }>> {
+  anchors: Awaited<ReturnType<typeof getStoredAiSections>>,
+  orientation: { title?: string; summary?: string },
+  enhanced: boolean
+): Promise<
+  Map<
+    string,
+    { summary: string; structure: string; oneLiner: string; signals?: string }
+  >
+> {
   const docs = batch
     .map(({ node, text }) => {
       const anchor = anchors.get(node.id);
@@ -921,41 +1018,63 @@ async function generateLeafBatch(
     })
     .join("\n\n");
 
-  const { object } = await generateObject({
-    model,
-    schema: LeafBatchSchema,
-    prompt: [
-      `You maintain working "Context" documents about items in a user's knowledge base.`,
-      orientation.title
-        ? `The ${batch.length} documents below are siblings inside the folder "${orientation.title}". Use that shared setting to summarize each one well.`
-        : `Below are ${batch.length} documents.`,
-      orientation.summary
-        ? `About this folder: ${orientation.summary.slice(0, 400)}`
-        : "",
-      `For EACH document, return one item with its nodeId copied exactly.`,
-      "Keep every item strictly about its own document — never blend content, terminology, or claims across documents.",
-      ANCHOR_RULE,
-      "",
-      docs,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    temperature: 0,
-  });
+  const prompt = [
+    `You maintain working "Context" documents about items in a user's knowledge base.`,
+    orientation.title
+      ? `The ${batch.length} documents below are siblings inside the folder "${orientation.title}". Use that shared setting to summarize each one well.`
+      : `Below are ${batch.length} documents.`,
+    orientation.summary
+      ? `About this folder: ${orientation.summary.slice(0, 400)}`
+      : "",
+    `For EACH document, return one item with its nodeId copied exactly.`,
+    "Keep every item strictly about its own document — never blend content, terminology, or claims across documents.",
+    ANCHOR_RULE,
+    "",
+    docs,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const results = new Map<string, { summary: string; structure: string }>();
+  type LeafResult = {
+    summary: string;
+    structure: string;
+    oneLiner: string;
+    signals?: string;
+  };
+  let items: Array<LeafResult & { nodeId: string }>;
+  if (enhanced) {
+    const { object } = await generateObject({
+      model,
+      schema: EnhancedLeafBatchSchema,
+      prompt,
+      temperature: 0,
+    });
+    items = object.items;
+  } else {
+    const { object } = await generateObject({
+      model,
+      schema: LeafBatchSchema,
+      prompt,
+      temperature: 0,
+    });
+    items = object.items;
+  }
+
+  const results = new Map<string, LeafResult>();
   const validIds = new Set(batch.map(({ node }) => node.id));
-  for (const item of object.items) {
+  for (const item of items) {
     if (validIds.has(item.nodeId)) {
       results.set(item.nodeId, {
         summary: item.summary,
         structure: item.structure,
+        oneLiner: item.oneLiner,
+        signals: item.signals,
       });
     }
   }
   // Hallucination audit: hashing keeps the log line bounded regardless of
   // how creative the model got with unknown nodeIds.
-  const unknown = object.items.filter((i) => !validIds.has(i.nodeId));
+  const unknown = items.filter((i) => !validIds.has(i.nodeId));
   if (unknown.length > 0) {
     logger.warn({
       layer: "ai",

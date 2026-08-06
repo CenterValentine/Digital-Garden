@@ -78,7 +78,8 @@ export type MetadataSectionKind =
   | "summary"
   | "structure"
   | "role-strategy"
-  | "directives";
+  | "directives"
+  | "signals";
 
 /** Per-section provenance stored in `AgenticMetadata.sectionsMeta`. */
 export interface MetadataSectionMeta {
@@ -97,4 +98,7 @@ export const METADATA_SECTION_OWNERS: Record<
   structure: "ai",
   "role-strategy": "ai-proposed",
   directives: "human",
+  // Gaps / ambiguities / misalignment notes — generated only for nodes whose
+  // resolved contextMode is ENHANCED (plan D10); pruned on downgrade (D8).
+  signals: "ai",
 };

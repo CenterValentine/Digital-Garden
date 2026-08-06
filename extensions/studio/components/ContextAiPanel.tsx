@@ -44,6 +44,7 @@ const SECTION_ORDER: MetadataSectionKind[] = [
   "structure",
   "role-strategy",
   "directives",
+  "signals",
 ];
 
 const SECTION_LABELS: Record<MetadataSectionKind, string> = {
@@ -51,6 +52,7 @@ const SECTION_LABELS: Record<MetadataSectionKind, string> = {
   structure: "Structure",
   "role-strategy": "Role & Strategy",
   directives: "Directives",
+  signals: "Signals",
 };
 
 const SECTION_EMPTY_HINTS: Record<MetadataSectionKind, string> = {
@@ -59,6 +61,8 @@ const SECTION_EMPTY_HINTS: Record<MetadataSectionKind, string> = {
   "role-strategy":
     "The operation this content serves and how it relates to its siblings.",
   directives: "Your standing instructions — the AI reads these every time.",
+  signals:
+    "Gaps, ambiguities, and misalignments the AI flags — generated only in Enhanced context mode.",
 };
 
 const OWNER_BADGES: Record<
@@ -412,4 +416,5 @@ const OWNER_DEFAULTS: Record<MetadataSectionKind, MetadataSectionOwner> = {
   structure: "ai",
   "role-strategy": "ai-proposed",
   directives: "human",
+  signals: "ai",
 };
