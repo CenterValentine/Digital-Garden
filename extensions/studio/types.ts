@@ -106,92 +106,23 @@ export interface SourceSelection {
   capApplied: boolean;
 }
 
-// ── Source content resolution (the web-search seam) ──────────────────────
+// ── Graduated substrate types (re-exported for studio-internal consumers) ─
+//
+// The source-resolution and agentic-metadata types moved to
+// `lib/domain/ai-context/types.ts` when the context layer graduated to
+// content-graph infrastructure (FOLDER-CONTEXT-CAPSULE-PLAN → Phase 0).
+// Re-exported here so studio components keep importing from "../types".
 
-/**
- * Content types the resolver knows how to turn into prompt-ready text.
- * Kept as a string union rather than importing the Prisma `ContentType` so
- * this file stays dependency-free.
- */
-export type ResolvableContentType =
-  | "note"
-  | "file"
-  | "html"
-  | "code"
-  | "external"
-  | "folder";
-
-/** Minimal node descriptor the resolver needs. */
-export interface ResolverNodeRef {
-  id: string;
-  contentType: ResolvableContentType | string;
-  title: string;
-}
-
-/** Result of resolving one node to text. */
-export interface ResolvedSourceContent {
-  nodeId: string;
-  /** Prompt-ready text. Empty string when `empty` is true. */
-  text: string;
-  estimatedTokens: number;
-  /**
-   * No usable text was available (blank extraction, folder, unsupported type).
-   * The picker surfaces this as a "NO TEXT" flag — the file is moot in studio.
-   */
-  empty: boolean;
-  /** Text was cut to fit a per-node ceiling. */
-  truncated: boolean;
-  /**
-   * Human-readable caveat for the picker, e.g. "No extractable text" or
-   * "Link preview only — full-page text not yet supported".
-   */
-  warning?: string;
-}
-
-/**
- * Turns any ContentNode into prompt-ready text. The `external` resolver is an
- * OG-metadata-only stub in v1; the future web-search plan fills it in place
- * without touching callers.
- */
-export interface SourceContentResolver {
-  resolve(node: ResolverNodeRef): Promise<ResolvedSourceContent>;
-}
-
-// ── Agentic metadata ─────────────────────────────────────────────────────
-
-/**
- * Ownership of a metadata section, which governs whether the generator may
- * overwrite it (see plan → "Metadata doc sections by ownership"):
- *  - `ai`          → regenerated freely
- *  - `ai-proposed` → regenerated as a diff the human confirms
- *  - `human`       → never machine-written; the AI reads it only
- */
-export type MetadataSectionOwner = "ai" | "ai-proposed" | "human";
-
-export type MetadataSectionKind =
-  | "summary"
-  | "structure"
-  | "role-strategy"
-  | "directives";
-
-/** Per-section provenance stored in `AgenticMetadata.sectionsMeta`. */
-export interface MetadataSectionMeta {
-  owner: MetadataSectionOwner;
-  /** ISO timestamp of last generation, if machine-written. */
-  generatedAt?: string;
-  model?: string;
-}
-
-/** Default ownership per section kind. */
-export const METADATA_SECTION_OWNERS: Record<
+export type {
+  ResolvableContentType,
+  ResolverNodeRef,
+  ResolvedSourceContent,
+  SourceContentResolver,
+  MetadataSectionOwner,
   MetadataSectionKind,
-  MetadataSectionOwner
-> = {
-  summary: "ai",
-  structure: "ai",
-  "role-strategy": "ai-proposed",
-  directives: "human",
-};
+  MetadataSectionMeta,
+} from "@/lib/domain/ai-context/types";
+export { METADATA_SECTION_OWNERS } from "@/lib/domain/ai-context/types";
 
 // ── Generation runs ──────────────────────────────────────────────────────
 

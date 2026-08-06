@@ -10,6 +10,22 @@ last_updated: 2026-08-05
 
 ---
 
+## Folder Context Capsule — follow-ups (2026-08-06, branch `feat/ai-context-capsule`; plan: FOLDER-CONTEXT-CAPSULE-PLAN.md)
+
+- [ ] **Recent-activity projection in the capsule** — "what changed lately" derived from `updatedAt` columns; zero LLM cost; valuable "what the user is up to" context. Deferred by owner decision.
+- [ ] **Glossary section** — promote when the AI demonstrably fumbles folder-local vocabulary (acronyms, entity names). Interim home: `directives` prose.
+- [ ] **Conventions/patterns section** — "a well-formed item here has sections X/Y/Z"; promote when creation-tasks need it. Interim home: `directives`.
+- [ ] **`search_folder` probe tool** — scoped full-text search within a subtree (needle-shaped queries; cheaper than walking). Global `searchNotes` is the interim fallback.
+- [ ] **Latency-class warning in Feature Routing UI** — flag when a slow reasoning model is routed to a background-frequency route (`studio-metadata`, `ai-context-enhanced`). The gate's stale-serve ladder already prevents hangs; this is advisory.
+- [ ] **Contract migration: drop `contextOptOut`** — the expand/contract second half (sweep B4). After one release on `contextMode`, remove the boolean column + `explicitMode` transition logic.
+- [ ] **Settings relocation** — `autoContextMode`/`dailyCallCap` storage keys live under `settings.studio.*` and the UI under `/settings/extensions/studio`, while the engine is core domain now (D2 identifier stability). Relocate keys + surface when worth a settings migration.
+- [ ] **File-tree context-menu quick-set** for context modes (rail is the only surface today).
+- [ ] **Dev-DB reproducibility** — local dev Postgres predates the baseline squash and carries push-drift (`SearchConnection`/`SitePage`/StudioContextSpend FK) + stale `_prisma_migrations` rows; a `migrate reset` on a day dev data doesn't matter restores `migrate dev`. (The capsule migration was applied via `db execute` + `resolve` for this reason; its recorded checksum predates the final file — cosmetic, dev-only.)
+- [ ] **Anthropic template curation** — `claude-haiku-4-5` added (build gate requires suggestions ∈ template); the remaining entries (sonnet-4, sonnet-3-5, opus-4, retired haiku-3-5) are dated — refresh via the catalog-freshness pass.
+- [ ] **Cross-folder `relations` section** — edges like "Banks draws evidence from Experience"; revisit if root roll-ups prove insufficient.
+
+---
+
 ## Per-item iteration + co-browse — follow-ups (2026-08-05, after the per-item-playbook-checkpoints PR)
 
 Surfaced during the reliability sweep; not blocking the PR:

@@ -93,9 +93,9 @@ export default function AIConnectionsPage({ embedded }: AIConnectionsPageProps =
       <header className="flex items-center justify-between">
         <div>
           {embedded ? (
-            <h2 className="text-lg font-semibold text-white">AI Connections</h2>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">AI Connections</h2>
           ) : (
-            <h1 className="text-2xl font-semibold text-white">AI Connections</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">AI Connections</h1>
           )}
           <p className="mt-1 text-sm text-gray-400">
             Each connection is a key + endpoint. Add one per provider you use; pick which routes through it in chat or feature settings.
@@ -179,7 +179,7 @@ function ConnectionList({
         style={{ background: glass0.background }}
       >
         <KeyRound className="h-8 w-8 mx-auto text-gray-500 mb-3" />
-        <p className="text-sm text-gray-300 font-medium">No connections yet</p>
+        <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">No connections yet</p>
         <p className="mt-1 text-xs text-gray-500 max-w-md mx-auto">
           Add an API key for a built-in provider, a gateway like Vercel AI Gateway or Fireworks, or a custom endpoint to start chatting.
         </p>
@@ -207,7 +207,7 @@ function ConnectionList({
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-white truncate">{c.label}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.label}</span>
                 <KindBadge kind={c.kind} />
                 {c.isPinned && (
                   <span className="text-[10px] uppercase tracking-wider text-amber-400">Pinned</span>
@@ -238,7 +238,7 @@ function KindBadge({ kind }: { kind: ConnectionKind }) {
   const map: Record<ConnectionKind, { label: string; cls: string }> = {
     direct: { label: "Direct", cls: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" },
     gateway: { label: "Gateway", cls: "bg-blue-500/15 text-blue-300 border-blue-500/30" },
-    custom: { label: "Custom", cls: "bg-gray-500/15 text-gray-300 border-gray-500/30" },
+    custom: { label: "Custom", cls: "bg-gray-500/15 text-gray-600 dark:text-gray-300 border-gray-500/30" },
   };
   const { label, cls } = map[kind];
   return (
@@ -293,7 +293,7 @@ function TemplatePicker({
             <Plus className="h-4 w-4 text-gray-400" />
           </div>
           <div className="text-left">
-            <div className="text-sm font-medium text-white">Custom endpoint</div>
+            <div className="text-sm font-medium text-gray-900 dark:text-white">Custom endpoint</div>
             <div className="text-xs text-gray-500">You fill in baseURL, adapter, and model list.</div>
           </div>
         </button>
@@ -305,7 +305,7 @@ function TemplatePicker({
 function Section({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-sm font-medium text-white">{title}</h2>
+      <h2 className="text-sm font-medium text-gray-900 dark:text-white">{title}</h2>
       <p className="mt-0.5 mb-3 text-xs text-gray-500">{subtitle}</p>
       {children}
     </section>
@@ -344,7 +344,7 @@ function TemplateCard({
         <ProviderIcon providerId={template.id} className="h-4 w-4" />
       </div>
       <div className="min-w-0">
-        <div className="text-sm font-medium text-white truncate">{template.name}</div>
+        <div className="text-sm font-medium text-gray-900 dark:text-white truncate">{template.name}</div>
         <div className="text-xs text-gray-500">
           {template.defaultModels.length} default model{template.defaultModels.length !== 1 ? "s" : ""}
         </div>
@@ -523,7 +523,7 @@ function ConnectionForm({
           </div>
         )}
         <div>
-          <h2 className="text-lg font-medium text-white">
+          <h2 className="text-lg font-medium text-gray-900 dark:text-white">
             {isEdit ? "Edit connection" : template ? `Add ${template.name}` : "Add custom connection"}
           </h2>
           {template?.apiKeyDocsURL && (
@@ -674,7 +674,7 @@ function ConnectionForm({
 function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <div className="text-xs font-medium text-gray-300 mb-1">{label}</div>
+      <div className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{label}</div>
       {children}
       {hint && <div className="mt-1 text-[11px] text-gray-500">{hint}</div>}
     </label>
@@ -1043,7 +1043,7 @@ function ModelEditor({
         {supportsFetch && (
           <div className="flex items-center justify-between gap-2 rounded-lg border border-black/10 dark:border-white/10 bg-black/20 px-3 py-1.5">
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-medium text-white flex items-center gap-1.5">
+              <div className="text-xs font-medium text-gray-900 dark:text-white flex items-center gap-1.5">
                 <Sparkles className="h-3 w-3 text-amber-300/80" />
                 Fetch live model list
               </div>
@@ -1090,7 +1090,7 @@ function ModelEditor({
           <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04]">
             {/* Header row: counts + close */}
             <div className="flex items-center justify-between gap-2 px-3 py-2 border-b border-amber-500/10">
-              <div className="text-[11px] font-medium text-amber-200 uppercase tracking-wide">
+              <div className="text-[11px] font-medium text-amber-700 dark:text-amber-200 uppercase tracking-wide">
                 {fetchedModels.length} models from upstream ·{" "}
                 {models.length} in connection
                 {fetchedFilter && (
@@ -1120,7 +1120,7 @@ function ModelEditor({
                   onChange={(e) => setFetchedFilter(e.target.value)}
                   placeholder="Filter by id or name…"
                   aria-label="Filter fetched models"
-                  className="w-full rounded-md border border-amber-500/20 bg-black/30 pl-6 pr-2 py-1 text-xs text-amber-100 placeholder:text-amber-300/40 focus:outline-none focus:border-amber-500/40"
+                  className="w-full rounded-md border border-amber-500/20 bg-amber-500/[0.06] pl-6 pr-2 py-1 text-xs text-amber-900 placeholder:text-amber-700/40 dark:bg-black/30 dark:text-amber-100 dark:placeholder:text-amber-300/40 focus:outline-none focus:border-amber-500/40"
                 />
               </div>
               <button
@@ -1138,7 +1138,7 @@ function ModelEditor({
                       ? "Sorted A → Z — click for Z → A"
                       : "Sorted Z → A — click for Suggested"
                 }
-                className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors"
+                className="inline-flex items-center gap-1 rounded-md border border-amber-500/20 bg-amber-500/[0.04] px-2 py-1 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-black/20 dark:text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors"
               >
                 <ArrowUpDown className="h-3 w-3" />
                 {fetchedSort === "suggested"
@@ -1151,7 +1151,7 @@ function ModelEditor({
                 type="button"
                 onClick={toggleAllVisible}
                 disabled={visibleFetched.length === 0}
-                className="rounded-md border border-amber-500/20 bg-black/20 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="rounded-md border border-amber-500/20 bg-amber-500/[0.04] px-2 py-1 text-[10px] uppercase tracking-wide text-amber-700 dark:bg-black/20 dark:text-amber-200/80 hover:bg-amber-500/10 hover:border-amber-500/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {allVisiblePresent ? "Remove view" : "Add view"}
               </button>
@@ -1165,8 +1165,8 @@ function ModelEditor({
                   onClick={() => setCapabilityFilter(null)}
                   className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
                     capabilityFilter === null
-                      ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
-                      : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                      ? "bg-amber-500/25 text-amber-900 dark:text-amber-100 border border-amber-400/40"
+                      : "border border-amber-500/15 text-amber-700/80 dark:text-amber-200/70 hover:bg-amber-500/10"
                   }`}
                 >
                   All
@@ -1180,8 +1180,8 @@ function ModelEditor({
                     }
                     className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide transition-colors ${
                       capabilityFilter === cap
-                        ? "bg-amber-500/25 text-amber-100 border border-amber-400/40"
-                        : "border border-amber-500/15 text-amber-200/70 hover:bg-amber-500/10"
+                        ? "bg-amber-500/25 text-amber-900 dark:text-amber-100 border border-amber-400/40"
+                        : "border border-amber-500/15 text-amber-700/80 dark:text-amber-200/70 hover:bg-amber-500/10"
                     }`}
                   >
                     {prettyCap(cap)}
@@ -1214,7 +1214,7 @@ function ModelEditor({
                         className={`relative h-4 w-7 shrink-0 rounded-full transition-colors cursor-pointer ${
                           checked
                             ? "bg-emerald-500/80"
-                            : "bg-black/30 border border-white/15"
+                            : "bg-black/[0.06] border border-black/15 dark:bg-black/30 dark:border-white/15"
                         }`}
                       >
                         <span
@@ -1224,7 +1224,7 @@ function ModelEditor({
                         />
                       </button>
                       <div className="min-w-0 flex-1">
-                        <div className="font-mono text-amber-200 truncate">
+                        <div className="font-mono text-amber-700 dark:text-amber-200 truncate">
                           {item.id}
                         </div>
                         {item.name !== item.id && (
@@ -1263,7 +1263,7 @@ function ModelEditor({
             </div>
 
             {/* Instant-persistence footer (no staging, no save step) */}
-            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10 text-[11px] text-amber-200/70">
+            <div className="flex items-center justify-end gap-2 px-3 py-2 border-t border-amber-500/10 text-[11px] text-amber-700/80 dark:text-amber-200/70">
               Checked models are saved to this connection instantly.
             </div>
           </div>
@@ -1313,7 +1313,7 @@ function ModelEditor({
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <div className="text-xs font-medium text-white truncate">
+                <div className="text-xs font-medium text-gray-900 dark:text-white truncate">
                   {m.name}
                 </div>
                 <div className="text-[10px] text-gray-500 font-mono truncate">
@@ -1430,7 +1430,7 @@ function ModelSuggestionPicker({
           type="button"
           onClick={onClose}
           aria-label="Close suggestions"
-          className="text-gray-500 hover:text-gray-300 transition-colors"
+          className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
         >
           <X className="h-3 w-3" />
         </button>

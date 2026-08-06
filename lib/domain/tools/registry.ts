@@ -158,7 +158,7 @@ const TOOL_REGISTRY: ToolDefinition[] = [
   // ─── SIDEBAR TABS (matches current RightSidebar) ───
   // Outline leads (decision 2026-07-16). The old standalone Links and Tags
   // tabs are MERGED into the Context tab as sub-tabs (links · tags · AI) —
-  // see extensions/studio/components/ContextTab.tsx.
+  // see components/content/ai-context/ContextTab.tsx.
   {
     id: "outline-tab",
     label: "Outline",
@@ -187,9 +187,10 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 50,
     tabKey: "publish",
   },
-  // Context hub: links + tags + AI metadata sub-tabs. Hosted by the studio
-  // extension component but the links/tags sub-tabs are core surfaces, so
-  // the tab itself is NOT filtered by studio enablement (the AI sub-tab is).
+  // Context hub: links + tags + AI metadata sub-tabs — all core surfaces
+  // (components/content/ai-context/ContextTab.tsx). The AI context layer
+  // graduated out of the studio extension, so nothing here follows studio
+  // enablement; per-node governance is contextMode.
   {
     id: "context-tab",
     label: "Context",

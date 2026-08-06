@@ -15,9 +15,9 @@
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
-import { createSourceContentResolver } from "./source-resolver";
-import { getGenLockedNodeIds } from "./gen-lock";
-import { estimateTokens } from "../tokens";
+import { createSourceContentResolver } from "@/lib/domain/ai-context/source-resolver";
+import { getGenLockedNodeIds } from "@/lib/domain/ai-context/gen-lock";
+import { estimateTokens } from "@/lib/domain/ai-context/tokens";
 
 // Guardrails: a pathological folder shouldn't turn one GET into thousands of
 // payload queries. Beyond the cap the picker shows what it has and says so.

@@ -2,25 +2,25 @@
  * AI sub-tab of the Context hub — per-node agentic metadata (Phase 2).
  *
  * Renders the Context doc from /api/studio/metadata/:nodeId with the
- * ownership contract visible: AI sections regenerate freely, Role & Strategy
- * arrives as a proposal to accept/dismiss, Directives are yours alone and
+ * ownership contract visible: AI sections (summary, structure, role &
+ * strategy, signals) regenerate freely; Directives are yours alone and
  * autosave (2s debounce, REST last-write-wins — deliberately not
  * collaborative). Staleness badges appear when sources changed since the
- * last generation.
+ * last generation. The accept/dismiss proposal flow was retired 2026-08-06.
  */
 
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, RefreshCw, Sparkles, X } from "lucide-react";
+import { ChevronDown, RefreshCw, Sparkles } from "lucide-react";
 import { useContentStore } from "@/state/content-store";
 import {
   AiContextUnconfiguredBanner,
   shouldShowAiContextBannerOnce,
 } from "./AiContextBanner";
-import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
+import type { MetadataSectionKind, MetadataSectionOwner } from "@/lib/domain/ai-context/types";
 
-// Mirrors MetadataView from extensions/studio/server/metadata.ts (kept as a
+// Mirrors MetadataView from lib/domain/ai-context/metadata.ts (kept as a
 // local DTO — the server module imports Prisma and must stay unimported here).
 interface SectionMetaDto {
   owner: MetadataSectionOwner;
@@ -29,6 +29,8 @@ interface SectionMetaDto {
   proposal?: string;
   proposedAt?: string;
 }
+type ContextModeDto = "OPT_OUT" | "REFERENCE" | "STANDARD" | "ENHANCED";
+
 interface MetadataViewDto {
   exists: boolean;
   sections: Record<MetadataSectionKind, string>;
@@ -37,13 +39,61 @@ interface MetadataViewDto {
   model: string | null;
   stale: boolean;
   optedOut: boolean;
+  /** Explicit per-node override; null = inherits (plan D6/D7). */
+  contextMode: ContextModeDto | null;
+  /** Effective mode after ancestor resolution. */
+  resolvedMode: ContextModeDto;
 }
+
+/**
+ * One control, the whole config (plan D11): pick a mode, see that mode's
+ * context. No per-feature toggles.
+ */
+const MODE_OPTIONS: Array<{
+  value: ContextModeDto | null;
+  label: string;
+  hint: string;
+}> = [
+  { value: null, label: "Inherit", hint: "Follows the nearest folder's setting." },
+  { value: "OPT_OUT", label: "Off", hint: "AI never reads this content; folders shield their whole subtree." },
+  {
+    value: "REFERENCE",
+    label: "Reference",
+    hint: "Lite context: index + one-liners. The AI draws from it, never audits it.",
+  },
+  {
+    value: "STANDARD",
+    label: "Standard",
+    hint: "Summaries and structure — the economy tier (default).",
+  },
+  {
+    value: "ENHANCED",
+    label: "Enhanced",
+    hint: "Adds Signals: gaps, ambiguities, and directive misalignment.",
+  },
+];
+
+const MODE_LABELS: Record<ContextModeDto, string> = {
+  OPT_OUT: "Off",
+  REFERENCE: "Reference",
+  STANDARD: "Standard",
+  ENHANCED: "Enhanced",
+};
+
+/** Which sections a mode maintains — the rail shows exactly those. */
+const SECTIONS_BY_MODE: Record<ContextModeDto, MetadataSectionKind[]> = {
+  OPT_OUT: [],
+  REFERENCE: ["directives"],
+  STANDARD: ["summary", "structure", "role-strategy", "directives"],
+  ENHANCED: ["summary", "structure", "role-strategy", "directives", "signals"],
+};
 
 const SECTION_ORDER: MetadataSectionKind[] = [
   "summary",
   "structure",
   "role-strategy",
   "directives",
+  "signals",
 ];
 
 const SECTION_LABELS: Record<MetadataSectionKind, string> = {
@@ -51,6 +101,7 @@ const SECTION_LABELS: Record<MetadataSectionKind, string> = {
   structure: "Structure",
   "role-strategy": "Role & Strategy",
   directives: "Directives",
+  signals: "Signals",
 };
 
 const SECTION_EMPTY_HINTS: Record<MetadataSectionKind, string> = {
@@ -59,6 +110,8 @@ const SECTION_EMPTY_HINTS: Record<MetadataSectionKind, string> = {
   "role-strategy":
     "The operation this content serves and how it relates to its siblings.",
   directives: "Your standing instructions — the AI reads these every time.",
+  signals:
+    "Gaps, ambiguities, and misalignments the AI flags — generated only in Enhanced context mode.",
 };
 
 const OWNER_BADGES: Record<
@@ -95,11 +148,14 @@ export function ContextAiPanel() {
     error: string | null;
     showAiBanner?: boolean;
   } | null>(null);
-  const [busy, setBusy] = useState<"generate" | "proposal" | null>(null);
+  const [busy, setBusy] = useState<"generate" | null>(null);
   const [draft, setDraft] = useState<{ forNodeId: string; text: string } | null>(
     null
   );
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  // Mode ladder is collapsed by default (owner UX call: full list cost too
+  // much rail space) — the trigger row shows the current rung.
+  const [modeOpen, setModeOpen] = useState(false);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const fetchView = useCallback((nodeId: string) => {
@@ -194,23 +250,6 @@ export function ContextAiPanel() {
       .finally(() => setBusy(null));
   };
 
-  const handleProposal = (action: "accept" | "dismiss") => {
-    if (!selectedContentId || busy) return;
-    const nodeId = selectedContentId;
-    setBusy("proposal");
-    fetch(`/api/studio/metadata/${nodeId}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roleStrategyAction: action }),
-    })
-      .then(async (res) => {
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error);
-        setResult({ forNodeId: nodeId, data: body.data, error: null });
-      })
-      .catch(() => undefined)
-      .finally(() => setBusy(null));
-  };
 
   if (!selectedContentId) {
     return (
@@ -225,7 +264,6 @@ export function ContextAiPanel() {
     draft?.forNodeId === selectedContentId
       ? draft.text
       : (view?.sections.directives ?? "");
-  const proposal = view?.sectionsMeta["role-strategy"]?.proposal;
 
   return (
     <div className="scrollbar-hide h-full overflow-y-auto px-3 py-3">
@@ -257,48 +295,122 @@ export function ContextAiPanel() {
         />
       )}
 
-      {/* Privacy toggle — same flag as the toolbar eye. Opted-out content is
-          never read by generation, roll-ups, or folder-chat sources. */}
+      {/* Mode selector — ONE control for the whole context config (plan D11).
+          "Off" replaces the old opt-out checkbox; the toolbar eye still works
+          through the same write path. */}
       {view && (
-        <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border border-black/10 px-3 py-2 dark:border-white/10">
-          <input
-            type="checkbox"
-            checked={!view.optedOut}
-            disabled={busy !== null}
-            onChange={() => {
-              if (!selectedContentId) return;
-              fetch(`/api/studio/metadata/${selectedContentId}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ contextOptOut: !view.optedOut }),
-              })
-                .then(() => fetchView(selectedContentId))
-                .catch(() => fetchView(selectedContentId));
-            }}
-            className="mt-0.5 h-3.5 w-3.5 accent-current"
-          />
-          <span className="min-w-0">
-            <span className="block text-xs font-medium text-gray-700 dark:text-gray-300">
-              AI may read this content
+        <div className="mt-2 rounded-lg border border-black/10 px-3 py-2 dark:border-white/10">
+          <button
+            type="button"
+            aria-expanded={modeOpen}
+            onClick={() => setModeOpen((open) => !open)}
+            className="flex w-full items-center justify-between gap-2"
+          >
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
+              Context mode
             </span>
-            {view.optedOut && (
-              <span className="block text-[11px] text-amber-600 dark:text-amber-400">
-                Opted out — no auto-updates, no Generate, excluded from folder
-                roll-ups and chat sources.
+            <span className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                {view.contextMode === null
+                  ? `Inherit → ${MODE_LABELS[view.resolvedMode]}`
+                  : MODE_LABELS[view.contextMode]}
               </span>
-            )}
-          </span>
-        </label>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-gray-400 transition-transform ${modeOpen ? "rotate-180" : ""}`}
+              />
+            </span>
+          </button>
+          {/* Vertical ladder list (owner UX call 2026-08-06): the wrap-prone
+              pill row misread in the narrow rail. One row per rung, hint
+              inline — the ordered ladder stays visible, nothing wraps. */}
+          {modeOpen && (
+          <div
+            role="radiogroup"
+            aria-label="Context mode"
+            className="mt-1.5 space-y-1"
+          >
+            {MODE_OPTIONS.map((option) => {
+              const active = view.contextMode === option.value;
+              return (
+                <button
+                  key={option.label}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  disabled={busy !== null || active}
+                  onClick={() => {
+                    if (!selectedContentId) return;
+                    const nodeId = selectedContentId;
+                    fetch(`/api/studio/metadata/${nodeId}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ contextMode: option.value }),
+                    })
+                      .then(async (res) => {
+                        const body = await res.json();
+                        if (!res.ok || !body.success) throw new Error(body.error);
+                        setResult({ forNodeId: nodeId, data: body.data, error: null });
+                        setModeOpen(false);
+                      })
+                      .catch(() => fetchView(nodeId));
+                  }}
+                  className={[
+                    "flex w-full items-start gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                    active
+                      ? "border-gold-primary/50 bg-gold-primary/10"
+                      : "border-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                  ].join(" ")}
+                >
+                  <span
+                    aria-hidden
+                    className={[
+                      "mt-1 h-2 w-2 shrink-0 rounded-full border",
+                      active
+                        ? "border-gold-primary bg-gold-primary"
+                        : "border-gray-400/60 dark:border-gray-500/60",
+                    ].join(" ")}
+                  />
+                  <span className="min-w-0">
+                    <span
+                      className={[
+                        "block text-xs font-medium",
+                        active
+                          ? "text-gold-primary"
+                          : "text-gray-700 dark:text-gray-300",
+                      ].join(" ")}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="block text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                      {option.hint}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          )}
+          {view.resolvedMode === "OPT_OUT" && (
+            <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+              Off — no auto-updates, no Generate, excluded from folder roll-ups,
+              chat sources, and folder mentions.
+            </p>
+          )}
+        </div>
       )}
 
       <div className="mt-3 space-y-2.5">
-        {SECTION_ORDER.map((kind) => {
-          const owner = view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
+        {(view ? SECTIONS_BY_MODE[view.resolvedMode] : SECTION_ORDER).map((kind) => {
+          const rawOwner =
+            view?.sectionsMeta[kind]?.owner ?? OWNER_DEFAULTS[kind];
+          // Proposal flow retired: rows written before 2026-08-06 may still
+          // carry ai-proposed provenance — render them as plain AI.
+          const owner = rawOwner === "ai-proposed" ? "ai" : rawOwner;
           const badge = OWNER_BADGES[owner];
           const text = view?.sections[kind] ?? "";
           const isDirectives = kind === "directives";
           const showStale =
-            view?.stale && (owner === "ai" || owner === "ai-proposed") && text;
+            view?.stale && owner === "ai" && text;
 
           return (
             <section
@@ -353,56 +465,37 @@ export function ContextAiPanel() {
                 </p>
               )}
 
-              {kind === "role-strategy" && proposal && (
-                <div className="mt-2 rounded-md border border-blue-400/30 bg-blue-500/[0.04] px-2.5 py-2 dark:bg-blue-400/[0.06]">
-                  <p className="text-[10px] font-medium uppercase tracking-wide text-blue-500 dark:text-blue-400">
-                    Proposed update
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-xs leading-relaxed text-gray-600 dark:text-gray-300">
-                    {proposal}
-                  </p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleProposal("accept")}
-                      disabled={busy !== null}
-                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-blue-400/40 text-xs text-blue-600 hover:bg-blue-500/10 disabled:opacity-50 dark:text-blue-400"
-                    >
-                      <Check className="h-3 w-3" /> Accept
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleProposal("dismiss")}
-                      disabled={busy !== null}
-                      className="flex min-h-[32px] flex-1 items-center justify-center gap-1 rounded-md border border-black/15 text-xs text-gray-500 hover:bg-black/[0.04] disabled:opacity-50 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/[0.06]"
-                    >
-                      <X className="h-3 w-3" /> Dismiss
-                    </button>
-                  </div>
-                </div>
-              )}
             </section>
           );
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={handleGenerate}
-        disabled={busy !== null || loading || view?.optedOut}
-        className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-gold-primary/40 text-xs text-gold-primary transition-colors hover:bg-gold-primary/10 disabled:cursor-default disabled:opacity-50"
-      >
-        {busy === "generate" ? (
-          <>
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating…
-          </>
-        ) : (
-          <>
-            <Sparkles className="h-3.5 w-3.5" />
-            {view?.exists ? "Regenerate context" : "Generate context"}
-          </>
-        )}
-      </button>
+      {view?.resolvedMode === "REFERENCE" && (
+        <p className="mt-3 px-1 text-[11px] italic leading-snug text-gray-400 dark:text-gray-500">
+          Reference mode keeps a lite index (per-item one-liners) maintained
+          automatically — no summaries or roll-ups to generate here.
+        </p>
+      )}
+
+      {view?.resolvedMode !== "OPT_OUT" && view?.resolvedMode !== "REFERENCE" && (
+        <button
+          type="button"
+          onClick={handleGenerate}
+          disabled={busy !== null || loading}
+          className="mt-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-md border border-gold-primary/40 text-xs text-gold-primary transition-colors hover:bg-gold-primary/10 disabled:cursor-default disabled:opacity-50"
+        >
+          {busy === "generate" ? (
+            <>
+              <RefreshCw className="h-3.5 w-3.5 animate-spin" /> Generating…
+            </>
+          ) : (
+            <>
+              <Sparkles className="h-3.5 w-3.5" />
+              {view?.exists ? "Regenerate context" : "Generate context"}
+            </>
+          )}
+        </button>
+      )}
     </div>
   );
 }
@@ -412,4 +505,5 @@ const OWNER_DEFAULTS: Record<MetadataSectionKind, MetadataSectionOwner> = {
   structure: "ai",
   "role-strategy": "ai-proposed",
   directives: "human",
+  signals: "ai",
 };

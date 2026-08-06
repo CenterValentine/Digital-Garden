@@ -31,9 +31,9 @@ import { logger } from "@/lib/core/logger";
 import { getUserSettings } from "@/lib/features/settings";
 import { getStudioSettings } from "../settings";
 import { getStudioToolById } from "../registry";
-import { StudioModelUnavailableError } from "./metadata";
+import { StudioModelUnavailableError } from "@/lib/domain/ai-context/metadata";
 import { getSelectionState } from "./source-selection";
-import { createSourceContentResolver } from "./source-resolver";
+import { createSourceContentResolver } from "@/lib/domain/ai-context/source-resolver";
 
 export const STUDIO_OUTPUTS_FOLDER_TITLE = "Studio outputs";
 

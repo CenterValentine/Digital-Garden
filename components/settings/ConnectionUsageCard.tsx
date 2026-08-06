@@ -130,7 +130,7 @@ export function ConnectionUsageCard({
                   <div className="text-[11px] uppercase tracking-wide text-gray-500">
                     {periodLabel(report.period)}
                   </div>
-                  <div className="text-sm text-white">
+                  <div className="text-sm text-gray-900 dark:text-white">
                     {report.totals.cost ? (
                       <span className="font-semibold">
                         {formatMoney(report.totals.cost.amount)}
@@ -186,7 +186,7 @@ export function ConnectionUsageCard({
                           {p.requests} turn{p.requests === 1 ? "" : "s"}
                         </span>
                         {p.cost && (
-                          <span className="font-medium text-amber-200/80 ml-2">
+                          <span className="font-medium text-amber-700/90 dark:text-amber-200/80 ml-2">
                             {formatMoney(p.cost.amount)}
                           </span>
                         )}
@@ -208,7 +208,7 @@ export function ConnectionUsageCard({
                         key={m.modelId}
                         className="flex items-center gap-2 text-xs px-2 py-1 rounded-md hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                       >
-                        <code className="text-amber-200/90 font-mono truncate flex-1">
+                        <code className="text-amber-800 dark:text-amber-200/90 font-mono truncate flex-1">
                           {m.modelId}
                         </code>
                         <span className="text-gray-500 shrink-0">
@@ -220,7 +220,7 @@ export function ConnectionUsageCard({
                           </span>
                         )}
                         {m.cost && (
-                          <span className="font-medium text-amber-200/80 shrink-0 ml-1">
+                          <span className="font-medium text-amber-700/90 dark:text-amber-200/80 shrink-0 ml-1">
                             {formatMoney(m.cost.amount)}
                           </span>
                         )}

@@ -9,7 +9,7 @@
  */
 
 export * from "./types";
-export * from "./tokens";
+export * from "@/lib/domain/ai-context/tokens";
 export {
   registerStudioTool,
   unregisterStudioTool,

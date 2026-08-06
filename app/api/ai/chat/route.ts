@@ -151,7 +151,9 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
-import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
+import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
+import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
+import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
   parsePlaybook,
   type PlaybookReference,
@@ -1208,7 +1210,75 @@ export async function POST(request: Request) {
         );
 
         if (mentionedNodes.length > 0) {
+          // Folder mentions (FOLDER-CONTEXT-CAPSULE-PLAN Phase 4): the gate
+          // runs server-side BEFORE prompt assembly — authoritative stage of
+          // the two-stage gate (sweep B5; the composer pre-flight usually
+          // makes this a cheap coverage check). Ladder D5: fresh capsule →
+          // stale capsule, flagged → honest absence. Gates run in parallel
+          // so multiple folder mentions share the wait.
+          const folderSections = new Map<string, string>();
+          await Promise.all(
+            mentionedNodes
+              .filter((node) => node.contentType === "folder")
+              .map(async (node) => {
+                try {
+                  const gate = await ensureFolderContextFresh(
+                    session.user.id,
+                    node.id
+                  );
+                  if (gate.status === "optedOut") {
+                    folderSections.set(
+                      node.id,
+                      `### ${node.title}\n(folder — its AI context is disabled by the user; only the name is available)`
+                    );
+                    return;
+                  }
+                  const capsule =
+                    gate.status === "none"
+                      ? null
+                      : await assembleFolderCapsule(session.user.id, node.id);
+                  if (!capsule) {
+                    folderSections.set(
+                      node.id,
+                      `### ${node.title}\n(folder — no context is available yet: generation could not run${gate.reason ? ` (${gate.reason})` : ""}. Say so rather than guessing at its contents.)`
+                    );
+                    return;
+                  }
+                  const staleBanner =
+                    gate.status === "stale"
+                      ? `\n[NOTE: this folder's context could not be fully refreshed (${gate.reason ?? "budget"}) — parts may lag recent edits.]`
+                      : "";
+                  folderSections.set(node.id, capsule.text + staleBanner);
+                  logger.info({
+                    layer: "ai",
+                    event: "ai_context:mention_gate",
+                    summary: `folder mention gated: ${gate.status}`,
+                    attrs: {
+                      folderId: node.id,
+                      status: gate.status,
+                      generationCalls: gate.generationCalls,
+                      refreshedNodes: gate.refreshedNodes,
+                      waitedMs: gate.waitedMs,
+                    },
+                  });
+                } catch (gateError) {
+                  logger.warn({
+                    layer: "ai",
+                    event: "ai_context:mention_gate_caught",
+                    summary: "folder mention gate failed — name-only fallback",
+                    error: gateError,
+                  });
+                  folderSections.set(
+                    node.id,
+                    `### ${node.title}\n(folder — context unavailable due to an internal error)`
+                  );
+                }
+              })
+          );
+
           const sections = mentionedNodes.map((node) => {
+            const folderSection = folderSections.get(node.id);
+            if (folderSection) return folderSection;
             const text =
               node.notePayload?.searchText || "(no text content available)";
             return `### ${node.title}\n${text.slice(0, 2000)}`;
