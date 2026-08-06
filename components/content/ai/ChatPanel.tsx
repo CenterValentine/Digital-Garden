@@ -33,6 +33,7 @@ import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
+import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
@@ -194,6 +195,8 @@ export function ChatPanel({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    notifyMentionInserted,
+    folderGates,
     commandItems,
     activePlaybook,
     attachPlaybook,
@@ -918,6 +921,7 @@ export function ChatPanel({
       {/* Input — make/model picker lives inside the input frame footer.
           Disabled while initial messages are loading so typed input
           can't be overwritten by setMessages mid-stream. */}
+      <FolderContextChips gates={folderGates} />
       <ChatInput
         value={input}
         onChange={setInput}
@@ -926,6 +930,7 @@ export function ChatPanel({
         status={status}
         disabled={loadingInitial}
         onMentionSearch={handleMentionSearch}
+        onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}
         onAttachPlaybook={attachPlaybook}

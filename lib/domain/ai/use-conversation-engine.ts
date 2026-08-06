@@ -96,6 +96,10 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  createFolderContextMentionPart,
+  type FolderContextMentionData,
+} from "@/lib/domain/ai-context/mention-part";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
@@ -415,6 +419,15 @@ export interface UseConversationEngineResult {
   // ── suggestions ──
   mentionResults: SuggestionItem[];
   handleMentionSearch: (query: string) => void;
+  /**
+   * Pre-flight gate for folder mentions (plan Phase 4 / sweep B5): fires on
+   * pill insert so context refreshes while the user is still typing. Chip
+   * states keyed by folderId; snapshots ride the sent message as durable
+   * `data-folder-context` parts.
+   */
+  notifyMentionInserted: (item: SuggestionItem) => void;
+  /** Live folder-mention chip states for the composer row. */
+  folderGates: Record<string, FolderContextMentionData>;
   /** Tool-hint commands + playbook attach entries for the `/` menu. */
   commandItems: SuggestionItem[];
 
@@ -930,6 +943,69 @@ export function useConversationEngine({
   // ── @ mention search (150ms debounce) ──
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── folder-mention pre-flight gate (plan Phase 4 / sweep B5) ──
+  // Fires when a folder pill lands in the composer: the chip animates
+  // through checking → fresh/stale/none while the user is still typing, so
+  // the send-time server gate is usually a cheap coverage check.
+  const [folderGates, setFolderGates] = useState<
+    Record<string, FolderContextMentionData>
+  >({});
+
+  const notifyMentionInserted = useCallback((item: SuggestionItem) => {
+    if (item.contentType !== "folder") return;
+    const folderId = item.id;
+    setFolderGates((prev) => ({
+      ...prev,
+      [folderId]: {
+        folderId,
+        title: item.label,
+        status: "checking",
+        generationCalls: 0,
+        refreshedNodes: 0,
+      },
+    }));
+    fetch("/api/ai-context/gate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error);
+        const data = body.data as FolderContextMentionData & {
+          title?: string;
+        };
+        setFolderGates((prev) => ({
+          ...prev,
+          [folderId]: {
+            folderId,
+            title: data.title ?? item.label,
+            status: data.status,
+            generationCalls: data.generationCalls ?? 0,
+            refreshedNodes: data.refreshedNodes ?? 0,
+            reason: data.reason,
+            waitedMs: data.waitedMs,
+          },
+        }));
+      })
+      .catch(() => {
+        // Pre-flight is best-effort — the server gate at send is
+        // authoritative. Mark stale-unknown so the chip is honest.
+        setFolderGates((prev) => ({
+          ...prev,
+          [folderId]: {
+            folderId,
+            title: item.label,
+            status: "stale",
+            generationCalls: 0,
+            refreshedNodes: 0,
+            reason: "error",
+          },
+        }));
+      });
+  }, []);
 
   const handleMentionSearch = useCallback((query: string) => {
     if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
@@ -2134,6 +2210,13 @@ export function useConversationEngine({
         }),
       );
     }
+    // Durable trace (plan D13): snapshot each mentioned folder's gate chip
+    // into a persisted data part rendered with the sent message. The server
+    // re-gates at send regardless (authoritative half of sweep B5).
+    for (const id of ids) {
+      const gate = folderGates[id];
+      if (gate) parts.push(createFolderContextMentionPart(gate));
+    }
     if (text) parts.push({ type: "text", text });
     for (const a of ready) {
       const part: FileUIPart = {
@@ -2164,6 +2247,8 @@ export function useConversationEngine({
 
     setInput("");
     setAttachments([]);
+    // Composer chips hand off to the durable message parts above.
+    setFolderGates({});
     // Sending implies the user wants to watch the reply — re-engage
     // auto-scroll even if they'd scrolled up reading earlier turns.
     pinnedRef.current = true;
@@ -2208,6 +2293,7 @@ export function useConversationEngine({
     input,
     attachments,
     attachmentsUploading,
+    folderGates,
     supportsImageAttachments,
     supportsAudioAttachments,
     pendingUserPartsRef,
@@ -2377,6 +2463,8 @@ export function useConversationEngine({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    notifyMentionInserted,
+    folderGates,
     commandItems,
     activePlaybook,
     attachPlaybook,

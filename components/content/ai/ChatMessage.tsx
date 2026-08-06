@@ -46,6 +46,7 @@ import {
   Volume2,
   Wrench,
   X,
+  FolderSearch,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
@@ -68,6 +69,7 @@ import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
+import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
   type ContentWriteReceipt,
@@ -781,6 +783,44 @@ export const ChatMessage = memo(function ChatMessage({
                     {phaseLabel}
                   </span>
                 )}
+              </div>
+            );
+          }
+
+          // Folder-mention durable trace (FOLDER-CONTEXT-CAPSULE-PLAN
+          // Phase 4 / D13): the gate outcome snapshot that rode the sent
+          // message — survives after the composer chip clears, so context
+          // spend stays auditable per turn.
+          if (part.type === "data-folder-context") {
+            const gate = parseFolderContextMentionPart(part);
+            if (!gate) return null;
+            const detail =
+              gate.status === "fresh"
+                ? gate.refreshedNodes > 0
+                  ? `context refreshed · ${gate.refreshedNodes} nodes${gate.generationCalls > 0 ? ` · ${gate.generationCalls} calls` : ""}`
+                  : "context fresh"
+                : gate.status === "stale"
+                  ? `stale context served${gate.reason ? ` (${gate.reason})` : ""}`
+                  : gate.status === "none"
+                    ? "no context available"
+                    : gate.status === "optedOut"
+                      ? "AI context disabled"
+                      : "context was still updating at send";
+            return (
+              <div
+                key={i}
+                title={`Folder mention: ${gate.title} — ${detail}`}
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${
+                  gate.status === "fresh"
+                    ? "border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-300"
+                    : gate.status === "stale"
+                      ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-700 dark:text-amber-300"
+                      : "border-black/15 bg-black/[0.03] text-gray-600 dark:border-white/15 dark:bg-white/[0.04] dark:text-gray-300"
+                }`}
+              >
+                <FolderSearch className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{gate.title}</span>
+                <span className="shrink-0 opacity-75">· {detail}</span>
               </div>
             );
           }
