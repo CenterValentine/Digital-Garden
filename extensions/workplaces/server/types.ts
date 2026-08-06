@@ -97,5 +97,14 @@ export interface WorkspaceOpenConflict {
 
 export interface WorkspaceOpenIntentResponse {
   allowed: boolean;
+  /**
+   * True when the workspace already holds a claim covering this content —
+   * either a direct item assignment or a recursive claim on the content or
+   * one of its ancestors (any assignment type). The client must NOT create
+   * a new assignment for covered opens: doing so would upsert over the
+   * existing claim (e.g. converting a borrowed/shared item to primary) or
+   * pin descendants of a borrowed folder past the borrow window.
+   */
+  alreadyCovered?: boolean;
   conflict: WorkspaceOpenConflict | null;
 }

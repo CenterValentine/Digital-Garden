@@ -13,6 +13,7 @@ import {
 import type {
   ContentWorkspaceResponse,
   WorkspaceOpenConflict,
+  WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
 } from "@/extensions/workplaces/server";
 import type {
@@ -957,16 +958,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         contentId,
       }),
     });
-    const result = await parseResponse<{
-      allowed: boolean;
-      conflict: WorkspaceOpenConflict | null;
-    }>(response, "Failed to resolve workspace conflict");
+    const result = await parseResponse<WorkspaceOpenIntentResponse>(
+      response,
+      "Failed to resolve workspace conflict",
+    );
 
     if (result.allowed) {
-      await get().assignContentToWorkspace(activeWorkspace.id, contentId, {
-        assignmentType: "primary",
-        scope: "item",
-      });
+      // A covered open (direct assignment or a recursive folder claim held by
+      // this workspace) must not create a new item: the upsert would overwrite
+      // the existing claim's type (borrowed/shared → primary) or permanently
+      // pin a descendant of a folder that was only borrowed.
+      if (!result.alreadyCovered) {
+        await get().assignContentToWorkspace(activeWorkspace.id, contentId, {
+          assignmentType: "primary",
+          scope: "item",
+        });
+      }
       directOpenContent(contentId, options);
       void get()
         .persistActiveWorkspace()
