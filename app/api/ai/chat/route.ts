@@ -394,8 +394,11 @@ export async function POST(request: Request) {
               p.state === "output-available"
             ) {
               const b = p.output?.itemBudget;
+              // Honor a user-raised item cap (up to the schema ceiling) so the
+              // server step-cap scales with the run they approved — a 40 clamp
+              // here would silently guillotine a large run at ~item 40.
               if (p.output?.ok && typeof b === "number" && Number.isFinite(b) && b > 0) {
-                budget = Math.min(Math.floor(b), 40);
+                budget = Math.min(Math.floor(b), 200);
               }
             } else if (
               p.type === "tool-record_iteration_findings" &&

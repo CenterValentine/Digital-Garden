@@ -473,14 +473,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             }),
           )
           .min(1)
-          .max(60)
+          .max(250)
           .describe("The enumerated items, in processing order."),
         itemCap: z
           .number()
           .int()
           .min(1)
-          .max(40)
-          .describe("Max items to process this run (propose sensibly; the user can adjust before approving)."),
+          .max(200)
+          .describe("Max items to process this run. PROPOSE a sensible default (~10-15) — the user can RAISE it in the plan card to run more (up to 200) at their own cost/risk; only raise it yourself if they explicitly ask for more."),
         ledgerLabel: z
           .string()
           .max(120)
