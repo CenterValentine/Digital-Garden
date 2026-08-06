@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-04
+last_updated: 2026-08-05
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,16 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 5, 2026**: **Per-item playbook iteration + co-browse reliability sweep** (branch `feat/per-item-playbook-checkpoints`; typecheck/lint(151)/prompt-cache/collab/extension gates green; owner-smoke-validated on tabs + LinkedIn list; PR-ready)
+
+Applies a playbook to EACH item of an enumerated set — jobs collected from a board, the user's open tabs (`list_tabs`), or given URLs — with the **ledger as the loop's authoritative state** so "all qualified documented" is checkable, not the model's memory. The **harness owns the loop; the playbook is the per-item unit** (works on a single JD or an N-item list). ~85% composition on the Phase-1 research-run pattern.
+
+The feature landed, then a smoke-test-driven **reliability sweep** hardened the whole chat + co-browse surface (each an independent, pre-existing bug surfaced by real use):
+- **Loop reliability:** raised the server step-cap for iterations (was ending after ~1 item) + prompt/tool-result nudges to continue autonomously; per-source processing (co-browse LISTS navigate item-by-item, not one snapshot); **completeness** — every opened page is recorded (empties → `unreadable`), never silently skipped; ledger rows/roll-up **link to source URLs** (click-through + round-2 re-read).
+- **Chat UX:** a persistent **"Working" indicator with elapsed time** (reasoning models no longer look frozen); **active-doc awareness** (chat resolves "this note" to the focused tab, no mention needed); generation **duration** in the avatar tooltip.
+- **Write safety:** `updateNote` is **content-only** now (a `title` param let the model serialize its own guard text into a rename — the `/do-not-rename/` bug); renaming split into an explicit `renameNote`; `updateNote` reseeds the **collab Y.Doc** so AI edits show in open notes (the NotePayload↔Y.Doc seam).
+- **Co-browse robustness:** `captchaDetected` only halts on an ACTIVE challenge (not LinkedIn's ambient reCAPTCHA); **session recovery** across SW eviction / app reload (re-attach while the tab is open — no timer), with an actionable no-session message so it never stalls; theme-independent banner; extension `4.0.0` versioning to distinguish WIP from released builds.
 
 **August 4, 2026**: Agentic Browsing **Slice 4 — hostile-target de-risk** (branch `feat/agentic-slice-4`; extension build/typecheck/prompt-cache/lint green; owner-validated live; PR-ready)
 

@@ -1,6 +1,6 @@
 ---
 title: Per-item playbook iteration — build spec
-status: BUILT (level-2 controller) — pending owner smoke test
+status: BUILT + owner-smoke-validated (tabs + LinkedIn list) — PR-ready. A reliability sweep followed the build (see STATUS.md 2026-08-05): loop continuation, completeness, URL links, collab-write, ambient-captcha, session recovery.
 branch: feat/per-item-playbook-checkpoints (this worktree; base origin/main post #145)
 last_updated: 2026-08-04
 ---
