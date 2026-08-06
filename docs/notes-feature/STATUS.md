@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-05
+last_updated: 2026-08-06
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 6, 2026**: **Heading folds + in-document heading links** (branch `feature/heading-ids-folding`; schema 1.14.0; typecheck/lint(151)/markdown/collab/publishing gates green; needs Hocuspocus redeploy post-merge)
+
+Headings get accordion-like collapse and linkable identity. Fold state is one stored boolean (`heading.collapsed` via `DGHeading`) — persists with the doc, shared in collaboration; the fold *range* (following siblings to the next heading of equal-or-higher rank; blank headings participate) is derived per edit and hidden with decorations, never restructured. A deterministic unfold-on-edit guard means nothing invisible is ever edited. The gutter chevron is a widget decoration in the left padding (zero flow presence, generous hit target). Heading anchor ids are **live slugs derived from text** (`lib/domain/content/heading-ids.ts` — unified the three previous slugifiers; published pages stop stamping ids on publishing-block headlines). `[[#` opens a heading-mode suggestion; links carry `headingSlug`, heal on rename via a deterministic appendTransaction, and break/un-break in real time via decorations when the target vanishes/returns. Source view shows `## Title {.collapsed}` (ids never appear — derivable); file exports stay clean. The accordion block moved to `extensions/publishing/blocks/` as the presentation-side collapse container (node type unchanged; published headings never collapse).
 
 **August 5, 2026**: **Per-item playbook iteration + co-browse reliability sweep** (branch `feat/per-item-playbook-checkpoints`; typecheck/lint(151)/prompt-cache/collab/extension gates green; owner-smoke-validated on tabs + LinkedIn list; PR-ready)
 
