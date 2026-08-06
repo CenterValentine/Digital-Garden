@@ -30,6 +30,7 @@ import { BulletListBackspace } from "./extensions/bullet-list";
 import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
 import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
 import { DGHeading } from "./extensions/heading";
+import { HeadingFold } from "./extensions/heading-fold";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -155,6 +156,11 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // Heading with `collapsed` attr (heading folds) — levels + markdown
     // shortcuts (# ## ###) match the previous StarterKit config.
     DGHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
+
+    // Fold engine: derived fold ranges, hidden-range decorations, gutter
+    // chevron widgets, and the unfold-on-edit guards. Client-only — read-only
+    // surfaces render expanded (the extension detects editability itself).
+    HeadingFold,
 
     ...(collaboration
       ? [
