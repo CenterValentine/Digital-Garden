@@ -53,7 +53,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**August 6, 2026**: **Folder Context Capsule — folder mentions, context modes, and the graduation of AI context to content-graph infrastructure** (branch `feat/ai-context-capsule`, 6 phase commits `7a28b940`→`bd828a8f` + gates commit; full `pnpm build` green incl. the model-routing gate; owner smoke pending — checklist in conversation/plan)
+**August 6, 2026**: **Folder Context Capsule — folder mentions, context modes, and the graduation of AI context to content-graph infrastructure** (branch `feat/ai-context-capsule`; full `pnpm build` green incl. the model-routing gate; **owner smoke PASSED 2026-08-06** — two smoke-round fix commits followed: settings/rail UX rework incl. proposal-flow retirement (D18) and the B10 empty-node coverage fix; PR opened)
 
 Mention a folder in chat or a playbook and the AI receives a **capsule** — purpose (directives + role), summary, enhanced-only **signals** (gaps/ambiguities/misalignment), and a machine-readable child index (ids, one-liners, token estimates, freshness) — then walks down via the new `read_folder_context` tool, reading only the files it needs. Plan: `work-tracking/FOLDER-CONTEXT-CAPSULE-PLAN.md` (17 locked decisions + pre-build bug sweep B1–B9, all landed).
 
