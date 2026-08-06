@@ -915,6 +915,7 @@ export async function resolveOpenIntent(
       select: {
         id: true,
         name: true,
+        isMain: true,
         isLocked: true,
         viewRootContentId: true,
         viewRoot: { select: { id: true, title: true } },
@@ -944,6 +945,14 @@ export async function resolveOpenIntent(
 
   if (!workspace) return { allowed: false, conflict: null };
   if (!content) return { allowed: false, conflict: null };
+
+  // The Main Workspace is the permanent catchall — opens from it are never
+  // gated by other workspaces' claims, and no claims are minted from it
+  // (alreadyCovered suppresses the client's auto-assignment).
+  if (workspace.isMain) {
+    return { allowed: true, alreadyCovered: true, conflict: null };
+  }
+
   if (currentAssignment) {
     return { allowed: true, alreadyCovered: true, conflict: null };
   }

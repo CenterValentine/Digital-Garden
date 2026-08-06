@@ -940,6 +940,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
+    // The Main Workspace is the unrestricted catchall: opens are never gated
+    // by other workspaces' claims and mint no claims, so skip the open-intent
+    // round trip entirely. The server enforces the same rule for stale-cache
+    // callers that POST anyway.
+    if (activeWorkspace.isMain) {
+      directOpenContent(contentId, options);
+      void get()
+        .persistActiveWorkspace()
+        .catch((error) => {
+          console.error(
+            "[Workspace Store] Failed to persist active workspace after open:",
+            error,
+          );
+        });
+      return;
+    }
+
     if (
       isContentAlreadyInWorkspace(activeWorkspace, contentId) ||
       useContentStore.getState().openContentIds.includes(contentId) ||
