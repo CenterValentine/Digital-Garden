@@ -71,7 +71,32 @@ const calloutCodec: BlockMarkdownCodec = {
   },
 };
 
-export const BLOCK_CODECS: BlockMarkdownCodec[] = [calloutCodec];
+/**
+ * Heading ⇄ fold-state marker: `## Title {.collapsed}` (pandoc-style attr).
+ *
+ * Serialize side lives in the turndown service (dgCollapsedHeading rule in
+ * markdown-serialize.ts) because non-collapsed headings must keep the default
+ * atx path — so this codec's toMarkdown declines and only the parse-side
+ * reconstruction is real: marked renders `<h2>Title {.collapsed}</h2>`, and
+ * reTag moves the trailing marker into data-collapsed for generateJSON.
+ * A heading whose literal text ends in "{.collapsed}" fails self-verify (its
+ * serialized form re-parses as a collapsed heading) and falls to the fence —
+ * lossless, just opaque, for that one pathological input.
+ */
+const headingCodec: BlockMarkdownCodec = {
+  type: "heading",
+  toMarkdown() {
+    return null; // turndown tier handles both shapes
+  },
+  reTag(html) {
+    return html.replace(
+      /<h([1-6])([^>]*)>([\s\S]*?)\s*\{\.collapsed\}\s*<\/h\1>/g,
+      '<h$1$2 data-collapsed="true">$3</h$1>',
+    );
+  },
+};
+
+export const BLOCK_CODECS: BlockMarkdownCodec[] = [calloutCodec, headingCodec];
 
 const CODEC_BY_TYPE = new Map(BLOCK_CODECS.map((c) => [c.type, c]));
 

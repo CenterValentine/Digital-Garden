@@ -90,6 +90,18 @@ const constructs: Array<{ name: string; doc: JSONContent }> = [
   { name: "image + width", doc: doc({ type: "image", attrs: { src: "https://x.com/a.png", alt: "pic", width: 300 } }) },
   { name: "horizontal rule", doc: doc({ type: "horizontalRule" }) },
   { name: "callout (custom)", doc: doc({ type: "callout", attrs: { type: "warning" }, content: [p([t("in")])] }) },
+  // Heading folds: `collapsed` must survive the round-trip (pretty form is
+  // asserted separately below), including on blank headings — which are legal
+  // and fold-relevant — and combined with marks.
+  { name: "collapsed heading", doc: doc(h(2, "Setup", { collapsed: true }), p([t("body")])) },
+  { name: "collapsed heading + marks", doc: doc({ type: "heading", attrs: { level: 3, collapsed: true }, content: [tm("Bold ", ["bold"]), t("tail")] }) },
+  { name: "blank heading", doc: doc({ type: "heading", attrs: { level: 2 } }) },
+  { name: "blank collapsed heading", doc: doc({ type: "heading", attrs: { level: 2, collapsed: true } }) },
+  // Pathological literal: heading text that ends in the fold marker itself.
+  // Must stay lossless (it fences — its pretty form would re-parse collapsed).
+  { name: "literal {.collapsed} heading text", doc: doc(h(2, "tricky {.collapsed}")) },
+  // In-document heading link (wikiLink.headingSlug) inside a paragraph.
+  { name: "wikiLink + headingSlug", doc: doc(p([t("see "), { type: "wikiLink", attrs: { targetTitle: "Setup", headingSlug: "setup" } }])) },
   { name: "table", doc: doc({ type: "table", content: [{ type: "tableRow", content: [tc("A"), tc("B")] }, { type: "tableRow", content: [tc("1"), tc("2")] }] }) },
 ];
 for (const c of constructs) {
@@ -100,6 +112,23 @@ for (const c of constructs) {
   } catch (e) {
     console.log(`  SKIP  ${c.name} (${(e as Error).message.slice(0, 40)})`);
   }
+}
+
+// ── 1b. Heading-fold pretty syntax ───────────────────────────────────────────
+// Losslessness alone would let collapsed headings silently regress to the
+// HTML tier or the fence; assert the source view actually shows the marker.
+console.log("\n  ── heading-fold syntax ──");
+{
+  const r = lossless(doc(h(2, "Setup", { collapsed: true }), p([t("body")])));
+  if (!r.ok) fail("collapsed heading — LOSSY");
+  else if (!r.md.includes("## Setup {.collapsed}")) {
+    fail(`collapsed heading — lossless but not pretty (got: ${JSON.stringify(r.md.split("\n")[0])})`);
+  } else pass("collapsed heading serializes as `## Setup {.collapsed}`");
+
+  const plain = lossless(doc(h(2, "Setup"), p([t("body")])));
+  if (!plain.ok) fail("plain heading — LOSSY");
+  else if (plain.md.includes("{.collapsed}")) fail("plain heading — spurious {.collapsed} marker");
+  else pass("plain heading stays marker-free");
 }
 
 // ── 2. Escaping battery ──────────────────────────────────────────────────────
