@@ -214,6 +214,50 @@ const chatBodyResolvers = new Map<string, () => Record<string, unknown>>();
  */
 const lastSentBodies = new Map<string, Record<string, unknown>>();
 
+/**
+ * Network-resilience knobs for auto-resuming a dropped stream (AI 3.3+).
+ *
+ * A transient client-side fetch failure (network blip, connection reset, a
+ * serverless response cut) is NOT fatal when resumable streams are configured:
+ * the server keeps producing into Redis via `result.consumeStream()`, decoupled
+ * from the client socket, so the client can reconnect with `resumeStream()` and
+ * continue receiving the SAME stream. Before this, that drop fired `onError` →
+ * a fatal toast, ending the run mid-iteration. These constants bound the retry
+ * so a genuinely-dead stream still surfaces an error instead of spinning
+ * forever. Backoff: 0.8s, 1.6s, 3.2s, 6.4s; each attempt watches ~2s for the
+ * stream to go active before giving up on that attempt.
+ */
+const MAX_RECONNECT_ATTEMPTS = 4;
+const RECONNECT_BACKOFF_MS = 800;
+const RECOVERY_POLL_MS = 400;
+const RECOVERY_POLL_COUNT = 5;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * True only for the browser's transient network-failure TypeErrors — the class
+ * of error a stream resume can actually recover. Deliberately narrow: a real
+ * HTTP error (auth, provider, a 500 with a body) is NOT transient and must
+ * surface immediately rather than spin the reconnect loop. The message text
+ * varies by engine — Chrome "Failed to fetch", Safari "Load failed" / "network
+ * connection was lost", Firefox "NetworkError when attempting to fetch".
+ */
+function isTransientNetworkError(err: unknown): boolean {
+  const message = (
+    err instanceof Error ? err.message : String(err ?? "")
+  ).toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("load failed") ||
+    message.includes("network connection was lost") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed")
+  );
+}
+
 const chatTransport = new DefaultChatTransport({
   api: "/api/ai/chat",
   prepareSendMessagesRequest: ({ id, messages, trigger, messageId, body }) => {
@@ -1191,6 +1235,59 @@ export function useConversationEngine({
     null,
   );
 
+  // ── network resilience (AI 3.3): auto-resume a dropped stream ──
+  // A transient network drop mid-stream would otherwise reach onError and
+  // toast fatally, ending the run. When the chat is conversation-bound AND
+  // resumable streams are configured, the server is still producing into
+  // Redis, so we reconnect (resumeStream) with bounded backoff and surface an
+  // error only if every attempt fails. Refs — not state — so the useChat
+  // onError closure and the async loop read live values off-render (no
+  // re-subscription, no stale capture). Populated by a sync effect below.
+  const resumeStreamRef = useRef<null | (() => Promise<void> | void)>(null);
+  const streamStatusRef = useRef<string>("ready");
+  const resumableEnabledRef = useRef<boolean>(true);
+  const conversationIdRef = useRef<string | null>(null);
+  const reconnectingRef = useRef<boolean>(false);
+  // Bumped by every fresh user send so an in-flight reconnect loop bails —
+  // otherwise its poll would read the NEW stream's "submitted" as a recovery.
+  const reconnectGenRef = useRef<number>(0);
+  const reconnectToastIdRef = useRef<string | number | null>(null);
+
+  const runReconnectLoop = useCallback(async () => {
+    const gen = reconnectGenRef.current;
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      reconnectToastIdRef.current = toast.loading(
+        `Connection interrupted — reconnecting (${attempt}/${MAX_RECONNECT_ATTEMPTS})…`,
+        reconnectToastIdRef.current != null
+          ? { id: reconnectToastIdRef.current }
+          : undefined,
+      );
+      await sleep(RECONNECT_BACKOFF_MS * 2 ** (attempt - 1));
+      if (reconnectGenRef.current !== gen) return; // superseded by a fresh send
+      // Reconnect to the server's buffered stream. Fire-and-forget: the safe
+      // reconnect URL (conversationId-bound) is built by the transport's
+      // prepareReconnectToStreamRequest; we detect success by polling status.
+      void resumeStreamRef.current?.();
+      for (let poll = 0; poll < RECOVERY_POLL_COUNT; poll++) {
+        await sleep(RECOVERY_POLL_MS);
+        if (reconnectGenRef.current !== gen) return;
+        const s = streamStatusRef.current;
+        if (s === "streaming" || s === "submitted") {
+          toast.success("Reconnected.", {
+            id: reconnectToastIdRef.current ?? undefined,
+          });
+          reconnectToastIdRef.current = null;
+          return;
+        }
+      }
+    }
+    toast.error(
+      "Connection lost — the response couldn't be restored. Send your message again to continue.",
+      { id: reconnectToastIdRef.current ?? undefined },
+    );
+    reconnectToastIdRef.current = null;
+  }, []);
+
   // ── useChat ──
   const chat = useChat({
     transport: chatTransport,
@@ -1581,7 +1678,26 @@ export function useConversationEngine({
     onError: (err) => {
       if (onError) {
         onError(err);
-      } else {
+        return;
+      }
+      // Network resilience: a transient drop on a resumable, conversation-bound
+      // chat is recoverable — reconnect to the server's buffered stream instead
+      // of failing. Non-transient errors (auth, provider, server) and
+      // unbound/transient chats surface immediately, as before.
+      if (
+        isTransientNetworkError(err) &&
+        resumableEnabledRef.current &&
+        conversationIdRef.current &&
+        !reconnectingRef.current
+      ) {
+        reconnectingRef.current = true;
+        void runReconnectLoop().finally(() => {
+          reconnectingRef.current = false;
+        });
+        return;
+      }
+      // Don't stomp an in-flight reconnect's own toast with a duplicate.
+      if (!reconnectingRef.current) {
         toast.error(err.message || "Chat request failed");
       }
     },
@@ -1838,6 +1954,16 @@ export function useConversationEngine({
     resumeStream,
   ]);
 
+  // Keep the network-resilience refs current for the onError closure + the
+  // reconnect loop, which read them off-render. A no-dep effect (pure ref
+  // writes) is the compiler-safe way to mirror live values into refs.
+  useEffect(() => {
+    streamStatusRef.current = status;
+    resumeStreamRef.current = resumeStream;
+    resumableEnabledRef.current = resumableStreamsEnabled;
+    conversationIdRef.current = conversationId ?? null;
+  });
+
   const isActive = status === "streaming" || status === "submitted";
   const stop = useCallback(() => {
     // Settle synchronously for immediate visual feedback; the SDK's abort
@@ -2062,6 +2188,13 @@ export function useConversationEngine({
     // A fresh user send has no buffered backlog — clear the resume flag so
     // this turn types normally (and un-stick the no-stream 204 case).
     streamStartedViaResumeRef.current = false;
+    // Supersede any in-flight reconnect loop: this new stream's "submitted"
+    // status must not be mistaken for a recovery of the dropped one.
+    reconnectGenRef.current += 1;
+    if (reconnectToastIdRef.current != null) {
+      toast.dismiss(reconnectToastIdRef.current);
+      reconnectToastIdRef.current = null;
+    }
     // Agentic Browsing Phase 1 — a fresh user turn ends any prior research run
     // (backstop for a run the model never closed via record_research_findings),
     // so this turn's reads are never charged to a stale budget.
