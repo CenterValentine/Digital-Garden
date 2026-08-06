@@ -31,6 +31,7 @@ import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
 import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
 import { DGHeading } from "./extensions/heading";
 import { HeadingFold } from "./extensions/heading-fold";
+import { HeadingLinkIntegrity } from "./extensions/heading-link-integrity";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -161,6 +162,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // chevron widgets, and the unfold-on-edit guards. Client-only — read-only
     // surfaces render expanded (the extension detects editability itself).
     HeadingFold,
+
+    // Heading-link integrity: heals [[#Heading]] links on rename, decorates
+    // links whose target heading is gone (non-destructive, self-healing).
+    HeadingLinkIntegrity,
 
     ...(collaboration
       ? [

@@ -54,10 +54,11 @@ export const ServerWikiLink = Node.create({
   },
 
   renderText({ node }) {
-    const { targetTitle, displayText } = node.attrs;
+    const { targetTitle, displayText, headingSlug } = node.attrs;
+    const title = `${headingSlug ? "#" : ""}${targetTitle ?? ""}`;
     if (displayText) {
-      return `[[${targetTitle}|${displayText}]]`;
+      return `[[${title}|${displayText}]]`;
     }
-    return `[[${targetTitle}]]`;
+    return `[[${title}]]`;
   },
 });
