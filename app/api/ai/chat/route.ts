@@ -151,7 +151,7 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
-import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
+import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
 import {
   parsePlaybook,
   type PlaybookReference,

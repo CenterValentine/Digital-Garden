@@ -20,7 +20,7 @@ import {
 } from "./AiContextBanner";
 import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
 
-// Mirrors MetadataView from extensions/studio/server/metadata.ts (kept as a
+// Mirrors MetadataView from lib/domain/ai-context/metadata.ts (kept as a
 // local DTO — the server module imports Prisma and must stay unimported here).
 interface SectionMetaDto {
   owner: MetadataSectionOwner;

@@ -136,7 +136,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -148,7 +148,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -160,7 +160,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -172,7 +172,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -184,7 +184,8 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      // claude-haiku-3-5 retired 2026-02-19; 4.5 is the current cheap tier.
+      modelId: "claude-haiku-4-5",
     },
     settingsHref: {
       label: "Configure Studio defaults",
@@ -224,7 +225,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       "Playbook phases tagged `model: scout` — fast, low-cost research/gather/search work.",
     requiredCapabilities: ["text", "tools"],
     preferredCapabilities: ["low-cost"],
-    defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-3-5" },
+    defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-4-5" },
   },
   {
     id: "role-analyst",

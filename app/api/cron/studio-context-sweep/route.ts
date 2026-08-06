@@ -8,7 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { runContextSweep } from "@/extensions/studio/server/context-refresh";
+import { runContextSweep } from "@/lib/domain/ai-context/context-refresh";
 import { logger } from "@/lib/core/logger";
 import { withRouteTrace } from "@/lib/core/logger/route-trace";
 

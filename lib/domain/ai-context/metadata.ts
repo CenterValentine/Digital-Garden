@@ -22,8 +22,8 @@ import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
-import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
-import { METADATA_SECTION_OWNERS } from "../types";
+import type { MetadataSectionKind, MetadataSectionOwner } from "./types";
+import { METADATA_SECTION_OWNERS } from "./types";
 import { createSourceContentResolver } from "./source-resolver";
 
 // ── Shapes ────────────────────────────────────────────────────────────────

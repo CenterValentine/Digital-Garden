@@ -34,7 +34,7 @@ import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
-import { getStudioSettings } from "../settings";
+import { getAiContextSettings } from "./settings";
 import {
   applyGeneratedSections,
   assembleSourceText,
@@ -129,7 +129,7 @@ export async function refreshContextOnAccess(
   userId: string,
   rootId: string
 ): Promise<RefreshOutcome> {
-  const settings = getStudioSettings(await getUserSettings(userId));
+  const settings = getAiContextSettings(await getUserSettings(userId));
   if (settings.autoContextMode === "off") return { status: "off" };
   return refreshScope(userId, rootId);
 }
@@ -169,7 +169,7 @@ async function runRefresh(
   // Daily spend ceiling — the last initiation gate before any scan/spend.
   // Checked again before every LLM call below; leftover work simply stays
   // dirty and drains after the UTC-midnight reset (or a raised cap).
-  const cap = getStudioSettings(await getUserSettings(userId)).dailyCallCap;
+  const cap = getAiContextSettings(await getUserSettings(userId)).dailyCallCap;
   let callsRemaining = cap - (await getTodaySpend(userId));
   if (callsRemaining <= 0) {
     logger.info({
@@ -566,7 +566,7 @@ export async function runContextSweep(): Promise<SweepStats> {
     0,
     SWEEP_MAX_USERS
   )) {
-    const settings = getStudioSettings(await getUserSettings(ownerId));
+    const settings = getAiContextSettings(await getUserSettings(ownerId));
     if (settings.autoContextMode !== "on-access-sweep") continue;
     stats.usersSwept += 1;
 

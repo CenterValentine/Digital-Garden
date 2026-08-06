@@ -12,8 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import type { Prisma } from "@/lib/database/generated/prisma";
-import { markContextDirty } from "@/extensions/studio/server/context-dirty";
-import { maybeRippleFromEdit } from "@/extensions/studio/server/context-refresh";
+import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
+import { maybeRippleFromEdit } from "@/lib/domain/ai-context/context-refresh";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { getOptionalBrowserExtensionBearerAuth } from "@/lib/domain/browser-bookmarks/http";

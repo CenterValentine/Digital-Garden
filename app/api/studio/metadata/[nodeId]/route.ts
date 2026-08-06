@@ -24,8 +24,8 @@ import {
   resolveRoleStrategyProposal,
   saveDirectives,
   setContextOptOut,
-} from "@/extensions/studio/server/metadata";
-import { refreshScope } from "@/extensions/studio/server/context-refresh";
+} from "@/lib/domain/ai-context/metadata";
+import { refreshScope } from "@/lib/domain/ai-context/context-refresh";
 import { getStudioSettings } from "@/extensions/studio/settings";
 
 /**
