@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-05
+last_updated: 2026-08-06
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,17 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 6, 2026**: **Folder Context Capsule — folder mentions, context modes, and the graduation of AI context to content-graph infrastructure** (branch `feat/ai-context-capsule`, 6 phase commits `7a28b940`→`bd828a8f` + gates commit; full `pnpm build` green incl. the model-routing gate; owner smoke pending — checklist in conversation/plan)
+
+Mention a folder in chat or a playbook and the AI receives a **capsule** — purpose (directives + role), summary, enhanced-only **signals** (gaps/ambiguities/misalignment), and a machine-readable child index (ids, one-liners, token estimates, freshness) — then walks down via the new `read_folder_context` tool, reading only the files it needs. Plan: `work-tracking/FOLDER-CONTEXT-CAPSULE-PLAN.md` (17 locked decisions + pre-build bug sweep B1–B9, all landed).
+
+- **Graduation (Phase 0)**: the agentic-metadata substrate moved `extensions/studio/server/` → `lib/domain/ai-context/` — content-graph infrastructure now; studio is a consumer. Code moved, identifiers stayed. Also fixed six feature routes whose `defaultSuggestion` named retired `claude-haiku-3-5` (+ added `claude-haiku-4-5` to the Anthropic template — the model-routing build gate enforces suggestion↔template consistency).
+- **Context mode ladder (Phase 1)**: `contextMode` enum `OPT_OUT < REFERENCE < STANDARD < ENHANCED`, nullable = inherit, nearest-explicit-ancestor-wins, OPT_OUT absolute downward; expand/contract migration (`contextOptOut` survives one release). Write hardening from the bug sweep: hash-at-read/revalidate-at-write (B1), cross-instance refresh claim CAS (B2), single-transaction mode writes (B3).
+- **Capsule + gate (Phase 2)**: hybrid assembly (structure live from ContentNode, semantics from cached rows); code-side freshness gate with the failure ladder fresh → stale-flagged → hard-fail-only-if-none; mentions bypass the settle debounce (B9); `ai-context-enhanced` feature route with fallback-to-standard (B6).
+- **AI Context rail (Phase 3)**: one mode selector replaces toggles; sections render per resolved mode; ContextTab/ContextAiPanel relocated to `components/content/ai-context/` and no longer follow studio enablement.
+- **Folder mentions (Phase 4)**: two-stage gate (composer pre-flight on pill insert drives live chips; server re-gates at send, authoritative); durable trace rides the sent message as a `data-folder-context` part.
+- **Walk tool (Phase 5)**: `read_folder_context` in the AI tool registry — progressive disclosure with the D17 frugality nudge.
 
 **August 5, 2026**: **Per-item playbook iteration + co-browse reliability sweep** (branch `feat/per-item-playbook-checkpoints`; typecheck/lint(151)/prompt-cache/collab/extension gates green; owner-smoke-validated on tabs + LinkedIn list; PR-ready)
 
