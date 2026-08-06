@@ -19,6 +19,7 @@ import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { getActiveTrace, logger, withSpan } from "@/lib/core/logger";
 import { prisma } from "@/lib/database/client";
 import { sanitizeSvg } from "@/lib/domain/content/svg-sanitizer";
+import { createSlugAssigner } from "@/lib/domain/content/heading-ids";
 import type { JSONContent } from "@tiptap/core";
 
 interface TipTapContentProps {
@@ -129,14 +130,17 @@ function normalizeDoc(node: JSONContent): JSONContent {
   };
 }
 
-function slugifyAnchor(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
+/**
+ * Is this heading element a publishing block's internal headline (hero, CTA,
+ * card, …) rather than authored prose? Block headlines must not receive
+ * anchor ids: they would offset/collide the prose heading sequence, desyncing
+ * published anchors from the editor's derived slugs — and they used to leak
+ * into the published TOC. Every block-internal headline carries a `block-*`
+ * class on the h element itself; authored headings never do (including ones
+ * nested inside container blocks, which DO keep their anchors).
+ */
+function isBlockInternalHeading(el: HTMLElement): boolean {
+  return Array.from(el.classList).some((cls) => cls.startsWith("block-"));
 }
 
 /**
@@ -167,16 +171,17 @@ function postProcessDom(
   jsdomDocument: Document,
   visualizationSources: VisualizationSourceMap,
 ): void {
-  // Pass 1 — heading IDs
-  const seen = new Map<string, number>();
+  // Pass 1 — heading IDs (prose headings only; same derived-slug algorithm as
+  // the editor, outline, and TOC — see lib/domain/content/heading-ids.ts)
+  const assignSlug = createSlugAssigner();
   const headingData: Array<{ level: number; text: string; id: string }> = [];
   container.querySelectorAll<HTMLElement>("h1,h2,h3,h4,h5,h6").forEach((el) => {
-    const base = slugifyAnchor(el.textContent ?? "") || "heading";
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    const id = count === 0 ? base : `${base}-${count + 1}`;
+    if (isBlockInternalHeading(el)) return;
+    const text = el.textContent ?? "";
+    const id = assignSlug(text);
+    if (id === null) return; // blank headings are not linkable
     el.id = id;
-    headingData.push({ level: parseInt(el.tagName[1]!, 10), text: el.textContent ?? "", id });
+    headingData.push({ level: parseInt(el.tagName[1]!, 10), text, id });
   });
 
   // Pass 2 — TOC placeholders
