@@ -18,6 +18,9 @@ import { z } from "zod/v4";
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { ContextMode } from "@/lib/database/generated/prisma";
+import { explicitMode, resolveContextMode } from "./mode-resolve";
+import { markContextDirty } from "./context-dirty";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { stableHash } from "@/lib/core/stable-hash";
@@ -50,6 +53,10 @@ export interface MetadataView {
   stale: boolean;
   /** Privacy opt-out: AI context never reads this node. */
   optedOut: boolean;
+  /** Explicit per-node mode override; null = inherits (plan D6/D7). */
+  contextMode: ContextMode | null;
+  /** Effective mode after ancestor resolution — what the engine acts on. */
+  resolvedMode: ContextMode;
 }
 
 const SECTION_KINDS: MetadataSectionKind[] = [
@@ -190,7 +197,7 @@ export async function computeSourceHash(
         bodyHash: true,
         updatedAt: true,
         agenticMetadata: {
-          select: { summaryHash: true, contextOptOut: true },
+          select: { summaryHash: true, contextOptOut: true, contextMode: true },
         },
       },
       orderBy: { id: "asc" },
@@ -201,7 +208,7 @@ export async function computeSourceHash(
       children: children
         // Opted-out children are invisible to the roll-up, so they can't
         // churn the folder's staleness either.
-        .filter((c) => !c.agenticMetadata?.contextOptOut)
+        .filter((c) => explicitMode(c.agenticMetadata) !== ContextMode.OPT_OUT)
         .map((c) => ({
           id: c.id,
           title: c.title,
@@ -236,6 +243,7 @@ export async function getMetadataForNode(
   const record = await prisma.agenticMetadata.findUnique({
     where: { nodeId },
   });
+  const resolvedMode = await resolveContextMode(nodeId);
 
   if (!record) {
     return {
@@ -245,7 +253,9 @@ export async function getMetadataForNode(
       generatedAt: null,
       model: null,
       stale: false,
-      optedOut: false,
+      optedOut: resolvedMode === ContextMode.OPT_OUT,
+      contextMode: null,
+      resolvedMode,
     };
   }
 
@@ -262,46 +272,101 @@ export async function getMetadataForNode(
     stale:
       record.sourceContentHash !== null &&
       record.sourceContentHash !== currentHash,
-    optedOut: record.contextOptOut,
+    optedOut: resolvedMode === ContextMode.OPT_OUT,
+    contextMode: record.contextMode,
+    resolvedMode,
   };
 }
 
 /**
- * Toggle the privacy opt-out for one node. Opting out clears the dirty bit
- * (there is deliberately no work to do); opting back IN marks dirty so the
- * refresh engine re-covers the node on the next drain. Stored sections are
- * retained — the user can still read what was generated before opting out;
- * the flag stops all future READS of the content by the context system.
+ * Set (or clear, with null = inherit) a node's explicit context mode.
+ *
+ * One `$transaction` for the row write plus the subtree dirty-mark (sweep
+ * B3 — the old opt-out toggle wrote flags in two statements, letting a
+ * concurrent dirty-mark land between them). Side effects (plan D8):
+ *  - Any mode change marks the SUBTREE dirty so the next drain re-evaluates
+ *    every descendant under the new resolved mode — marking is free, damping
+ *    bounds the actual spend.
+ *  - OPT_OUT clears the node's own bit (there is deliberately no work to do)
+ *    and skips subtree marking (the subtree is shielded from scope anyway).
+ *  - Ancestors are re-marked after the transaction via markContextDirty —
+ *    a child's mode change alters what the parent roll-up may read.
+ * Stored sections are retained on OPT_OUT — the user can still read what was
+ * generated before opting out; the mode stops all future READS by the
+ * context system. Downgrade-from-ENHANCED signal pruning lands with signals
+ * themselves (Phase 2).
+ */
+export async function setContextMode(
+  userId: string,
+  nodeId: string,
+  mode: ContextMode | null
+): Promise<MetadataView | null> {
+  const node = await loadOwnedNode(userId, nodeId);
+  if (!node) return null;
+
+  const optedOut = mode === ContextMode.OPT_OUT;
+  const emptyDoc = writeSections(
+    readSections(null)
+  ) as unknown as Prisma.InputJsonValue;
+  const emptyMeta = defaultMeta() as unknown as Prisma.InputJsonValue;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.agenticMetadata.upsert({
+      where: { nodeId },
+      create: {
+        nodeId,
+        tiptapJson: emptyDoc,
+        sectionsMeta: emptyMeta,
+        derivedText: "",
+        contextMode: mode,
+        contextOptOut: optedOut,
+        contextDirty: !optedOut,
+      },
+      update: {
+        contextMode: mode,
+        contextOptOut: optedOut,
+        contextDirty: optedOut ? false : true,
+      },
+    });
+    if (!optedOut && node.contentType === "folder") {
+      // Subtree re-evaluation mark (bounded like every chain walk). Rows
+      // explicitly opted out keep their own shield.
+      await tx.$executeRaw`
+        WITH RECURSIVE sub AS (
+          SELECT id FROM "ContentNode" WHERE id = ${nodeId}::uuid
+          UNION
+          SELECT c.id FROM "ContentNode" c JOIN sub s ON c."parentId" = s.id
+        )
+        UPDATE "AgenticMetadata"
+        SET "contextDirty" = true
+        WHERE "nodeId" IN (SELECT id FROM sub LIMIT 400)
+          AND "contextOptOut" = false
+          AND ("contextMode" IS NULL OR "contextMode" <> 'OPT_OUT')
+      `;
+    }
+  });
+
+  // Ancestor chain re-mark (outside the transaction by design — it swallows
+  // its own failures and must never roll back the mode write).
+  await markContextDirty([node.id]);
+
+  return getMetadataForNode(userId, nodeId);
+}
+
+/**
+ * Legacy boolean toggle — thin wrapper over setContextMode so both surfaces
+ * share one write path (and the old two-statement race is gone).
  */
 export async function setContextOptOut(
   userId: string,
   nodeId: string,
   optedOut: boolean
 ): Promise<MetadataView | null> {
-  const node = await loadOwnedNode(userId, nodeId);
-  if (!node) return null;
-
-  const record = await prisma.agenticMetadata.findUnique({ where: { nodeId } });
-  if (record) {
-    await prisma.agenticMetadata.update({
-      where: { nodeId },
-      data: { contextOptOut: optedOut, contextDirty: optedOut ? false : true },
-    });
-  } else {
-    const sections = readSections(null);
-    await upsertRecord(nodeId, sections, defaultMeta(), {
-      sourceContentHash: null,
-      model: null,
-      generatedAt: null,
-      summaryHash: null,
-      contextDirty: !optedOut,
-    });
-    await prisma.agenticMetadata.update({
-      where: { nodeId },
-      data: { contextOptOut: optedOut },
-    });
-  }
-  return getMetadataForNode(userId, nodeId);
+  return setContextMode(
+    userId,
+    nodeId,
+    optedOut ? ContextMode.OPT_OUT : null
+  );
 }
 
 export class StudioContextOptedOutError extends Error {
@@ -468,6 +533,9 @@ export async function generateMetadataForNode(
   };
 
   const sourceText = await assembleSourceText(node);
+  // B1: hash the inputs BEFORE the LLM call — this is the hash the generated
+  // sections actually correspond to (write-time revalidation happens below).
+  const sourceHashAtRead = await computeSourceHash(node);
   const promptLines = [
     `You maintain a working "Context" document about one item in a user's knowledge base.`,
     `Item: "${node.title}" (type: ${node.contentType})`,
@@ -506,13 +574,22 @@ export async function generateMetadataForNode(
     proposedAt: now.toISOString(),
   };
 
-  const sourceContentHash = await computeSourceHash(node);
+  // Write-time revalidation (sweep B1): an edit that landed during the LLM
+  // call must keep the node dirty — see applyGeneratedSections for the full
+  // rationale.
+  const live = await prisma.contentNode.findUnique({
+    where: { id: nodeId },
+    select: { title: true, bodyHash: true, updatedAt: true },
+  });
+  const sourceHashAtWrite = await computeSourceHash(
+    live ? { ...node, ...live } : node
+  );
   await upsertRecord(nodeId, sections, meta, {
-    sourceContentHash,
+    sourceContentHash: sourceHashAtRead,
     model: route.modelId,
     generatedAt: now,
     summaryHash: hashAiSections(sections.summary, sections.structure),
-    contextDirty: false,
+    contextDirty: sourceHashAtWrite !== sourceHashAtRead,
   });
 
   logger.info({
@@ -538,7 +615,7 @@ export async function assembleSourceText(node: {
         title: true,
         contentType: true,
         agenticMetadata: {
-          select: { derivedText: true, contextOptOut: true },
+          select: { derivedText: true, contextOptOut: true, contextMode: true },
         },
       },
       orderBy: { displayOrder: "asc" },
@@ -546,7 +623,7 @@ export async function assembleSourceText(node: {
     // Privacy: opted-out children are excluded entirely — not even their
     // titles reach the roll-up prompt.
     const visible = children.filter(
-      (child) => !child.agenticMetadata?.contextOptOut
+      (child) => explicitMode(child.agenticMetadata) !== ContextMode.OPT_OUT
     );
     if (visible.length === 0) return "";
     return visible
@@ -648,18 +725,35 @@ export async function getStoredAiSections(
 export async function applyGeneratedSections(
   node: MetadataNodeShape,
   generated: { summary: string; structure: string },
-  modelId: string
+  modelId: string,
+  sourceHashAtRead: string
 ): Promise<{ changed: boolean }> {
   const record = await prisma.agenticMetadata.findUnique({
     where: { nodeId: node.id },
   });
   const newSummaryHash = hashAiSections(generated.summary, generated.structure);
-  const sourceContentHash = await computeSourceHash(node);
+
+  // Write-time revalidation (plan → sweep B1): re-fetch the node and recompute
+  // the source hash NOW. The in-memory `node` carries READ-time fields, so a
+  // fresh fetch is what detects an edit that landed during the LLM call. On a
+  // mismatch the dirty bit stays SET (the next drain re-runs) and we store the
+  // READ-time hash, keeping the stale detector honest about which content
+  // these sections actually reflect. Clearing unconditionally here was a
+  // lost-update race: the mid-flight edit's mark got erased and the node
+  // looked clean while its context was stale.
+  const live = await prisma.contentNode.findUnique({
+    where: { id: node.id },
+    select: { title: true, bodyHash: true, updatedAt: true },
+  });
+  const sourceHashAtWrite = await computeSourceHash(
+    live ? { ...node, ...live } : node
+  );
+  const contextDirty = sourceHashAtWrite !== sourceHashAtRead;
 
   if (record && record.summaryHash === newSummaryHash) {
     await prisma.agenticMetadata.update({
       where: { nodeId: node.id },
-      data: { sourceContentHash, contextDirty: false },
+      data: { sourceContentHash: sourceHashAtRead, contextDirty },
     });
     return { changed: false };
   }
@@ -677,11 +771,11 @@ export async function applyGeneratedSections(
   meta.structure = { owner: "ai", ...stamp };
 
   await upsertRecord(node.id, sections, meta, {
-    sourceContentHash,
+    sourceContentHash: sourceHashAtRead,
     model: modelId,
     generatedAt: now,
     summaryHash: newSummaryHash,
-    contextDirty: false,
+    contextDirty,
   });
   return { changed: true };
 }

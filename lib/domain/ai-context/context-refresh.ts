@@ -29,6 +29,7 @@
 import { generateObject } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import { ContextMode } from "@/lib/database/generated/prisma";
 import { getUserSettings } from "@/lib/features/settings";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
@@ -45,6 +46,7 @@ import {
 import { createSourceContentResolver } from "./source-resolver";
 import { getGenLockedNodeIds } from "./gen-lock";
 import { getTodaySpend, recordSpend } from "./context-spend";
+import { resolveChildMode, resolveContextMode } from "./mode-resolve";
 
 // ── Budgets ───────────────────────────────────────────────────────────────
 
@@ -99,6 +101,8 @@ export type RefreshOutcome =
 interface ScopeNode extends MetadataNodeShape {
   parentId: string | null;
   depth: number;
+  /** Effective mode after inheritance (plan D6/D7) — what the drain acts on. */
+  resolvedMode: ContextMode;
   meta: {
     exists: boolean;
     contextDirty: boolean;
@@ -152,9 +156,77 @@ export async function refreshScope(
   if (inFlight.has(flightKey)) return { status: "skipped" };
   inFlight.add(flightKey);
   try {
-    return await runRefresh(userId, rootId, options);
+    // Cross-instance single-flight (sweep B2): the in-process set above only
+    // covers one serverless isolate; the claim stamp covers the rest.
+    if (!(await claimScope(rootId))) return { status: "skipped" };
+    try {
+      return await runRefresh(userId, rootId, options);
+    } finally {
+      await releaseScope(rootId);
+    }
   } finally {
     inFlight.delete(flightKey);
+  }
+}
+
+/** Cross-instance claim TTL — a crashed drain's claim expires after this. */
+const CLAIM_TTL_MS = 5 * 60_000;
+
+/**
+ * CAS-claim the scope root's `refreshClaimedAt` (sweep B2). A conditional
+ * updateMany takes the claim only when it is empty or expired — Postgres
+ * serializes the row write, so exactly one instance wins. Session-scoped
+ * advisory locks were rejected here: through a connection pool, consecutive
+ * $queryRaw calls can run on different connections and leak the lock. An
+ * uncovered root gets a bare metadata row created to carry the stamp; the
+ * unique constraint settles that race too.
+ */
+async function claimScope(rootId: string): Promise<boolean> {
+  const now = new Date();
+  const expiredBefore = new Date(now.getTime() - CLAIM_TTL_MS);
+  const claimed = await prisma.agenticMetadata.updateMany({
+    where: {
+      nodeId: rootId,
+      OR: [
+        { refreshClaimedAt: null },
+        { refreshClaimedAt: { lt: expiredBefore } },
+      ],
+    },
+    data: { refreshClaimedAt: now },
+  });
+  if (claimed.count === 1) return true;
+
+  const row = await prisma.agenticMetadata.findUnique({
+    where: { nodeId: rootId },
+    select: { refreshClaimedAt: true },
+  });
+  if (row) return false; // live claim held by another instance
+
+  try {
+    await prisma.agenticMetadata.create({
+      data: {
+        nodeId: rootId,
+        tiptapJson: { version: 1, sections: {} },
+        sectionsMeta: {},
+        derivedText: "",
+        contextDirty: true,
+        refreshClaimedAt: now,
+      },
+    });
+    return true;
+  } catch {
+    return false; // unique-constraint race: another instance created + claimed
+  }
+}
+
+async function releaseScope(rootId: string): Promise<void> {
+  try {
+    await prisma.agenticMetadata.updateMany({
+      where: { nodeId: rootId },
+      data: { refreshClaimedAt: null },
+    });
+  } catch {
+    // Never fail a drain on release — a stuck claim expires via the TTL.
   }
 }
 
@@ -226,6 +298,10 @@ async function runRefresh(
 
   const leafWork: ScopeNode[] = [];
   const bitClearOnly: string[] = [];
+  // READ-time source hashes for generation candidates — passed through to
+  // applyGeneratedSections, whose write-time revalidation (sweep B1) compares
+  // against a fresh recompute to catch edits landing during the LLM call.
+  const readHashes = new Map<string, string>();
   for (const node of leafCandidates) {
     if (genLocked.has(node.id)) continue; // studio outputs: never auto-covered
     if (!isSettled(node)) {
@@ -234,12 +310,11 @@ async function runRefresh(
     }
     // Leaf source hashes are pure functions of fields already in hand —
     // verify true staleness before spending. Over-marked bits clear free.
-    if (node.meta.exists) {
-      const currentHash = await computeSourceHash(node);
-      if (currentHash === node.meta.sourceContentHash) {
-        bitClearOnly.push(node.id);
-        continue;
-      }
+    const currentHash = await computeSourceHash(node);
+    readHashes.set(node.id, currentHash);
+    if (node.meta.exists && currentHash === node.meta.sourceContentHash) {
+      bitClearOnly.push(node.id);
+      continue;
     }
     leafWork.push(node);
   }
@@ -326,7 +401,8 @@ async function runRefresh(
           const { changed } = await applyGeneratedSections(
             node,
             generated,
-            route.modelId
+            route.modelId,
+            readHashes.get(node.id) ?? (await computeSourceHash(node))
           );
           if (changed) {
             stats.leavesRefreshed += 1;
@@ -359,10 +435,30 @@ async function runRefresh(
   }
 
   // ── Folders (deepest-first, after their children) ───────────────────────
+  // Reference-mode folders have no roll-up work class (plan D6): their
+  // capsule content is the child index + one-liners, both cheaper surfaces.
+  // A dirty bit on one is bookkeeping with nothing to spend on — clear it.
+  const referenceFolders = scope.filter(
+    (n) =>
+      n.contentType === "folder" &&
+      n.resolvedMode === ContextMode.REFERENCE &&
+      n.meta.exists &&
+      n.meta.contextDirty
+  );
+  if (referenceFolders.length > 0) {
+    await prisma.agenticMetadata.updateMany({
+      where: { nodeId: { in: referenceFolders.map((n) => n.id) } },
+      data: { contextDirty: false },
+    });
+    stats.foldersDamped += referenceFolders.length;
+  }
+
   const folderWork = scope
     .filter(
       (n) =>
-        n.contentType === "folder" && (!n.meta.exists || n.meta.contextDirty)
+        n.contentType === "folder" &&
+        n.resolvedMode !== ContextMode.REFERENCE &&
+        (!n.meta.exists || n.meta.contextDirty)
     )
     .filter((n) => {
       if (isSettled(n)) return true;
@@ -431,7 +527,8 @@ async function runRefresh(
       const { changed: rollupChanged } = await applyGeneratedSections(
         folder,
         object,
-        route.modelId
+        route.modelId,
+        currentHash
       );
       if (rollupChanged) stats.foldersRefreshed += 1;
       else stats.foldersDamped += 1;
@@ -617,16 +714,21 @@ async function collectScope(
           summaryHash: true,
           updatedAt: true,
           contextOptOut: true,
+          contextMode: true,
         },
       },
     },
   });
-  // Privacy: an opted-out root yields an empty scope — nothing is read.
-  if (!root || root.agenticMetadata?.contextOptOut) return [];
+  if (!root) return [];
+  // Mode resolution walks the root's ANCESTORS too — an inherited OPT_OUT
+  // shields this scope exactly like an explicit one (plan D7).
+  const rootMode = await resolveContextMode(rootId);
+  if (rootMode === ContextMode.OPT_OUT) return [];
 
   const toScopeNode = (
     node: typeof root & { parentId: string | null },
-    depth: number
+    depth: number,
+    resolvedMode: ContextMode
   ): ScopeNode => ({
     id: node.id,
     parentId: node.parentId,
@@ -635,6 +737,7 @@ async function collectScope(
     bodyHash: node.bodyHash,
     updatedAt: node.updatedAt,
     depth,
+    resolvedMode,
     meta: {
       exists: node.agenticMetadata !== null,
       contextDirty: node.agenticMetadata?.contextDirty ?? false,
@@ -645,8 +748,13 @@ async function collectScope(
     },
   });
 
-  const scope: ScopeNode[] = [toScopeNode(root, 0)];
+  const scope: ScopeNode[] = [toScopeNode(root, 0, rootMode)];
   if (root.contentType !== "folder") return scope;
+
+  // Top-down inheritance during BFS: a child's resolved mode is its explicit
+  // override or its parent's resolved mode — the parent's value already folds
+  // in everything above it, so no per-child ancestor walks are needed.
+  const resolvedByFolder = new Map<string, ContextMode>([[root.id, rootMode]]);
 
   let frontier = [root.id];
   let depth = 0;
@@ -668,6 +776,7 @@ async function collectScope(
             summaryHash: true,
             updatedAt: true,
             contextOptOut: true,
+            contextMode: true,
           },
         },
       },
@@ -677,11 +786,17 @@ async function collectScope(
     const nextFrontier: string[] = [];
     for (const child of children) {
       if (scope.length >= MAX_SCOPE_NODES) break;
+      const parentResolved =
+        resolvedByFolder.get(child.parentId ?? "") ?? ContextMode.STANDARD;
+      const childMode = resolveChildMode(child.agenticMetadata, parentResolved);
       // Privacy: opted-out nodes never enter the scope, and an opted-out
       // FOLDER shields its entire subtree (no descent).
-      if (child.agenticMetadata?.contextOptOut) continue;
-      scope.push(toScopeNode(child, depth));
-      if (child.contentType === "folder") nextFrontier.push(child.id);
+      if (childMode === ContextMode.OPT_OUT) continue;
+      scope.push(toScopeNode(child, depth, childMode));
+      if (child.contentType === "folder") {
+        resolvedByFolder.set(child.id, childMode);
+        nextFrontier.push(child.id);
+      }
     }
     frontier = nextFrontier;
   }
