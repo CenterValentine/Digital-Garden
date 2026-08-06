@@ -208,10 +208,9 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       presetId: "anthropic",
       modelId: "claude-haiku-4-5",
     },
-    settingsHref: {
-      label: "Configure Studio defaults",
-      href: "/settings/extensions/studio",
-    },
+    // Deliberately no settingsHref: this route card IS the enhanced tier's
+    // whole config (owner call 2026-08-06 — enhanced gets its own config,
+    // not a pointer into Studio defaults).
   },
   {
     id: "studio-generation",

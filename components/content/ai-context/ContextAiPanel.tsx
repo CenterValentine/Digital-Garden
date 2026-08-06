@@ -325,14 +325,22 @@ export function ContextAiPanel() {
               </span>
             )}
           </div>
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          {/* Vertical ladder list (owner UX call 2026-08-06): the wrap-prone
+              pill row misread in the narrow rail. One row per rung, hint
+              inline — the ordered ladder stays visible, nothing wraps. */}
+          <div
+            role="radiogroup"
+            aria-label="Context mode"
+            className="mt-1.5 space-y-1"
+          >
             {MODE_OPTIONS.map((option) => {
               const active = view.contextMode === option.value;
               return (
                 <button
                   key={option.label}
                   type="button"
-                  title={option.hint}
+                  role="radio"
+                  aria-checked={active}
                   disabled={busy !== null || active}
                   onClick={() => {
                     if (!selectedContentId) return;
@@ -349,18 +357,41 @@ export function ContextAiPanel() {
                       })
                       .catch(() => fetchView(nodeId));
                   }}
-                  className={cnModeButton(active)}
+                  className={[
+                    "flex w-full items-start gap-2 rounded-md border px-2.5 py-1.5 text-left transition-colors",
+                    active
+                      ? "border-gold-primary/50 bg-gold-primary/10"
+                      : "border-transparent hover:bg-black/[0.04] dark:hover:bg-white/[0.06]",
+                  ].join(" ")}
                 >
-                  {option.label}
+                  <span
+                    aria-hidden
+                    className={[
+                      "mt-1 h-2 w-2 shrink-0 rounded-full border",
+                      active
+                        ? "border-gold-primary bg-gold-primary"
+                        : "border-gray-400/60 dark:border-gray-500/60",
+                    ].join(" ")}
+                  />
+                  <span className="min-w-0">
+                    <span
+                      className={[
+                        "block text-xs font-medium",
+                        active
+                          ? "text-gold-primary"
+                          : "text-gray-700 dark:text-gray-300",
+                      ].join(" ")}
+                    >
+                      {option.label}
+                    </span>
+                    <span className="block text-[11px] leading-snug text-gray-400 dark:text-gray-500">
+                      {option.hint}
+                    </span>
+                  </span>
                 </button>
               );
             })}
           </div>
-          <p className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
-            {MODE_OPTIONS.find((o) =>
-              view.contextMode === null ? o.value === null : o.value === view.contextMode
-            )?.hint ?? ""}
-          </p>
           {view.resolvedMode === "OPT_OUT" && (
             <p className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
               Off — no auto-updates, no Generate, excluded from folder roll-ups,
@@ -493,16 +524,6 @@ export function ContextAiPanel() {
       )}
     </div>
   );
-}
-
-/** Segmented-button styling for the mode selector. */
-function cnModeButton(active: boolean): string {
-  return [
-    "rounded-md border px-2 py-1 text-[11px] transition-colors",
-    active
-      ? "border-gold-primary/50 bg-gold-primary/10 text-gold-primary"
-      : "border-black/10 text-gray-500 hover:bg-black/[0.04] dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/[0.06]",
-  ].join(" ");
 }
 
 const OWNER_DEFAULTS: Record<MetadataSectionKind, MetadataSectionOwner> = {

@@ -36,7 +36,7 @@ function Field({
 }) {
   return (
     <label className="block">
-      <div className="mb-1 text-xs font-medium text-gray-300">{label}</div>
+      <div className="mb-1 text-xs font-medium text-gray-600 dark:text-gray-300">{label}</div>
       {children}
       {hint && <div className="mt-1 text-[11px] text-gray-500">{hint}</div>}
     </label>
@@ -122,7 +122,7 @@ export function SearchConnectionsCard() {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-white">Web Search</h2>
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Web Search</h2>
         <p className="mt-1 text-sm text-gray-400">
           Give models without built-in search (DeepSeek, Kimi, Mistral,
           local, …) live web access. The big-four providers use their own
@@ -141,7 +141,7 @@ export function SearchConnectionsCard() {
               <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="truncate text-sm font-medium text-white">
+                    <span className="truncate text-sm font-medium text-gray-900 dark:text-white">
                       {row.label}
                     </span>
                     {row.isDefault && (
