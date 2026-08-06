@@ -58,6 +58,8 @@ import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
 import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
 import { logger } from "@/lib/core/logger";
+import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
+import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -1158,6 +1160,51 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
+    // The WALK primitive (FOLDER-CONTEXT-CAPSULE-PLAN Phase 5): capsules for
+    // progressive folder disclosure. A mention injects the root capsule;
+    // every descent is one visible call here. Playbooks reach folders by
+    // resolving the title via searchNotes first, then walking.
+    read_folder_context: tool({
+      description:
+        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with searchNotes when you only have a title.",
+      inputSchema: z.object({
+        folderId: z
+          .string()
+          .describe(
+            "The folder's ContentNode id (from a capsule index, a mention, or searchNotes results)."
+          ),
+      }),
+      execute: async ({ folderId }) => {
+        try {
+          const gate = await ensureFolderContextFresh(ctx.userId, folderId, {
+            budgetMs: 3000,
+          });
+          if (gate.status === "optedOut") {
+            return "This folder's AI context is disabled by the user — only its name is available. Do not attempt to read its contents.";
+          }
+          const capsule =
+            gate.status === "none"
+              ? null
+              : await assembleFolderCapsule(ctx.userId, folderId);
+          if (!capsule) {
+            return `No context is available for this folder yet (${gate.reason ?? "generation could not run"}). You can still read individual files inside it if you know their ids, or tell the user context generation needs configuring.`;
+          }
+          const staleBanner =
+            gate.status === "stale"
+              ? `\n[NOTE: parts of this capsule could not be refreshed (${gate.reason ?? "budget"}) and may lag recent edits.]`
+              : "";
+          return capsule.text + staleBanner;
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "ai_context:tool_read_folder_caught",
+            summary: "read_folder_context failed",
+            error,
+          });
+          return "Reading the folder's context failed with an internal error — continue without it and tell the user.";
+        }
+      },
+    }),
     search_playbooks: tool({
       description:
         "List the user's playbooks (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a playbook by name or topic; it searches ONLY playbooks, so it won't return unrelated notes. If a playbook is already attached to this chat (see the Active Playbook section, if present), you don't need this — that one is already the answer.",

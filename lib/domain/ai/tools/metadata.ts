@@ -28,6 +28,7 @@ export const BASE_TOOL_IDS = [
   "read_page",
   "phase_checkpoint",
   "create_folder",
+  "read_folder_context",
   "create_docx",
   "searchNotes",
   "search_playbooks",
@@ -79,6 +80,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Create Folder",
     description:
       "Find or create a folder (playbook destinations like job-search/{Company})",
+  },
+  read_folder_context: {
+    name: "Read Folder Context",
+    description:
+      "Read a folder's context capsule — purpose, summary, signals, and an indexed list of its children with ids and token estimates (the walk primitive for folder mentions)",
   },
   create_docx: {
     name: "Create Word Document",
