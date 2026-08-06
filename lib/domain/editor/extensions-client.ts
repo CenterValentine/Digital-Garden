@@ -46,7 +46,6 @@ import { BlockFocusExtension } from "./extensions/block-focus-ext";
 import { SectionHeader } from "./extensions/blocks/section-header";
 import { CardPanel } from "./extensions/blocks/card-panel";
 import { BlockDivider } from "./extensions/blocks/divider";
-import { Accordion } from "./extensions/blocks/accordion";
 import { Column, Columns } from "./extensions/blocks/columns";
 import { BlockColumn, BlockColumns } from "./extensions/blocks/block-columns";
 import { TabPanel, Tabs } from "./extensions/blocks/tabs";
@@ -279,7 +278,6 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     SectionHeader,
     CardPanel,
     BlockDivider,
-    Accordion,
     Column,
     Columns,
     BlockColumn,

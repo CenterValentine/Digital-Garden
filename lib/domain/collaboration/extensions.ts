@@ -17,7 +17,6 @@ import { HeadingHardbreakSplit } from "@/lib/domain/editor/extensions/heading-ha
 import { ServerSectionHeader } from "@/lib/domain/editor/extensions/blocks/section-header";
 import { ServerCardPanel } from "@/lib/domain/editor/extensions/blocks/card-panel";
 import { ServerBlockDivider } from "@/lib/domain/editor/extensions/blocks/divider";
-import { ServerAccordion } from "@/lib/domain/editor/extensions/blocks/accordion";
 import { ServerColumn, ServerColumns } from "@/lib/domain/editor/extensions/blocks/columns";
 import { ServerBlockColumn, ServerBlockColumns } from "@/lib/domain/editor/extensions/blocks/block-columns";
 import { ServerTabPanel, ServerTabs } from "@/lib/domain/editor/extensions/blocks/tabs";
@@ -90,7 +89,6 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerSectionHeader,
     ServerCardPanel,
     ServerBlockDivider,
-    ServerAccordion,
     ServerColumn,
     ServerColumns,
     ServerBlockColumn,

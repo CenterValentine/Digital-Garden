@@ -38,11 +38,15 @@ import { BookmarkCard } from "./blocks/bookmark-card";
 import { TagCloud } from "./blocks/tag-cloud";
 // W11 blocks
 import { StatsTable } from "./blocks/stats-table";
+// Presentation blocks relocated from the core editor set
+import { Accordion } from "./blocks/accordion";
 
 export const publishingExtensionRuntime: ExtensionRuntime = {
   id: PUBLISHING_EXTENSION_ID,
   leftSidebarPanel: PublishingViewMode,
   editorClientExtensions: [
+    // Presentation
+    Accordion,
     // W2
     Gallery,
     HeroImage,

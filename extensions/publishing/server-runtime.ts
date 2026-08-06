@@ -35,10 +35,14 @@ import { ServerBookmarkCard } from "./blocks/bookmark-card";
 import { ServerTagCloud } from "./blocks/tag-cloud";
 // W11 blocks
 import { ServerStatsTable } from "./blocks/stats-table";
+// Presentation blocks relocated from the core editor set
+import { ServerAccordion } from "./blocks/accordion";
 
 export const publishingExtensionServerRuntime: ExtensionServerRuntime = {
   id: PUBLISHING_EXTENSION_ID,
   editorServerExtensions: [
+    // Presentation
+    ServerAccordion,
     // W2
     ServerGallery,
     ServerHeroImage,

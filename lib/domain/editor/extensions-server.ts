@@ -27,7 +27,6 @@ import { AiHighlight } from "./extensions/ai-highlight";
 import { ServerSectionHeader } from "./extensions/blocks/section-header";
 import { ServerCardPanel } from "./extensions/blocks/card-panel";
 import { ServerBlockDivider } from "./extensions/blocks/divider";
-import { ServerAccordion } from "./extensions/blocks/accordion";
 import { ServerColumn, ServerColumns } from "./extensions/blocks/columns";
 import { ServerBlockColumn, ServerBlockColumns } from "./extensions/blocks/block-columns";
 import { ServerTabPanel, ServerTabs } from "./extensions/blocks/tabs";
@@ -153,7 +152,6 @@ export function getServerExtensions(): Extensions {
     ServerSectionHeader,
     ServerCardPanel,
     ServerBlockDivider,
-    ServerAccordion,
     ServerColumn,
     ServerColumns,
     ServerBlockColumn,
