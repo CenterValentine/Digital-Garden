@@ -74,13 +74,18 @@ export function CoBrowseIndicator() {
     }
   };
 
+  // Theme-INDEPENDENT on purpose: a solid amber "the agent is driving" bar with
+  // near-black text, identical in light and dark. Light/dark variants washed out
+  // in the embed (its theme handling forced the dark text color onto a light
+  // background — "light font on light bg"). A warning/active banner should be
+  // loud and unambiguous regardless of theme, like the browser's own debug bar.
   return (
-    <div className="flex items-center gap-2 border-b border-amber-500/30 bg-amber-500/10 px-3 py-1.5 text-xs text-amber-900 dark:text-amber-100">
+    <div className="flex items-center gap-2 border-b border-amber-600 bg-amber-400 px-3 py-1.5 text-xs font-medium text-amber-950">
       <span className="relative flex h-2 w-2 shrink-0">
-        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75" />
-        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-800 opacity-75" />
+        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-800" />
       </span>
-      <span className="min-w-0 flex-1 truncate font-medium">
+      <span className="min-w-0 flex-1 truncate font-semibold">
         {waitUntil
           ? `⏱ ${waitLabel ? `${waitLabel} — ` : ""}${fmt(remaining)} left`
           : `Co-browsing${host ? ` — ${host}` : ""}`}
@@ -88,14 +93,14 @@ export function CoBrowseIndicator() {
       <button
         type="button"
         onClick={() => void coBrowseReveal()}
-        className="shrink-0 rounded px-1.5 py-0.5 font-medium hover:bg-amber-500/20"
+        className="shrink-0 rounded border border-amber-700/60 px-1.5 py-0.5 font-semibold text-amber-950 hover:bg-amber-300"
       >
         Show me
       </button>
       <button
         type="button"
         onClick={() => void stop()}
-        className="shrink-0 rounded bg-amber-600 px-2 py-0.5 font-semibold text-white hover:bg-amber-700"
+        className="shrink-0 rounded bg-amber-800 px-2 py-0.5 font-semibold text-white hover:bg-amber-900"
       >
         Stop
       </button>

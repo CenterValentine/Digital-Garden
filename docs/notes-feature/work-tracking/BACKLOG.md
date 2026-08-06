@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-03
+last_updated: 2026-08-05
 ---
 
 # Sprint Backlog
@@ -9,6 +9,14 @@ last_updated: 2026-08-03
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Per-item iteration + co-browse — follow-ups (2026-08-05, after the per-item-playbook-checkpoints PR)
+
+Surfaced during the reliability sweep; not blocking the PR:
+- **Restart-vs-recover by idempotency.** Co-browse session recovery re-attaches to the same tab (preserves in-progress state, e.g. a half-filled application). For URL-addressable/idempotent work (read iteration) a fresh re-open is simpler + safer; for stateful work (forms) re-attach is essential. Refinement: remember the last URL + whether an uncommitted action was in flight, and pick restart vs recover accordingly.
+- **Round-2 playbook chaining.** The URL-linked roll-up now *enables* "take the qualified set → run a resume-tailoring playbook over those exact pages" via the pasted-URLs enumeration source. New feature, not yet built.
+- **Broader NotePayload↔Y.Doc seam.** `updateNote` now reseeds the collab Y.Doc after a NotePayload write; audit other server write paths (imports, migrations, other tools) for the same "edit invisible in an open collab note" gap.
+- **PWA → extension co-browse handoff** (carried from Phase 2b) — co-browse is unavailable in the installed PWA (no side panel); a handoff to a browser tab is a nice-to-have.
 
 ## AI Block Authoring — follow-ups (2026-08-03, after the insert_block feature wraps)
 

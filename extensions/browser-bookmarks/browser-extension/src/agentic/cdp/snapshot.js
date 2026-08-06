@@ -8,7 +8,7 @@
 // boundaries natively, which is exactly why a11y-first targeting sidesteps
 // Playwright's shadow-piercing selectors (Category B, resolved cheaply).
 
-import { send, getChildSessions, getSession } from "./executor.js";
+import { send, getChildSessions, getSession, ensureSession, NO_SESSION_MESSAGE } from "./executor.js";
 
 // Roles the agent can act on. Deliberately broad but not exhaustive.
 const INTERACTABLE_ROLES = new Set([
@@ -103,12 +103,38 @@ function isChallengeFrame(url) {
   return CHALLENGE_FRAME_PATTERNS.some((p) => u.includes(p));
 }
 
-// Which currently-attached child frames are captcha/challenge frames — a pure URL
-// read over getChildSessions (no AX call). Callers surface `captchaDetected` to the
-// model so it can STOP and hand to the user instead of trying to solve a captcha.
+// ACTIVE, user-facing challenge frames — a NARROWER set than the suppression list
+// above. This is what raises `captchaDetected` (which HALTS the run), so it must
+// match only a challenge actually presented to the user, NOT the ambient,
+// invisible bot-scoring frames many sites load on every page. The false positive
+// this fixes (observed live): LinkedIn loads reCAPTCHA Enterprise's `anchor` frame
+// ambiently on jobs pages — no challenge shown — which halted a co-browse run.
+// reCAPTCHA: `bframe` is the challenge popup; `anchor`/api.js/webworker are
+// ambient. hCaptcha / FunCaptcha / DataDome challenge frames are interactive by
+// nature. Ambient scorers (PerimeterX, Turnstile-managed, reCAPTCHA v3) are
+// excluded here — their nodes are still suppressed above, they just don't HALT.
+const ACTIVE_CHALLENGE_PATTERNS = [
+  "/recaptcha/api2/bframe",
+  "/recaptcha/enterprise/bframe",
+  "hcaptcha.com/captcha",
+  "arkoselabs.com",
+  "funcaptcha.com",
+  "captcha-delivery.com", // DataDome interactive challenge
+];
+
+function isActiveChallengeFrame(url) {
+  if (!url) return false;
+  const u = url.toLowerCase();
+  return ACTIVE_CHALLENGE_PATTERNS.some((p) => u.includes(p));
+}
+
+// Which currently-attached child frames are ACTIVE captcha challenges — a pure URL
+// read over getChildSessions (no AX call). Callers surface `captchaDetected` so the
+// model STOPS and hands to the user. Uses the NARROW active-challenge test (not the
+// broad suppression list) so ambient bot-scoring frames don't falsely halt a run.
 export function detectChallenges() {
   const frames = getChildSessions()
-    .filter((f) => isChallengeFrame(f.url))
+    .filter((f) => isActiveChallengeFrame(f.url))
     .map((f) => f.url);
   return { captchaDetected: frames.length > 0, frames };
 }
@@ -164,11 +190,15 @@ async function collectFrame(out, groupState, sessionId, frameUrl) {
 // Each node carries a `group` (nearest container) so related elements cluster;
 // cross-frame nodes carry `sessionId`/`frameUrl`.
 export async function getA11ySnapshot() {
-  // Fail LOUD with no session. An empty snapshot when nothing is attached is a lie
-  // that reads as "no matches found" — it masked a forgot-to-attach during Slice 4
-  // de-risk, burning a debugging round. The AI path always attaches first, so this
-  // only ever fires for genuine misuse (or a session that ended mid-flight).
-  if (!getSession()) throw new Error("No active co-browse session — attach first.");
+  // Self-heal a session lost to SW eviction (ensureSession re-attaches to the
+  // persisted tab), then fail LOUD if there's genuinely nothing. An empty snapshot
+  // when nothing is attached is a lie that reads as "no matches found" — the guard
+  // must throw here (collectFrame swallows per-frame errors, so relying on send()'s
+  // recovery inside the loop would silently return []).
+  if (!getSession()) {
+    await ensureSession();
+    if (!getSession()) throw new Error(NO_SESSION_MESSAGE);
+  }
   const out = [];
   const groupState = { counter: 0 };
   await collectFrame(out, groupState, undefined, undefined); // top frame

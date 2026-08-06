@@ -135,6 +135,7 @@ import {
   coBrowseOpenTool,
   coBrowseActTool,
   readCurrentPageTool,
+  listTabsTool,
 } from "@/lib/domain/ai/tools/registry";
 import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
 import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
@@ -142,6 +143,7 @@ import {
   CO_BROWSE_OPEN,
   CO_BROWSE_ACT,
   READ_CURRENT_PAGE,
+  LIST_TABS,
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import { effectiveCapabilities } from "@/lib/domain/ai/features/capabilities";
 import { prisma } from "@/lib/database/client";
@@ -361,6 +363,42 @@ export async function POST(request: Request) {
               }
             } else if (
               p.type === "tool-record_research_findings" &&
+              p.state === "output-available"
+            ) {
+              budget = null; // run closed → back to default caps
+            }
+          }
+        }
+        return budget;
+      })();
+      // Per-item iteration (spec) — same shape as researchPageBudget: an active
+      // iteration (approved propose_item_iteration, not yet closed by
+      // record_iteration_findings) raises the step cap so the loop has room to
+      // process ALL its items in the run. Without this the default 7/8-step cap
+      // ends the turn after ~1 item, even though the client item budget allows N.
+      const itemIterationBudget = ((): number | null => {
+        const msgs = (body as { messages?: unknown }).messages;
+        if (!Array.isArray(msgs)) return null;
+        let budget: number | null = null;
+        for (const m of msgs) {
+          const parts = (m as { parts?: unknown }).parts;
+          if (!Array.isArray(parts)) continue;
+          for (const part of parts) {
+            const p = part as {
+              type?: string;
+              state?: string;
+              output?: { ok?: boolean; itemBudget?: number };
+            };
+            if (
+              p.type === "tool-propose_item_iteration" &&
+              p.state === "output-available"
+            ) {
+              const b = p.output?.itemBudget;
+              if (p.output?.ok && typeof b === "number" && Number.isFinite(b) && b > 0) {
+                budget = Math.min(Math.floor(b), 40);
+              }
+            } else if (
+              p.type === "tool-record_iteration_findings" &&
               p.state === "output-available"
             ) {
               budget = null; // run closed → back to default caps
@@ -1021,6 +1059,9 @@ export async function POST(request: Request) {
               // R1: read the tab the user is already on (content-script capture,
               // no new tab / no re-fetch) — distinct from read_page and co_browse_open.
               [READ_CURRENT_PAGE]: readCurrentPageTool,
+              // Per-item iteration spec, Enumeration sources: the user's open
+              // tabs (lean title+URL; explicit-ask-gated by description).
+              [LIST_TABS]: listTabsTool,
             }
           : {}),
       };
@@ -1573,6 +1614,23 @@ export async function POST(request: Request) {
                 typeof rawCurrentPage.title === "string" ? rawCurrentPage.title : "",
             }
           : null;
+      // The garden doc the user is actively VIEWING (focused content tab) — the
+      // internal twin of currentPage. Lets the model resolve "this note/doc"
+      // without the user naming it, and read it with getCurrentNote(contentId).
+      const rawViewedContent = body.viewedContent;
+      const viewedContentHint =
+        rawViewedContent &&
+        typeof rawViewedContent === "object" &&
+        typeof rawViewedContent.contentId === "string" &&
+        rawViewedContent.contentId.trim()
+          ? {
+              contentId: rawViewedContent.contentId,
+              title:
+                typeof rawViewedContent.title === "string"
+                  ? rawViewedContent.title
+                  : "",
+            }
+          : null;
 
       const toolsActive = Object.keys(tools).length > 0;
       const validatedPlaybookId = attachedPlaybookResolved
@@ -1653,6 +1711,12 @@ export async function POST(request: Request) {
         promptCachePolicy.providerOptions,
       );
 
+      // Turn start — for the generation-duration shown in the assistant avatar
+      // tooltip (attached on `finish` in messageMetadata below). Anchored here so
+      // it spans the whole turn (reasoning + tools + text), matching the wall
+      // time the user waited.
+      const turnStartMs = Date.now();
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
@@ -1676,11 +1740,17 @@ export async function POST(request: Request) {
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
         stopWhen: stepCountIs(
-          researchPageBudget != null
-            ? researchPageBudget * 2 + 4
-            : editableContentId
-              ? 8
-              : 7,
+          itemIterationBudget != null
+            ? // Each item ≈ read + record (+ optional re-read); +8 overhead for
+              // list_tabs / propose / roll-up createNote / record_iteration_findings.
+              // The client item budget is the true limiter (soft-stops new items);
+              // this is the safety ceiling that must not cut off before it.
+              itemIterationBudget * 4 + 8
+            : researchPageBudget != null
+              ? researchPageBudget * 2 + 4
+              : editableContentId
+                ? 8
+                : 7,
         ),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
@@ -1692,6 +1762,9 @@ export async function POST(request: Request) {
           hasCoBrowseTools: CO_BROWSE_OPEN in tools,
           hasReadCurrentPage: READ_CURRENT_PAGE in tools,
           hasResearchTools: "extract_structured" in tools,
+          hasListTabs: LIST_TABS in tools,
+          hasItemIteration: "propose_item_iteration" in tools,
+          viewedContentHint,
           // Runtime identity (v3.1): what this turn is ACTUALLY served by,
           // from live routing — so the model self-identifies from ground
           // truth. Prefer the connection's preset template name (matches
@@ -1991,6 +2064,9 @@ export async function POST(request: Request) {
                 outputTokens: part.totalUsage?.outputTokens,
                 totalTokens: part.totalUsage?.totalTokens,
               },
+              // Generation wall time for the avatar tooltip (persisted with the
+              // message, so it survives reload alongside usage).
+              durationMs: Date.now() - turnStartMs,
               finishReason: part.finishReason,
             };
           }

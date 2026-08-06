@@ -34,6 +34,7 @@ export const BASE_TOOL_IDS = [
   "getCurrentNote",
   "createNote",
   "updateNote",
+  "renameNote",
   "generate_image",
   "generate_speech",
   "notify_user",
@@ -102,7 +103,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
   },
   updateNote: {
     name: "Update Note",
-    description: "Update an existing note's content (and optionally its title)",
+    description: "Update an existing note's content (content only — never the title)",
+  },
+  renameNote: {
+    name: "Rename Note",
+    description: "Rename (retitle) an existing note, chat, or folder — title only",
   },
   generate_image: {
     name: "Generate Image",

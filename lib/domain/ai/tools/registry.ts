@@ -56,6 +56,8 @@ import {
 } from "./output-placement";
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
+import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
+import { logger } from "@/lib/core/logger";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -71,6 +73,8 @@ import {
   coBrowseActInputSchema,
   READ_CURRENT_PAGE_DESCRIPTION,
   readCurrentPageInputSchema,
+  LIST_TABS_DESCRIPTION,
+  listTabsInputSchema,
 } from "./co-browse-tools";
 
 /**
@@ -123,6 +127,18 @@ export const coBrowseActTool = tool({
 export const readCurrentPageTool = tool({
   description: READ_CURRENT_PAGE_DESCRIPTION,
   inputSchema: readCurrentPageInputSchema,
+});
+
+/**
+ * `list_tabs` — CLIENT-EXECUTED (no server `execute`), per-item iteration spec
+ * "Enumeration sources". Surfaces the user's open tabs (lean title+URL) so a
+ * tabs-as-curation iteration can enumerate them. Registered only when co-browse
+ * is available; privacy-gated by description (explicit ask only). The engine's
+ * onToolCall runs coBrowseListTabs through the trust-gated panel bridge.
+ */
+export const listTabsTool = tool({
+  description: LIST_TABS_DESCRIPTION,
+  inputSchema: listTabsInputSchema,
 });
 
 /**
@@ -425,6 +441,252 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ok: false,
             note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}).`,
           };
+        }
+      },
+    }),
+    // ── Per-item playbook iteration (level-2 controller; see the spec) ──────
+    // The HARNESS owns the loop; the playbook is the per-item unit. The ledger —
+    // not the model's memory — is the loop's authoritative state: one row per
+    // item, so "all N processed, none dropped" is a checkable claim. Mirrors the
+    // research-run trio (propose → per-step record → findings close); the client
+    // engine enforces the item budget the same way it enforces page budget.
+    propose_item_iteration: tool({
+      description:
+        "Propose a BOUNDED per-item iteration for the user to approve BEFORE processing: apply an analysis (usually an attached playbook) to EACH item in an enumerated set — jobs on a board (from collect), the user's open tabs (from list_tabs), or given URLs. " +
+        "Enumerate FIRST, then propose with the item list. On approval you receive an item budget, a ledger checklist (one row per item), and stable item keys. Process items IN ORDER, one at a time, recording EVERY item with record_item_result; finish with a roll-up (createNote) + record_iteration_findings. " +
+        "Skip this tool for a single item — just run the analysis directly.",
+      needsApproval: true,
+      inputSchema: z.object({
+        objective: z
+          .string()
+          .min(1)
+          .max(400)
+          .describe("What each item gets, in one sentence (e.g. \"score fit with the Job Fit playbook; document >75% matches\")."),
+        source: z
+          .enum(["list-page", "open-tabs", "urls"])
+          .describe("Where the items were enumerated from."),
+        items: z
+          .array(
+            z.object({
+              label: z.string().min(1).max(200).describe("Human label — title/company as shown."),
+              url: z.string().max(600).optional().describe("The item's own URL when known (tab URL, link href) — the strongest stable key."),
+            }),
+          )
+          .min(1)
+          .max(60)
+          .describe("The enumerated items, in processing order."),
+        itemCap: z
+          .number()
+          .int()
+          .min(1)
+          .max(40)
+          .describe("Max items to process this run (propose sensibly; the user can adjust before approving)."),
+        ledgerLabel: z
+          .string()
+          .max(120)
+          .optional()
+          .describe("Short label for the run's ledger; omit to derive from the objective."),
+      }),
+      execute: async ({ objective, source, items, itemCap, ledgerLabel }) => {
+        const label = (ledgerLabel ?? objective).trim();
+        const ledgerRunKey =
+          "iterate:" +
+          (label
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/^-+|-+$/g, "")
+            .slice(0, 60) || "items");
+        // Tiered stable key (spec Q2): the item's own URL when present (tier
+        // "url" — survives list re-renders/reshuffles), else a label slug (tier
+        // "label" — weaker; the tier is recorded so weak keys stay visible).
+        const seen = new Set<string>();
+        const normalized = items.map((it) => {
+          const base = it.url?.trim()
+            ? it.url.trim()
+            : it.label
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, "-")
+                .replace(/^-+|-+$/g, "")
+                .slice(0, 80) || "item";
+          let key = base;
+          for (let n = 2; seen.has(key); n++) key = `${base}~${n}`;
+          seen.add(key);
+          return {
+            key,
+            keyTier: it.url?.trim() ? ("url" as const) : ("label" as const),
+            label: it.label,
+            ...(it.url?.trim() ? { url: it.url.trim() } : {}),
+          };
+        });
+        const itemBudget = Math.min(itemCap, normalized.length);
+        let ledgerNodeId: string | null = null;
+        const placement = resolveToolOutputPlacement(ctx);
+        if (placement.parentId || placement.ownedByNoteId) {
+          try {
+            const ledger = await upsertRunLedger(
+              ctx.userId,
+              placement.parentId,
+              {
+                phase: "Iteration plan",
+                summary:
+                  `**Objective (per item):** ${objective}\n\n` +
+                  `**Source:** ${source} · **Budget:** ${itemBudget} of ${normalized.length} items\n\n` +
+                  `**Checklist:**\n${normalized
+                    .map(
+                      (n) =>
+                        `- [ ] ${n.url ? `[${n.label}](${n.url})` : n.label}${n.keyTier === "label" ? " *(weak key)*" : ""}`,
+                    )
+                    .join("\n")}`,
+                runTitle: label,
+                next: "Process items in order; record every item; reconcile at the end.",
+              },
+              { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+            );
+            ledgerNodeId = ledger.contentNodeId;
+            if (ctx.conversationId) {
+              void addAutoAssociation(
+                ctx.userId,
+                ctx.conversationId,
+                ledgerNodeId,
+                "tool-call",
+              ).catch(() => null);
+            }
+          } catch {
+            // Ledger is best-effort — the run can still proceed without it.
+          }
+        }
+        return {
+          ok: true,
+          ledgerRunKey,
+          ledgerNodeId,
+          objective,
+          source,
+          itemBudget,
+          items: normalized,
+          nextAction:
+            `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/playbook applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
+            `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
+            `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, write the roll-up (createNote: a short summary + a markdown table of items/verdicts) and close with record_iteration_findings. ` +
+            `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
+        };
+      },
+    }),
+    // Per-item record — the checklist advance. One call per item, every item,
+    // including failures: an unreadable item is RECORDED, never silently skipped
+    // (a silent skip is the failure mode that breaks "all documented").
+    record_item_result: tool({
+      description:
+        "Record ONE item's outcome in the iteration ledger. Call after finishing EACH item of an approved propose_item_iteration run — including items you could NOT read (status unreadable/blocked). Never skip an item silently. ALWAYS pass the item's `url` so the ledger links to the source page (the user can click through, and a follow-up run can revisit it).",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
+        itemKey: z.string().min(1).max(600).describe("The item's key from the approved run's items list."),
+        itemLabel: z.string().max(200).optional().describe("The item's label (for the ledger line)."),
+        url: z
+          .string()
+          .max(600)
+          .optional()
+          .describe("The item's source URL (from the approved items list / the page you read). ALWAYS include it when known — the ledger renders it as a clickable link so the page can be revisited."),
+        status: z
+          .enum(["done", "unreadable", "blocked"])
+          .describe("done = analyzed; unreadable = page could not be read; blocked = an obstacle (login/captcha) stopped this item."),
+        qualified: z.boolean().optional().describe("Whether the item met the objective's bar (e.g. fit > 75%)."),
+        fitPercent: z.number().min(0).max(100).optional().describe("Numeric score when the objective scores items."),
+        verdict: z.string().max(1000).optional().describe("One-to-three sentence rationale for this item."),
+        artifactTitle: z.string().max(200).optional().describe("Title of any per-item note you created."),
+      }),
+      execute: async ({ ledgerRunKey, itemKey, itemLabel, url, status, qualified, fitPercent, verdict, artifactTitle }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        if (!placement.parentId && !placement.ownedByNoteId) {
+          return { ok: false, note: "No target folder set, so no ledger was written. Continue the run; reconcile in the roll-up." };
+        }
+        // Prefer an explicit url; fall back to itemKey when it IS a url (url-tier
+        // stable key). A linked heading makes the runbook click-through-able and
+        // lets a round-2 run re-read the source pages.
+        const linkUrl = url?.trim() || (/^https?:\/\//.test(itemKey) ? itemKey : "");
+        const label = itemLabel ?? itemKey;
+        const heading = linkUrl ? `[${label}](${linkUrl})` : `**${label}**`;
+        const line =
+          `${heading} — ${status}` +
+          (typeof fitPercent === "number" ? ` · fit ${Math.round(fitPercent)}%` : "") +
+          (qualified === true ? " · **qualified**" : qualified === false ? " · not qualified" : "") +
+          (verdict ? `\n\n${verdict}` : "");
+        try {
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: `Item: ${(itemLabel ?? itemKey).slice(0, 80)}`,
+              summary: line,
+              artifacts: artifactTitle ? [artifactTitle] : undefined,
+              next: "Next pending item (or reconcile if none remain).",
+            },
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          return {
+            ok: true,
+            recorded: itemKey,
+            status,
+            ledgerNodeId: ledger.contentNodeId,
+            // Continuation directive after EVERY item — the run must not stall
+            // here (observed live: model recorded 1 item then asked "shall I
+            // continue?"). This is a server tool so the model keeps going in the
+            // same turn; push it to the next item, not to the user.
+            next: "Recorded. Do NOT stop or ask the user whether to continue — immediately move to the NEXT item now (open/read it, then record it). Only once EVERY item is recorded do you write the roll-up (createNote) and call record_iteration_findings.",
+          };
+        } catch (error) {
+          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
+        }
+      },
+    }),
+    // Close the iteration — the reconciliation record. Clears the client-side
+    // item budget (the engine watches for this result, as with research runs).
+    record_iteration_findings: tool({
+      description:
+        "Close an iteration run: record the reconciliation (processed / qualified / unreadable counts + summary) in its ledger. Call AFTER the roll-up note (createNote), passing the ledgerRunKey from propose_item_iteration.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
+        resultSummary: z.string().min(1).max(4000).describe("Short markdown reconciliation: what was processed and what qualified."),
+        processedCount: z.number().int().min(0).describe("Items actually processed (recorded)."),
+        qualifiedCount: z.number().int().min(0).optional().describe("Items that met the bar."),
+        unreadableItems: z.array(z.string()).max(60).optional().describe("Keys/labels of items that could not be read or were blocked."),
+        rollupTitle: z.string().max(200).optional().describe("Title of the roll-up note, recorded as the run's artifact."),
+      }),
+      execute: async ({ ledgerRunKey, resultSummary, processedCount, qualifiedCount, unreadableItems, rollupTitle }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        if (!placement.parentId && !placement.ownedByNoteId) {
+          return { ok: false, note: "No target folder set, so no ledger was written. The roll-up note still landed." };
+        }
+        const summary =
+          resultSummary.trim() +
+          `\n\n**Processed:** ${processedCount}` +
+          (typeof qualifiedCount === "number" ? ` · **Qualified:** ${qualifiedCount}` : "") +
+          (unreadableItems?.length
+            ? `\n\n**Unreadable/blocked (${unreadableItems.length}):**\n${unreadableItems.map((u) => `- ${u}`).join("\n")}`
+            : "");
+        try {
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: "Reconciliation",
+              summary,
+              artifacts: rollupTitle ? [rollupTitle] : undefined,
+              next: "Run complete.",
+              tokensSoFar: ctx.runTokens?.total,
+            },
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          if (ctx.conversationId) {
+            void addAutoAssociation(
+              ctx.userId,
+              ctx.conversationId,
+              ledger.contentNodeId,
+              "tool-call",
+            ).catch(() => null);
+          }
+          return { ok: true, ledgerNodeId: ledger.contentNodeId };
+        } catch (error) {
+          return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}).` };
         }
       },
     }),
@@ -1158,7 +1420,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
         "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "RENAME RULE: do NOT set the `title` argument unless the user EXPLICITLY asks to rename (e.g. 'rename this to X'). Mentioning a topic or theme is NOT a rename request. NEVER set `title` when the target is the user's open chat — renaming a chat while updating its notes is wrong.",
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update.",
       inputSchema: z.object({
         contentId: z
           .string()
@@ -1172,16 +1434,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Full new markdown content for the notes. This replaces the current notes; if the user wants to append, include the existing content in this string.",
           ),
-        title: z
-          .string()
-          .min(1)
-          .max(255)
-          .optional()
-          .describe(
-            "New title for the content. ONLY set this if the user explicitly asked to rename. NEVER set when updating a chat's notes.",
-          ),
       }),
-      execute: async ({ contentId, content, title }) => {
+      execute: async ({ contentId, content }) => {
         // Allow updateNote against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
@@ -1198,13 +1452,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
         }
 
-        // Hard rename-guard: never rename when the target IS the active
-        // chat. This protects against the AI inferring a title from the
-        // user's update prompt and silently rewriting the chat's name.
-        const isUpdatingActiveChat =
-          ctx.chatContentId !== undefined && contentId === ctx.chatContentId;
-        const titleToApply = isUpdatingActiveChat ? undefined : title;
-
+        // updateNote is CONTENT-ONLY — it structurally cannot rename. (Renaming
+        // lives in the separate `renameNote` tool.) The former `title` argument
+        // was removed after it caused a silent rename: the model serialized this
+        // tool's own "do NOT … rename" guard text into the title field
+        // ("/do-not-rename/"). No title param = nothing to bleed in.
         const conversion = markdownToTiptapResult(content);
         const tiptapJson = conversion.json;
         const searchText = extractSearchTextFromTipTap(tiptapJson);
@@ -1240,10 +1492,31 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             },
           },
         });
-        if (titleToApply) {
-          await prisma.contentNode.update({
-            where: { id: contentId },
-            data: { title: titleToApply },
+
+        // Realign the collaborative Y.Doc with the payload we just wrote.
+        // updateNote writes NotePayload directly (bypassing collab), so for a
+        // collab-enabled note a stale-but-non-empty CollaborationDocument wins at
+        // bootstrap and the AI's edit stays INVISIBLE in the open editor — the
+        // NotePayload↔Y.Doc seam (DB-confirmed live). Guarded to notes that
+        // ALREADY have a collab doc: that's the only case divergence can happen
+        // (a note with no collab doc seeds fresh FROM NotePayload on first open),
+        // so we never enable collab on a note that wasn't. Non-fatal: NotePayload
+        // is the durable source of truth, so a reseed failure can't fail the write.
+        try {
+          const hasCollabDoc = await prisma.collaborationDocument.findUnique({
+            where: { contentId },
+            select: { contentId: true },
+          });
+          if (hasCollabDoc) {
+            await reseedCollaborationDocumentFromNote(prisma, contentId);
+          }
+        } catch (error) {
+          logger.error({
+            layer: "ai",
+            event: "update_note:reseed_failed",
+            summary: "failed to reseed collaboration doc after updateNote write",
+            attrs: { content_id: contentId },
+            error,
           });
         }
 
@@ -1251,8 +1524,62 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           __notePayload: true,
           kind: "updated",
           contentId: existing.id,
-          title: titleToApply ?? existing.title,
+          title: existing.title, // unchanged — updateNote never renames
           wordCount,
+          targetKind: existing.contentType,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            existing.id,
+            "updated",
+            existing.contentType === "note" ? "note" : "notes",
+          )),
+        });
+      },
+    }),
+
+    // Explicit, standalone RENAME. Split out from updateNote (2026-08-05): a
+    // title argument on a content-update tool let the model rename as a side
+    // effect — and worse, it serialized updateNote's own "do NOT … rename" guard
+    // text into the title ("/do-not-rename/"). Renaming is now its own deliberate
+    // action the user must ask for; content updates can't touch the title.
+    renameNote: tool({
+      description:
+        "Rename (retitle) an existing note, chat, folder, or other content the user owns. " +
+        "Use ONLY when the user EXPLICITLY asks to rename or retitle something (e.g. 'rename this to X', 'call this note Y'). " +
+        "This changes the TITLE ONLY and never touches content — do not use it as part of a content update (use updateNote for content). Mentioning a topic or theme is NOT a rename request.",
+      inputSchema: z.object({
+        contentId: z
+          .string()
+          .uuid()
+          .describe("UUID of the content to rename."),
+        title: z
+          .string()
+          .min(1)
+          .max(255)
+          .describe("The new title, exactly as the user asked. Do not invent or decorate it."),
+      }),
+      execute: async ({ contentId, title }) => {
+        const newTitle = title.trim();
+        if (!newTitle) {
+          return "A non-empty title is required to rename.";
+        }
+        const existing = await prisma.contentNode.findFirst({
+          where: { id: contentId, ownerId: ctx.userId, deletedAt: null },
+          select: { id: true, title: true, contentType: true },
+        });
+        if (!existing) {
+          return `Content "${contentId}" not found or deleted. Use searchNotes to find the right id.`;
+        }
+        await prisma.contentNode.update({
+          where: { id: contentId },
+          data: { title: newTitle },
+        });
+        return JSON.stringify({
+          __notePayload: true,
+          kind: "renamed",
+          contentId: existing.id,
+          title: newTitle,
+          previousTitle: existing.title,
           targetKind: existing.contentType,
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
