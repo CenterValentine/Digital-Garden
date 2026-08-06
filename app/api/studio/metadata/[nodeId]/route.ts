@@ -23,8 +23,10 @@ import {
   getMetadataForNode,
   resolveRoleStrategyProposal,
   saveDirectives,
+  setContextMode,
   setContextOptOut,
 } from "@/lib/domain/ai-context/metadata";
+import { ContextMode } from "@/lib/database/generated/prisma";
 import { refreshScope } from "@/lib/domain/ai-context/context-refresh";
 import { getStudioSettings } from "@/extensions/studio/settings";
 
@@ -44,7 +46,14 @@ interface PutBody {
   roleStrategyAction?: "accept" | "dismiss";
   /** Privacy toggle: AI context stops reading this node. */
   contextOptOut?: boolean;
+  /**
+   * Context investment ladder (plan D6): explicit mode override, or null to
+   * inherit from the nearest explicit ancestor.
+   */
+  contextMode?: ContextMode | null;
 }
+
+const CONTEXT_MODES = new Set<string>(Object.values(ContextMode));
 
 export async function GET(
   request: NextRequest,
@@ -119,10 +128,20 @@ export async function PUT(
           body.contextOptOut
         );
       }
+      if (body.contextMode !== undefined) {
+        if (body.contextMode !== null && !CONTEXT_MODES.has(body.contextMode)) {
+          return NextResponse.json(
+            { success: false, error: "Invalid contextMode" },
+            { status: 400 }
+          );
+        }
+        view = await setContextMode(session.user.id, nodeId, body.contextMode);
+      }
       if (
         view === null &&
         typeof body.directives !== "string" &&
-        typeof body.contextOptOut !== "boolean"
+        typeof body.contextOptOut !== "boolean" &&
+        body.contextMode === undefined
       ) {
         return NextResponse.json(
           { success: false, error: "No supported operation in body" },
