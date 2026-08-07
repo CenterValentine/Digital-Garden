@@ -47,7 +47,7 @@ const PANEL_DISABLED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
 // The sidebar strip is drag-resizable but CLAMPED so it never starves the
 // workspace or gets too cramped to use. Fraction of the split's height.
 const SIDEBAR_MIN_FRAC = 0.22;
-const SIDEBAR_MAX_FRAC = 0.67;
+const SIDEBAR_MAX_FRAC = 0.74;
 const SIDEBAR_DEFAULT_FRAC = 0.4;
 const SIDEBAR_FRAC_KEY = "dg-panel-sidebar-frac";
 // B3-B settle window: how long a page URL must hold steady before auto-linking

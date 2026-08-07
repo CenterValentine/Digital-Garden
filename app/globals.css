@@ -176,6 +176,11 @@ body:has(.embed-layout-page) {
 #embed-root .dg-sidebar-chat-tabs {
   padding-top: 0.125rem; /* pt-0.5, from pt-1.5 */
 }
+/* Conversation tabs: a touch shorter (~4px). */
+#embed-root .dg-chat-tab {
+  padding-top: 0.25rem; /* py-1, from py-1.5 */
+  padding-bottom: 0.25rem;
+}
 
 /* Radix menus/popovers/selects portal to <body>, i.e. OUTSIDE #embed-root —
  * which is fixed-positioned at z-index:100. Portalled content ships at z-50,

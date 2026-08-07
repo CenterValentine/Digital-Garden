@@ -301,7 +301,7 @@ function TabButton({
       tabIndex={active ? 0 : -1}
       aria-label={`Conversation: ${label}${active ? " (active)" : ""}`}
       className={cn(
-        "group/tab relative inline-flex items-center gap-1 px-2.5 py-1.5",
+        "dg-chat-tab group/tab relative inline-flex items-center gap-1 px-2.5 py-1.5",
         "rounded-t-md border border-b-0 text-[11px] transition-colors max-w-[180px] shrink-0",
         // Visible keyboard-focus ring for SR/keyboard users.
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60",
