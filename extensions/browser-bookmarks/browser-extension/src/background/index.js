@@ -1821,8 +1821,17 @@ let panelPort = null;
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "dg-panel") return;
   panelPort = port;
+  // Durable open-flag: `panelPort` is nulled whenever the service worker is
+  // evicted — which Chrome does even while the side panel is open — so an
+  // in-memory-only check reports "closed" on a cold wake, and the "both" handle
+  // then re-opens (toggling the real panel shut = the swap). chrome.storage.session
+  // survives eviction: set true on connect, false only on a genuine disconnect
+  // (which runs in a live SW; an eviction kills the SW without firing it, so the
+  // flag correctly stays true across eviction).
+  void chrome.storage.session.set({ dgPanelOpen: true }).catch(() => {});
   port.onDisconnect.addListener(() => {
     if (panelPort === port) panelPort = null;
+    void chrome.storage.session.set({ dgPanelOpen: false }).catch(() => {});
   });
 });
 
@@ -2482,7 +2491,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // Panel-open state — only the background knows (via its port). The overlay's
   // "both"/panel handles query this to decide open-vs-close.
   if (message.type === "get-panel-state") {
-    sendResponse({ ok: true, data: { open: panelPort != null } });
+    // Prefer the live port; fall back to the durable flag so a service-worker
+    // eviction (panelPort reset to null while the panel is still open) doesn't
+    // wrongly report "closed" and make the "both" handle toggle the panel shut.
+    if (panelPort != null) {
+      sendResponse({ ok: true, data: { open: true } });
+      return true;
+    }
+    chrome.storage.session
+      .get("dgPanelOpen")
+      .then((r) => sendResponse({ ok: true, data: { open: r?.dgPanelOpen === true } }))
+      .catch(() => sendResponse({ ok: true, data: { open: false } }));
     return true;
   }
 
