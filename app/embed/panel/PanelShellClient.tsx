@@ -15,6 +15,7 @@ import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { RightSidebar } from "@/components/content/RightSidebar";
 import { STUDIO_TAB_KEY } from "@/extensions/studio/manifest";
 import { DeferredStoreHydrator } from "@/lib/features/stores/deferred-store-hydrator";
+import { PanelRightOpen } from "lucide-react";
 import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -39,13 +40,14 @@ import { useExtensionShellNavigationControls } from "@/lib/extensions/client-reg
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
 // The panel = content workspace (top) + the real RightSidebar as a bottom strip
-// (chat + backlinks/outline/tags). Studio is trimmed — heavy for a short strip.
-// Module constant so RightSidebar's tab memo stays referentially stable.
-const PANEL_EXCLUDED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
+// (chat + backlinks/outline/tags). Studio shows but DISABLED here (dimmed +
+// unresponsive) — it doesn't belong in the compact strip, but cutting it left an
+// odd gap. Module constant so the tab memo/props stay referentially stable.
+const PANEL_DISABLED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
 // The sidebar strip is drag-resizable but CLAMPED so it never starves the
 // workspace or gets too cramped to use. Fraction of the split's height.
 const SIDEBAR_MIN_FRAC = 0.22;
-const SIDEBAR_MAX_FRAC = 0.62;
+const SIDEBAR_MAX_FRAC = 0.67;
 const SIDEBAR_DEFAULT_FRAC = 0.4;
 const SIDEBAR_FRAC_KEY = "dg-panel-sidebar-frac";
 // B3-B settle window: how long a page URL must hold steady before auto-linking
@@ -671,42 +673,30 @@ export function PanelShellClient({
           </div>
 
           {isRightCollapsed ? (
-            // Collapsed: a slim re-open bar (the `>|` toggle is hidden with the
-            // strip, so this is how the user brings it back).
-            <button
-              type="button"
-              onClick={toggleRightCollapsed}
-              title="Show sidebar"
-              aria-label="Show sidebar"
+            // Collapsed: a slim bar with the same toggle button (app style), at
+            // the right edge — right where it collapsed from — so the re-open is
+            // exactly where the `>|` was.
+            <div
               style={{
                 flexShrink: 0,
-                height: 28,
+                height: 30,
                 display: "flex",
                 alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-                border: 0,
+                justifyContent: "flex-end",
+                padding: "0 8px",
                 borderTop: "1px solid var(--border-primary, #2a2a2a)",
-                background: "transparent",
-                color: "var(--text-secondary, #9a9a9a)",
-                cursor: "pointer",
-                fontSize: 11,
               }}
             >
-              <svg
-                width="14"
-                height="14"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              <button
+                type="button"
+                onClick={toggleRightCollapsed}
+                title="Show sidebar (Cmd+.)"
+                aria-label="Show sidebar"
+                className="shrink-0 rounded p-1 text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gold-primary dark:text-gray-400 dark:hover:bg-white/10"
               >
-                <path d="m18 15-6-6-6 6" />
-              </svg>
-              Sidebar
-            </button>
+                <PanelRightOpen className="h-4 w-4" />
+              </button>
+            </div>
           ) : (
             <>
               {/* Drag handle — resize the sidebar strip within its clamped range. */}
@@ -737,7 +727,7 @@ export function PanelShellClient({
                   overflow: "hidden",
                 }}
               >
-                <RightSidebar excludeTabs={PANEL_EXCLUDED_SIDEBAR_TABS} />
+                <RightSidebar disabledTabs={PANEL_DISABLED_SIDEBAR_TABS} />
               </div>
             </>
           )}

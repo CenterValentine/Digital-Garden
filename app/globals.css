@@ -166,11 +166,15 @@ body:has(.embed-layout-page) {
  * Scoped to the embed so the main app's sidebar keeps its full padding. Modest
  * on purpose — leaves breathing room, doesn't crush the tap targets. */
 #embed-root .dg-rightsidebar-tabs {
-  height: 2.5rem; /* h-10, from h-12 */
+  height: 2.25rem; /* h-9, from h-12 */
 }
 #embed-root .dg-rightsidebar-tabs button {
-  padding-top: 0.5rem; /* py-2, from py-3 */
-  padding-bottom: 0.5rem;
+  padding-top: 0.375rem; /* py-1.5, from py-3 */
+  padding-bottom: 0.375rem;
+}
+/* Chat conversation-tab bar: shave its top padding too. */
+#embed-root .dg-sidebar-chat-tabs {
+  padding-top: 0.125rem; /* pt-0.5, from pt-1.5 */
 }
 
 /* Radix menus/popovers/selects portal to <body>, i.e. OUTSIDE #embed-root —

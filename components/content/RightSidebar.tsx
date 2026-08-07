@@ -30,14 +30,18 @@ import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
 interface RightSidebarProps {
   /**
-   * Tab keys to hide regardless of extension state — used by the compact panel
-   * embed to trim heavy tabs (e.g. Studio) that don't fit a short bottom strip.
-   * Pass a referentially-stable array (a module constant) so the memo stays put.
+   * Tab keys to hide regardless of extension state. Pass a referentially-stable
+   * array (a module constant) so the memo stays put.
    */
   excludeTabs?: string[];
+  /**
+   * Tab keys to render disabled (visible but dimmed + unresponsive) — the panel
+   * embed does this for Studio.
+   */
+  disabledTabs?: string[];
 }
 
-export function RightSidebar({ excludeTabs }: RightSidebarProps = {}) {
+export function RightSidebar({ excludeTabs, disabledTabs }: RightSidebarProps = {}) {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -117,6 +121,7 @@ export function RightSidebar({ excludeTabs }: RightSidebarProps = {}) {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         disabled={!rightPanelReady}
+        disabledTabs={disabledTabs}
       />
 
       {/* Preference loader until the persisted last-seen view is known

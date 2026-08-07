@@ -67,9 +67,19 @@ interface RightSidebarHeaderProps {
    * (spec §3.4) — prevents the "clickable but no-op / wrong tab" window.
    */
   disabled?: boolean;
+  /**
+   * Specific tab keys to render disabled (dimmed + unresponsive) while still
+   * showing them — e.g. Studio in the compact panel embed.
+   */
+  disabledTabs?: string[];
 }
 
-export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }: RightSidebarHeaderProps) {
+export function RightSidebarHeader({
+  activeTab,
+  onTabChange,
+  disabled = false,
+  disabledTabs,
+}: RightSidebarHeaderProps) {
   const { toggleCollapsed } = useRightPanelCollapseStore();
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -122,13 +132,15 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
           const svgPath = TAB_SVG_PATHS[tabKey];
           if (!svgPath) return null;
 
+          const tabDisabled = disabled || (disabledTabs?.includes(tabKey) ?? false);
+
           return (
             <button
               key={tool.id}
               onClick={() => onTabChange(tabKey)}
-              disabled={disabled}
+              disabled={tabDisabled}
               className={`flex flex-1 items-center justify-center px-4 py-3 transition-colors ${
-                disabled ? "cursor-default opacity-40" : ""
+                tabDisabled ? "cursor-not-allowed opacity-40" : ""
               } ${
                 activeTab === tabKey
                   ? "border-b-2 border-gold-primary text-gold-primary"
