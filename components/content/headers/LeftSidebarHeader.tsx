@@ -7,6 +7,8 @@
 
 "use client";
 
+import { useEffect } from "react";
+
 import { useSearchStore } from "@/state/search-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -66,7 +68,12 @@ export function LeftSidebarHeader({
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const pathname = usePathname();
-  const isPanelEmbed = pathname?.startsWith("/embed/panel") ?? false;
+  // Both the side panel (/embed/panel) and the right-side tree overlay
+  // (/embed/tree) are compact extension surfaces that drop the full nav-tab row.
+  const isPanelEmbed =
+    (pathname?.startsWith("/embed/panel") ||
+      pathname?.startsWith("/embed/tree")) ??
+    false;
   const extensionNavItems = useExtensionHeaderNavItems();
   const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
@@ -81,6 +88,18 @@ export function LeftSidebarHeader({
     activeView === "search" ||
     activeView === "recents" ||
     subAffordanceIds.has(activeView);
+
+  // Panel embed hides the main nav-tab row (inbox/people/calendar/extensions
+  // etc.) to reclaim vertical space, keeping only the files section + its
+  // search/recents sub-row. But activeView is persisted per embed context —
+  // if the user last left it on a now-hidden view, there'd be no affordance to
+  // switch back and the tree (plus the sub-row) would vanish. Pin it back to
+  // "files" whenever the embed is stranded outside the files section.
+  useEffect(() => {
+    if (isPanelEmbed && !showFilesSection) {
+      setActiveView("files");
+    }
+  }, [isPanelEmbed, showFilesSection, setActiveView]);
 
   const headerExtensionItems = extensionNavItems.filter(({ item }) => {
     if (item.type === "action") return !subAffordanceIds.has(item.id);
@@ -104,7 +123,11 @@ export function LeftSidebarHeader({
 
   return (
     <div className="flex flex-col shrink-0 bg-white dark:bg-transparent">
-      {/* Main header row */}
+      {/* Main header row — the extension nav tabs (files/inbox/people/calendar/
+          workflows/studio/extensions). Hidden in the side-panel embed to
+          reclaim its vertical space; the files section + search/recents sub-row
+          below become the panel's only left-nav chrome (panel UI polish). */}
+      {!isPanelEmbed && (
       <div className="flex h-12 shrink-0 items-end pb-0 px-2 gap-1">
         <div className="scrollbar-hide flex min-w-0 flex-1 items-center gap-1 overflow-x-auto">
 
@@ -224,6 +247,7 @@ export function LeftSidebarHeader({
           </div>
         )}
       </div>
+      )}
 
       {/* Sub-affordance row — visible for any view in the files section */}
       {/* Gray bridge closes the visual gap between the main row and sub-row */}

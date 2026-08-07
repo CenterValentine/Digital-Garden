@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-06
+last_updated: 2026-08-07
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 7, 2026**: **Browser Extension V5 — Browser UI Overhaul** (Panel Overlay: tree-as-overlay, reclaimed sidebar, pin + link handles, slim panel chrome) (branch `feat/panel-tree-overlay`; ext 4.2.x → **5.0.0**; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR #152)
+
+The extension's file tree moves to a right-side on-page overlay; the side panel reuses the real content workspace + the real `RightSidebar` (chat + backlinks/outline/tags) as a resizable, clamped bottom strip (Studio disabled). A minimal handle cluster — both / panel / tree / **pin** / **link** / AI — with movable collapsed re-open handles (independent app vs panel localStorage keys). **Pin** files the current page under the selected folder (panel resolves target, background writes with the bearer token); **Link** associates the page with the content open in the panel; both flash persistent green cleared on navigation. Co-browse verified surface-gated (no schema). See `work-tracking/PANEL-OVERLAY-PLAN.md`.
 
 **August 6, 2026**: **Workspaces — folder-scope borrow/share decisions now stick** (direct to `main`; typecheck/lint(151)/build green)
 

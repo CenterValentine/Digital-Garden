@@ -1818,13 +1818,43 @@ chrome.runtime.onInstalled.addListener(async () => {
 // synchronous, so openAiChatPanel can branch without an await (which would
 // consume the user gesture that authorizes sidePanel.open).
 let panelPort = null;
+
+// Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
+// belief and never has to query it at click time. That matters because
+// chrome.sidePanel.open() needs a live user gesture, and an async state query
+// between the click and the open consumes the gesture — the open then silently
+// fails (the "both"/panel handle looks dead, especially after a manual close).
+// Also persists to chrome.storage.session so the belief survives service-worker
+// eviction (which nulls the in-memory `panelPort` even while the panel is open).
+function broadcastPanelState(open) {
+  void chrome.storage.session.set({ dgPanelOpen: open }).catch(() => {});
+  chrome.tabs.query({}, (tabs) => {
+    if (chrome.runtime.lastError) return;
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      chrome.tabs.sendMessage(tab.id, { type: "dg-panel-state", open }, () => {
+        void chrome.runtime.lastError; // no overlay in that tab — ignore
+      });
+    }
+  });
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "dg-panel") return;
   panelPort = port;
+  broadcastPanelState(true);
   port.onDisconnect.addListener(() => {
+    // A genuine close runs this in a live SW → false. An eviction kills the SW
+    // without firing it, so the persisted flag stays true across eviction.
     if (panelPort === port) panelPort = null;
+    broadcastPanelState(false);
   });
 });
+
+// Pin quick-add: an overlay's `pin-add` response is held open while the panel
+// resolves the target folder (it owns the selection) and posts `pin-resolved`
+// back. Keyed by the requesting tab id so concurrent tabs don't collide.
+const pendingPinResolves = new Map();
 
 // Open the side panel on the Chat view for `tab` — or, if the panel is already
 // open, switch it to Chat in place. Re-calling sidePanel.open() on an open
@@ -2461,9 +2491,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // tabId toggles/collapses it (learned in B2's chat-panel work); windowId
     // reveals it for the whole window. tabId is only a last resort.
     const target = windowId != null ? { windowId } : { tabId };
+    // Re-enable in case a previous close disabled the panel. Fire-and-forget (no
+    // await) so the gesture-critical open() below still runs synchronously.
+    chrome.sidePanel.setOptions({ path: "panel.html", enabled: true }).catch(() => {});
     chrome.sidePanel
       .open(target)
-      .then(() => sendResponse({ ok: true, data: true }))
+      .then(() => {
+        broadcastPanelState(true);
+        sendResponse({ ok: true, data: true });
+      })
       .catch((error) => {
         console.warn("[DG Bookmarks] open-side-panel failed", error, target);
         sendResponse({
@@ -2471,6 +2507,192 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           error: error instanceof Error ? error.message : "Failed to open side panel",
         });
       });
+    return true;
+  }
+
+  // Panel-open state — only the background knows (via its port). The overlay's
+  // "both"/panel handles query this to decide open-vs-close.
+  if (message.type === "get-panel-state") {
+    // Prefer the live port; fall back to the durable flag so a service-worker
+    // eviction (panelPort reset to null while the panel is still open) doesn't
+    // wrongly report "closed" and make the "both" handle toggle the panel shut.
+    if (panelPort != null) {
+      sendResponse({ ok: true, data: { open: true } });
+      return true;
+    }
+    chrome.storage.session
+      .get("dgPanelOpen")
+      .then((r) => sendResponse({ ok: true, data: { open: r?.dgPanelOpen === true } }))
+      .catch(() => sendResponse({ ok: true, data: { open: false } }));
+    return true;
+  }
+
+  // Close the side panel. MV3 has no sidePanel.close(), and window.close() inside
+  // the panel page is ignored by many Chrome builds (the tree closed but the
+  // panel didn't). Disabling the panel closes it reliably; re-enable immediately
+  // after so it can be opened again (enabling does NOT auto-open it).
+  if (message.type === "close-side-panel") {
+    // setOptions({enabled:false}) does NOT close an open panel in every Chrome
+    // build (it didn't here). The reliable close is to tell the panel PAGE to
+    // close itself via window.close(), delivered by broadcast so it arrives
+    // regardless of the dg-panel port. Keep the disable as a belt-and-suspenders;
+    // the open path re-enables before opening.
+    chrome.runtime.sendMessage({ type: "dg-close-panel" }, () => void chrome.runtime.lastError);
+    chrome.sidePanel.setOptions({ enabled: false }).catch((error) => {
+      console.warn("[DG Bookmarks] close-side-panel failed", error);
+    });
+    panelPort = null;
+    broadcastPanelState(false);
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Pin quick-add (step 1): the overlay's pin fired. Only the panel knows the
+  // selection, so relay there and HOLD this response until the panel resolves
+  // the target folder (pin-resolved, step 2). Panel closed → no target; the
+  // overlay opens the tree so the user can pick a folder instead.
+  if (message.type === "pin-add") {
+    const tabId = sender.tab?.id ?? null;
+    if (!panelPort) {
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    pendingPinResolves.set(tabId, sendResponse);
+    try {
+      panelPort.postMessage({
+        type: "pin-add",
+        tabId,
+        mode: message.payload?.mode === "associate" ? "associate" : "folder",
+        url: message.payload?.url ?? null,
+        title: message.payload?.title ?? null,
+      });
+    } catch {
+      panelPort = null;
+      pendingPinResolves.delete(tabId);
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    return true; // keep the channel open for the panel's async pin-resolved
+  }
+
+  // Pin quick-add (step 2): the panel resolved the target folder. Create the
+  // external link with the bearer token (the panel is session-authed and can't),
+  // then fulfil the held overlay response so the pin can flash success/open tree.
+  if (message.type === "pin-resolved") {
+    const tabId = message.tabId ?? null;
+    const resolve = pendingPinResolves.get(tabId);
+    pendingPinResolves.delete(tabId);
+    if (!resolve) {
+      sendResponse({ ok: true, data: true });
+      return true;
+    }
+    if (message.noTarget) {
+      resolve({ ok: true, data: { noTarget: true } });
+    } else if (message.contentId) {
+      // Hold → link the page to the OPEN content. Resolve a webResourceId first
+      // (same as the note-link path), then associate — so the green means the
+      // link actually exists.
+      (async () => {
+        try {
+          const context = await fetchResourceContext({
+            url: message.url ?? null,
+            canonicalUrl: null,
+            title: message.title ?? null,
+            faviconUrl: null,
+            metadata: { source: "pin-associate" },
+          });
+          const webResourceId = context?.resource?.id;
+          if (!webResourceId) throw new Error("Couldn't resolve this page");
+          await createResourceAssociation({
+            webResourceId,
+            contentId: message.contentId,
+          });
+          resolve({ ok: true, data: { added: true } });
+        } catch {
+          resolve({ ok: false, data: { added: false } });
+        }
+      })();
+    } else {
+      // Tap → create the external link under the resolved parent folder.
+      createContentPickerItem({
+        parentId: message.parentId ?? null,
+        type: "external",
+        title: message.title ?? null,
+        url: message.url ?? null,
+      })
+        .then(() => resolve({ ok: true, data: { added: true } }))
+        .catch(() => resolve({ ok: false, data: { added: false } }));
+    }
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // PANEL-OVERLAY-PLAN Phase 1b: open a tree-clicked content in the side panel.
+  // Warm (panel open) → hand it straight to the embed via the dg-panel port.
+  // Cold (panel closed) → stash it for the panel boot to consume, then open the
+  // panel synchronously (gesture-preserving) — mirrors the ask-about-page path.
+  if (message.type === "open-content-in-side-panel") {
+    const contentId = message.payload?.contentId;
+    const contentType = message.payload?.contentType || null;
+    if (!contentId) {
+      sendResponse({ ok: false, error: "no contentId" });
+      return true;
+    }
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "open-content", contentId, contentType });
+        sendResponse({ ok: true, data: true });
+        return true;
+      } catch {
+        panelPort = null;
+      }
+    }
+    // Panel closed — stash for boot, then open (must stay synchronous).
+    chrome.storage.session
+      .set({ dgPanelOpenContentId: contentId, dgPanelOpenContentType: contentType })
+      .catch(() => {});
+    const tabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = windowId != null ? { windowId } : { tabId };
+    chrome.sidePanel
+      .open(target)
+      .then(() => sendResponse({ ok: true, data: true }))
+      .catch((error) => {
+        console.warn("[DG Bookmarks] open-content-in-side-panel failed", error, target);
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open side panel",
+        });
+      });
+    return true;
+  }
+
+  // Workspace sync hub: mirror a workspace switch to BOTH the panel (port) and
+  // the active tab's overlay (→ tree iframe). Each side applies only when the id
+  // differs, so the origin's own echo is a harmless no-op (no loop).
+  if (message.type === "workspace-sync" && message.workspaceId) {
+    const workspaceId = message.workspaceId;
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "workspace-changed", workspaceId });
+      } catch {
+        panelPort = null;
+      }
+    }
+    chrome.tabs
+      .query({ active: true, lastFocusedWindow: true })
+      .then((tabs) => {
+        const tab = tabs[0];
+        if (tab?.id != null) {
+          chrome.tabs.sendMessage(
+            tab.id,
+            { type: "dg-workspace-changed", workspaceId },
+            () => void chrome.runtime.lastError,
+          );
+        }
+      })
+      .catch(() => {});
+    sendResponse({ ok: true, data: true });
     return true;
   }
 

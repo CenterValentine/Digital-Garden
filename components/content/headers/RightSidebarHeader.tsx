@@ -67,10 +67,27 @@ interface RightSidebarHeaderProps {
    * (spec §3.4) — prevents the "clickable but no-op / wrong tab" window.
    */
   disabled?: boolean;
+  /**
+   * Specific tab keys to render disabled (dimmed + unresponsive) while still
+   * showing them — e.g. Studio in the compact panel embed.
+   */
+  disabledTabs?: string[];
+  /**
+   * Override the `>|` collapse toggle. When set, it fires this instead of the
+   * shared right-panel-collapse store — the panel embed uses its own state.
+   */
+  onToggleCollapse?: () => void;
 }
 
-export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }: RightSidebarHeaderProps) {
+export function RightSidebarHeader({
+  activeTab,
+  onTabChange,
+  disabled = false,
+  disabledTabs,
+  onToggleCollapse,
+}: RightSidebarHeaderProps) {
   const { toggleCollapsed } = useRightPanelCollapseStore();
+  const handleCollapseToggle = onToggleCollapse ?? toggleCollapsed;
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
   const activeView = useLeftPanelViewStore((state) => state.activeView);
@@ -113,7 +130,7 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
   });
 
   return (
-    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+    <div className="dg-rightsidebar-tabs flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
       <div className="scrollbar-hide flex min-w-0 flex-1 items-center justify-around overflow-x-auto">
         {uniqueTabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
@@ -122,13 +139,15 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
           const svgPath = TAB_SVG_PATHS[tabKey];
           if (!svgPath) return null;
 
+          const tabDisabled = disabled || (disabledTabs?.includes(tabKey) ?? false);
+
           return (
             <button
               key={tool.id}
               onClick={() => onTabChange(tabKey)}
-              disabled={disabled}
+              disabled={tabDisabled}
               className={`flex flex-1 items-center justify-center px-4 py-3 transition-colors ${
-                disabled ? "cursor-default opacity-40" : ""
+                tabDisabled ? "cursor-not-allowed opacity-40" : ""
               } ${
                 activeTab === tabKey
                   ? "border-b-2 border-gold-primary text-gold-primary"
@@ -157,7 +176,7 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
 
       {/* Panel collapse toggle — must never be clipped */}
       <button
-        onClick={toggleCollapsed}
+        onClick={handleCollapseToggle}
         className="shrink-0 rounded p-1 transition-colors hover:bg-black/[0.04] dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 hover:text-gold-primary"
         title="Collapse sidebar (Cmd+.)"
         type="button"

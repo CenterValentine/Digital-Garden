@@ -277,6 +277,16 @@ export function LeftSidebarContent({
     return ws?.isView ? (ws.viewRoot?.title ?? null) : null;
   });
 
+  // Transient "escape the view filter": on a view-workspace the user can bypass
+  // the view root to see the whole tree. Deliberately EPHEMERAL — it never
+  // persists and resets on ANY workspace change (including leaving and coming
+  // back), so a workspace's view always re-applies fresh.
+  const [viewBypassed, setViewBypassed] = useState(false);
+  // Reset the transient bypass whenever the workspace changes.
+  useEffect(() => {
+    setViewBypassed(false);
+  }, [activeWorkspaceId]);
+
   // Fetch tree data
   const fetchTree = useCallback(async () => {
     try {
@@ -284,7 +294,7 @@ export function LeftSidebarContent({
       setError(null);
 
       const url = new URL("/api/content/content/tree", window.location.origin);
-      if (activeWorkspaceIsView && activeViewRootContentId) {
+      if (activeWorkspaceIsView && activeViewRootContentId && !viewBypassed) {
         url.searchParams.set("viewRootContentId", activeViewRootContentId);
       }
       if (showReferencedContent) {
@@ -328,7 +338,7 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, showReferencedContent]);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed, showReferencedContent]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -2451,6 +2461,11 @@ export function LeftSidebarContent({
             isSelected={!selectedContentId}
             isView={activeWorkspaceIsView}
             viewRootTitle={activeViewRootTitle}
+            viewBypassed={viewBypassed}
+            onToggleViewBypass={setViewBypassed}
+            onRefresh={() => {
+              void fetchTree();
+            }}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);

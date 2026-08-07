@@ -1684,10 +1684,10 @@ export function useConversationEngine({
                 "A normal read came back blocked/thin, so I opened a VISIBLE tab and read it there.";
             } else if (
               launched.reason &&
-              /turned off|Browser Bookmarks/i.test(launched.reason)
+              /turned off|Browser (Bookmarks|Extension)/i.test(launched.reason)
             ) {
               escalationNote =
-                "A normal read was blocked, and opening a tab to read blocked pages is turned off in the user's Browser Bookmarks settings.";
+                "A normal read was blocked, and opening a tab to read blocked pages is turned off in the user's Browser Extension and Cobrowse settings.";
             } else if (launched.reason || launched.ok) {
               escalationNote =
                 "A normal read was blocked, so I also opened a VISIBLE tab — but the page still couldn't be read (likely a human-verification captcha, which no tool can pass).";
