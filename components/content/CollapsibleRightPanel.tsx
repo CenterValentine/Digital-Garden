@@ -12,9 +12,9 @@
 
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
-import { PanelRight } from "lucide-react";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { RightSidebar } from "./RightSidebar";
+import { MovableCollapseHandle } from "./MovableCollapseHandle";
 import { getSurfaceStyles } from "@/lib/design/system";
 
 export function CollapsibleRightPanel() {
@@ -58,23 +58,11 @@ export function CollapsibleRightPanel() {
         </div>
 
         {isCollapsed && (
-          <div
-            className="
-              fixed right-0 top-4 z-50
-              flex items-center justify-center
-              h-12 w-8
-              bg-gray-900/90 backdrop-blur-sm
-              border-l border-t border-b border-white/10
-              rounded-l-lg
-              cursor-pointer
-              transition-colors duration-200
-              hover:bg-gray-800/90 hover:border-gold-primary/50
-            "
-            onClick={toggleCollapsed}
-            title="Expand sidebar (Cmd+.)"
-          >
-            <PanelRight className="h-4 w-4 text-gray-400 hover:text-gold-primary" />
-          </div>
+          <MovableCollapseHandle
+            edge="right"
+            onExpand={toggleCollapsed}
+            positionKey="dg-app-right-handle-pos"
+          />
         )}
       </>
     );
@@ -97,25 +85,14 @@ export function CollapsibleRightPanel() {
         <RightSidebar />
       </div>
 
-      {/* Collapsed Tab - U-shaped protrusion when panel is hidden */}
+      {/* Collapsed handle — the movable rounded tab (drag vertically to keep it
+          clear of the toolbar tabs / the ×). Click expands. */}
       {isCollapsed && (
-        <div
-          className="
-            fixed right-0 top-[72px] z-50
-            flex items-center justify-center
-            h-12 w-8
-            bg-gray-900/90 backdrop-blur-sm
-            border-l border-t border-b border-white/10
-            rounded-l-lg
-            cursor-pointer
-            transition-colors duration-200
-            hover:bg-gray-800/90 hover:border-gold-primary/50
-          "
-          onClick={toggleCollapsed}
-          title="Expand sidebar (Cmd+.)"
-        >
-          <PanelRight className="h-4 w-4 text-gray-400 hover:text-gold-primary" />
-        </div>
+        <MovableCollapseHandle
+          edge="right"
+          onExpand={toggleCollapsed}
+          positionKey="dg-app-right-handle-pos"
+        />
       )}
     </>
   );

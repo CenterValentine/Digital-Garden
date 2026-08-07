@@ -15,7 +15,7 @@ import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { RightSidebar } from "@/components/content/RightSidebar";
 import { STUDIO_TAB_KEY } from "@/extensions/studio/manifest";
 import { DeferredStoreHydrator } from "@/lib/features/stores/deferred-store-hydrator";
-import { PanelRightOpen } from "lucide-react";
+import { MovableCollapseHandle } from "@/components/content/MovableCollapseHandle";
 import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -694,30 +694,14 @@ export function PanelShellClient({
           </div>
 
           {isRightCollapsed ? (
-            // Collapsed: a slim bar with the same toggle button (app style), at
-            // the right edge — right where it collapsed from — so the re-open is
-            // exactly where the `>|` was.
-            <div
-              style={{
-                flexShrink: 0,
-                height: 30,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                padding: "0 8px",
-                borderTop: "1px solid var(--border-primary, #2a2a2a)",
-              }}
-            >
-              <button
-                type="button"
-                onClick={toggleRightCollapsed}
-                title="Show sidebar (Cmd+.)"
-                aria-label="Show sidebar"
-                className="shrink-0 rounded p-1 text-gray-500 transition-colors hover:bg-black/[0.04] hover:text-gold-primary dark:text-gray-400 dark:hover:bg-white/10"
-              >
-                <PanelRightOpen className="h-4 w-4" />
-              </button>
-            </div>
+            // Collapsed: the SAME movable rounded handle as the main app, docked
+            // to the bottom edge (where the strip collapses to). Its own position
+            // key — deliberately separate from the app's handle.
+            <MovableCollapseHandle
+              edge="bottom"
+              onExpand={toggleRightCollapsed}
+              positionKey="dg-panel-sidebar-handle-pos"
+            />
           ) : (
             <>
               {/* Drag handle — resize the sidebar strip within its clamped range. */}
