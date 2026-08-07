@@ -1151,7 +1151,7 @@ function createOverlayApp(state) {
         <button class="dg-handle" data-variant="both" id="dg-handle-both" type="button" title="Open panel + file tree" aria-label="Open panel and file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button>
         <button class="dg-handle" id="dg-handle-panel" type="button" title="Open panel" aria-label="Open panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
         <button class="dg-handle" id="dg-handle-tree" type="button" title="Open file tree" aria-label="Open file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
-        <button class="dg-handle" id="dg-handle-pin" type="button" title="Pin this page to the selected folder" aria-label="Pin this page to the selected folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+        <button class="dg-handle" id="dg-handle-pin" type="button" title="Pin this page to the selected folder · hold to link it to the active note" aria-label="Pin this page to the selected folder — hold to link to the active note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
         <button class="dg-handle dg-handle-disabled" id="dg-handle-ai" type="button" title="AI — coming soon" aria-label="AI (coming soon)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></button>
       </div>
       <div class="dg-snap-panel" id="dg-snap-panel">
@@ -3210,6 +3210,12 @@ function wireRootEvents(state) {
     if (current === _lastTrackedHref) return;
     _lastTrackedHref = current;
 
+    // The pin's persistent green is page-specific — leaving the page clears it.
+    if (state.pinnedHref && state.pinnedHref !== current) {
+      state.handlePin?.classList.remove("dg-handle-success");
+      state.pinnedHref = null;
+    }
+
     const normalizedCurrent = applyUrlStrategyToHref(current);
 
     // Strategy says ignore this domain — clear context but don't re-fetch.
@@ -3555,26 +3561,61 @@ function wireRootEvents(state) {
   // so it creates the link. On success the pin flashes green in place. No
   // selection / panel closed → open the tree so the user can pick a folder,
   // mirroring what the folder handle does.
+  // The green PERSISTS (no timer) as a "this page is pinned/linked from here"
+  // indicator — it clears only when the page URL changes (see _onUrlChange).
   const flashPinSuccess = () => {
     const el = state.handlePin;
     if (!el) return;
     el.classList.add("dg-handle-success");
-    window.setTimeout(() => el.classList.remove("dg-handle-success"), 1300);
+    state.pinnedHref = location.href;
   };
-  state.handlePin?.addEventListener(
-    "click",
-    handleGuarded(() => {
-      chrome.runtime.sendMessage(
-        { type: "pin-add", payload: { url: location.href, title: document.title } },
-        (resp) => {
-          if (chrome.runtime.lastError) return;
-          const data = resp?.ok ? resp.data : null;
-          if (data?.added) flashPinSuccess();
-          else if (data?.noTarget) showTreeOverlay(state, { toggle: false });
-        },
-      );
-    }),
-  );
+  const sendPin = (mode) => {
+    chrome.runtime.sendMessage(
+      { type: "pin-add", payload: { mode, url: location.href, title: document.title } },
+      (resp) => {
+        if (chrome.runtime.lastError) return;
+        const data = resp?.ok ? resp.data : null;
+        if (data?.added) flashPinSuccess();
+        else if (data?.noTarget) showTreeOverlay(state, { toggle: false });
+      },
+    );
+  };
+  // Tap = file the page under the selected FOLDER (or the parent of selected
+  // content). Press-and-hold = LINK the page to the active note/content/chat
+  // (an association — no new item). The long-press suppresses the trailing click
+  // so a hold never also triggers folder-mode.
+  state.handlePin?.addEventListener("click", handleGuarded(() => sendPin("folder")));
+  let pinHoldTimer = null;
+  let pinHoldStart = null;
+  const cancelPinHold = () => {
+    if (pinHoldTimer) {
+      window.clearTimeout(pinHoldTimer);
+      pinHoldTimer = null;
+    }
+    pinHoldStart = null;
+  };
+  state.handlePin?.addEventListener("pointerdown", (event) => {
+    pinHoldStart = { x: event.clientX, y: event.clientY };
+    pinHoldTimer = window.setTimeout(() => {
+      pinHoldTimer = null;
+      state.suppressHandleClickUntil = Date.now() + 400; // eat the folder-mode click
+      sendPin("associate");
+    }, 500);
+  });
+  state.handlePin?.addEventListener("pointerup", cancelPinHold);
+  state.handlePin?.addEventListener("pointerleave", cancelPinHold);
+  state.handlePin?.addEventListener("pointermove", (event) => {
+    if (!pinHoldStart) return;
+    // Movement means the user is dragging the cluster, not holding — let the
+    // cluster drag win and cancel the pending long-press.
+    if (
+      Math.abs(event.clientY - pinHoldStart.y) +
+        Math.abs(event.clientX - pinHoldStart.x) >
+      4
+    ) {
+      cancelPinHold();
+    }
+  });
 
   // Drag the cluster vertically along the right wall. The offset is a fraction of
   // viewport height, persisted globally (chrome.storage.local) so it holds across

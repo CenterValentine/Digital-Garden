@@ -420,6 +420,7 @@ export function PanelShellClient({
         const tabId = data.payload.tabId ?? null;
         const url = data.payload.url ?? null;
         const title = data.payload.title ?? null;
+        const mode = data.payload.mode === "associate" ? "associate" : "folder";
         const reply = (extra: Record<string, unknown>) =>
           window.parent.postMessage(
             {
@@ -435,6 +436,10 @@ export function PanelShellClient({
         const scType = store.selectedContentType;
         if (!scId) {
           reply({ noTarget: true });
+        } else if (mode === "associate") {
+          // Press-and-hold: link the page to the active content ITSELF
+          // (note / content / chat), not a folder.
+          reply({ contentId: scId });
         } else if (scType === "folder") {
           reply({ parentId: scId });
         } else {

@@ -2515,6 +2515,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       panelPort.postMessage({
         type: "pin-add",
         tabId,
+        mode: message.payload?.mode === "associate" ? "associate" : "folder",
         url: message.payload?.url ?? null,
         title: message.payload?.title ?? null,
       });
@@ -2540,7 +2541,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.noTarget) {
       resolve({ ok: true, data: { noTarget: true } });
+    } else if (message.contentId) {
+      // Associate mode (press-and-hold): link the page to the active content.
+      // Resolve a webResourceId first (same as the note link path), then
+      // associate — so the green means the link actually exists.
+      (async () => {
+        try {
+          const context = await fetchResourceContext({
+            url: message.url ?? null,
+            canonicalUrl: null,
+            title: message.title ?? null,
+            faviconUrl: null,
+            metadata: { source: "pin-associate" },
+          });
+          const webResourceId = context?.resource?.id;
+          if (!webResourceId) throw new Error("Couldn't resolve this page");
+          await createResourceAssociation({
+            webResourceId,
+            contentId: message.contentId,
+          });
+          resolve({ ok: true, data: { added: true } });
+        } catch {
+          resolve({ ok: false, data: { added: false } });
+        }
+      })();
     } else {
+      // Folder mode (tap): create the external link under the resolved parent.
       createContentPickerItem({
         parentId: message.parentId ?? null,
         type: "external",
