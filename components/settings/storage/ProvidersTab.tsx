@@ -344,7 +344,7 @@ export function StorageProvidersTab() {
 
           <button
             onClick={() => setShowAddProvider(false)}
-            className="mt-4 px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors"
+            className="mt-4 px-4 py-2 text-sm text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
           >
             Cancel
           </button>

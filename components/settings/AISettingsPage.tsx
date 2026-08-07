@@ -55,8 +55,8 @@ import {
 } from "@/components/settings/ui";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import {
-  ALL_TOOL_IDS,
   ALL_TOOL_METADATA,
+  TOOL_GROUPS,
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
@@ -359,20 +359,33 @@ export default function AISettingsPage() {
           </span>
         }
       >
-        <div className="space-y-2">
-          {ALL_TOOL_IDS.map((toolId) => (
-            <ToolConfigRow
-              key={toolId}
-              toolId={toolId}
-              meta={ALL_TOOL_METADATA[toolId]}
-              callsAi={
-                BASE_TOOL_METADATA[toolId as keyof typeof BASE_TOOL_METADATA]
-                  ?.callsAi
-              }
-              config={toolConfig[toolId] ?? {}}
-              connections={connections}
-              onChange={(next) => handleToolConfigChange(toolId, next)}
-            />
+        <div className="space-y-4">
+          {TOOL_GROUPS.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <div className="flex items-baseline gap-2 border-b border-black/10 pb-1 dark:border-white/10">
+                <h4 className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {group.label}
+                </h4>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                  {group.description}
+                </span>
+              </div>
+              {group.ids.map((toolId) => (
+                <ToolConfigRow
+                  key={toolId}
+                  toolId={toolId}
+                  meta={ALL_TOOL_METADATA[toolId]}
+                  callsAi={
+                    BASE_TOOL_METADATA[
+                      toolId as keyof typeof BASE_TOOL_METADATA
+                    ]?.callsAi
+                  }
+                  config={toolConfig[toolId] ?? {}}
+                  connections={connections}
+                  onChange={(next) => handleToolConfigChange(toolId, next)}
+                />
+              ))}
+            </div>
           ))}
         </div>
       </SettingSection>

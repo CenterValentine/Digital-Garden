@@ -33,6 +33,7 @@ import {
   extractSearchTextFromTipTap,
   markdownToTiptapResult,
 } from "@/lib/domain/content";
+import { linkifyWikiRefsInTiptap } from "@/lib/domain/editor/wiki-link-refs";
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
@@ -58,6 +59,8 @@ import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
 import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
 import { logger } from "@/lib/core/logger";
+import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
+import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
 import {
   READ_PAGE_HEADLESS_OR_BROWSER_DESCRIPTION,
   readPageInBrowserInputSchema,
@@ -1158,6 +1161,51 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       },
     }),
 
+    // The WALK primitive (FOLDER-CONTEXT-CAPSULE-PLAN Phase 5): capsules for
+    // progressive folder disclosure. A mention injects the root capsule;
+    // every descent is one visible call here. Playbooks reach folders by
+    // resolving the title via searchNotes first, then walking.
+    read_folder_context: tool({
+      description:
+        "Read a folder's context capsule: its purpose (user directives + role), summary, signals (known gaps/ambiguities), and a machine-readable index of its DIRECT children — each with id, one-liner, token estimate, and freshness. Use it to understand a folder and decide which specific files to read; be frugal — prefer drilling via the index over reading every file. Call again with a subfolder's id (from the index) to descend one level. Resolve a folder's id from its name with searchNotes when you only have a title.",
+      inputSchema: z.object({
+        folderId: z
+          .string()
+          .describe(
+            "The folder's ContentNode id (from a capsule index, a mention, or searchNotes results)."
+          ),
+      }),
+      execute: async ({ folderId }) => {
+        try {
+          const gate = await ensureFolderContextFresh(ctx.userId, folderId, {
+            budgetMs: 3000,
+          });
+          if (gate.status === "optedOut") {
+            return "This folder's AI context is disabled by the user — only its name is available. Do not attempt to read its contents.";
+          }
+          const capsule =
+            gate.status === "none"
+              ? null
+              : await assembleFolderCapsule(ctx.userId, folderId);
+          if (!capsule) {
+            return `No context is available for this folder yet (${gate.reason ?? "generation could not run"}). You can still read individual files inside it if you know their ids, or tell the user context generation needs configuring.`;
+          }
+          const staleBanner =
+            gate.status === "stale"
+              ? `\n[NOTE: parts of this capsule could not be refreshed (${gate.reason ?? "budget"}) and may lag recent edits.]`
+              : "";
+          return capsule.text + staleBanner;
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "ai_context:tool_read_folder_caught",
+            summary: "read_folder_context failed",
+            error,
+          });
+          return "Reading the folder's context failed with an internal error — continue without it and tell the user.";
+        }
+      },
+    }),
     search_playbooks: tool({
       description:
         "List the user's playbooks (notes/folders marked as multi-phase procedures) with their descriptions. Use this — not searchNotes — when the user asks to run/find a playbook by name or topic; it searches ONLY playbooks, so it won't return unrelated notes. If a playbook is already attached to this chat (see the Active Playbook section, if present), you don't need this — that one is already the answer.",
@@ -1251,7 +1299,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         title: z
           .string()
@@ -1345,7 +1394,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const conversion = content
           ? markdownToTiptapResult(content)
           : { json: { type: "doc", content: [{ type: "paragraph" }] }, degraded: false };
-        const tiptapJson = conversion.json;
+        // Wiki-link enrichment: literal [[Title]] / [[Title|Alias]] in the
+        // AI's markdown becomes real wikiLink nodes (clickable, id-healing,
+        // capsule-injecting for folders). The global markdown parser stays
+        // untouched — this is an authoring-seam upgrade only.
+        const tiptapJson = linkifyWikiRefsInTiptap(conversion.json);
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
@@ -1420,7 +1473,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
         "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update.",
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
           .string()
@@ -1458,7 +1512,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // tool's own "do NOT … rename" guard text into the title field
         // ("/do-not-rename/"). No title param = nothing to bleed in.
         const conversion = markdownToTiptapResult(content);
-        const tiptapJson = conversion.json;
+        // Wiki-link enrichment: literal [[Title]] / [[Title|Alias]] in the
+        // AI's markdown becomes real wikiLink nodes (clickable, id-healing,
+        // capsule-injecting for folders). The global markdown parser stays
+        // untouched — this is an authoring-seam upgrade only.
+        const tiptapJson = linkifyWikiRefsInTiptap(conversion.json);
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
         const degradedMeta = conversion.degraded

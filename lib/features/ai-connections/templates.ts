@@ -64,6 +64,12 @@ const ANTHROPIC: ConnectionTemplate = {
     { id: "claude-sonnet-4", name: "Claude Sonnet 4", contextWindow: 200_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "claude-sonnet-3-5", name: "Claude 3.5 Sonnet", contextWindow: 200_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "claude-opus-4", name: "Claude Opus 4", contextWindow: 200_000, capabilities: ["text", "vision", "tools", "streaming"] },
+    // Current cheap tier — claude-haiku-3-5 retired 2026-02-19; the feature-
+    // route defaultSuggestions point here (validate-model-routing asserts
+    // suggestions exist in this list). The retired entry stays for legacy
+    // stored connections; "Fetch from API" + catalog drift reconciliation
+    // keep both honest going forward.
+    { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", contextWindow: 200_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "claude-haiku-3-5", name: "Claude 3.5 Haiku", contextWindow: 200_000, capabilities: ["text", "tools", "streaming"] },
   ],
   apiKeyHint: "Starts with `sk-ant-` — get one from console.anthropic.com",

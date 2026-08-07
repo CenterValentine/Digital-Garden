@@ -47,7 +47,7 @@ interface ExpandableEditorProps {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
   /** Fetch tags for tag autocomplete */
   fetchTags?: (query: string) => Promise<Array<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>>;
   fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;

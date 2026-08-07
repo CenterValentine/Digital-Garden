@@ -17,8 +17,8 @@ import { logger, withRouteTrace } from "@/lib/core/logger";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { getUserSettings } from "@/lib/features/settings";
 import { getStudioSettings } from "@/extensions/studio/settings";
-import { refreshScope } from "@/extensions/studio/server/context-refresh";
-import { getTodaySpend } from "@/extensions/studio/server/context-spend";
+import { refreshScope } from "@/lib/domain/ai-context/context-refresh";
+import { getTodaySpend } from "@/lib/domain/ai-context/context-spend";
 
 const ROUTE_PATH = "/api/studio/context/refresh";
 

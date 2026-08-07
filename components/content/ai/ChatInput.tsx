@@ -75,6 +75,12 @@ interface ChatInputProps {
   commandItems?: SuggestionItem[];
   /** Called when a `/` selection is a playbook (contentType "playbook") — attach instead of inserting text. */
   onAttachPlaybook?: (item: SuggestionItem) => void;
+  /**
+   * Fires after a mention pill is inserted. Folder mentions use this to
+   * start the pre-flight context gate (plan Phase 4 / sweep B5) while the
+   * user is still typing.
+   */
+  onMentionInserted?: (item: SuggestionItem) => void;
   /** The playbook currently attached to this conversation, if any. */
   activePlaybook?: ActivePlaybook | null;
   /** Detach the active playbook (dismiss the chip). */
@@ -104,6 +110,7 @@ export function ChatInput({
   mentionResults = [],
   commandItems = [],
   onAttachPlaybook,
+  onMentionInserted,
   activePlaybook = null,
   onDetachPlaybook,
   footerLeading,
@@ -330,6 +337,7 @@ export function ChatInput({
         const space = document.createTextNode(" ");
         pill.after(space);
         placeCaretAfter(space);
+        onMentionInserted?.(item);
       } else if (item.contentType === "playbook") {
         // Attach, don't insert text — the trigger text was already deleted
         // above. The composer chip (below) shows what's attached.
@@ -344,7 +352,7 @@ export function ChatInput({
       emit();
       root.focus();
     },
-    [closeSuggestions, emit, onAttachPlaybook, suggestionMode],
+    [closeSuggestions, emit, onAttachPlaybook, onMentionInserted, suggestionMode],
   );
 
   // ── submit / keyboard ──
