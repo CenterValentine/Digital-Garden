@@ -246,10 +246,16 @@ export const HeadingFold = Extension.create({
   addKeyboardShortcuts() {
     return {
       /**
-       * Enter on a collapsed heading must not drop the cursor into the hidden
-       * section. At the end of the heading: continue writing BELOW the fold
-       * (section stays collapsed). Mid-text: split as usual, but only the
-       * lower half — the one adjacent to the section — keeps `collapsed`.
+       * Enter MID-TEXT on a collapsed heading splits it; ProseMirror copies
+       * attrs to both halves, which would leave the upper half claiming a
+       * fold it no longer owns. Normalize: only the lower half — the one
+       * adjacent to the section — keeps `collapsed`.
+       *
+       * Enter at the END of a collapsed heading deliberately falls through
+       * to the default split: the new paragraph lands inside the (derived)
+       * hidden range — there IS no position "below the fold but above the
+       * next same-rank heading" — so the guard plugin expands the fold and
+       * the cursor is visibly where typing goes (unfold-on-edit).
        */
       Enter: () => {
         const { state } = this.editor;
@@ -258,22 +264,9 @@ export const HeadingFold = Extension.create({
         if ($from.parent.type.name !== "heading") return false;
         if ($from.parent.attrs.collapsed !== true) return false;
         if ($from.parentOffset === 0) return false; // default: insert block above
+        if ($from.parentOffset >= $from.parent.content.size) return false; // default + guard
 
         const headingPos = $from.before();
-        const fold = computeFoldRanges(state.doc).find(
-          (f) => f.headingPos === headingPos,
-        );
-        if (!fold) return false;
-
-        if ($from.parentOffset === $from.parent.content.size) {
-          if (fold.rangeTo <= fold.rangeFrom) return false; // empty section
-          const paragraph = state.schema.nodes.paragraph.create();
-          const tr = state.tr.insert(fold.rangeTo, paragraph);
-          tr.setSelection(TextSelection.create(tr.doc, fold.rangeTo + 1));
-          this.editor.view.dispatch(tr.scrollIntoView());
-          return true;
-        }
-
         const tr = state.tr;
         tr.split($from.pos);
         const upper = tr.doc.nodeAt(headingPos);
