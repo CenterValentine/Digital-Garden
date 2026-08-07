@@ -17,6 +17,8 @@ interface WikiLinkSuggestionItem {
   id: string;
   title: string;
   slug: string;
+  /** "note" (default) or "folder" — folders link to their capsule-backed view. */
+  contentType?: string;
 }
 
 interface WikiLinkListProps {
@@ -77,7 +79,7 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
   if (props.items.length === 0) {
     return (
       <div className="rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-sm">
-        <div className="text-sm text-gray-400">No notes found</div>
+        <div className="text-sm text-gray-400">No matches found</div>
       </div>
     );
   }
@@ -95,7 +97,14 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
                 : "text-gray-300 hover:bg-white/5"
             }`}
           >
-            {item.title}
+            <span className="flex items-center justify-between gap-2">
+              <span className="truncate">{item.title}</span>
+              {item.contentType === "folder" && (
+                <span className="shrink-0 rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
+                  folder
+                </span>
+              )}
+            </span>
           </button>
         ))}
       </div>

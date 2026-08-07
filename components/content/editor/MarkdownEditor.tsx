@@ -173,7 +173,7 @@ export interface MarkdownEditorProps {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
   /** Callback when a tag is clicked */
   onTagClick?: (tagId: string, tagName: string) => void;
   /** Fetch tags for tag autocomplete */

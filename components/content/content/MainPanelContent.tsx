@@ -1292,12 +1292,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         type NoteItem = { id: string; title: string; slug: string; contentType: string };
+        // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
+        // wiki-link navigates to the folder and, in playbooks/chat, injects
+        // its context capsule like a chat mention.
         return ((result.data?.items as NoteItem[] | undefined) || [])
-          .filter((item) => item.contentType === 'note')
+          .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
           .map((item) => ({
             id: item.id,
             title: item.title,
             slug: item.slug,
+            contentType: item.contentType,
           }));
       } catch (err) {
         clientLogger.error({
