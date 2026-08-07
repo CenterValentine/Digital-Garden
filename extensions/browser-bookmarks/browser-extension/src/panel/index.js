@@ -195,6 +195,16 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Workspace sync: the panel switched workspace — relay to the background so the
+  // tree overlay mirrors it (and vice-versa via the port below).
+  if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+    chrome.runtime.sendMessage(
+      { type: "workspace-sync", workspaceId: data.payload.workspaceId },
+      () => void chrome.runtime.lastError,
+    );
+    return;
+  }
+
   // Capture: the embed asks for the current page's content at a scope. Only
   // the content script can read the page, so relay there and post the result
   // back. The active tab is authoritative here (the panel host tracks it).
@@ -640,6 +650,10 @@ try {
         contentId: msg.contentId,
         contentType: msg.contentType || null,
       });
+    }
+    // Workspace sync: a switch elsewhere (tree overlay) — mirror it in the panel.
+    if (msg?.type === "workspace-changed" && msg.workspaceId) {
+      postToEmbed("workspace-changed", { workspaceId: msg.workspaceId });
     }
   });
   // Auto-recovery: a live port keeps the service worker awake, so while the

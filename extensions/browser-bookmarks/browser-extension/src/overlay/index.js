@@ -1288,6 +1288,14 @@ function createOverlayApp(state) {
         },
       });
     }
+    // Workspace sync: the tree switched workspace — relay to the background so the
+    // panel mirrors it.
+    if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+      chrome.runtime.sendMessage({
+        type: "workspace-sync",
+        workspaceId: data.payload.workspaceId,
+      });
+    }
   });
 }
 
@@ -3397,6 +3405,21 @@ function wireRootEvents(state) {
           error: error instanceof Error ? error.message : "Failed to open tree panel",
         });
       }
+      return true;
+    }
+
+    if (message?.type === "dg-workspace-changed" && message.workspaceId) {
+      // Workspace switched elsewhere (the panel) — mirror it into the tree iframe.
+      state.treeIframe?.contentWindow?.postMessage(
+        {
+          v: 1,
+          source: "dg-tree-host",
+          type: "workspace-changed",
+          payload: { workspaceId: message.workspaceId },
+        },
+        "*",
+      );
+      sendResponse?.({ ok: true });
       return true;
     }
 

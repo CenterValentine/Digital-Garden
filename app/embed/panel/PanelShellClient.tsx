@@ -31,6 +31,7 @@ import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
@@ -252,6 +253,34 @@ export function PanelShellClient({
   // dropped when Phase 3 stripped the Garden view; restore it in the top bar.
   const shellNavigationControls = useExtensionShellNavigationControls();
 
+  // ── workspace sync (panel ↔ tree overlay) ──
+  // The panel selector and the tree-overlay selector must MIRROR at all times:
+  // one workspace choice drives the tabs (here) AND the tree (overlay). They're
+  // separate partitioned iframes, so carry the switch through the host →
+  // background. Broadcast local switches; apply remote ones via the SAME
+  // activateWorkspace(). A guard stops the applied change from echoing back.
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const applyingRemoteWsRef = useRef(false);
+  const lastWsRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (applyingRemoteWsRef.current) {
+      applyingRemoteWsRef.current = false;
+      lastWsRef.current = activeWorkspaceId;
+      return;
+    }
+    if (!activeWorkspaceId || activeWorkspaceId === lastWsRef.current) return;
+    lastWsRef.current = activeWorkspaceId;
+    window.parent.postMessage(
+      {
+        v: 1,
+        source: "dg-panel-embed",
+        type: "workspace-changed",
+        payload: { workspaceId: activeWorkspaceId },
+      },
+      "*",
+    );
+  }, [activeWorkspaceId]);
+
   // ── B3-B settle-then-associate ────────────────────────────────────────────
   // Capture settings (killswitch + denylist) live in the extension's
   // chrome.storage; this partitioned iframe's own settings store is empty, so we
@@ -356,6 +385,17 @@ export function PanelShellClient({
           .openContentInPane(String(data.payload.contentId), TOP_LEFT_PANE_ID, {
             contentType: data.payload.contentType ?? null,
           });
+      }
+
+      // Workspace sync: the tree overlay (or another surface) switched workspace;
+      // mirror it here so the tabs follow. Apply the SAME activateWorkspace; the
+      // guard ref stops it echoing back out.
+      if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+        const id = String(data.payload.workspaceId);
+        if (useWorkspaceStore.getState().activeWorkspaceId !== id) {
+          applyingRemoteWsRef.current = true;
+          void useWorkspaceStore.getState().activateWorkspace(id);
+        }
       }
 
       // The page's content node was resolved (reused or created). Anchor the

@@ -2514,6 +2514,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Workspace sync hub: mirror a workspace switch to BOTH the panel (port) and
+  // the active tab's overlay (→ tree iframe). Each side applies only when the id
+  // differs, so the origin's own echo is a harmless no-op (no loop).
+  if (message.type === "workspace-sync" && message.workspaceId) {
+    const workspaceId = message.workspaceId;
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "workspace-changed", workspaceId });
+      } catch {
+        panelPort = null;
+      }
+    }
+    chrome.tabs
+      .query({ active: true, lastFocusedWindow: true })
+      .then((tabs) => {
+        const tab = tabs[0];
+        if (tab?.id != null) {
+          chrome.tabs.sendMessage(
+            tab.id,
+            { type: "dg-workspace-changed", workspaceId },
+            () => void chrome.runtime.lastError,
+          );
+        }
+      })
+      .catch(() => {});
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });

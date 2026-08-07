@@ -111,6 +111,49 @@ export function TreeShellClient({
   // the tree out here).
   const shellNavigationControls = useExtensionShellNavigationControls();
 
+  // ── workspace sync (tree overlay ↔ panel) ──
+  // One workspace choice must drive BOTH the tree (here) and the panel's tabs —
+  // the core-app behavior. They're separate partitioned iframes, so carry the
+  // switch through the overlay host → background → panel. Broadcast local
+  // switches; apply remote ones via the SAME activateWorkspace() (tabs + tree).
+  // A guard stops the applied remote change from echoing back.
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const applyingRemoteWsRef = useRef(false);
+  const lastWsRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (applyingRemoteWsRef.current) {
+      applyingRemoteWsRef.current = false;
+      lastWsRef.current = activeWorkspaceId;
+      return;
+    }
+    if (!activeWorkspaceId || activeWorkspaceId === lastWsRef.current) return;
+    lastWsRef.current = activeWorkspaceId;
+    window.parent.postMessage(
+      {
+        v: 1,
+        source: "dg-tree-embed",
+        type: "workspace-changed",
+        payload: { workspaceId: activeWorkspaceId },
+      },
+      "*",
+    );
+  }, [activeWorkspaceId]);
+  useEffect(() => {
+    function onMessage(event: MessageEvent) {
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.v !== 1 || data.source !== "dg-tree-host") return;
+      if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+        const id = String(data.payload.workspaceId);
+        if (useWorkspaceStore.getState().activeWorkspaceId === id) return;
+        applyingRemoteWsRef.current = true;
+        void useWorkspaceStore.getState().activateWorkspace(id);
+      }
+    }
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
   return (
     <div
       className={isDark ? "dark" : undefined}
