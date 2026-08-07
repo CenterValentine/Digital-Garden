@@ -33,6 +33,7 @@ import {
   extractSearchTextFromTipTap,
   markdownToTiptapResult,
 } from "@/lib/domain/content";
+import { linkifyWikiRefsInTiptap } from "@/lib/domain/editor/wiki-link-refs";
 import { generateAndStoreImage } from "@/lib/domain/ai/image/generate-and-store";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import type { ImageProviderId, ImageModelId, ImageSize } from "@/lib/domain/ai/image/types";
@@ -1298,7 +1299,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "Ambiguous phrasings to watch for: 'update the note in this chat', 'add to this conversation's notes', 'put X in the note' — these do NOT mean 'create a new note'. They typically refer to an existing note. When the phrasing is ambiguous, ASK the user whether to create a new note or update an existing one before calling this tool. " +
         "If they confirm a new note, this is the right tool. If they name an existing note, use `searchNotes` to find its id then use `updateNote`. " +
         "Do NOT create output on your own initiative — only when the user asks for it. " +
-        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset.",
+        "Targeting: omit placement fields to use the configured output-target preset. If the user or active playbook gives THIS note a different relative destination, pass `outputLocation` (`under_chat`, `under_content`, or `beside_content`). Pass `parentId` only for a specifically resolved folder UUID. A per-note instruction always overrides the preset. " +
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         title: z
           .string()
@@ -1392,7 +1394,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         const conversion = content
           ? markdownToTiptapResult(content)
           : { json: { type: "doc", content: [{ type: "paragraph" }] }, degraded: false };
-        const tiptapJson = conversion.json;
+        // Wiki-link enrichment: literal [[Title]] / [[Title|Alias]] in the
+        // AI's markdown becomes real wikiLink nodes (clickable, id-healing,
+        // capsule-injecting for folders). The global markdown parser stays
+        // untouched — this is an authoring-seam upgrade only.
+        const tiptapJson = linkifyWikiRefsInTiptap(conversion.json);
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
 
@@ -1467,7 +1473,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         "If the user is chatting in a full-page chat and asks to update 'the note in this chat' or 'this chat's notes', pass the CHAT's contentId here — that updates the notes panel attached to the chat itself, not a separate file. " +
         "Do NOT use this to create new top-level notes — use `createNote` for that. " +
         "Do NOT call this on your own initiative — only when the user asks you to write to a note. There is no default between writing-to-a-note and creating new output (createNote/create_docx); pick whichever the user's request actually asks for, and do neither unless they ask. " +
-        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update.",
+        "This updates CONTENT ONLY — it never changes the title. Renaming is a separate, explicit action: if the user asks to rename/retitle, use `renameNote`. Do not rename as a side effect of a content update. " +
+        "HYPERLINKING: to link other garden content inline (notes OR folders), write wiki-links in the markdown — [[Exact Title]] or [[Exact Title|Shown Text]]. They become real clickable links, resolve by title, and a linked FOLDER also feeds its context to the AI when the note is used in chat or as a playbook. Use the content's exact title; do not invent URL-style links for internal content.",
       inputSchema: z.object({
         contentId: z
           .string()
@@ -1505,7 +1512,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // tool's own "do NOT … rename" guard text into the title field
         // ("/do-not-rename/"). No title param = nothing to bleed in.
         const conversion = markdownToTiptapResult(content);
-        const tiptapJson = conversion.json;
+        // Wiki-link enrichment: literal [[Title]] / [[Title|Alias]] in the
+        // AI's markdown becomes real wikiLink nodes (clickable, id-healing,
+        // capsule-injecting for folders). The global markdown parser stays
+        // untouched — this is an authoring-seam upgrade only.
+        const tiptapJson = linkifyWikiRefsInTiptap(conversion.json);
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
         const degradedMeta = conversion.degraded

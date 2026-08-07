@@ -154,6 +154,7 @@ import { assembleFolderChatContext } from "@/extensions/studio/server/source-sel
 import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
+import { collectWikiLinkRefs } from "@/lib/domain/editor/wiki-link-refs";
 import {
   parsePlaybook,
   type PlaybookReference,
@@ -191,6 +192,62 @@ import {
 
 const ROUTE_PATH = "/api/ai/chat";
 
+/**
+ * Gate + capsule for ONE folder reference — a chat mention pill, a playbook
+ * [[link]], or a folder wiki-linked from a mentioned note — rendered as a
+ * prompt section per the D5 ladder (fresh capsule / stale capsule flagged /
+ * honest absence / name-only when opted out). Never throws.
+ */
+async function buildFolderMentionSection(
+  userId: string,
+  folderId: string,
+  title: string,
+  budgetMs?: number,
+): Promise<string> {
+  try {
+    const gate = await ensureFolderContextFresh(
+      userId,
+      folderId,
+      budgetMs ? { budgetMs } : undefined,
+    );
+    if (gate.status === "optedOut") {
+      return `### ${title}\n(folder — its AI context is disabled by the user; only the name is available)`;
+    }
+    const capsule =
+      gate.status === "none"
+        ? null
+        : await assembleFolderCapsule(userId, folderId);
+    if (!capsule) {
+      return `### ${title}\n(folder — no context is available yet: generation could not run${gate.reason ? ` (${gate.reason})` : ""}. Say so rather than guessing at its contents.)`;
+    }
+    const staleBanner =
+      gate.status === "stale"
+        ? `\n[NOTE: this folder's context could not be fully refreshed (${gate.reason ?? "budget"}) — parts may lag recent edits.]`
+        : "";
+    logger.info({
+      layer: "ai",
+      event: "ai_context:mention_gate",
+      summary: `folder mention gated: ${gate.status}`,
+      attrs: {
+        folderId,
+        status: gate.status,
+        generationCalls: gate.generationCalls,
+        refreshedNodes: gate.refreshedNodes,
+        waitedMs: gate.waitedMs,
+      },
+    });
+    return capsule.text + staleBanner;
+  } catch (gateError) {
+    logger.warn({
+      layer: "ai",
+      event: "ai_context:mention_gate_caught",
+      summary: "folder mention gate failed — name-only fallback",
+      error: gateError,
+    });
+    return `### ${title}\n(folder — context unavailable due to an internal error)`;
+  }
+}
+
 async function resolvePlaybookReferenceContext(
   userId: string,
   references: PlaybookReference[],
@@ -216,6 +273,7 @@ async function resolvePlaybookReferenceContext(
     select: {
       id: true,
       title: true,
+      contentType: true,
       notePayload: { select: { metadata: true } },
     },
   });
@@ -226,24 +284,57 @@ async function resolvePlaybookReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        .filter((node) => activeTitles.has(node.title))
+        // Folders are capsule-consumed (below), never getCurrentNote-read —
+        // keep them out of the checkpoint gate's reference expectations.
+        .filter(
+          (node) =>
+            activeTitles.has(node.title) && node.contentType !== "folder",
+        )
         .map((node) => node.id),
     ),
   );
   const lines = uniqueTitles.map((title) => {
     const found = byTitle.get(title);
     if (!found) return `- [[${title}]] — not found in your notes`;
+    if (found.contentType === "folder") {
+      // Folder refs behave like chat folder mentions (capsule-plan
+      // follow-up): active-phase folders get their capsule injected below;
+      // other phases' folders stay lazy behind the walk tool.
+      return activeTitles.has(title)
+        ? `- [[${title}]] — FOLDER (context capsule injected below)`
+        : `- [[${title}]] — FOLDER (call read_folder_context with folderId: ${found.id} when the current phase needs it)`;
+    }
     const isSubPlaybook = isPlaybookMetadata(found.notePayload?.metadata);
     return isSubPlaybook
       ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
       : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
   });
 
+  // Active-phase folder refs get the full mention treatment (gate +
+  // capsule), capped so a link-heavy phase can't flood context. Same D5
+  // ladder and 3s budget as the walk tool.
+  const activeFolders = referenceNodes
+    .filter(
+      (node) => node.contentType === "folder" && activeTitles.has(node.title),
+    )
+    .slice(0, 3);
+  let folderCapsules = "";
+  if (activeFolders.length > 0) {
+    const sections = await Promise.all(
+      activeFolders.map((folder) =>
+        buildFolderMentionSection(userId, folder.id, folder.title, 3000),
+      ),
+    );
+    folderCapsules =
+      "\n\n**Referenced folder context:**\n\n" + sections.join("\n\n");
+  }
+
   return {
     manifest:
       "\n\n**Linked extensions** " +
       "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
-      lines.join("\n"),
+      lines.join("\n") +
+      folderCapsules,
     activeReferenceContentIds,
   };
 }
@@ -1201,7 +1292,9 @@ export async function POST(request: Request) {
                 deletedAt: null,
               },
               include: {
-                notePayload: { select: { searchText: true } },
+                // tiptapJson rides along so folder wiki-links inside a
+                // mentioned note can get the capsule treatment below.
+                notePayload: { select: { searchText: true, tiptapJson: true } },
               },
             });
             span.attr("found", result.length).summary(`${result.length} mentions`);
@@ -1221,60 +1314,79 @@ export async function POST(request: Request) {
             mentionedNodes
               .filter((node) => node.contentType === "folder")
               .map(async (node) => {
-                try {
-                  const gate = await ensureFolderContextFresh(
+                folderSections.set(
+                  node.id,
+                  await buildFolderMentionSection(
                     session.user.id,
-                    node.id
-                  );
-                  if (gate.status === "optedOut") {
-                    folderSections.set(
-                      node.id,
-                      `### ${node.title}\n(folder — its AI context is disabled by the user; only the name is available)`
-                    );
-                    return;
-                  }
-                  const capsule =
-                    gate.status === "none"
-                      ? null
-                      : await assembleFolderCapsule(session.user.id, node.id);
-                  if (!capsule) {
-                    folderSections.set(
-                      node.id,
-                      `### ${node.title}\n(folder — no context is available yet: generation could not run${gate.reason ? ` (${gate.reason})` : ""}. Say so rather than guessing at its contents.)`
-                    );
-                    return;
-                  }
-                  const staleBanner =
-                    gate.status === "stale"
-                      ? `\n[NOTE: this folder's context could not be fully refreshed (${gate.reason ?? "budget"}) — parts may lag recent edits.]`
-                      : "";
-                  folderSections.set(node.id, capsule.text + staleBanner);
-                  logger.info({
-                    layer: "ai",
-                    event: "ai_context:mention_gate",
-                    summary: `folder mention gated: ${gate.status}`,
-                    attrs: {
-                      folderId: node.id,
-                      status: gate.status,
-                      generationCalls: gate.generationCalls,
-                      refreshedNodes: gate.refreshedNodes,
-                      waitedMs: gate.waitedMs,
-                    },
-                  });
-                } catch (gateError) {
-                  logger.warn({
-                    layer: "ai",
-                    event: "ai_context:mention_gate_caught",
-                    summary: "folder mention gate failed — name-only fallback",
-                    error: gateError,
-                  });
-                  folderSections.set(
                     node.id,
-                    `### ${node.title}\n(folder — context unavailable due to an internal error)`
-                  );
-                }
+                    node.title
+                  )
+                );
               })
           );
+
+          // Transitive folder links (capsule-plan follow-up): a mentioned
+          // NOTE that wiki-links folders behaves like mentioning those
+          // folders directly — same rule as a playbook's [[refs]]. Id-first
+          // resolution with exact-title fallback, deduped against direct
+          // mentions, capped at 3.
+          const linkedFolderSections: string[] = [];
+          try {
+            const linkedRefs = mentionedNodes
+              .filter((node) => node.contentType !== "folder")
+              .flatMap((node) =>
+                collectWikiLinkRefs(
+                  (node.notePayload?.tiptapJson ?? null) as JSONContent | null
+                )
+              );
+            if (linkedRefs.length > 0) {
+              const mentionedIds = new Set(mentionedNodes.map((n) => n.id));
+              const idRefs = linkedRefs
+                .map((ref) => ref.targetId)
+                .filter((id): id is string => !!id);
+              const titleRefs = [
+                ...new Set(
+                  linkedRefs
+                    .filter((ref) => !ref.targetId)
+                    .map((ref) => ref.targetTitle)
+                ),
+              ];
+              const linkedFolders = await prisma.contentNode.findMany({
+                where: {
+                  ownerId: session.user.id,
+                  contentType: "folder",
+                  deletedAt: null,
+                  OR: [
+                    ...(idRefs.length > 0 ? [{ id: { in: idRefs } }] : []),
+                    ...(titleRefs.length > 0
+                      ? [{ title: { in: titleRefs } }]
+                      : []),
+                  ],
+                },
+                select: { id: true, title: true },
+                take: 3,
+              });
+              for (const folder of linkedFolders) {
+                if (mentionedIds.has(folder.id)) continue;
+                linkedFolderSections.push(
+                  await buildFolderMentionSection(
+                    session.user.id,
+                    folder.id,
+                    folder.title,
+                    3000
+                  )
+                );
+              }
+            }
+          } catch (linkError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:linked_folder_caught",
+              summary:
+                "transitive folder-link resolution failed — continuing without it",
+              error: linkError,
+            });
+          }
 
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
@@ -1283,6 +1395,7 @@ export async function POST(request: Request) {
               node.notePayload?.searchText || "(no text content available)";
             return `### ${node.title}\n${text.slice(0, 2000)}`;
           });
+          sections.push(...linkedFolderSections);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
         }
       }
