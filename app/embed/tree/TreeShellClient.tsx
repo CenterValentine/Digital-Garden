@@ -1,6 +1,6 @@
 "use client";
 
-import { createElement, useEffect, useRef, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
@@ -8,8 +8,7 @@ import { fileTreeActionProvider } from "@/components/content/context-menu/file-t
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
-import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
-import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
+import { useContentStore } from "@/state/content-store";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -105,18 +104,15 @@ export function TreeShellClient({
     );
   }, [selectedContentId, selectedContentType]);
 
-  // Workspace switcher — the tree is workspace-scoped (LeftSidebarContent fetches
-  // by activeWorkspaceId), so its selector rides at the top of the tree overlay
-  // (it lived above the tree in the old panel Garden view before Phase 3 moved
-  // the tree out here).
-  const shellNavigationControls = useExtensionShellNavigationControls();
-
-  // ── workspace sync (tree overlay ↔ panel) ──
-  // One workspace choice must drive BOTH the tree (here) and the panel's tabs —
-  // the core-app behavior. They're separate partitioned iframes, so carry the
-  // switch through the overlay host → background → panel. Broadcast local
-  // switches; apply remote ones via the SAME activateWorkspace() (tabs + tree).
-  // A guard stops the applied remote change from echoing back.
+  // ── workspace sync (sidebar → tree overlay) ──
+  // The workspace selector lives ONLY in the sidebar now (owner). The tree here
+  // is workspace-scoped (LeftSidebarContent fetches by activeWorkspaceId), so a
+  // sidebar switch must filter this tree — including view-workspaces. They're
+  // separate partitioned iframes, so the switch carries through the background;
+  // we apply it via the SAME activateWorkspace() (scope + view filtering). The
+  // broadcast side stays harmless (no local selector to fire it) so re-adding a
+  // selector later would still mirror; the guard prevents an applied change from
+  // echoing back.
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
   const applyingRemoteWsRef = useRef(false);
   const lastWsRef = useRef<string | null>(null);
@@ -165,25 +161,6 @@ export function TreeShellClient({
       }}
     >
       <DndWrapper>
-        {shellNavigationControls.length > 0 && (
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "4px 8px",
-              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-              flexShrink: 0,
-            }}
-          >
-            {shellNavigationControls.map((Control) =>
-              createElement(Control, {
-                key: Control.displayName ?? Control.name,
-                paneId: TOP_LEFT_PANE_ID,
-              }),
-            )}
-          </div>
-        )}
         <div
           style={{
             flex: 1,

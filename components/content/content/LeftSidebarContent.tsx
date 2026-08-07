@@ -2451,6 +2451,9 @@ export function LeftSidebarContent({
             isSelected={!selectedContentId}
             isView={activeWorkspaceIsView}
             viewRootTitle={activeViewRootTitle}
+            onRefresh={() => {
+              void fetchTree();
+            }}
             onClick={() => {
               setSelectedContentId(null);
               setSelectedIds([]);
