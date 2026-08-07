@@ -14,6 +14,7 @@ import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { RightSidebar } from "@/components/content/RightSidebar";
 import { STUDIO_TAB_KEY } from "@/extensions/studio/manifest";
+import { DeferredStoreHydrator } from "@/lib/features/stores/deferred-store-hydrator";
 import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -560,6 +561,11 @@ export function PanelShellClient({
         flexDirection: "column",
       }}
     >
+      {/* Rehydrate the deferred (skipHydration) stores — the app mounts this in
+          its layout, but the panel embed doesn't, so without it the RightSidebar's
+          right-sidebar-state store never hydrates and rightPanelReady sticks
+          false → the strip is stuck on its skeleton. Renders null. */}
+      <DeferredStoreHydrator />
       {/* Co-browse indicator + Stop (5d) — above both views, visible whenever a
           session is driving a tab. Renders nothing when inactive. */}
       <CoBrowseIndicator />
