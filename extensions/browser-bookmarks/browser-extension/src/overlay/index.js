@@ -3537,6 +3537,10 @@ function wireRootEvents(state) {
   chrome.runtime.sendMessage({ type: "get-panel-state" }, (resp) => {
     if (chrome.runtime.lastError) return;
     state.sidePanelOpen = resp?.ok ? resp.data?.open === true : false;
+    // Seed the "both" alternation from reality at load: if ANYTHING is open the
+    // first click closes all; if all closed the first click opens all. After
+    // that it simply alternates.
+    state.bothOpen = state.sidePanelOpen || isTreeOpen();
   });
   const isTreeOpen = () => state.treeIframe?.style.display === "block";
   // Guard: swallow the click that ends a drag so repositioning never fires a handle.
@@ -3556,19 +3560,24 @@ function wireRootEvents(state) {
   );
   // Both: all-or-nothing, never switching back and forth — if ANYTHING is open,
   // close everything; only when both are closed does it open both.
+  // Both: a single OPEN-ALL / CLOSE-ALL signal that simply ALTERNATES. It does
+  // NOT read the individual pane states to decide (those reads were the source of
+  // the misfires) — it flips a local intent, seeded from reality at load. The
+  // ops are idempotent (open-by-windowId reveals; close disables the panel), so
+  // each click lands fully open or fully closed.
   state.handleBoth?.addEventListener(
     "click",
     handleGuarded(() => {
-      const treeOpen = isTreeOpen();
-      const panelOpen = state.sidePanelOpen === true;
-      if (treeOpen || panelOpen) {
-        if (treeOpen) hideTreeOverlay(state);
-        if (panelOpen) closePanelViaMessage();
+      if (state.bothOpen) {
+        hideTreeOverlay(state);
+        closePanelViaMessage();
+        state.bothOpen = false;
       } else {
         // Open the panel FIRST so sidePanel.open() runs synchronously inside the
         // click gesture, then reveal the tree.
         openPanelViaMessage();
         showTreeOverlay(state, { toggle: false });
+        state.bothOpen = true;
       }
     }),
   );
