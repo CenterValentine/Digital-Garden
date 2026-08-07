@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
-import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
-import { PanelQuickAccess } from "@/components/content/PanelQuickAccess";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
 import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
 import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
@@ -26,12 +24,8 @@ import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
-import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
-import { createElement } from "react";
 
-const TREE_COLLAPSED_KEY = "dg-panel-tree-collapsed";
-const QUICK_ACCESS_COLLAPSED_KEY = "dg-panel-quick-access-collapsed";
 // Short opener pre-filled (not sent) into the new chat when opened via "Ask AI
 // about this page" — so a user who isn't expecting to type can just hit send.
 const ASK_ABOUT_PAGE_PREFILL = "Give me a quick overview of this page.";
@@ -161,19 +155,11 @@ interface PanelPageContext {
   faviconUrl?: string;
 }
 
-type PanelView = "garden" | "chat";
-
 export function PanelShellClient({
   themePreference = "system",
 }: {
   themePreference?: "light" | "dark" | "system";
 }) {
-  // Always first-paint the Garden, even when opened via "Ask AI about this
-  // page" (?view=chat). Cold-rendering the chat surface visible on the very
-  // first paint — before the Garden view's layout/effects have settled —
-  // tears the panel down. The requested view is applied one paint later in the
-  // effect below, which mirrors the proven launcher→Chat-tab path.
-  const [view, setView] = useState<PanelView>("garden");
   // "Ask AI about this page" bumps this to force a fresh conversation once the
   // page's content node is anchored; also gates the orchestration below.
   const [newChatNonce, setNewChatNonce] = useState(0);
@@ -187,16 +173,12 @@ export function PanelShellClient({
   useEffect(() => {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("view") === "chat") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- deliberate one-paint-later switch; see comment above
-      setView("chat");
-    }
     if (params.get("intent") === "ask-about-page") {
       pageChatPendingRef.current = true;
     }
     // Cold-open from a tree-overlay click (PANEL-OVERLAY-PLAN Phase 1b): the panel
     // was closed, so the target rode in on the URL. Open it in the workspace; the
-    // default Garden view shows it.
+    // content pane reveals when a selection exists.
     const openId = params.get("open");
     if (openId) {
       useContentStore.getState().openContentInPane(openId, TOP_LEFT_PANE_ID, {
@@ -206,11 +188,6 @@ export function PanelShellClient({
   }, []);
 
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
-  const [treeCollapsed, setTreeCollapsed] = useState(false);
-  // Quick access (Associated Content) starts collapsed: expanding it is what
-  // triggers the resource-context fetch, so a collapsed default keeps the panel
-  // from creating a WebResource row for every page you open.
-  const [quickAccessCollapsed, setQuickAccessCollapsed] = useState(true);
 
   // ── "Ask AI about this page" orchestration ──────────────────────────────
   // Mirror pageContext into a ref so the (stable-closure) message listener and
@@ -254,10 +231,6 @@ export function PanelShellClient({
   const setRightCollapsed = useRightPanelCollapseStore((s) => s.setCollapsed);
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
-  // Shell-slot navigation controls (the workspace chooser lives here) —
-  // rendered above the file tree per owner direction; the full navigation
-  // bar (back/forward, pane layout) is suppressed in the panel.
-  const shellNavigationControls = useExtensionShellNavigationControls();
   const selectedContentId = useContentStore((s) => s.selectedContentId);
 
   // ── B3-B settle-then-associate ────────────────────────────────────────────
@@ -333,45 +306,6 @@ export function PanelShellClient({
     if (layoutMode !== "single") setLayoutMode("single");
   }, [layoutMode, setLayoutMode]);
 
-  // Tree collapse preference persists per embed context.
-  useEffect(() => {
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
-      setTreeCollapsed(localStorage.getItem(TREE_COLLAPSED_KEY) === "true");
-      // Absent key → keep the collapsed default; only an explicit "false" opens
-      // it. (The disable above covers both setState calls in this effect.)
-      setQuickAccessCollapsed(
-        localStorage.getItem(QUICK_ACCESS_COLLAPSED_KEY) !== "false"
-      );
-    } catch {
-      // Storage unavailable (partitioned iframe edge cases) — default open.
-    }
-  }, []);
-
-  function toggleTreeCollapsed() {
-    setTreeCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(TREE_COLLAPSED_KEY, String(next));
-      } catch {
-        // Non-fatal.
-      }
-      return next;
-    });
-  }
-
-  function toggleQuickAccessCollapsed() {
-    setQuickAccessCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(QUICK_ACCESS_COLLAPSED_KEY, String(next));
-      } catch {
-        // Non-fatal.
-      }
-      return next;
-    });
-  }
-
   // C2-hardened message listener: exact-origin validation, versioned envelope.
   useEffect(() => {
     function handleMessage(event: MessageEvent) {
@@ -380,17 +314,11 @@ export function PanelShellClient({
       if (!data || typeof data !== "object") return;
       if (data.v !== 1 || data.source !== "dg-panel-host") return;
 
-      // Live view switch (host → embed). Sent when "Ask AI about this page"
-      // fires while the panel is ALREADY open: the background can't re-open the
-      // panel (that toggles it shut), so it asks us to switch to Chat in place.
-      if (
-        data.type === "set-view" &&
-        (data.payload?.view === "chat" || data.payload?.view === "garden")
-      ) {
-        setView(data.payload.view);
-        // Already-open "Ask AI about this page": kick off now if the page URL
-        // is known, else defer to the pending effect once it arrives.
-        if (data.payload.intent === "ask-about-page") {
+      // "Ask AI about this page" fired while the panel is ALREADY open. With the
+      // toggle retired, chat is always visible — no view switch needed; just kick
+      // off the page chat. (Message type kept for host compatibility.)
+      if (data.type === "set-view") {
+        if (data.payload?.intent === "ask-about-page") {
           if (pageContextRef.current?.url) {
             pageChatPendingRef.current = false;
             kickoffPageChat();
@@ -401,19 +329,19 @@ export function PanelShellClient({
       }
 
       // Tree overlay (PANEL-OVERLAY-PLAN Phase 1b): a file-click relayed here
-      // while the panel is already open. Open it in the workspace and show Garden.
+      // while the panel is already open. Open it in the workspace; the content
+      // pane reveals automatically when a selection exists.
       if (data.type === "open-content" && data.payload?.contentId) {
         useContentStore
           .getState()
           .openContentInPane(String(data.payload.contentId), TOP_LEFT_PANE_ID, {
             contentType: data.payload.contentType ?? null,
           });
-        setView("garden");
       }
 
       // The page's content node was resolved (reused or created). Anchor the
-      // chat to it, switch to Chat, start a fresh conversation, and capture the
-      // page so its context rides the user's first message.
+      // chat to it, start a fresh conversation, and capture the page so its
+      // context rides the user's first message. (Chat is always visible now.)
       if (data.type === "page-node-resolved") {
         if (data.payload?.url && data.payload.url !== pageChatUrlRef.current) {
           return;
@@ -426,7 +354,6 @@ export function PanelShellClient({
             .openContentInPane(contentId, TOP_LEFT_PANE_ID, {
               contentType: "external",
             });
-          setView("chat");
           setNewChatNonce((n) => n + 1);
           requestPageCapture("full");
         }
@@ -437,8 +364,7 @@ export function PanelShellClient({
           return;
         }
         pageChatUrlRef.current = null;
-        // Couldn't anchor — still show Chat so the user isn't left on Garden.
-        setView("chat");
+        // Couldn't anchor — chat stays visible, nothing to switch.
       }
 
       if (data.type === "page-context" && data.payload?.url) {
@@ -543,49 +469,17 @@ export function PanelShellClient({
       {/* Co-browse indicator + Stop (5d) — above both views, visible whenever a
           session is driving a tab. Renders nothing when inactive. */}
       <CoBrowseIndicator />
-      {/* Slim view switcher — app chrome, not extension chrome */}
+      {/* Slim top bar — the Garden/Chat toggle is retired (content + chat now
+          share the panel). Only the tree-launch handle remains here. */}
       <div
-        role="tablist"
-        aria-label="Panel view"
         style={{
           display: "flex",
-          gap: 4,
-          padding: "6px 8px",
+          justifyContent: "flex-end",
+          padding: "4px 8px",
           borderBottom: "1px solid var(--border-primary, #2a2a2a)",
           flexShrink: 0,
         }}
       >
-        {(
-          [
-            ["garden", "Garden"],
-            ["chat", "Chat"],
-          ] as const
-        ).map(([key, label]) => (
-          <button
-            key={key}
-            role="tab"
-            aria-selected={view === key}
-            onClick={() => setView(key)}
-            style={{
-              flex: 1,
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 6,
-              border: "1px solid transparent",
-              cursor: "pointer",
-              background:
-                view === key
-                  ? "var(--surface-secondary, #1e1e1e)"
-                  : "transparent",
-              color:
-                view === key
-                  ? "var(--text-primary, #f5f5f5)"
-                  : "var(--text-secondary, #9a9a9a)",
-            }}
-          >
-            {label}
-          </button>
-        ))}
         {/* Phase 2b: launch the right-side file-tree overlay from the panel. */}
         <button
           type="button"
@@ -595,6 +489,7 @@ export function PanelShellClient({
           style={{
             flexShrink: 0,
             width: 30,
+            height: 24,
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
@@ -620,214 +515,45 @@ export function PanelShellClient({
         </button>
       </div>
 
-      {/* DndWrapper spans BOTH views: the tree needs it for drag-and-drop, and
-          ChatInput's useDrop (drag a note onto the composer) throws
-          "Expected drag drop context" without a provider above it. */}
+      {/* Phase 3: content + chat share one space (toggle retired). Content sits on
+          top only while something is open; otherwise chat takes the full height.
+          Both stay mounted — MultiConversationSidebar must NEVER unmount (it holds
+          live useChat/streaming state). DndWrapper wraps both: ChatInput's useDrop
+          throws "Expected drag drop context" without a provider above it. */}
       <DndWrapper>
-      {/* Garden view: tree over tabbed workspace. Kept mounted when hidden. */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: view === "garden" ? "flex" : "none",
-          flexDirection: "column",
-        }}
-      >
-        <>
-          {/* Slim collapse bar — reclaims the tree's space for notes. */}
-          <button
-            type="button"
-            onClick={toggleTreeCollapsed}
-            aria-expanded={!treeCollapsed}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "3px 10px",
-              fontSize: 11,
-              border: 0,
-              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-              background: "transparent",
-              color: "var(--text-secondary, #9a9a9a)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                transition: "transform 0.15s",
-                transform: treeCollapsed ? "rotate(-90deg)" : "none",
-              }}
-            >
-              ▾
-            </span>
-            Files
-          </button>
-          {/* No overflow:auto here — LeftSidebar's virtualized tree owns its
-              scrolling and needs a bounded flex box (minHeight:0), not a
-              scrollable ancestor competing with it. */}
-          <div
-            style={{
-              // Grow to share the column (was a fixed 42%, which starved the
-              // virtualized tree to ~5 rows). minHeight floors it when open;
-              // the tree scrolls internally within whatever height it gets.
-              flex: 1,
-              minHeight: treeCollapsed ? 0 : 120,
-              display: treeCollapsed ? "none" : "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-            }}
-          >
-            {/* Workspace chooser — top of the collapsible Files section, so it
-                collapses away with the tree (owner direction 2026-07-20) */}
-            {shellNavigationControls.length > 0 && (
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  padding: "4px 8px",
-                  borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-                  flexShrink: 0,
-                }}
-              >
-                {shellNavigationControls.map((Control) =>
-                  createElement(Control, {
-                    key: Control.displayName ?? Control.name,
-                    paneId: TOP_LEFT_PANE_ID,
-                  })
-                )}
-              </div>
-            )}
-            {/* LeftSidebar's root is `h-full` (height:100%), which cannot
-                resolve against a flex-basis:0 parent, so the virtualized tree
-                sized to its own content (a circular 564px) instead of the
-                available space. This relative box IS bounded (flex:1 shares the
-                Files section); the absolutely-positioned inner fills it with a
-                DEFINITE height that h-full resolves against → the tree gets a
-                real height and scrolls. overflow:hidden guarantees nothing can
-                spill into the workspace below even mid-measure. */}
-            <div
-              style={{
-                flex: 1,
-                minHeight: 0,
-                position: "relative",
-                overflow: "hidden",
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  display: "flex",
-                  flexDirection: "column",
-                }}
-              >
-                <LeftSidebar />
-              </div>
-            </div>
-          </div>
-          {/* Quick access — Associated Content ported from the overlay. Same
-              disclosure design as Files (rotating chevron, CSS-var styling). */}
-          <button
-            type="button"
-            onClick={toggleQuickAccessCollapsed}
-            aria-expanded={!quickAccessCollapsed}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-              padding: "3px 10px",
-              fontSize: 11,
-              border: 0,
-              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-              background: "transparent",
-              color: "var(--text-secondary, #9a9a9a)",
-              cursor: "pointer",
-              flexShrink: 0,
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                transition: "transform 0.15s",
-                transform: quickAccessCollapsed ? "rotate(-90deg)" : "none",
-              }}
-            >
-              ▾
-            </span>
-            Quick access
-          </button>
-          <div
-            style={{
-              display: quickAccessCollapsed ? "none" : "block",
-              maxHeight: 260,
-              overflowY: "auto",
-              flexShrink: 0,
-              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-            }}
-          >
-            <PanelQuickAccess
+        {/* Content workspace — shown only when content is open. */}
+        <div
+          style={{
+            flex: selectedContentId != null ? "1 1 55%" : "0 0 0",
+            minHeight: 0,
+            display: selectedContentId != null ? "flex" : "none",
+            flexDirection: "column",
+            overflow: "hidden",
+            borderBottom: "1px solid var(--border-primary, #2a2a2a)",
+          }}
+        >
+          {/* B3-B: note↔page link toggle. Self-hides without an open note + page. */}
+          <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+            <PanelPageLinkButton
               pageUrl={pageContext?.url ?? null}
               pageTitle={pageContext?.title ?? ""}
-              faviconUrl={pageContext?.faviconUrl}
-              active={!quickAccessCollapsed}
+              contentId={selectedContentId}
             />
           </div>
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
-            {/* B3-B: note↔page link toggle. Renders only in the panel embed with
-                both an open note and a current page (self-hides otherwise). */}
-            <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-              <PanelPageLinkButton
-                pageUrl={pageContext?.url ?? null}
-                pageTitle={pageContext?.title ?? ""}
-                contentId={selectedContentId}
-              />
-            </div>
-            <MainPanelWorkspace />
-          </div>
-        </>
-      </div>
+          <MainPanelWorkspace />
+        </div>
 
-      {/* Chat view. Kept mounted when hidden so the conversation survives
-          view switches. pageContext is held for B2 (context scopes); the
-          page pill itself is extension chrome per decision #10. */}
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          display: view === "chat" ? "flex" : "none",
-          flexDirection: "column",
-        }}
-        data-page-context-url={pageContext?.url ?? undefined}
-      >
-        {/* Page-context bar now lives INSIDE the composer (ChatInput →
-            PanelPageContextBar), per owner direction — closer to where the
-            user types, and self-contained. */}
-        {/* Full multi-conversation surface (tabs + picker + new chat), the
-            same component the right sidebar mounts — a bare ChatPanel gave
-            no way to open or start conversations. Bound to whatever content
-            is active in the panel, so chats follow the Garden selection.
-            Wrapped in flex:1/min-height:0 so it takes the space LEFT of the
-            context bar — its own `h-full` would otherwise claim the full
-            parent height and push the composer off the bottom. */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+        {/* Chat — always present, always mounted. */}
+        <div
+          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+          data-page-context-url={pageContext?.url ?? undefined}
+        >
           <MultiConversationSidebar
             contentId={selectedContentId}
             newChatNonce={newChatNonce}
             newChatPrefill={ASK_ABOUT_PAGE_PREFILL}
           />
         </div>
-      </div>
       </DndWrapper>
 
       {/* Global context menu — the app mounts this in ResizablePanels, which
