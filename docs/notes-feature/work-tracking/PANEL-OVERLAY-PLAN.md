@@ -1,14 +1,18 @@
 ---
 title: Panel Overlay Plan — file tree to right-side overlay, sidebar reclaimed for co-browse chat + content
 status: >
-  BUILT — Phases 1–4 complete on feat/panel-tree-overlay (stacked on
-  feat/panel-ui-simplify; ext 4.2.4), 2026-08-06. 1a/1c tree-as-right-overlay,
-  1b tree-click-opens-in-panel, 2a three-handle cluster (smaller + draggable),
-  2b in-panel tree launcher, 3 retired the Garden/Chat toggle (content + chat
-  unified), 4 VERIFIED co-browse is surface-gated so all panel chat is uniformly
-  browser-enabled (no schema, no code — the unification IS the uniformity). Owner
-  smoke-tested through 2b live; final unified-panel smoke pending. Interim "swap"
-  idea DROPPED. Cutover: EXPLORATORY. Ready to PR the stack when owner confirms.
+  BUILT + REALIGNED — feat/panel-tree-overlay, ext 4.2.12, 2026-08-07. Phases
+  1–4: tree-as-right-overlay, tree-click-opens-in-panel, three-handle cluster
+  (draggable), in-panel tree launcher, retired the Garden/Chat toggle (content +
+  chat unified), co-browse VERIFIED surface-gated (no schema — the unification IS
+  the uniformity). REALIGNED per owner (Phase 5): the panel reuses the real
+  content workspace + the real RightSidebar as a resizable, clamped bottom strip
+  (Studio disabled); movable collapsed re-open handles shared by app + panel with
+  INDEPENDENT localStorage keys; the "both" handle is all-or-nothing; the handle
+  cluster gained a Pin (file the page under the selected folder) and a Link
+  (associate the page with the OPEN panel content), plus a disabled AI star; the
+  tree handle is a left-panel glyph. Owner smoke-tested 2026-08-07. Interim "swap"
+  idea DROPPED. Cutover: EXPLORATORY. READY TO PR the stack.
 owner: centervalentine
 extends: >
   BROWSER-REACH-PLAN.md (B1 panel shell, B4 overlay immersive projection) and
@@ -139,6 +143,34 @@ tree) is browser-enabled identically, and the main app (not `/embed/panel`) neve
 dangles co-browse it can't run. The "two-class chat" fear was a misconception:
 co-browse was never chat-gated. Nothing to build — the unification is the
 uniformity. (D2/D4 confirmed.)
+
+### Phase 5 — Realignment + affordances (owner-directed, 2026-08-07)
+The permanent chat dock from the first Phase-3 pass was rejected. The panel now
+**reuses the core app by composition** rather than re-implementing it:
+- **Panel body = the real components.** `MainPanelWorkspace` (content) on top +
+  the real `RightSidebar` (chat + backlinks/outline/tags) horizontalized as a
+  **resizable, clamped bottom strip** (`SIDEBAR_MIN/MAX/DEFAULT_FRAC`), never
+  allowed to oversize the viewport. Studio tab **disabled** (not cut) via
+  `RightSidebar disabledTabs`. "We're iframing, so including everything is cheap."
+- **Movable collapsed re-open handle** (`MovableCollapseHandle`) — the app's
+  rounded edge tab, made draggable-within-range and persisted. Shared by the
+  app's right sidebar (`dg-app-right-handle-pos`) and the panel strip
+  (`dg-panel-sidebar-handle-pos`) with **independent keys** — same look, separate
+  position. The app handle was also made movable so it stops blocking tabs / the ×.
+- **"Both" handle = all-or-nothing.** If anything (tree or panel) is open → close
+  everything; only when both are closed does it open both. Tree/panel handles
+  each toggle their own pane.
+- **Handle cluster affordances.** Tree handle → **left-panel glyph** (mirror of
+  the panel handle above it; the tree IS the left sidebar). New **Pin** handle:
+  click files the current page under the selected folder (or the parent of the
+  open content) via the bearer-authed `content-picker-tree` — the panel resolves
+  the target (it owns the selection), the background writes (it holds the token).
+  New **Link** handle (between Pin and AI): click associates the page with the
+  content OPEN in the panel (`fetchResourceContext` → `createResourceAssociation`).
+  Both flash **persistent green** on the acting handle, cleared on navigation via
+  the overlay's `_onUrlChange`. Disabled **AI star** ("coming soon"). An earlier
+  press-and-hold-to-link on the pin was dropped — a hold inside a draggable
+  cluster was inherently ambiguous; two explicit handles are clearer.
 
 ## Risks / watch items
 
