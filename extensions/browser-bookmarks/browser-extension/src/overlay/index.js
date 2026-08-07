@@ -393,11 +393,12 @@ function hideTreeOverlay(state) {
  * 1c). Loads /embed/tree lazily with a fresh embed session token (same auth flow
  * as openEmbedForPanel). Toggles: a second trigger hides it.
  */
-function showTreeOverlay(state) {
+function showTreeOverlay(state, { toggle = true } = {}) {
   const iframe = state.treeIframe;
   if (!iframe || !state.config?.appBaseUrl) return;
   if (iframe.style.display === "block") {
-    hideTreeOverlay(state);
+    // Already open: the tree handle toggles it shut; "open both" keeps it open.
+    if (toggle) hideTreeOverlay(state);
     return;
   }
   const reveal = () => {
@@ -710,6 +711,33 @@ function overlayStyles() {
       display: flex; bottom: 0; left: 50%; transform: translateX(-50%);
       width: 48px; height: 14px; border-bottom: 0; border-radius: 8px 8px 0 0; cursor: ew-resize;
     }
+
+    /* ── Three-handle control (PANEL-OVERLAY-PLAN Phase 2) ──
+       Replaces the single launcher/edge-tab: open tree / open panel / open both.
+       Docked mid-height at the right edge; "both" is the most prominent. The
+       old launcher + edge-tab are hidden (kept in code for now). */
+    .dg-launcher-btn, .dg-edge-tab { display: none !important; }
+    .dg-handle-cluster {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 5px;
+      z-index: 2147482400; pointer-events: auto;
+    }
+    .dg-handle {
+      width: 30px; height: 40px;
+      border: 1px solid rgba(201,168,108,0.28); border-right: 0;
+      border-radius: 9px 0 0 9px;
+      background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s; backdrop-filter: blur(10px);
+      padding: 0;
+    }
+    .dg-handle:hover { background: rgba(201,168,108,0.22); color: #f2e2b6; }
+    .dg-handle svg { width: 17px; height: 17px; }
+    .dg-handle[data-variant="both"] {
+      height: 54px; background: rgba(201,168,108,0.26);
+      border-color: rgba(201,168,108,0.52); color: #f6ead0;
+    }
+    .dg-handle[data-variant="both"]:hover { background: rgba(201,168,108,0.4); }
 
     /* ── Snap panel ── */
     .dg-snap-panel {
@@ -1115,6 +1143,11 @@ function createOverlayApp(state) {
     <div class="dg-overlay" data-snap="right" data-panel-open="false" data-idle="false">
       <button class="dg-launcher-btn" id="dg-launcher-btn" type="button" aria-label="Digital Garden">◌</button>
       <div class="dg-edge-tab" id="dg-edge-tab" role="button" tabindex="0" aria-label="Open Digital Garden panel"></div>
+      <div class="dg-handle-cluster" id="dg-handle-cluster">
+        <button class="dg-handle" data-variant="both" id="dg-handle-both" type="button" title="Open panel + file tree" aria-label="Open panel and file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button>
+        <button class="dg-handle" id="dg-handle-panel" type="button" title="Open panel" aria-label="Open panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
+        <button class="dg-handle" id="dg-handle-tree" type="button" title="Open file tree" aria-label="Open file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
+      </div>
       <div class="dg-snap-panel" id="dg-snap-panel">
         <div class="dg-panel-header">
           <select class="dg-workspace-select" id="dg-workspace-select">
@@ -1166,6 +1199,9 @@ function createOverlayApp(state) {
   state.root = shadow.querySelector(".dg-overlay");
   state.launcherBtn = shadow.getElementById("dg-launcher-btn");
   state.edgeTab = shadow.getElementById("dg-edge-tab");
+  state.handleTree = shadow.getElementById("dg-handle-tree");
+  state.handlePanel = shadow.getElementById("dg-handle-panel");
+  state.handleBoth = shadow.getElementById("dg-handle-both");
   state.snapPanel = shadow.getElementById("dg-snap-panel");
   state.workspaceSelect = shadow.getElementById("dg-workspace-select");
   state.panelCloseBtn = shadow.getElementById("dg-panel-close-btn");
@@ -3428,6 +3464,19 @@ function wireRootEvents(state) {
       // Older Chromium without sidePanel support falls back to the overlay.
       if (chrome.runtime.lastError) void openSnapPanel(state);
     });
+  });
+
+  // ── Three-handle control (PANEL-OVERLAY-PLAN Phase 2): tree / panel / both ──
+  const openPanelViaMessage = () => {
+    chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
+      if (chrome.runtime.lastError) void openSnapPanel(state);
+    });
+  };
+  state.handleTree?.addEventListener("click", () => showTreeOverlay(state));
+  state.handlePanel?.addEventListener("click", openPanelViaMessage);
+  state.handleBoth?.addEventListener("click", () => {
+    showTreeOverlay(state, { toggle: false });
+    openPanelViaMessage();
   });
 
   let launcherDrag = null;
