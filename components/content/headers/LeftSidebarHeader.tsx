@@ -68,7 +68,12 @@ export function LeftSidebarHeader({
   const { mode, toggleMode } = useLeftPanelCollapseStore();
   const { activeView, setActiveView } = useLeftPanelViewStore();
   const pathname = usePathname();
-  const isPanelEmbed = pathname?.startsWith("/embed/panel") ?? false;
+  // Both the side panel (/embed/panel) and the right-side tree overlay
+  // (/embed/tree) are compact extension surfaces that drop the full nav-tab row.
+  const isPanelEmbed =
+    (pathname?.startsWith("/embed/panel") ||
+      pathname?.startsWith("/embed/tree")) ??
+    false;
   const extensionNavItems = useExtensionHeaderNavItems();
   const unreadCount = useNotificationsStore((state) => state.unreadCount);
 
