@@ -7,6 +7,7 @@ import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import { useSettingsStore } from "@/state/settings-store";
+import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -62,6 +63,14 @@ export function TreeShellClient({
       { v: 1, source: "dg-tree-embed", type: "ready" },
       "*",
     );
+  }, []);
+
+  // Hydrate the workspace store. LeftSidebarContent gates its FIRST tree fetch on
+  // `workspaceStore.hasLoadedOnce` — in the full app / panel the workplaces shell
+  // controller fires this, but the bare tree shell mounts no shell controllers,
+  // so without this the tree sits on skeletons forever.
+  useEffect(() => {
+    void useWorkspaceStore.getState().loadWorkspaces();
   }, []);
 
   return (
