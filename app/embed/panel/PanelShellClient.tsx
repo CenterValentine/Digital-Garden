@@ -2,6 +2,7 @@
 
 import {
   createElement,
+  type PointerEvent as ReactPointerEvent,
   useCallback,
   useEffect,
   useRef,
@@ -11,7 +12,8 @@ import {
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
-import { MultiConversationSidebar } from "@/components/content/ai/MultiConversationSidebar";
+import { RightSidebar } from "@/components/content/RightSidebar";
+import { STUDIO_TAB_KEY } from "@/extensions/studio/manifest";
 import { CoBrowseIndicator } from "@/components/content/ai/CoBrowseIndicator";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
 import { fileTreeActionProvider } from "@/components/content/context-menu/file-tree-actions";
@@ -29,15 +31,21 @@ import {
 } from "@/lib/domain/browser-extension/panel-bridge";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
-import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
-// Short opener pre-filled (not sent) into the new chat when opened via "Ask AI
-// about this page" — so a user who isn't expecting to type can just hit send.
-const ASK_ABOUT_PAGE_PREFILL = "Give me a quick overview of this page.";
+// The panel = content workspace (top) + the real RightSidebar as a bottom strip
+// (chat + backlinks/outline/tags). Studio is trimmed — heavy for a short strip.
+// Module constant so RightSidebar's tab memo stays referentially stable.
+const PANEL_EXCLUDED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
+// The sidebar strip is drag-resizable but CLAMPED so it never starves the
+// workspace or gets too cramped to use. Fraction of the split's height.
+const SIDEBAR_MIN_FRAC = 0.22;
+const SIDEBAR_MAX_FRAC = 0.5;
+const SIDEBAR_DEFAULT_FRAC = 0.34;
+const SIDEBAR_FRAC_KEY = "dg-panel-sidebar-frac";
 // B3-B settle window: how long a page URL must hold steady before auto-linking
 // it to the open note. Long enough that flipping through tabs doesn't associate
 // every page you glance at.
@@ -169,9 +177,6 @@ export function PanelShellClient({
 }: {
   themePreference?: "light" | "dark" | "system";
 }) {
-  // "Ask AI about this page" bumps this to force a fresh conversation once the
-  // page's content node is anchored; also gates the orchestration below.
-  const [newChatNonce, setNewChatNonce] = useState(0);
   // True while we still owe a "new chat about this page" (intent seen, but the
   // page URL / resolved node isn't ready yet). A ref, not state, so the async
   // steps can read/clear it without re-render churn.
@@ -237,16 +242,9 @@ export function PanelShellClient({
   // lives in the composer (PanelPageContextBar) and drives capture itself.
   // This shell only relays the host's responses in via getState() (below),
   // so the listener effect needs no store deps.
-  const setRightCollapsed = useRightPanelCollapseStore((s) => s.setCollapsed);
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
   const selectedContentId = useContentStore((s) => s.selectedContentId);
-  const selectedContentType = useContentStore((s) => s.selectedContentType);
-  // Chat is the sidebar's job — never render a chat node as "content" in the
-  // workspace, or the panel shows TWO chat surfaces (composer + model picker) in
-  // one pane. Only non-chat content opens the top pane.
-  const showContentPane =
-    selectedContentId != null && selectedContentType !== "chat";
   // Workspace selector — belongs where the tabs are: switching it runs
   // content-store.restoreWorkspace() in THIS iframe, loading that workspace's
   // tabs (the machinery WorkplacesShellController already drives here). It was
@@ -342,11 +340,6 @@ export function PanelShellClient({
     document.documentElement.classList.toggle("dark", isDark);
   }, [isDark]);
 
-  // The panel has no room for the right sidebar; keep it collapsed.
-  useEffect(() => {
-    setRightCollapsed(true);
-  }, [setRightCollapsed]);
-
   // Single-pane by necessity at panel width. Enforced silently through the
   // store's own setLayoutMode (which reflows tabs into one pane), so nothing
   // app-side is overridden — the panel context just never leaves "single".
@@ -413,7 +406,6 @@ export function PanelShellClient({
             .openContentInPane(contentId, TOP_LEFT_PANE_ID, {
               contentType: "external",
             });
-          setNewChatNonce((n) => n + 1);
           requestPageCapture("full");
         }
       }
@@ -515,6 +507,49 @@ export function PanelShellClient({
     );
   }, []);
 
+  // ── content ↕ sidebar split ──
+  // The sidebar strip is drag-resizable but CLAMPED (SIDEBAR_MIN/MAX_FRAC) so it
+  // can't starve the workspace or get too cramped. Persisted per embed context.
+  const splitRef = useRef<HTMLDivElement>(null);
+  const [sidebarFrac, setSidebarFrac] = useState(SIDEBAR_DEFAULT_FRAC);
+  const sidebarFracRef = useRef(SIDEBAR_DEFAULT_FRAC);
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SIDEBAR_FRAC_KEY);
+      const f = raw ? Number.parseFloat(raw) : Number.NaN;
+      if (!Number.isNaN(f)) {
+        const clamped = Math.min(SIDEBAR_MAX_FRAC, Math.max(SIDEBAR_MIN_FRAC, f));
+        sidebarFracRef.current = clamped;
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
+        setSidebarFrac(clamped);
+      }
+    } catch {
+      // Storage unavailable — keep the default.
+    }
+  }, []);
+  const startSidebarDrag = useCallback((e: ReactPointerEvent) => {
+    e.preventDefault();
+    const onMove = (ev: PointerEvent) => {
+      const rect = splitRef.current?.getBoundingClientRect();
+      if (!rect || rect.height === 0) return;
+      const frac = (rect.bottom - ev.clientY) / rect.height;
+      const clamped = Math.min(SIDEBAR_MAX_FRAC, Math.max(SIDEBAR_MIN_FRAC, frac));
+      sidebarFracRef.current = clamped;
+      setSidebarFrac(clamped);
+    };
+    const onUp = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      try {
+        localStorage.setItem(SIDEBAR_FRAC_KEY, String(sidebarFracRef.current));
+      } catch {
+        // Non-fatal.
+      }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }, []);
+
   return (
     <div
       className={isDark ? "dark" : undefined}
@@ -585,41 +620,14 @@ export function PanelShellClient({
         </button>
       </div>
 
-      {/* Phase 3: content + chat share one space (toggle retired). Content sits on
-          top only while something is open; otherwise chat takes the full height.
-          Both stay mounted — MultiConversationSidebar must NEVER unmount (it holds
-          live useChat/streaming state). DndWrapper wraps both: ChatInput's useDrop
-          throws "Expected drag drop context" without a provider above it. */}
+      {/* The panel = the content workspace (top) + the real RightSidebar as a
+          bottom strip (chat + backlinks/outline/tags), the app's layout inverted
+          to a column. Both regions are minHeight:0 + overflow:hidden so nothing
+          can ever oversize past the panel. The strip is drag-resizable, clamped.
+          DndWrapper is required above both: ChatInput's useDrop throws without it. */}
       <DndWrapper>
-        {/* Content workspace — shown only when NON-CHAT content is open (a chat
-            node stays in the sidebar, never duplicated here). */}
         <div
-          style={{
-            flex: showContentPane ? "1 1 55%" : "0 0 0",
-            minHeight: 0,
-            display: showContentPane ? "flex" : "none",
-            flexDirection: "column",
-            overflow: "hidden",
-            borderBottom: "1px solid var(--border-primary, #2a2a2a)",
-          }}
-        >
-          {/* B3-B: note↔page link toggle. Self-hides without an open note + page. */}
-          <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
-            <PanelPageLinkButton
-              pageUrl={pageContext?.url ?? null}
-              pageTitle={pageContext?.title ?? ""}
-              contentId={selectedContentId}
-            />
-          </div>
-          <MainPanelWorkspace />
-        </div>
-
-        {/* Chat — always present, always mounted. The inner flex:1/min-height:0
-            wrapper is load-bearing: MultiConversationSidebar renders with h-full,
-            which would otherwise claim the full parent height and push the
-            composer past the viewport bottom. overflow:hidden is the hard floor
-            so nothing here can ever spill outside the panel. */}
-        <div
+          ref={splitRef}
           style={{
             flex: 1,
             minHeight: 0,
@@ -627,14 +635,58 @@ export function PanelShellClient({
             flexDirection: "column",
             overflow: "hidden",
           }}
-          data-page-context-url={pageContext?.url ?? undefined}
         >
-          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-            <MultiConversationSidebar
-              contentId={selectedContentId}
-              newChatNonce={newChatNonce}
-              newChatPrefill={ASK_ABOUT_PAGE_PREFILL}
-            />
+          {/* Content workspace — grows to fill above the sidebar strip. */}
+          <div
+            style={{
+              flex: "1 1 0",
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+            data-page-context-url={pageContext?.url ?? undefined}
+          >
+            {/* B3-B: note↔page link toggle. Self-hides without an open note + page. */}
+            <div style={{ flexShrink: 0, display: "flex", justifyContent: "flex-end" }}>
+              <PanelPageLinkButton
+                pageUrl={pageContext?.url ?? null}
+                pageTitle={pageContext?.title ?? ""}
+                contentId={selectedContentId}
+              />
+            </div>
+            <MainPanelWorkspace />
+          </div>
+
+          {/* Drag handle — resize the sidebar strip within its clamped range. */}
+          <div
+            onPointerDown={startSidebarDrag}
+            role="separator"
+            aria-orientation="horizontal"
+            title="Drag to resize"
+            style={{
+              flexShrink: 0,
+              height: 6,
+              cursor: "row-resize",
+              background: "var(--border-primary, #2a2a2a)",
+              borderTop: "1px solid var(--border-primary, #2a2a2a)",
+            }}
+          />
+
+          {/* Sidebar strip — chat + backlinks/outline/tags (Studio trimmed).
+              Clamped, bounded, never oversizes. */}
+          <div
+            style={{
+              flexBasis: `${sidebarFrac * 100}%`,
+              flexGrow: 0,
+              flexShrink: 0,
+              minHeight: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+            }}
+          >
+            <RightSidebar excludeTabs={PANEL_EXCLUDED_SIDEBAR_TABS} />
           </div>
         </div>
       </DndWrapper>
