@@ -53,7 +53,7 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**August 7, 2026**: **Panel Overlay redesign — tree-as-overlay, reclaimed sidebar, pin + link handles** (branch `feat/panel-tree-overlay`; ext 4.2.0 → 4.2.12; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR-ready)
+**August 7, 2026**: **Browser Extension V5 — Browser UI Overhaul** (Panel Overlay: tree-as-overlay, reclaimed sidebar, pin + link handles, slim panel chrome) (branch `feat/panel-tree-overlay`; ext 4.2.x → **5.0.0**; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR #152)
 
 The extension's file tree moves to a right-side on-page overlay; the side panel reuses the real content workspace + the real `RightSidebar` (chat + backlinks/outline/tags) as a resizable, clamped bottom strip (Studio disabled). A minimal handle cluster — both / panel / tree / **pin** / **link** / AI — with movable collapsed re-open handles (independent app vs panel localStorage keys). **Pin** files the current page under the selected folder (panel resolves target, background writes with the bearer token); **Link** associates the page with the content open in the panel; both flash persistent green cleared on navigation. Co-browse verified surface-gated (no schema). See `work-tracking/PANEL-OVERLAY-PLAN.md`.
 

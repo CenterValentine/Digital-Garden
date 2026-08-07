@@ -1,7 +1,9 @@
 ---
 title: Panel Overlay Plan — file tree to right-side overlay, sidebar reclaimed for co-browse chat + content
 status: >
-  BUILT + REALIGNED — feat/panel-tree-overlay, ext 4.2.12, 2026-08-07. Phases
+  SHIPPED as EXTENSION V5 (Browser UI Overhaul) — feat/panel-tree-overlay,
+  ext 5.0.0, PR #152, 2026-08-07. The cumulative drastic UI changes were recoined
+  from 4.2.x to a major V5. Phases
   1–4: tree-as-right-overlay, tree-click-opens-in-panel, three-handle cluster
   (draggable), in-panel tree launcher, retired the Garden/Chat toggle (content +
   chat unified), co-browse VERIFIED surface-gated (no schema — the unification IS
