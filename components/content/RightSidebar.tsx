@@ -39,9 +39,19 @@ interface RightSidebarProps {
    * embed does this for Studio.
    */
   disabledTabs?: string[];
+  /**
+   * Override the collapse toggle (the `>|` button). When set, the button calls
+   * this instead of the shared right-panel-collapse store — the panel embed uses
+   * it to keep its own, separate collapse state.
+   */
+  onToggleCollapse?: () => void;
 }
 
-export function RightSidebar({ excludeTabs, disabledTabs }: RightSidebarProps = {}) {
+export function RightSidebar({
+  excludeTabs,
+  disabledTabs,
+  onToggleCollapse,
+}: RightSidebarProps = {}) {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -122,6 +132,7 @@ export function RightSidebar({ excludeTabs, disabledTabs }: RightSidebarProps = 
         onTabChange={handleTabChange}
         disabled={!rightPanelReady}
         disabledTabs={disabledTabs}
+        onToggleCollapse={onToggleCollapse}
       />
 
       {/* Preference loader until the persisted last-seen view is known

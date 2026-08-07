@@ -33,7 +33,6 @@ import {
 } from "@/lib/domain/browser-extension/panel-bridge";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
-import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
@@ -50,6 +49,9 @@ const SIDEBAR_MIN_FRAC = 0.22;
 const SIDEBAR_MAX_FRAC = 0.74;
 const SIDEBAR_DEFAULT_FRAC = 0.4;
 const SIDEBAR_FRAC_KEY = "dg-panel-sidebar-frac";
+// Panel-owned collapse — a SEPARATE key from the app's right-panel-collapse
+// store so the identical-looking `>|` toggle never crosses into the app.
+const SIDEBAR_COLLAPSED_KEY = "dg-panel-sidebar-collapsed";
 // B3-B settle window: how long a page URL must hold steady before auto-linking
 // it to the open note. Long enough that flipping through tabs doesn't associate
 // every page you glance at.
@@ -249,11 +251,30 @@ export function PanelShellClient({
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
   const selectedContentId = useContentStore((s) => s.selectedContentId);
-  // The sidebar strip's collapse toggle is the `>|` button inside RightSidebar's
-  // header (it flips this store). The panel reads it to collapse the strip; when
-  // collapsed the button is hidden with the strip, so we show a slim re-open bar.
-  const isRightCollapsed = useRightPanelCollapseStore((s) => s.isCollapsed);
-  const toggleRightCollapsed = useRightPanelCollapseStore((s) => s.toggleCollapsed);
+  // Panel-OWNED collapse state (not the shared right-panel-collapse store, which
+  // is the app's and defaults collapsed). Own key, defaults open, persisted. The
+  // `>|` button in RightSidebar's header is wired to this via onToggleCollapse;
+  // when collapsed the strip is hidden, so a slim re-open bar shows instead.
+  const [isRightCollapsed, setIsRightCollapsed] = useState(false);
+  useEffect(() => {
+    try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time localStorage hydration
+      setIsRightCollapsed(localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true");
+    } catch {
+      // Storage unavailable — default open.
+    }
+  }, []);
+  const toggleRightCollapsed = useCallback(() => {
+    setIsRightCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(next));
+      } catch {
+        // Non-fatal.
+      }
+      return next;
+    });
+  }, []);
   // Workspace selector — belongs where the tabs are: switching it runs
   // content-store.restoreWorkspace() in THIS iframe, loading that workspace's
   // tabs (the machinery WorkplacesShellController already drives here). It was
@@ -727,7 +748,10 @@ export function PanelShellClient({
                   overflow: "hidden",
                 }}
               >
-                <RightSidebar disabledTabs={PANEL_DISABLED_SIDEBAR_TABS} />
+                <RightSidebar
+                  disabledTabs={PANEL_DISABLED_SIDEBAR_TABS}
+                  onToggleCollapse={toggleRightCollapsed}
+                />
               </div>
             </>
           )}
