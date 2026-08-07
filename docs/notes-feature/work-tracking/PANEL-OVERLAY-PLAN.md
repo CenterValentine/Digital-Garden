@@ -1,11 +1,14 @@
 ---
 title: Panel Overlay Plan — file tree to right-side overlay, sidebar reclaimed for co-browse chat + content
 status: >
-  PLANNING (2026-08-06). Move #1 (trim the extension nav-tab row in the panel
-  embed) SHIPPED on feat/panel-ui-simplify, ext bumped 4.0.0 -> 4.2.0. The
-  interim "swap content-store to a new tab" idea is DROPPED (throwaway vs. this
-  end-state). Cutover style: EXPLORATORY — rip old affordances early, move fast
-  (owner, 2026-08-06). Phase 1 (tree-as-right-overlay) NEXT.
+  BUILT — Phases 1–4 complete on feat/panel-tree-overlay (stacked on
+  feat/panel-ui-simplify; ext 4.2.4), 2026-08-06. 1a/1c tree-as-right-overlay,
+  1b tree-click-opens-in-panel, 2a three-handle cluster (smaller + draggable),
+  2b in-panel tree launcher, 3 retired the Garden/Chat toggle (content + chat
+  unified), 4 VERIFIED co-browse is surface-gated so all panel chat is uniformly
+  browser-enabled (no schema, no code — the unification IS the uniformity). Owner
+  smoke-tested through 2b live; final unified-panel smoke pending. Interim "swap"
+  idea DROPPED. Cutover: EXPLORATORY. Ready to PR the stack when owner confirms.
 owner: centervalentine
 extends: >
   BROWSER-REACH-PLAN.md (B1 panel shell, B4 overlay immersive projection) and
@@ -125,11 +128,17 @@ Each phase is independently shippable; extension phases need rebuild+reload and 
   the Garden/Chat toggle and "Files" bar (their rationale dissolves). Content
   target selection (sidebar default vs. overlay) wired to the open action.
 
-### Phase 4 — Uniform, honest co-browse (no schema)
-- Verify a tree-opened `ChatViewer` in the panel actually sends `coBrowseAvailable`
-  (D4); if not, pass panel context through (small, no schema).
-- Present chat as one thing in the panel (no "which kind" ambiguity). Ensure the
-  main-app chat doesn't advertise co-browse it can't perform.
+### Phase 4 — Uniform, honest co-browse (no schema) — VERIFIED, no code
+Traced the co-browse path (2026-08-06): `ChatViewer` (chat-as-content) calls the
+SAME `useConversationEngine` as the sidebar chat (`ChatViewer.tsx:261`, comment
+`:287`) and shares the same conversation store. The engine gates co-browse ONLY
+on `isCoBrowseAvailable()` / `isExtensionAcquireAvailable()`
+(`use-conversation-engine.ts:1899-1901,2334-2336`) — pure surface checks, no
+per-instance flag. So EVERY chat under `/embed/panel` (sidebar or opened-from-
+tree) is browser-enabled identically, and the main app (not `/embed/panel`) never
+dangles co-browse it can't run. The "two-class chat" fear was a misconception:
+co-browse was never chat-gated. Nothing to build — the unification is the
+uniformity. (D2/D4 confirmed.)
 
 ## Risks / watch items
 
