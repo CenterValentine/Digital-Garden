@@ -383,6 +383,46 @@ function applyFloatingPanelPosition(state) {
   state.snapPanel.style.height = `${panelH}px`;
 }
 
+function hideTreeOverlay(state) {
+  if (state.treeIframe) state.treeIframe.style.display = "none";
+  if (state.treeClose) state.treeClose.style.display = "none";
+}
+
+/**
+ * Show the full app file tree in the right-side dock (PANEL-OVERLAY-PLAN Phase
+ * 1c). Loads /embed/tree lazily with a fresh embed session token (same auth flow
+ * as openEmbedForPanel). Toggles: a second trigger hides it.
+ */
+function showTreeOverlay(state) {
+  const iframe = state.treeIframe;
+  if (!iframe || !state.config?.appBaseUrl) return;
+  if (iframe.style.display === "block") {
+    hideTreeOverlay(state);
+    return;
+  }
+  const reveal = () => {
+    iframe.style.display = "block";
+    if (state.treeClose) state.treeClose.style.display = "block";
+    markActivity(state);
+  };
+  if (state.treeIframeLoaded) {
+    reveal();
+    return;
+  }
+  const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
+  chrome.runtime.sendMessage({ type: "refresh-embed-session" }, (response) => {
+    const token = response?.ok && response?.data ? response.data.token : null;
+    iframe.setAttribute(
+      "src",
+      token
+        ? `${baseUrl}/embed/tree?_t=${encodeURIComponent(token)}`
+        : `${baseUrl}/embed/tree`,
+    );
+    state.treeIframeLoaded = true;
+    reveal();
+  });
+}
+
 async function openSnapPanel(state) {
   state.panelOpen = true;
   state.root.setAttribute("data-panel-open", "true");
@@ -1158,6 +1198,30 @@ function createOverlayApp(state) {
     "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;";
   shadow.appendChild(prewarmContainer);
   state.prewarmContainer = prewarmContainer;
+
+  // Dedicated right-docked iframe for the FULL app file tree (PANEL-OVERLAY-PLAN
+  // Phase 1c). Deliberately self-contained — independent of the snap panel (the
+  // native tree, kept in code for now) and the floating embed panels — so it
+  // can't disturb either. Loads /embed/tree; toggled by dg-show-tree-panel.
+  const treeIframe = document.createElement("iframe");
+  treeIframe.className = "dg-tree-iframe";
+  treeIframe.setAttribute("allow", "clipboard-read; clipboard-write");
+  treeIframe.style.cssText =
+    "position:fixed;top:0;right:0;width:340px;height:100vh;border:0;z-index:2147483000;background:#0d0d0d;display:none;box-shadow:-2px 0 12px rgba(0,0,0,0.35);";
+  shadow.appendChild(treeIframe);
+  state.treeIframe = treeIframe;
+  state.treeIframeLoaded = false;
+
+  const treeClose = document.createElement("button");
+  treeClose.className = "dg-tree-close";
+  treeClose.type = "button";
+  treeClose.textContent = "✕";
+  treeClose.title = "Close file tree";
+  treeClose.style.cssText =
+    "position:fixed;top:8px;right:350px;width:26px;height:26px;border:0;border-radius:6px;cursor:pointer;z-index:2147483001;background:rgba(0,0,0,0.62);color:#fff;font-size:13px;line-height:1;display:none;";
+  treeClose.addEventListener("click", () => hideTreeOverlay(state));
+  shadow.appendChild(treeClose);
+  state.treeClose = treeClose;
 }
 
 function schedulePersist(state, contentId) {
@@ -3254,17 +3318,18 @@ function wireRootEvents(state) {
     }
 
     if (message?.type === "dg-show-tree-panel") {
-      void (async () => {
-        try {
-          await openSnapPanel(state);
-          sendResponse?.({ ok: true });
-        } catch (error) {
-          sendResponse?.({
-            ok: false,
-            error: error instanceof Error ? error.message : "Failed to open tree panel",
-          });
-        }
-      })();
+      // PANEL-OVERLAY-PLAN Phase 1c: show the FULL app tree (/embed/tree) in the
+      // right dock instead of the native snap-panel tree. openSnapPanel + the
+      // native tree stay in code for now (owner: keep it around).
+      try {
+        showTreeOverlay(state);
+        sendResponse?.({ ok: true });
+      } catch (error) {
+        sendResponse?.({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open tree panel",
+        });
+      }
       return true;
     }
 
