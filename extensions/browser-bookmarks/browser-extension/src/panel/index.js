@@ -655,6 +655,15 @@ try {
     if (msg?.type === "workspace-changed" && msg.workspaceId) {
       postToEmbed("workspace-changed", { workspaceId: msg.workspaceId });
     }
+    // Close the side panel (the "both"/panel handle asked). No sidePanel.close()
+    // in MV3, so the panel document closes itself.
+    if (msg?.type === "close-panel") {
+      try {
+        window.close();
+      } catch {
+        // Some Chromium builds disallow programmatic side-panel close — no-op.
+      }
+    }
   });
   // Auto-recovery: a live port keeps the service worker awake, so while the
   // panel is open the port only disconnects if the EXTENSION was reloaded —

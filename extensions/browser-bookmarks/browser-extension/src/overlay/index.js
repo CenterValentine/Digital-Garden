@@ -739,6 +739,9 @@ function overlayStyles() {
       border-color: rgba(201,168,108,0.52); color: #f6ead0;
     }
     .dg-handle[data-variant="both"]:hover { background: rgba(201,168,108,0.4); }
+    .dg-handle-disabled { opacity: 0.38; cursor: not-allowed; }
+    .dg-handle-disabled:hover { background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82); }
+    .dg-handle-success { background: rgba(52,199,89,0.32) !important; border-color: rgba(52,199,89,0.6) !important; color: #eafff0 !important; }
 
     /* ── Snap panel ── */
     .dg-snap-panel {
@@ -1148,6 +1151,7 @@ function createOverlayApp(state) {
         <button class="dg-handle" data-variant="both" id="dg-handle-both" type="button" title="Open panel + file tree" aria-label="Open panel and file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button>
         <button class="dg-handle" id="dg-handle-panel" type="button" title="Open panel" aria-label="Open panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
         <button class="dg-handle" id="dg-handle-tree" type="button" title="Open file tree" aria-label="Open file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg></button>
+        <button class="dg-handle dg-handle-disabled" id="dg-handle-ai" type="button" title="AI — coming soon" aria-label="AI (coming soon)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></button>
       </div>
       <div class="dg-snap-panel" id="dg-snap-panel">
         <div class="dg-panel-header">
@@ -3491,24 +3495,55 @@ function wireRootEvents(state) {
     });
   });
 
-  // ── Three-handle control (PANEL-OVERLAY-PLAN Phase 2): tree / panel / both ──
+  // ── Handle control: tree / panel / both (+ disabled AI) ──
   const openPanelViaMessage = () => {
     chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
       if (chrome.runtime.lastError) void openSnapPanel(state);
     });
   };
+  const closePanelViaMessage = () => {
+    chrome.runtime.sendMessage({ type: "close-side-panel" }, () => {
+      void chrome.runtime.lastError;
+    });
+  };
+  // Ask the background whether the side panel is open (only it knows via its port).
+  const withPanelState = (cb) => {
+    chrome.runtime.sendMessage({ type: "get-panel-state" }, (resp) => {
+      cb(resp?.ok ? resp.data?.open === true : false);
+    });
+  };
+  const isTreeOpen = () => state.treeIframe?.style.display === "block";
   // Guard: swallow the click that ends a drag so repositioning never fires a handle.
   const handleGuarded = (fn) => () => {
     if (Date.now() < (state.suppressHandleClickUntil ?? 0)) return;
     fn();
   };
+  // Tree / panel: each toggles ITS OWN pane.
   state.handleTree?.addEventListener("click", handleGuarded(() => showTreeOverlay(state)));
-  state.handlePanel?.addEventListener("click", handleGuarded(openPanelViaMessage));
+  state.handlePanel?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      withPanelState((panelOpen) => {
+        if (panelOpen) closePanelViaMessage();
+        else openPanelViaMessage();
+      });
+    }),
+  );
+  // Both: all-or-nothing, never switching back and forth — if ANYTHING is open,
+  // close everything; only when both are closed does it open both.
   state.handleBoth?.addEventListener(
     "click",
     handleGuarded(() => {
-      showTreeOverlay(state, { toggle: false });
-      openPanelViaMessage();
+      const treeOpen = isTreeOpen();
+      withPanelState((panelOpen) => {
+        if (treeOpen || panelOpen) {
+          if (treeOpen) hideTreeOverlay(state);
+          if (panelOpen) closePanelViaMessage();
+        } else {
+          showTreeOverlay(state, { toggle: false });
+          openPanelViaMessage();
+        }
+      });
     }),
   );
 

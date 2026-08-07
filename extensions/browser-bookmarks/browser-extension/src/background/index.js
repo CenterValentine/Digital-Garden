@@ -2474,6 +2474,27 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Panel-open state — only the background knows (via its port). The overlay's
+  // "both"/panel handles query this to decide open-vs-close.
+  if (message.type === "get-panel-state") {
+    sendResponse({ ok: true, data: { open: panelPort != null } });
+    return true;
+  }
+
+  // Close the side panel. MV3 has no sidePanel.close(), so ask the panel page to
+  // close itself via its port (best-effort — window.close() in a side panel).
+  if (message.type === "close-side-panel") {
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "close-panel" });
+      } catch {
+        panelPort = null;
+      }
+    }
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
   // PANEL-OVERLAY-PLAN Phase 1b: open a tree-clicked content in the side panel.
   // Warm (panel open) → hand it straight to the embed via the dg-panel port.
   // Cold (panel closed) → stash it for the panel boot to consume, then open the
