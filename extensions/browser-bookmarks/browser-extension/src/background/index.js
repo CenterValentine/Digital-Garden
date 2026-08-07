@@ -1818,20 +1818,36 @@ chrome.runtime.onInstalled.addListener(async () => {
 // synchronous, so openAiChatPanel can branch without an await (which would
 // consume the user gesture that authorizes sidePanel.open).
 let panelPort = null;
+
+// Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
+// belief and never has to query it at click time. That matters because
+// chrome.sidePanel.open() needs a live user gesture, and an async state query
+// between the click and the open consumes the gesture — the open then silently
+// fails (the "both"/panel handle looks dead, especially after a manual close).
+// Also persists to chrome.storage.session so the belief survives service-worker
+// eviction (which nulls the in-memory `panelPort` even while the panel is open).
+function broadcastPanelState(open) {
+  void chrome.storage.session.set({ dgPanelOpen: open }).catch(() => {});
+  chrome.tabs.query({}, (tabs) => {
+    if (chrome.runtime.lastError) return;
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      chrome.tabs.sendMessage(tab.id, { type: "dg-panel-state", open }, () => {
+        void chrome.runtime.lastError; // no overlay in that tab — ignore
+      });
+    }
+  });
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "dg-panel") return;
   panelPort = port;
-  // Durable open-flag: `panelPort` is nulled whenever the service worker is
-  // evicted — which Chrome does even while the side panel is open — so an
-  // in-memory-only check reports "closed" on a cold wake, and the "both" handle
-  // then re-opens (toggling the real panel shut = the swap). chrome.storage.session
-  // survives eviction: set true on connect, false only on a genuine disconnect
-  // (which runs in a live SW; an eviction kills the SW without firing it, so the
-  // flag correctly stays true across eviction).
-  void chrome.storage.session.set({ dgPanelOpen: true }).catch(() => {});
+  broadcastPanelState(true);
   port.onDisconnect.addListener(() => {
+    // A genuine close runs this in a live SW → false. An eviction kills the SW
+    // without firing it, so the persisted flag stays true across eviction.
     if (panelPort === port) panelPort = null;
-    void chrome.storage.session.set({ dgPanelOpen: false }).catch(() => {});
+    broadcastPanelState(false);
   });
 });
 
@@ -2477,7 +2493,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     const target = windowId != null ? { windowId } : { tabId };
     chrome.sidePanel
       .open(target)
-      .then(() => sendResponse({ ok: true, data: true }))
+      .then(() => {
+        broadcastPanelState(true);
+        sendResponse({ ok: true, data: true });
+      })
       .catch((error) => {
         console.warn("[DG Bookmarks] open-side-panel failed", error, target);
         sendResponse({
@@ -2505,16 +2524,19 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  // Close the side panel. MV3 has no sidePanel.close(), so ask the panel page to
-  // close itself via its port (best-effort — window.close() in a side panel).
+  // Close the side panel. MV3 has no sidePanel.close(), and window.close() inside
+  // the panel page is ignored by many Chrome builds (the tree closed but the
+  // panel didn't). Disabling the panel closes it reliably; re-enable immediately
+  // after so it can be opened again (enabling does NOT auto-open it).
   if (message.type === "close-side-panel") {
-    if (panelPort) {
-      try {
-        panelPort.postMessage({ type: "close-panel" });
-      } catch {
-        panelPort = null;
-      }
-    }
+    chrome.sidePanel
+      .setOptions({ enabled: false })
+      .then(() => chrome.sidePanel.setOptions({ path: "panel.html", enabled: true }))
+      .catch((error) => {
+        console.warn("[DG Bookmarks] close-side-panel failed", error);
+      });
+    panelPort = null;
+    broadcastPanelState(false);
     sendResponse({ ok: true, data: true });
     return true;
   }

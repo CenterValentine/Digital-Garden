@@ -3407,6 +3407,14 @@ function wireRootEvents(state) {
       return true;
     }
 
+    if (message?.type === "dg-panel-state") {
+      // The background pushes the Chrome side-panel's open/closed state so the
+      // handle cluster can decide synchronously (no gesture-consuming query).
+      state.sidePanelOpen = message.open === true;
+      sendResponse?.({ ok: true });
+      return true;
+    }
+
     if (message?.type === "dg-show-tree-panel") {
       // PANEL-OVERLAY-PLAN Phase 1c: show the FULL app tree (/embed/tree) in the
       // right dock instead of the native snap-panel tree. openSnapPanel + the
@@ -3507,37 +3515,43 @@ function wireRootEvents(state) {
   });
 
   // ── Handle control: tree / panel / both (+ disabled AI) ──
+  // Optimistically flip the LOCAL belief the instant we act, so rapid clicks
+  // decide off the intended state; the background's dg-panel-state push confirms
+  // it shortly after.
   const openPanelViaMessage = () => {
+    state.sidePanelOpen = true;
     chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
       if (chrome.runtime.lastError) void openSnapPanel(state);
     });
   };
   const closePanelViaMessage = () => {
+    state.sidePanelOpen = false;
     chrome.runtime.sendMessage({ type: "close-side-panel" }, () => {
       void chrome.runtime.lastError;
     });
   };
-  // Ask the background whether the side panel is open (only it knows via its port).
-  const withPanelState = (cb) => {
-    chrome.runtime.sendMessage({ type: "get-panel-state" }, (resp) => {
-      cb(resp?.ok ? resp.data?.open === true : false);
-    });
-  };
+  // Seed the side-panel belief once at load (async is fine — not gesture
+  // critical). After that the background PUSHES dg-panel-state on every change,
+  // so the handles never need to query it at click time (a query would consume
+  // the user gesture that chrome.sidePanel.open() requires).
+  chrome.runtime.sendMessage({ type: "get-panel-state" }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    state.sidePanelOpen = resp?.ok ? resp.data?.open === true : false;
+  });
   const isTreeOpen = () => state.treeIframe?.style.display === "block";
   // Guard: swallow the click that ends a drag so repositioning never fires a handle.
   const handleGuarded = (fn) => () => {
     if (Date.now() < (state.suppressHandleClickUntil ?? 0)) return;
     fn();
   };
-  // Tree / panel: each toggles ITS OWN pane.
+  // Tree / panel: each toggles ITS OWN pane. The side-panel decision reads the
+  // LOCAL belief synchronously so the open runs inside the click gesture.
   state.handleTree?.addEventListener("click", handleGuarded(() => showTreeOverlay(state)));
   state.handlePanel?.addEventListener(
     "click",
     handleGuarded(() => {
-      withPanelState((panelOpen) => {
-        if (panelOpen) closePanelViaMessage();
-        else openPanelViaMessage();
-      });
+      if (state.sidePanelOpen === true) closePanelViaMessage();
+      else openPanelViaMessage();
     }),
   );
   // Both: all-or-nothing, never switching back and forth — if ANYTHING is open,
@@ -3546,15 +3560,16 @@ function wireRootEvents(state) {
     "click",
     handleGuarded(() => {
       const treeOpen = isTreeOpen();
-      withPanelState((panelOpen) => {
-        if (treeOpen || panelOpen) {
-          if (treeOpen) hideTreeOverlay(state);
-          if (panelOpen) closePanelViaMessage();
-        } else {
-          showTreeOverlay(state, { toggle: false });
-          openPanelViaMessage();
-        }
-      });
+      const panelOpen = state.sidePanelOpen === true;
+      if (treeOpen || panelOpen) {
+        if (treeOpen) hideTreeOverlay(state);
+        if (panelOpen) closePanelViaMessage();
+      } else {
+        // Open the panel FIRST so sidePanel.open() runs synchronously inside the
+        // click gesture, then reveal the tree.
+        openPanelViaMessage();
+        showTreeOverlay(state, { toggle: false });
+      }
     }),
   );
 
