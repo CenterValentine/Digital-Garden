@@ -113,7 +113,7 @@ export function RightSidebarHeader({ activeTab, onTabChange, disabled = false }:
   });
 
   return (
-    <div className="flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+    <div className="dg-rightsidebar-tabs flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
       <div className="scrollbar-hide flex min-w-0 flex-1 items-center justify-around overflow-x-auto">
         {uniqueTabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;

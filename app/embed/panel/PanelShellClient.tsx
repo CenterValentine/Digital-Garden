@@ -32,6 +32,7 @@ import {
 } from "@/lib/domain/browser-extension/panel-bridge";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
+import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
@@ -44,8 +45,8 @@ const PANEL_EXCLUDED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
 // The sidebar strip is drag-resizable but CLAMPED so it never starves the
 // workspace or gets too cramped to use. Fraction of the split's height.
 const SIDEBAR_MIN_FRAC = 0.22;
-const SIDEBAR_MAX_FRAC = 0.5;
-const SIDEBAR_DEFAULT_FRAC = 0.34;
+const SIDEBAR_MAX_FRAC = 0.62;
+const SIDEBAR_DEFAULT_FRAC = 0.4;
 const SIDEBAR_FRAC_KEY = "dg-panel-sidebar-frac";
 // B3-B settle window: how long a page URL must hold steady before auto-linking
 // it to the open note. Long enough that flipping through tabs doesn't associate
@@ -246,6 +247,11 @@ export function PanelShellClient({
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+  // The sidebar strip's collapse toggle is the `>|` button inside RightSidebar's
+  // header (it flips this store). The panel reads it to collapse the strip; when
+  // collapsed the button is hidden with the strip, so we show a slim re-open bar.
+  const isRightCollapsed = useRightPanelCollapseStore((s) => s.isCollapsed);
+  const toggleRightCollapsed = useRightPanelCollapseStore((s) => s.toggleCollapsed);
   // Workspace selector — belongs where the tabs are: switching it runs
   // content-store.restoreWorkspace() in THIS iframe, loading that workspace's
   // tabs (the machinery WorkplacesShellController already drives here). It was
@@ -664,36 +670,77 @@ export function PanelShellClient({
             <MainPanelWorkspace />
           </div>
 
-          {/* Drag handle — resize the sidebar strip within its clamped range. */}
-          <div
-            onPointerDown={startSidebarDrag}
-            role="separator"
-            aria-orientation="horizontal"
-            title="Drag to resize"
-            style={{
-              flexShrink: 0,
-              height: 6,
-              cursor: "row-resize",
-              background: "var(--border-primary, #2a2a2a)",
-              borderTop: "1px solid var(--border-primary, #2a2a2a)",
-            }}
-          />
+          {isRightCollapsed ? (
+            // Collapsed: a slim re-open bar (the `>|` toggle is hidden with the
+            // strip, so this is how the user brings it back).
+            <button
+              type="button"
+              onClick={toggleRightCollapsed}
+              title="Show sidebar"
+              aria-label="Show sidebar"
+              style={{
+                flexShrink: 0,
+                height: 28,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+                border: 0,
+                borderTop: "1px solid var(--border-primary, #2a2a2a)",
+                background: "transparent",
+                color: "var(--text-secondary, #9a9a9a)",
+                cursor: "pointer",
+                fontSize: 11,
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="m18 15-6-6-6 6" />
+              </svg>
+              Sidebar
+            </button>
+          ) : (
+            <>
+              {/* Drag handle — resize the sidebar strip within its clamped range. */}
+              <div
+                onPointerDown={startSidebarDrag}
+                role="separator"
+                aria-orientation="horizontal"
+                title="Drag to resize"
+                style={{
+                  flexShrink: 0,
+                  height: 6,
+                  cursor: "row-resize",
+                  background: "var(--border-primary, #2a2a2a)",
+                  borderTop: "1px solid var(--border-primary, #2a2a2a)",
+                }}
+              />
 
-          {/* Sidebar strip — chat + backlinks/outline/tags (Studio trimmed).
-              Clamped, bounded, never oversizes. */}
-          <div
-            style={{
-              flexBasis: `${sidebarFrac * 100}%`,
-              flexGrow: 0,
-              flexShrink: 0,
-              minHeight: 0,
-              display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
-            }}
-          >
-            <RightSidebar excludeTabs={PANEL_EXCLUDED_SIDEBAR_TABS} />
-          </div>
+              {/* Sidebar strip — chat + backlinks/outline/tags (Studio trimmed).
+                  Clamped, bounded, never oversizes. */}
+              <div
+                style={{
+                  flexBasis: `${sidebarFrac * 100}%`,
+                  flexGrow: 0,
+                  flexShrink: 0,
+                  minHeight: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }}
+              >
+                <RightSidebar excludeTabs={PANEL_EXCLUDED_SIDEBAR_TABS} />
+              </div>
+            </>
+          )}
         </div>
       </DndWrapper>
 
