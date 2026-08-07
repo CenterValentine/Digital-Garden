@@ -614,16 +614,28 @@ export function PanelShellClient({
           <MainPanelWorkspace />
         </div>
 
-        {/* Chat — always present, always mounted. */}
+        {/* Chat — always present, always mounted. The inner flex:1/min-height:0
+            wrapper is load-bearing: MultiConversationSidebar renders with h-full,
+            which would otherwise claim the full parent height and push the
+            composer past the viewport bottom. overflow:hidden is the hard floor
+            so nothing here can ever spill outside the panel. */}
         <div
-          style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}
+          style={{
+            flex: 1,
+            minHeight: 0,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
           data-page-context-url={pageContext?.url ?? undefined}
         >
-          <MultiConversationSidebar
-            contentId={selectedContentId}
-            newChatNonce={newChatNonce}
-            newChatPrefill={ASK_ABOUT_PAGE_PREFILL}
-          />
+          <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+            <MultiConversationSidebar
+              contentId={selectedContentId}
+              newChatNonce={newChatNonce}
+              newChatPrefill={ASK_ABOUT_PAGE_PREFILL}
+            />
+          </div>
         </div>
       </DndWrapper>
 
