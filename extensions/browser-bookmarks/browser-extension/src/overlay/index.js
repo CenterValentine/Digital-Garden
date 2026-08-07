@@ -719,23 +719,23 @@ function overlayStyles() {
     .dg-launcher-btn, .dg-edge-tab { display: none !important; }
     .dg-handle-cluster {
       position: fixed; right: 0; top: 50%; transform: translateY(-50%);
-      display: flex; flex-direction: column; gap: 3px;
+      display: flex; flex-direction: column; gap: 4px;
       z-index: 2147482400; pointer-events: auto; touch-action: none;
     }
     .dg-handle-cluster[data-dragging="true"] { cursor: grabbing; }
     .dg-handle {
-      width: 22px; height: 28px;
+      width: 26px; height: 34px;
       border: 1px solid rgba(201,168,108,0.28); border-right: 0;
-      border-radius: 7px 0 0 7px;
+      border-radius: 8px 0 0 8px;
       background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: background .15s, color .15s; backdrop-filter: blur(10px);
       padding: 0;
     }
     .dg-handle:hover { background: rgba(201,168,108,0.22); color: #f2e2b6; }
-    .dg-handle svg { width: 13px; height: 13px; }
+    .dg-handle svg { width: 15px; height: 15px; }
     .dg-handle[data-variant="both"] {
-      height: 38px; background: rgba(201,168,108,0.26);
+      height: 46px; background: rgba(201,168,108,0.26);
       border-color: rgba(201,168,108,0.52); color: #f6ead0;
     }
     .dg-handle[data-variant="both"]:hover { background: rgba(201,168,108,0.4); }
