@@ -719,22 +719,23 @@ function overlayStyles() {
     .dg-launcher-btn, .dg-edge-tab { display: none !important; }
     .dg-handle-cluster {
       position: fixed; right: 0; top: 50%; transform: translateY(-50%);
-      display: flex; flex-direction: column; gap: 5px;
-      z-index: 2147482400; pointer-events: auto;
+      display: flex; flex-direction: column; gap: 3px;
+      z-index: 2147482400; pointer-events: auto; touch-action: none;
     }
+    .dg-handle-cluster[data-dragging="true"] { cursor: grabbing; }
     .dg-handle {
-      width: 30px; height: 40px;
+      width: 22px; height: 28px;
       border: 1px solid rgba(201,168,108,0.28); border-right: 0;
-      border-radius: 9px 0 0 9px;
+      border-radius: 7px 0 0 7px;
       background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82);
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: background .15s, color .15s; backdrop-filter: blur(10px);
       padding: 0;
     }
     .dg-handle:hover { background: rgba(201,168,108,0.22); color: #f2e2b6; }
-    .dg-handle svg { width: 17px; height: 17px; }
+    .dg-handle svg { width: 13px; height: 13px; }
     .dg-handle[data-variant="both"] {
-      height: 54px; background: rgba(201,168,108,0.26);
+      height: 38px; background: rgba(201,168,108,0.26);
       border-color: rgba(201,168,108,0.52); color: #f6ead0;
     }
     .dg-handle[data-variant="both"]:hover { background: rgba(201,168,108,0.4); }
@@ -1199,6 +1200,7 @@ function createOverlayApp(state) {
   state.root = shadow.querySelector(".dg-overlay");
   state.launcherBtn = shadow.getElementById("dg-launcher-btn");
   state.edgeTab = shadow.getElementById("dg-edge-tab");
+  state.handleCluster = shadow.getElementById("dg-handle-cluster");
   state.handleTree = shadow.getElementById("dg-handle-tree");
   state.handlePanel = shadow.getElementById("dg-handle-panel");
   state.handleBoth = shadow.getElementById("dg-handle-both");
@@ -3472,12 +3474,71 @@ function wireRootEvents(state) {
       if (chrome.runtime.lastError) void openSnapPanel(state);
     });
   };
-  state.handleTree?.addEventListener("click", () => showTreeOverlay(state));
-  state.handlePanel?.addEventListener("click", openPanelViaMessage);
-  state.handleBoth?.addEventListener("click", () => {
-    showTreeOverlay(state, { toggle: false });
-    openPanelViaMessage();
-  });
+  // Guard: swallow the click that ends a drag so repositioning never fires a handle.
+  const handleGuarded = (fn) => () => {
+    if (Date.now() < (state.suppressHandleClickUntil ?? 0)) return;
+    fn();
+  };
+  state.handleTree?.addEventListener("click", handleGuarded(() => showTreeOverlay(state)));
+  state.handlePanel?.addEventListener("click", handleGuarded(openPanelViaMessage));
+  state.handleBoth?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      showTreeOverlay(state, { toggle: false });
+      openPanelViaMessage();
+    }),
+  );
+
+  // Drag the cluster vertically along the right wall. The offset is a fraction of
+  // viewport height, persisted globally (chrome.storage.local) so it holds across
+  // pages. Clamped so the cluster can't be dragged off-screen.
+  const applyClusterOffset = () => {
+    if (!state.handleCluster) return;
+    const frac = Math.min(0.92, Math.max(0.08, state.handleClusterOffset ?? 0.5));
+    state.handleCluster.style.top = `${frac * 100}%`;
+  };
+  chrome.storage.local
+    .get("dgHandleClusterOffset")
+    .then((r) => {
+      if (typeof r.dgHandleClusterOffset === "number") {
+        state.handleClusterOffset = r.dgHandleClusterOffset;
+        applyClusterOffset();
+      }
+    })
+    .catch(() => {});
+  if (state.handleCluster) {
+    let clusterDrag = null;
+    state.handleCluster.addEventListener("pointerdown", (event) => {
+      clusterDrag = { startY: event.clientY, moved: false };
+      const onMove = (moveEvent) => {
+        if (!clusterDrag) return;
+        if (!clusterDrag.moved && Math.abs(moveEvent.clientY - clusterDrag.startY) > 4) {
+          clusterDrag.moved = true;
+          state.handleCluster.setAttribute("data-dragging", "true");
+        }
+        if (!clusterDrag.moved) return;
+        state.handleClusterOffset = Math.min(
+          0.92,
+          Math.max(0.08, moveEvent.clientY / window.innerHeight),
+        );
+        applyClusterOffset();
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        state.handleCluster.removeAttribute("data-dragging");
+        if (clusterDrag?.moved) {
+          state.suppressHandleClickUntil = Date.now() + 250;
+          chrome.storage.local
+            .set({ dgHandleClusterOffset: state.handleClusterOffset })
+            .catch(() => {});
+        }
+        clusterDrag = null;
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  }
 
   let launcherDrag = null;
   state.launcherBtn.addEventListener("pointerdown", (event) => {

@@ -186,6 +186,15 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Phase 2b: the panel asks to open the right-side tree overlay. Relay the
+  // existing show-tree-panel message to the background → active tab's overlay.
+  if (data.type === "show-tree") {
+    chrome.runtime.sendMessage({ type: "show-tree-panel" }, () => {
+      void chrome.runtime.lastError; // fire-and-forget; overlay may be unavailable
+    });
+    return;
+  }
+
   // Capture: the embed asks for the current page's content at a scope. Only
   // the content script can read the page, so relay there and post the result
   // back. The active tab is authoritative here (the panel host tracks it).
