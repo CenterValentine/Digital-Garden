@@ -2491,6 +2491,9 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // tabId toggles/collapses it (learned in B2's chat-panel work); windowId
     // reveals it for the whole window. tabId is only a last resort.
     const target = windowId != null ? { windowId } : { tabId };
+    // Re-enable in case a previous close disabled the panel. Fire-and-forget (no
+    // await) so the gesture-critical open() below still runs synchronously.
+    chrome.sidePanel.setOptions({ path: "panel.html", enabled: true }).catch(() => {});
     chrome.sidePanel
       .open(target)
       .then(() => {
@@ -2529,12 +2532,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // panel didn't). Disabling the panel closes it reliably; re-enable immediately
   // after so it can be opened again (enabling does NOT auto-open it).
   if (message.type === "close-side-panel") {
-    chrome.sidePanel
-      .setOptions({ enabled: false })
-      .then(() => chrome.sidePanel.setOptions({ path: "panel.html", enabled: true }))
-      .catch((error) => {
-        console.warn("[DG Bookmarks] close-side-panel failed", error);
-      });
+    // Disabling the global side panel closes it. Do NOT re-enable here — an
+    // immediate re-enable cancels the close before it takes effect (the panel
+    // stays open while the tree closes = the split the owner saw). The open path
+    // re-enables just before it opens.
+    chrome.sidePanel.setOptions({ enabled: false }).catch((error) => {
+      console.warn("[DG Bookmarks] close-side-panel failed", error);
+    });
     panelPort = null;
     broadcastPanelState(false);
     sendResponse({ ok: true, data: true });
