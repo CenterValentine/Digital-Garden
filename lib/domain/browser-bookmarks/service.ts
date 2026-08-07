@@ -988,7 +988,7 @@ export async function createBrowserExtensionTokenRecord(
   const token = await prisma.browserExtensionToken.create({
     data: {
       userId,
-      name: input.name.trim() || "Browser Bookmarks",
+      name: input.name.trim() || "Browser Extension",
       tokenHash: hashBrowserExtensionToken(tokenValue),
       tokenPrefix: createBrowserExtensionTokenPrefix(tokenValue),
       scopes:
@@ -1092,7 +1092,7 @@ export async function trustBrowserExtensionInstall(
     const token = await tx.browserExtensionToken.create({
       data: {
         userId,
-        name: `${input.browserName} Browser Bookmarks`,
+        name: `${input.browserName} Browser Extension`,
         tokenHash: hashBrowserExtensionToken(tokenValue),
         tokenPrefix: createBrowserExtensionTokenPrefix(tokenValue),
         scopes: [BROWSER_BOOKMARKS_SCOPE],

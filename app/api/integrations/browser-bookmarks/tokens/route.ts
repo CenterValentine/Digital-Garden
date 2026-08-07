@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     const session = await requireAuth();
     const body = await request.json();
     const data = await createBrowserExtensionTokenRecord(session.user.id, {
-      name: typeof body.name === "string" ? body.name : "Browser Bookmarks",
+      name: typeof body.name === "string" ? body.name : "Browser Extension",
       expiresAt:
         body.expiresAt === null || typeof body.expiresAt === "string"
           ? body.expiresAt

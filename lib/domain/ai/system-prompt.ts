@@ -289,7 +289,7 @@ export function buildSystemPrompt(ctx: SystemPromptContext): string {
     ];
     if (ctx.hasTabLauncher) {
       parts.push(
-        "Use `open_tab_and_read` ONLY when the user EXPLICITLY asks to open a page in a tab (it forces the visible tab immediately). If a read reports that opening tabs is turned off, relay that briefly — the user can enable it in Browser Bookmarks settings. When a read result carries an `escalationNote`, mention what it says in one short line (e.g. \"a normal read was blocked, so I opened a tab\") so the user can see the steps that were taken.",
+        "Use `open_tab_and_read` ONLY when the user EXPLICITLY asks to open a page in a tab (it forces the visible tab immediately). If a read reports that opening tabs is turned off, relay that briefly — the user can enable it in Browser Extension and Cobrowse settings. When a read result carries an `escalationNote`, mention what it says in one short line (e.g. \"a normal read was blocked, so I opened a tab\") so the user can see the steps that were taken.",
       );
     }
     parts.push(

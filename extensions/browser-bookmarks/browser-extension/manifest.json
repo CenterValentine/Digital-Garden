@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Digital Garden Browser Bookmarks",
+  "name": "Digital Garden Browser Extension",
   "version": "5.0.0",
   "description": "Sync your Chromium browser's activity as external links to your content folders.",
   "permissions": [
@@ -40,7 +40,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Digital Garden Bookmarks",
+    "default_title": "Digital Garden Browser Extension",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",

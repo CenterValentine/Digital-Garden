@@ -438,7 +438,7 @@ export default function BrowserBookmarksSettingsPage() {
         installed: node.getAttribute("data-installed") === "true",
         extensionId: node.getAttribute("data-extension-id") || "",
         extensionName:
-          node.getAttribute("data-extension-name") || "Digital Garden Browser Bookmarks",
+          node.getAttribute("data-extension-name") || "Digital Garden Browser Extension",
         extensionVersion: node.getAttribute("data-extension-version") || "",
         installInstanceId: node.getAttribute("data-install-instance-id") || "",
         trustedInstallId: node.getAttribute("data-trusted-install-id") || null,
@@ -897,7 +897,7 @@ export default function BrowserBookmarksSettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Browser Bookmarks</h1>
+        <h1 className="text-3xl font-bold">Browser Extension and Cobrowse</h1>
         <p className="mt-2 text-muted-foreground">
           Trust browser installs, attach them to sync connections, and manage browser bookmark integration
           for Chrome and Vivaldi.
@@ -958,7 +958,7 @@ export default function BrowserBookmarksSettingsPage() {
             <div className="font-medium text-foreground">Install the browser extension first</div>
             <div className="mt-2 text-muted-foreground">
               This app page cannot read browser bookmarks on its own. Install the Digital Garden Browser
-              Bookmarks extension in your Chromium browser, then reload this page.
+              Extension in your Chromium browser, then reload this page.
             </div>
             <div className="mt-3 space-y-1 text-muted-foreground">
               <div>1. Open `chrome://extensions` or `vivaldi://extensions`.</div>
