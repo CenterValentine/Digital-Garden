@@ -694,11 +694,11 @@ export function PanelShellClient({
           </div>
 
           {isRightCollapsed ? (
-            // Collapsed: the SAME movable rounded handle as the main app, docked
-            // to the bottom edge (where the strip collapses to). Its own position
-            // key — deliberately separate from the app's handle.
+            // Collapsed: the SAME movable rounded handle as the main app, on the
+            // right wall (owner). Its own position key — deliberately separate
+            // from the app's handle.
             <MovableCollapseHandle
-              edge="bottom"
+              edge="right"
               onExpand={toggleRightCollapsed}
               positionKey="dg-panel-sidebar-handle-pos"
             />
