@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {
+  createElement,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { MainPanelWorkspace } from "@/components/content/MainPanelWorkspace";
 import { PanelPageLinkButton } from "@/components/content/PanelPageLinkButton";
@@ -24,6 +31,7 @@ import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
 import { useSettingsStore } from "@/state/settings-store";
+import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
 // Short opener pre-filled (not sent) into the new chat when opened via "Ask AI
@@ -232,6 +240,17 @@ export function PanelShellClient({
   const layoutMode = useContentStore((s) => s.layoutMode);
   const setLayoutMode = useContentStore((s) => s.setLayoutMode);
   const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const selectedContentType = useContentStore((s) => s.selectedContentType);
+  // Chat is the sidebar's job — never render a chat node as "content" in the
+  // workspace, or the panel shows TWO chat surfaces (composer + model picker) in
+  // one pane. Only non-chat content opens the top pane.
+  const showContentPane =
+    selectedContentId != null && selectedContentType !== "chat";
+  // Workspace selector — belongs where the tabs are: switching it runs
+  // content-store.restoreWorkspace() in THIS iframe, loading that workspace's
+  // tabs (the machinery WorkplacesShellController already drives here). It was
+  // dropped when Phase 3 stripped the Garden view; restore it in the top bar.
+  const shellNavigationControls = useExtensionShellNavigationControls();
 
   // ── B3-B settle-then-associate ────────────────────────────────────────────
   // Capture settings (killswitch + denylist) live in the extension's
@@ -474,12 +493,23 @@ export function PanelShellClient({
       <div
         style={{
           display: "flex",
-          justifyContent: "flex-end",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 6,
           padding: "4px 8px",
           borderBottom: "1px solid var(--border-primary, #2a2a2a)",
           flexShrink: 0,
         }}
       >
+        {/* Workspace selector — switching it loads that workspace's tabs here. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
+          {shellNavigationControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId: TOP_LEFT_PANE_ID,
+            }),
+          )}
+        </div>
         {/* Phase 2b: launch the right-side file-tree overlay from the panel. */}
         <button
           type="button"
@@ -521,12 +551,13 @@ export function PanelShellClient({
           live useChat/streaming state). DndWrapper wraps both: ChatInput's useDrop
           throws "Expected drag drop context" without a provider above it. */}
       <DndWrapper>
-        {/* Content workspace — shown only when content is open. */}
+        {/* Content workspace — shown only when NON-CHAT content is open (a chat
+            node stays in the sidebar, never duplicated here). */}
         <div
           style={{
-            flex: selectedContentId != null ? "1 1 55%" : "0 0 0",
+            flex: showContentPane ? "1 1 55%" : "0 0 0",
             minHeight: 0,
-            display: selectedContentId != null ? "flex" : "none",
+            display: showContentPane ? "flex" : "none",
             flexDirection: "column",
             overflow: "hidden",
             borderBottom: "1px solid var(--border-primary, #2a2a2a)",
