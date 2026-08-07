@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
@@ -8,6 +8,7 @@ import { fileTreeActionProvider } from "@/components/content/context-menu/file-t
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
+import { useContentStore } from "@/state/content-store";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -72,6 +73,36 @@ export function TreeShellClient({
   useEffect(() => {
     void useWorkspaceStore.getState().loadWorkspaces();
   }, []);
+
+  // ── open-content wire (PANEL-OVERLAY-PLAN Phase 1b) ──
+  // A file-click sets content-store's selection. Since this tree lives in its own
+  // partitioned iframe (no workspace to render into), relay the selection to the
+  // overlay host → background → side panel, where it opens by default. The local
+  // store update is harmless (nothing here consumes it).
+  const selectedContentId = useContentStore((s) => s.selectedContentId);
+  const selectedContentType = useContentStore((s) => s.selectedContentType);
+  const lastOpenedRef = useRef<string | null>(null);
+  const openWatchReadyRef = useRef(false);
+  useEffect(() => {
+    // Skip the hydrated initial value so a persisted selection doesn't auto-open
+    // on load — only user clicks after mount should open in the panel.
+    if (!openWatchReadyRef.current) {
+      openWatchReadyRef.current = true;
+      lastOpenedRef.current = selectedContentId;
+      return;
+    }
+    if (!selectedContentId || selectedContentId === lastOpenedRef.current) return;
+    lastOpenedRef.current = selectedContentId;
+    window.parent.postMessage(
+      {
+        v: 1,
+        source: "dg-tree-embed",
+        type: "open-content",
+        payload: { contentId: selectedContentId, contentType: selectedContentType },
+      },
+      "*",
+    );
+  }, [selectedContentId, selectedContentType]);
 
   return (
     <div

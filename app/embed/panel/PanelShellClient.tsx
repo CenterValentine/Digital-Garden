@@ -194,6 +194,15 @@ export function PanelShellClient({
     if (params.get("intent") === "ask-about-page") {
       pageChatPendingRef.current = true;
     }
+    // Cold-open from a tree-overlay click (PANEL-OVERLAY-PLAN Phase 1b): the panel
+    // was closed, so the target rode in on the URL. Open it in the workspace; the
+    // default Garden view shows it.
+    const openId = params.get("open");
+    if (openId) {
+      useContentStore.getState().openContentInPane(openId, TOP_LEFT_PANE_ID, {
+        contentType: params.get("openType"),
+      });
+    }
   }, []);
 
   const [pageContext, setPageContext] = useState<PanelPageContext | null>(null);
@@ -379,6 +388,17 @@ export function PanelShellClient({
             pageChatPendingRef.current = true;
           }
         }
+      }
+
+      // Tree overlay (PANEL-OVERLAY-PLAN Phase 1b): a file-click relayed here
+      // while the panel is already open. Open it in the workspace and show Garden.
+      if (data.type === "open-content" && data.payload?.contentId) {
+        useContentStore
+          .getState()
+          .openContentInPane(String(data.payload.contentId), TOP_LEFT_PANE_ID, {
+            contentType: data.payload.contentType ?? null,
+          });
+        setView("garden");
       }
 
       // The page's content node was resolved (reused or created). Anchor the

@@ -402,7 +402,7 @@ function showTreeOverlay(state) {
   }
   const reveal = () => {
     iframe.style.display = "block";
-    if (state.treeClose) state.treeClose.style.display = "block";
+    if (state.treeClose) state.treeClose.style.display = "flex";
     markActivity(state);
   };
   if (state.treeIframeLoaded) {
@@ -1212,16 +1212,45 @@ function createOverlayApp(state) {
   state.treeIframe = treeIframe;
   state.treeIframeLoaded = false;
 
+  // Collapse handle styled like the app's sidebar toggle (panel-collapse icon).
+  // Right-side mirror (PanelRightClose) since the tree docks right; clicking it
+  // closes the tree — matching the app's toggle look, per owner.
   const treeClose = document.createElement("button");
   treeClose.className = "dg-tree-close";
   treeClose.type = "button";
-  treeClose.textContent = "✕";
   treeClose.title = "Close file tree";
+  treeClose.innerHTML =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>';
   treeClose.style.cssText =
-    "position:fixed;top:8px;right:350px;width:26px;height:26px;border:0;border-radius:6px;cursor:pointer;z-index:2147483001;background:rgba(0,0,0,0.62);color:#fff;font-size:13px;line-height:1;display:none;";
+    "position:fixed;top:8px;right:348px;width:28px;height:28px;border:0;border-radius:6px;cursor:pointer;z-index:2147483001;background:rgba(255,255,255,0.1);color:#d1d5db;align-items:center;justify-content:center;transition:color .12s;display:none;";
+  treeClose.addEventListener("mouseenter", () => {
+    treeClose.style.color = "#C9A86C";
+  });
+  treeClose.addEventListener("mouseleave", () => {
+    treeClose.style.color = "#d1d5db";
+  });
   treeClose.addEventListener("click", () => hideTreeOverlay(state));
   shadow.appendChild(treeClose);
   state.treeClose = treeClose;
+
+  // PANEL-OVERLAY-PLAN Phase 1b: the tree iframe relays a file-click here (its
+  // own listener — the embed-iframe listener gates on state.embedIframe). Default
+  // target = the side panel; hand it to the background, which opens the panel and
+  // routes the content to PanelShellClient.
+  window.addEventListener("message", (event) => {
+    if (!state.treeIframe || event.source !== state.treeIframe.contentWindow) return;
+    const data = event.data;
+    if (!data || typeof data !== "object" || data.source !== "dg-tree-embed") return;
+    if (data.type === "open-content" && data.payload?.contentId) {
+      chrome.runtime.sendMessage({
+        type: "open-content-in-side-panel",
+        payload: {
+          contentId: data.payload.contentId,
+          contentType: data.payload.contentType || null,
+        },
+      });
+    }
+  });
 }
 
 function schedulePersist(state, contentId) {

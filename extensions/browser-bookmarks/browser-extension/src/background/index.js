@@ -2474,6 +2474,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // PANEL-OVERLAY-PLAN Phase 1b: open a tree-clicked content in the side panel.
+  // Warm (panel open) → hand it straight to the embed via the dg-panel port.
+  // Cold (panel closed) → stash it for the panel boot to consume, then open the
+  // panel synchronously (gesture-preserving) — mirrors the ask-about-page path.
+  if (message.type === "open-content-in-side-panel") {
+    const contentId = message.payload?.contentId;
+    const contentType = message.payload?.contentType || null;
+    if (!contentId) {
+      sendResponse({ ok: false, error: "no contentId" });
+      return true;
+    }
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "open-content", contentId, contentType });
+        sendResponse({ ok: true, data: true });
+        return true;
+      } catch {
+        panelPort = null;
+      }
+    }
+    // Panel closed — stash for boot, then open (must stay synchronous).
+    chrome.storage.session
+      .set({ dgPanelOpenContentId: contentId, dgPanelOpenContentType: contentType })
+      .catch(() => {});
+    const tabId = sender?.tab?.id;
+    const windowId = sender?.tab?.windowId;
+    const target = windowId != null ? { windowId } : { tabId };
+    chrome.sidePanel
+      .open(target)
+      .then(() => sendResponse({ ok: true, data: true }))
+      .catch((error) => {
+        console.warn("[DG Bookmarks] open-content-in-side-panel failed", error, target);
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open side panel",
+        });
+      });
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });

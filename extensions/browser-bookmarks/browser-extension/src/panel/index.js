@@ -561,9 +561,16 @@ async function boot() {
   // a fresh chat about the page. One-shot: consumed here so a later manual open
   // is neutral.
   try {
-    const { dgPanelView, dgPanelIntent } = await chrome.storage.session.get([
+    const {
+      dgPanelView,
+      dgPanelIntent,
+      dgPanelOpenContentId,
+      dgPanelOpenContentType,
+    } = await chrome.storage.session.get([
       "dgPanelView",
       "dgPanelIntent",
+      "dgPanelOpenContentId",
+      "dgPanelOpenContentType",
     ]);
     if (dgPanelView === "chat") {
       panelUrl.searchParams.set("view", "chat");
@@ -571,7 +578,19 @@ async function boot() {
     if (dgPanelIntent) {
       panelUrl.searchParams.set("intent", dgPanelIntent);
     }
-    await chrome.storage.session.remove(["dgPanelView", "dgPanelIntent"]);
+    // Cold-open from a tree click (Phase 1b): the content to open on boot.
+    if (dgPanelOpenContentId) {
+      panelUrl.searchParams.set("open", dgPanelOpenContentId);
+      if (dgPanelOpenContentType) {
+        panelUrl.searchParams.set("openType", dgPanelOpenContentType);
+      }
+    }
+    await chrome.storage.session.remove([
+      "dgPanelView",
+      "dgPanelIntent",
+      "dgPanelOpenContentId",
+      "dgPanelOpenContentType",
+    ]);
   } catch {
     // Session storage unavailable — default view is fine.
   }
@@ -604,6 +623,14 @@ try {
   panelPort.onMessage.addListener((msg) => {
     if (msg?.type === "show-chat") {
       postToEmbed("set-view", { view: "chat", intent: msg.intent });
+    }
+    // PANEL-OVERLAY-PLAN Phase 1b: a tree-clicked content to open in the sidebar
+    // while the panel is already open. Relay to the embed shell.
+    if (msg?.type === "open-content" && msg.contentId) {
+      postToEmbed("open-content", {
+        contentId: msg.contentId,
+        contentType: msg.contentType || null,
+      });
     }
   });
   // Auto-recovery: a live port keeps the service worker awake, so while the
