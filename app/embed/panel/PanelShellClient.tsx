@@ -420,7 +420,6 @@ export function PanelShellClient({
         const tabId = data.payload.tabId ?? null;
         const url = data.payload.url ?? null;
         const title = data.payload.title ?? null;
-        const mode = data.payload.mode === "associate" ? "associate" : "folder";
         const reply = (extra: Record<string, unknown>) =>
           window.parent.postMessage(
             {
@@ -436,10 +435,6 @@ export function PanelShellClient({
         const scType = store.selectedContentType;
         if (!scId) {
           reply({ noTarget: true });
-        } else if (mode === "associate") {
-          // Press-and-hold: link the page to the active content ITSELF
-          // (note / content / chat), not a folder.
-          reply({ contentId: scId });
         } else if (scType === "folder") {
           reply({ parentId: scId });
         } else {
@@ -698,7 +693,8 @@ export function PanelShellClient({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
+            <rect width="18" height="18" x="3" y="3" rx="2" />
+            <path d="M9 3v18" />
           </svg>
         </button>
       </div>

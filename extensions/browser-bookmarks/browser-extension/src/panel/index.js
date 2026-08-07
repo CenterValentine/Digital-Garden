@@ -214,7 +214,6 @@ window.addEventListener("message", (event) => {
         type: "pin-resolved",
         tabId: data.payload?.tabId ?? null,
         parentId: data.payload?.parentId ?? null,
-        contentId: data.payload?.contentId ?? null,
         url: data.payload?.url ?? null,
         title: data.payload?.title ?? null,
         noTarget: data.payload?.noTarget === true,
@@ -689,7 +688,6 @@ try {
     if (msg?.type === "pin-add") {
       postToEmbed("pin-add", {
         tabId: msg.tabId ?? null,
-        mode: msg.mode === "associate" ? "associate" : "folder",
         url: msg.url ?? null,
         title: msg.title ?? null,
       });
