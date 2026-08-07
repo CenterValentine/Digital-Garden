@@ -205,6 +205,24 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Pin quick-add: the embed resolved the target folder for the pinned page.
+  // Relay to the background so it can create the link with the bearer token and
+  // fulfil the overlay's held response.
+  if (data.type === "pin-resolved") {
+    chrome.runtime.sendMessage(
+      {
+        type: "pin-resolved",
+        tabId: data.payload?.tabId ?? null,
+        parentId: data.payload?.parentId ?? null,
+        url: data.payload?.url ?? null,
+        title: data.payload?.title ?? null,
+        noTarget: data.payload?.noTarget === true,
+      },
+      () => void chrome.runtime.lastError,
+    );
+    return;
+  }
+
   // Capture: the embed asks for the current page's content at a scope. Only
   // the content script can read the page, so relay there and post the result
   // back. The active tab is authoritative here (the panel host tracks it).
@@ -663,6 +681,16 @@ try {
       } catch {
         // Some Chromium builds disallow programmatic side-panel close — no-op.
       }
+    }
+    // Pin quick-add: the overlay wants to pin the current page under the
+    // selection. Only the embed knows the selection — relay in; it posts
+    // `pin-resolved` back out (window listener above) → background creates it.
+    if (msg?.type === "pin-add") {
+      postToEmbed("pin-add", {
+        tabId: msg.tabId ?? null,
+        url: msg.url ?? null,
+        title: msg.title ?? null,
+      });
     }
   });
   // Auto-recovery: a live port keeps the service worker awake, so while the

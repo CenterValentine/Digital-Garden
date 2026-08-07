@@ -410,6 +410,49 @@ export function PanelShellClient({
           });
       }
 
+      // Pin quick-add (PANEL-OVERLAY-PLAN): the overlay's pin wants to file the
+      // current page under the selection. We own the selection, so resolve the
+      // target folder here — a folder maps to itself; a content item maps to its
+      // parent (one session-authed GET, since tabMeta doesn't carry parentId).
+      // Post the result back; the background creates the link (bearer token). No
+      // selection → noTarget, and the overlay opens the tree to pick a folder.
+      if (data.type === "pin-add" && data.payload) {
+        const tabId = data.payload.tabId ?? null;
+        const url = data.payload.url ?? null;
+        const title = data.payload.title ?? null;
+        const reply = (extra: Record<string, unknown>) =>
+          window.parent.postMessage(
+            {
+              v: 1,
+              source: "dg-panel-embed",
+              type: "pin-resolved",
+              payload: { tabId, url, title, ...extra },
+            },
+            "*",
+          );
+        const store = useContentStore.getState();
+        const scId = store.selectedContentId;
+        const scType = store.selectedContentType;
+        if (!scId) {
+          reply({ noTarget: true });
+        } else if (scType === "folder") {
+          reply({ parentId: scId });
+        } else {
+          void (async () => {
+            try {
+              const res = await fetch(`/api/content/content/${scId}`, {
+                credentials: "include",
+              });
+              const json = await res.json();
+              const parentId = json?.parentId ?? json?.data?.parentId ?? null;
+              reply({ parentId });
+            } catch {
+              reply({ parentId: null });
+            }
+          })();
+        }
+      }
+
       // Workspace sync: the tree overlay (or another surface) switched workspace;
       // mirror it here so the tabs follow. Apply the SAME activateWorkspace; the
       // guard ref stops it echoing back out.

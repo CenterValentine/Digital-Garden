@@ -1826,6 +1826,11 @@ chrome.runtime.onConnect.addListener((port) => {
   });
 });
 
+// Pin quick-add: an overlay's `pin-add` response is held open while the panel
+// resolves the target folder (it owns the selection) and posts `pin-resolved`
+// back. Keyed by the requesting tab id so concurrent tabs don't collide.
+const pendingPinResolves = new Map();
+
 // Open the side panel on the Chat view for `tab` — or, if the panel is already
 // open, switch it to Chat in place. Re-calling sidePanel.open() on an open
 // panel TOGGLES it shut (the API is not idempotent and has no isOpen()), so we
@@ -2490,6 +2495,60 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       } catch {
         panelPort = null;
       }
+    }
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Pin quick-add (step 1): the overlay's pin fired. Only the panel knows the
+  // selection, so relay there and HOLD this response until the panel resolves
+  // the target folder (pin-resolved, step 2). Panel closed → no target; the
+  // overlay opens the tree so the user can pick a folder instead.
+  if (message.type === "pin-add") {
+    const tabId = sender.tab?.id ?? null;
+    if (!panelPort) {
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    pendingPinResolves.set(tabId, sendResponse);
+    try {
+      panelPort.postMessage({
+        type: "pin-add",
+        tabId,
+        url: message.payload?.url ?? null,
+        title: message.payload?.title ?? null,
+      });
+    } catch {
+      panelPort = null;
+      pendingPinResolves.delete(tabId);
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    return true; // keep the channel open for the panel's async pin-resolved
+  }
+
+  // Pin quick-add (step 2): the panel resolved the target folder. Create the
+  // external link with the bearer token (the panel is session-authed and can't),
+  // then fulfil the held overlay response so the pin can flash success/open tree.
+  if (message.type === "pin-resolved") {
+    const tabId = message.tabId ?? null;
+    const resolve = pendingPinResolves.get(tabId);
+    pendingPinResolves.delete(tabId);
+    if (!resolve) {
+      sendResponse({ ok: true, data: true });
+      return true;
+    }
+    if (message.noTarget) {
+      resolve({ ok: true, data: { noTarget: true } });
+    } else {
+      createContentPickerItem({
+        parentId: message.parentId ?? null,
+        type: "external",
+        title: message.title ?? null,
+        url: message.url ?? null,
+      })
+        .then(() => resolve({ ok: true, data: { added: true } }))
+        .catch(() => resolve({ ok: false, data: { added: false } }));
     }
     sendResponse({ ok: true, data: true });
     return true;

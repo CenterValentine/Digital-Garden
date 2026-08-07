@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Digital Garden Browser Bookmarks",
-  "version": "4.2.7",
+  "version": "4.2.8",
   "description": "Sync your Chromium browser's activity as external links to your content folders.",
   "permissions": [
     "bookmarks",
