@@ -653,6 +653,16 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "cobrowse-session-ended") {
     postToEmbed("cobrowse-session-ended", message.payload || {});
   }
+  // Close-all asked the panel to close. A side-panel page can close itself via
+  // window.close(); this arrives by broadcast (not the dg-panel port, which is
+  // null after SW eviction), so it reaches the panel regardless of port state.
+  if (message?.type === "dg-close-panel") {
+    try {
+      window.close();
+    } catch {
+      // Some Chromium builds disallow programmatic side-panel close — no-op.
+    }
+  }
 });
 
 let panelPort = null;

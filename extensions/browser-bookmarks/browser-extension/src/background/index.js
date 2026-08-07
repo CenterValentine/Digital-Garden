@@ -2532,10 +2532,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // panel didn't). Disabling the panel closes it reliably; re-enable immediately
   // after so it can be opened again (enabling does NOT auto-open it).
   if (message.type === "close-side-panel") {
-    // Disabling the global side panel closes it. Do NOT re-enable here — an
-    // immediate re-enable cancels the close before it takes effect (the panel
-    // stays open while the tree closes = the split the owner saw). The open path
-    // re-enables just before it opens.
+    // setOptions({enabled:false}) does NOT close an open panel in every Chrome
+    // build (it didn't here). The reliable close is to tell the panel PAGE to
+    // close itself via window.close(), delivered by broadcast so it arrives
+    // regardless of the dg-panel port. Keep the disable as a belt-and-suspenders;
+    // the open path re-enables before opening.
+    chrome.runtime.sendMessage({ type: "dg-close-panel" }, () => void chrome.runtime.lastError);
     chrome.sidePanel.setOptions({ enabled: false }).catch((error) => {
       console.warn("[DG Bookmarks] close-side-panel failed", error);
     });
