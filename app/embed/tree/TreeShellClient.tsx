@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useSyncExternalStore } from "react";
+import { createElement, useEffect, useRef, useSyncExternalStore } from "react";
 import { DndWrapper } from "@/components/content/DndWrapper";
 import { LeftSidebar } from "@/components/content/LeftSidebar";
 import { ContextMenu } from "@/components/content/context-menu/ContextMenu";
@@ -8,7 +8,8 @@ import { fileTreeActionProvider } from "@/components/content/context-menu/file-t
 import { editorActionProvider } from "@/components/content/context-menu/editor-actions";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
-import { useContentStore } from "@/state/content-store";
+import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
+import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -104,6 +105,12 @@ export function TreeShellClient({
     );
   }, [selectedContentId, selectedContentType]);
 
+  // Workspace switcher — the tree is workspace-scoped (LeftSidebarContent fetches
+  // by activeWorkspaceId), so its selector rides at the top of the tree overlay
+  // (it lived above the tree in the old panel Garden view before Phase 3 moved
+  // the tree out here).
+  const shellNavigationControls = useExtensionShellNavigationControls();
+
   return (
     <div
       className={isDark ? "dark" : undefined}
@@ -115,6 +122,25 @@ export function TreeShellClient({
       }}
     >
       <DndWrapper>
+        {shellNavigationControls.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 8px",
+              borderBottom: "1px solid var(--border-primary, #2a2a2a)",
+              flexShrink: 0,
+            }}
+          >
+            {shellNavigationControls.map((Control) =>
+              createElement(Control, {
+                key: Control.displayName ?? Control.name,
+                paneId: TOP_LEFT_PANE_ID,
+              }),
+            )}
+          </div>
+        )}
         <div
           style={{
             flex: 1,
