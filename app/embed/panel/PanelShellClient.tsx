@@ -410,16 +410,19 @@ export function PanelShellClient({
           });
       }
 
-      // Pin quick-add (PANEL-OVERLAY-PLAN): the overlay's pin wants to file the
-      // current page under the selection. We own the selection, so resolve the
-      // target folder here — a folder maps to itself; a content item maps to its
-      // parent (one session-authed GET, since tabMeta doesn't carry parentId).
-      // Post the result back; the background creates the link (bearer token). No
-      // selection → noTarget, and the overlay opens the tree to pick a folder.
+      // Pin (PANEL-OVERLAY-PLAN): the overlay's pin wants to file/link the
+      // current page against the OPEN content — we own that selection, so we
+      // resolve the target here and post it back; the background does the
+      // privileged write (bearer token). Tap (mode "folder"): file under a
+      // folder — the open item if it's a folder, else its parent (one
+      // session-authed GET, since tabMeta doesn't carry parentId). Hold (mode
+      // "associate"): link the page to the open content itself. Nothing open →
+      // noTarget, and the overlay opens the tree to pick a folder.
       if (data.type === "pin-add" && data.payload) {
         const tabId = data.payload.tabId ?? null;
         const url = data.payload.url ?? null;
         const title = data.payload.title ?? null;
+        const mode = data.payload.mode === "associate" ? "associate" : "folder";
         const reply = (extra: Record<string, unknown>) =>
           window.parent.postMessage(
             {
@@ -435,6 +438,9 @@ export function PanelShellClient({
         const scType = store.selectedContentType;
         if (!scId) {
           reply({ noTarget: true });
+        } else if (mode === "associate") {
+          // Hold: associate the page with the content OPEN in the panel.
+          reply({ contentId: scId });
         } else if (scType === "folder") {
           reply({ parentId: scId });
         } else {
