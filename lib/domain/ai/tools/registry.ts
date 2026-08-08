@@ -26,6 +26,7 @@ import {
   findOrCreateFolder,
 } from "@/lib/domain/ai/documents";
 import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
+import type { JSONContent } from "@tiptap/core";
 import { listPlaybooks, isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import {
@@ -1343,7 +1344,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           },
           include: {
             notePayload: {
-              select: { searchText: true, metadata: true },
+              select: { searchText: true, metadata: true, tiptapJson: true },
             },
           },
         });
@@ -1362,7 +1363,18 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           return `Content "${content.title}" is a ${content.contentType}, not readable as text.`;
         }
 
-        const text = content.notePayload.searchText || "(empty note)";
+        // Render live from tiptapJson — the materialized searchText column
+        // was written by the old extractor for existing notes, and that
+        // extractor dropped every atomic inline node ([[wiki-links]], #tags,
+        // @mentions). Live extraction fixes all notes without a reindex;
+        // searchText stays as the fallback for payloads with no JSON.
+        const liveText = content.notePayload.tiptapJson
+          ? extractSearchTextFromTipTap(
+              content.notePayload.tiptapJson as JSONContent,
+            ).trim()
+          : "";
+        const text =
+          liveText || content.notePayload.searchText || "(empty note)";
         // Summarize-on-write (S5): abstract first, so multi-phase runs can
         // often stop reading here instead of pulling full content into
         // context.
