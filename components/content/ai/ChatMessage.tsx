@@ -2706,6 +2706,13 @@ function ToolCallBubble({
             : undefined;
         return `Recorded item${label ? `: ${label}` : ""}`;
       }
+      if (toolName === "record_batch_checkpoint") {
+        const n =
+          args && typeof args === "object"
+            ? (args as { batchNumber?: number }).batchNumber
+            : undefined;
+        return `Batch checkpoint${typeof n === "number" ? ` ${n}` : ""} recorded`;
+      }
       if (toolName === "record_iteration_findings") {
         return "Closed the run (reconciliation recorded)";
       }

@@ -483,14 +483,27 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .int()
           .min(1)
           .max(200)
-          .describe("Max items to process this run. PROPOSE a sensible default (~10-15) — the user can RAISE it in the plan card to run more (up to 200) at their own cost/risk; only raise it yourself if they explicitly ask for more."),
+          // The plan card is approve/reject only — do NOT promise editable
+          // fields here (an earlier description claimed the user could raise
+          // the cap in the card; they can't, and a denied proposal was the
+          // observable result).
+          .describe("Max items to process this run. PROPOSE a sensible default (~10-15, up to 200); raise it yourself ONLY when the user explicitly asked for more. If the user wants a different cap after seeing the plan, they will say so — re-propose with their number."),
+        batchSize: z
+          .number()
+          .int()
+          .min(2)
+          .max(50)
+          .optional()
+          .describe(
+            "Optional batch cadence: checkpoint the run every N items (dedupe the batch, record a batch checkpoint in the ledger) before starting the next batch. Omit when one batch covers the whole run. RECOMMEND 10 or fewer — larger batches raise drift and context risk; go higher only when the user asks for it.",
+          ),
         ledgerLabel: z
           .string()
           .max(120)
           .optional()
           .describe("Short label for the run's ledger; omit to derive from the objective."),
       }),
-      execute: async ({ objective, source, items, itemCap, ledgerLabel }) => {
+      execute: async ({ objective, source, items, itemCap, batchSize, ledgerLabel }) => {
         const label = (ledgerLabel ?? objective).trim();
         const ledgerRunKey =
           "iterate:" +
@@ -522,6 +535,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           };
         });
         const itemBudget = Math.min(itemCap, normalized.length);
+        // A batch cadence >= the whole run is a single batch — drop it so the
+        // client's batch-boundary gate never arms.
+        const effectiveBatchSize =
+          batchSize != null && batchSize < itemBudget ? batchSize : null;
         let ledgerNodeId: string | null = null;
         const placement = resolveToolOutputPlacement(ctx);
         if (placement.parentId || placement.ownedByNoteId) {
@@ -533,7 +550,11 @@ export function createBaseTools(ctx: ToolExecuteContext) {
                 phase: "Iteration plan",
                 summary:
                   `**Objective (per item):** ${objective}\n\n` +
-                  `**Source:** ${source} · **Budget:** ${itemBudget} of ${normalized.length} items\n\n` +
+                  `**Source:** ${source} · **Budget:** ${itemBudget} of ${normalized.length} items` +
+                  (effectiveBatchSize
+                    ? ` · **Batches:** checkpoint every ${effectiveBatchSize} items`
+                    : "") +
+                  `\n\n` +
                   `**Checklist:**\n${normalized
                     .map(
                       (n) =>
@@ -565,10 +586,14 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           objective,
           source,
           itemBudget,
+          batchSize: effectiveBatchSize,
           items: normalized,
           nextAction:
             `APPROVED. Process the items IN ORDER, ONE at a time — the FULL analysis/playbook applies to each item (all its phases; the user's framing and mentions apply across every item). ` +
             `After EACH item, call record_item_result with ledgerRunKey "${ledgerRunKey}" and that item's key — status done (with the verdict), or unreadable/blocked if it could not be read (NEVER silently skip an item). ` +
+            (effectiveBatchSize
+              ? `This run is BATCHED: after every ${effectiveBatchSize} recorded items, pause acquisition and call record_batch_checkpoint (dedupe the batch, note anomalies) BEFORE starting the next item — the harness holds new reads until the checkpoint is recorded. `
+              : "") +
             `The ledger is the checklist; never trust your memory for completeness. When every item is recorded OR the budget is reached, write the roll-up (createNote: a short summary + a markdown table of items/verdicts) and close with record_iteration_findings. ` +
             `If a captcha or session end interrupts, stop and tell the user — recorded progress is preserved and the run can resume from the first pending item.`,
         };
@@ -638,6 +663,69 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           };
         } catch (error) {
           return { ok: false, note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Continue to the next item; reconcile in the roll-up.` };
+        }
+      },
+    }),
+    // Batch checkpoint — the mid-run reconciliation for BATCHED iterations.
+    // The client engine holds new reads once a full batch has been recorded
+    // since the last checkpoint, so this write is what re-opens acquisition.
+    // Harness-owned batching (owner rule 2026-08-08): the batch protocol lives
+    // here, not in playbook prose — models improvising their own batch
+    // choreography was a proven failure mode.
+    record_batch_checkpoint: tool({
+      description:
+        "Record a BATCH checkpoint in the iteration ledger. Call it when an approved batched run (propose_item_iteration with batchSize) has recorded a full batch since the last checkpoint — the harness holds new item reads until this is written. Summarize the batch (counts, qualified so far, duplicates merged, anomalies), then continue IMMEDIATELY with the next item. Skip it after the FINAL batch — the roll-up + record_iteration_findings close the run.",
+      inputSchema: z.object({
+        ledgerRunKey: z.string().min(1).describe("The ledgerRunKey from propose_item_iteration."),
+        batchNumber: z.number().int().min(1).describe("1-based index of the batch just completed."),
+        itemsRecordedSoFar: z.number().int().min(1).describe("Total items recorded so far in this run (across all batches)."),
+        batchSummary: z.string().min(1).max(2000).describe("Short markdown reconciliation of THIS batch: what was covered, counts, qualified so far, anomalies."),
+        duplicatesMerged: z
+          .array(z.string())
+          .max(40)
+          .optional()
+          .describe("Labels/keys identified as duplicates (within this batch or against earlier batches)."),
+      }),
+      execute: async ({ ledgerRunKey, batchNumber, itemsRecordedSoFar, batchSummary, duplicatesMerged }) => {
+        const placement = resolveToolOutputPlacement(ctx);
+        if (!placement.parentId && !placement.ownedByNoteId) {
+          // Still ok:true — this result is the client gate's re-open marker,
+          // so a missing ledger must not wedge the run at a batch boundary.
+          return {
+            ok: true,
+            note: "No target folder set, so no ledger was written. Checkpoint counted — continue the run.",
+            next: "Continue IMMEDIATELY with the next item.",
+          };
+        }
+        const summary =
+          batchSummary.trim() +
+          `\n\n**Recorded so far:** ${itemsRecordedSoFar}` +
+          (duplicatesMerged?.length
+            ? `\n\n**Duplicates merged (${duplicatesMerged.length}):**\n${duplicatesMerged.map((d) => `- ${d}`).join("\n")}`
+            : "");
+        try {
+          const ledger = await upsertRunLedger(
+            ctx.userId,
+            placement.parentId,
+            {
+              phase: `Batch ${batchNumber} checkpoint`,
+              summary,
+              next: "Continue with the next batch's first item.",
+              tokensSoFar: ctx.runTokens?.total,
+            },
+            { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
+          );
+          return {
+            ok: true,
+            ledgerNodeId: ledger.contentNodeId,
+            next: "Checkpoint recorded. Do NOT stop or ask the user whether to continue — move IMMEDIATELY to the next item.",
+          };
+        } catch (error) {
+          return {
+            ok: true,
+            note: `Ledger write failed (${error instanceof Error ? error.message : "unknown"}). Checkpoint counted — continue the run.`,
+            next: "Continue IMMEDIATELY with the next item.",
+          };
         }
       },
     }),

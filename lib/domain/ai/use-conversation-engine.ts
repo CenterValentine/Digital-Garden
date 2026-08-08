@@ -727,8 +727,20 @@ function deriveActiveResearchRun(
  */
 function deriveActiveItemIteration(
   messages: UIMessage[],
-): { itemBudget: number; itemsRecorded: number } | null {
-  let active: { itemBudget: number; itemsRecorded: number } | null = null;
+): {
+  itemBudget: number;
+  itemsRecorded: number;
+  /** Batch cadence from the approved plan; null = single-batch run. */
+  batchSize: number | null;
+  /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
+  itemsAtLastCheckpoint: number;
+} | null {
+  let active: {
+    itemBudget: number;
+    itemsRecorded: number;
+    batchSize: number | null;
+    itemsAtLastCheckpoint: number;
+  } | null = null;
   for (const m of messages) {
     if (m.role !== "assistant") continue;
     for (const part of m.parts) {
@@ -737,9 +749,19 @@ function deriveActiveItemIteration(
         p.type === "tool-propose_item_iteration" &&
         p.state === "output-available"
       ) {
-        const out = p.output as { ok?: boolean; itemBudget?: number } | undefined;
+        const out = p.output as
+          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | undefined;
         if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
-          active = { itemBudget: out.itemBudget, itemsRecorded: 0 };
+          active = {
+            itemBudget: out.itemBudget,
+            itemsRecorded: 0,
+            batchSize:
+              typeof out.batchSize === "number" && out.batchSize > 0
+                ? out.batchSize
+                : null,
+            itemsAtLastCheckpoint: 0,
+          };
         }
       } else if (
         p.type === "tool-record_item_result" &&
@@ -748,6 +770,15 @@ function deriveActiveItemIteration(
       ) {
         const out = p.output as { ok?: boolean } | undefined;
         if (out?.ok !== false) active.itemsRecorded += 1;
+      } else if (
+        p.type === "tool-record_batch_checkpoint" &&
+        p.state === "output-available" &&
+        active
+      ) {
+        // Any recorded checkpoint re-opens the batch gate — the tool returns
+        // ok:true even when the ledger write failed, so a run can never wedge
+        // at a batch boundary.
+        active.itemsAtLastCheckpoint = active.itemsRecorded;
       } else if (
         p.type === "tool-record_iteration_findings" &&
         p.state === "output-available"
@@ -1656,6 +1687,29 @@ export function useConversationEngine({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
           output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
+        });
+        return;
+      }
+      // Batch cadence (batched runs only) — harness-owned batching, owner rule
+      // 2026-08-08: once a full batch is recorded since the last checkpoint,
+      // hold the NEXT item's read until record_batch_checkpoint is written.
+      // Same seam as the budget stop (reads are how the next item starts), so
+      // mid-item acting is never broken. Fail-open for unbatched runs.
+      if (
+        iteration &&
+        iteration.batchSize != null &&
+        iteration.itemsRecorded < iteration.itemBudget &&
+        iteration.itemsRecorded - iteration.itemsAtLastCheckpoint >=
+          iteration.batchSize
+      ) {
+        const batchNumber = Math.max(
+          1,
+          Math.floor(iteration.itemsRecorded / iteration.batchSize),
+        );
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Batch complete (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded; batch size ${iteration.batchSize}). Before starting the next item: dedupe this batch and call record_batch_checkpoint (batchNumber ${batchNumber}, itemsRecordedSoFar ${iteration.itemsRecorded}) — then continue with the next item.`,
         });
         return;
       }
