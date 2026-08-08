@@ -64,6 +64,12 @@ export function TreeShellClient({
       { v: 1, source: "dg-tree-embed", type: "ready" },
       "*",
     );
+    // Restore the persisted active workspace (host replays as `workspace-changed`,
+    // which the receive-handler below activates) so the tree doesn't reset to Main.
+    window.parent.postMessage(
+      { v: 1, source: "dg-tree-embed", type: "request-active-workspace" },
+      "*",
+    );
   }, []);
 
   // Hydrate the workspace store. LeftSidebarContent gates its FIRST tree fetch on

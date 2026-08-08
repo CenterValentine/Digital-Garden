@@ -584,6 +584,14 @@ export function PanelShellClient({
       { v: 1, source: "dg-panel-embed", type: "ready" },
       "*"
     );
+    // Restore the persisted active workspace: the host replays it as
+    // `workspace-changed`, which the receive-handler below activates. A fresh
+    // partitioned iframe has empty localStorage, so without this the panel
+    // defaults to Main every open.
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "request-active-workspace" },
+      "*"
+    );
   }, []);
 
   // ── content ↕ sidebar split ──

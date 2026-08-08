@@ -205,6 +205,18 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Boot restore: the embed asks for the persisted active workspace. Fetch it
+  // from the background and replay as `workspace-changed` so the embed's existing
+  // receive-handler activates it (instead of defaulting to Main).
+  if (data.type === "request-active-workspace") {
+    chrome.runtime.sendMessage({ type: "get-active-workspace" }, (resp) => {
+      if (chrome.runtime.lastError) return;
+      const workspaceId = resp?.ok ? resp.data?.workspaceId : null;
+      if (workspaceId) postToEmbed("workspace-changed", { workspaceId });
+    });
+    return;
+  }
+
   // Pin quick-add: the embed resolved the target folder for the pinned page.
   // Relay to the background so it can create the link with the bearer token and
   // fulfil the overlay's held response.

@@ -2672,6 +2672,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // differs, so the origin's own echo is a harmless no-op (no loop).
   if (message.type === "workspace-sync" && message.workspaceId) {
     const workspaceId = message.workspaceId;
+    // Persist the last active workspace so a freshly-opened panel/tree (a
+    // partitioned iframe with empty localStorage) can RESTORE it on boot instead
+    // of defaulting to Main — and uniformly, since both partitions read this one
+    // background-owned value.
+    void chrome.storage.local.set({ dgActiveWorkspace: workspaceId }).catch(() => {});
     if (panelPort) {
       try {
         panelPort.postMessage({ type: "workspace-changed", workspaceId });
@@ -2693,6 +2698,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(() => {});
     sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Boot restore: an embed (panel or tree) asks for the persisted active
+  // workspace so it can activate it instead of defaulting to Main.
+  if (message.type === "get-active-workspace") {
+    chrome.storage.local
+      .get("dgActiveWorkspace")
+      .then((r) =>
+        sendResponse({ ok: true, data: { workspaceId: r?.dgActiveWorkspace ?? null } }),
+      )
+      .catch(() => sendResponse({ ok: true, data: { workspaceId: null } }));
     return true;
   }
 
