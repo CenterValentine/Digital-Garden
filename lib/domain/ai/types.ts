@@ -12,7 +12,8 @@ export type AIProviderId =
   | "google"
   | "xai"
   | "mistral"
-  | "groq";
+  | "groq"
+  | "deepseek";
 
 /** Model identifiers — canonical DG model IDs mapped to provider strings in registry */
 export type AIModelId =
@@ -31,7 +32,9 @@ export type AIModelId =
   | "mistral-large"
   | "codestral"
   | "mixtral-8x7b"
-  | "llama-3.3-70b";
+  | "llama-3.3-70b"
+  | "deepseek-v4-pro"
+  | "deepseek-v4-flash";
 
 /** Configuration passed to resolveChatModel() */
 export interface ProviderConfig {

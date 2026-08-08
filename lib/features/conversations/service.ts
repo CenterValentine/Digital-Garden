@@ -757,6 +757,7 @@ export async function updateMessageParts(
   messageId: string,
   parts: unknown,
   textCache?: string | null,
+  metadata?: unknown,
 ): Promise<boolean> {
   const { count } = await prisma.conversationMessage.updateMany({
     where: {
@@ -766,6 +767,12 @@ export async function updateMessageParts(
     data: {
       parts: parts as Prisma.InputJsonValue,
       ...(textCache !== undefined && { textCache }),
+      // Continuations refresh metadata too — a turn's usage/finishReason are
+      // only final on its terminal request, so the create-time snapshot must
+      // not be the last word.
+      ...(metadata !== undefined && {
+        metadata: metadata as Prisma.InputJsonValue,
+      }),
     },
   });
   return count > 0;

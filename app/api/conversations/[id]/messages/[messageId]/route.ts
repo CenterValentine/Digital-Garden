@@ -31,6 +31,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       const body = (await request.json()) as {
         parts?: unknown;
         textCache?: string | null;
+        metadata?: unknown;
       };
       if (body.parts === undefined || body.parts === null) {
         return NextResponse.json(
@@ -44,6 +45,7 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         messageId,
         body.parts,
         body.textCache,
+        body.metadata,
       );
       if (!updated) {
         return NextResponse.json(

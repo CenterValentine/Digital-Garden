@@ -54,6 +54,122 @@ interface MessageLike {
   parts: unknown;
 }
 
+/** Running turn totals for one assistant message (see mergeTurnUsageMetadata). */
+interface TurnUsageAccum {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  reasoningTokens: number;
+  cachedInputTokens: number;
+  durationMs: number;
+  requestCount: number;
+  finishReason?: string;
+  /**
+   * Signature of the last per-request metadata folded in — persistTurns can
+   * run repeatedly for the same finish event, and a repeat pass with
+   * unchanged metadata must not double-count.
+   */
+  lastRequestSig?: string;
+}
+
+interface RequestUsageSnapshot {
+  inputTokens: number;
+  outputTokens: number;
+  totalTokens: number;
+  reasoningTokens: number;
+  cachedInputTokens: number;
+  durationMs: number;
+  requestCount: number;
+  finishReason?: string;
+}
+
+function readUsageSnapshot(
+  metadata: Record<string, unknown> | undefined,
+): RequestUsageSnapshot | null {
+  if (!metadata) return null;
+  const usage = metadata.usage as Record<string, unknown> | undefined;
+  if (
+    usage === undefined &&
+    metadata.finishReason === undefined &&
+    metadata.durationMs === undefined
+  ) {
+    return null;
+  }
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : 0;
+  return {
+    inputTokens: num(usage?.inputTokens),
+    outputTokens: num(usage?.outputTokens),
+    totalTokens: num(usage?.totalTokens),
+    reasoningTokens: num(usage?.reasoningTokens),
+    cachedInputTokens: num(usage?.cachedInputTokens),
+    durationMs: num(metadata.durationMs),
+    // Merged blobs (persisted by this module) carry their own requestCount;
+    // raw per-request metadata from the SDK counts as one request.
+    requestCount: Math.max(1, num(metadata.requestCount) || 1),
+    finishReason:
+      typeof metadata.finishReason === "string"
+        ? metadata.finishReason
+        : undefined,
+  };
+}
+
+/**
+ * Fold one finish-metadata blob into the per-turn accumulator and return the
+ * metadata to persist: usage and duration SUMMED across every HTTP request of
+ * the turn, finishReason from the TERMINAL request.
+ *
+ * Why: a turn with client-executed tools (browser reads, co-browse) spans
+ * several requests, each emitting its own finish metadata. Persisting any
+ * single request's values misreports the turn — the 2026-08-08 DeepSeek
+ * failure was mis-diagnosed from metadata frozen at request #1
+ * ("tool-calls", 659 tokens) while the terminal request actually died at the
+ * output cap ("length", 4096 tokens).
+ */
+function mergeTurnUsageMetadata(
+  accum: Map<string, TurnUsageAccum>,
+  messageId: string,
+  incoming: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  const request = readUsageSnapshot(incoming);
+  if (!request) return incoming;
+  const sig = JSON.stringify(request);
+  const entry: TurnUsageAccum = accum.get(messageId) ?? {
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    reasoningTokens: 0,
+    cachedInputTokens: 0,
+    durationMs: 0,
+    requestCount: 0,
+  };
+  if (entry.lastRequestSig !== sig) {
+    entry.inputTokens += request.inputTokens;
+    entry.outputTokens += request.outputTokens;
+    entry.totalTokens += request.totalTokens;
+    entry.reasoningTokens += request.reasoningTokens;
+    entry.cachedInputTokens += request.cachedInputTokens;
+    entry.durationMs += request.durationMs;
+    entry.requestCount += request.requestCount;
+    entry.lastRequestSig = sig;
+    if (request.finishReason) entry.finishReason = request.finishReason;
+  }
+  accum.set(messageId, entry);
+  return {
+    ...(incoming ?? {}),
+    usage: {
+      inputTokens: entry.inputTokens,
+      outputTokens: entry.outputTokens,
+      totalTokens: entry.totalTokens,
+      reasoningTokens: entry.reasoningTokens,
+      cachedInputTokens: entry.cachedInputTokens,
+    },
+    durationMs: entry.durationMs,
+    requestCount: entry.requestCount,
+    ...(entry.finishReason ? { finishReason: entry.finishReason } : {}),
+  };
+}
+
 interface UseConversationBindingParams {
   conversationId: string | null;
   /** Engine messages (AI SDK UIMessage[]). */
@@ -155,6 +271,10 @@ export function useConversationBinding({
   // resumes mutate/extend an already-saved assistant message) so the
   // persister can PATCH the row instead of skipping it forever.
   const savedPartsSigRef = useRef<Map<string, string>>(new Map());
+  // Per-turn usage totals across the turn's HTTP requests (client-executed
+  // tools split one turn into several). Seeded from loaded history so
+  // post-reload continuations add to persisted totals.
+  const usageAccumRef = useRef<Map<string, TurnUsageAccum>>(new Map());
   const [loadingInitial, setLoadingInitial] = useState<boolean>(
     Boolean(conversationId),
   );
@@ -184,6 +304,7 @@ export function useConversationBinding({
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
       savedPartsSigRef.current = new Map();
+      usageAccumRef.current = new Map();
       setLoadingInitial(false);
       setConversationTitle(null);
       setInitialActiveContextId(null);
@@ -203,12 +324,14 @@ export function useConversationBinding({
       savedIdsRef.current = new Set();
       dbIdByClientIdRef.current = new Map();
       savedPartsSigRef.current = new Map();
+      usageAccumRef.current = new Map();
       setLoadingInitial(false);
       return;
     }
     savedIdsRef.current = new Set();
     dbIdByClientIdRef.current = new Map();
     savedPartsSigRef.current = new Map();
+    usageAccumRef.current = new Map();
     setLoadingInitial(true);
     let cancelled = false;
     (async () => {
@@ -289,7 +412,12 @@ export function useConversationBinding({
         });
 
         // Every loaded message is already saved — track by DB UUID.
-        for (const m of stored as Array<{ id: string; parts?: unknown }>) {
+        for (const m of stored as Array<{
+          id: string;
+          parts?: unknown;
+          role?: string;
+          metadata?: unknown;
+        }>) {
           savedIdsRef.current.add(m.id);
           // Seed the exact persisted baseline. Without this, the first
           // post-reload approval continuation only established a baseline and
@@ -298,6 +426,19 @@ export function useConversationBinding({
             m.id,
             JSON.stringify(m.parts ?? []),
           );
+          // Seed turn totals so a post-reload continuation ADDS to the
+          // persisted usage instead of restarting the sums from zero.
+          if (
+            m.role === "assistant" &&
+            m.metadata &&
+            typeof m.metadata === "object"
+          ) {
+            mergeTurnUsageMetadata(
+              usageAccumRef.current,
+              m.id,
+              m.metadata as Record<string, unknown>,
+            );
+          }
         }
 
         // Seed per-message stamps from the persisted provider/model so the
@@ -397,6 +538,33 @@ export function useConversationBinding({
       const effectiveParts = freshAssistantMatches
         ? payload.freshAssistant!.parts!
         : m.parts;
+      // Metadata read order (see the read-order comment below): prefer the
+      // SDK's fresh onFinish copy, fall back to the closure message. Fold
+      // assistant metadata through the per-turn accumulator so multi-request
+      // turns persist SUMMED usage and the TERMINAL finishReason — persisting
+      // any single request's values misreports the turn.
+      let requestMetadata = (
+        m as { metadata?: Record<string, unknown> | undefined }
+      ).metadata;
+      if (
+        m.role === "assistant" &&
+        payload?.freshAssistant &&
+        payload.freshAssistant.id === m.id &&
+        payload.freshAssistant.metadata != null
+      ) {
+        requestMetadata = payload.freshAssistant.metadata as Record<
+          string,
+          unknown
+        >;
+      }
+      const turnMetadata =
+        m.role === "assistant"
+          ? mergeTurnUsageMetadata(
+              usageAccumRef.current,
+              m.id,
+              requestMetadata,
+            )
+          : requestMetadata;
       if (savedIdsRef.current.has(m.id)) {
         // Continuation persistence (S4): an approval resume EXTENDS a
         // saved assistant message (resolved approval state + new parts).
@@ -418,7 +586,13 @@ export function useConversationBinding({
               method: "PATCH",
               credentials: "include",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ parts: effectiveParts }),
+              // Continuation requests carry fresh finish metadata — without
+              // this, the row's metadata stays frozen at request #1's values
+              // (the bug that hid the 2026-08-08 "length" death).
+              body: JSON.stringify({
+                parts: effectiveParts,
+                ...(turnMetadata ? { metadata: turnMetadata } : {}),
+              }),
             },
           );
           if (res.ok) savedPartsSigRef.current.set(m.id, sig);
@@ -442,7 +616,7 @@ export function useConversationBinding({
       // the assistant message — the meter adapter reads those back for
       // per-Connection $ figures.
       //
-      // Read order:
+      // Read order (applied above, before the continuation branch):
       //   1. The fresh assistant from the SDK's onFinish event (when
       //      this is the assistant turn AND payload.freshAssistant
       //      matches by id). The SDK applies metadata to its internal
@@ -450,16 +624,6 @@ export function useConversationBinding({
       //      `messages` array we close over may not have flushed the
       //      change yet. The event payload is fresher.
       //   2. The closure UIMessage's own metadata field as a fallback.
-      let metadata =
-        (m as { metadata?: Record<string, unknown> | undefined }).metadata;
-      if (
-        m.role === "assistant" &&
-        payload?.freshAssistant &&
-        payload.freshAssistant.id === m.id &&
-        payload.freshAssistant.metadata != null
-      ) {
-        metadata = payload.freshAssistant.metadata as Record<string, unknown>;
-      }
       try {
         const res = await fetch(
           `/api/conversations/${encodeURIComponent(conversationId)}/messages`,
@@ -473,7 +637,7 @@ export function useConversationBinding({
               providerId: stamp.providerId,
               modelId: stamp.modelId,
               parts: partsToSave,
-              metadata: metadata ?? undefined,
+              metadata: turnMetadata ?? undefined,
             }),
           },
         );

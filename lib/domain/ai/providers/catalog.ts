@@ -167,6 +167,37 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
     ],
   },
   {
+    id: "deepseek",
+    name: "DeepSeek",
+    requiresApiKey: true,
+    models: [
+      {
+        // Hybrid-thinking model: emits reasoning unprompted ("auto"), and
+        // accepts control knobs (thinking.type / reasoningEffort) that the
+        // chat route synthesizes in buildProviderOptions. maxOutput is our
+        // send-value budget, not the model ceiling (DeepSeek documents a far
+        // higher output cap) — 64k leaves prompt headroom in the 128k window
+        // the direct API serves (templates.ts pins the same figure).
+        id: "deepseek-v4-pro",
+        name: "DeepSeek V4 Pro",
+        contextWindow: 128_000,
+        maxOutput: 65_536,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "medium",
+        reasoning: "auto",
+      },
+      {
+        id: "deepseek-v4-flash",
+        name: "DeepSeek V4 Flash",
+        contextWindow: 128_000,
+        maxOutput: 65_536,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "low",
+        reasoning: "auto",
+      },
+    ],
+  },
+  {
     id: "groq",
     name: "Groq",
     requiresApiKey: true,
