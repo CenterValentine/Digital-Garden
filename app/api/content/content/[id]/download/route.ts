@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
+import { getSession, validateSession } from "@/lib/infrastructure/auth";
 import { getUserStorageProvider } from "@/lib/infrastructure/storage";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 
@@ -27,16 +28,31 @@ export async function GET(
 ) {
   return withRouteTrace(request, { route: ROUTE_PATH }, async () => {
     try {
-      const session = await withSpan(
-        { layer: "auth", name: "session" },
-        { summary: "session lookup" },
-        async () => requireAuth(),
-      );
-      const { id } = await params;
-
       const { searchParams } = new URL(request.url);
       const stream = searchParams.get('stream') === 'true';
       const forceDownload = searchParams.get('download') === 'true';
+
+      // Cross-site embed iframe fallback: native <img> loads (inline note images)
+      // can't send the /embed-scoped session cookie or the X-Embed-Session header,
+      // so the embed bridge appends the session token as ?_t=. Fall back to it when
+      // no cookie/header session exists. Ownership is still enforced below
+      // (content.ownerId === session.user.id), so a token only ever unlocks its
+      // own user's files — no cross-user access.
+      const embedToken = searchParams.get('_t');
+      const session = await withSpan(
+        { layer: "auth", name: "session" },
+        { summary: "session lookup" },
+        async () => {
+          const cookieSession = await getSession();
+          if (cookieSession) return cookieSession;
+          if (embedToken) {
+            const tokenSession = await validateSession(embedToken);
+            if (tokenSession) return tokenSession;
+          }
+          return requireAuth(); // no session anywhere → throws → handled as 500
+        },
+      );
+      const { id } = await params;
 
       const content = await withSpan(
         { layer: "content", name: "payload" },

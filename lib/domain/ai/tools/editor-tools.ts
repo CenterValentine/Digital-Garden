@@ -34,7 +34,7 @@ import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-re
 import type { ToolExecuteContext } from "./types";
 import type { Extensions } from "@tiptap/core";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
-import { getAllBlocks } from "@/lib/domain/blocks/registry";
+import { getAllBlocks, getBlockDefinition } from "@/lib/domain/blocks/registry";
 import {
   getAuthorableBlocks,
   getBlockAuthoringMode,
@@ -67,7 +67,14 @@ function getInsertBlockCatalog() {
       const keys = Object.keys(b.attrsSchema.shape).filter(
         (k) => k !== "blockId" && k !== "blockType"
       );
-      const attrHint = keys.length ? ` — attrs: ${keys.join(", ")}` : "";
+      // Surface each attr's own Zod .describe() — critical for structured
+      // attrs like featureList.items, whose {icon,title,description} item shape
+      // lives only in the describe (and which the model otherwise guesses wrong).
+      const attrHints = keys.map((k) => {
+        const desc = (b.attrsSchema.shape[k] as { description?: string }).description;
+        return desc ? `${k} (${desc})` : k;
+      });
+      const attrHint = attrHints.length ? ` — attrs: ${attrHints.join("; ")}` : "";
       const containerHint =
         getBlockAuthoringMode(b.type) === "container"
           ? " [container: takes a `content` array of child blocks]"
@@ -76,10 +83,10 @@ function getInsertBlockCatalog() {
     })
     .join("\n");
   const description = [
-    "Insert a rich content block at the end of the open note. Provide the block `blockType` and its `attrs` as a JSON object; omitted attributes use sensible defaults.",
+    "Insert a NEW rich content block — appended at the end of the note by default, or right after an existing block via `afterBlockId` (get ids from list_document_blocks). Provide the block `blockType` and its `attrs`; omitted attributes use sensible defaults. To CHANGE an existing block, use update_block instead — never insert a copy of it.",
     "Most blocks carry their text in attributes (a hero's headline, a CTA's primaryLabel, a stat's value) — put that text in `attrs`, not elsewhere.",
     "Use EXACTLY the attribute names listed after each block (`attrs: …`); unknown names are rejected, not silently ignored.",
-    "Container blocks (marked [container]) take a `content` array of child blocks: for columns/blockColumns each child becomes one column (provide 2–4); for tabs each becomes one tab; for accordion/cardPanel/listContainer the children stack in order. Non-container blocks must omit `content`.",
+    "Container blocks (marked [container]) take a `content` array of child blocks: for columns/blockColumns each child becomes one column (provide 2–4); for tabs each becomes one tab — set each tab child's `label` to a meaningful tab name (don't leave it blank); for accordion/cardPanel/listContainer the children stack in order. Non-container blocks must omit `content`.",
     "",
     "Available block types:",
     list,
@@ -93,6 +100,8 @@ interface BlockSpec {
   blockType: string;
   attrs?: Record<string, unknown>;
   content?: BlockSpec[];
+  /** Tab name — used only when this spec is a child of a `tabs` block. */
+  label?: string;
 }
 
 /** Recursive Zod schema for a block spec (the tool input + its `content` items). */
@@ -101,6 +110,7 @@ const blockSpecSchema: z.ZodType<BlockSpec> = z.lazy(() =>
     blockType: z.string(),
     attrs: z.record(z.string(), z.unknown()).optional(),
     content: z.array(blockSpecSchema).optional(),
+    label: z.string().optional(),
   })
 );
 
@@ -115,6 +125,24 @@ const MAX_CONTAINER_DEPTH = 4;
 
 function emptyParagraph(): JSONContent {
   return { type: "paragraph" };
+}
+
+/** Every registered block instance in a document, in reading order. */
+function findBlocksInDoc(
+  doc: JSONContent
+): Array<{ blockId: string; blockType: string; attrs: Record<string, unknown> }> {
+  const out: Array<{ blockId: string; blockType: string; attrs: Record<string, unknown> }> = [];
+  const walk = (node: JSONContent | undefined) => {
+    if (!node) return;
+    const attrs = (node.attrs ?? {}) as Record<string, unknown>;
+    const blockId = attrs.blockId;
+    if (typeof blockId === "string" && node.type && getBlockDefinition(node.type)) {
+      out.push({ blockId, blockType: node.type, attrs });
+    }
+    (node.content ?? []).forEach(walk);
+  };
+  walk(doc);
+  return out;
 }
 
 /**
@@ -242,11 +270,14 @@ function buildBlockNode(
     node.content = cols.map((c) => ({ type: wrapper, content: [c] }));
   } else if (wrapper === "tabPanel") {
     const tabs = childNodes.length > 0 ? childNodes : [emptyParagraph(), emptyParagraph()];
-    node.content = tabs.map((c, i) => ({
-      type: "tabPanel",
-      attrs: { label: `Tab ${i + 1}` },
-      content: [c],
-    }));
+    node.content = tabs.map((c, i) => {
+      const label = (specChildren[i]?.label ?? "").trim();
+      return {
+        type: "tabPanel",
+        attrs: { label: label || `Tab ${i + 1}` },
+        content: [c],
+      };
+    });
   } else {
     // block+ containers (accordion, cardPanel, listContainer).
     node.content = childNodes.length > 0 ? childNodes : [emptyParagraph()];
@@ -512,12 +543,26 @@ export function createEditorTools(ctx: ToolExecuteContext) {
         content: z
           .array(blockSpecSchema)
           .optional()
-          .describe("Container blocks only. An array of child blocks: columns/blockColumns → one child per column (2–4); tabs → one child per tab; accordion/cardPanel/listContainer → children stack in order. Omit for non-container blocks."),
+          .describe("Container blocks only. An array of child blocks: columns/blockColumns → one child per column (2–4); tabs → one child per tab (give each child a `label` naming its tab); accordion/cardPanel/listContainer → children stack in order. Omit for non-container blocks."),
+        afterBlockId: z
+          .string()
+          .optional()
+          .describe("Insert immediately AFTER this existing block (a blockId from list_document_blocks). Omit to append at the end. To place between two blocks, pass the id of the block it should follow."),
       }),
-      execute: async ({ blockType, attrs, content }) => {
+      execute: async ({ blockType, attrs, content, afterBlockId }) => {
         const result = await loadNote();
         if ("error" in result) return result.error;
         const { node: noteNode } = result;
+
+        // If positioning after a block, verify it exists — a clear error beats a
+        // silent append at the end (which reads as a misplaced duplicate).
+        if (afterBlockId) {
+          const doc = result.payload.tiptapJson as unknown as JSONContent;
+          const exists = findBlocksInDoc(doc).some((b) => b.blockId === afterBlockId);
+          if (!exists) {
+            return `No block with id "${afterBlockId}" to insert after. Call list_document_blocks for valid blockIds, or omit afterBlockId to append at the end.`;
+          }
+        }
 
         const { blocks, extensions } = getInsertBlockCatalog();
 
@@ -542,8 +587,112 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           type: "insert_block",
           node: finalNode,
           blockType,
+          afterBlockId,
           documentTitle: noteNode.title,
           action: `Inserted ${label} block into "${noteNode.title}"`,
+          ...(await getContentWriteReceiptEnvelope(
+            ctx.userId,
+            noteNode.id,
+            "updated",
+            "note",
+          )),
+        });
+      },
+    }),
+
+    // ─── List Document Blocks ───────────────────────────────
+    // Read-only: enumerates the rich blocks in the open note so the model can
+    // reference one (by blockId) with update_block.
+    list_document_blocks: tool({
+      description:
+        "List the rich blocks currently in the open note — each block's id, type, and editable attributes. Call this before update_block so you can target a specific block by its blockId.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const result = await loadNote();
+        if ("error" in result) return result.error;
+        const doc = result.payload.tiptapJson as unknown as JSONContent;
+        const blocks = findBlocksInDoc(doc);
+        if (blocks.length === 0) {
+          return "This note has no rich blocks yet. Use insert_block to add one.";
+        }
+        return blocks
+          .map((b, i) => {
+            const attrs = Object.entries(b.attrs)
+              .filter(([k]) => k !== "blockId" && k !== "blockType")
+              .map(([k, v]) => {
+                const s = typeof v === "string" ? v : JSON.stringify(v);
+                return `${k}=${s.length > 80 ? s.slice(0, 80) + "…" : s}`;
+              })
+              .join(", ");
+            return `${i + 1}. ${b.blockType} [blockId: ${b.blockId}]${attrs ? ` — ${attrs}` : ""}`;
+          })
+          .join("\n");
+      },
+    }),
+
+    // ─── Update Block (Client-Side) ─────────────────────────
+    // Patches an existing block's attributes. Returns an __editPayload the
+    // orchestrator applies to the live editor node (found by blockId).
+    update_block: tool({
+      description:
+        "Update attributes of an existing block in the open note. Get the blockId from list_document_blocks first, then pass only the attributes you want to change (same names/format as insert_block).",
+      inputSchema: z.object({
+        blockId: z
+          .string()
+          .describe("The block's id, from list_document_blocks."),
+        attrs: z
+          .record(z.string(), z.unknown())
+          .describe("The attributes to change — only the ones being updated."),
+      }),
+      execute: async ({ blockId, attrs }) => {
+        const result = await loadNote();
+        if ("error" in result) return result.error;
+        const { node: noteNode } = result;
+        const doc = result.payload.tiptapJson as unknown as JSONContent;
+        const { blocks: catalog } = getInsertBlockCatalog();
+
+        const target = findBlocksInDoc(doc).find((b) => b.blockId === blockId);
+        if (!target) {
+          return `No block with id "${blockId}" in this note. Call list_document_blocks to see valid blockIds.`;
+        }
+        const def = catalog.find((b) => b.type === target.blockType);
+        if (!def) {
+          return `The "${target.blockType}" block can't be edited by the AI.`;
+        }
+
+        const validKeys = new Set(Object.keys(def.attrsSchema.shape));
+        const settable = [...validKeys].filter((k) => k !== "blockId" && k !== "blockType");
+        const unknownKeys = Object.keys(attrs).filter((k) => !validKeys.has(k));
+        if (unknownKeys.length > 0) {
+          return `Unknown attribute(s) for "${target.blockType}": ${unknownKeys.join(", ")}. Valid attributes are: ${settable.join(", ")}.`;
+        }
+
+        // Validate the change by merging into the block's current attrs and
+        // full-parsing (types/enums + array→JSON-string coercion), then send only
+        // the changed keys so the client merges into the LIVE node's attrs.
+        const merged = { ...target.attrs, ...attrs, blockType: target.blockType };
+        let parsed: Record<string, unknown>;
+        try {
+          parsed = def.attrsSchema.parse(merged) as Record<string, unknown>;
+        } catch (err) {
+          const coerced = coerceJsonStringAttrs(merged, err);
+          try {
+            if (!coerced) throw err;
+            parsed = def.attrsSchema.parse(coerced) as Record<string, unknown>;
+          } catch (finalErr) {
+            return `Invalid attributes for "${target.blockType}". Valid fields: ${settable.join(", ")}.\n${finalErr instanceof Error ? finalErr.message : String(finalErr)}`;
+          }
+        }
+        const changedAttrs: Record<string, unknown> = {};
+        for (const k of Object.keys(attrs)) changedAttrs[k] = parsed[k];
+
+        return JSON.stringify({
+          __editPayload: true,
+          type: "update_block",
+          blockId,
+          attrs: changedAttrs,
+          documentTitle: noteNode.title,
+          action: `Updated ${def.label} block in "${noteNode.title}"`,
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
             noteNode.id,

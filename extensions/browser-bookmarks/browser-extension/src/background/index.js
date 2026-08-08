@@ -1818,6 +1818,18 @@ chrome.runtime.onInstalled.addListener(async () => {
 // synchronous, so openAiChatPanel can branch without an await (which would
 // consume the user gesture that authorizes sidePanel.open).
 let panelPort = null;
+// Synchronous best-guess of the panel's open state so a gesture-sensitive path
+// (open-content) can decide WITHOUT an async storage read that would consume the
+// gesture. Mirrors the durable dgPanelOpen flag: seeded from it on SW startup,
+// updated on every change. Needed because `panelPort` alone is null after SW
+// eviction even while the panel is open.
+let panelOpenFlag = false;
+void chrome.storage.session
+  .get("dgPanelOpen")
+  .then((r) => {
+    panelOpenFlag = r?.dgPanelOpen === true;
+  })
+  .catch(() => {});
 
 // Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
 // belief and never has to query it at click time. That matters because
@@ -1827,6 +1839,7 @@ let panelPort = null;
 // Also persists to chrome.storage.session so the belief survives service-worker
 // eviction (which nulls the in-memory `panelPort` even while the panel is open).
 function broadcastPanelState(open) {
+  panelOpenFlag = open;
   void chrome.storage.session.set({ dgPanelOpen: open }).catch(() => {});
   chrome.tabs.query({}, (tabs) => {
     if (chrome.runtime.lastError) return;
@@ -2647,23 +2660,53 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         panelPort = null;
       }
     }
-    // Panel closed — stash for boot, then open (must stay synchronous).
+    // panelPort is null. If the panel is nonetheless OPEN (SW was evicted while it
+    // stayed open — common), calling sidePanel.open() here would TOGGLE IT SHUT
+    // (the "sidebar collapses when I click a file" bug). Instead deliver the
+    // content by BROADCAST, which reaches the open panel page regardless of the
+    // dead port. Only when the panel is genuinely closed do we stash + open.
+    if (panelOpenFlag) {
+      chrome.runtime.sendMessage(
+        { type: "dg-open-content", contentId, contentType },
+        () => void chrome.runtime.lastError,
+      );
+      sendResponse({ ok: true, data: true });
+      return true;
+    }
+    // panelOpenFlag is seeded async on SW startup, so the FIRST message after an
+    // eviction can arrive before it loads. Confirm against the durable flag before
+    // risking a toggle-shut: if open → broadcast; only if genuinely closed →
+    // stash + open.
+    const openTabId = sender?.tab?.id;
+    const openWindowId = sender?.tab?.windowId;
+    const openTarget = openWindowId != null ? { windowId: openWindowId } : { tabId: openTabId };
     chrome.storage.session
-      .set({ dgPanelOpenContentId: contentId, dgPanelOpenContentType: contentType })
-      .catch(() => {});
-    const tabId = sender?.tab?.id;
-    const windowId = sender?.tab?.windowId;
-    const target = windowId != null ? { windowId } : { tabId };
-    chrome.sidePanel
-      .open(target)
-      .then(() => sendResponse({ ok: true, data: true }))
-      .catch((error) => {
-        console.warn("[DG Bookmarks] open-content-in-side-panel failed", error, target);
-        sendResponse({
-          ok: false,
-          error: error instanceof Error ? error.message : "Failed to open side panel",
-        });
-      });
+      .get("dgPanelOpen")
+      .then((r) => {
+        if (r?.dgPanelOpen === true) {
+          panelOpenFlag = true;
+          chrome.runtime.sendMessage(
+            { type: "dg-open-content", contentId, contentType },
+            () => void chrome.runtime.lastError,
+          );
+          sendResponse({ ok: true, data: true });
+          return;
+        }
+        chrome.storage.session
+          .set({ dgPanelOpenContentId: contentId, dgPanelOpenContentType: contentType })
+          .catch(() => {});
+        chrome.sidePanel
+          .open(openTarget)
+          .then(() => sendResponse({ ok: true, data: true }))
+          .catch((error) => {
+            console.warn("[DG Bookmarks] open-content-in-side-panel failed", error, openTarget);
+            sendResponse({
+              ok: false,
+              error: error instanceof Error ? error.message : "Failed to open side panel",
+            });
+          });
+      })
+      .catch(() => sendResponse({ ok: false, error: "panel state read failed" }));
     return true;
   }
 
@@ -2672,6 +2715,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // differs, so the origin's own echo is a harmless no-op (no loop).
   if (message.type === "workspace-sync" && message.workspaceId) {
     const workspaceId = message.workspaceId;
+    // Persist the last active workspace so a freshly-opened panel/tree (a
+    // partitioned iframe with empty localStorage) can RESTORE it on boot instead
+    // of defaulting to Main — and uniformly, since both partitions read this one
+    // background-owned value.
+    void chrome.storage.local.set({ dgActiveWorkspace: workspaceId }).catch(() => {});
     if (panelPort) {
       try {
         panelPort.postMessage({ type: "workspace-changed", workspaceId });
@@ -2693,6 +2741,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       })
       .catch(() => {});
     sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Boot restore: an embed (panel or tree) asks for the persisted active
+  // workspace so it can activate it instead of defaulting to Main.
+  if (message.type === "get-active-workspace") {
+    chrome.storage.local
+      .get("dgActiveWorkspace")
+      .then((r) =>
+        sendResponse({ ok: true, data: { workspaceId: r?.dgActiveWorkspace ?? null } }),
+      )
+      .catch(() => sendResponse({ ok: true, data: { workspaceId: null } }));
     return true;
   }
 

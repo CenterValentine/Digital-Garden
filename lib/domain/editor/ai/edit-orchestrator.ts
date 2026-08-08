@@ -65,6 +65,20 @@ export interface InsertBlockPayload {
   /** A fully-formed, server-validated TipTap block node ready to insert. */
   node: JSONContent;
   blockType: string;
+  /** Insert immediately after the block with this id; falls back to doc end. */
+  afterBlockId?: string;
+  documentTitle: string;
+  action: string;
+  toolCallId?: string;
+}
+
+export interface UpdateBlockPayload {
+  __editPayload: true;
+  type: "update_block";
+  /** The blockId of the existing block to patch. */
+  blockId: string;
+  /** The attribute changes to merge into the block's live attrs. */
+  attrs: Record<string, unknown>;
   documentTitle: string;
   action: string;
   toolCallId?: string;
@@ -74,7 +88,8 @@ export type EditPayload =
   | ApplyDiffPayload
   | ReplaceDocumentPayload
   | InsertImagePayload
-  | InsertBlockPayload;
+  | InsertBlockPayload
+  | UpdateBlockPayload;
 
 export interface EditResult {
   success: boolean;
@@ -296,6 +311,8 @@ export class AiEditOrchestrator {
       result = await this.executeInsertImage(payload);
     } else if (payload.type === "insert_block") {
       result = await this.executeInsertBlock(payload);
+    } else if (payload.type === "update_block") {
+      result = await this.executeUpdateBlock(payload);
     } else {
       return { success: false, action: "Unknown edit type", error: "Unknown payload type" };
     }
@@ -473,10 +490,23 @@ export class AiEditOrchestrator {
       // Lock editor for block insertion
       this.lockEditor();
 
-      // Insert at end of document (before trailing doc boundary)
-      const insertPos = editor.state.doc.content.size - 1;
+      // Insert right after a specific block if requested, else at the doc end.
+      let insertPos = editor.state.doc.content.size - 1;
+      if (payload.afterBlockId) {
+        let anchor: { pos: number; nodeSize: number } | null = null;
+        editor.state.doc.descendants((node, pos) => {
+          if (anchor) return false;
+          if ((node.attrs as Record<string, unknown> | undefined)?.blockId === payload.afterBlockId) {
+            anchor = { pos, nodeSize: node.nodeSize };
+            return false;
+          }
+          return true;
+        });
+        const a = anchor as { pos: number; nodeSize: number } | null;
+        if (a) insertPos = a.pos + a.nodeSize;
+      }
 
-      // Scroll to end
+      // Scroll to the insertion point
       editor.chain().setTextSelection(insertPos).scrollIntoView().run();
       if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
       await sleep(CURSOR_ARRIVAL_DELAY);
@@ -521,6 +551,67 @@ export class AiEditOrchestrator {
         success: false,
         action: payload.action,
         error: err instanceof Error ? err.message : "Unknown error during block insertion",
+      };
+    }
+  }
+
+  private async executeUpdateBlock(payload: UpdateBlockPayload): Promise<EditResult> {
+    const editor = this.getEditor();
+    if (!editor) {
+      return { success: false, action: payload.action, error: "Editor not available" };
+    }
+
+    try {
+      this.lockEditor();
+
+      // Locate the block node by its blockId.
+      let found: { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null = null;
+      editor.state.doc.descendants((node, pos) => {
+        if (found) return false;
+        const bid = (node.attrs as Record<string, unknown> | undefined)?.blockId;
+        if (bid === payload.blockId) {
+          found = {
+            pos,
+            attrs: node.attrs as Record<string, unknown>,
+            nodeSize: node.nodeSize,
+          };
+          return false;
+        }
+        return true;
+      });
+      const target = found as { pos: number; attrs: Record<string, unknown>; nodeSize: number } | null;
+      if (!target) {
+        return {
+          success: false,
+          action: payload.action,
+          error: `Block "${payload.blockId}" was not found in the document.`,
+        };
+      }
+
+      editor.chain().setTextSelection(target.pos).scrollIntoView().run();
+      if (this.aborted) return { success: false, action: payload.action, error: "Aborted" };
+      await sleep(CURSOR_ARRIVAL_DELAY);
+
+      // Merge the changed attrs into the live node's attrs.
+      const tr = editor.state.tr.setNodeMarkup(target.pos, undefined, {
+        ...target.attrs,
+        ...payload.attrs,
+      });
+      editor.view.dispatch(tr);
+
+      this.applyAiHighlight(editor, target.pos, target.pos + target.nodeSize);
+
+      // A bot edit must not leave the block selected / hijack the right rail.
+      useBlockStore.getState().clearSelection();
+
+      await sleep(SETTLE_DELAY);
+
+      return { success: true, action: payload.action };
+    } catch (err) {
+      return {
+        success: false,
+        action: payload.action,
+        error: err instanceof Error ? err.message : "Unknown error during block update",
       };
     }
   }

@@ -1304,6 +1304,26 @@ function createOverlayApp(state) {
         workspaceId: data.payload.workspaceId,
       });
     }
+    // Boot restore: the tree asks for the persisted active workspace. Fetch it
+    // from the background and post it back as `workspace-changed` (dg-tree-host)
+    // so TreeShellClient's existing handler activates it instead of Main.
+    if (data.type === "request-active-workspace") {
+      chrome.runtime.sendMessage({ type: "get-active-workspace" }, (resp) => {
+        if (chrome.runtime.lastError) return;
+        const workspaceId = resp?.ok ? resp.data?.workspaceId : null;
+        if (workspaceId) {
+          state.treeIframe?.contentWindow?.postMessage(
+            {
+              v: 1,
+              source: "dg-tree-host",
+              type: "workspace-changed",
+              payload: { workspaceId },
+            },
+            "*",
+          );
+        }
+      });
+    }
   });
 }
 

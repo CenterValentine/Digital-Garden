@@ -26,11 +26,20 @@ carries `🔭 Planned` and, once one exists, a link to its design doc. When some
 update ritual promotes it: label removed, evidence link added. Technical screeners check claims
 against code; one inflated claim costs more than ten missing features.
 
-**Presentation driver: high-demand AI skills first.** When choosing what to surface, feature, or
-lead with, the priority order is: agentic orchestration (tools, playbooks, workflows) → AI
-infrastructure (routing, fallback, streaming, governance) → multimodal pipelines → everything
-else. Non-AI features earn README space by demonstrating engineering depth (collab CRDTs, CI
-gates), not by completeness.
+**Presentation driver: rank by relevance to analyst / operations / low-tech solutions engineer /
+customer success-support hiring managers** — not by engineering depth. This audience is the
+target, not deep AI/ML engineering roles: automation and knowledge-work capabilities that map onto
+what these roles actually hire for (workflow automation, SOP/runbook execution, knowledge-base-
+grounded assistance, support-relevant multimodal tools) rank above backend reliability internals
+(fallback chains, resumable streams, context/token governance) that read as pure engineering
+jargon to this audience. Within the "AI & agentic systems" competency table specifically, the
+order is: durable workflows → agent playbooks → grounded learning studio (Folder Studio) →
+multimodal pipelines → tool-calling orchestration → provider abstraction (BYOK) → agentic browser
+reach → multi-model routing/fallback → resumable streaming → resource governance → planned items
+last. When a new capability is added, place it by asking "would an ops/analyst/CS-support hiring
+manager recognize this as something they'd want automated," not "is this technically impressive."
+Non-AI features earn README space by demonstrating engineering depth (collab CRDTs, CI gates), not
+by completeness — that framing is unchanged.
 
 **PR bodies for showcase-content-only changes stay generic ("don't show the man behind the
 curtain").** This is a deliberate exception to the repo's usual detailed sprint-format PR
