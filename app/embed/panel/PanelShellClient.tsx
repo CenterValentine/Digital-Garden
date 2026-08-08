@@ -41,14 +41,11 @@ import {
 } from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
-// The panel = content workspace (top) + the real RightSidebar as a bottom strip
-// (chat + backlinks/outline/tags). Studio shows but DISABLED here (dimmed +
-// unresponsive) — it doesn't belong in the compact strip, but cutting it left an
-// odd gap. Module constant so the tab memo/props stay referentially stable.
+// The panel = content workspace (top) + the real RightSidebar as a bottom strip.
 // Studio (folder-only) and the dynamic "Extension" tab (a calendar/other
-// extension's right-sidebar surface) don't belong in the compact co-browse
-// strip — shown but DISABLED (dimmed + inert), like Studio, rather than cut
-// (cutting left an odd gap). Module constant so the tab memo/props stay stable.
+// extension's right-sidebar surface) don't belong in the compact co-browse strip
+// — shown but DISABLED (dimmed + inert), like Studio, rather than cut (cutting
+// left an odd gap). Module constant so the tab memo/props stay referentially stable.
 const PANEL_DISABLED_SIDEBAR_TABS = [STUDIO_TAB_KEY, "extension"];
 // The sidebar strip is drag-resizable but CLAMPED so it never starves the
 // workspace or gets too cramped to use. Fraction of the split's height.
@@ -690,7 +687,8 @@ export function PanelShellClient({
           flexShrink: 0,
         }}
       >
-        {/* Workspace selector — switching it loads that workspace's tabs here. */}
+        {/* Workspace selector + clear-all-tabs (the main app's exact affordance),
+            side by side where workspace/tab actions belong. */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {shellNavigationControls.map((Control) =>
             createElement(Control, {
@@ -698,16 +696,15 @@ export function PanelShellClient({
               paneId: TOP_LEFT_PANE_ID,
             }),
           )}
-        </div>
-        {/* Right cluster: clear-all-tabs (same affordance as the main app) +
-            the file-tree overlay launcher. */}
-        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           {shellNavigationTrailingControls.map((Control) =>
             createElement(Control, {
               key: Control.displayName ?? Control.name,
               paneId: TOP_LEFT_PANE_ID,
             }),
           )}
+        </div>
+        {/* File-tree overlay launcher. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
           {/* Phase 2b: launch the right-side file-tree overlay from the panel. */}
           <button
             type="button"
