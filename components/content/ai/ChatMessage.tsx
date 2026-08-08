@@ -42,7 +42,6 @@ import {
   RotateCcw,
   ShieldAlert,
   Table2,
-  TriangleAlert,
   User,
   Volume2,
   Wrench,
@@ -50,6 +49,7 @@ import {
   FolderSearch,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
+import { AnomalyChipRow, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -346,6 +346,20 @@ export const ChatMessage = memo(function ChatMessage({
         .join("")
         .trim(),
     [message.parts],
+  );
+
+  // Failure surface for this turn (output limit / tool errors / captcha) —
+  // derived from the durable transcript so live and reloaded views agree.
+  const messageAnomalies = useMemo(
+    () =>
+      isAssistant
+        ? deriveMessageAnomalies(
+            message.parts as unknown[],
+            (message as { metadata?: Record<string, unknown> }).metadata,
+            Boolean(messageText),
+          )
+        : [],
+    [isAssistant, message, messageText],
   );
 
   const [editing, setEditing] = useState(false);
@@ -1088,26 +1102,15 @@ export const ChatMessage = memo(function ChatMessage({
             time so a multi-minute reasoning model reads as alive, not frozen. */}
         {showWorking && <WorkingIndicator />}
 
-        {/* Output-limit truncation notice. A turn whose terminal request
-            ended with finishReason "length" may have produced NO visible
-            output at all (reasoning models spend the whole budget thinking) —
-            without this banner the user just sees the model silently stop
-            (2026-08-08 DeepSeek run: 4096 tokens of reasoning, zero text,
-            and a user asking "Why did you stop?"). */}
-        {isAssistant &&
-          !isStreaming &&
-          (message as { metadata?: { finishReason?: unknown } }).metadata
-            ?.finishReason === "length" && (
-            <div className="my-1 flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-800 dark:text-amber-200">
-              <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-              <span>
-                The response was cut off by the output-token limit before it
-                finished{messageText ? "" : " — nothing visible was produced"}.
-                Raise or clear &ldquo;Max tokens&rdquo; in AI settings (empty =
-                model maximum), then ask the model to continue.
-              </span>
-            </div>
-          )}
+        {/* Anomaly chips — the single failure surface for this turn: output-
+            limit truncation (a turn can die with NO visible output when a
+            reasoning model spends the whole budget thinking — the 2026-08-08
+            DeepSeek run), tool errors, ok:false tool results, captcha halts.
+            Derived from durable parts + metadata, so live and reloaded
+            transcripts show the same chips. */}
+        {isAssistant && messageAnomalies.length > 0 && (
+          <AnomalyChipRow anomalies={messageAnomalies} />
+        )}
 
         {/* Hover actions — icon-only, with tooltip + aria-label for a11y.
             Copy on every message; edit (user); regenerate + branch
