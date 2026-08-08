@@ -31,6 +31,8 @@ export interface CoBrowseNode {
   role?: string;
   name?: string;
   value?: string;
+  /** Link destination from the AX tree (extension ≥5.2) — the OBSERVED URL. */
+  href?: string;
   expanded?: boolean;
   disabled?: boolean;
   focusable?: boolean;

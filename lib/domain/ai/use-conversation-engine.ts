@@ -654,6 +654,9 @@ function coBrowseSnapshotOutput(snap: {
     role: n.role,
     name: n.name,
     ...(n.value ? { value: n.value } : {}),
+    // A link's real destination (extension ≥5.2 sends it from the AX tree) —
+    // the observed URL the model must use for item lists. Never invent URLs.
+    ...(n.href ? { href: n.href } : {}),
     ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
     ...(n.disabled ? { disabled: true } : {}),
     // Elements sharing a `group` are in the same card/row/item — use it to act on
