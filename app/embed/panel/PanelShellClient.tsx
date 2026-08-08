@@ -35,14 +35,18 @@ import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy
 import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
-import { useExtensionShellNavigationControls } from "@/lib/extensions/client-registry";
+import {
+  useExtensionShellNavigationControls,
+  useExtensionShellNavigationTrailingControls,
+} from "@/lib/extensions/client-registry";
 import { isAllowedEmbedMessageOrigin } from "@/lib/domain/browser-extension/embed-message-origins";
 
-// The panel = content workspace (top) + the real RightSidebar as a bottom strip
-// (chat + backlinks/outline/tags). Studio shows but DISABLED here (dimmed +
-// unresponsive) — it doesn't belong in the compact strip, but cutting it left an
-// odd gap. Module constant so the tab memo/props stay referentially stable.
-const PANEL_DISABLED_SIDEBAR_TABS = [STUDIO_TAB_KEY];
+// The panel = content workspace (top) + the real RightSidebar as a bottom strip.
+// Studio (folder-only) and the dynamic "Extension" tab (a calendar/other
+// extension's right-sidebar surface) don't belong in the compact co-browse strip
+// — shown but DISABLED (dimmed + inert), like Studio, rather than cut (cutting
+// left an odd gap). Module constant so the tab memo/props stay referentially stable.
+const PANEL_DISABLED_SIDEBAR_TABS = [STUDIO_TAB_KEY, "extension"];
 // The sidebar strip is drag-resizable but CLAMPED so it never starves the
 // workspace or gets too cramped to use. Fraction of the split's height.
 const SIDEBAR_MIN_FRAC = 0.22;
@@ -280,6 +284,10 @@ export function PanelShellClient({
   // tabs (the machinery WorkplacesShellController already drives here). It was
   // dropped when Phase 3 stripped the Garden view; restore it in the top bar.
   const shellNavigationControls = useExtensionShellNavigationControls();
+  // The clear-all-tabs affordance (CircleX) from the main app's tab row — same
+  // component, wired the same way, placed in the panel's top bar.
+  const shellNavigationTrailingControls =
+    useExtensionShellNavigationTrailingControls();
 
   // ── workspace sync (panel ↔ tree overlay) ──
   // The panel selector and the tree-overlay selector must MIRROR at all times:
@@ -361,13 +369,24 @@ export function PanelShellClient({
 
   // Two consumers read the theme from different places: Tailwind's `dark:`
   // variants need a `.dark` ancestor class, while JS-computed styles (the chat
-  // gradient) read useResolvedTheme → the settings store, which is empty in the
-  // partitioned iframe. The class is applied in render below; seed the store here.
+  // gradient) read useResolvedTheme → the settings store. In the partitioned
+  // iframe that store is empty and hydrates to "system" (OS-tracking), so the
+  // chat rendered dark on a light panel. A one-time seed isn't enough — the
+  // DeferredStoreHydrator rehydrate / fetchFromBackend clobber it back to
+  // "system". ENFORCE the server-resolved theme against any drift: set it now,
+  // and re-set it whenever the store changes away from the concrete value.
   useEffect(() => {
-    useSettingsStore.setState((state) => ({
-      ui: { ...state.ui, theme: isDark ? "dark" : "light" },
-    }));
+    const target = isDark ? "dark" : "light";
+    const enforce = () => {
+      if (useSettingsStore.getState().ui?.theme !== target) {
+        useSettingsStore.setState((state) => ({
+          ui: { ...state.ui, theme: target },
+        }));
+      }
+    };
+    enforce();
     document.documentElement.classList.toggle("dark", isDark);
+    return useSettingsStore.subscribe(enforce);
   }, [isDark]);
 
   // Single-pane by necessity at panel width. Enforced silently through the
@@ -664,11 +683,12 @@ export function PanelShellClient({
           justifyContent: "space-between",
           gap: 6,
           padding: "4px 8px",
-          borderBottom: "1px solid var(--border-primary, #2a2a2a)",
+          borderBottom: "1px solid var(--border, #2a2a2a)",
           flexShrink: 0,
         }}
       >
-        {/* Workspace selector — switching it loads that workspace's tabs here. */}
+        {/* Workspace selector + clear-all-tabs (the main app's exact affordance),
+            side by side where workspace/tab actions belong. */}
         <div style={{ display: "flex", alignItems: "center", gap: 6, minWidth: 0 }}>
           {shellNavigationControls.map((Control) =>
             createElement(Control, {
@@ -676,41 +696,50 @@ export function PanelShellClient({
               paneId: TOP_LEFT_PANE_ID,
             }),
           )}
+          {shellNavigationTrailingControls.map((Control) =>
+            createElement(Control, {
+              key: Control.displayName ?? Control.name,
+              paneId: TOP_LEFT_PANE_ID,
+            }),
+          )}
         </div>
-        {/* Phase 2b: launch the right-side file-tree overlay from the panel. */}
-        <button
-          type="button"
-          onClick={launchTree}
-          title="Open file tree"
-          aria-label="Open file tree"
-          style={{
-            flexShrink: 0,
-            width: 30,
-            height: 24,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            borderRadius: 6,
-            border: "1px solid transparent",
-            background: "transparent",
-            color: "var(--text-secondary, #9a9a9a)",
-            cursor: "pointer",
-          }}
-        >
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        {/* File-tree overlay launcher. */}
+        <div style={{ display: "flex", alignItems: "center", gap: 4, flexShrink: 0 }}>
+          {/* Phase 2b: launch the right-side file-tree overlay from the panel. */}
+          <button
+            type="button"
+            onClick={launchTree}
+            title="Open file tree"
+            aria-label="Open file tree"
+            style={{
+              flexShrink: 0,
+              width: 30,
+              height: 24,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              borderRadius: 6,
+              border: "1px solid transparent",
+              background: "transparent",
+              color: "var(--text-secondary, #9a9a9a)",
+              cursor: "pointer",
+            }}
           >
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M9 3v18" />
-          </svg>
-        </button>
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M9 3v18" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       {/* The panel = the content workspace (top) + the real RightSidebar as a
@@ -772,8 +801,8 @@ export function PanelShellClient({
                   flexShrink: 0,
                   height: 6,
                   cursor: "row-resize",
-                  background: "var(--border-primary, #2a2a2a)",
-                  borderTop: "1px solid var(--border-primary, #2a2a2a)",
+                  background: "var(--border, #2a2a2a)",
+                  borderTop: "1px solid var(--border, #2a2a2a)",
                 }}
               />
 

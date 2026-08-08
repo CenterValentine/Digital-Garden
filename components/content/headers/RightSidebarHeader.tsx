@@ -130,7 +130,7 @@ export function RightSidebarHeader({
   });
 
   return (
-    <div className="dg-rightsidebar-tabs flex h-12 shrink-0 items-center border-b border-white/10 px-2 gap-1">
+    <div className="dg-rightsidebar-tabs flex h-12 shrink-0 items-center border-b border-black/10 dark:border-white/10 px-2 gap-1">
       <div className="scrollbar-hide flex min-w-0 flex-1 items-center justify-around overflow-x-auto">
         {uniqueTabs.map((tool: ToolDefinition) => {
           const tabKey = tool.tabKey as RightSidebarTab | undefined;
@@ -151,7 +151,7 @@ export function RightSidebarHeader({
               } ${
                 activeTab === tabKey
                   ? "border-b-2 border-gold-primary text-gold-primary"
-                  : "text-gray-400 hover:text-gray-300"
+                  : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
               title={TAB_TITLES[tabKey] ?? tool.label}
               type="button"

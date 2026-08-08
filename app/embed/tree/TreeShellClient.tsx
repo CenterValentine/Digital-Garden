@@ -9,6 +9,7 @@ import { editorActionProvider } from "@/components/content/context-menu/editor-a
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContentStore } from "@/state/content-store";
+import { getSurfaceStyles } from "@/lib/design/system";
 
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
@@ -50,11 +51,21 @@ export function TreeShellClient({
       ? systemPrefersDark
       : themePreference === "dark";
 
+  // Enforce the server-resolved theme against store drift (a one-time seed gets
+  // clobbered back to "system" by the DeferredStoreHydrator / fetchFromBackend in
+  // the empty partitioned iframe) — same fix the panel uses.
   useEffect(() => {
-    useSettingsStore.setState((state) => ({
-      ui: { ...state.ui, theme: isDark ? "dark" : "light" },
-    }));
+    const target = isDark ? "dark" : "light";
+    const enforce = () => {
+      if (useSettingsStore.getState().ui?.theme !== target) {
+        useSettingsStore.setState((state) => ({
+          ui: { ...state.ui, theme: target },
+        }));
+      }
+    };
+    enforce();
     document.documentElement.classList.toggle("dark", isDark);
+    return useSettingsStore.subscribe(enforce);
   }, [isDark]);
 
   // Announce readiness to the overlay host (extension), matching the panel's
@@ -156,6 +167,11 @@ export function TreeShellClient({
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
+  // Match the app's LeftSidebar surface: the app wraps it in a Glass-0 panel
+  // (ConditionalNotesLayout), while this overlay otherwise renders it bare on the
+  // embed canvas (var(--background)) — the "different CSS / black-on-black" the
+  // owner saw. getSurfaceStyles is CSS-variable based, so `.dark` themes it.
+  const glass0 = getSurfaceStyles("glass-0");
   return (
     <div
       className={isDark ? "dark" : undefined}
@@ -164,6 +180,8 @@ export function TreeShellClient({
         minHeight: 0,
         display: "flex",
         flexDirection: "column",
+        background: glass0.background,
+        backdropFilter: glass0.backdropFilter,
       }}
     >
       <DndWrapper>
