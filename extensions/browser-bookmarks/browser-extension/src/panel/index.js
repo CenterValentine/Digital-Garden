@@ -675,6 +675,14 @@ chrome.runtime.onMessage.addListener((message) => {
       // Some Chromium builds disallow programmatic side-panel close — no-op.
     }
   }
+  // A tree file-click while the panel is open but the dg-panel port is dead (SW
+  // evicted). Delivered by broadcast instead of the port so it still lands.
+  if (message?.type === "dg-open-content" && message.contentId) {
+    postToEmbed("open-content", {
+      contentId: message.contentId,
+      contentType: message.contentType || null,
+    });
+  }
 });
 
 let panelPort = null;
