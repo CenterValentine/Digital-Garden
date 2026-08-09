@@ -56,7 +56,10 @@ import {
   PROVIDER_CATALOG,
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
-import { stripReasoningForResend } from "@/lib/domain/ai/context-diet";
+import {
+  stripReasoningForResend,
+  supersedeIterationHistory,
+} from "@/lib/domain/ai/context-diet";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
@@ -1320,13 +1323,21 @@ export async function POST(request: Request) {
       const repairedMessages = compactToolOutputs(
         repairDanglingToolCalls(messages),
       );
-      // Context diet (S7): reasoning parts are model OUTPUT with no resend
-      // value for non-Anthropic providers, yet convertToModelMessages
-      // forwards them as input verbatim (~100k chars replayed per request in
-      // the measured DeepSeek run). Applied ONLY to this model-message path —
-      // repairedMessages stays intact for originalMessages/persistence.
+      // Context diet (S7/S8): both transforms apply ONLY to this
+      // model-message path — repairedMessages stays intact for
+      // originalMessages/persistence.
+      //   - supersedeIterationHistory: raw perception outputs behind the
+      //     latest batch checkpoint collapse to stubs (the ledger is the
+      //     cross-batch memory); reclaims 128k-window space on long runs.
+      //   - stripReasoningForResend: reasoning parts are model OUTPUT with
+      //     no resend value for non-Anthropic providers, yet
+      //     convertToModelMessages forwards them as input verbatim (~100k
+      //     chars replayed per request in the measured DeepSeek run).
       const resolvedMessages = resolveAttachmentsForModel(
-        stripReasoningForResend(repairedMessages, executedVendorId),
+        stripReasoningForResend(
+          supersedeIterationHistory(repairedMessages),
+          executedVendorId,
+        ),
         executedVendorId,
         audioCapable,
       );

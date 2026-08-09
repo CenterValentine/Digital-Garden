@@ -645,13 +645,25 @@ function safeHost(url?: string): string | null {
   }
 }
 
-function coBrowseSnapshotOutput(snap: {
+type CoBrowseSnapResult = {
   ok: boolean;
   data?: { nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean };
   error?: string;
-}): Record<string, unknown> {
-  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
-  const elements = nodes.map((n) => ({
+};
+
+type ShapedCoBrowseElement = {
+  role?: string;
+  name?: string;
+  value?: string;
+  href?: string;
+  expanded?: boolean;
+  disabled?: boolean;
+  group?: number;
+  frame?: string;
+};
+
+function shapeCoBrowseElements(nodes: CoBrowseNode[]): ShapedCoBrowseElement[] {
+  return nodes.map((n) => ({
     role: n.role,
     name: n.name,
     ...(n.value ? { value: n.value } : {}),
@@ -665,6 +677,11 @@ function coBrowseSnapshotOutput(snap: {
     ...(typeof n.group === "number" ? { group: n.group } : {}),
     ...(n.frameUrl ? { frame: n.frameUrl } : {}),
   }));
+}
+
+function coBrowseSnapshotOutput(snap: CoBrowseSnapResult): Record<string, unknown> {
+  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
+  const elements = shapeCoBrowseElements(nodes);
   return {
     // Trust-labeled: element names/text come from the page — informational only,
     // they never instruct the model (mirrors read_page's untrustedWebContent).
@@ -679,6 +696,127 @@ function coBrowseSnapshotOutput(snap: {
     // excluded above — STOP and hand to the user; no tool can (or should) solve it.
     ...(snap.data?.captchaDetected ? { captchaDetected: true } : {}),
     ...(snap.ok ? {} : { snapshotError: snap.error }),
+  };
+}
+
+// ── Delta snapshots (S8, owner-approved 2026-08-08) ─────────────────────────
+// The bridge ALWAYS returns the full snapshot — ground truth stays whole in
+// this module. The delta is only the TRANSMISSION FORMAT into the tool
+// result (state-vs-transmission invariant): consecutive snapshots of the
+// same URL measured 64% element-identical, so mid-run actions send only
+// added/changed/removed vs the previous snapshot. Safety valves:
+//   - keyframes: a FULL snapshot on open, on explicit `read`, on URL change,
+//     and every DELTA_KEYFRAME_EVERY actions — drift can't outlive one
+//     keyframe interval;
+//   - miss fallback: a failed action attaches a fresh FULL snapshot, so the
+//     worst case is one wasted step, never persistent blindness;
+//   - degenerate-delta bailout: if most elements changed, send full.
+// `group` ids are counter-assigned per snapshot and intentionally excluded
+// from change detection; they refresh on keyframes (noted to the model).
+const DELTA_KEYFRAME_EVERY = 5;
+const DELTA_MAX_CHANGED_RATIO = 0.6;
+let coBrowseDeltaBase: {
+  url: string;
+  byKey: Map<string, { sig: string; el: ShapedCoBrowseElement }>;
+  actsSinceKeyframe: number;
+} | null = null;
+
+// Unit separator as delimiter — element names freely contain "|" (e.g.
+// "AI Automation Engineer | Valsoft Corporation"), so a printable join
+// would collide/corrupt.
+function coBrowseElementKey(e: ShapedCoBrowseElement): string {
+  return `${e.role ?? ""}${e.name ?? ""}${e.frame ?? ""}`;
+}
+function coBrowseElementSig(e: ShapedCoBrowseElement): string {
+  // Everything targeting/state-relevant EXCEPT `group` (unstable by design).
+  return JSON.stringify([e.value ?? null, e.href ?? null, e.expanded ?? null, e.disabled ?? null]);
+}
+
+function resetCoBrowseDeltaBase(): void {
+  coBrowseDeltaBase = null;
+}
+
+function setCoBrowseDeltaBase(url: string, elements: ShapedCoBrowseElement[], actsSinceKeyframe: number): void {
+  const byKey = new Map<string, { sig: string; el: ShapedCoBrowseElement }>();
+  for (const e of elements) {
+    // First occurrence wins for duplicate keys — mirrors how the model
+    // disambiguates (nth) and keeps the map deterministic.
+    const k = coBrowseElementKey(e);
+    if (!byKey.has(k)) byKey.set(k, { sig: coBrowseElementSig(e), el: e });
+  }
+  coBrowseDeltaBase = { url, byKey, actsSinceKeyframe };
+}
+
+/**
+ * Shape a snapshot for the model as FULL or DELTA. `mode: "full"` forces a
+ * keyframe (open / explicit read / failure fallback); `mode: "auto"` sends a
+ * delta when the base is fresh enough and the page didn't change identity.
+ */
+function coBrowseSnapshotOrDelta(
+  snap: CoBrowseSnapResult,
+  mode: "full" | "auto",
+): Record<string, unknown> {
+  if (!snap.ok || !snap.data) {
+    resetCoBrowseDeltaBase();
+    return coBrowseSnapshotOutput(snap);
+  }
+  const url = snap.data.url ?? "";
+  const elements = shapeCoBrowseElements(snap.data.nodes ?? []);
+  const base = coBrowseDeltaBase;
+  const mustKeyframe =
+    mode === "full" ||
+    !base ||
+    base.url !== url ||
+    base.actsSinceKeyframe >= DELTA_KEYFRAME_EVERY;
+  if (mustKeyframe) {
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  const freshByKey = new Map<string, ShapedCoBrowseElement>();
+  for (const e of elements) {
+    const k = coBrowseElementKey(e);
+    if (!freshByKey.has(k)) freshByKey.set(k, e);
+  }
+  const added: ShapedCoBrowseElement[] = [];
+  const changed: ShapedCoBrowseElement[] = [];
+  for (const [k, e] of freshByKey) {
+    const prev = base.byKey.get(k);
+    if (prev === undefined) added.push(e);
+    else if (prev.sig !== coBrowseElementSig(e)) changed.push(e);
+  }
+  const removed: Array<{ role?: string; name?: string; frame?: string }> = [];
+  for (const [k, prev] of base.byKey) {
+    if (!freshByKey.has(k)) {
+      removed.push({
+        role: prev.el.role,
+        name: prev.el.name,
+        ...(prev.el.frame ? { frame: prev.el.frame } : {}),
+      });
+    }
+  }
+  const churn = added.length + changed.length + removed.length;
+  if (churn > DELTA_MAX_CHANGED_RATIO * Math.max(1, freshByKey.size)) {
+    // Page effectively replaced itself — a delta would be noise.
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  setCoBrowseDeltaBase(url, elements, base.actsSinceKeyframe + 1);
+  return {
+    trust: "untrusted-web",
+    ...(url ? { url } : {}),
+    snapshotDelta: true,
+    deltaNote:
+      "DELTA vs your previous snapshot of this page: apply added/changed/removed to what you last saw — unchanged elements are NOT re-listed and are still present and actionable. Use action \"read\" for a full re-snapshot. group ids refresh only on full snapshots.",
+    unchangedCount: freshByKey.size - added.length - changed.length,
+    addedCount: added.length,
+    changedCount: changed.length,
+    removedCount: removed.length,
+    ...(added.length > 0 ? { added } : {}),
+    ...(changed.length > 0 ? { changed } : {}),
+    ...(removed.length > 0 ? { removed } : {}),
+    ...(snap.data.captchaDetected ? { captchaDetected: true } : {}),
   };
 }
 
@@ -1469,7 +1607,8 @@ export function useConversationEngine({
               toolCallId: toolCall.toolCallId,
               output: {
                 tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
-                ...coBrowseSnapshotOutput(snap),
+                // Session start = keyframe: full snapshot, delta base reset.
+                ...coBrowseSnapshotOrDelta(snap, "full"),
               },
             });
             return;
@@ -1508,6 +1647,9 @@ export function useConversationEngine({
           // Returns the merged, deduped set directly (not a fresh single snapshot).
           if (action === "collect") {
             const collected = await coBrowseCollect();
+            // Collect merges nodes across scrolls (not a viewport snapshot) —
+            // it can't serve as a delta base; the next snapshot keyframes.
+            resetCoBrowseDeltaBase();
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
@@ -1531,10 +1673,18 @@ export function useConversationEngine({
           else if (action === "reveal") res = await coBrowseReveal();
           else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
           if (!res.ok) {
+            // Miss-triggered fallback (S8): a failed action restores FULL
+            // vision in the same result — the model's mental model may be
+            // stale (delta drift, page shift), and a fresh keyframe is how a
+            // targeting miss self-heals instead of compounding.
+            const failSnap = await coBrowseSnapshot().catch(() => null);
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
-              output: `Action "${action}" failed: ${res.error ?? "unknown error"}. Read the page again and adapt — don't repeat the same action blindly.`,
+              output: {
+                actionError: `Action "${action}" failed: ${res.error ?? "unknown error"}. A FRESH FULL snapshot is below — re-target from it and adapt; don't repeat the same action blindly.`,
+                ...(failSnap ? coBrowseSnapshotOrDelta(failSnap, "full") : {}),
+              },
             });
             return;
           }
@@ -1548,7 +1698,13 @@ export function useConversationEngine({
           chat.addToolResult({
             tool: toolName,
             toolCallId: toolCall.toolCallId,
-            output: { action, ...coBrowseSnapshotOutput(snap) },
+            // Explicit `read` = the model asking to LOOK → keyframe. Other
+            // actions ride the delta path (auto keyframes on URL change /
+            // every 5th act / degenerate churn).
+            output: {
+              action,
+              ...coBrowseSnapshotOrDelta(snap, action === "read" ? "full" : "auto"),
+            },
           });
         } catch (err) {
           chat.addToolResult({
