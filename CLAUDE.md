@@ -20,6 +20,8 @@ pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
 pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches)
+pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
+pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
@@ -352,6 +354,10 @@ Custom OAuth with Google Sign-In. `lib/infrastructure/auth/` (barrel export via 
 **Location:** `lib/domain/ai/`
 
 AI SDK v6 integration with BYOK (Bring Your Own Key) support.
+
+**Orientation docs (read these before changing AI behavior):**
+- [docs/notes-feature/core/AI-ARCHITECTURE.md](docs/notes-feature/core/AI-ARCHITECTURE.md) — the request lifecycle (multi-request turns, resolution ladder, tool assembly, step budgets, resume predicate), the five parallel model tables and which code consumes each, and "changing things safely" checklists. Symbol-anchored; verified per branch.
+- [docs/notes-feature/core/AI-CAPABILITY-MATRIX.md](docs/notes-feature/core/AI-CAPABILITY-MATRIX.md) — **generated** (`pnpm ai:matrix`, guarded by `ai:matrix:check`): what every provider/model actually gets (ceilings, reasoning, search/PDF/caching, adapter coverage). Never edit by hand.
 
 **AI domain structure:**
 - `types.ts` — Chat types, model configuration

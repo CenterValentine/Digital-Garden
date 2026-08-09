@@ -17,6 +17,8 @@ on:
       - "lib/features/ai-connections/**"
       - "lib/features/settings/validation.ts"
       - "scripts/validate-ai-drift.ts"
+      - "scripts/generate-ai-capability-matrix.ts"
+      - "docs/notes-feature/core/AI-CAPABILITY-MATRIX.md"
       - "package.json"
       - "pnpm-lock.yaml"
   push:
@@ -48,3 +50,6 @@ jobs:
 
       - name: Validate AI drift gates
         run: pnpm ai:drift:check
+
+      - name: Validate capability matrix freshness
+        run: pnpm ai:matrix:check
