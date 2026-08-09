@@ -68,6 +68,12 @@ import {
 } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+// Direct path import — the ai-connections barrel would leak Prisma here.
+import {
+  computeTurnCost,
+  formatUsdEstimate,
+  readPersistedCost,
+} from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
 import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
@@ -1765,6 +1771,61 @@ function extractDurationMs(
   return typeof d === "number" && Number.isFinite(d) && d >= 0 ? d : undefined;
 }
 
+/**
+ * Estimated turn cost for display (COST-METERING-PLAN.md).
+ *
+ * Precedence:
+ *   1. Persisted `metadata.cost` — priced at write time, version-pinned.
+ *   2. Persisted unpriced marker — render "cost n/a", never $0.
+ *   3. Live/legacy fallback — price the visible usage at CURRENT rates
+ *      (streaming turns carry raw per-request metadata that hasn't been
+ *      through the accumulator yet; pre-feature history rows never will).
+ */
+type CostDisplay =
+  | { kind: "priced"; usd: number; current: boolean }
+  | { kind: "unpriced" }
+  | undefined;
+
+function extractCostDisplay(
+  metadata: Record<string, unknown> | undefined,
+  providerId: string | null | undefined,
+  modelId: string | null | undefined,
+): CostDisplay {
+  const raw = (metadata as { cost?: unknown } | undefined)?.cost;
+  const persisted = readPersistedCost(raw);
+  if (persisted) return { kind: "priced", usd: persisted.usd, current: false };
+  if (
+    raw &&
+    typeof raw === "object" &&
+    (raw as { unpriced?: unknown }).unpriced === true
+  ) {
+    return { kind: "unpriced" };
+  }
+  const usage = (metadata as { usage?: unknown } | undefined)?.usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const u = usage as Record<string, unknown>;
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  const inputTokens = num(u.inputTokens);
+  const outputTokens = num(u.outputTokens);
+  if (inputTokens == null && outputTokens == null) return undefined;
+  const computed = computeTurnCost(
+    {
+      inputTokens,
+      outputTokens,
+      cachedInputTokens: num(u.cachedInputTokens),
+      cacheWriteTokens: num(u.cacheWriteTokens),
+    },
+    modelId,
+    providerId,
+  );
+  return computed
+    ? { kind: "priced", usd: computed.usd, current: true }
+    : modelId
+      ? { kind: "unpriced" }
+      : undefined;
+}
+
 /** Human duration: "0.8s", "12s", "1m 05s". */
 function formatDuration(ms: number): string {
   const totalSec = ms / 1000;
@@ -1799,6 +1860,10 @@ function AssistantAvatar({
   const modelName = model?.name ?? modelId ?? null;
   const usage = useMemo(() => extractUsage(metadata), [metadata]);
   const durationMs = useMemo(() => extractDurationMs(metadata), [metadata]);
+  const cost = useMemo(
+    () => extractCostDisplay(metadata, providerId, modelId),
+    [metadata, providerId, modelId],
+  );
 
   useEffect(() => {
     // One-shot SSR/hydration boundary marker so we only render the
@@ -1920,6 +1985,32 @@ function AssistantAvatar({
                   </span>
                 </div>
               )}
+            {/* Estimated cost (COST-METERING-PLAN.md). Unpriced models say
+                so explicitly — an unknown price must never render as $0. */}
+            {cost && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                {cost.kind === "priced" ? (
+                  <span>
+                    <span className="text-gray-500">est. cost</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {cost.usd > 0 && cost.usd < 0.001
+                        ? "<$0.001"
+                        : formatUsdEstimate(cost.usd)}
+                    </span>
+                    {cost.current && (
+                      <span className="text-gray-400 dark:text-gray-500">
+                        {" "}
+                        (current rates)
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">
+                    cost n/a — no price entry for this model
+                  </span>
+                )}
+              </div>
+            )}
           </div>,
           document.body,
         )}

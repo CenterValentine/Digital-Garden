@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-07
+last_updated: 2026-08-08
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 8, 2026**: **AI Cost Metering** (branch `AI-sys-improve/cost-metering`, stacked on `feat/ai-harness-reliability`; typecheck/lint(151)/full-build green incl. new `ai:pricing:check` gate; owner smoke pending)
+
+Pricing engine v2 in `lib/features/ai-connections/usage/pricing.ts`: 5-vendor seed table verified against official pages (Anthropic, OpenAI gpt-5.6 family incl. cache-write + >272K tier, Gemini incl. >200K Pro tier, DeepSeek hit/miss, Kimi via family-prefix matching), `PRICING_VERSION` stamping, null-not-zero unpriced contract. Cost computed **per request** in the turn accumulator (`mergeTurnUsageMetadata`) and persisted in message metadata; Anthropic cache-write tokens captured via `providerMetadata` in the chat route. Surfaces: avatar-tooltip est. cost (priced / current-rates / n-a states), per-connection meters now prefer persisted costs + exact `modelRoute.connectionId` attribution, run-ledger token stamps carry `~$` estimates, `ConversationDetail.spend` cumulative (API only — header line deferred to the inspector work). Gate: `pnpm ai:pricing:check` (coverage + calculator fixtures) wired into `build`. See `work-tracking/COST-METERING-PLAN.md`.
 
 **August 7, 2026**: **Browser Extension V5 — Browser UI Overhaul** (Panel Overlay: tree-as-overlay, reclaimed sidebar, pin + link handles, slim panel chrome) (branch `feat/panel-tree-overlay`; ext 4.2.x → **5.0.0**; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR #152)
 

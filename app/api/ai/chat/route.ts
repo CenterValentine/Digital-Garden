@@ -1164,8 +1164,9 @@ export async function POST(request: Request) {
 
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
-      // Run Ledger.
-      const runTokenCounter = { total: 0 };
+      // Run Ledger. Input/output split added by cost metering so ledger
+      // stamps can carry a $ estimate (totals alone can't be priced).
+      const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
       // Per-request step tracker (self-describing turns): onStepFinish counts
       // steps and records bounded summaries; messageMetadata stamps them into
       // the turn's segment record so the persisted row can say how close the
@@ -1189,6 +1190,12 @@ export async function POST(request: Request) {
         // Filled in AFTER playbook resolution below (tools close over this
         // object, so a later property assignment is visible at execute time).
         activePlaybook: undefined as { contentId: string; title: string } | undefined,
+        // Executed model identity (cost metering): lets ledger stamps
+        // price the run's tokens. Bare id + vendor, post-resolution.
+        executedModel: {
+          modelId: executedBareModelId,
+          vendorId: executedVendorId,
+        },
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -2082,6 +2089,15 @@ export async function POST(request: Request) {
       // record the client path receives (parity; see messageMetadata).
       let lastFinishMetadata: Record<string, unknown> | null = null;
 
+      // Cache-WRITE tokens (cost metering P1): Anthropic bills cache
+      // writes at 1.25× input, but the SDK surfaces them only in
+      // providerMetadata — never in normalized usage. Summed across steps
+      // here and emitted with the finish usage blob so the pricing
+      // calculator sees them. Zero for every other provider (and for
+      // Anthropic today — the app sets no cache_control breakpoints —
+      // but the plumbing must exist before the pricing formula does).
+      let turnCacheWriteTokens = 0;
+
       const result = streamText({
         model: wrappedModel,
         messages: modelMessages,
@@ -2156,15 +2172,33 @@ export async function POST(request: Request) {
         }),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
-          runTokenCounter.total +=
-            (step as { usage?: { totalTokens?: number } }).usage
-              ?.totalTokens ?? 0;
+          const stepUsage = (
+            step as {
+              usage?: {
+                totalTokens?: number;
+                inputTokens?: number;
+                outputTokens?: number;
+                cachedInputTokens?: number;
+              };
+            }
+          ).usage;
+          runTokenCounter.total += stepUsage?.totalTokens ?? 0;
+          runTokenCounter.input += stepUsage?.inputTokens ?? 0;
+          runTokenCounter.output += stepUsage?.outputTokens ?? 0;
+          runTokenCounter.cachedInput += stepUsage?.cachedInputTokens ?? 0;
+          const cacheCreation = (
+            step as {
+              providerMetadata?: {
+                anthropic?: { cacheCreationInputTokens?: unknown };
+              };
+            }
+          ).providerMetadata?.anthropic?.cacheCreationInputTokens;
+          if (typeof cacheCreation === "number" && Number.isFinite(cacheCreation)) {
+            turnCacheWriteTokens += cacheCreation;
+          }
           // Step tracking for the segment record (self-describing turns).
           stepsTracker.used += 1;
           if (stepsTracker.summaries.length < MAX_STEP_SUMMARIES) {
-            const stepUsage = (
-              step as { usage?: { outputTokens?: number } }
-            ).usage;
             stepsTracker.summaries.push({
               finishReason:
                 typeof step.finishReason === "string"
@@ -2505,6 +2539,11 @@ export async function POST(request: Request) {
                 // the only place its hit rate becomes visible to the user).
                 reasoningTokens: part.totalUsage?.reasoningTokens,
                 cachedInputTokens: part.totalUsage?.cachedInputTokens,
+                // Anthropic cache writes (providerMetadata-only; summed in
+                // onStepFinish above). Omitted when zero.
+                ...(turnCacheWriteTokens > 0
+                  ? { cacheWriteTokens: turnCacheWriteTokens }
+                  : {}),
               },
               // Generation wall time for the avatar tooltip (persisted with the
               // message, so it survives reload alongside usage).

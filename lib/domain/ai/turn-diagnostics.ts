@@ -22,7 +22,20 @@
  *
  * This module must stay importable from client components, the chat route,
  * scripts, and the future Run Inspector: no Prisma, no zod, no React.
+ *
+ * Turn COST is folded here too (COST-METERING-PLAN.md) rather than in a
+ * parallel accumulator: cost accrues per REQUEST for the same reason
+ * segments do — long-context price tiers key off a single request's prompt
+ * size, so pricing a turn's summed usage would be wrong.
  */
+
+// Direct path import — the ai-connections BARREL pulls in service.ts
+// (Prisma) and must never reach client code.
+import {
+  computeTurnCost,
+  PRICING_VERSION,
+  type TurnCostBreakdown,
+} from "@/lib/features/ai-connections/usage/pricing";
 
 export const DIAGNOSTICS_VERSION = 1;
 
@@ -333,6 +346,7 @@ export interface TurnUsageAccum {
   totalTokens: number;
   reasoningTokens: number;
   cachedInputTokens: number;
+  cacheWriteTokens: number;
   durationMs: number;
   requestCount: number;
   finishReason?: string;
@@ -340,6 +354,16 @@ export interface TurnUsageAccum {
   segments: TurnSegment[];
   /** Count of segment records dropped beyond the bound. */
   segmentsTruncated: number;
+  /**
+   * Estimated USD, accumulated PER REQUEST (long-context price tiers key
+   * off a single request's prompt size, so pricing the turn's summed
+   * usage would be wrong — see COST-METERING-PLAN.md).
+   */
+  costUsd: number;
+  costBreakdown: TurnCostBreakdown;
+  costPriceVersion: string;
+  /** True once any folded request had no price row — whole turn renders unpriced. */
+  unpriced: boolean;
   /**
    * Signature of the last per-request metadata folded in — the persister can
    * run repeatedly for the same finish event, and a repeat pass with
@@ -354,9 +378,18 @@ interface RequestUsageSnapshot {
   totalTokens: number;
   reasoningTokens: number;
   cachedInputTokens: number;
+  cacheWriteTokens: number;
   durationMs: number;
   requestCount: number;
   finishReason?: string;
+  /**
+   * Cost carried by an already-merged blob (reload seeding). Undefined on
+   * raw per-request SDK metadata — those are priced at fold time.
+   */
+  persistedCostUsd?: number;
+  persistedCostBreakdown?: TurnCostBreakdown;
+  persistedCostVersion?: string;
+  persistedUnpriced?: boolean;
 }
 
 function readUsageSnapshot(
@@ -371,12 +404,38 @@ function readUsageSnapshot(
   ) {
     return null;
   }
+  // Cost persisted by a previous merge pass (reload seeding) rides along
+  // so continuations ADD to the stored dollars instead of re-pricing
+  // summed usage (which would break long-context tier correctness).
+  const cost = metadata.cost as
+    | {
+        usd?: unknown;
+        breakdown?: unknown;
+        priceVersion?: unknown;
+        unpriced?: unknown;
+      }
+    | undefined;
+  const persistedCost =
+    cost && typeof cost.usd === "number" && Number.isFinite(cost.usd)
+      ? {
+          persistedCostUsd: cost.usd,
+          ...(cost.breakdown && typeof cost.breakdown === "object"
+            ? { persistedCostBreakdown: cost.breakdown as TurnCostBreakdown }
+            : {}),
+          ...(typeof cost.priceVersion === "string"
+            ? { persistedCostVersion: cost.priceVersion }
+            : {}),
+        }
+      : cost?.unpriced === true
+        ? { persistedUnpriced: true }
+        : {};
   return {
     inputTokens: num(usage?.inputTokens),
     outputTokens: num(usage?.outputTokens),
     totalTokens: num(usage?.totalTokens),
     reasoningTokens: num(usage?.reasoningTokens),
     cachedInputTokens: num(usage?.cachedInputTokens),
+    cacheWriteTokens: num(usage?.cacheWriteTokens),
     durationMs: num(metadata.durationMs),
     // Merged blobs (persisted by this module) carry their own requestCount;
     // raw per-request metadata from the SDK counts as one request.
@@ -385,6 +444,7 @@ function readUsageSnapshot(
       typeof metadata.finishReason === "string"
         ? metadata.finishReason
         : undefined,
+    ...persistedCost,
   };
 }
 
@@ -416,10 +476,15 @@ export function mergeTurnUsageMetadata(
     totalTokens: 0,
     reasoningTokens: 0,
     cachedInputTokens: 0,
+    cacheWriteTokens: 0,
     durationMs: 0,
     requestCount: 0,
     segments: [],
     segmentsTruncated: 0,
+    costUsd: 0,
+    costBreakdown: { input: 0, cachedInput: 0, cacheWrite: 0, output: 0 },
+    costPriceVersion: PRICING_VERSION,
+    unpriced: false,
   };
   // A blob stamped with diagnosticsVersion was merged BY this module (the
   // seed path folds persisted rows back in on load) — its segments restore
@@ -432,10 +497,68 @@ export function mergeTurnUsageMetadata(
     entry.totalTokens += request.totalTokens;
     entry.reasoningTokens += request.reasoningTokens;
     entry.cachedInputTokens += request.cachedInputTokens;
+    entry.cacheWriteTokens += request.cacheWriteTokens;
     entry.durationMs += request.durationMs;
     entry.requestCount += request.requestCount;
     entry.lastRequestSig = sig;
     if (request.finishReason) entry.finishReason = request.finishReason;
+
+    // Cost folds per request (never from turn sums — long-context price
+    // tiers key off a single request's prompt size). A reload-seeded
+    // merged blob carries its persisted dollars; a raw SDK request gets
+    // priced here from its own usage + the turn's model stamp.
+    if (request.persistedCostUsd !== undefined) {
+      entry.costUsd += request.persistedCostUsd;
+      const b = request.persistedCostBreakdown;
+      if (b) {
+        entry.costBreakdown.input += b.input ?? 0;
+        entry.costBreakdown.cachedInput += b.cachedInput ?? 0;
+        entry.costBreakdown.cacheWrite += b.cacheWrite ?? 0;
+        entry.costBreakdown.output += b.output ?? 0;
+      }
+      if (request.persistedCostVersion) {
+        entry.costPriceVersion = request.persistedCostVersion;
+      }
+    } else if (request.persistedUnpriced) {
+      entry.unpriced = true;
+    } else {
+      const route = (incoming?.modelRoute ?? {}) as {
+        providerId?: unknown;
+        modelId?: unknown;
+      };
+      const modelId =
+        typeof route.modelId === "string" ? route.modelId : undefined;
+      // Usage-semantics vendor: a namespaced gateway id ("anthropic/…")
+      // identifies the underlying vendor better than the gateway's own
+      // providerId does.
+      const vendor = modelId?.includes("/")
+        ? modelId.split("/")[0]
+        : typeof route.providerId === "string"
+          ? route.providerId
+          : undefined;
+      const cost = modelId
+        ? computeTurnCost(
+            {
+              inputTokens: request.inputTokens,
+              outputTokens: request.outputTokens,
+              cachedInputTokens: request.cachedInputTokens,
+              cacheWriteTokens: request.cacheWriteTokens,
+            },
+            modelId,
+            vendor,
+          )
+        : null;
+      if (cost) {
+        entry.costUsd += cost.usd;
+        entry.costBreakdown.input += cost.breakdown.input;
+        entry.costBreakdown.cachedInput += cost.breakdown.cachedInput;
+        entry.costBreakdown.cacheWrite += cost.breakdown.cacheWrite;
+        entry.costBreakdown.output += cost.breakdown.output;
+        entry.costPriceVersion = cost.priceVersion;
+      } else {
+        entry.unpriced = true;
+      }
+    }
   }
   if (isMergedBlob) {
     if (entry.segments.length === 0 && Array.isArray(incoming?.segments)) {
@@ -470,6 +593,9 @@ export function mergeTurnUsageMetadata(
     string,
     unknown
   > & { segment?: unknown };
+  const routeModelId = (
+    (incoming?.modelRoute ?? {}) as { modelId?: unknown }
+  ).modelId;
   return {
     ...base,
     usage: {
@@ -478,10 +604,27 @@ export function mergeTurnUsageMetadata(
       totalTokens: entry.totalTokens,
       reasoningTokens: entry.reasoningTokens,
       cachedInputTokens: entry.cachedInputTokens,
+      ...(entry.cacheWriteTokens > 0
+        ? { cacheWriteTokens: entry.cacheWriteTokens }
+        : {}),
     },
     durationMs: entry.durationMs,
     requestCount: entry.requestCount,
     ...(entry.finishReason ? { finishReason: entry.finishReason } : {}),
+    // Persisted turn cost (COST-METERING-PLAN.md): estimates at list
+    // prices, pinned to the price-table version that computed them.
+    // "unpriced" is a first-class state — never $0 for unknown models.
+    cost: entry.unpriced
+      ? {
+          unpriced: true,
+          ...(typeof routeModelId === "string" ? { modelId: routeModelId } : {}),
+        }
+      : {
+          usd: entry.costUsd,
+          priceVersion: entry.costPriceVersion,
+          breakdown: { ...entry.costBreakdown },
+          estimated: true,
+        },
     segments: entry.segments,
     segmentsTruncated: entry.segmentsTruncated,
     // Recomputed on every fold — a resumed turn naturally clears transient

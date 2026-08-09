@@ -43,7 +43,18 @@ export interface ToolExecuteContext {
    * Ledger. Scoped to ONE streamText call — the ledger's per-phase
    * deltas come from subtracting successive checkpoint stamps.
    */
-  runTokens?: { total: number };
+  runTokens?: {
+    total: number;
+    /** Input/output/cached split (cost metering) — lets ledger stamps carry $. */
+    input?: number;
+    output?: number;
+    cachedInput?: number;
+  };
+  /**
+   * The resolved model actually serving this request (bare id + vendor).
+   * Cost metering: ledger stamps price `runTokens` with this identity.
+   */
+  executedModel?: { modelId: string; vendorId: string };
   /**
    * The chat content node id when this chat is being viewed as a full-page
    * ChatViewer (i.e. the chat IS the open content, not the editor). Set

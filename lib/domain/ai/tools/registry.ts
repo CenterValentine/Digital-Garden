@@ -26,6 +26,7 @@ import {
   findOrCreateFolder,
 } from "@/lib/domain/ai/documents";
 import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
+import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import type { JSONContent } from "@tiptap/core";
 import { listPlaybooks, isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -144,6 +145,30 @@ export const listTabsTool = tool({
   description: LIST_TABS_DESCRIPTION,
   inputSchema: listTabsInputSchema,
 });
+
+/**
+ * Price the run's accumulated tokens against the executed model for
+ * ledger stamps (cost metering). Coarse by design — run totals are
+ * summed across steps, so long-context tier boundaries are approximate
+ * here (exact per-request pricing lives in the turn accumulator).
+ * Undefined when the model has no price row: the ledger line then shows
+ * tokens only, never $0.
+ */
+function estimateRunCostUsd(ctx: ToolExecuteContext): number | undefined {
+  const tokens = ctx.runTokens;
+  const model = ctx.executedModel;
+  if (!tokens || !model || tokens.total <= 0) return undefined;
+  const cost = computeTurnCost(
+    {
+      inputTokens: tokens.input,
+      outputTokens: tokens.output,
+      cachedInputTokens: tokens.cachedInput,
+    },
+    model.modelId,
+    model.vendorId,
+  );
+  return cost?.usd;
+}
 
 /**
  * Create the base AI tools, bound to a specific user's context.
@@ -419,6 +444,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               openQuestions,
               next: "Run complete.",
               tokensSoFar: ctx.runTokens?.total,
+              estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
           );
@@ -713,6 +739,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               summary,
               next: "Continue with the next batch's first item.",
               tokensSoFar: ctx.runTokens?.total,
+              estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
           );
@@ -765,6 +792,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               artifacts: rollupTitle ? [rollupTitle] : undefined,
               next: "Run complete.",
               tokensSoFar: ctx.runTokens?.total,
+              estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             { runKey: ledgerRunKey, ownerContentId: placement.ownedByNoteId },
           );
@@ -1005,6 +1033,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               // record ("tokens so far" at each checkpoint = per-phase
               // deltas by subtraction).
               tokensSoFar: ctx.runTokens?.total,
+              estimatedCostUsd: estimateRunCostUsd(ctx),
             },
             {
               // WS7: nest the ledger under the chat when the output target does.

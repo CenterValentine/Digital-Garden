@@ -30,6 +30,9 @@ import { clientLogger } from "@/lib/core/logger/client";
 import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
+// Usage, segments AND cost all fold in one place — turn-diagnostics owns
+// the per-request accumulator (it imports the client-safe pricing module
+// by direct path, never the Prisma-bearing ai-connections barrel).
 import {
   mergeTurnUsageMetadata,
   type TurnUsageAccum,

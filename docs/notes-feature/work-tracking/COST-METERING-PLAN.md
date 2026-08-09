@@ -1,8 +1,13 @@
 # Cost Metering — Plan
 
 **Branch:** `AI-sys-improve/cost-metering` (stacked on `feat/ai-harness-reliability` — must merge after it)
-**Status:** PLANNED — no implementation yet
+**Status:** IMPLEMENTED (P1–P4, 2026-08-08) — owner smoke + per-provider usage-semantics verification pending
 **Drafted:** 2026-08-08
+
+**Implementation deviations from the plan below:**
+1. `estimateCost()` was deleted outright (not kept as a deprecated wrapper) — `telemetry.ts` migrated to `computeTurnCost` in the same change, so no compat window was needed.
+2. The conversation-header cumulative-spend line is deferred: `ConversationDetail.spend` ships in the API (summed persisted costs + unpriced count), but no header UI consumes the detail response today — building that surface belongs with the `inspector` sibling rather than a one-off element here.
+3. The avatar tooltip prices live/legacy turns at current rates as a fallback (labeled "(current rates)") instead of leaving legacy turn footers blank — uniform display, honesty preserved via the label.
 **Sibling work:** `AI-sys-improve/self-describing-turns` (segment records) and `AI-sys-improve/inspector` (run inspector) extend the same accumulator seam; see [Coordination](#coordination-with-sibling-branches).
 
 ## Goal

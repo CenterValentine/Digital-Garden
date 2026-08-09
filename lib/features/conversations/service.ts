@@ -104,6 +104,30 @@ export async function listConversations(
   return rows.map(toSummary);
 }
 
+/**
+ * Cumulative estimated spend (cost metering): sum persisted write-time
+ * costs from assistant metadata; count unpriced turns separately so the
+ * total never silently absorbs $0 placeholders.
+ */
+function computeSpend(
+  messages: Array<{ role: string; metadata: unknown }>,
+): { usd: number; pricedTurns: number; unpricedTurns: number } {
+  const spend = { usd: 0, pricedTurns: 0, unpricedTurns: 0 };
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    const cost = (m.metadata as { cost?: unknown } | null)?.cost;
+    if (!cost || typeof cost !== "object") continue;
+    const c = cost as { usd?: unknown; unpriced?: unknown };
+    if (typeof c.usd === "number" && Number.isFinite(c.usd)) {
+      spend.usd += c.usd;
+      spend.pricedTurns += 1;
+    } else if (c.unpriced === true) {
+      spend.unpricedTurns += 1;
+    }
+  }
+  return spend;
+}
+
 /** Get a single conversation with messages + associations. */
 export async function getConversation(
   userId: string,
@@ -136,6 +160,7 @@ export async function getConversation(
       : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
+    spend: computeSpend(row.messages),
   };
 }
 
@@ -251,6 +276,7 @@ export async function createConversation(
       : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
+    spend: computeSpend(row.messages),
   };
 }
 
@@ -356,6 +382,7 @@ async function promoteContentNodeToConversation(
         : null,
       messages: reread.messages.map(toMessageView),
       associations: reread.associations.map(toAssociationView),
+      spend: computeSpend(reread.messages),
     };
   }
 
@@ -469,6 +496,7 @@ async function promoteContentNodeToConversation(
       : null,
     messages: row.messages.map(toMessageView),
     associations: row.associations.map(toAssociationView),
+    spend: computeSpend(row.messages),
   };
 }
 

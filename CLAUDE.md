@@ -22,6 +22,7 @@ pnpm collab:schema:check  # CI gate: validate collaboration schema covers all ed
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
+pnpm ai:pricing:check # CI gate: every reachable model id has a price row or an explicit unpriced-allowlist entry + cost-calculator fixtures (lib/features/ai-connections/usage/pricing.ts)
 pnpm showcase:figures # Sync README/docs figure slots with media in docs/media/figures/ + rewrite the FIGURES.md audit (see guides/showcase/SHOWCASE-MAINTENANCE.md; /update-showcase skill)
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
