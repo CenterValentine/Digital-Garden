@@ -78,10 +78,14 @@ Everything else is new files. Strictly untouched: `app/api/ai/chat/route.ts`, `l
 
 ## Implementation slices
 
-1. **S1 — Shared-module extraction + analyzer + fixtures + `inspector:check`** (pure logic)
-2. **S2 — Admin API** (list + detail)
-3. **S3 — Detail page** (the core surface)
-4. **S4 — List page + filters + sidebar nav entry**
-5. **S5 — Polish**: audit logging, raw-JSON viewer ergonomics, STATUS.md/BACKLOG.md updates in the PR
+1. **S1 — Shared-module extraction + analyzer + fixtures + `inspector:check`** ✅ 586fca77
+2. **S2 — Admin API** (list + detail, audit-logged) ✅ a7287d05
+3. **S3 — Detail page** (turn cards, step timeline, raw JSON) ✅ 273380e0
+4. **S4 — List page + filters + sidebar nav; `inspector:check` in build chain** ✅ 76ff636f
+5. **S5 — Owner browser smoke + STATUS.md update at PR time** — pending
 
-Gates: `pnpm typecheck` → `pnpm lint` (ratchet, zero new warnings) → `pnpm build` → browser smoke of both pages in light + dark. PR must note its base is `feat/ai-harness-reliability`, not main.
+Gates run per slice: `pnpm inspector:check` (13 checks) · `pnpm typecheck` · `pnpm lint` (151 warnings, unchanged, ratchet 159) · full `pnpm build` ✅ after S4.
+
+**Smoke steps (owner, pre-PR):** run `pnpm dev --port 3017` in this worktree → `/admin/ai-runs` → verify list renders with badges in light AND dark → open a conversation → verify step timeline, finding badges with tooltips, request numbers, raw-parts JSON expander, copy-id, linked-content links → toggle "anomalies only" → paginate.
+
+PR must note its base is `feat/ai-harness-reliability`, not main.
