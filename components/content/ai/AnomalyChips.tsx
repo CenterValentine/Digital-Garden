@@ -1,11 +1,14 @@
 "use client";
 
 /**
- * Anomaly chips — the chat's single surface for "something failed in this
- * turn" (owner ask, 2026-08-08). One compact chip row per assistant message,
+ * Anomaly surfaces — the chat's single pipeline for "something went wrong in
+ * this turn" (owner ask, 2026-08-08). One derivation per assistant message,
  * DERIVED from durable data (persisted parts + turn metadata), never from
- * transient client state — so a chip that shows live shows identically after
- * reload, and historical transcripts grow chips retroactively.
+ * transient client state — so what shows live shows identically after
+ * reload, and historical transcripts grow the surfaces retroactively.
+ * Presentation is decided per-kind by ANOMALY_SURFACE below (quiet inline
+ * line for flow events, pill chip for turn failures) — one registry, one
+ * derivation, renderers only filter.
  *
  * Derivation, not persistence: failures are already durably encoded (tool
  * parts with state "output-error", tool outputs with ok:false /
@@ -210,6 +213,26 @@ export function deriveMessageAnomalies(
   return anomalies;
 }
 
+/**
+ * Presentation registry — the ONE place that decides how an anomaly kind
+ * renders. The derivation above never varies by surface and renderers only
+ * filter on this map, so a kind can move between surfaces without touching
+ * the pipeline (normalization rule, owner 2026-08-08).
+ *
+ * "line" = a conversation-FLOW event, rendered as a quiet hairline-rule line
+ * in the ModelSwitchDivider grammar (industry convention for interruptions).
+ * "chip" = a content-anchored failure of the turn itself, rendered as a pill.
+ */
+const ANOMALY_SURFACE: Record<AnomalyKind, "chip" | "line"> = {
+  "output-limit": "chip",
+  "tool-error": "chip",
+  "tool-failure": "chip",
+  interrupted: "line",
+  "provider-error": "chip",
+  "content-filter": "chip",
+  captcha: "chip",
+};
+
 function chipIcon(anomaly: MessageAnomaly) {
   if (anomaly.kind === "captcha") {
     return <ShieldAlert className="h-3 w-3 shrink-0" />;
@@ -221,30 +244,54 @@ function chipIcon(anomaly: MessageAnomaly) {
   );
 }
 
-/** Compact chip row — mirrors the FolderContextChips visual grammar. */
-export function AnomalyChipRow({
+/**
+ * All anomaly surfaces for one message: hairline-rule lines for flow events,
+ * then the compact pill row (FolderContextChips grammar) for turn failures.
+ * Single mount point — callers never pick a surface themselves.
+ */
+export function AnomalySurfaces({
   anomalies,
 }: {
   anomalies: MessageAnomaly[];
 }) {
   if (anomalies.length === 0) return null;
+  const lines = anomalies.filter((a) => ANOMALY_SURFACE[a.kind] === "line");
+  const chips = anomalies.filter((a) => ANOMALY_SURFACE[a.kind] === "chip");
   return (
-    <div className="my-1 flex flex-wrap items-center gap-1.5">
-      {anomalies.map((a, i) => (
-        <span
-          key={`${a.kind}-${i}`}
+    <>
+      {lines.map((a, i) => (
+        <div
+          key={`line-${a.kind}-${i}`}
           title={a.detail}
-          className={[
-            "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
-            a.severity === "error"
-              ? "border-red-500/40 bg-red-500/[0.06] text-red-600 dark:text-red-400"
-              : "border-amber-500/40 bg-amber-500/[0.06] text-amber-600 dark:text-amber-400",
-          ].join(" ")}
+          className="my-2 flex w-full items-center gap-2 text-[11px] text-gray-500 dark:text-gray-400"
         >
-          {chipIcon(a)}
-          <span className="truncate">{a.label}</span>
-        </span>
+          <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+          <span className="inline-flex min-w-0 items-center gap-1.5">
+            <TriangleAlert className="h-3 w-3 shrink-0 opacity-70" />
+            <span className="truncate">{a.label}</span>
+          </span>
+          <span className="h-px flex-1 bg-black/10 dark:bg-white/10" />
+        </div>
       ))}
-    </div>
+      {chips.length > 0 && (
+        <div className="my-1 flex flex-wrap items-center gap-1.5">
+          {chips.map((a, i) => (
+            <span
+              key={`chip-${a.kind}-${i}`}
+              title={a.detail}
+              className={[
+                "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px]",
+                a.severity === "error"
+                  ? "border-red-500/40 bg-red-500/[0.06] text-red-600 dark:text-red-400"
+                  : "border-amber-500/40 bg-amber-500/[0.06] text-amber-600 dark:text-amber-400",
+              ].join(" ")}
+            >
+              {chipIcon(a)}
+              <span className="truncate">{a.label}</span>
+            </span>
+          ))}
+        </div>
+      )}
+    </>
   );
 }

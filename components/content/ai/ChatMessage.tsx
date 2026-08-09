@@ -49,7 +49,7 @@ import {
   FolderSearch,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
-import { AnomalyChipRow, deriveMessageAnomalies } from "./AnomalyChips";
+import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -1103,14 +1103,13 @@ export const ChatMessage = memo(function ChatMessage({
             time so a multi-minute reasoning model reads as alive, not frozen. */}
         {showWorking && <WorkingIndicator />}
 
-        {/* Anomaly chips — the single failure surface for this turn: output-
-            limit truncation (a turn can die with NO visible output when a
-            reasoning model spends the whole budget thinking — the 2026-08-08
-            DeepSeek run), tool errors, ok:false tool results, captcha halts.
-            Derived from durable parts + metadata, so live and reloaded
-            transcripts show the same chips. */}
+        {/* Anomaly surfaces — the single failure pipeline for this turn:
+            interruptions render as quiet inline lines (model-switch-divider
+            grammar), turn failures (output limit, tool errors, ok:false
+            results, captcha) as pill chips. Derived from durable parts +
+            metadata, so live and reloaded transcripts always agree. */}
         {isAssistant && messageAnomalies.length > 0 && (
-          <AnomalyChipRow anomalies={messageAnomalies} />
+          <AnomalySurfaces anomalies={messageAnomalies} />
         )}
 
         {/* Hover actions — icon-only, with tooltip + aria-label for a11y.
