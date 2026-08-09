@@ -9,13 +9,17 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Brain, ChevronDown, ChevronRight } from "lucide-react";
 import type { ReasoningBlockProps } from "./types";
+import {
+  useReasoningDisclosure,
+  formatReasoningElapsed,
+} from "./reasoning-disclosure";
 
 export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) {
-  const [userPref, setUserPref] = useState<boolean | null>(null);
-  const open = userPref ?? Boolean(streaming);
+  const { open, toggle, headerRef, elapsed } = useReasoningDisclosure(streaming);
+  const elapsedLabel = formatReasoningElapsed(elapsed, streaming);
 
   // Split into "steps" on blank lines. If there's only one block of text
   // (common during early streaming) we just render it as a single step.
@@ -27,8 +31,9 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
   return (
     <div className="my-2 rounded-lg border border-[#10A37F]/25 bg-[#10A37F]/[0.04]">
       <button
+        ref={headerRef}
         type="button"
-        onClick={() => setUserPref(!open)}
+        onClick={toggle}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0B7A5E] dark:text-[#10A37F] hover:bg-[#10A37F]/[0.08] transition-colors rounded-lg"
       >
         {open ? (
@@ -36,13 +41,20 @@ export function ReasoningBlockChatGPT({ text, streaming }: ReasoningBlockProps) 
         ) : (
           <ChevronRight className="h-3 w-3 opacity-70" />
         )}
-        <Brain className="h-3 w-3 opacity-70" />
-        <span>{streaming ? "Reasoning…" : "Reasoning"}</span>
-        {!streaming && (
-          <span className="ml-auto text-[10px] font-normal opacity-60">
-            {steps.length} step{steps.length === 1 ? "" : "s"}
-          </span>
-        )}
+        <Brain
+          className={`h-3 w-3 ${streaming ? "animate-pulse opacity-90" : "opacity-70"}`}
+        />
+        <span className={streaming ? "animate-pulse" : undefined}>
+          {streaming ? "Reasoning…" : "Reasoning"}
+        </span>
+        <span className="ml-auto inline-flex items-center gap-2 text-[10px] font-normal opacity-60">
+          {!streaming && (
+            <span>
+              {steps.length} step{steps.length === 1 ? "" : "s"}
+            </span>
+          )}
+          {elapsedLabel && <span className="tabular-nums">{elapsedLabel}</span>}
+        </span>
       </button>
       {open && (
         <ol className="space-y-1.5 px-3 pb-3 pt-1">

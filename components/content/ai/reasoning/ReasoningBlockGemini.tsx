@@ -9,9 +9,13 @@
 
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Lightbulb, ChevronDown, ChevronRight } from "lucide-react";
 import type { ReasoningBlockProps } from "./types";
+import {
+  useReasoningDisclosure,
+  formatReasoningElapsed,
+} from "./reasoning-disclosure";
 
 interface Section {
   heading: string | null;
@@ -53,8 +57,8 @@ function parseSections(text: string): Section[] {
 }
 
 export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
-  const [userPref, setUserPref] = useState<boolean | null>(null);
-  const open = userPref ?? Boolean(streaming);
+  const { open, toggle, headerRef, elapsed } = useReasoningDisclosure(streaming);
+  const elapsedLabel = formatReasoningElapsed(elapsed, streaming);
 
   const sections = useMemo(() => parseSections(text), [text]);
 
@@ -68,8 +72,9 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
       }}
     >
       <button
+        ref={headerRef}
         type="button"
-        onClick={() => setUserPref(!open)}
+        onClick={toggle}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide text-[#1967D2] dark:text-[#4285F4] hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors rounded-lg"
       >
         {open ? (
@@ -77,8 +82,17 @@ export function ReasoningBlockGemini({ text, streaming }: ReasoningBlockProps) {
         ) : (
           <ChevronRight className="h-3 w-3 opacity-70" />
         )}
-        <Lightbulb className="h-3 w-3 opacity-70" />
-        <span>{streaming ? "Thinking process…" : "Thinking process"}</span>
+        <Lightbulb
+          className={`h-3 w-3 ${streaming ? "animate-pulse opacity-90" : "opacity-70"}`}
+        />
+        <span className={streaming ? "animate-pulse" : undefined}>
+          {streaming ? "Thinking process…" : "Thinking process"}
+        </span>
+        {elapsedLabel && (
+          <span className="ml-auto tabular-nums text-[10px] font-normal opacity-60">
+            {elapsedLabel}
+          </span>
+        )}
       </button>
       {open && (
         <div className="space-y-2.5 px-3.5 pb-3 pt-1 text-xs leading-relaxed text-gray-700 dark:text-gray-300">

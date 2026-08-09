@@ -1098,8 +1098,10 @@ export const SlashCommands = Extension.create({
           });
         },
         render: () => {
-          let component: ReactRenderer<SlashCommandsListRef>;
-          let popup: TippyInstance[];
+          // May be unassigned when the plugin delivers onUpdate/onKeyDown
+          // before onStart (async items()) or after onExit tore them down.
+          let component: ReactRenderer<SlashCommandsListRef> | undefined;
+          let popup: TippyInstance[] | undefined;
 
           return {
             onStart: (props: SlashSuggestionRenderProps) => {
@@ -1124,13 +1126,13 @@ export const SlashCommands = Extension.create({
             },
 
             onUpdate(props: SlashSuggestionRenderProps) {
-              component.updateProps(props);
+              component?.updateProps(props);
 
               if (!props.clientRect) {
                 return;
               }
 
-              popup[0].setProps({
+              popup?.[0]?.setProps({
                 getReferenceClientRect: props.clientRect,
               });
             },
@@ -1141,7 +1143,7 @@ export const SlashCommands = Extension.create({
                 return true;
               }
 
-              return component.ref?.onKeyDown(props);
+              return component?.ref?.onKeyDown(props) ?? false;
             },
 
             onExit() {
