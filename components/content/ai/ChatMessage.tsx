@@ -357,9 +357,10 @@ export const ChatMessage = memo(function ChatMessage({
             message.parts as unknown[],
             (message as { metadata?: Record<string, unknown> }).metadata,
             Boolean(messageText),
+            isStreaming,
           )
         : [],
-    [isAssistant, message, messageText],
+    [isAssistant, message, messageText, isStreaming],
   );
 
   const [editing, setEditing] = useState(false);

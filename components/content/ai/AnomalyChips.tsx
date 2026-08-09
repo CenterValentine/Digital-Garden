@@ -20,6 +20,7 @@ export type AnomalyKind =
   | "output-limit"
   | "tool-error"
   | "tool-failure"
+  | "interrupted"
   | "captcha";
 
 export interface MessageAnomaly {
@@ -46,6 +47,9 @@ export function deriveMessageAnomalies(
   parts: unknown[],
   metadata: Record<string, unknown> | undefined,
   hasVisibleText: boolean,
+  /** True while this message is still streaming — suppresses the
+   * "interrupted" kind, since in-flight tool calls are normal then. */
+  isStreaming?: boolean,
 ): MessageAnomaly[] {
   const anomalies: MessageAnomaly[] = [];
 
@@ -66,6 +70,7 @@ export function deriveMessageAnomalies(
 
   const errorsByTool = new Map<string, number>();
   const failuresByTool = new Map<string, string>();
+  const stuckTools: string[] = [];
   let captcha = false;
   for (const raw of parts) {
     const p = raw as AnomalousPartShape;
@@ -73,6 +78,18 @@ export function deriveMessageAnomalies(
     const tool = toolLabel(p.type.slice(5));
     if (p.state === "output-error") {
       errorsByTool.set(tool, (errorsByTool.get(tool) ?? 0) + 1);
+      continue;
+    }
+    // A tool call frozen mid-flight on a FINISHED message = the turn was
+    // interrupted (panel/tab closed or reloaded while a client-executed tool
+    // ran — observed live: a co-browse run orphaned by a side-panel reload
+    // surfaced only as a bare "network error"). "approval-requested" is a
+    // legitimate pause, not an interruption.
+    if (
+      !isStreaming &&
+      (p.state === "input-available" || p.state === "input-streaming")
+    ) {
+      stuckTools.push(tool);
       continue;
     }
     if (
@@ -114,6 +131,16 @@ export function deriveMessageAnomalies(
       kind: "tool-failure",
       label: `${tool}: failed`,
       detail: note,
+      severity: "warning",
+    });
+  }
+  if (stuckTools.length > 0) {
+    anomalies.push({
+      kind: "interrupted",
+      label: `Interrupted — ${stuckTools[0]} never returned`,
+      detail:
+        `The turn ended while ${stuckTools.join(", ")} was still running — usually the panel or tab closed/reloaded mid-run. ` +
+        "Recorded progress is preserved; resend or say “continue” to resume.",
       severity: "warning",
     });
   }
