@@ -21,6 +21,8 @@ export type AnomalyKind =
   | "tool-error"
   | "tool-failure"
   | "interrupted"
+  | "provider-error"
+  | "content-filter"
   | "captcha";
 
 export interface MessageAnomaly {
@@ -36,6 +38,7 @@ interface AnomalousPartShape {
   type?: string;
   state?: string;
   output?: unknown;
+  errorText?: unknown;
 }
 
 /** Human-ish tool name for chip labels: "read_page_headless_or_browser" → "read page". */
@@ -67,16 +70,59 @@ export function deriveMessageAnomalies(
       severity: "error",
     });
   }
+  // Provider-terminal states — the stream just ends on these; without a chip
+  // they are indistinguishable from a normal (if abrupt) finish.
+  if (metadata?.finishReason === "error") {
+    anomalies.push({
+      kind: "provider-error",
+      label: "Provider error ended the turn",
+      detail:
+        "The model provider reported an error mid-turn (after automatic retries). Try again; if it persists, check the provider's status page or your connection key.",
+      severity: "error",
+    });
+  }
+  if (metadata?.finishReason === "content-filter") {
+    anomalies.push({
+      kind: "content-filter",
+      label: "Content filtered by provider",
+      detail:
+        "The provider stopped this response with its content filter. Rephrase the request or try a different model.",
+      severity: "warning",
+    });
+  }
 
   const errorsByTool = new Map<string, number>();
   const failuresByTool = new Map<string, string>();
   const stuckTools: string[] = [];
   let captcha = false;
+  // A user-pressed Stop marks in-flight tool parts output-error with
+  // "Stopped by the user…" — a deliberate act, not an anomaly. It also
+  // freezes text/reasoning parts mid-stream, so when detected it suppresses
+  // the interrupted chips too.
+  let userStopped = false;
+  // Text/reasoning frozen at state "streaming" on a finished message = the
+  // stream died mid-response (connection drop, failed resumable replay,
+  // app closed mid-answer). Only an EXPLICIT "streaming" state counts —
+  // older persisted parts carry no state at all.
+  let frozenResponse = false;
   for (const raw of parts) {
     const p = raw as AnomalousPartShape;
-    if (typeof p.type !== "string" || !p.type.startsWith("tool-")) continue;
+    if (typeof p.type !== "string") continue;
+    if (
+      !isStreaming &&
+      (p.type === "text" || p.type === "reasoning") &&
+      p.state === "streaming"
+    ) {
+      frozenResponse = true;
+    }
+    if (!p.type.startsWith("tool-")) continue;
     const tool = toolLabel(p.type.slice(5));
     if (p.state === "output-error") {
+      const err = typeof p.errorText === "string" ? p.errorText : "";
+      if (err.startsWith("Stopped by the user")) {
+        userStopped = true;
+        continue;
+      }
       errorsByTool.set(tool, (errorsByTool.get(tool) ?? 0) + 1);
       continue;
     }
@@ -134,13 +180,21 @@ export function deriveMessageAnomalies(
       severity: "warning",
     });
   }
-  if (stuckTools.length > 0) {
+  if (!userStopped && stuckTools.length > 0) {
     anomalies.push({
       kind: "interrupted",
       label: `Interrupted — ${stuckTools[0]} never returned`,
       detail:
         `The turn ended while ${stuckTools.join(", ")} was still running — usually the panel or tab closed/reloaded mid-run. ` +
         "Recorded progress is preserved; resend or say “continue” to resume.",
+      severity: "warning",
+    });
+  } else if (!userStopped && frozenResponse) {
+    anomalies.push({
+      kind: "interrupted",
+      label: "Interrupted mid-response",
+      detail:
+        "The turn ended while the response was still streaming — the connection dropped or the app closed mid-answer. What arrived is preserved; resend or say “continue”.",
       severity: "warning",
     });
   }
