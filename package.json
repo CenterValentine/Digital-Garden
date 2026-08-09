@@ -11,7 +11,7 @@
     "dev:collab": "tsx server/hocuspocus/bootstrap.ts",
     "start:collab": "tsx server/hocuspocus/bootstrap.ts",
     "typecheck": "tsc --noEmit",
-    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm markdown:blocks:check && pnpm extensions:check && pnpm playbooks:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm lint && next build --turbopack",
+    "build": "prisma generate && pnpm build:tokens && tsc --noEmit && pnpm collab:schema:check && pnpm markdown:blocks:check && pnpm extensions:check && pnpm playbooks:check && pnpm output-targets:check && pnpm prompt-cache:check && pnpm ai:diagnostics:check && pnpm model-routing:check && pnpm ai:pricing:check && pnpm inspector:check && pnpm lint && next build --turbopack",
     "vercel-build": "prisma generate && pnpm build:tokens && NODE_OPTIONS='--max-old-space-size=5120' next build --turbopack",
     "start": "next start",
     "lint": "eslint --max-warnings 159",
