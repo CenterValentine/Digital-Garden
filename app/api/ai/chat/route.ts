@@ -60,6 +60,13 @@ import {
   stripReasoningForResend,
   supersedeIterationHistory,
 } from "@/lib/domain/ai/context-diet";
+import {
+  MAX_STEP_SUMMARIES,
+  type MaxTokensSource,
+  type StepCapSource,
+  type TurnSegment,
+  type TurnStepSummary,
+} from "@/lib/domain/ai/turn-diagnostics";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
@@ -122,6 +129,26 @@ function buildProviderOptions(
     };
   }
   return undefined;
+}
+
+/**
+ * Compact label of the reasoning config applied to this turn — persisted in
+ * the segment record (self-describing turns) so a transcript shows whether a
+ * hybrid-thinking model ran with effort capped. Mirrors buildProviderOptions'
+ * branches; keep in sync when adding a vendor there.
+ */
+function describeReasoningConfig(
+  vendorId: string,
+  hasReasoningOptions: boolean,
+  mechanicalRun: boolean,
+): string | null {
+  if (!hasReasoningOptions) return null;
+  if (vendorId === "deepseek") {
+    return mechanicalRun ? "deepseek:adaptive+low" : "deepseek:adaptive";
+  }
+  if (vendorId === "anthropic") return "anthropic:thinking";
+  if (vendorId === "google") return "google:include-thoughts";
+  return `${vendorId}:reasoning`;
 }
 import {
   getConnectionWithKey,
@@ -873,6 +900,14 @@ export async function POST(request: Request) {
       const maxTokens =
         requestedMaxTokens ??
         getModelMeta(executedBareModelId)?.model.maxOutput;
+      // Ceiling provenance — persisted per segment (self-describing turns),
+      // so a truncated turn records WHICH ceiling cut it off.
+      const maxTokensSource: MaxTokensSource =
+        requestedMaxTokens != null
+          ? "user"
+          : maxTokens != null
+            ? "catalog"
+            : "provider-default";
 
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
@@ -1131,6 +1166,15 @@ export async function POST(request: Request) {
       // step's usage; phase_checkpoint stamps the running total into the
       // Run Ledger.
       const runTokenCounter = { total: 0 };
+      // Per-request step tracker (self-describing turns): onStepFinish counts
+      // steps and records bounded summaries; messageMetadata stamps them into
+      // the turn's segment record so the persisted row can say how close the
+      // request came to its stopWhen ceiling.
+      const stepsTracker = {
+        used: 0,
+        truncated: 0,
+        summaries: [] as TurnStepSummary[],
+      };
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
       // pushed before streamText begins are available at execution time.
@@ -2001,11 +2045,42 @@ export async function POST(request: Request) {
         promptCachePolicy.providerOptions,
       );
 
+      // Step ceiling in force for this request — hoisted from the stopWhen
+      // call so stopWhen, the per-segment diagnostics, and the finish-log
+      // events all report the SAME cap (self-describing turns). Formula
+      // rationale lives on the stopWhen comment below.
+      const stepCap =
+        itemIterationBudget != null
+          ? itemIterationBudget * 4 + 8
+          : researchPageBudget != null
+            ? researchPageBudget * 2 + 4
+            : editableContentId
+              ? 8
+              : 7;
+      const stepCapSource: StepCapSource =
+        itemIterationBudget != null
+          ? "item-iteration"
+          : researchPageBudget != null
+            ? "research"
+            : editableContentId
+              ? "editable"
+              : "base";
+      const reasoningConfigSummary = describeReasoningConfig(
+        executedVendorId,
+        reasoningProviderOptions !== undefined,
+        itemIterationBudget != null,
+      );
+      const activeToolCount = toolsActive ? Object.keys(tools).length : 0;
+
       // Turn start — for the generation-duration shown in the assistant avatar
       // tooltip (attached on `finish` in messageMetadata below). Anchored here so
       // it spans the whole turn (reasoning + tools + text), matching the wall
       // time the user waited.
       const turnStartMs = Date.now();
+      // The finish-part metadata blob of THIS request — captured so the
+      // server-side persistence path writes the identical self-describing
+      // record the client path receives (parity; see messageMetadata).
+      let lastFinishMetadata: Record<string, unknown> | null = null;
 
       const result = streamText({
         model: wrappedModel,
@@ -2029,19 +2104,13 @@ export async function POST(request: Request) {
         // extract/synthesis), so a run sized for N pages always has the steps to
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
-        stopWhen: stepCountIs(
-          itemIterationBudget != null
-            ? // Each item ≈ read + record (+ optional re-read); +8 overhead for
-              // list_tabs / propose / roll-up createNote / record_iteration_findings.
-              // The client item budget is the true limiter (soft-stops new items);
-              // this is the safety ceiling that must not cut off before it.
-              itemIterationBudget * 4 + 8
-            : researchPageBudget != null
-              ? researchPageBudget * 2 + 4
-              : editableContentId
-                ? 8
-                : 7,
-        ),
+        // Item runs: each item ≈ read + record (+ optional re-read); +8
+        // overhead for list_tabs / propose / roll-up createNote /
+        // record_iteration_findings. The client item budget is the true
+        // limiter (soft-stops new items); this ceiling must not cut off
+        // before it. Cap value + provenance hoisted above (stepCap /
+        // stepCapSource) so diagnostics report the same number.
+        stopWhen: stepCountIs(stepCap),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
@@ -2090,6 +2159,23 @@ export async function POST(request: Request) {
           runTokenCounter.total +=
             (step as { usage?: { totalTokens?: number } }).usage
               ?.totalTokens ?? 0;
+          // Step tracking for the segment record (self-describing turns).
+          stepsTracker.used += 1;
+          if (stepsTracker.summaries.length < MAX_STEP_SUMMARIES) {
+            const stepUsage = (
+              step as { usage?: { outputTokens?: number } }
+            ).usage;
+            stepsTracker.summaries.push({
+              finishReason:
+                typeof step.finishReason === "string"
+                  ? step.finishReason
+                  : null,
+              tools: (step.toolCalls ?? []).map((call) => call.toolName),
+              outputTokens: stepUsage?.outputTokens ?? null,
+            });
+          } else {
+            stepsTracker.truncated += 1;
+          }
           // A checkpoint approval may only surface after the current phase's
           // runtime-verifiable research/reference requirements completed.
           // This includes provider-native search because it is represented in
@@ -2152,6 +2238,37 @@ export async function POST(request: Request) {
             Number(cacheUsage.hitRate.toFixed(4)),
           );
           if (finishReason) streamSpan.attr("finish_reason", finishReason);
+          // Harness-decision attrs (self-describing turns): the span is the
+          // server-side ground truth even when the client never persists.
+          streamSpan.attr("steps_used", stepsTracker.used);
+          streamSpan.attr("step_cap", stepCap);
+          streamSpan.attr("cap_source", stepCapSource);
+          if (finishReason === "length") {
+            logger.warn({
+              layer: "ai",
+              event: "turn:truncated_output",
+              summary: `turn hit the output-token ceiling (${maxTokens ?? "provider default"}, ${maxTokensSource})`,
+              attrs: {
+                conversation_id: conversationIdForAssoc ?? null,
+                model: activeModelId,
+                steps_used: stepsTracker.used,
+                max_output_tokens: maxTokens ?? null,
+              },
+            });
+          }
+          if (finishReason === "tool-calls" && stepsTracker.used >= stepCap) {
+            logger.warn({
+              layer: "ai",
+              event: "turn:step_cap_hit",
+              summary: `turn used all ${stepCap} steps (${stepCapSource}) and still wanted tools — harness ended the loop`,
+              attrs: {
+                conversation_id: conversationIdForAssoc ?? null,
+                model: activeModelId,
+                step_cap: stepCap,
+                cap_source: stepCapSource,
+              },
+            });
+          }
           // Capture the full finish event to sidecar for replay.
           await spanPayload(streamSpan, "chat_finish", finishEvent);
           streamSpan.end("ok");
@@ -2263,6 +2380,10 @@ export async function POST(request: Request) {
                 ...(modelRouteNotices.length > 0
                   ? { modelRouteNotices }
                   : {}),
+                // Parity with the client path (self-describing turns): the
+                // finish-part blob carries usage / durationMs / finishReason
+                // / the segment record for THIS request.
+                ...(lastFinishMetadata ?? {}),
               },
               parentId: null,
             });
@@ -2347,7 +2468,33 @@ export async function POST(request: Request) {
             return routeMeta;
           }
           if (part.type === "finish") {
-            return {
+            // The request's segment record (self-describing turns): what cap
+            // was in force, how close the model came, and which ceilings
+            // applied. FIXED SHAPE — the SDK deep-merges metadata across a
+            // turn's requests in client memory, so an omitted key would
+            // silently inherit the previous request's value.
+            const segment: TurnSegment = {
+              startedAt: new Date(turnStartMs).toISOString(),
+              finishReason: part.finishReason ?? null,
+              usage: {
+                inputTokens: part.totalUsage?.inputTokens ?? 0,
+                outputTokens: part.totalUsage?.outputTokens ?? 0,
+                totalTokens: part.totalUsage?.totalTokens ?? 0,
+                reasoningTokens: part.totalUsage?.reasoningTokens ?? 0,
+                cachedInputTokens: part.totalUsage?.cachedInputTokens ?? 0,
+              },
+              durationMs: Date.now() - turnStartMs,
+              stepsUsed: stepsTracker.used,
+              stepCap,
+              capSource: stepCapSource,
+              steps: stepsTracker.summaries,
+              stepsTruncated: stepsTracker.truncated,
+              maxOutputTokens: maxTokens ?? null,
+              maxTokensSource,
+              reasoningConfig: reasoningConfigSummary,
+              toolCount: activeToolCount,
+            };
+            const finishMeta = {
               ...routeMeta,
               usage: {
                 inputTokens: part.totalUsage?.inputTokens,
@@ -2361,9 +2508,12 @@ export async function POST(request: Request) {
               },
               // Generation wall time for the avatar tooltip (persisted with the
               // message, so it survives reload alongside usage).
-              durationMs: Date.now() - turnStartMs,
+              durationMs: segment.durationMs,
               finishReason: part.finishReason,
+              segment,
             };
+            lastFinishMetadata = finishMeta;
+            return finishMeta;
           }
           return undefined;
         },

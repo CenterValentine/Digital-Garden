@@ -876,6 +876,9 @@ export async function forkConversation(
       modelId: true,
       parts: true,
       textCache: true,
+      // Turn metadata (usage, model route, diagnostics) — dropping it here
+      // silently stripped every forked turn of its self-describing record.
+      metadata: true,
     },
   });
 
@@ -905,6 +908,10 @@ export async function forkConversation(
             modelId: m.modelId,
             parts: m.parts as unknown as Prisma.InputJsonValue,
             textCache: m.textCache,
+            metadata:
+              m.metadata === null
+                ? Prisma.JsonNull
+                : (m.metadata as unknown as Prisma.InputJsonValue),
           })),
         },
         associations: source.associations.length
