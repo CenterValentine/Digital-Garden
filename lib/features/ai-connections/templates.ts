@@ -102,7 +102,7 @@ const GOOGLE: ConnectionTemplate = {
   defaultBaseURL: null,
   baseURLLocked: true,
   defaultModels: [
-    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 2_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro", contextWindow: 1_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash", contextWindow: 1_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
   ],
   apiKeyHint: "Get one from aistudio.google.com",
@@ -118,8 +118,8 @@ const XAI: ConnectionTemplate = {
   defaultBaseURL: null,
   baseURLLocked: true,
   defaultModels: [
-    { id: "grok-3", name: "Grok 3", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
-    { id: "grok-3-mini", name: "Grok 3 Mini", contextWindow: 128_000, capabilities: ["text", "streaming"] },
+    { id: "grok-3", name: "Grok 3", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
+    { id: "grok-3-mini", name: "Grok 3 Mini", contextWindow: 131_072, capabilities: ["text", "streaming"] },
   ],
   apiKeyHint: "Get one from console.x.ai",
   apiKeyDocsURL: "https://console.x.ai",
@@ -178,7 +178,7 @@ const VERCEL_GATEWAY: ConnectionTemplate = {
     { id: "anthropic/claude-haiku-3-5", name: "Claude Haiku 3.5 (via Gateway)", contextWindow: 200_000, capabilities: ["text", "tools", "streaming"] },
     { id: "openai/gpt-4o", name: "GPT-4o (via Gateway)", contextWindow: 128_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (via Gateway)", contextWindow: 128_000, capabilities: ["text", "vision", "tools", "streaming"] },
-    { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via Gateway)", contextWindow: 2_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
+    { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via Gateway)", contextWindow: 1_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "google/gemini-2.5-flash", name: "Gemini 2.5 Flash (via Gateway)", contextWindow: 1_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
     // Reasoning models. OpenAI o-series auto-emits reasoning through
     // the Gateway. Anthropic + Google reasoning trigger via the
@@ -192,7 +192,7 @@ const VERCEL_GATEWAY: ConnectionTemplate = {
     { id: "xai/grok-3", name: "Grok 3 (via Gateway)", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
     { id: "xai/grok-3-mini", name: "Grok 3 Mini (via Gateway)", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
     { id: "mistral/mistral-large-latest", name: "Mistral Large (via Gateway)", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
-    { id: "groq/llama-3.3-70b-versatile", name: "Llama 3.3 70B (via Groq, via Gateway)", contextWindow: 131_072, capabilities: ["text", "tools", "streaming"] },
+    { id: "groq/llama-3.3-70b-versatile", name: "Llama 3.3 70B (via Groq, via Gateway)", contextWindow: 128_000, capabilities: ["text", "tools", "streaming"] },
   ],
   apiKeyHint: "Get one from vercel.com — Settings → AI",
   apiKeyDocsURL: "https://vercel.com/docs/ai/gateway",
@@ -291,7 +291,7 @@ const OPENROUTER: ConnectionTemplate = {
     { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet (via OpenRouter)", contextWindow: 200_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "openai/gpt-4o", name: "GPT-4o (via OpenRouter)", contextWindow: 128_000, capabilities: ["text", "vision", "tools", "streaming"] },
     { id: "openai/gpt-4o-mini", name: "GPT-4o Mini (via OpenRouter)", contextWindow: 128_000, capabilities: ["text", "vision", "tools", "streaming"] },
-    { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via OpenRouter)", contextWindow: 2_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
+    { id: "google/gemini-2.5-pro", name: "Gemini 2.5 Pro (via OpenRouter)", contextWindow: 1_000_000, capabilities: ["text", "vision", "tools", "streaming"] },
     // Reasoning
     { id: "openai/o3-mini", name: "o3-mini (via OpenRouter)", contextWindow: 200_000, capabilities: ["text", "tools", "streaming"] },
     // Popular non-big-three

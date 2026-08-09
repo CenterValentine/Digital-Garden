@@ -159,6 +159,41 @@ export const ALL_TOOL_IDS = [
   ..._WORKFLOW_TOOL_IDS,
 ] as const;
 
+/**
+ * Tools that exist but are deliberately NOT user-configurable — the harness
+ * depends on them (loop state, approval plumbing, budget accounting), so a
+ * settings toggle that disabled one would silently break runs mid-loop.
+ *
+ * Every tool must be classified exactly one way: in ALL_TOOL_IDS (settings
+ * UI) or here. `pnpm ai:drift:check` enforces the classification — a new
+ * tool that appears in neither list fails the build, forcing the decision.
+ */
+export const HARNESS_INTERNAL_TOOL_IDS: readonly string[] = [
+  // Bounded research-run trio: the proposal is approval-gated in chat, and
+  // the record tools ARE the run's ledger/loop state — disabling any of them
+  // strands an approved run mid-loop.
+  "propose_research_run",
+  "extract_structured",
+  "record_research_findings",
+  // Per-item iteration harness: same shape — the ledger tools are the loop's
+  // authoritative state, and the budget/step-cap derivations key off their
+  // parts appearing in history.
+  "propose_item_iteration",
+  "record_item_result",
+  "record_batch_checkpoint",
+  "record_iteration_findings",
+  // Browser/co-browse client tools: availability-gated by the extension and
+  // its own trust settings (side panel, "open a tab to read blocked pages"),
+  // not by the tool-config toggles — a second, independent off-switch here
+  // would produce "extension connected but AI can't see it" states.
+  "read_page_headless_or_browser",
+  "open_tab_and_read",
+  "co_browse_open",
+  "co_browse_act",
+  "read_current_page",
+  "list_tabs",
+];
+
 /** All tool metadata combined */
 export const ALL_TOOL_METADATA: Record<
   string,
