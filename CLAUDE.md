@@ -19,6 +19,7 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
+pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
@@ -50,6 +51,7 @@ CI runners (GitHub Actions, Vercel) have larger heaps by default and don't need 
 **CI gates** (`.github/workflows/`):
 - **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
+- **ai-drift.yml** — runs `pnpm ai:drift:check` on AI-touching PRs (`lib/domain/ai/**`, `lib/features/ai-connections/**`, the chat route, settings validation). Guards the AI subsystem's parallel tables: every direct-vendor template model must have a `PROVIDER_CATALOG` entry (the catalog is load-bearing — it supplies the per-model output ceiling and reasoning config), contextWindows must agree across files, type unions/settings enum must match the catalog, every tool must be classified user-configurable (settings metadata) or harness-internal, prompt/description tool references must resolve, and every `AdapterKind` needs a resolver branch. Full rationale: `docs/notes-feature/work-tracking/AI-DRIFT-GATES-PLAN.md`.
 - **publishing-visual.yml** — runs on PRs touching the publishing surface (`extensions/publishing/`, `components/public/`, `app/(public)/`, `app/(test)/test/publishing-fixtures/`, `app/globals.css`, the publishing fixtures/spec/schema scripts). Two jobs: `schema` (typecheck + `publishing:schema:check` + `publishing:audit:defaults`) and `visual` (Playwright per-block snapshot suite against the synthetic fixture route). Visual job uploads diff PNGs as an artifact on failure. Hard-gate; failures block merge. Can be temporarily skipped via repo var `PUBLISHING_VISUAL_GATE=skip`.
 
 ## Visual Regression Testing (Playwright)

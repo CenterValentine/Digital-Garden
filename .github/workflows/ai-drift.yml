@@ -1,0 +1,50 @@
+name: AI Drift Gates
+
+# Guards the AI subsystem's parallel tables (provider catalog ↔ connection
+# templates ↔ type unions ↔ settings enum; tool inventory ↔ settings
+# metadata; prompt/description tool references; adapter branches). See
+# docs/notes-feature/work-tracking/AI-DRIFT-GATES-PLAN.md.
+#
+# validate-ai-drift.ts is import-light by design (source-scans the tool
+# registry instead of importing it), so this job needs no Prisma client and
+# no database env.
+
+on:
+  pull_request:
+    paths:
+      - "app/api/ai/chat/**"
+      - "lib/domain/ai/**"
+      - "lib/features/ai-connections/**"
+      - "lib/features/settings/validation.ts"
+      - "scripts/validate-ai-drift.ts"
+      - "package.json"
+      - "pnpm-lock.yaml"
+  push:
+    branches:
+      - main
+
+jobs:
+  drift:
+    name: AI drift gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.25.0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Validate AI drift gates
+        run: pnpm ai:drift:check

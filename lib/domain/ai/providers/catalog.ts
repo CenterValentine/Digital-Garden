@@ -1,8 +1,17 @@
 /**
  * AI Provider Catalog
  *
- * Static metadata for provider/model selection in the settings UI.
- * This is display-only data — actual model resolution happens in registry.ts.
+ * Static per-model metadata. Originally display-only for the settings UI;
+ * since the per-model output-ceiling fix the chat route CONSUMES this at
+ * call time — `maxOutput` becomes the default output ceiling and `reasoning`
+ * gates provider thinking config. A model missing here silently falls back
+ * to its provider's own default output cap (the 2026-08-08 DeepSeek incident
+ * class). `pnpm ai:drift:check` enforces coverage against the connection
+ * templates. Actual model resolution still happens in registry.ts.
+ *
+ * Where a vendor's direct-API id differs from our legacy canonical id
+ * (mistral, groq), BOTH are listed: the BYOK path resolves the direct id,
+ * the legacy MODEL_MAP path resolves the canonical one.
  */
 
 import type { ProviderMeta } from "./types";
@@ -40,6 +49,14 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         maxOutput: 32_000,
         capabilities: ["text", "vision", "tools", "streaming"],
         costTier: "high",
+      },
+      {
+        id: "claude-haiku-4-5",
+        name: "Claude Haiku 4.5",
+        contextWindow: 200_000,
+        maxOutput: 64_000,
+        capabilities: ["text", "vision", "tools", "streaming"],
+        costTier: "low",
       },
       {
         id: "claude-haiku-3-5",
@@ -164,6 +181,24 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
         capabilities: ["text", "tools", "streaming"],
         costTier: "medium",
       },
+      // Direct-API ids (what the Mistral template/connection actually sends);
+      // the suffix-less ids above are the legacy canonical ids MODEL_MAP maps.
+      {
+        id: "mistral-large-latest",
+        name: "Mistral Large",
+        contextWindow: 128_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "vision", "tools", "streaming"],
+        costTier: "medium",
+      },
+      {
+        id: "codestral-latest",
+        name: "Codestral",
+        contextWindow: 32_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "medium",
+      },
     ],
   },
   {
@@ -212,6 +247,24 @@ export const PROVIDER_CATALOG: ProviderMeta[] = [
       },
       {
         id: "llama-3.3-70b",
+        name: "Llama 3.3 70B",
+        contextWindow: 128_000,
+        maxOutput: 8_192,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "low",
+      },
+      // Direct-API ids (what the Groq template/connection actually sends);
+      // the short ids above are the legacy canonical ids MODEL_MAP maps.
+      {
+        id: "mixtral-8x7b-32768",
+        name: "Mixtral 8x7B",
+        contextWindow: 32_768,
+        maxOutput: 4_096,
+        capabilities: ["text", "tools", "streaming"],
+        costTier: "low",
+      },
+      {
+        id: "llama-3.3-70b-versatile",
         name: "Llama 3.3 70B",
         contextWindow: 128_000,
         maxOutput: 8_192,

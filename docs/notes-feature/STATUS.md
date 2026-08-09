@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-07
+last_updated: 2026-08-08
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 8, 2026**: **AI Drift Gates — CI checks for the AI subsystem's parallel tables** (branch `AI-sys-improve/drift-gates`, stacked on `feat/ai-harness-reliability` PR #156; typecheck/lint/ai:drift:check green)
+
+New `pnpm ai:drift:check` (`scripts/validate-ai-drift.ts`) + path-filtered `ai-drift.yml` workflow + build-chain wiring. Five binary gates born from the 2026-08-08 prod DeepSeek failure: (1) model identity tables agree — direct-vendor template models must have `PROVIDER_CATALOG` entries (now load-bearing: output ceiling + reasoning config), contextWindows must match across files, `AIProviderId`/`AIModelId` unions and the settings enum must match the catalog, `MODEL_MAP` keys ⊆ union; (2) catalog completeness — every model has `maxOutput`, reasoning-capable models ≥16k floor; (3) every tool classified user-configurable (settings metadata) or `HARNESS_INTERNAL_TOOL_IDS`, with route cross-checks so the gate can't go stale; (4) prompt/description tool-name references resolve to real tools; (5) every `AdapterKind` has a resolver branch. First run caught **33 live drift findings**, all fixed in the same PR (haiku-4-5 + mistral/groq direct-API ids added to catalog, gemini/grok contextWindow reconciliation, two flashcard proposal tools restored to settings metadata). Plan: `work-tracking/AI-DRIFT-GATES-PLAN.md`.
 
 **August 7, 2026**: **Browser Extension V5 — Browser UI Overhaul** (Panel Overlay: tree-as-overlay, reclaimed sidebar, pin + link handles, slim panel chrome) (branch `feat/panel-tree-overlay`; ext 4.2.x → **5.0.0**; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR #152)
 
