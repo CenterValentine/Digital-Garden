@@ -56,6 +56,7 @@ import {
   PROVIDER_CATALOG,
   getModelMeta,
 } from "@/lib/domain/ai/providers/catalog";
+import { stripReasoningForResend } from "@/lib/domain/ai/context-diet";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
@@ -1138,6 +1139,9 @@ export async function POST(request: Request) {
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
+        // Filled in AFTER playbook resolution below (tools close over this
+        // object, so a later property assignment is visible at execute time).
+        activePlaybook: undefined as { contentId: string; title: string } | undefined,
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -1222,6 +1226,36 @@ export async function POST(request: Request) {
         ),
       );
 
+      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
+      // schema set to the run's working tools. The full ~50-schema prefix
+      // measured ~36k tokens per request; the 128k window (not price) is the
+      // binding constraint on long runs. The set is stable for the whole run
+      // (itemIterationBudget stays non-null until record_iteration_findings),
+      // so the provider prefix cache re-warms once at run start. Pending
+      // approvals mid-run only occur for kept tools (createNote,
+      // phase_checkpoint).
+      if (itemIterationBudget != null) {
+        const ITERATION_RUN_TOOLS = new Set([
+          // browsing + enumeration
+          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
+          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
+          "search_web",
+          // the iteration harness itself
+          "propose_item_iteration", "record_item_result",
+          "record_batch_checkpoint", "record_iteration_findings",
+          // note output + grounding
+          "createNote", "updateNote", "renameNote", "getCurrentNote",
+          "searchNotes", "read_folder_context",
+          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
+          // run/plumbing
+          "phase_checkpoint", "ask_user", "notify_user",
+          "finish_with_summary", "plan",
+        ]);
+        for (const id of Object.keys(tools)) {
+          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+        }
+      }
+
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED
       // provider, not the requested one — the resolver above may have landed
@@ -1286,8 +1320,13 @@ export async function POST(request: Request) {
       const repairedMessages = compactToolOutputs(
         repairDanglingToolCalls(messages),
       );
+      // Context diet (S7): reasoning parts are model OUTPUT with no resend
+      // value for non-Anthropic providers, yet convertToModelMessages
+      // forwards them as input verbatim (~100k chars replayed per request in
+      // the measured DeepSeek run). Applied ONLY to this model-message path —
+      // repairedMessages stays intact for originalMessages/persistence.
       const resolvedMessages = resolveAttachmentsForModel(
-        repairedMessages,
+        stripReasoningForResend(repairedMessages, executedVendorId),
         executedVendorId,
         audioCapable,
       );
@@ -1534,6 +1573,12 @@ export async function POST(request: Request) {
           ) {
             attachedPlaybookResolved = true;
             attachedPlaybookTitle = playbookNode.title;
+            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // pointer — the body is already injected below.
+            toolCtx.activePlaybook = {
+              contentId: explicitPlaybookId,
+              title: playbookNode.title,
+            };
             const parsed = parsePlaybook(
               playbookNode.notePayload.tiptapJson as JSONContent,
             );
@@ -1643,6 +1688,11 @@ export async function POST(request: Request) {
             );
             rootedPlaybookResolved = true;
             attachedPlaybookTitle = rootedNode.title;
+            // Context diet (S7-C2): same pointer rule for rooted execution.
+            toolCtx.activePlaybook = {
+              contentId: rootedPlaybookId,
+              title: rootedNode.title,
+            };
             playbookOutputDirectives.push(
               ...extractPlaybookOutputDirectives(parsed),
             );

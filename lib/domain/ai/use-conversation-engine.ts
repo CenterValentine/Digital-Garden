@@ -42,6 +42,7 @@ import {
   CO_BROWSE_ACT,
   READ_CURRENT_PAGE,
   LIST_TABS,
+  stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import {
   isCoBrowseAvailable,
@@ -1287,6 +1288,10 @@ export function useConversationEngine({
    */
   const fetchFollowUps = useCallback(
     async (finalMessages: UIMessage[]) => {
+      // Context diet (S7-C4): no follow-up suggestions mid-iteration — a
+      // mechanical run has no reader for them, and each fetch is a separate
+      // model invocation billed outside the chat turn.
+      if (deriveActiveItemIteration(finalMessages)) return;
       const requestVersion = followUpRequestVersionRef.current + 1;
       followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
@@ -1619,7 +1624,9 @@ export function useConversationEngine({
                 t.url.toLowerCase().includes(want),
             )
             .slice(0, 60)
-            .map((t) => ({ title: t.title, url: t.url }));
+            // Tracking params stripped (S7-C1): they were the bulk of a
+            // measured ~20k-char list_tabs output and identify nothing.
+            .map((t) => ({ title: t.title, url: stripTrackingParams(t.url) }));
           chat.addToolResult({
             tool: LIST_TABS,
             toolCallId: toolCall.toolCallId,

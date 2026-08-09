@@ -20,6 +20,48 @@
 
 import { z } from "zod/v4";
 
+/**
+ * Known tracking params — stripped from tab/link URLs before they reach the
+ * model (S7-C1 context diet). One live list_tabs call cost ~20k chars, almost
+ * entirely LinkedIn tracking bloat (a single eBP param ran ~700 chars).
+ * Functional params (e.g. LinkedIn's currentJobId) are preserved — a stripped
+ * URL must still open the same content. Absence-safe by definition: tracking
+ * params identify nothing the model needs.
+ */
+const TRACKING_PARAMS = new Set([
+  "eBP",
+  "trackingId",
+  "refId",
+  "origin",
+  "originToLandingJobPostings",
+  "gclid",
+  "fbclid",
+  "mc_cid",
+  "mc_eid",
+  "igshid",
+  "_hsenc",
+  "_hsmi",
+  "vero_id",
+  "ref_src",
+]);
+
+/** Strip known tracking params; returns the input unchanged on any parse issue. */
+export function stripTrackingParams(rawUrl: string): string {
+  try {
+    const u = new URL(rawUrl);
+    let changed = false;
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(key) || key.startsWith("utm_")) {
+        u.searchParams.delete(key);
+        changed = true;
+      }
+    }
+    return changed ? u.toString() : rawUrl;
+  } catch {
+    return rawUrl;
+  }
+}
+
 /** Tool names — the single source of truth both sides match on. */
 export const CO_BROWSE_OPEN = "co_browse_open";
 export const CO_BROWSE_ACT = "co_browse_act";

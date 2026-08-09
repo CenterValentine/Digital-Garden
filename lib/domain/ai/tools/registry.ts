@@ -1336,6 +1336,13 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         contentId: z.string().uuid().describe("The content node ID to read"),
       }),
       execute: async ({ contentId }) => {
+        // Context diet (S7-C2): the active playbook's full body is already
+        // re-injected into the system prompt on EVERY request — answering a
+        // re-read with a pointer saves the duplicate copy (17k chars in one
+        // measured run) with zero information loss.
+        if (ctx.activePlaybook && contentId === ctx.activePlaybook.contentId) {
+          return `"${ctx.activePlaybook.title}" is ALREADY LOADED IN FULL in your system context as the Active Playbook — no need to re-read it. Act on the playbook content already provided above.`;
+        }
         const content = await prisma.contentNode.findFirst({
           where: {
             id: contentId,

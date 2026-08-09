@@ -40,10 +40,34 @@ function propValue(node, name) {
 // /jobs/view/438941904x URLs, all nonexistent). Tracking-bloated URLs get
 // their query stripped rather than truncated — a cut URL is a fabricated URL.
 const MAX_HREF_LENGTH = 600; // matches the iteration tool's url cap
+// Known tracking params, stripped before hrefs reach the model (S7-C1) —
+// mirrors stripTrackingParams in the app's co-browse-tools.ts. Functional
+// params (LinkedIn currentJobId etc.) are preserved.
+const TRACKING_PARAMS = new Set([
+  "eBP", "trackingId", "refId", "origin", "originToLandingJobPostings",
+  "gclid", "fbclid", "mc_cid", "mc_eid", "igshid", "_hsenc", "_hsmi",
+  "vero_id", "ref_src",
+]);
+function stripTracking(raw) {
+  try {
+    const u = new URL(raw);
+    let changed = false;
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(key) || key.startsWith("utm_")) {
+        u.searchParams.delete(key);
+        changed = true;
+      }
+    }
+    return changed ? u.toString() : raw;
+  } catch {
+    return raw;
+  }
+}
 function linkHref(node, role) {
   if (role !== "link") return undefined;
-  const raw = propValue(node, "url");
-  if (typeof raw !== "string" || !raw) return undefined;
+  const rawValue = propValue(node, "url");
+  if (typeof rawValue !== "string" || !rawValue) return undefined;
+  const raw = stripTracking(rawValue);
   if (raw.length <= MAX_HREF_LENGTH) return raw;
   try {
     const u = new URL(raw);

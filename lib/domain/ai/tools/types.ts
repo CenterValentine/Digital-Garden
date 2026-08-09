@@ -15,6 +15,15 @@ export interface ToolExecuteContext {
   /** The content node being edited — required for editor tools */
   contentId?: string;
   /**
+   * Set by the chat route AFTER playbook resolution (attached or rooted
+   * execution) when a playbook's full body is already injected into the
+   * system prompt. getCurrentNote returns a short pointer for this id
+   * instead of re-sending the body — weak models re-read the playbook as a
+   * belt-and-braces habit (measured: 17k duplicate chars in one live run).
+   * The pointer is absence-safe: the source is re-injected every request.
+   */
+  activePlaybook?: { contentId: string; title: string };
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).
