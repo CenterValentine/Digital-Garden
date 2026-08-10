@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-05
+last_updated: 2026-08-09
 ---
 
 # Sprint Backlog
@@ -9,6 +9,15 @@ last_updated: 2026-08-05
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Context diet — follow-ups (2026-08-09, after PR #156 Sprints 7–8; measurements in the `ai-reliability-fix-plan` memo)
+
+Owner direction: generalize beyond the shipped named-param stripping — review real sessions to find the NEXT bloat class, especially **non-informative fluff in the HTML/content itself**. Hard boundary from the elision analysis (see `read-elision-rejected` memory): every cut must be *provably absence-safe* — structural chrome and opaque tokens, never evidence the analysis might judge. Fuzzy/heuristic removal of content text stays banned.
+
+- [ ] **Learn-and-heal session audits.** Script the decomposition harness used in the 2026-08-08 analysis (chars by part type, resend curve, consecutive-snapshot repetition ratio) so it runs over recent co-browse conversations on demand. Each audit's findings graduate into concrete diet rules — this loop is what caught tracking params; it should catch whatever is next.
+- [ ] **Maintained tracking-param ruleset.** Replace the hand-named `TRACKING_PARAMS` sets (app `co-browse-tools.ts` + extension `snapshot.js` — keep them as fallback) with a vendored community ruleset (ClearURLs rules DB or AdGuard's tracking-params list) per the repo's prefer-maintained-standards rule. Skip value-length/entropy stripping for any URL the model may navigate to — presigned/filter URLs carry functional long values.
+- [ ] **HTML/content fluff pass.** Audit what still reaches the model after the existing filters (AX-tree interactable+orientation allowlist, readability extraction, overlay/embed-frame exclusion, delta snapshots): candidates are cookie/consent banner subtrees, skip-links, icon-only elements with verbose accessible names, repeated per-card action labels ("Dismiss job", "Save"), `banner`/`contentinfo` boilerplate in reads, and page-read text outside the readability main region. Measure first (via the audit script), cut only what classifies as chrome by ROLE/STRUCTURE — not by content similarity.
+- [ ] **Canonical-URL surfacing.** Extension reports `<link rel="canonical">` alongside the address-bar URL — clean ledger keys and dedup on tracking-heavy sites (LinkedIn job pages canonicalize to bare `/jobs/view/ID`). Display/dedup hint only; never substitute it for the navigation URL (pagination canonicals lie).
 
 ## Folder Context Capsule — follow-ups (2026-08-06, branch `feat/ai-context-capsule`; plan: FOLDER-CONTEXT-CAPSULE-PLAN.md)
 
