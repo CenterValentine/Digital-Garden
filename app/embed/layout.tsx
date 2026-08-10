@@ -203,6 +203,15 @@ export default async function EmbedLayout({
         // came out muddy/low-contrast. `--background` is the real themed
         // token and follows the resolved theme.
         background: "var(--background, #0d0d0d)",
+        // Pair the surface with its TEXT color from the SAME variable scope.
+        // Without this, elements with no explicit text class (e.g. tree row
+        // titles) inherit `color` as computed on <body> — which follows the
+        // <html>-level theme class, NOT this subtree's forced `dark`. A
+        // cross-origin iframe inherits prefers-color-scheme from the HOST
+        // page's color scheme, so on light host pages the html-level theme
+        // resolved light and inherited text rendered BLACK on this forced-dark
+        // surface (owner report 2026-08-10: black tree filenames).
+        color: "var(--foreground, #E5D4B0)",
         // Tells the UA to render its own chrome (scrollbars, form controls,
         // caret) dark, matching the forced `dark` class above. Without it the
         // iframe's scrollbars render light against the dark surface.
