@@ -296,6 +296,31 @@ async function saveDomainMemory(hostname, data, scope) {
   } catch { /* best-effort */ }
 }
 
+// ── Tree lock, per page (owner ask 2026-08-09) ──────────────────────────────
+// The tree overlay auto-collapses when the user interacts with the PAGE; a 3s
+// hold on the tree handle LOCKS it open for THIS page only. Keyed by
+// origin+pathname (query/hash are too volatile to be page identity) and
+// persisted in chrome.storage.local so the lock survives page refresh. A
+// single click on the handle releases the lock (business as usual after).
+function treeLockKey() {
+  return `dgTreeLock:${window.location.origin}${window.location.pathname}`;
+}
+async function loadTreeLock() {
+  try {
+    const key = treeLockKey();
+    const result = await chrome.storage.local.get(key);
+    return result[key] === true;
+  } catch {
+    return false;
+  }
+}
+function saveTreeLock(locked) {
+  try {
+    if (locked) void chrome.storage.local.set({ [treeLockKey()]: true });
+    else void chrome.storage.local.remove(treeLockKey());
+  } catch { /* best-effort */ }
+}
+
 async function saveDomainDefaultDeck(hostname, deckId) {
   try {
     const existing = await loadDomainMemory(hostname);
@@ -383,9 +408,24 @@ function applyFloatingPanelPosition(state) {
   state.snapPanel.style.height = `${panelH}px`;
 }
 
+function setTreeLocked(state, locked) {
+  state.treeLocked = locked;
+  saveTreeLock(locked);
+  if (state.handleTree) {
+    state.handleTree.setAttribute("data-locked", locked ? "true" : "false");
+    state.handleTree.title = locked
+      ? "File tree locked to this page — click once to release"
+      : "Open file tree (hold 3s to lock it to this page)";
+    state.handleTree.setAttribute("aria-label", state.handleTree.title);
+  }
+}
+
 function hideTreeOverlay(state) {
   if (state.treeIframe) state.treeIframe.style.display = "none";
   if (state.treeClose) state.treeClose.style.display = "none";
+  // Closing the tree always releases a page lock — a lock's only meaning is
+  // "keep it open"; a closed-but-locked tree would resurrect confusingly.
+  if (state.treeLocked) setTreeLocked(state, false);
 }
 
 /**
@@ -724,6 +764,7 @@ function overlayStyles() {
     }
     .dg-handle-cluster[data-dragging="true"] { cursor: grabbing; }
     .dg-handle {
+      position: relative;
       width: 26px; height: 34px;
       border: 1px solid rgba(201,168,108,0.28); border-right: 0;
       border-radius: 8px 0 0 8px;
@@ -731,6 +772,23 @@ function overlayStyles() {
       cursor: pointer; display: flex; align-items: center; justify-content: center;
       transition: background .15s, color .15s; backdrop-filter: blur(10px);
       padding: 0;
+    }
+    /* Hold-to-lock (tree handle): charging glow while the 3s hold arms, then
+       a quiet locked ring + dot. Lite signaling by design. */
+    .dg-handle[data-lock-charging="true"] {
+      background: rgba(201,168,108,0.34) !important;
+      box-shadow: inset 0 0 0 1.5px rgba(201,168,108,0.9);
+      transition: background 3s linear, box-shadow 3s linear;
+    }
+    .dg-handle[data-locked="true"] {
+      border-color: rgba(201,168,108,0.9);
+      color: #f6ead0;
+      box-shadow: 0 0 0 1.5px rgba(201,168,108,0.5), 0 0 9px rgba(201,168,108,0.32);
+    }
+    .dg-handle[data-locked="true"]::after {
+      content: ""; position: absolute; right: 3px; bottom: 3px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #C9A86C; box-shadow: 0 0 4px rgba(201,168,108,0.8);
     }
     .dg-handle:hover { background: rgba(201,168,108,0.22); color: #f2e2b6; }
     .dg-handle svg { width: 15px; height: 15px; }
@@ -3570,7 +3628,74 @@ function wireRootEvents(state) {
   };
   // Tree / panel: each toggles ITS OWN pane. The side-panel decision reads the
   // LOCAL belief synchronously so the open runs inside the click gesture.
-  state.handleTree?.addEventListener("click", handleGuarded(() => showTreeOverlay(state)));
+  // Tree-lock semantics (owner 2026-08-09): a LOCKED handle's single click
+  // ONLY releases the lock (tree stays open, business as usual after);
+  // unlocked clicks toggle as before.
+  state.handleTree?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      if (state.treeLocked) {
+        setTreeLocked(state, false);
+        return;
+      }
+      showTreeOverlay(state);
+    }),
+  );
+  // Hold-to-lock (3s): pointerdown arms a charge (the handle glows while it
+  // fills); releasing or dragging early cancels and the normal click
+  // proceeds. At 3s the tree opens (if needed) and LOCKS to this page; the
+  // release click is swallowed via the same suppress used by drag-end.
+  {
+    let treeLockTimer = null;
+    let chargeStart = null;
+    const cancelCharge = () => {
+      if (treeLockTimer) {
+        clearTimeout(treeLockTimer);
+        treeLockTimer = null;
+      }
+      chargeStart = null;
+      state.handleTree?.removeAttribute("data-lock-charging");
+    };
+    state.handleTree?.addEventListener("pointerdown", (event) => {
+      if (state.treeLocked) return; // locked → next CLICK releases; no re-arm
+      cancelCharge();
+      chargeStart = { x: event.clientX, y: event.clientY };
+      state.handleTree.setAttribute("data-lock-charging", "true");
+      treeLockTimer = setTimeout(() => {
+        treeLockTimer = null;
+        state.handleTree?.removeAttribute("data-lock-charging");
+        showTreeOverlay(state, { toggle: false });
+        setTreeLocked(state, true);
+        state.suppressHandleClickUntil = Date.now() + 800;
+      }, 3000);
+    });
+    state.handleTree?.addEventListener("pointermove", (event) => {
+      // A hold is stationary — >6px of travel is a drag, not a lock intent.
+      if (!chargeStart) return;
+      const dx = event.clientX - chargeStart.x;
+      const dy = event.clientY - chargeStart.y;
+      if (dx * dx + dy * dy > 36) cancelCharge();
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((ev) =>
+      state.handleTree?.addEventListener(ev, cancelCharge),
+    );
+  }
+  // Auto-collapse (owner 2026-08-09): interacting with the PAGE closes the
+  // tree overlay — unless it's locked to this page. Capture-phase pointerdown
+  // so page-side stopPropagation can't defeat it. Events originating inside
+  // the overlay surface with the closed-shadow HOST in composedPath(), so one
+  // includes() check separates page from overlay; presses inside the tree
+  // IFRAME never reach this document (cross-origin), so using the tree can't
+  // collapse it.
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!isTreeOpen() || state.treeLocked) return;
+      if (event.composedPath().includes(state.host)) return;
+      hideTreeOverlay(state);
+    },
+    true,
+  );
   state.handlePanel?.addEventListener(
     "click",
     handleGuarded(() => {
@@ -4321,6 +4446,16 @@ async function initOverlay() {
   state.edgeTabOffset = domainMemory.edgeTabOffset ?? 0.5;
   state.flashcard.defaultDeckId = domainMemory.defaultDeckId || null;
   setSnap(state, domainMemory.snap || "right");
+
+  // Per-page tree lock (owner 2026-08-09): a lock persists across refresh —
+  // restore the locked-open tree for this exact page.
+  loadTreeLock()
+    .then((locked) => {
+      if (!locked) return;
+      setTreeLocked(state, true);
+      showTreeOverlay(state, { toggle: false });
+    })
+    .catch(() => {});
 
   // Pre-load local flashcard history so it's ready when the panel opens
   loadLocalFlashcardHistory(hostname).then((h) => { state.localFlashcards = h; }).catch(() => { state.localFlashcards = []; });
