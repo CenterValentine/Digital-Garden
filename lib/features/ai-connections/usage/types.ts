@@ -25,6 +25,8 @@ export interface UsageTokens {
   input?: number;
   output?: number;
   total?: number;
+  /** Cache-read/hit tokens (subset of input) when the provider reports them. */
+  cached?: number;
 }
 
 export interface ModelUsageRow {

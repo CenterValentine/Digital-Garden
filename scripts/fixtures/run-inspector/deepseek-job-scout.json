@@ -1,0 +1,784 @@
+{
+  "name": "deepseek-job-scout",
+  "description": "Prod failure 2026-08-08: DeepSeek V4 Flash job-screening run. Turn 1 ends mid-reasoning after 3 steps (legacy metadata frozen at request #1 claims tool-calls/659 tokens); turn 2 is a single-step pure-reasoning death at the 4096 output cap (finishReason length, nothing visible).",
+  "conversation": {
+    "id": "fixture-deepseek-job-scout",
+    "title": "Scraping and Processing Job Listings (distilled)"
+  },
+  "messages": [
+    {
+      "id": "ff6fd3c6-a667-4f77-a9bf-8bd5639855fe",
+      "role": "user",
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-flash",
+      "createdAt": "2026-08-08T08:21:35.584Z",
+      "parts": [
+        {
+          "data": {
+            "target": {
+              "mode": "chat"
+            }
+          },
+          "type": "data-output-target"
+        },
+        {
+          "text": "Run this @[Rapid Scout II - Shortlist unfiltered job posting pages](7ea01169-db79-4b90-86a7-95a8340d330c) playbook on each job and its description from this LinkedIn page.  To do this only scrape 10 jobs at a time until the list is exhauste…",
+          "type": "text"
+        }
+      ],
+      "metadata": null
+    },
+    {
+      "id": "0dec1b3c-a724-49af-a3d2-f1356ca86957",
+      "role": "assistant",
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-flash",
+      "createdAt": "2026-08-08T08:21:36.067Z",
+      "parts": [
+        {
+          "type": "step-start"
+        },
+        {
+          "text": "The user wants me to run the \"Rapid Scout II\" playbook on the LinkedIn page they're viewing (the AI Automation Engineer | Valsoft Corporation job search results page). They want me to:\n\n1. Scrape jobs in batches of 10 (they see ~25 listings…",
+          "type": "reasoning",
+          "state": "done"
+        },
+        {
+          "text": "I'll start by reading the playbook in full and the LinkedIn page you're viewing, so I have the exact steps and the job list.",
+          "type": "text",
+          "state": "done"
+        },
+        {
+          "type": "tool-getCurrentNote",
+          "input": {
+            "contentId": "7ea01169-db79-4b90-86a7-95a8340d330c"
+          },
+          "state": "output-available",
+          "output": "Title: Rapid Scout II - Shortlist unfiltered job posting pages\nType: note\nUpdated: 2026-08-08T07:49:46.468Z\nContent:\nThis document is the initial screening process in a line of work for applying for jobs and landing interviews for those job…",
+          "toolCallId": "call_00_13hzclEVSoc8CWFbJBnY9472"
+        },
+        {
+          "type": "tool-read_current_page",
+          "input": {
+            "purpose": "Get the list of job postings on this LinkedIn search results page, ~25 listings, with titles, companies, and URLs"
+          },
+          "state": "output-available",
+          "output": {
+            "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4389419040&eBP=CwEAAAGf4F-VZ9ymTijGfJUvTUeAu2XkKyEOjXKsRXS-qGZ8DxvizQlRw_0PjSHihbWAwgHxfDaCeNAlhBq7sOsIBqZ42qBdSF5ndnyJxFSd6v1VzISzwllmoGGIbCSc-CcjVU1vN2aCNeuIwVAn-qnvSeoDqaBZXbOnoP…",
+            "via": "current-tab",
+            "title": "AI Automation Engineer | Valsoft Corporation",
+            "untrustedWebContent": "About the jobDescriptionJoin the team transforming 150+ software companies with AIAbout ValsoftValsoft is a global firm that acquires and grows mission-critical vertical market software companies. Since 2015, we have built a portfolio of 15…"
+          },
+          "toolCallId": "call_01_5JJ3YXc3YxwFgFbY1OHk2992"
+        },
+        {
+          "type": "step-start"
+        },
+        {
+          "text": "Let me understand the situation:\n\n1. The playbook \"Rapid Scout II\" is a multi-phase procedure. Let me re-read it:\n   - Step 0: Record all jobs and their descriptions (batches of 10, up to 25 total, checkpoint/dedupe/record each batch)\n   - …",
+          "type": "reasoning",
+          "state": "done"
+        },
+        {
+          "text": "The playbook is loaded and I have the Valsoft job detail (that's the landing card on your page — I'll need the full list). This is a per-item iteration with the Rapid Scout II playbook applied to each job, in batches of 10 with checkpoints …",
+          "type": "text",
+          "state": "done"
+        },
+        {
+          "type": "tool-co_browse_open",
+          "input": {
+            "url": "https://www.linkedin.com/jobs/search-results/?keywords=Customer%20Support%20Automation%20Engineer&geoId=103644278&f_SAL=f_SA_id_225001%3A272001&currentJobId=4389419040",
+            "purpose": "Enumerate all ~25 job listings on this LinkedIn search results page (titles, companies, links) to run the Rapid Scout II playbook on each"
+          },
+          "state": "output-available",
+          "output": {
+            "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4389419040&keywords=Customer%20Support%20Automation%20Engineer&geoId=103644278&f_SAL=f_SA_id_225001%3A272001",
+            "tabId": 1392196630,
+            "trust": "untrusted-web",
+            "elements": [
+              {
+                "name": "0 notifications",
+                "role": "heading"
+              },
+              {
+                "name": "",
+                "role": "banner"
+              },
+              {
+                "name": "Skip to main content",
+                "role": "button"
+              },
+              {
+                "name": "LinkedIn",
+                "role": "button"
+              },
+              {
+                "name": "",
+                "role": "navigation"
+              },
+              {
+                "name": "Reactivate Premium: 50% Off",
+                "role": "link"
+              },
+              {
+                "name": "",
+                "role": "main"
+              },
+              {
+                "name": "Open panel and file tree",
+                "role": "button"
+              },
+              {
+                "name": "Open panel",
+                "role": "button"
+              },
+              {
+                "name": "Open file tree",
+                "role": "button"
+              },
+              {
+                "name": "Pin this page to the selected folder",
+                "role": "button"
+              },
+              {
+                "name": "Link this page to the open content",
+                "role": "button"
+              },
+              {
+                "name": "AI (coming soon)",
+                "role": "button"
+              },
+              {
+                "name": "Close jump menu",
+                "role": "button"
+              },
+              {
+                "name": "",
+                "role": "navigation"
+              },
+              {
+                "name": "",
+                "role": "status"
+              },
+              {
+                "name": "",
+                "role": "search"
+              },
+              {
+                "name": "Reactivate Premium: 50% Off",
+                "role": "link"
+              },
+              {
+                "name": "",
+                "role": "navigation"
+              },
+              {
+                "name": "Location United States",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Automation Specialist Closers.io United States (Remote) Dismiss Automation Specialist job $60K/yr - $60K/yr Actively reviewing applicants Posted 3 weeks ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Customer Support Automation Engineer (Verified job) WeSuite United States (Remote) Dismiss Customer Support Automation Engineer job Saved · Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Selected, AI Automation Engineer (Verified job) Valsoft Corporation United States (Remote) Dismiss AI Automation Engineer job Viewed · Posted 1 week ago",
+                "role": "button"
+              },
+              {
+                "name": "Customer Support Operations Intelligence Engineer Seeq Corporation United States (Remote) Dismiss Customer Support Operations Intelligence Engineer job $125K/yr - $170K/yr • 1 benefit Posted 3 months ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Digital Support Intelligent Automation Solutions Engineer (Verified job) Autodesk Arizona, United States (Remote) Dismiss Digital Support Intelligent Automation Solutions Engineer job 6 school alumni work here Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Automation Solutions Analyst (Verified job) SquareTrade Dallas, TX (Remote) Dismiss Automation Solutions Analyst job 401(k) benefit 1 school alumni works here Posted 2 weeks ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Stellar Virtual United States (Remote) Dismiss Systems Automations Engineer job 401(k) benefit Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Harvey United States (Remote) Dismiss Support Operations Engineer job Posted 1 week ago",
+                "role": "button"
+              },
+              {
+                "name": "Autodesk Florida, United States (Remote) Dismiss Digital Support Intelligent Automation Solutions Engineer job 6 school alumni work here Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "BILL California, United States (Remote) Dismiss Artificial Intelligence Automation Specialist job 401(k), +1 benefit 31 school alumni work here Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Figma United States (Remote) Dismiss Support Engineer, AI Infrastructure job Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Proofpoint Phoenix, AZ (Remote) Dismiss AI Integration Specialist - Customer Office job 17 school alumni work here Posted 5 days ago",
+                "role": "button"
+              },
+              {
+                "name": "Cresta United States (Remote) Dismiss Customer Engineer job Posted 6 days ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Proofpoint Maryland City, MD (Remote) Dismiss AI Integration Specialist - Customer Office job 17 school alumni work here Posted 6 days ago",
+                "role": "button"
+              },
+              {
+                "name": "BILL California, United States (Remote) Dismiss CXO Senior AI Automation Specialist job 401(k), +1 benefit 31 school alumni work here Posted 1 week ago",
+                "role": "button"
+              },
+              {
+                "name": "Seeq Corporation Washington, DC Dismiss Customer Support Operations Intelligence Engineer job 1 benefit Posted 3 months ago",
+                "role": "button"
+              },
+              {
+                "name": "Harvey United States (Remote) Dismiss Automation Engineer, Customer Education job Posted 2 days ago",
+                "role": "button"
+              },
+              {
+                "name": "Figma New York, NY Dismiss Support Engineer, AI Infrastructure job Posted 2 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Hatch United States (Remote) Dismiss Forward Deployed Engineer (Integration Engineer) job 401(k) benefit Posted 1 week ago",
+                "role": "button"
+              },
+              {
+                "name": "1mind United States (Remote) Dismiss Customer Solutions Engineer, AI Agents job $125K/yr - $220K/yr 2 school alumni work here Posted 3 weeks ago",
+                "role": "button"
+              },
+              {
+                "name": "Celigo United States (Remote) Dismiss Customer Experience Automation Manager job Actively reviewing applicants Posted 4 days ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Modern Family Law Virginia, United States (Remote) Dismiss AI Workflow Engineer/Automation Architect job $120K/yr - $135K/yr • 401(k) benefit 1 school alumni works here Posted 3 days ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Cresta United States (Remote) Dismiss Application Support Engineer job 1 benefit Saved · Posted 1 week ago",
+                "role": "button"
+              },
+              {
+                "name": "Augment United States (Remote) Dismiss Solutions Engineer job 1 school alumni works here Posted 1 month ago",
+                "role": "button"
+              },
+              {
+                "name": "Modern Family Law Washington, United States (Remote) Dismiss AI Workflow Engineer/Automation Architect job $130K/yr - $145K/yr • 401(k) benefit 1 school alumni works here Posted 3 days ago · Easy Apply",
+                "role": "button"
+              },
+              {
+                "name": "Are these results helpful?",
+                "role": "heading"
+              },
+              {
+                "name": "Share positive feedback",
+                "role": "button"
+              },
+              {
+                "name": "Share negative feedback",
+                "role": "link"
+              },
+              {
+                "name": "Reactivate Premium",
+                "role": "link"
+              },
+              {
+                "name": "Dismiss See jobs where you’re a top applicant",
+                "role": "button"
+              },
+              {
+                "name": "Next",
+                "role": "button"
+              },
+              {
+                "name": "For Business",
+                "role": "button",
+                "group": 1,
+                "expanded": false
+              },
+              {
+                "name": "Filter by Remote",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by Date posted",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Filter by SaaS",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by Cloud",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by Azure",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by API",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by IT Services",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by Easy Apply",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by Experience level",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Filter by Employment type",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Filter by Company",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Filter by Under 10 applicants",
+                "role": "radio"
+              },
+              {
+                "name": "Filter by In my network",
+                "role": "radio"
+              },
+              {
+                "name": "How promoted jobs are ranked",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Automation Specialist job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Support Automation Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss AI Automation Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Support Operations Intelligence Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Digital Support Intelligent Automation Solutions Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Automation Solutions Analyst job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Systems Automations Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Support Operations Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Digital Support Intelligent Automation Solutions Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Artificial Intelligence Automation Specialist job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Support Engineer, AI Infrastructure job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss AI Integration Specialist - Customer Office job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss AI Integration Specialist - Customer Office job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss CXO Senior AI Automation Specialist job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Support Operations Intelligence Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Automation Engineer, Customer Education job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Support Engineer, AI Infrastructure job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Forward Deployed Engineer (Integration Engineer) job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Solutions Engineer, AI Agents job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Customer Experience Automation Manager job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss AI Workflow Engineer/Automation Architect job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Application Support Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss Solutions Engineer job",
+                "role": "button"
+              },
+              {
+                "name": "Dismiss AI Workflow Engineer/Automation Architect job",
+                "role": "button"
+              },
+              {
+                "name": "About",
+                "role": "link"
+              },
+              {
+                "name": "Accessibility",
+                "role": "link"
+              },
+              {
+                "name": "Help Center",
+                "role": "link"
+              },
+              {
+                "name": "Privacy & Terms",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Ad Choices",
+                "role": "link"
+              },
+              {
+                "name": "Advertising",
+                "role": "link"
+              },
+              {
+                "name": "Business Services",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Get the LinkedIn app",
+                "role": "link"
+              },
+              {
+                "name": "More",
+                "role": "link"
+              },
+              {
+                "name": "Get job alerts for this search",
+                "role": "heading"
+              },
+              {
+                "name": "Tap to toggle setting",
+                "role": "switch"
+              },
+              {
+                "name": "Company, Valsoft Corporation.",
+                "role": "link"
+              },
+              {
+                "name": "More options",
+                "role": "button",
+                "expanded": false
+              },
+              {
+                "name": "Remote",
+                "role": "link"
+              },
+              {
+                "name": "Full-time",
+                "role": "link"
+              },
+              {
+                "name": "Apply on company website",
+                "role": "link"
+              },
+              {
+                "name": "Save the job",
+                "role": "button"
+              },
+              {
+                "name": "Reactivate Premium: 50% Off",
+                "role": "link"
+              },
+              {
+                "name": "Describe the job you want",
+                "role": "textbox",
+                "value": "Customer Support Automation Engineer remote"
+              },
+              {
+                "name": "Clear Selection",
+                "role": "button"
+              },
+              {
+                "name": "Home, 1 new notification",
+                "role": "button",
+                "group": 2
+              },
+              {
+                "name": "My Network, 3 new notifications",
+                "role": "link",
+                "group": 3
+              },
+              {
+                "name": "Jobs, 0 new notifications",
+                "role": "link",
+                "group": 4
+              },
+              {
+                "name": "Messaging, 1 new notification",
+                "role": "link",
+                "group": 5
+              },
+              {
+                "name": "Notifications, 24 new notifications",
+                "role": "link",
+                "group": 6
+              },
+              {
+                "name": "Me",
+                "role": "button",
+                "group": 7,
+                "expanded": false
+              },
+              {
+                "name": "Filter by Jobs",
+                "role": "radio"
+              },
+              {
+                "name": "Page 1",
+                "role": "button",
+                "group": 8
+              },
+              {
+                "name": "Page 2",
+                "role": "button",
+                "group": 9
+              },
+              {
+                "name": "Page 3",
+                "role": "button",
+                "group": 10
+              },
+              {
+                "name": "AI Automation Engineer",
+                "role": "link"
+              },
+              {
+                "name": "Verified job",
+                "role": "link"
+              },
+              {
+                "name": "About the job",
+                "role": "heading"
+              },
+              {
+                "name": "Unlock hiring insights on Valsoft Corporation",
+                "role": "heading"
+              },
+              {
+                "name": "Reactivate Premium",
+                "role": "link"
+              },
+              {
+                "name": "Remote",
+                "role": "checkbox"
+              },
+              {
+                "name": "Date posted",
+                "role": "checkbox"
+              },
+              {
+                "name": "SaaS",
+                "role": "checkbox"
+              },
+              {
+                "name": "Cloud",
+                "role": "checkbox"
+              },
+              {
+                "name": "Azure",
+                "role": "checkbox"
+              },
+              {
+                "name": "API",
+                "role": "checkbox"
+              },
+              {
+                "name": "IT Services",
+                "role": "checkbox"
+              },
+              {
+                "name": "Easy Apply",
+                "role": "checkbox"
+              },
+              {
+                "name": "Experience level",
+                "role": "checkbox"
+              },
+              {
+                "name": "Employment type",
+                "role": "checkbox"
+              },
+              {
+                "name": "Company",
+                "role": "checkbox"
+              },
+              {
+                "name": "Under 10 applicants",
+                "role": "checkbox"
+              },
+              {
+                "name": "In my network",
+                "role": "checkbox"
+              },
+              {
+                "name": "",
+                "role": "switch"
+              },
+              {
+                "name": "Unable to load your job match data",
+                "role": "button"
+              },
+              {
+                "name": "Unable to load your job match data",
+                "role": "link"
+              },
+              {
+                "name": "Jobs",
+                "role": "checkbox"
+              },
+              {
+                "name": "Valsoft Corporation",
+                "role": "link"
+              },
+              {
+                "name": "Show match details",
+                "role": "link",
+                "group": 11
+              }
+            ],
+            "elementCount": 145
+          },
+          "toolCallId": "call_00_Mfumas5qxgFDX7IfWTbX9815"
+        },
+        {
+          "type": "step-start"
+        },
+        {
+          "text": "The page has loaded. I can see ~25 job cards in the snapshot. Let me count the job buttons:\n\n1. Automation Specialist — Closers.io — United States (Remote) — $60K/yr — 3 weeks ago\n2. Customer Support Automation Engineer (Verified) — WeSuite…",
+          "type": "reasoning",
+          "state": "done"
+        }
+      ],
+      "metadata": {
+        "usage": {
+          "inputTokens": 28705,
+          "totalTokens": 29364,
+          "outputTokens": 659
+        },
+        "durationMs": 6244,
+        "modelRoute": {
+          "source": "default",
+          "modelId": "deepseek-v4-flash",
+          "providerId": "deepseek"
+        },
+        "finishReason": "tool-calls"
+      }
+    },
+    {
+      "id": "52c4f2c3-00c7-4f04-b4f8-1164c99c31ef",
+      "role": "user",
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-flash",
+      "createdAt": "2026-08-08T08:25:39.463Z",
+      "parts": [
+        {
+          "data": {
+            "target": {
+              "mode": "chat"
+            }
+          },
+          "type": "data-output-target"
+        },
+        {
+          "text": "Why did you stop?",
+          "type": "text"
+        }
+      ],
+      "metadata": null
+    },
+    {
+      "id": "e3f563cf-984c-46bf-a9a3-389bffb8b775",
+      "role": "assistant",
+      "providerId": "deepseek",
+      "modelId": "deepseek-v4-flash",
+      "createdAt": "2026-08-08T08:25:40.009Z",
+      "parts": [
+        {
+          "type": "step-start"
+        },
+        {
+          "text": "The user is asking why I stopped. Looking at my previous turn, I had just opened the co-browse tab and received the snapshot of the LinkedIn search results page with ~25 job listings. I was about to propose the item iteration, but I stopped…",
+          "type": "reasoning",
+          "state": "done"
+        }
+      ],
+      "metadata": {
+        "usage": {
+          "inputTokens": 42260,
+          "totalTokens": 46356,
+          "outputTokens": 4096
+        },
+        "durationMs": 36323,
+        "modelRoute": {
+          "source": "default",
+          "modelId": "deepseek-v4-flash",
+          "providerId": "deepseek"
+        },
+        "finishReason": "length"
+      }
+    }
+  ]
+}

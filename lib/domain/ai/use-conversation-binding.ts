@@ -30,6 +30,13 @@ import { clientLogger } from "@/lib/core/logger/client";
 import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
+// Usage, segments AND cost all fold in one place — turn-diagnostics owns
+// the per-request accumulator (it imports the client-safe pricing module
+// by direct path, never the Prisma-bearing ai-connections barrel).
+import {
+  mergeTurnUsageMetadata,
+  type TurnUsageAccum,
+} from "@/lib/domain/ai/turn-diagnostics";
 
 /**
  * Optional payload that flows through `persistRef.current(...)` to
@@ -48,126 +55,30 @@ export interface PersistFinishPayload {
   };
 }
 
+/**
+ * Plaintext cache of a message's text parts, for FTS and quick summaries.
+ * The server-persist path computes the same join; client-persisted rows
+ * historically sent nothing, leaving textCache null forever.
+ */
+function computeTextCache(parts: unknown): string | null {
+  if (!Array.isArray(parts)) return null;
+  const text = parts
+    .filter(
+      (p): p is { type: string; text: string } =>
+        !!p &&
+        typeof p === "object" &&
+        (p as { type?: unknown }).type === "text" &&
+        typeof (p as { text?: unknown }).text === "string",
+    )
+    .map((p) => p.text)
+    .join("\n");
+  return text || null;
+}
+
 interface MessageLike {
   id: string;
   role: string;
   parts: unknown;
-}
-
-/** Running turn totals for one assistant message (see mergeTurnUsageMetadata). */
-interface TurnUsageAccum {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  reasoningTokens: number;
-  cachedInputTokens: number;
-  durationMs: number;
-  requestCount: number;
-  finishReason?: string;
-  /**
-   * Signature of the last per-request metadata folded in — persistTurns can
-   * run repeatedly for the same finish event, and a repeat pass with
-   * unchanged metadata must not double-count.
-   */
-  lastRequestSig?: string;
-}
-
-interface RequestUsageSnapshot {
-  inputTokens: number;
-  outputTokens: number;
-  totalTokens: number;
-  reasoningTokens: number;
-  cachedInputTokens: number;
-  durationMs: number;
-  requestCount: number;
-  finishReason?: string;
-}
-
-function readUsageSnapshot(
-  metadata: Record<string, unknown> | undefined,
-): RequestUsageSnapshot | null {
-  if (!metadata) return null;
-  const usage = metadata.usage as Record<string, unknown> | undefined;
-  if (
-    usage === undefined &&
-    metadata.finishReason === undefined &&
-    metadata.durationMs === undefined
-  ) {
-    return null;
-  }
-  const num = (v: unknown) =>
-    typeof v === "number" && Number.isFinite(v) ? v : 0;
-  return {
-    inputTokens: num(usage?.inputTokens),
-    outputTokens: num(usage?.outputTokens),
-    totalTokens: num(usage?.totalTokens),
-    reasoningTokens: num(usage?.reasoningTokens),
-    cachedInputTokens: num(usage?.cachedInputTokens),
-    durationMs: num(metadata.durationMs),
-    // Merged blobs (persisted by this module) carry their own requestCount;
-    // raw per-request metadata from the SDK counts as one request.
-    requestCount: Math.max(1, num(metadata.requestCount) || 1),
-    finishReason:
-      typeof metadata.finishReason === "string"
-        ? metadata.finishReason
-        : undefined,
-  };
-}
-
-/**
- * Fold one finish-metadata blob into the per-turn accumulator and return the
- * metadata to persist: usage and duration SUMMED across every HTTP request of
- * the turn, finishReason from the TERMINAL request.
- *
- * Why: a turn with client-executed tools (browser reads, co-browse) spans
- * several requests, each emitting its own finish metadata. Persisting any
- * single request's values misreports the turn — the 2026-08-08 DeepSeek
- * failure was mis-diagnosed from metadata frozen at request #1
- * ("tool-calls", 659 tokens) while the terminal request actually died at the
- * output cap ("length", 4096 tokens).
- */
-function mergeTurnUsageMetadata(
-  accum: Map<string, TurnUsageAccum>,
-  messageId: string,
-  incoming: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  const request = readUsageSnapshot(incoming);
-  if (!request) return incoming;
-  const sig = JSON.stringify(request);
-  const entry: TurnUsageAccum = accum.get(messageId) ?? {
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    reasoningTokens: 0,
-    cachedInputTokens: 0,
-    durationMs: 0,
-    requestCount: 0,
-  };
-  if (entry.lastRequestSig !== sig) {
-    entry.inputTokens += request.inputTokens;
-    entry.outputTokens += request.outputTokens;
-    entry.totalTokens += request.totalTokens;
-    entry.reasoningTokens += request.reasoningTokens;
-    entry.cachedInputTokens += request.cachedInputTokens;
-    entry.durationMs += request.durationMs;
-    entry.requestCount += request.requestCount;
-    entry.lastRequestSig = sig;
-    if (request.finishReason) entry.finishReason = request.finishReason;
-  }
-  accum.set(messageId, entry);
-  return {
-    ...(incoming ?? {}),
-    usage: {
-      inputTokens: entry.inputTokens,
-      outputTokens: entry.outputTokens,
-      totalTokens: entry.totalTokens,
-      reasoningTokens: entry.reasoningTokens,
-      cachedInputTokens: entry.cachedInputTokens,
-    },
-    durationMs: entry.durationMs,
-    requestCount: entry.requestCount,
-    ...(entry.finishReason ? { finishReason: entry.finishReason } : {}),
-  };
 }
 
 interface UseConversationBindingParams {
@@ -437,6 +348,7 @@ export function useConversationBinding({
               usageAccumRef.current,
               m.id,
               m.metadata as Record<string, unknown>,
+              Array.isArray(m.parts) ? m.parts : [],
             );
           }
         }
@@ -563,6 +475,7 @@ export function useConversationBinding({
               usageAccumRef.current,
               m.id,
               requestMetadata,
+              Array.isArray(effectiveParts) ? effectiveParts : [],
             )
           : requestMetadata;
       if (savedIdsRef.current.has(m.id)) {
@@ -591,6 +504,7 @@ export function useConversationBinding({
               // (the bug that hid the 2026-08-08 "length" death).
               body: JSON.stringify({
                 parts: effectiveParts,
+                textCache: computeTextCache(effectiveParts),
                 ...(turnMetadata ? { metadata: turnMetadata } : {}),
               }),
             },
@@ -637,6 +551,7 @@ export function useConversationBinding({
               providerId: stamp.providerId,
               modelId: stamp.modelId,
               parts: partsToSave,
+              textCache: computeTextCache(partsToSave),
               metadata: turnMetadata ?? undefined,
             }),
           },

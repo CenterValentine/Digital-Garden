@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-07
+last_updated: 2026-08-08
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,18 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 8, 2026**: **AI Cost Metering** (branch `AI-sys-improve/cost-metering`, stacked on `feat/ai-harness-reliability`; typecheck/lint(151)/full-build green incl. new `ai:pricing:check` gate; owner smoke pending)
+
+Pricing engine v2 in `lib/features/ai-connections/usage/pricing.ts`: 5-vendor seed table verified against official pages (Anthropic, OpenAI gpt-5.6 family incl. cache-write + >272K tier, Gemini incl. >200K Pro tier, DeepSeek hit/miss, Kimi via family-prefix matching), `PRICING_VERSION` stamping, null-not-zero unpriced contract. Cost computed **per request** in the turn accumulator (`mergeTurnUsageMetadata`) and persisted in message metadata; Anthropic cache-write tokens captured via `providerMetadata` in the chat route. Surfaces: avatar-tooltip est. cost (priced / current-rates / n-a states), per-connection meters now prefer persisted costs + exact `modelRoute.connectionId` attribution, run-ledger token stamps carry `~$` estimates, `ConversationDetail.spend` cumulative (API only — header line deferred to the inspector work). Gate: `pnpm ai:pricing:check` (coverage + calculator fixtures) wired into `build`. See `work-tracking/COST-METERING-PLAN.md`.
+
+**August 8, 2026**: **AI Architecture Map + generated Capability Matrix** (branch `AI-sys-improve/architecture-map`, stacked on drift-gates PR #157; typecheck/lint/ai:drift:check/ai:matrix:check green)
+
+Two orientation docs for the AI subsystem: `core/AI-ARCHITECTURE.md` (hand-written, symbol-anchored — the multi-request turn lifecycle, the 6-rung model resolution ladder, the five parallel model tables and which code consumes each, tool assembly + the deliberately-narrow resume predicate, step-budget formulas, playbook injection modes, prompt-cache policy, and "changing things safely" checklists) and `core/AI-CAPABILITY-MATRIX.md` (**generated** by `pnpm ai:matrix` from `PROVIDER_CATALOG`/`CONNECTION_TEMPLATES`/`resolveModelTemperature`/`supportsOpenAIPromptCaching` + scanned route vendor sets — per-model ceilings, reasoning posture, native search/PDF/caching, adapter coverage; `pnpm ai:matrix:check` in build + ai-drift.yml keeps it from going stale).
+
+**August 8, 2026**: **AI Drift Gates — CI checks for the AI subsystem's parallel tables** (branch `AI-sys-improve/drift-gates`, stacked on `feat/ai-harness-reliability` PR #156; typecheck/lint/ai:drift:check green)
+
+New `pnpm ai:drift:check` (`scripts/validate-ai-drift.ts`) + path-filtered `ai-drift.yml` workflow + build-chain wiring. Five binary gates born from the 2026-08-08 prod DeepSeek failure: (1) model identity tables agree — direct-vendor template models must have `PROVIDER_CATALOG` entries (now load-bearing: output ceiling + reasoning config), contextWindows must match across files, `AIProviderId`/`AIModelId` unions and the settings enum must match the catalog, `MODEL_MAP` keys ⊆ union; (2) catalog completeness — every model has `maxOutput`, reasoning-capable models ≥16k floor; (3) every tool classified user-configurable (settings metadata) or `HARNESS_INTERNAL_TOOL_IDS`, with route cross-checks so the gate can't go stale; (4) prompt/description tool-name references resolve to real tools; (5) every `AdapterKind` has a resolver branch. First run caught **33 live drift findings**, all fixed in the same PR (haiku-4-5 + mistral/groq direct-API ids added to catalog, gemini/grok contextWindow reconciliation, two flashcard proposal tools restored to settings metadata). Plan: `work-tracking/AI-DRIFT-GATES-PLAN.md`.
 
 **August 7, 2026**: **Browser Extension V5 — Browser UI Overhaul** (Panel Overlay: tree-as-overlay, reclaimed sidebar, pin + link handles, slim panel chrome) (branch `feat/panel-tree-overlay`; ext 4.2.x → **5.0.0**; typecheck/lint(151)/extension-build gates green; owner-smoke-validated; PR #152)
 
