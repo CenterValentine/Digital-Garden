@@ -15,23 +15,23 @@ the full inventory.
 
 | Feature | Status | Notes | Code |
 |---|---|---|---|
-| Agentic chat engine | ✅ | Shared conversation engine across all chat surfaces; persisted conversations with associations to content | `lib/domain/ai/use-conversation-engine.ts` |
-| Server tool registry | ✅ | Editor, flashcard, and workflow tool families; client-safe metadata split (no Prisma in client bundle) | `lib/domain/ai/tools/` |
-| Output placement | ✅ | Canonical modules place agent output *into documents* — bot outputs nest under chats as movable references | `lib/domain/ai/output-target.ts`, `tools/output-placement.ts` |
 | Playbooks | ✅ | Notes/folders marked as reusable agent procedures; progressive-disclosure injection; `search_playbooks` discovery; checkpoint gating | `lib/domain/ai/playbooks/` |
-| Multi-model routing + fallback | ✅ | Per-feature routes, fallback chains, registry-authoritative model catalog, per-model constraints | `lib/domain/ai/features/`, `model-route-resolver.ts` |
-| Provider abstraction (BYOK) | ✅ | Dedicated factories: Anthropic · OpenAI · Google · Groq · Mistral · xAI · DeepSeek. Plus a generic OpenAI-compatible connection type for Moonshot (Kimi), Fireworks, Together, OpenRouter, Ollama, and any other OpenAI-compatible endpoint; encrypted key storage; env-key fallbacks | `lib/domain/ai/providers/` |
-| Resumable streaming | ✅ | SSE responses survive page reload mid-generation (Upstash-backed) | `lib/domain/ai/resumable/` |
-| Resource governance | ✅ / 🔭 | Shipped: per-run ledger, tool-output compaction, dangling-tool repair, prompt caching. Planned: enforced per-run token/step budgets | `run-ledger.ts`, `compact-tool-outputs.ts` |
 | Folder Studio (grounded learning) | ✅ | NotebookLM-parallel studio — grounded in a folder's *existing* notes (no separate source-curation step). Create shelf: reports, flashcards, mind maps, audio/video overviews, slide decks, infographics. Practice shelf: quizzes, oral exams, teach-it-back, study plans. Analyze shelf: glossaries, comparisons, prerequisites | `extensions/studio/` |
-| Folder assist | ✅ | AI operations over folder contents from the tree | `lib/domain/ai/folder-assist/` |
-| Chat contexts | ✅ | Custom-instruction presets per conversation | `app/api/ai/` + chat UI |
-| Follow-up suggestions | ✅ | Model-generated next-step chips after responses | `lib/domain/ai/follow-ups.ts` |
 | Text-to-speech | ✅ | TTS generation + stored catalog; read-aloud player for docs/selections; block-level `ttsSkip` | `lib/domain/ai/speech/` |
 | Speech-to-text | ✅ | Transcription pipeline | `lib/domain/ai/transcribe/` |
 | AI image generation | ✅ | Generate + store, gateway path, AI-mediated media injection into notes ("Add to…") | `lib/domain/ai/image/`, `app/api/ai/inject-media/` |
+| Agentic chat engine | ✅ | Shared conversation engine across all chat surfaces; persisted conversations with associations to content | `lib/domain/ai/use-conversation-engine.ts` |
+| Server tool registry | ✅ | Editor, flashcard, and workflow tool families; client-safe metadata split (no Prisma in client bundle) | `lib/domain/ai/tools/` |
+| Output placement | ✅ | Canonical modules place agent output *into documents* — bot outputs nest under chats as movable references | `lib/domain/ai/output-target.ts`, `tools/output-placement.ts` |
+| Provider abstraction (BYOK) | ✅ | Dedicated factories: Anthropic · OpenAI · Google · Groq · Mistral · xAI · DeepSeek. Plus a generic OpenAI-compatible connection type for Moonshot (Kimi), Fireworks, Together, OpenRouter, Ollama, and any other OpenAI-compatible endpoint; encrypted key storage; env-key fallbacks | `lib/domain/ai/providers/` |
 | Browser content acquisition | ✅ | Extension as acquisition provider: service-worker fetch → session-tab ladder; server-built trust envelope | `lib/domain/ai/acquisition/` |
+| Folder assist | ✅ | AI operations over folder contents from the tree | `lib/domain/ai/folder-assist/` |
+| Chat contexts | ✅ | Custom-instruction presets per conversation | `app/api/ai/` + chat UI |
+| Follow-up suggestions | ✅ | Model-generated next-step chips after responses | `lib/domain/ai/follow-ups.ts` |
+| Multi-model routing + fallback | ✅ | Per-feature routes, fallback chains, registry-authoritative model catalog, per-model constraints | `lib/domain/ai/features/`, `model-route-resolver.ts` |
 | Markdown source view | ✅ | Rich-text ⇄ markdown toggle with a self-verifying lossless serializer (deny-by-default, fenced fallback) + CI gate | editor source-view modules |
+| Resumable streaming | ✅ | SSE responses survive page reload mid-generation (Upstash-backed) | `lib/domain/ai/resumable/` |
+| Resource governance | ✅ / 🔭 | Shipped: per-run ledger, tool-output compaction, dangling-tool repair, prompt caching. Planned: enforced per-run token/step budgets | `run-ledger.ts`, `compact-tool-outputs.ts` |
 | MCP server + client | 🔭 | Design of record: [MCP-PLAN.md](notes-feature/work-tracking/MCP-PLAN.md) — read-only server first | — |
 | Conversation memory bank | 🔭 | Long-horizon memory across chat sessions | — |
 

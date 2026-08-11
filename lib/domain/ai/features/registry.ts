@@ -136,7 +136,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -148,7 +148,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -160,7 +160,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -172,7 +172,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      modelId: "claude-haiku-4-5",
     },
   },
   {
@@ -184,12 +184,33 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
     preferredCapabilities: ["low-cost"],
     defaultSuggestion: {
       presetId: "anthropic",
-      modelId: "claude-haiku-3-5",
+      // claude-haiku-3-5 retired 2026-02-19; 4.5 is the current cheap tier.
+      modelId: "claude-haiku-4-5",
     },
     settingsHref: {
       label: "Configure Studio defaults",
       href: "/settings/extensions/studio",
     },
+  },
+  {
+    // Signals tier of the AI-context engine (FOLDER-CONTEXT-CAPSULE-PLAN →
+    // D9/D10): gaps/misalignment generation for ENHANCED-mode nodes. STANDARD
+    // and below share the studio-metadata route. Unconfigured → the engine
+    // falls back to studio-metadata's model rather than silently skipping
+    // signals (sweep B6).
+    id: "ai-context-enhanced",
+    label: "AI Context — Enhanced Signals",
+    description:
+      "Generates the Signals section (gaps, ambiguities, directive misalignment) for folders and files set to Enhanced context mode. Negative-space reasoning — a mid-tier model pays off here; standard summaries stay on the Studio Context route.",
+    requiredCapabilities: ["text"],
+    preferredCapabilities: ["low-cost"],
+    defaultSuggestion: {
+      presetId: "anthropic",
+      modelId: "claude-haiku-4-5",
+    },
+    // Deliberately no settingsHref: this route card IS the enhanced tier's
+    // whole config (owner call 2026-08-06 — enhanced gets its own config,
+    // not a pointer into Studio defaults).
   },
   {
     id: "studio-generation",
@@ -224,7 +245,7 @@ export const FEATURE_REGISTRY: FeatureSpec[] = [
       "Playbook phases tagged `model: scout` — fast, low-cost research/gather/search work.",
     requiredCapabilities: ["text", "tools"],
     preferredCapabilities: ["low-cost"],
-    defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-3-5" },
+    defaultSuggestion: { presetId: "anthropic", modelId: "claude-haiku-4-5" },
   },
   {
     id: "role-analyst",

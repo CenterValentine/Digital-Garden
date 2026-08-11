@@ -15,7 +15,7 @@
 import { prisma } from "@/lib/database/client";
 import { getUserSettings } from "@/lib/features/settings";
 import { getStudioSettings } from "../settings";
-import { getGuidanceText } from "./metadata";
+import { getGuidanceText } from "@/lib/domain/ai-context/metadata";
 
 interface ToolPromptTemplate {
   /** Suggested artifact title; `{folder}` is replaced with the folder title. */

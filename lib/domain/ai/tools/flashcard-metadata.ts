@@ -15,6 +15,8 @@ export const FLASHCARD_TOOL_IDS = [
   "propose_deck",
   "propose_deck_with_cards",
   "propose_image_cards",
+  "propose_sound_id_cards",
+  "propose_cards_from_media",
 ] as const;
 
 export type FlashcardToolId = (typeof FLASHCARD_TOOL_IDS)[number];
@@ -49,5 +51,15 @@ export const FLASHCARD_TOOL_METADATA: Record<
     name: "Recommend Image Cards",
     description:
       "Propose up to 5 identification cards with AI-generated images on the front (plants, insects, code, etc.) — images are generated for preview before you confirm. Uses your image-generation provider.",
+  },
+  propose_sound_id_cards: {
+    name: "Recommend Sound-ID Cards",
+    description:
+      "Propose sound-identification cards (bird calls, instruments, engines) — commits as text prompts until a sound provider lands; the sound description is preserved",
+  },
+  propose_cards_from_media: {
+    name: "Recommend Cards from Attached Media",
+    description:
+      "Propose identification cards from images/audio you attached to the chat — your media on the front, the AI's identification on the back",
   },
 };

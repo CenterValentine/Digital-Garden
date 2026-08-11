@@ -38,6 +38,8 @@ export interface WikiLinkSuggestionItem {
   id: string;
   title: string;
   slug: string;
+  /** "note" (default) or "folder" — folders link to their capsule-backed view. */
+  contentType?: string;
 }
 
 interface WikiLinkListProps {
@@ -127,7 +129,14 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
                 <span className="truncate">{item.text}</span>
               </span>
             ) : (
-              item.title
+              <span className="flex items-center justify-between gap-2">
+                <span className="truncate">{item.title}</span>
+                {item.contentType === "folder" && (
+                  <span className="shrink-0 rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
+                    folder
+                  </span>
+                )}
+              </span>
             )}
           </button>
         ))}
@@ -169,8 +178,8 @@ export function createWikiLinkSuggestion(
     },
 
     render: () => {
-      let component: ReactRenderer<WikiLinkListRef>;
-      let popup: TippyInstance[];
+      let component: ReactRenderer<WikiLinkListRef> | undefined;
+      let popup: TippyInstance[] | undefined;
 
       return {
         onStart: (props) => {
@@ -194,25 +203,30 @@ export function createWikiLinkSuggestion(
           });
         },
 
+        // `component`/`popup` only exist once onStart has run — but the
+        // suggestion plugin can deliver onUpdate/onKeyDown before that
+        // (items() is async) or after onExit tore them down. Guard every
+        // access (live crash: "Cannot read properties of undefined
+        // (reading 'ref')" on a keydown that raced onStart).
         onUpdate(props) {
-          component.updateProps(props);
+          component?.updateProps(props);
 
           if (!props.clientRect) {
             return;
           }
 
-          popup[0].setProps({
+          popup?.[0]?.setProps({
             getReferenceClientRect: props.clientRect as GetReferenceClientRect,
           });
         },
 
         onKeyDown(props) {
           if (props.event.key === "Escape") {
-            popup[0].hide();
+            popup?.[0]?.hide();
             return true;
           }
 
-          return component.ref?.onKeyDown(props) ?? false;
+          return component?.ref?.onKeyDown(props) ?? false;
         },
 
         onExit() {

@@ -27,6 +27,13 @@ export function extractSearchTextFromTipTap(json: JSONContent): string {
     text += json.text;
   }
 
+  // Atomic inline nodes carry their human text in ATTRS, not text content —
+  // a text-only traversal renders each one as "" and silently drops it.
+  // That blinded getCurrentNote (which serves searchText to the AI) to every
+  // [[wiki-link]] in a note: a playbook's cross-references to its grounding
+  // docs vanished from what the model saw (2026-08-08 Rapid Scout run).
+  text += atomicInlineText(json);
+
   // Recursively extract from children
   if (json.content && Array.isArray(json.content)) {
     for (const child of json.content) {
@@ -43,6 +50,39 @@ export function extractSearchTextFromTipTap(json: JSONContent): string {
   }
 
   return text;
+}
+
+/**
+ * Render the attr-carried text of an atomic inline node ("" for other nodes).
+ * Wiki-links keep their `[[Target]]` / `[[Target|Display]]` syntax so the AI
+ * (and search) can see and follow the reference by title.
+ */
+function atomicInlineText(json: JSONContent): string {
+  const attrs = (json.attrs ?? {}) as Record<string, unknown>;
+  const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+  switch (json.type) {
+    case "wikiLink": {
+      const title = str(attrs.targetTitle);
+      if (!title) return "";
+      const display = str(attrs.displayText);
+      return display && display !== title
+        ? `[[${title}|${display}]]`
+        : `[[${title}]]`;
+    }
+    case "tag": {
+      const name = str(attrs.tagName);
+      return name ? `#${name}` : "";
+    }
+    case "personMention": {
+      const label = str(attrs.label);
+      return label ? `@${label}` : "";
+    }
+    case "inlineTimestamp":
+      return str(attrs.isoDate);
+    default:
+      return "";
+  }
 }
 
 /**

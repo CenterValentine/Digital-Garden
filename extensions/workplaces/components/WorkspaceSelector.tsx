@@ -1196,7 +1196,7 @@ export function WorkspaceSelector() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="inline-flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
             title={
               getWorkspaceDescription(activeWorkspace) || "Choose workspace"
             }
@@ -1406,7 +1406,7 @@ export function WorkspaceSelector() {
                           }}
                           className={`rounded p-0.5 opacity-0 transition-colors group-hover:opacity-100 group-focus:opacity-100 ${
                             isActive
-                              ? "text-white hover:bg-gold-primary/15 hover:text-white"
+                              ? "text-gray-600 dark:text-white hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
                               : "text-gray-500 hover:bg-red-500/10 hover:text-red-600"
                           }`}
                           aria-label={`Delete ${workspace.name}`}

@@ -27,6 +27,7 @@ function formatTokenCount(n: number): string {
 import { TargetFolderChip } from "../ai/TargetFolderChip";
 import { OutputTargetChip } from "../ai/OutputTargetChip";
 import { ChatInput } from "../ai/ChatInput";
+import { FolderContextChips } from "@/components/content/ai/FolderContextChips";
 import { FollowUpsStrip } from "../ai/FollowUpsStrip";
 import { ChatErrorBanner } from "../ai/ChatErrorBanner";
 import { MakeAndModelPicker } from "../ai/MakeAndModelPicker";
@@ -244,6 +245,8 @@ function ChatViewerInner({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    notifyMentionInserted,
+    folderGates,
     commandItems,
     activePlaybook,
     attachPlaybook,
@@ -908,6 +911,7 @@ function ChatViewerInner({
       />
 
       {/* Input — make/model picker lives inside the input frame footer */}
+      <FolderContextChips gates={folderGates} />
       <ChatInput
         value={input}
         onChange={setInput}
@@ -917,6 +921,7 @@ function ChatViewerInner({
         disabled={loadingInitial}
         placeholder="Continue the conversation..."
         onMentionSearch={handleMentionSearch}
+        onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}
         onAttachPlaybook={attachPlaybook}

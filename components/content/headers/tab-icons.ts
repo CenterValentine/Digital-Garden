@@ -5,6 +5,7 @@ import {
   FileText,
   Folder,
   MessageCircle,
+  MessagesSquare,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -29,6 +30,8 @@ export function getTabIcon(contentType: string | null): LucideIcon {
       return ExternalLink;
     case "chat":
       return MessageCircle;
+    case "dm-thread":
+      return MessagesSquare;
     default:
       return File;
   }

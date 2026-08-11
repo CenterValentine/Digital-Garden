@@ -15,6 +15,15 @@ export interface ToolExecuteContext {
   /** The content node being edited — required for editor tools */
   contentId?: string;
   /**
+   * Set by the chat route AFTER playbook resolution (attached or rooted
+   * execution) when a playbook's full body is already injected into the
+   * system prompt. getCurrentNote returns a short pointer for this id
+   * instead of re-sending the body — weak models re-read the playbook as a
+   * belt-and-braces habit (measured: 17k duplicate chars in one live run).
+   * The pointer is absence-safe: the source is re-injected every request.
+   */
+  activePlaybook?: { contentId: string; title: string };
+  /**
    * The bound Conversation entity id (sidebar multi-conv / full-page chat).
    * AI v3 core S3: lets tools associate created/read content with the
    * conversation (dual association — node + target folder).
@@ -34,7 +43,18 @@ export interface ToolExecuteContext {
    * Ledger. Scoped to ONE streamText call — the ledger's per-phase
    * deltas come from subtracting successive checkpoint stamps.
    */
-  runTokens?: { total: number };
+  runTokens?: {
+    total: number;
+    /** Input/output/cached split (cost metering) — lets ledger stamps carry $. */
+    input?: number;
+    output?: number;
+    cachedInput?: number;
+  };
+  /**
+   * The resolved model actually serving this request (bare id + vendor).
+   * Cost metering: ledger stamps price `runTokens` with this identity.
+   */
+  executedModel?: { modelId: string; vendorId: string };
   /**
    * The chat content node id when this chat is being viewed as a full-page
    * ChatViewer (i.e. the chat IS the open content, not the editor). Set

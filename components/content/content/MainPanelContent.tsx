@@ -13,6 +13,7 @@ import { usePathname } from "next/navigation";
 import { AlertTriangle, Code2, FileText } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
+import { DmThreadTab } from "@/components/client/inbox/DmThreadTab";
 import { clientLogger } from "@/lib/core/logger/client";
 import { tracedFetch } from "@/lib/core/logger/client-fetch";
 import { triggerBlobDownload } from "@/lib/core/download";
@@ -421,6 +422,21 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       setContentCustomIcon(null);
       setContentIconColor(null);
       setContentType("person-profile");
+      setOwnedByNote(null);
+      return;
+    }
+
+    // DM conversation opened as a content tab (dm:<threadId>). Synthetic id,
+    // no ContentNode fetch — DmThreadTab drives its own data from dm-store.
+    if (selectedContentId.startsWith("dm:")) {
+      setIsLoading(false);
+      setError(null);
+      setNoteContent(null);
+      setContentParentId(null);
+      setContentData(null);
+      setContentCustomIcon(null);
+      setContentIconColor(null);
+      setContentType("dm-thread");
       setOwnedByNote(null);
       return;
     }
@@ -1308,12 +1324,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         }
 
         type NoteItem = { id: string; title: string; slug: string; contentType: string };
+        // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
+        // wiki-link navigates to the folder and, in playbooks/chat, injects
+        // its context capsule like a chat mention.
         return ((result.data?.items as NoteItem[] | undefined) || [])
-          .filter((item) => item.contentType === 'note')
+          .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
           .map((item) => ({
             id: item.id,
             title: item.title,
             slug: item.slug,
+            contentType: item.contentType,
           }));
       } catch (err) {
         clientLogger.error({
@@ -2034,6 +2054,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         </div>
       </div>
     );
+  } else if (contentType === "dm-thread" && selectedContentId) {
+    contentElement = <DmThreadTab threadId={selectedContentId.slice(3)} />;
   } else if (ExtensionContentViewer && selectedContentId) {
     contentElement = (
       <ExtensionContentViewer

@@ -1,10 +1,10 @@
 /**
  * Agentic metadata service — the Context doc behind the Context tab.
  *
- * Ownership contract (frozen in types.ts): summary/structure are AI-owned and
- * regenerated freely; role-strategy is AI-PROPOSED (generation writes a
- * proposal, a human accepts or dismisses it); directives are human-owned and
- * never machine-written. Persistence is REST last-write-wins by design — this
+ * Ownership contract (frozen in types.ts): summary/structure/role-strategy/
+ * signals are AI-owned and regenerated freely (the role-strategy proposal
+ * flow was retired — plan D18); directives are human-owned and never
+ * machine-written. Persistence is REST last-write-wins by design — this
  * surface is deliberately NOT collaborative and never joins publishing,
  * export, or the collab schema.
  *
@@ -18,12 +18,15 @@ import { z } from "zod/v4";
 import type { JSONContent } from "@tiptap/core";
 import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
+import { ContextMode } from "@/lib/database/generated/prisma";
+import { explicitMode, resolveContextMode } from "./mode-resolve";
+import { markContextDirty } from "./context-dirty";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
-import type { MetadataSectionKind, MetadataSectionOwner } from "../types";
-import { METADATA_SECTION_OWNERS } from "../types";
+import type { MetadataSectionKind, MetadataSectionOwner } from "./types";
+import { METADATA_SECTION_OWNERS } from "./types";
 import { createSourceContentResolver } from "./source-resolver";
 
 // ── Shapes ────────────────────────────────────────────────────────────────
@@ -50,6 +53,10 @@ export interface MetadataView {
   stale: boolean;
   /** Privacy opt-out: AI context never reads this node. */
   optedOut: boolean;
+  /** Explicit per-node mode override; null = inherits (plan D6/D7). */
+  contextMode: ContextMode | null;
+  /** Effective mode after ancestor resolution — what the engine acts on. */
+  resolvedMode: ContextMode;
 }
 
 const SECTION_KINDS: MetadataSectionKind[] = [
@@ -57,6 +64,7 @@ const SECTION_KINDS: MetadataSectionKind[] = [
   "structure",
   "role-strategy",
   "directives",
+  "signals",
 ];
 
 // ── Restricted TipTap helpers (paragraphs only) ───────────────────────────
@@ -92,9 +100,13 @@ const SECTION_LABELS: Record<MetadataSectionKind, string> = {
   structure: "Structure",
   "role-strategy": "Role & Strategy",
   directives: "Directives",
+  signals: "Signals",
 };
 
 function buildDerivedText(sections: Record<MetadataSectionKind, string>): string {
+  // Signals ride along deliberately: a parent roll-up that reads a child's
+  // derived Context sees the child's gaps too, which is what lets root-level
+  // gap aggregation work compositionally.
   return SECTION_KINDS.filter((kind) => sections[kind].trim())
     .map((kind) => `## ${SECTION_LABELS[kind]}\n${sections[kind].trim()}`)
     .join("\n\n");
@@ -105,6 +117,12 @@ function buildDerivedText(sections: Record<MetadataSectionKind, string>): string
 interface StoredDoc {
   version: 1;
   sections: Partial<Record<MetadataSectionKind, JSONContent>>;
+  /**
+   * One-sentence index line for the parent capsule's child index (plan D3).
+   * Scalar, not a section: it never joins derivedText or the roll-up input —
+   * it exists purely so folder capsules don't truncate summaries crudely.
+   */
+  oneLiner?: string;
 }
 
 function readSections(tiptapJson: unknown): Record<MetadataSectionKind, string> {
@@ -116,8 +134,16 @@ function readSections(tiptapJson: unknown): Record<MetadataSectionKind, string> 
   return out;
 }
 
+/** The stored one-liner index line, if any (plan D3 — scalar, not a section). */
+export function readOneLiner(tiptapJson: unknown): string | null {
+  const doc = tiptapJson as StoredDoc | null;
+  const line = doc?.oneLiner;
+  return typeof line === "string" && line.trim() ? line.trim() : null;
+}
+
 function writeSections(
-  sections: Record<MetadataSectionKind, string>
+  sections: Record<MetadataSectionKind, string>,
+  oneLiner?: string | null
 ): StoredDoc {
   const stored: StoredDoc = { version: 1, sections: {} };
   for (const kind of SECTION_KINDS) {
@@ -125,6 +151,7 @@ function writeSections(
       stored.sections[kind] = textToFragment(sections[kind]);
     }
   }
+  if (oneLiner && oneLiner.trim()) stored.oneLiner = oneLiner.trim();
   return stored;
 }
 
@@ -190,7 +217,7 @@ export async function computeSourceHash(
         bodyHash: true,
         updatedAt: true,
         agenticMetadata: {
-          select: { summaryHash: true, contextOptOut: true },
+          select: { summaryHash: true, contextOptOut: true, contextMode: true },
         },
       },
       orderBy: { id: "asc" },
@@ -201,7 +228,7 @@ export async function computeSourceHash(
       children: children
         // Opted-out children are invisible to the roll-up, so they can't
         // churn the folder's staleness either.
-        .filter((c) => !c.agenticMetadata?.contextOptOut)
+        .filter((c) => explicitMode(c.agenticMetadata) !== ContextMode.OPT_OUT)
         .map((c) => ({
           id: c.id,
           title: c.title,
@@ -236,6 +263,7 @@ export async function getMetadataForNode(
   const record = await prisma.agenticMetadata.findUnique({
     where: { nodeId },
   });
+  const resolvedMode = await resolveContextMode(nodeId);
 
   if (!record) {
     return {
@@ -245,7 +273,9 @@ export async function getMetadataForNode(
       generatedAt: null,
       model: null,
       stale: false,
-      optedOut: false,
+      optedOut: resolvedMode === ContextMode.OPT_OUT,
+      contextMode: null,
+      resolvedMode,
     };
   }
 
@@ -262,46 +292,128 @@ export async function getMetadataForNode(
     stale:
       record.sourceContentHash !== null &&
       record.sourceContentHash !== currentHash,
-    optedOut: record.contextOptOut,
+    optedOut: resolvedMode === ContextMode.OPT_OUT,
+    contextMode: record.contextMode,
+    resolvedMode,
   };
 }
 
 /**
- * Toggle the privacy opt-out for one node. Opting out clears the dirty bit
- * (there is deliberately no work to do); opting back IN marks dirty so the
- * refresh engine re-covers the node on the next drain. Stored sections are
- * retained — the user can still read what was generated before opting out;
- * the flag stops all future READS of the content by the context system.
+ * Set (or clear, with null = inherit) a node's explicit context mode.
+ *
+ * One `$transaction` for the row write plus the subtree dirty-mark (sweep
+ * B3 — the old opt-out toggle wrote flags in two statements, letting a
+ * concurrent dirty-mark land between them). Side effects (plan D8):
+ *  - Any mode change marks the SUBTREE dirty so the next drain re-evaluates
+ *    every descendant under the new resolved mode — marking is free, damping
+ *    bounds the actual spend.
+ *  - OPT_OUT clears the node's own bit (there is deliberately no work to do)
+ *    and skips subtree marking (the subtree is shielded from scope anyway).
+ *  - Ancestors are re-marked after the transaction via markContextDirty —
+ *    a child's mode change alters what the parent roll-up may read.
+ * Stored sections are retained on OPT_OUT — the user can still read what was
+ * generated before opting out; the mode stops all future READS by the
+ * context system. Downgrade-from-ENHANCED signal pruning lands with signals
+ * themselves (Phase 2).
+ */
+export async function setContextMode(
+  userId: string,
+  nodeId: string,
+  mode: ContextMode | null
+): Promise<MetadataView | null> {
+  const node = await loadOwnedNode(userId, nodeId);
+  if (!node) return null;
+
+  const optedOut = mode === ContextMode.OPT_OUT;
+  const emptyDoc = writeSections(
+    readSections(null)
+  ) as unknown as Prisma.InputJsonValue;
+  const emptyMeta = defaultMeta() as unknown as Prisma.InputJsonValue;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.agenticMetadata.upsert({
+      where: { nodeId },
+      create: {
+        nodeId,
+        tiptapJson: emptyDoc,
+        sectionsMeta: emptyMeta,
+        derivedText: "",
+        contextMode: mode,
+        contextOptOut: optedOut,
+        contextDirty: !optedOut,
+      },
+      update: {
+        contextMode: mode,
+        contextOptOut: optedOut,
+        contextDirty: optedOut ? false : true,
+      },
+    });
+    if (!optedOut && node.contentType === "folder") {
+      // Subtree re-evaluation mark (bounded like every chain walk). Rows
+      // explicitly opted out keep their own shield.
+      await tx.$executeRaw`
+        WITH RECURSIVE sub AS (
+          SELECT id FROM "ContentNode" WHERE id = ${nodeId}::uuid
+          UNION
+          SELECT c.id FROM "ContentNode" c JOIN sub s ON c."parentId" = s.id
+        )
+        UPDATE "AgenticMetadata"
+        SET "contextDirty" = true
+        WHERE "nodeId" IN (SELECT id FROM sub LIMIT 400)
+          AND "contextOptOut" = false
+          AND ("contextMode" IS NULL OR "contextMode" <> 'OPT_OUT')
+      `;
+    }
+  });
+
+  // Ancestor chain re-mark (outside the transaction by design — it swallows
+  // its own failures and must never roll back the mode write).
+  await markContextDirty([node.id]);
+
+  // Prune-on-downgrade (plan D8): a stale gaps list nobody maintains is
+  // worse than none, and it would ride into every capsule. Applies to this
+  // node only — descendants prune at their own next write via the B8
+  // write-time re-check.
+  if ((await resolveContextMode(nodeId)) !== ContextMode.ENHANCED) {
+    const record = await prisma.agenticMetadata.findUnique({
+      where: { nodeId },
+    });
+    if (record) {
+      const sections = readSections(record.tiptapJson);
+      if (sections.signals.trim()) {
+        sections.signals = "";
+        await upsertRecord(nodeId, sections, {
+          ...defaultMeta(),
+          ...(record.sectionsMeta as SectionsMeta),
+        }, {
+          sourceContentHash: record.sourceContentHash,
+          model: record.model,
+          generatedAt: record.generatedAt,
+          summaryHash: record.summaryHash,
+          contextDirty: record.contextDirty,
+          oneLiner: readOneLiner(record.tiptapJson),
+        });
+      }
+    }
+  }
+
+  return getMetadataForNode(userId, nodeId);
+}
+
+/**
+ * Legacy boolean toggle — thin wrapper over setContextMode so both surfaces
+ * share one write path (and the old two-statement race is gone).
  */
 export async function setContextOptOut(
   userId: string,
   nodeId: string,
   optedOut: boolean
 ): Promise<MetadataView | null> {
-  const node = await loadOwnedNode(userId, nodeId);
-  if (!node) return null;
-
-  const record = await prisma.agenticMetadata.findUnique({ where: { nodeId } });
-  if (record) {
-    await prisma.agenticMetadata.update({
-      where: { nodeId },
-      data: { contextOptOut: optedOut, contextDirty: optedOut ? false : true },
-    });
-  } else {
-    const sections = readSections(null);
-    await upsertRecord(nodeId, sections, defaultMeta(), {
-      sourceContentHash: null,
-      model: null,
-      generatedAt: null,
-      summaryHash: null,
-      contextDirty: !optedOut,
-    });
-    await prisma.agenticMetadata.update({
-      where: { nodeId },
-      data: { contextOptOut: optedOut },
-    });
-  }
-  return getMetadataForNode(userId, nodeId);
+  return setContextMode(
+    userId,
+    nodeId,
+    optedOut ? ContextMode.OPT_OUT : null
+  );
 }
 
 export class StudioContextOptedOutError extends Error {
@@ -335,50 +447,7 @@ export async function saveDirectives(
     generatedAt: record?.generatedAt ?? null,
     summaryHash: record?.summaryHash ?? null,
     contextDirty: record?.contextDirty ?? false,
-  });
-  return getMetadataForNode(userId, nodeId);
-}
-
-/** Accept or dismiss the pending Role & Strategy proposal. */
-export async function resolveRoleStrategyProposal(
-  userId: string,
-  nodeId: string,
-  action: "accept" | "dismiss"
-): Promise<MetadataView | null> {
-  const node = await loadOwnedNode(userId, nodeId);
-  if (!node) return null;
-
-  const record = await prisma.agenticMetadata.findUnique({ where: { nodeId } });
-  if (!record) return getMetadataForNode(userId, nodeId);
-
-  const sections = readSections(record.tiptapJson);
-  const meta: SectionsMeta = {
-    ...defaultMeta(),
-    ...(record.sectionsMeta as SectionsMeta),
-  };
-  const rs = meta["role-strategy"] ?? { owner: "ai-proposed" as const };
-
-  if (action === "accept" && rs.proposal) {
-    sections["role-strategy"] = rs.proposal;
-    meta["role-strategy"] = {
-      owner: "ai-proposed",
-      generatedAt: new Date().toISOString(),
-      model: rs.model,
-    };
-  } else {
-    meta["role-strategy"] = {
-      owner: "ai-proposed",
-      generatedAt: rs.generatedAt,
-      model: rs.model,
-    };
-  }
-
-  await upsertRecord(nodeId, sections, meta, {
-    sourceContentHash: record.sourceContentHash,
-    model: record.model,
-    generatedAt: record.generatedAt,
-    summaryHash: record.summaryHash,
-    contextDirty: record.contextDirty,
+    oneLiner: readOneLiner(record?.tiptapJson),
   });
   return getMetadataForNode(userId, nodeId);
 }
@@ -404,6 +473,11 @@ export async function getGuidanceText(nodeId: string): Promise<{
 
 // ── Generation ────────────────────────────────────────────────────────────
 
+export const ONE_LINER_DESC =
+  "ONE sentence, under 120 characters, naming what this item is — rendered as its line in the parent folder's index.";
+export const SIGNALS_DESC =
+  "Gaps, ambiguities, and misalignments worth flagging: what seems missing given this item's apparent purpose, what is ambiguous, and any tension between the user's directives and the actual content. Short lines, hedged appropriately. Empty string when nothing is worth flagging.";
+
 const GeneratedSectionsSchema = z.object({
   summary: z
     .string()
@@ -415,6 +489,7 @@ const GeneratedSectionsSchema = z.object({
     .describe(
       "How the content is organized — main parts/headings and their flow, as short lines."
     ),
+  oneLiner: z.string().min(1).describe(ONE_LINER_DESC),
   roleStrategy: z
     .string()
     .min(1)
@@ -422,6 +497,41 @@ const GeneratedSectionsSchema = z.object({
       "The operation this content appears to serve, the strategy it advances, and how it relates to its sibling content. 2-3 sentences, hedged appropriately."
     ),
 });
+
+const EnhancedGeneratedSectionsSchema = GeneratedSectionsSchema.extend({
+  signals: z.string().describe(SIGNALS_DESC),
+});
+
+/**
+ * Model route for context generation. ENHANCED nodes use the dedicated
+ * `ai-context-enhanced` route; when it is unconfigured we FALL BACK to the
+ * standard `studio-metadata` route rather than silently skipping signals
+ * (sweep B6) — the rail surfaces "configure enhanced route" separately.
+ */
+export async function resolveContextGenerationRoute(
+  userId: string,
+  enhanced: boolean
+): Promise<{
+  route: NonNullable<Awaited<ReturnType<typeof resolvePrimaryRoute>>>;
+  enhancedFellBack: boolean;
+} | null> {
+  if (enhanced) {
+    const enhancedRoute = await resolvePrimaryRoute(userId, "ai-context-enhanced");
+    if (enhancedRoute) return { route: enhancedRoute, enhancedFellBack: false };
+    const standard = await resolvePrimaryRoute(userId, "studio-metadata");
+    if (!standard) return null;
+    logger.warn({
+      layer: "ai",
+      event: "ai_context:enhanced_route_fallback",
+      summary:
+        "ai-context-enhanced route unconfigured — signals generating on the standard route's model",
+      attrs: { userId },
+    });
+    return { route: standard, enhancedFellBack: true };
+  }
+  const route = await resolvePrimaryRoute(userId, "studio-metadata");
+  return route ? { route, enhancedFellBack: false } : null;
+}
 
 export class StudioModelUnavailableError extends Error {
   constructor() {
@@ -447,14 +557,14 @@ export async function generateMetadataForNode(
   const node = await loadOwnedNode(userId, nodeId);
   if (!node) return null;
 
-  const existing = await prisma.agenticMetadata.findUnique({
-    where: { nodeId },
-    select: { contextOptOut: true },
-  });
-  if (existing?.contextOptOut) throw new StudioContextOptedOutError();
+  // Resolution covers inherited opt-out too (an ancestor's shield applies).
+  const resolvedMode = await resolveContextMode(nodeId);
+  if (resolvedMode === ContextMode.OPT_OUT) throw new StudioContextOptedOutError();
+  const enhanced = resolvedMode === ContextMode.ENHANCED;
 
-  const route = await resolvePrimaryRoute(userId, "studio-metadata");
-  if (!route) throw new StudioModelUnavailableError();
+  const routing = await resolveContextGenerationRoute(userId, enhanced);
+  if (!routing) throw new StudioModelUnavailableError();
+  const { route } = routing;
   const model = await resolveChatModelFromConnection(
     route.connection,
     route.modelId
@@ -468,6 +578,9 @@ export async function generateMetadataForNode(
   };
 
   const sourceText = await assembleSourceText(node);
+  // B1: hash the inputs BEFORE the LLM call — this is the hash the generated
+  // sections actually correspond to (write-time revalidation happens below).
+  const sourceHashAtRead = await computeSourceHash(node);
   const promptLines = [
     `You maintain a working "Context" document about one item in a user's knowledge base.`,
     `Item: "${node.title}" (type: ${node.contentType})`,
@@ -475,44 +588,84 @@ export async function generateMetadataForNode(
     existingSections.directives.trim()
       ? `The user's standing directives about this item (follow them):\n${existingSections.directives.trim()}`
       : "",
+    enhanced && existingSections["role-strategy"].trim()
+      ? `Accepted Role & Strategy for this item (flag any misalignment with the actual content in your signals):\n${existingSections["role-strategy"].trim()}`
+      : "",
     "",
     "Content:",
     sourceText || "(no extractable text — describe what can be inferred from the title and type alone, and say so)",
   ].filter(Boolean);
+  const prompt = promptLines.join("\n");
 
   // temperature 0 across the metadata lane: greedy decoding keeps outputs
   // stable on unchanged inputs, which is what makes output-hash damping
   // (summaryHash comparison) meaningful rather than sampling noise.
-  const { object } = await generateObject({
-    model,
-    schema: GeneratedSectionsSchema,
-    prompt: promptLines.join("\n"),
-    temperature: 0,
-  });
+  let generated: {
+    summary: string;
+    structure: string;
+    oneLiner: string;
+    roleStrategy: string;
+    signals?: string;
+  };
+  if (enhanced) {
+    const { object } = await generateObject({
+      model,
+      schema: EnhancedGeneratedSectionsSchema,
+      prompt,
+      temperature: 0,
+    });
+    generated = object;
+  } else {
+    const { object } = await generateObject({
+      model,
+      schema: GeneratedSectionsSchema,
+      prompt,
+      temperature: 0,
+    });
+    generated = object;
+  }
 
   const now = new Date();
   const stamp = { generatedAt: now.toISOString(), model: route.modelId };
 
   const sections = { ...existingSections };
-  sections.summary = object.summary;
-  sections.structure = object.structure;
+  sections.summary = generated.summary;
+  sections.structure = generated.structure;
   meta.summary = { owner: "ai", ...stamp };
   meta.structure = { owner: "ai", ...stamp };
-  meta["role-strategy"] = {
-    owner: "ai-proposed",
-    generatedAt: meta["role-strategy"]?.generatedAt,
-    model: meta["role-strategy"]?.model,
-    proposal: object.roleStrategy,
-    proposedAt: now.toISOString(),
-  };
+  // Role & Strategy writes directly — the accept/dismiss proposal flow was
+  // retired (owner call 2026-08-06): the AI's read is applied as-is.
+  sections["role-strategy"] = generated.roleStrategy;
+  meta["role-strategy"] = { owner: "ai", ...stamp };
 
-  const sourceContentHash = await computeSourceHash(node);
+  // B8 write-time mode re-check: a downgrade that landed during the LLM call
+  // must not re-plant signals — and any leftover signals from a prior
+  // ENHANCED life are pruned on regeneration under a lower mode.
+  const modeAtWrite = await resolveContextMode(nodeId);
+  if (modeAtWrite === ContextMode.ENHANCED && generated.signals !== undefined) {
+    sections.signals = generated.signals;
+    meta.signals = { owner: "ai", ...stamp };
+  } else {
+    sections.signals = "";
+  }
+
+  // Write-time revalidation (sweep B1): an edit that landed during the LLM
+  // call must keep the node dirty — see applyGeneratedSections for the full
+  // rationale.
+  const live = await prisma.contentNode.findUnique({
+    where: { id: nodeId },
+    select: { title: true, bodyHash: true, updatedAt: true },
+  });
+  const sourceHashAtWrite = await computeSourceHash(
+    live ? { ...node, ...live } : node
+  );
   await upsertRecord(nodeId, sections, meta, {
-    sourceContentHash,
+    sourceContentHash: sourceHashAtRead,
     model: route.modelId,
     generatedAt: now,
     summaryHash: hashAiSections(sections.summary, sections.structure),
-    contextDirty: false,
+    contextDirty: sourceHashAtWrite !== sourceHashAtRead,
+    oneLiner: generated.oneLiner,
   });
 
   logger.info({
@@ -538,7 +691,7 @@ export async function assembleSourceText(node: {
         title: true,
         contentType: true,
         agenticMetadata: {
-          select: { derivedText: true, contextOptOut: true },
+          select: { derivedText: true, contextOptOut: true, contextMode: true },
         },
       },
       orderBy: { displayOrder: "asc" },
@@ -546,7 +699,7 @@ export async function assembleSourceText(node: {
     // Privacy: opted-out children are excluded entirely — not even their
     // titles reach the roll-up prompt.
     const visible = children.filter(
-      (child) => !child.agenticMetadata?.contextOptOut
+      (child) => explicitMode(child.agenticMetadata) !== ContextMode.OPT_OUT
     );
     if (visible.length === 0) return "";
     return visible
@@ -580,9 +733,14 @@ async function upsertRecord(
     generatedAt: Date | null;
     summaryHash: string | null;
     contextDirty: boolean;
+    /** Index line for parent capsules; pass the preserved value on non-generation writes. */
+    oneLiner: string | null;
   }
 ): Promise<void> {
-  const tiptapJson = writeSections(sections) as unknown as Prisma.InputJsonValue;
+  const tiptapJson = writeSections(
+    sections,
+    fields.oneLiner
+  ) as unknown as Prisma.InputJsonValue;
   const sectionsMeta = meta as unknown as Prisma.InputJsonValue;
   const derivedText = buildDerivedText(sections);
 
@@ -617,8 +775,26 @@ function hashAiSections(summary: string, structure: string): string {
  */
 export async function getStoredAiSections(
   nodeIds: string[]
-): Promise<Map<string, { summary: string; structure: string }>> {
-  const out = new Map<string, { summary: string; structure: string }>();
+): Promise<
+  Map<
+    string,
+    {
+      summary: string;
+      structure: string;
+      oneLiner: string | null;
+      signals: string;
+    }
+  >
+> {
+  const out = new Map<
+    string,
+    {
+      summary: string;
+      structure: string;
+      oneLiner: string | null;
+      signals: string;
+    }
+  >();
   if (nodeIds.length === 0) return out;
   const records = await prisma.agenticMetadata.findMany({
     where: { nodeId: { in: nodeIds } },
@@ -629,6 +805,8 @@ export async function getStoredAiSections(
     out.set(record.nodeId, {
       summary: sections.summary,
       structure: sections.structure,
+      oneLiner: readOneLiner(record.tiptapJson),
+      signals: sections.signals,
     });
   }
   return out;
@@ -647,20 +825,81 @@ export async function getStoredAiSections(
  */
 export async function applyGeneratedSections(
   node: MetadataNodeShape,
-  generated: { summary: string; structure: string },
-  modelId: string
+  generated: {
+    summary: string;
+    structure: string;
+    oneLiner?: string;
+    signals?: string;
+  },
+  modelId: string,
+  sourceHashAtRead: string
 ): Promise<{ changed: boolean }> {
   const record = await prisma.agenticMetadata.findUnique({
     where: { nodeId: node.id },
   });
   const newSummaryHash = hashAiSections(generated.summary, generated.structure);
-  const sourceContentHash = await computeSourceHash(node);
+
+  // B8 write-time mode re-check: signals persist only while the node is
+  // ENHANCED at the moment of the write — a mid-flight downgrade must not
+  // re-plant a pruned section.
+  const modeAtWrite = await resolveContextMode(node.id);
+  const signalsAllowed = modeAtWrite === ContextMode.ENHANCED;
+
+  // Write-time revalidation (plan → sweep B1): re-fetch the node and recompute
+  // the source hash NOW. The in-memory `node` carries READ-time fields, so a
+  // fresh fetch is what detects an edit that landed during the LLM call. On a
+  // mismatch the dirty bit stays SET (the next drain re-runs) and we store the
+  // READ-time hash, keeping the stale detector honest about which content
+  // these sections actually reflect. Clearing unconditionally here was a
+  // lost-update race: the mid-flight edit's mark got erased and the node
+  // looked clean while its context was stale.
+  const live = await prisma.contentNode.findUnique({
+    where: { id: node.id },
+    select: { title: true, bodyHash: true, updatedAt: true },
+  });
+  const sourceHashAtWrite = await computeSourceHash(
+    live ? { ...node, ...live } : node
+  );
+  const contextDirty = sourceHashAtWrite !== sourceHashAtRead;
 
   if (record && record.summaryHash === newSummaryHash) {
-    await prisma.agenticMetadata.update({
-      where: { nodeId: node.id },
-      data: { sourceContentHash, contextDirty: false },
-    });
+    // Damped on summary/structure — but oneLiner/signals may still have
+    // moved (they are excluded from the damping hash so meaning-neutral
+    // wording tweaks in them never cascade upward). Side-write them when
+    // they differ; the cascade still stops here (changed: false).
+    const sections = readSections(record.tiptapJson);
+    const storedOneLiner = readOneLiner(record.tiptapJson);
+    const nextOneLiner = generated.oneLiner?.trim() || storedOneLiner;
+    const nextSignals = signalsAllowed
+      ? (generated.signals ?? sections.signals)
+      : "";
+    if (nextOneLiner !== storedOneLiner || nextSignals !== sections.signals) {
+      const meta: SectionsMeta = {
+        ...defaultMeta(),
+        ...(record.sectionsMeta as SectionsMeta),
+      };
+      if (signalsAllowed && nextSignals !== sections.signals) {
+        meta.signals = {
+          owner: "ai",
+          generatedAt: new Date().toISOString(),
+          model: modelId,
+        };
+      }
+      sections.signals = nextSignals;
+      await upsertRecord(node.id, sections, meta, {
+        sourceContentHash: sourceHashAtRead,
+        model: record.model,
+        generatedAt: record.generatedAt,
+        summaryHash: record.summaryHash,
+        contextDirty,
+        oneLiner: nextOneLiner,
+      });
+    } else {
+      await prisma.agenticMetadata.update({
+        where: { nodeId: node.id },
+        data: { sourceContentHash: sourceHashAtRead, contextDirty },
+      });
+    }
     return { changed: false };
   }
 
@@ -675,13 +914,21 @@ export async function applyGeneratedSections(
   sections.structure = generated.structure;
   meta.summary = { owner: "ai", ...stamp };
   meta.structure = { owner: "ai", ...stamp };
+  if (signalsAllowed && generated.signals !== undefined) {
+    sections.signals = generated.signals;
+    meta.signals = { owner: "ai", ...stamp };
+  } else if (!signalsAllowed) {
+    sections.signals = "";
+  }
 
   await upsertRecord(node.id, sections, meta, {
-    sourceContentHash,
+    sourceContentHash: sourceHashAtRead,
     model: modelId,
     generatedAt: now,
     summaryHash: newSummaryHash,
-    contextDirty: false,
+    contextDirty,
+    oneLiner:
+      generated.oneLiner?.trim() || readOneLiner(record?.tiptapJson ?? null),
   });
   return { changed: true };
 }

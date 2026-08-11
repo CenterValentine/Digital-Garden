@@ -33,6 +33,51 @@ function propValue(node, name) {
   return p && p.value ? p.value.value : undefined;
 }
 
+// A link's destination, from the AX tree's `url` property. This is the one
+// datum that makes list-page enumeration REAL: propose_item_iteration wants a
+// per-item URL, and without hrefs in the snapshot a model "helpfully"
+// fabricates them by incrementing ids (observed live: sequential
+// /jobs/view/438941904x URLs, all nonexistent). Tracking-bloated URLs get
+// their query stripped rather than truncated — a cut URL is a fabricated URL.
+const MAX_HREF_LENGTH = 600; // matches the iteration tool's url cap
+// Known tracking params, stripped before hrefs reach the model (S7-C1) —
+// mirrors stripTrackingParams in the app's co-browse-tools.ts. Functional
+// params (LinkedIn currentJobId etc.) are preserved.
+const TRACKING_PARAMS = new Set([
+  "eBP", "trackingId", "refId", "origin", "originToLandingJobPostings",
+  "gclid", "fbclid", "mc_cid", "mc_eid", "igshid", "_hsenc", "_hsmi",
+  "vero_id", "ref_src",
+]);
+function stripTracking(raw) {
+  try {
+    const u = new URL(raw);
+    let changed = false;
+    for (const key of [...u.searchParams.keys()]) {
+      if (TRACKING_PARAMS.has(key) || key.startsWith("utm_")) {
+        u.searchParams.delete(key);
+        changed = true;
+      }
+    }
+    return changed ? u.toString() : raw;
+  } catch {
+    return raw;
+  }
+}
+function linkHref(node, role) {
+  if (role !== "link") return undefined;
+  const rawValue = propValue(node, "url");
+  if (typeof rawValue !== "string" || !rawValue) return undefined;
+  const raw = stripTracking(rawValue);
+  if (raw.length <= MAX_HREF_LENGTH) return raw;
+  try {
+    const u = new URL(raw);
+    const bare = `${u.origin}${u.pathname}`;
+    return bare.length <= MAX_HREF_LENGTH ? bare : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 // Compact one AX node to the fields targeting + the band-aids need.
 function normalize(node) {
   const role = node.role && node.role.value;
@@ -42,6 +87,7 @@ function normalize(node) {
   if (!interactable && !ORIENTATION_ROLES.has(role)) return null;
 
   const expanded = propValue(node, "expanded"); // true | false | undefined
+  const href = linkHref(node, role);
   return {
     // The stable handle every later slice resolves through (getBoxModel /
     // scrollIntoViewIfNeeded / getNodeForLocation).
@@ -49,6 +95,7 @@ function normalize(node) {
     role,
     name,
     ...(node.value && node.value.value ? { value: node.value.value } : {}),
+    ...(href ? { href } : {}),
     // Accordion/disclosure state — a PROPERTY read, not a pixel heuristic. Drives
     // the expand-collapsed pre-scrape pass (Slice 3d).
     ...(expanded === true || expanded === false ? { expanded } : {}),
@@ -139,7 +186,43 @@ export function detectChallenges() {
   return { captchaDetected: frames.length > 0, frames };
 }
 
-async function collectFrame(out, groupState, sessionId, frameUrl) {
+// The extension's own overlay (jump menu, panel toggles, pin/link buttons) is
+// page chrome WE inject — it must never enter the agent's perception. It read
+// as page UI in a live run ("Open panel and file tree", "Pin this page to the
+// selected folder" in a LinkedIn snapshot), inviting the model to act on our
+// own controls. Resolve the host's backendNodeId so its whole AX subtree can
+// be dropped. Top frame only — the overlay is a top-document content script.
+const OVERLAY_HOST_SELECTOR = "#dg-browser-overlay-root";
+async function overlayBackendNodeId() {
+  try {
+    const doc = await send("DOM.getDocument", { depth: 1 });
+    const q = await send("DOM.querySelector", {
+      nodeId: doc.root.nodeId,
+      selector: OVERLAY_HOST_SELECTOR,
+    });
+    if (!q || !q.nodeId) return undefined;
+    const d = await send("DOM.describeNode", { nodeId: q.nodeId });
+    return d && d.node ? d.node.backendNodeId : undefined;
+  } catch {
+    return undefined; // best-effort — a missing overlay just means nothing to drop
+  }
+}
+
+// Extension-owned UI frames: the embedded app surfaces the overlay mounts
+// (/embed/panel, /embed/tree, /embed/content/...) and any chrome-extension://
+// page. They are OUR UI, not page content — perceiving them lets the agent
+// "read" the user's own Digital Garden through the co-browse tab.
+function isExtensionUiFrame(url) {
+  if (!url) return false;
+  if (url.startsWith("chrome-extension://")) return true;
+  try {
+    return new URL(url).pathname.startsWith("/embed/");
+  } catch {
+    return false;
+  }
+}
+
+async function collectFrame(out, groupState, sessionId, frameUrl, excludeBackendId) {
   let result;
   try {
     result = await send("Accessibility.getFullAXTree", undefined, sessionId);
@@ -149,6 +232,23 @@ async function collectFrame(out, groupState, sessionId, frameUrl) {
   const nodes = (result && result.nodes) || [];
   const byId = new Map();
   for (const n of nodes) byId.set(n.nodeId, n);
+  // Drop the excluded host's entire AX subtree (childIds BFS — the AX tree
+  // crosses the overlay's closed shadow root, so ancestry walks find it).
+  let excludedIds;
+  if (excludeBackendId != null) {
+    const hostAx = nodes.find((n) => n.backendDOMNodeId === excludeBackendId);
+    if (hostAx) {
+      excludedIds = new Set();
+      const queue = [hostAx.nodeId];
+      while (queue.length) {
+        const id = queue.pop();
+        if (excludedIds.has(id)) continue;
+        excludedIds.add(id);
+        const n = byId.get(id);
+        for (const c of (n && n.childIds) || []) queue.push(c);
+      }
+    }
+  }
   // Nearest grouping-container ancestor → a compact group number shared across the
   // whole snapshot, so elements in the same card/row carry the same `group`.
   const groupFor = new Map(); // ancestor nodeId -> group number
@@ -170,6 +270,7 @@ async function collectFrame(out, groupState, sessionId, frameUrl) {
   };
   for (const node of nodes) {
     if (node.ignored) continue;
+    if (excludedIds && excludedIds.has(node.nodeId)) continue;
     const normalized = normalize(node);
     if (!normalized) continue;
     const group = resolveGroup(node);
@@ -201,7 +302,9 @@ export async function getA11ySnapshot() {
   }
   const out = [];
   const groupState = { counter: 0 };
-  await collectFrame(out, groupState, undefined, undefined); // top frame
+  // Top frame — with the extension's own overlay subtree excluded.
+  const overlayId = await overlayBackendNodeId();
+  await collectFrame(out, groupState, undefined, undefined, overlayId);
   for (const frame of getChildSessions()) {
     // Only DOCUMENT frames carry an AX tree. Flat auto-attach also surfaces non-DOM
     // targets — e.g. a reCAPTCHA/anti-bot webworker (seen live on LinkedIn) — where
@@ -210,6 +313,8 @@ export async function getA11ySnapshot() {
     // Never let a captcha/challenge frame's nodes enter the actionable set — the
     // agent must not target a captcha (detectChallenges surfaces the pause signal).
     if (isChallengeFrame(frame.url)) continue;
+    // Never perceive the extension's own embedded app surfaces as page content.
+    if (isExtensionUiFrame(frame.url)) continue;
     await collectFrame(out, groupState, frame.sessionId, frame.url);
   }
   return out;

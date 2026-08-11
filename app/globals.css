@@ -161,6 +161,27 @@ body:has(.embed-layout-page) {
   overflow: hidden !important;
 }
 
+/* Panel embed (/embed/panel): the RightSidebar sits in a short bottom strip, so
+ * trim the tab-strip's vertical fat to hand more height to the chat/tools below.
+ * Scoped to the embed so the main app's sidebar keeps its full padding. Modest
+ * on purpose — leaves breathing room, doesn't crush the tap targets. */
+#embed-root .dg-rightsidebar-tabs {
+  height: 2.25rem; /* h-9, from h-12 */
+}
+#embed-root .dg-rightsidebar-tabs button {
+  padding-top: 0.375rem; /* py-1.5, from py-3 */
+  padding-bottom: 0.375rem;
+}
+/* Chat conversation-tab bar: shave its top padding too. */
+#embed-root .dg-sidebar-chat-tabs {
+  padding-top: 0.125rem; /* pt-0.5, from pt-1.5 */
+}
+/* Conversation tabs: a touch shorter (~4px). */
+#embed-root .dg-chat-tab {
+  padding-top: 0.25rem; /* py-1, from py-1.5 */
+  padding-bottom: 0.25rem;
+}
+
 /* Radix menus/popovers/selects portal to <body>, i.e. OUTSIDE #embed-root —
  * which is fixed-positioned at z-index:100. Portalled content ships at z-50,
  * so every dropdown opened inside an embed rendered *behind* the panel and

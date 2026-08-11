@@ -52,7 +52,21 @@ import {
   BYOKRequiredError,
 } from "@/lib/domain/ai/providers/registry";
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
-import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import {
+  PROVIDER_CATALOG,
+  getModelMeta,
+} from "@/lib/domain/ai/providers/catalog";
+import {
+  stripReasoningForResend,
+  supersedeIterationHistory,
+} from "@/lib/domain/ai/context-diet";
+import {
+  MAX_STEP_SUMMARIES,
+  type MaxTokensSource,
+  type StepCapSource,
+  type TurnSegment,
+  type TurnStepSummary,
+} from "@/lib/domain/ai/turn-diagnostics";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
@@ -69,13 +83,21 @@ import {
 function buildProviderOptions(
   providerId: string,
   modelId: string,
+  opts?: {
+    /**
+     * True when this turn runs inside an approved item-iteration — the
+     * steps are mechanical (read → record → next), so hybrid-thinking
+     * models get low reasoning effort instead of open-ended deliberation.
+     */
+    mechanicalRun?: boolean;
+  },
 ): AIProviderOptions | undefined {
   const model = PROVIDER_CATALOG
     .find((p) => p.id === providerId)
     ?.models.find((m) => m.id === modelId);
-  if (!model || model.reasoning !== "enabled") return undefined;
+  if (!model || !model.reasoning) return undefined;
 
-  if (providerId === "anthropic") {
+  if (providerId === "anthropic" && model.reasoning === "enabled") {
     return {
       anthropic: {
         thinking: {
@@ -85,14 +107,48 @@ function buildProviderOptions(
       },
     };
   }
-  if (providerId === "google") {
+  if (providerId === "google" && model.reasoning === "enabled") {
     return {
       google: {
         thinkingConfig: { includeThoughts: true },
       },
     };
   }
+  if (providerId === "deepseek") {
+    // Hybrid-thinking control (@ai-sdk/deepseek): "adaptive" lets the model
+    // decide when to think; reasoningEffort caps how long. Effort is the
+    // regulator that actually limits thinking spend — output-token caps only
+    // truncate reasoning AFTER it is generated and billed, which is how the
+    // 2026-08-08 iteration run died. Outside mechanical runs the effort knob
+    // is omitted so the provider default applies.
+    return {
+      deepseek: {
+        thinking: { type: "adaptive" },
+        ...(opts?.mechanicalRun ? { reasoningEffort: "low" } : {}),
+      },
+    };
+  }
   return undefined;
+}
+
+/**
+ * Compact label of the reasoning config applied to this turn — persisted in
+ * the segment record (self-describing turns) so a transcript shows whether a
+ * hybrid-thinking model ran with effort capped. Mirrors buildProviderOptions'
+ * branches; keep in sync when adding a vendor there.
+ */
+function describeReasoningConfig(
+  vendorId: string,
+  hasReasoningOptions: boolean,
+  mechanicalRun: boolean,
+): string | null {
+  if (!hasReasoningOptions) return null;
+  if (vendorId === "deepseek") {
+    return mechanicalRun ? "deepseek:adaptive+low" : "deepseek:adaptive";
+  }
+  if (vendorId === "anthropic") return "anthropic:thinking";
+  if (vendorId === "google") return "google:include-thoughts";
+  return `${vendorId}:reasoning`;
 }
 import {
   getConnectionWithKey,
@@ -151,7 +207,10 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger, spanPayload, startSpan, withRouteTrace, withSpan } from "@/lib/core/logger";
 import { after } from "next/server";
 import { assembleFolderChatContext } from "@/extensions/studio/server/source-selection";
-import { refreshContextOnAccess } from "@/extensions/studio/server/context-refresh";
+import { refreshContextOnAccess } from "@/lib/domain/ai-context/context-refresh";
+import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
+import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
+import { collectWikiLinkRefs } from "@/lib/domain/editor/wiki-link-refs";
 import {
   parsePlaybook,
   type PlaybookReference,
@@ -189,6 +248,62 @@ import {
 
 const ROUTE_PATH = "/api/ai/chat";
 
+/**
+ * Gate + capsule for ONE folder reference — a chat mention pill, a playbook
+ * [[link]], or a folder wiki-linked from a mentioned note — rendered as a
+ * prompt section per the D5 ladder (fresh capsule / stale capsule flagged /
+ * honest absence / name-only when opted out). Never throws.
+ */
+async function buildFolderMentionSection(
+  userId: string,
+  folderId: string,
+  title: string,
+  budgetMs?: number,
+): Promise<string> {
+  try {
+    const gate = await ensureFolderContextFresh(
+      userId,
+      folderId,
+      budgetMs ? { budgetMs } : undefined,
+    );
+    if (gate.status === "optedOut") {
+      return `### ${title}\n(folder — its AI context is disabled by the user; only the name is available)`;
+    }
+    const capsule =
+      gate.status === "none"
+        ? null
+        : await assembleFolderCapsule(userId, folderId);
+    if (!capsule) {
+      return `### ${title}\n(folder — no context is available yet: generation could not run${gate.reason ? ` (${gate.reason})` : ""}. Say so rather than guessing at its contents.)`;
+    }
+    const staleBanner =
+      gate.status === "stale"
+        ? `\n[NOTE: this folder's context could not be fully refreshed (${gate.reason ?? "budget"}) — parts may lag recent edits.]`
+        : "";
+    logger.info({
+      layer: "ai",
+      event: "ai_context:mention_gate",
+      summary: `folder mention gated: ${gate.status}`,
+      attrs: {
+        folderId,
+        status: gate.status,
+        generationCalls: gate.generationCalls,
+        refreshedNodes: gate.refreshedNodes,
+        waitedMs: gate.waitedMs,
+      },
+    });
+    return capsule.text + staleBanner;
+  } catch (gateError) {
+    logger.warn({
+      layer: "ai",
+      event: "ai_context:mention_gate_caught",
+      summary: "folder mention gate failed — name-only fallback",
+      error: gateError,
+    });
+    return `### ${title}\n(folder — context unavailable due to an internal error)`;
+  }
+}
+
 async function resolvePlaybookReferenceContext(
   userId: string,
   references: PlaybookReference[],
@@ -214,6 +329,7 @@ async function resolvePlaybookReferenceContext(
     select: {
       id: true,
       title: true,
+      contentType: true,
       notePayload: { select: { metadata: true } },
     },
   });
@@ -224,24 +340,57 @@ async function resolvePlaybookReferenceContext(
   const activeReferenceContentIds = Array.from(
     new Set(
       referenceNodes
-        .filter((node) => activeTitles.has(node.title))
+        // Folders are capsule-consumed (below), never getCurrentNote-read —
+        // keep them out of the checkpoint gate's reference expectations.
+        .filter(
+          (node) =>
+            activeTitles.has(node.title) && node.contentType !== "folder",
+        )
         .map((node) => node.id),
     ),
   );
   const lines = uniqueTitles.map((title) => {
     const found = byTitle.get(title);
     if (!found) return `- [[${title}]] — not found in your notes`;
+    if (found.contentType === "folder") {
+      // Folder refs behave like chat folder mentions (capsule-plan
+      // follow-up): active-phase folders get their capsule injected below;
+      // other phases' folders stay lazy behind the walk tool.
+      return activeTitles.has(title)
+        ? `- [[${title}]] — FOLDER (context capsule injected below)`
+        : `- [[${title}]] — FOLDER (call read_folder_context with folderId: ${found.id} when the current phase needs it)`;
+    }
     const isSubPlaybook = isPlaybookMetadata(found.notePayload?.metadata);
     return isSubPlaybook
       ? `- [[${title}]] (getCurrentNote contentId: ${found.id}) — SUB-PLAYBOOK: has its own standing rules/phases; follow its directives once read`
       : `- [[${title}]] (getCurrentNote contentId: ${found.id})`;
   });
 
+  // Active-phase folder refs get the full mention treatment (gate +
+  // capsule), capped so a link-heavy phase can't flood context. Same D5
+  // ladder and 3s budget as the walk tool.
+  const activeFolders = referenceNodes
+    .filter(
+      (node) => node.contentType === "folder" && activeTitles.has(node.title),
+    )
+    .slice(0, 3);
+  let folderCapsules = "";
+  if (activeFolders.length > 0) {
+    const sections = await Promise.all(
+      activeFolders.map((folder) =>
+        buildFolderMentionSection(userId, folder.id, folder.title, 3000),
+      ),
+    );
+    folderCapsules =
+      "\n\n**Referenced folder context:**\n\n" + sections.join("\n\n");
+  }
+
   return {
     manifest:
       "\n\n**Linked extensions** " +
       "(call getCurrentNote with the contentId below when the current phase needs one — not preloaded):\n" +
-      lines.join("\n"),
+      lines.join("\n") +
+      folderCapsules,
     activeReferenceContentIds,
   };
 }
@@ -483,8 +632,16 @@ export async function POST(request: Request) {
         body.modelId ?? aiSettings.modelId ?? "claude-sonnet-3-5";
       const temperature =
         body.temperature ?? aiSettings.temperature ?? 0.7;
-      const maxTokens =
-        body.maxTokens ?? aiSettings.maxTokens ?? 4096;
+      // Requested output ceiling. null = no user ceiling — resolved to the
+      // executed model's documented catalog maximum at middleware assembly,
+      // once routing has picked the model. Stored 4096 is the legacy imposed
+      // default (never a deliberate choice): normalize it to unset. A flat
+      // 4096 cap silently truncated reasoning-heavy turns — finishReason
+      // "length" with zero visible output (2026-08-08 DeepSeek run).
+      const rawRequestedMaxTokens =
+        body.maxTokens ?? aiSettings.maxTokens ?? null;
+      const requestedMaxTokens =
+        rawRequestedMaxTokens === 4096 ? null : rawRequestedMaxTokens;
 
       // Check if AI is enabled
       if (aiSettings.enabled === false) {
@@ -734,6 +891,23 @@ export async function POST(request: Request) {
         activeModelId,
         temperature,
       );
+
+      // Output ceiling actually sent: the user's explicit setting, else the
+      // executed model's documented maximum from the catalog. Never omitted
+      // for known models — providers substitute their own (often low)
+      // defaults when max_tokens is absent. Unknown models fall through to
+      // the provider default.
+      const maxTokens =
+        requestedMaxTokens ??
+        getModelMeta(executedBareModelId)?.model.maxOutput;
+      // Ceiling provenance — persisted per segment (self-describing turns),
+      // so a truncated turn records WHICH ceiling cut it off.
+      const maxTokensSource: MaxTokensSource =
+        requestedMaxTokens != null
+          ? "user"
+          : maxTokens != null
+            ? "catalog"
+            : "provider-default";
 
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
@@ -990,8 +1164,18 @@ export async function POST(request: Request) {
 
       // Per-request token accumulator (v3.1 R5): onStepFinish adds each
       // step's usage; phase_checkpoint stamps the running total into the
-      // Run Ledger.
-      const runTokenCounter = { total: 0 };
+      // Run Ledger. Input/output split added by cost metering so ledger
+      // stamps can carry a $ estimate (totals alone can't be priced).
+      const runTokenCounter = { total: 0, input: 0, output: 0, cachedInput: 0 };
+      // Per-request step tracker (self-describing turns): onStepFinish counts
+      // steps and records bounded summaries; messageMetadata stamps them into
+      // the turn's segment record so the persisted row can say how close the
+      // request came to its stopWhen ceiling.
+      const stepsTracker = {
+        used: 0,
+        truncated: 0,
+        summaries: [] as TurnStepSummary[],
+      };
       // Playbook validation happens below, after the tool registry is built.
       // Tool closures retain this array reference, so trusted directives
       // pushed before streamText begins are available at execution time.
@@ -1003,6 +1187,15 @@ export async function POST(request: Request) {
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
+        // Filled in AFTER playbook resolution below (tools close over this
+        // object, so a later property assignment is visible at execute time).
+        activePlaybook: undefined as { contentId: string; title: string } | undefined,
+        // Executed model identity (cost metering): lets ledger stamps
+        // price the run's tokens. Bare id + vendor, post-resolution.
+        executedModel: {
+          modelId: executedBareModelId,
+          vendorId: executedVendorId,
+        },
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -1087,6 +1280,36 @@ export async function POST(request: Request) {
         ),
       );
 
+      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
+      // schema set to the run's working tools. The full ~50-schema prefix
+      // measured ~36k tokens per request; the 128k window (not price) is the
+      // binding constraint on long runs. The set is stable for the whole run
+      // (itemIterationBudget stays non-null until record_iteration_findings),
+      // so the provider prefix cache re-warms once at run start. Pending
+      // approvals mid-run only occur for kept tools (createNote,
+      // phase_checkpoint).
+      if (itemIterationBudget != null) {
+        const ITERATION_RUN_TOOLS = new Set([
+          // browsing + enumeration
+          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
+          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
+          "search_web",
+          // the iteration harness itself
+          "propose_item_iteration", "record_item_result",
+          "record_batch_checkpoint", "record_iteration_findings",
+          // note output + grounding
+          "createNote", "updateNote", "renameNote", "getCurrentNote",
+          "searchNotes", "read_folder_context",
+          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
+          // run/plumbing
+          "phase_checkpoint", "ask_user", "notify_user",
+          "finish_with_summary", "plan",
+        ]);
+        for (const id of Object.keys(tools)) {
+          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+        }
+      }
+
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED
       // provider, not the requested one — the resolver above may have landed
@@ -1151,8 +1374,21 @@ export async function POST(request: Request) {
       const repairedMessages = compactToolOutputs(
         repairDanglingToolCalls(messages),
       );
+      // Context diet (S7/S8): both transforms apply ONLY to this
+      // model-message path — repairedMessages stays intact for
+      // originalMessages/persistence.
+      //   - supersedeIterationHistory: raw perception outputs behind the
+      //     latest batch checkpoint collapse to stubs (the ledger is the
+      //     cross-batch memory); reclaims 128k-window space on long runs.
+      //   - stripReasoningForResend: reasoning parts are model OUTPUT with
+      //     no resend value for non-Anthropic providers, yet
+      //     convertToModelMessages forwards them as input verbatim (~100k
+      //     chars replayed per request in the measured DeepSeek run).
       const resolvedMessages = resolveAttachmentsForModel(
-        repairedMessages,
+        stripReasoningForResend(
+          supersedeIterationHistory(repairedMessages),
+          executedVendorId,
+        ),
         executedVendorId,
         audioCapable,
       );
@@ -1199,7 +1435,9 @@ export async function POST(request: Request) {
                 deletedAt: null,
               },
               include: {
-                notePayload: { select: { searchText: true } },
+                // tiptapJson rides along so folder wiki-links inside a
+                // mentioned note can get the capsule treatment below.
+                notePayload: { select: { searchText: true, tiptapJson: true } },
               },
             });
             span.attr("found", result.length).summary(`${result.length} mentions`);
@@ -1208,11 +1446,99 @@ export async function POST(request: Request) {
         );
 
         if (mentionedNodes.length > 0) {
+          // Folder mentions (FOLDER-CONTEXT-CAPSULE-PLAN Phase 4): the gate
+          // runs server-side BEFORE prompt assembly — authoritative stage of
+          // the two-stage gate (sweep B5; the composer pre-flight usually
+          // makes this a cheap coverage check). Ladder D5: fresh capsule →
+          // stale capsule, flagged → honest absence. Gates run in parallel
+          // so multiple folder mentions share the wait.
+          const folderSections = new Map<string, string>();
+          await Promise.all(
+            mentionedNodes
+              .filter((node) => node.contentType === "folder")
+              .map(async (node) => {
+                folderSections.set(
+                  node.id,
+                  await buildFolderMentionSection(
+                    session.user.id,
+                    node.id,
+                    node.title
+                  )
+                );
+              })
+          );
+
+          // Transitive folder links (capsule-plan follow-up): a mentioned
+          // NOTE that wiki-links folders behaves like mentioning those
+          // folders directly — same rule as a playbook's [[refs]]. Id-first
+          // resolution with exact-title fallback, deduped against direct
+          // mentions, capped at 3.
+          const linkedFolderSections: string[] = [];
+          try {
+            const linkedRefs = mentionedNodes
+              .filter((node) => node.contentType !== "folder")
+              .flatMap((node) =>
+                collectWikiLinkRefs(
+                  (node.notePayload?.tiptapJson ?? null) as JSONContent | null
+                )
+              );
+            if (linkedRefs.length > 0) {
+              const mentionedIds = new Set(mentionedNodes.map((n) => n.id));
+              const idRefs = linkedRefs
+                .map((ref) => ref.targetId)
+                .filter((id): id is string => !!id);
+              const titleRefs = [
+                ...new Set(
+                  linkedRefs
+                    .filter((ref) => !ref.targetId)
+                    .map((ref) => ref.targetTitle)
+                ),
+              ];
+              const linkedFolders = await prisma.contentNode.findMany({
+                where: {
+                  ownerId: session.user.id,
+                  contentType: "folder",
+                  deletedAt: null,
+                  OR: [
+                    ...(idRefs.length > 0 ? [{ id: { in: idRefs } }] : []),
+                    ...(titleRefs.length > 0
+                      ? [{ title: { in: titleRefs } }]
+                      : []),
+                  ],
+                },
+                select: { id: true, title: true },
+                take: 3,
+              });
+              for (const folder of linkedFolders) {
+                if (mentionedIds.has(folder.id)) continue;
+                linkedFolderSections.push(
+                  await buildFolderMentionSection(
+                    session.user.id,
+                    folder.id,
+                    folder.title,
+                    3000
+                  )
+                );
+              }
+            }
+          } catch (linkError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:linked_folder_caught",
+              summary:
+                "transitive folder-link resolution failed — continuing without it",
+              error: linkError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
+            const folderSection = folderSections.get(node.id);
+            if (folderSection) return folderSection;
             const text =
               node.notePayload?.searchText || "(no text content available)";
             return `### ${node.title}\n${text.slice(0, 2000)}`;
           });
+          sections.push(...linkedFolderSections);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
         }
       }
@@ -1309,6 +1635,12 @@ export async function POST(request: Request) {
           ) {
             attachedPlaybookResolved = true;
             attachedPlaybookTitle = playbookNode.title;
+            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // pointer — the body is already injected below.
+            toolCtx.activePlaybook = {
+              contentId: explicitPlaybookId,
+              title: playbookNode.title,
+            };
             const parsed = parsePlaybook(
               playbookNode.notePayload.tiptapJson as JSONContent,
             );
@@ -1418,6 +1750,11 @@ export async function POST(request: Request) {
             );
             rootedPlaybookResolved = true;
             attachedPlaybookTitle = rootedNode.title;
+            // Context diet (S7-C2): same pointer rule for rooted execution.
+            toolCtx.activePlaybook = {
+              contentId: rootedPlaybookId,
+              title: rootedNode.title,
+            };
             playbookOutputDirectives.push(
               ...extractPlaybookOutputDirectives(parsed),
             );
@@ -1708,17 +2045,58 @@ export async function POST(request: Request) {
       const reasoningProviderOptions = buildProviderOptions(
         executedVendorId,
         executedBareModelId,
+        { mechanicalRun: itemIterationBudget != null },
       );
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
         promptCachePolicy.providerOptions,
       );
 
+      // Step ceiling in force for this request — hoisted from the stopWhen
+      // call so stopWhen, the per-segment diagnostics, and the finish-log
+      // events all report the SAME cap (self-describing turns). Formula
+      // rationale lives on the stopWhen comment below.
+      const stepCap =
+        itemIterationBudget != null
+          ? itemIterationBudget * 4 + 8
+          : researchPageBudget != null
+            ? researchPageBudget * 2 + 4
+            : editableContentId
+              ? 8
+              : 7;
+      const stepCapSource: StepCapSource =
+        itemIterationBudget != null
+          ? "item-iteration"
+          : researchPageBudget != null
+            ? "research"
+            : editableContentId
+              ? "editable"
+              : "base";
+      const reasoningConfigSummary = describeReasoningConfig(
+        executedVendorId,
+        reasoningProviderOptions !== undefined,
+        itemIterationBudget != null,
+      );
+      const activeToolCount = toolsActive ? Object.keys(tools).length : 0;
+
       // Turn start — for the generation-duration shown in the assistant avatar
       // tooltip (attached on `finish` in messageMetadata below). Anchored here so
       // it spans the whole turn (reasoning + tools + text), matching the wall
       // time the user waited.
       const turnStartMs = Date.now();
+      // The finish-part metadata blob of THIS request — captured so the
+      // server-side persistence path writes the identical self-describing
+      // record the client path receives (parity; see messageMetadata).
+      let lastFinishMetadata: Record<string, unknown> | null = null;
+
+      // Cache-WRITE tokens (cost metering P1): Anthropic bills cache
+      // writes at 1.25× input, but the SDK surfaces them only in
+      // providerMetadata — never in normalized usage. Summed across steps
+      // here and emitted with the finish usage blob so the pricing
+      // calculator sees them. Zero for every other provider (and for
+      // Anthropic today — the app sets no cache_control breakpoints —
+      // but the plumbing must exist before the pricing formula does).
+      let turnCacheWriteTokens = 0;
 
       const result = streamText({
         model: wrappedModel,
@@ -1742,19 +2120,13 @@ export async function POST(request: Request) {
         // extract/synthesis), so a run sized for N pages always has the steps to
         // finish N pages. The page budget is the depth lever; this is the safety
         // ceiling that follows it. Outside a research run, the normal 7/8 cap.
-        stopWhen: stepCountIs(
-          itemIterationBudget != null
-            ? // Each item ≈ read + record (+ optional re-read); +8 overhead for
-              // list_tabs / propose / roll-up createNote / record_iteration_findings.
-              // The client item budget is the true limiter (soft-stops new items);
-              // this is the safety ceiling that must not cut off before it.
-              itemIterationBudget * 4 + 8
-            : researchPageBudget != null
-              ? researchPageBudget * 2 + 4
-              : editableContentId
-                ? 8
-                : 7,
-        ),
+        // Item runs: each item ≈ read + record (+ optional re-read); +8
+        // overhead for list_tabs / propose / roll-up createNote /
+        // record_iteration_findings. The client item budget is the true
+        // limiter (soft-stops new items); this ceiling must not cut off
+        // before it. Cap value + provenance hoisted above (stepCap /
+        // stepCapSource) so diagnostics report the same number.
+        stopWhen: stepCountIs(stepCap),
         system: buildSystemPrompt({
           hasImageTools: "generate_image" in tools,
           hasFlashcardTools: "list_decks" in tools,
@@ -1800,9 +2172,44 @@ export async function POST(request: Request) {
         }),
         onStepFinish: (step) => {
           // Tokens-per-phase accumulator (v3.1 R5) — cheap, never throws.
-          runTokenCounter.total +=
-            (step as { usage?: { totalTokens?: number } }).usage
-              ?.totalTokens ?? 0;
+          const stepUsage = (
+            step as {
+              usage?: {
+                totalTokens?: number;
+                inputTokens?: number;
+                outputTokens?: number;
+                cachedInputTokens?: number;
+              };
+            }
+          ).usage;
+          runTokenCounter.total += stepUsage?.totalTokens ?? 0;
+          runTokenCounter.input += stepUsage?.inputTokens ?? 0;
+          runTokenCounter.output += stepUsage?.outputTokens ?? 0;
+          runTokenCounter.cachedInput += stepUsage?.cachedInputTokens ?? 0;
+          const cacheCreation = (
+            step as {
+              providerMetadata?: {
+                anthropic?: { cacheCreationInputTokens?: unknown };
+              };
+            }
+          ).providerMetadata?.anthropic?.cacheCreationInputTokens;
+          if (typeof cacheCreation === "number" && Number.isFinite(cacheCreation)) {
+            turnCacheWriteTokens += cacheCreation;
+          }
+          // Step tracking for the segment record (self-describing turns).
+          stepsTracker.used += 1;
+          if (stepsTracker.summaries.length < MAX_STEP_SUMMARIES) {
+            stepsTracker.summaries.push({
+              finishReason:
+                typeof step.finishReason === "string"
+                  ? step.finishReason
+                  : null,
+              tools: (step.toolCalls ?? []).map((call) => call.toolName),
+              outputTokens: stepUsage?.outputTokens ?? null,
+            });
+          } else {
+            stepsTracker.truncated += 1;
+          }
           // A checkpoint approval may only surface after the current phase's
           // runtime-verifiable research/reference requirements completed.
           // This includes provider-native search because it is represented in
@@ -1865,6 +2272,37 @@ export async function POST(request: Request) {
             Number(cacheUsage.hitRate.toFixed(4)),
           );
           if (finishReason) streamSpan.attr("finish_reason", finishReason);
+          // Harness-decision attrs (self-describing turns): the span is the
+          // server-side ground truth even when the client never persists.
+          streamSpan.attr("steps_used", stepsTracker.used);
+          streamSpan.attr("step_cap", stepCap);
+          streamSpan.attr("cap_source", stepCapSource);
+          if (finishReason === "length") {
+            logger.warn({
+              layer: "ai",
+              event: "turn:truncated_output",
+              summary: `turn hit the output-token ceiling (${maxTokens ?? "provider default"}, ${maxTokensSource})`,
+              attrs: {
+                conversation_id: conversationIdForAssoc ?? null,
+                model: activeModelId,
+                steps_used: stepsTracker.used,
+                max_output_tokens: maxTokens ?? null,
+              },
+            });
+          }
+          if (finishReason === "tool-calls" && stepsTracker.used >= stepCap) {
+            logger.warn({
+              layer: "ai",
+              event: "turn:step_cap_hit",
+              summary: `turn used all ${stepCap} steps (${stepCapSource}) and still wanted tools — harness ended the loop`,
+              attrs: {
+                conversation_id: conversationIdForAssoc ?? null,
+                model: activeModelId,
+                step_cap: stepCap,
+                cap_source: stepCapSource,
+              },
+            });
+          }
           // Capture the full finish event to sidecar for replay.
           await spanPayload(streamSpan, "chat_finish", finishEvent);
           streamSpan.end("ok");
@@ -1976,6 +2414,10 @@ export async function POST(request: Request) {
                 ...(modelRouteNotices.length > 0
                   ? { modelRouteNotices }
                   : {}),
+                // Parity with the client path (self-describing turns): the
+                // finish-part blob carries usage / durationMs / finishReason
+                // / the segment record for THIS request.
+                ...(lastFinishMetadata ?? {}),
               },
               parentId: null,
             });
@@ -2060,18 +2502,57 @@ export async function POST(request: Request) {
             return routeMeta;
           }
           if (part.type === "finish") {
-            return {
+            // The request's segment record (self-describing turns): what cap
+            // was in force, how close the model came, and which ceilings
+            // applied. FIXED SHAPE — the SDK deep-merges metadata across a
+            // turn's requests in client memory, so an omitted key would
+            // silently inherit the previous request's value.
+            const segment: TurnSegment = {
+              startedAt: new Date(turnStartMs).toISOString(),
+              finishReason: part.finishReason ?? null,
+              usage: {
+                inputTokens: part.totalUsage?.inputTokens ?? 0,
+                outputTokens: part.totalUsage?.outputTokens ?? 0,
+                totalTokens: part.totalUsage?.totalTokens ?? 0,
+                reasoningTokens: part.totalUsage?.reasoningTokens ?? 0,
+                cachedInputTokens: part.totalUsage?.cachedInputTokens ?? 0,
+              },
+              durationMs: Date.now() - turnStartMs,
+              stepsUsed: stepsTracker.used,
+              stepCap,
+              capSource: stepCapSource,
+              steps: stepsTracker.summaries,
+              stepsTruncated: stepsTracker.truncated,
+              maxOutputTokens: maxTokens ?? null,
+              maxTokensSource,
+              reasoningConfig: reasoningConfigSummary,
+              toolCount: activeToolCount,
+            };
+            const finishMeta = {
               ...routeMeta,
               usage: {
                 inputTokens: part.totalUsage?.inputTokens,
                 outputTokens: part.totalUsage?.outputTokens,
                 totalTokens: part.totalUsage?.totalTokens,
+                // Reasoning + provider-cache detail (DeepSeek/OpenAI report
+                // these; DeepSeek's context cache is automatic and this is
+                // the only place its hit rate becomes visible to the user).
+                reasoningTokens: part.totalUsage?.reasoningTokens,
+                cachedInputTokens: part.totalUsage?.cachedInputTokens,
+                // Anthropic cache writes (providerMetadata-only; summed in
+                // onStepFinish above). Omitted when zero.
+                ...(turnCacheWriteTokens > 0
+                  ? { cacheWriteTokens: turnCacheWriteTokens }
+                  : {}),
               },
               // Generation wall time for the avatar tooltip (persisted with the
               // message, so it survives reload alongside usage).
-              durationMs: Date.now() - turnStartMs,
+              durationMs: segment.durationMs,
               finishReason: part.finishReason,
+              segment,
             };
+            lastFinishMetadata = finishMeta;
+            return finishMeta;
           }
           return undefined;
         },

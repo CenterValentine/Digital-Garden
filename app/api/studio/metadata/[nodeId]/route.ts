@@ -4,13 +4,13 @@
  * GET  /api/studio/metadata/:nodeId
  *   → { success, data: MetadataView }
  * PUT  /api/studio/metadata/:nodeId
- *   body: { directives?: string; roleStrategyAction?: "accept" | "dismiss" }
+ *   body: { directives?: string; contextMode?: ContextMode | null; contextOptOut?: boolean }
  *   → { success, data: MetadataView }
  *
  * Last-write-wins by design (this surface is deliberately not collaborative).
- * Only human-ownable operations go through PUT: directives text, and
- * accepting/dismissing the pending Role & Strategy proposal. AI sections are
- * written exclusively by the generate route.
+ * Only human-ownable operations go through PUT: directives text, the context
+ * mode, and the legacy opt-out boolean. AI sections are written exclusively
+ * by the generate route (the proposal flow was retired — plan D18).
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -21,11 +21,12 @@ import { getUserSettings } from "@/lib/features/settings";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import {
   getMetadataForNode,
-  resolveRoleStrategyProposal,
   saveDirectives,
+  setContextMode,
   setContextOptOut,
-} from "@/extensions/studio/server/metadata";
-import { refreshScope } from "@/extensions/studio/server/context-refresh";
+} from "@/lib/domain/ai-context/metadata";
+import { ContextMode } from "@/lib/database/generated/prisma";
+import { refreshScope } from "@/lib/domain/ai-context/context-refresh";
 import { getStudioSettings } from "@/extensions/studio/settings";
 
 /**
@@ -41,10 +42,16 @@ const ROUTE_PATH = "/api/studio/metadata/[nodeId]";
 
 interface PutBody {
   directives?: string;
-  roleStrategyAction?: "accept" | "dismiss";
   /** Privacy toggle: AI context stops reading this node. */
   contextOptOut?: boolean;
+  /**
+   * Context investment ladder (plan D6): explicit mode override, or null to
+   * inherit from the nearest explicit ancestor.
+   */
+  contextMode?: ContextMode | null;
 }
+
+const CONTEXT_MODES = new Set<string>(Object.values(ContextMode));
 
 export async function GET(
   request: NextRequest,
@@ -105,13 +112,6 @@ export async function PUT(
       if (typeof body.directives === "string") {
         view = await saveDirectives(session.user.id, nodeId, body.directives);
       }
-      if (body.roleStrategyAction === "accept" || body.roleStrategyAction === "dismiss") {
-        view = await resolveRoleStrategyProposal(
-          session.user.id,
-          nodeId,
-          body.roleStrategyAction
-        );
-      }
       if (typeof body.contextOptOut === "boolean") {
         view = await setContextOptOut(
           session.user.id,
@@ -119,10 +119,20 @@ export async function PUT(
           body.contextOptOut
         );
       }
+      if (body.contextMode !== undefined) {
+        if (body.contextMode !== null && !CONTEXT_MODES.has(body.contextMode)) {
+          return NextResponse.json(
+            { success: false, error: "Invalid contextMode" },
+            { status: 400 }
+          );
+        }
+        view = await setContextMode(session.user.id, nodeId, body.contextMode);
+      }
       if (
         view === null &&
         typeof body.directives !== "string" &&
-        typeof body.contextOptOut !== "boolean"
+        typeof body.contextOptOut !== "boolean" &&
+        body.contextMode === undefined
       ) {
         return NextResponse.json(
           { success: false, error: "No supported operation in body" },

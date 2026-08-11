@@ -35,6 +35,12 @@ export interface CheckpointEntry {
   runTitle?: string;
   /** Route-accumulated token usage through this checkpoint (v3.1 R5). */
   tokensSoFar?: number;
+  /**
+   * Estimated USD for the tokens above, priced against the executed model
+   * (cost metering). Undefined when the model has no price entry — the
+   * line then renders tokens only, never $0.
+   */
+  estimatedCostUsd?: number;
 }
 
 function renderEntry(entry: CheckpointEntry): string {
@@ -50,7 +56,14 @@ function renderEntry(entry: CheckpointEntry): string {
   }
   if (entry.next) lines.push("", `**Next:** ${entry.next}`);
   if (typeof entry.tokensSoFar === "number" && entry.tokensSoFar > 0) {
-    lines.push("", `**Tokens so far (this turn):** ~${entry.tokensSoFar.toLocaleString()}`);
+    const cost =
+      typeof entry.estimatedCostUsd === "number" && entry.estimatedCostUsd > 0
+        ? ` (~$${entry.estimatedCostUsd >= 0.1 ? entry.estimatedCostUsd.toFixed(2) : entry.estimatedCostUsd.toFixed(3)} est.)`
+        : "";
+    lines.push(
+      "",
+      `**Tokens so far (this turn):** ~${entry.tokensSoFar.toLocaleString()}${cost}`,
+    );
   }
   return lines.join("\n");
 }

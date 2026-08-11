@@ -55,8 +55,8 @@ import {
 } from "@/components/settings/ui";
 import { IMAGE_PROVIDER_CATALOG } from "@/lib/domain/ai/image/catalog";
 import {
-  ALL_TOOL_IDS,
   ALL_TOOL_METADATA,
+  TOOL_GROUPS,
   BASE_TOOL_METADATA,
 } from "@/lib/domain/ai/tools/metadata";
 import { useSettingsStore } from "@/state/settings-store";
@@ -82,7 +82,10 @@ export default function AISettingsPage() {
   // Effective values with the same fallbacks the old page used.
   const enabled = ai?.enabled ?? true;
   const temperature = ai?.temperature ?? 0.7;
-  const maxTokens = ai?.maxTokens ?? 4096;
+  // null = model maximum. Stored 4096 was the old imposed default (never a
+  // deliberate choice) — normalize it to "unset" so legacy settings pick up
+  // the catalog-resolved maximum instead of a silent truncation cap.
+  const maxTokens = ai?.maxTokens === 4096 ? null : (ai?.maxTokens ?? null);
   const typingEffect = ai?.typingEffect ?? true;
   const showAiHighlight = ai?.showAiHighlight ?? true;
   const showReasoning = ai?.showReasoning ?? true;
@@ -128,8 +131,15 @@ export default function AISettingsPage() {
 
   const commitMaxTokens = () => {
     if (maxTokensDraft === null) return;
-    const parsed = parseInt(maxTokensDraft, 10);
+    const trimmed = maxTokensDraft.trim();
     setMaxTokensDraft(null);
+    if (trimmed === "") {
+      if (maxTokens !== null) {
+        void generation.track(setAISettings({ maxTokens: null }));
+      }
+      return;
+    }
+    const parsed = parseInt(trimmed, 10);
     if (Number.isNaN(parsed)) return;
     const clamped = Math.min(Math.max(parsed, MAX_TOKENS_MIN), MAX_TOKENS_MAX);
     if (clamped !== maxTokens) {
@@ -217,7 +227,7 @@ export default function AISettingsPage() {
 
         <SettingRow
           label="Max tokens"
-          description="Maximum number of tokens the model can generate per response."
+          description="Per-response output cap. Leave empty to allow each model's documented maximum — reasoning models need the headroom."
           htmlFor="ai-max-tokens"
         >
           <Input
@@ -226,7 +236,8 @@ export default function AISettingsPage() {
             min={MAX_TOKENS_MIN}
             max={MAX_TOKENS_MAX}
             className="w-32"
-            value={maxTokensDraft ?? String(maxTokens)}
+            placeholder="Model max"
+            value={maxTokensDraft ?? (maxTokens === null ? "" : String(maxTokens))}
             onChange={(event) => setMaxTokensDraft(event.target.value)}
             onBlur={commitMaxTokens}
             onKeyDown={(event) => {
@@ -359,20 +370,33 @@ export default function AISettingsPage() {
           </span>
         }
       >
-        <div className="space-y-2">
-          {ALL_TOOL_IDS.map((toolId) => (
-            <ToolConfigRow
-              key={toolId}
-              toolId={toolId}
-              meta={ALL_TOOL_METADATA[toolId]}
-              callsAi={
-                BASE_TOOL_METADATA[toolId as keyof typeof BASE_TOOL_METADATA]
-                  ?.callsAi
-              }
-              config={toolConfig[toolId] ?? {}}
-              connections={connections}
-              onChange={(next) => handleToolConfigChange(toolId, next)}
-            />
+        <div className="space-y-4">
+          {TOOL_GROUPS.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <div className="flex items-baseline gap-2 border-b border-black/10 pb-1 dark:border-white/10">
+                <h4 className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                  {group.label}
+                </h4>
+                <span className="text-[11px] text-gray-400 dark:text-gray-500">
+                  {group.description}
+                </span>
+              </div>
+              {group.ids.map((toolId) => (
+                <ToolConfigRow
+                  key={toolId}
+                  toolId={toolId}
+                  meta={ALL_TOOL_METADATA[toolId]}
+                  callsAi={
+                    BASE_TOOL_METADATA[
+                      toolId as keyof typeof BASE_TOOL_METADATA
+                    ]?.callsAi
+                  }
+                  config={toolConfig[toolId] ?? {}}
+                  connections={connections}
+                  onChange={(next) => handleToolConfigChange(toolId, next)}
+                />
+              ))}
+            </div>
           ))}
         </div>
       </SettingSection>

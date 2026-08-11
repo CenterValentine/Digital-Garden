@@ -28,7 +28,30 @@ import {
 } from "@/state/right-sidebar-state-store";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";
 
-export function RightSidebar() {
+interface RightSidebarProps {
+  /**
+   * Tab keys to hide regardless of extension state. Pass a referentially-stable
+   * array (a module constant) so the memo stays put.
+   */
+  excludeTabs?: string[];
+  /**
+   * Tab keys to render disabled (visible but dimmed + unresponsive) — the panel
+   * embed does this for Studio.
+   */
+  disabledTabs?: string[];
+  /**
+   * Override the collapse toggle (the `>|` button). When set, the button calls
+   * this instead of the shared right-panel-collapse store — the panel embed uses
+   * it to keep its own, separate collapse state.
+   */
+  onToggleCollapse?: () => void;
+}
+
+export function RightSidebar({
+  excludeTabs,
+  disabledTabs,
+  onToggleCollapse,
+}: RightSidebarProps = {}) {
   const selectedContentId = useContentStore((state) => state.selectedContentId);
   const selectedContentType = useContentStore((state) => state.selectedContentType);
   const selectedBlockId = useBlockStore((s) => s.selectedBlockId);
@@ -60,7 +83,9 @@ export function RightSidebar() {
       .filter(Boolean)
       // Context stays regardless (its links/tags sub-tabs are core); only
       // the Studio tab follows extension enablement.
-      .filter((tabKey) => studioEnabled || tabKey !== STUDIO_TAB_KEY) as RightSidebarTab[];
+      .filter((tabKey) => studioEnabled || tabKey !== STUDIO_TAB_KEY)
+      // Caller-requested exclusions (compact panel embed trims heavy tabs).
+      .filter((tabKey) => !excludeTabs?.includes(tabKey as string)) as RightSidebarTab[];
 
     // Properties tab is available when a block is selected (injected by RightSidebarHeader)
     if (selectedBlockId && !tabs.includes("properties")) {
@@ -68,7 +93,7 @@ export function RightSidebar() {
     }
 
     return tabs;
-  }, [selectedContentType, selectedBlockId, studioEnabled]);
+  }, [selectedContentType, selectedBlockId, studioEnabled, excludeTabs]);
 
   // The saved tab is sacred: it ONLY changes via an explicit user action
   // (handleTabChange). Selecting a block shows the Properties panel as a LIVE,
@@ -106,6 +131,8 @@ export function RightSidebar() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         disabled={!rightPanelReady}
+        disabledTabs={disabledTabs}
+        onToggleCollapse={onToggleCollapse}
       />
 
       {/* Preference loader until the persisted last-seen view is known

@@ -186,6 +186,56 @@ window.addEventListener("message", (event) => {
     return;
   }
 
+  // Phase 2b: the panel asks to open the right-side tree overlay. Relay the
+  // existing show-tree-panel message to the background → active tab's overlay.
+  if (data.type === "show-tree") {
+    chrome.runtime.sendMessage({ type: "show-tree-panel" }, () => {
+      void chrome.runtime.lastError; // fire-and-forget; overlay may be unavailable
+    });
+    return;
+  }
+
+  // Workspace sync: the panel switched workspace — relay to the background so the
+  // tree overlay mirrors it (and vice-versa via the port below).
+  if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+    chrome.runtime.sendMessage(
+      { type: "workspace-sync", workspaceId: data.payload.workspaceId },
+      () => void chrome.runtime.lastError,
+    );
+    return;
+  }
+
+  // Boot restore: the embed asks for the persisted active workspace. Fetch it
+  // from the background and replay as `workspace-changed` so the embed's existing
+  // receive-handler activates it (instead of defaulting to Main).
+  if (data.type === "request-active-workspace") {
+    chrome.runtime.sendMessage({ type: "get-active-workspace" }, (resp) => {
+      if (chrome.runtime.lastError) return;
+      const workspaceId = resp?.ok ? resp.data?.workspaceId : null;
+      if (workspaceId) postToEmbed("workspace-changed", { workspaceId });
+    });
+    return;
+  }
+
+  // Pin quick-add: the embed resolved the target folder for the pinned page.
+  // Relay to the background so it can create the link with the bearer token and
+  // fulfil the overlay's held response.
+  if (data.type === "pin-resolved") {
+    chrome.runtime.sendMessage(
+      {
+        type: "pin-resolved",
+        tabId: data.payload?.tabId ?? null,
+        parentId: data.payload?.parentId ?? null,
+        contentId: data.payload?.contentId ?? null,
+        url: data.payload?.url ?? null,
+        title: data.payload?.title ?? null,
+        noTarget: data.payload?.noTarget === true,
+      },
+      () => void chrome.runtime.lastError,
+    );
+    return;
+  }
+
   // Capture: the embed asks for the current page's content at a scope. Only
   // the content script can read the page, so relay there and post the result
   // back. The active tab is authoritative here (the panel host tracks it).
@@ -561,9 +611,16 @@ async function boot() {
   // a fresh chat about the page. One-shot: consumed here so a later manual open
   // is neutral.
   try {
-    const { dgPanelView, dgPanelIntent } = await chrome.storage.session.get([
+    const {
+      dgPanelView,
+      dgPanelIntent,
+      dgPanelOpenContentId,
+      dgPanelOpenContentType,
+    } = await chrome.storage.session.get([
       "dgPanelView",
       "dgPanelIntent",
+      "dgPanelOpenContentId",
+      "dgPanelOpenContentType",
     ]);
     if (dgPanelView === "chat") {
       panelUrl.searchParams.set("view", "chat");
@@ -571,7 +628,19 @@ async function boot() {
     if (dgPanelIntent) {
       panelUrl.searchParams.set("intent", dgPanelIntent);
     }
-    await chrome.storage.session.remove(["dgPanelView", "dgPanelIntent"]);
+    // Cold-open from a tree click (Phase 1b): the content to open on boot.
+    if (dgPanelOpenContentId) {
+      panelUrl.searchParams.set("open", dgPanelOpenContentId);
+      if (dgPanelOpenContentType) {
+        panelUrl.searchParams.set("openType", dgPanelOpenContentType);
+      }
+    }
+    await chrome.storage.session.remove([
+      "dgPanelView",
+      "dgPanelIntent",
+      "dgPanelOpenContentId",
+      "dgPanelOpenContentType",
+    ]);
   } catch {
     // Session storage unavailable — default view is fine.
   }
@@ -596,6 +665,24 @@ chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === "cobrowse-session-ended") {
     postToEmbed("cobrowse-session-ended", message.payload || {});
   }
+  // Close-all asked the panel to close. A side-panel page can close itself via
+  // window.close(); this arrives by broadcast (not the dg-panel port, which is
+  // null after SW eviction), so it reaches the panel regardless of port state.
+  if (message?.type === "dg-close-panel") {
+    try {
+      window.close();
+    } catch {
+      // Some Chromium builds disallow programmatic side-panel close — no-op.
+    }
+  }
+  // A tree file-click while the panel is open but the dg-panel port is dead (SW
+  // evicted). Delivered by broadcast instead of the port so it still lands.
+  if (message?.type === "dg-open-content" && message.contentId) {
+    postToEmbed("open-content", {
+      contentId: message.contentId,
+      contentType: message.contentType || null,
+    });
+  }
 });
 
 let panelPort = null;
@@ -604,6 +691,38 @@ try {
   panelPort.onMessage.addListener((msg) => {
     if (msg?.type === "show-chat") {
       postToEmbed("set-view", { view: "chat", intent: msg.intent });
+    }
+    // PANEL-OVERLAY-PLAN Phase 1b: a tree-clicked content to open in the sidebar
+    // while the panel is already open. Relay to the embed shell.
+    if (msg?.type === "open-content" && msg.contentId) {
+      postToEmbed("open-content", {
+        contentId: msg.contentId,
+        contentType: msg.contentType || null,
+      });
+    }
+    // Workspace sync: a switch elsewhere (tree overlay) — mirror it in the panel.
+    if (msg?.type === "workspace-changed" && msg.workspaceId) {
+      postToEmbed("workspace-changed", { workspaceId: msg.workspaceId });
+    }
+    // Close the side panel (the "both"/panel handle asked). No sidePanel.close()
+    // in MV3, so the panel document closes itself.
+    if (msg?.type === "close-panel") {
+      try {
+        window.close();
+      } catch {
+        // Some Chromium builds disallow programmatic side-panel close — no-op.
+      }
+    }
+    // Pin quick-add: the overlay wants to pin the current page under the
+    // selection. Only the embed knows the selection — relay in; it posts
+    // `pin-resolved` back out (window listener above) → background creates it.
+    if (msg?.type === "pin-add") {
+      postToEmbed("pin-add", {
+        tabId: msg.tabId ?? null,
+        mode: msg.mode === "associate" ? "associate" : "folder",
+        url: msg.url ?? null,
+        title: msg.title ?? null,
+      });
     }
   });
   // Auto-recovery: a live port keeps the service worker awake, so while the

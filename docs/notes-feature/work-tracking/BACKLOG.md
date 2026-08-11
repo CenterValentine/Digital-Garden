@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-05
+last_updated: 2026-08-09
 ---
 
 # Sprint Backlog
@@ -7,6 +7,31 @@ last_updated: 2026-08-05
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Context diet — follow-ups (2026-08-09, after PR #156 Sprints 7–8; measurements in the `ai-reliability-fix-plan` memo)
+
+Owner direction: generalize beyond the shipped named-param stripping — review real sessions to find the NEXT bloat class, especially **non-informative fluff in the HTML/content itself**. Hard boundary from the elision analysis (see `read-elision-rejected` memory): every cut must be *provably absence-safe* — structural chrome and opaque tokens, never evidence the analysis might judge. Fuzzy/heuristic removal of content text stays banned.
+
+- [ ] **Learn-and-heal session audits.** Script the decomposition harness used in the 2026-08-08 analysis (chars by part type, resend curve, consecutive-snapshot repetition ratio) so it runs over recent co-browse conversations on demand. Each audit's findings graduate into concrete diet rules — this loop is what caught tracking params; it should catch whatever is next.
+- [ ] **Maintained tracking-param ruleset.** Replace the hand-named `TRACKING_PARAMS` sets (app `co-browse-tools.ts` + extension `snapshot.js` — keep them as fallback) with a vendored community ruleset (ClearURLs rules DB or AdGuard's tracking-params list) per the repo's prefer-maintained-standards rule. Skip value-length/entropy stripping for any URL the model may navigate to — presigned/filter URLs carry functional long values.
+- [ ] **HTML/content fluff pass.** Audit what still reaches the model after the existing filters (AX-tree interactable+orientation allowlist, readability extraction, overlay/embed-frame exclusion, delta snapshots): candidates are cookie/consent banner subtrees, skip-links, icon-only elements with verbose accessible names, repeated per-card action labels ("Dismiss job", "Save"), `banner`/`contentinfo` boilerplate in reads, and page-read text outside the readability main region. Measure first (via the audit script), cut only what classifies as chrome by ROLE/STRUCTURE — not by content similarity.
+- [ ] **Canonical-URL surfacing.** Extension reports `<link rel="canonical">` alongside the address-bar URL — clean ledger keys and dedup on tracking-heavy sites (LinkedIn job pages canonicalize to bare `/jobs/view/ID`). Display/dedup hint only; never substitute it for the navigation URL (pagination canonicals lie).
+
+## Folder Context Capsule — follow-ups (2026-08-06, branch `feat/ai-context-capsule`; plan: FOLDER-CONTEXT-CAPSULE-PLAN.md)
+
+- [ ] **Recent-activity projection in the capsule** — "what changed lately" derived from `updatedAt` columns; zero LLM cost; valuable "what the user is up to" context. Deferred by owner decision.
+- [ ] **Glossary section** — promote when the AI demonstrably fumbles folder-local vocabulary (acronyms, entity names). Interim home: `directives` prose.
+- [ ] **Conventions/patterns section** — "a well-formed item here has sections X/Y/Z"; promote when creation-tasks need it. Interim home: `directives`.
+- [ ] **`search_folder` probe tool** — scoped full-text search within a subtree (needle-shaped queries; cheaper than walking). Global `searchNotes` is the interim fallback.
+- [ ] **Latency-class warning in Feature Routing UI** — flag when a slow reasoning model is routed to a background-frequency route (`studio-metadata`, `ai-context-enhanced`). The gate's stale-serve ladder already prevents hangs; this is advisory.
+- [ ] **Contract migration: drop `contextOptOut`** — the expand/contract second half (sweep B4). After one release on `contextMode`, remove the boolean column + `explicitMode` transition logic.
+- [ ] **Settings relocation** — `autoContextMode`/`dailyCallCap` storage keys live under `settings.studio.*` and the UI under `/settings/extensions/studio`, while the engine is core domain now (D2 identifier stability). Relocate keys + surface when worth a settings migration.
+- [ ] **File-tree context-menu quick-set** for context modes (rail is the only surface today).
+- [ ] **Dev-DB reproducibility** — local dev Postgres predates the baseline squash and carries push-drift (`SearchConnection`/`SitePage`/StudioContextSpend FK) + stale `_prisma_migrations` rows; a `migrate reset` on a day dev data doesn't matter restores `migrate dev`. (The capsule migration was applied via `db execute` + `resolve` for this reason; its recorded checksum predates the final file — cosmetic, dev-only.)
+- [ ] **Anthropic template curation** — `claude-haiku-4-5` added (build gate requires suggestions ∈ template); the remaining entries (sonnet-4, sonnet-3-5, opus-4, retired haiku-3-5) are dated — refresh via the catalog-freshness pass.
+- [ ] **Cross-folder `relations` section** — edges like "Banks draws evidence from Experience"; revisit if root roll-ups prove insufficient.
 
 ---
 

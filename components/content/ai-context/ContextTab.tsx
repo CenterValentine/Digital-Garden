@@ -4,9 +4,10 @@
  * One tab, three sub-tabs: Links (backlinks), Tags, and AI (the agentic
  * metadata doc). Layout mirrors the inbox left-panel navigator — a row of
  * rounded icon buttons inside a bordered header (no section title above it),
- * with the active sub-tab's label BENEATH the divider line. The AI sub-tab
- * follows studio extension enablement; links/tags are core and always
- * available for their content types.
+ * with the active sub-tab's label BENEATH the divider line. All three
+ * sub-tabs are CORE surfaces — the AI context layer graduated out of the
+ * studio extension (FOLDER-CONTEXT-CAPSULE-PLAN Phase 0/3), so none of them
+ * follow extension enablement.
  */
 
 "use client";
@@ -15,10 +16,8 @@ import { useState } from "react";
 import { BrainCircuit, Link as LinkIcon, Tag as TagIcon } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
-import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import { BacklinksPanel } from "@/components/content/BacklinksPanel";
 import { TagsPanel } from "@/components/content/TagsPanel";
-import { STUDIO_EXTENSION_ID } from "../manifest";
 import { ContextAiPanel } from "./ContextAiPanel";
 
 type ContextSubTab = "links" | "tags" | "ai";
@@ -53,18 +52,15 @@ const AI_CONTENT_TYPES = new Set([
 export function ContextTab() {
   const selectedContentId = useContentStore((s) => s.selectedContentId);
   const selectedContentType = useContentStore((s) => s.selectedContentType);
-  const studioEnabled = useIsExtensionEnabled(STUDIO_EXTENSION_ID);
 
   const available: ContextSubTab[] = [];
   if (selectedContentType && LINKS_CONTENT_TYPES.has(selectedContentType)) {
     available.push("links");
   }
   available.push("tags");
-  if (
-    studioEnabled &&
-    selectedContentType &&
-    AI_CONTENT_TYPES.has(selectedContentType)
-  ) {
+  // AI context is CORE infrastructure post-graduation (plan Phase 0/D11):
+  // it no longer follows studio enablement — governance is contextMode.
+  if (selectedContentType && AI_CONTENT_TYPES.has(selectedContentType)) {
     available.push("ai");
   }
 

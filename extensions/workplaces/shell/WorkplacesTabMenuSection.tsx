@@ -1,8 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import type { ExtensionShellTabMenuSectionProps } from "@/lib/extensions/types";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
+import {
+  copyTreeItems,
+  ensureAltTracker,
+} from "@/lib/features/content/tree-clipboard";
 
 export function WorkplacesTabMenuSection({
   tab,
@@ -14,6 +18,12 @@ export function WorkplacesTabMenuSection({
     (state) => state.assignContentToWorkspace
   );
 
+  // Alt at Copy-click = strictly the URL — the tracker must be live while
+  // the menu is open, before any click lands.
+  useEffect(() => {
+    ensureAltTracker();
+  }, []);
+
   const targetWorkspaces = useMemo(
     () => workspaces.filter((workspace) => workspace.id !== activeWorkspaceId),
     [activeWorkspaceId, workspaces]
@@ -21,6 +31,32 @@ export function WorkplacesTabMenuSection({
 
   return (
     <>
+      <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
+        Clipboard
+      </div>
+      <button
+        type="button"
+        className="flex w-full items-center rounded px-2 py-1.5 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10"
+        onClick={() => {
+          closeMenu();
+          // Same dual-flavor payload as the file tree (owner spec
+          // 2026-08-10): URL as text, wiki-link html for note paste,
+          // @-mention on chat paste — and tree paste rides along for free.
+          void copyTreeItems(
+            [
+              {
+                id: tab.contentId,
+                title: tab.title || "Untitled",
+                contentType: tab.contentType ?? "note",
+              },
+            ],
+            "copy",
+          );
+        }}
+      >
+        Copy link
+      </button>
+      <div className="my-1 h-px bg-black/10 dark:bg-white/10" />
       <div className="px-2 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-gray-500">
         Move to workplace
       </div>

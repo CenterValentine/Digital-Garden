@@ -52,6 +52,13 @@ export interface ConversationDetail extends ConversationSummary {
    * override is visible instead of silently misdirecting output.
    */
   inferredTargetFolder: { id: string; title: string | null } | null;
+  /**
+   * Cumulative estimated spend across the conversation's visible
+   * assistant turns (cost metering). `usd` sums persisted write-time
+   * costs; `unpricedTurns` counts turns whose model had no price entry
+   * (excluded from the sum — surfaced so the total is honest).
+   */
+  spend: { usd: number; pricedTurns: number; unpricedTurns: number };
 }
 
 export interface ConversationMessageView {

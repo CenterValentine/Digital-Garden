@@ -14,6 +14,8 @@ export const EDITOR_TOOL_IDS = [
   "replace_document",
   "insert_image",
   "insert_block",
+  "list_document_blocks",
+  "update_block",
   "plan",
   "ask_user",
   "finish_with_summary",
@@ -53,6 +55,14 @@ export const EDITOR_TOOL_METADATA: Record<
   insert_block: {
     name: "Insert Block",
     description: "Insert a rich content block (hero, callout, card, stat, …) into the document",
+  },
+  list_document_blocks: {
+    name: "List Blocks",
+    description: "List the rich blocks currently in the open document",
+  },
+  update_block: {
+    name: "Update Block",
+    description: "Edit an existing block's attributes",
   },
   plan: {
     name: "Plan Edits",
