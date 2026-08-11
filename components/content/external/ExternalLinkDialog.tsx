@@ -119,12 +119,12 @@ export function ExternalLinkDialog({
     <>
       {/* Backdrop - lighter and more transparent */}
       <div
-        className="fixed inset-0 z-50 bg-black/5 backdrop-blur-sm"
+        className="fixed inset-0 z-[200] bg-black/5 backdrop-blur-sm"
         onClick={() => onOpenChange(false)}
       />
 
       {/* Dialog */}
-      <div className="fixed left-1/2 top-1/2 z-50 w-full max-w-md -translate-x-1/2 -translate-y-1/2">
+      <div className="fixed left-1/2 top-1/2 z-[200] w-full max-w-md -translate-x-1/2 -translate-y-1/2">
         <div
           className="border border-white/10 rounded-lg shadow-2xl"
           style={{

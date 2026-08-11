@@ -56,6 +56,8 @@ registerBlock({
   type: "sectionHeader",
   label: "Section Header",
   description: "Styled section divider with heading text",
+  aiHint:
+    "A large styled heading that titles a section of a document; body content follows it. Use to break a long note into named parts. Not a quotation (use pullQuote) and not a bordered box (use cardPanel).",
   iconName: "Heading",
   family: "content",
   group: "text",

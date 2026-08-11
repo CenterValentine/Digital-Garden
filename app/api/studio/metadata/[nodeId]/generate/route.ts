@@ -17,7 +17,7 @@ import {
   generateMetadataForNode,
   StudioContextOptedOutError,
   StudioModelUnavailableError,
-} from "@/extensions/studio/server/metadata";
+} from "@/lib/domain/ai-context/metadata";
 
 const ROUTE_PATH = "/api/studio/metadata/[nodeId]/generate";
 

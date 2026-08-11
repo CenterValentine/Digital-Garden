@@ -43,7 +43,7 @@ const CATEGORIES: Category[] = [
       { name: "IDE-style editor", desc: "A rich TipTap editor with a panel-based workspace — built for writing, not just typing." },
       { name: "Slash commands", desc: "Type / to drop in headings, callouts, blocks, diagrams, and more without leaving the keyboard." },
       { name: "Daily & periodic notes", desc: "One keystroke opens today's note — a frictionless home for whatever's on your mind." },
-      { name: "Browser bookmarks extension", desc: "Clip pages, highlights, and links from anywhere on the web straight into your garden." },
+      { name: "Browser extension", desc: "Clip pages, links, and highlights into your garden — and co-browse the web with AI, right from the page." },
       { name: "External links + previews", desc: "Paste any URL and get a rich Open Graph card with title, image, and description." },
       { name: "File uploads", desc: "Drop in images, PDFs, and documents — stored in your own cloud, attached to your notes." },
       { name: "Voice to text", desc: "Speak a thought and have it transcribed into the note — capture at the speed of talking." },

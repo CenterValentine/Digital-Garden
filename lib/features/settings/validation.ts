@@ -92,12 +92,15 @@ const aiSettingsSchema = z
     enabled: z.boolean().optional(),
     // Provider & model selection
     providerId: z
-      .enum(["anthropic", "openai", "google", "xai", "mistral", "groq"])
+      .enum(["anthropic", "openai", "google", "xai", "mistral", "groq", "deepseek"])
       .optional(),
     modelId: z.string().optional(),
     // Generation parameters
     temperature: z.number().min(0).max(2).optional(),
-    maxTokens: z.number().min(1).max(200_000).optional(),
+    // null = no user ceiling — the chat route sends the executed model's
+    // documented maximum from the provider catalog instead. A number is an
+    // explicit per-response output cap.
+    maxTokens: z.number().min(1).max(200_000).nullable().optional(),
     streamingEnabled: z.boolean().optional(),
     // Subtle typewriter reveal of streaming responses. Default on.
     typingEffect: z.boolean().optional(),
@@ -514,7 +517,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     providerId: "anthropic",
     modelId: "claude-sonnet-3-5",
     temperature: 0.7,
-    maxTokens: 4096,
+    // null = model maximum (catalog-resolved per executed model). A flat
+    // numeric default here silently truncated reasoning-heavy models.
+    maxTokens: null,
     streamingEnabled: true,
     typingEffect: true,
     conversationHistory: true,

@@ -9,6 +9,12 @@
  * affordances unconditionally and let the surface decide.
  */
 
+import { isAllowedEmbedMessageOrigin } from "./embed-message-origins";
+import type {
+  ExtensionAcquireMode,
+  ExtensionAcquireResult,
+} from "./page-bridge-client";
+
 export type OverlayCorner =
   | "top-left"
   | "top-right"
@@ -214,6 +220,189 @@ export function requestOpenUrl(url: string): void {
     { v: 1, source: "dg-panel-embed", type: "open-url", payload: { url } },
     "*"
   );
+}
+
+const PANEL_ACQUIRE_TIMEOUT_MS = 35_000;
+
+/**
+ * Panel-embed acquisition (B5). The extension's `page-bridge` content script
+ * doesn't run in this iframe, so acquisition can't use it here — it rides the
+ * panel-host channel instead (embed → host → background → provider). Unlike the
+ * fire-and-forget helpers above, this is a promise-based round-trip: the host
+ * replies with a single `acquire-url-result`. Only meaningful in the panel
+ * embed; resolves `ok:false` elsewhere so the caller can fall back.
+ *
+ * Requests are issued sequentially by the acquisition ladder (P2 then P3), so a
+ * single in-flight listener is sufficient — no request id needed.
+ */
+export function requestPanelAcquire(
+  url: string,
+  mode: ExtensionAcquireMode,
+  visible?: boolean
+): Promise<ExtensionAcquireResult> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, reason: "not in the panel embed" });
+      return;
+    }
+    let settled = false;
+    const finish = (result: ExtensionAcquireResult) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "acquire-url-result") {
+        finish(
+          (data.payload ?? { ok: false, reason: "empty result" }) as ExtensionAcquireResult
+        );
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, reason: "the extension took too long" }),
+      PANEL_ACQUIRE_TIMEOUT_MS
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      {
+        v: 1,
+        source: "dg-panel-embed",
+        type: "acquire-url",
+        payload: { url, mode, visible: visible === true },
+      },
+      "*"
+    );
+  });
+}
+
+const CO_BROWSE_TIMEOUT_MS = 30_000;
+let coBrowseSeq = 0;
+
+/** Result envelope from a co-browse op relayed through the panel host. */
+export interface CoBrowseResult<T = unknown> {
+  ok: boolean;
+  data?: T;
+  error?: string;
+}
+
+/**
+ * Agentic co-browse (Phase 2b, Slice 5a). The interaction engine lives in the
+ * extension's background service worker (chrome.debugger + CDP); the panel embed
+ * drives it THROUGH the panel host — the only trust-gated app→extension channel
+ * (exact-origin + source-checked in the host). It is deliberately NOT reachable
+ * from the open page-bridge content script (which runs on every web page), so a
+ * random page can't trigger a debugger attach. Promise round-trip correlated by
+ * `id`, so an out-of-band `status` poll can't be mistaken for an action's reply.
+ * Resolves `ok:false` outside the panel so callers can degrade.
+ */
+export function requestCoBrowse<T = unknown>(
+  op: string,
+  args?: Record<string, unknown>
+): Promise<CoBrowseResult<T>> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, error: "co-browse is only available in the side panel" });
+      return;
+    }
+    const id = ++coBrowseSeq;
+    let settled = false;
+    const finish = (result: CoBrowseResult<T>) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object") return;
+      if (data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "cobrowse-result" && data.payload?.id === id) {
+        finish(
+          (data.payload.result ?? { ok: false, error: "empty result" }) as CoBrowseResult<T>
+        );
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, error: "the extension took too long" }),
+      CO_BROWSE_TIMEOUT_MS
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "cobrowse", payload: { id, op, args: args ?? {} } },
+      "*"
+    );
+  });
+}
+
+/** Readable content of the tab the user is currently on (R1: "read the page I'm on"). */
+export interface CapturedPageContent {
+  ok: boolean;
+  url?: string;
+  title?: string;
+  siteName?: string;
+  content?: string;
+  error?: string;
+}
+
+/**
+ * Read the CURRENT tab's readable content via the panel's content-script capture
+ * (Readability) — the page already open + authenticated in front of the user, NO
+ * re-fetch and NO new tab (and no debugger banner; this is a pure read). Promise
+ * round-trip: post `capture-page`, resolve on `page-content` / reject-shape on
+ * `page-content-error`. Only meaningful in the panel embed.
+ */
+export function capturePageContent(scope = "full"): Promise<CapturedPageContent> {
+  return new Promise((resolve) => {
+    if (!isPanelEmbedSurface()) {
+      resolve({ ok: false, error: "reading the current page is only available in the side panel" });
+      return;
+    }
+    let settled = false;
+    const finish = (result: CapturedPageContent) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      window.removeEventListener("message", onMessage);
+      resolve(result);
+    };
+    function onMessage(event: MessageEvent) {
+      if (!isAllowedEmbedMessageOrigin(event.origin)) return;
+      const data = event.data;
+      if (!data || typeof data !== "object" || data.v !== 1 || data.source !== "dg-panel-host") return;
+      if (data.type === "page-content") {
+        const p = data.payload ?? {};
+        finish({
+          ok: true,
+          url: typeof p.url === "string" ? p.url : undefined,
+          title: typeof p.title === "string" ? p.title : undefined,
+          siteName: typeof p.siteName === "string" ? p.siteName : undefined,
+          content: typeof p.content === "string" ? p.content : "",
+        });
+      } else if (data.type === "page-content-error") {
+        finish({
+          ok: false,
+          error: typeof data.payload?.message === "string" ? data.payload.message : "couldn't read this page",
+        });
+      }
+    }
+    const timer = window.setTimeout(
+      () => finish({ ok: false, error: "reading the current page timed out" }),
+      20_000,
+    );
+    window.addEventListener("message", onMessage);
+    window.parent.postMessage(
+      { v: 1, source: "dg-panel-embed", type: "capture-page", payload: { scope } },
+      "*",
+    );
+  });
 }
 
 /** Decode a data: URL into a File for the chat's attachment path. */

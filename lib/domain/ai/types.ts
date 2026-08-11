@@ -12,13 +12,15 @@ export type AIProviderId =
   | "google"
   | "xai"
   | "mistral"
-  | "groq";
+  | "groq"
+  | "deepseek";
 
 /** Model identifiers — canonical DG model IDs mapped to provider strings in registry */
 export type AIModelId =
   | "claude-opus-4"
   | "claude-sonnet-4"
   | "claude-sonnet-3-5"
+  | "claude-haiku-4-5"
   | "claude-haiku-3-5"
   | "gpt-4o"
   | "gpt-4o-mini"
@@ -31,7 +33,16 @@ export type AIModelId =
   | "mistral-large"
   | "codestral"
   | "mixtral-8x7b"
-  | "llama-3.3-70b";
+  | "llama-3.3-70b"
+  // Direct-API ids where they differ from the canonical short ids above —
+  // the BYOK/template path resolves these (catalog lookup is by the id the
+  // provider connection actually sends). See the catalog header note.
+  | "mistral-large-latest"
+  | "codestral-latest"
+  | "mixtral-8x7b-32768"
+  | "llama-3.3-70b-versatile"
+  | "deepseek-v4-pro"
+  | "deepseek-v4-flash";
 
 /** Configuration passed to resolveChatModel() */
 export interface ProviderConfig {

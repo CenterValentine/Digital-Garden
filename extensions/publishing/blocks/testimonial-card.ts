@@ -47,6 +47,8 @@ registerBlock({
   type: "testimonialCard",
   label: "Testimonial",
   description: "A quote from a person with attribution and optional star rating",
+  aiHint:
+    "A quotation attributed to a named person, with optional photo, role, and star rating. To emphasize a phrase from the current document with no external attribution, use pullQuote instead.",
   iconName: "Quote",
   family: "content",
   group: "publishing",

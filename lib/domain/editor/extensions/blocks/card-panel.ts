@@ -32,6 +32,8 @@ registerBlock({
   type: "cardPanel",
   label: "Card / Panel",
   description: "Bordered container with optional header",
+  aiHint:
+    "A bordered, always-visible container that groups blocks under an optional header. For a section that collapses/expands use accordion; for a question-and-answer list use faqAccordion.",
   iconName: "SquareStack",
   family: "content",
   group: "container",

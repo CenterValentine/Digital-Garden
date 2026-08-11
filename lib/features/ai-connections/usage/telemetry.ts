@@ -14,10 +14,18 @@
  * the chat route's resolver priority (direct beats gateway), which
  * makes the meter mirror the routing the user actually saw.
  *
- * Token totals come from message metadata (`metadata.usage`) when
- * present; otherwise rows show requests only with no $ figure.
- * Capturing usage in metadata is a planned wiring follow-up — for now
- * the adapter renders message counts honestly and the UI flags it.
+ * Token totals come from message metadata (`metadata.usage`), captured
+ * by the chat route + the client's per-turn accumulator. Dollar figures
+ * prefer the PERSISTED `metadata.cost` (priced at write time, pinned to
+ * the price-table version of that day); rows that predate cost
+ * persistence fall back to pricing their usage at CURRENT rates and the
+ * report notes it. Models with no price row count as "unpriced" — never
+ * silently $0.
+ *
+ * Attribution upgrade (cost-metering P3): messages persisted after AI 3.4
+ * carry `metadata.modelRoute.connectionId` — the EXACT Connection that
+ * served the turn. That wins outright; the resolver-mirror heuristic
+ * below remains for older rows.
  */
 
 import { prisma } from "@/lib/database/client";
@@ -28,7 +36,7 @@ import type {
   UsageMoney,
   UsageReport,
 } from "./types";
-import { estimateCost, priceFor } from "./pricing";
+import { computeTurnCost, readPersistedCost } from "./pricing";
 
 interface AggregateKey {
   providerId: string;
@@ -39,8 +47,12 @@ interface AggregateBucket {
   requests: number;
   inputTokens: number;
   outputTokens: number;
+  cachedInputTokens: number;
   cost: number;
   haveTokens: boolean; // false → row shows "requests only"
+  haveCost: boolean; // false → row shows tokens without a $ figure
+  legacyCostRows: number; // rows priced at current rates (no persisted cost)
+  unpricedRows: number; // rows with usage but no price entry
 }
 
 /**
@@ -111,11 +123,28 @@ export async function buildTelemetryReport(
 
   for (const m of messages) {
     if (!m.providerId || !m.modelId) continue;
-    const attributed = attribute(
-      args.allConnections,
-      m.providerId,
-      m.modelId,
-    );
+    const meta = (m.metadata ?? {}) as {
+      usage?: {
+        inputTokens?: number;
+        outputTokens?: number;
+        cachedInputTokens?: number;
+        cacheWriteTokens?: number;
+      };
+      cost?: unknown;
+      modelRoute?: { connectionId?: unknown };
+    };
+
+    // Exact attribution first (metadata.modelRoute.connectionId names the
+    // Connection that actually served the turn); heuristic for old rows.
+    const stampedConnectionId =
+      typeof meta.modelRoute?.connectionId === "string"
+        ? meta.modelRoute.connectionId
+        : null;
+    const attributed =
+      stampedConnectionId &&
+      args.allConnections.some((c) => c.id === stampedConnectionId)
+        ? stampedConnectionId
+        : attribute(args.allConnections, m.providerId, m.modelId);
     if (attributed !== args.connection.id) continue;
 
     const key = keyFor({ providerId: m.providerId, modelId: m.modelId });
@@ -125,29 +154,50 @@ export async function buildTelemetryReport(
         requests: 0,
         inputTokens: 0,
         outputTokens: 0,
+        cachedInputTokens: 0,
         cost: 0,
         haveTokens: false,
+        haveCost: false,
+        legacyCostRows: 0,
+        unpricedRows: 0,
       };
       buckets.set(key, bucket);
     }
     bucket.requests += 1;
 
-    // Token usage may live in metadata.usage when the chat route's
-    // server-side onFinish persistence is wired (deferred). Until then
-    // most messages won't have it; the bucket falls through to
-    // requests-only.
-    const meta = (m.metadata ?? {}) as { usage?: { inputTokens?: number; outputTokens?: number } };
     if (
       meta.usage &&
       (typeof meta.usage.inputTokens === "number" ||
         typeof meta.usage.outputTokens === "number")
     ) {
       bucket.haveTokens = true;
-      const i = meta.usage.inputTokens ?? 0;
-      const o = meta.usage.outputTokens ?? 0;
-      bucket.inputTokens += i;
-      bucket.outputTokens += o;
-      bucket.cost += estimateCost(m.modelId, i, o);
+      bucket.inputTokens += meta.usage.inputTokens ?? 0;
+      bucket.outputTokens += meta.usage.outputTokens ?? 0;
+      bucket.cachedInputTokens += meta.usage.cachedInputTokens ?? 0;
+
+      // Dollar figure: persisted cost wins (write-time pricing, version-
+      // pinned); legacy rows priced at current rates; no price row →
+      // counted as unpriced, NOT zero.
+      const persisted = readPersistedCost(meta.cost);
+      if (persisted) {
+        bucket.haveCost = true;
+        bucket.cost += persisted.usd;
+      } else if (
+        meta.cost &&
+        typeof meta.cost === "object" &&
+        (meta.cost as { unpriced?: unknown }).unpriced === true
+      ) {
+        bucket.unpricedRows += 1;
+      } else {
+        const computed = computeTurnCost(meta.usage, m.modelId, m.providerId);
+        if (computed) {
+          bucket.haveCost = true;
+          bucket.cost += computed.usd;
+          bucket.legacyCostRows += 1;
+        } else {
+          bucket.unpricedRows += 1;
+        }
+      }
     }
   }
 
@@ -159,14 +209,22 @@ export async function buildTelemetryReport(
   let totalOutput = 0;
   let totalCost = 0;
   let anyTokens = false;
+  let anyCost = false;
+  let legacyCostRows = 0;
+  let unpricedRows = 0;
 
   for (const [key, b] of buckets) {
     const [providerId, modelId] = key.split("::");
     totalRequests += b.requests;
+    legacyCostRows += b.legacyCostRows;
+    unpricedRows += b.unpricedRows;
     if (b.haveTokens) {
       anyTokens = true;
       totalInput += b.inputTokens;
       totalOutput += b.outputTokens;
+    }
+    if (b.haveCost) {
+      anyCost = true;
       totalCost += b.cost;
     }
     byModel.push({
@@ -178,12 +236,10 @@ export async function buildTelemetryReport(
             input: b.inputTokens,
             output: b.outputTokens,
             total: b.inputTokens + b.outputTokens,
+            ...(b.cachedInputTokens > 0 ? { cached: b.cachedInputTokens } : {}),
           }
         : undefined,
-      cost:
-        b.haveTokens && priceFor(modelId)
-          ? { amount: b.cost, currency: "USD" }
-          : undefined,
+      cost: b.haveCost ? { amount: b.cost, currency: "USD" } : undefined,
     });
 
     const prov = byProvider.get(providerId) ?? {
@@ -199,6 +255,8 @@ export async function buildTelemetryReport(
         output: (prov.tokens?.output ?? 0) + b.outputTokens,
         total: (prov.tokens?.total ?? 0) + b.inputTokens + b.outputTokens,
       };
+    }
+    if (b.haveCost) {
       prov.cost = {
         amount: (prov.cost?.amount ?? 0) + b.cost,
         currency: "USD",
@@ -220,7 +278,7 @@ export async function buildTelemetryReport(
       tokens: anyTokens
         ? { input: totalInput, output: totalOutput, total: totalInput + totalOutput }
         : undefined,
-      cost: anyTokens ? { amount: totalCost, currency: "USD" } : undefined,
+      cost: anyCost ? { amount: totalCost, currency: "USD" } : undefined,
     },
     byModel,
     // Only attach the cross-provider breakdown for gateways — for a
@@ -233,8 +291,29 @@ export async function buildTelemetryReport(
         ? byUnderlyingProvider
         : undefined,
     refreshedAt: new Date().toISOString(),
-    note: anyTokens
-      ? undefined
-      : "Token counts and cost estimates are pending — server-side usage capture isn't wired yet. Counts below are message totals.",
+    note: buildReportNote({ anyTokens, legacyCostRows, unpricedRows }),
   };
+}
+
+/** Honesty notes: say exactly which figures are soft and why. */
+function buildReportNote(args: {
+  anyTokens: boolean;
+  legacyCostRows: number;
+  unpricedRows: number;
+}): string | undefined {
+  if (!args.anyTokens) {
+    return "No token usage captured for messages in this window (they predate usage persistence). Counts are message totals.";
+  }
+  const parts: string[] = [];
+  if (args.legacyCostRows > 0) {
+    parts.push(
+      `${args.legacyCostRows} turn${args.legacyCostRows === 1 ? "" : "s"} predate write-time pricing — estimated at current list rates`,
+    );
+  }
+  if (args.unpricedRows > 0) {
+    parts.push(
+      `${args.unpricedRows} turn${args.unpricedRows === 1 ? "" : "s"} on unpriced models excluded from $ totals`,
+    );
+  }
+  return parts.length > 0 ? `${parts.join("; ")}.` : undefined;
 }

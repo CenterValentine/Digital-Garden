@@ -59,6 +59,8 @@ registerBlock({
   type: "processSteps",
   label: "Process Steps",
   description: "Step-by-step process or how-to list — 6 visual variants",
+  aiHint:
+    "An ordered, numbered how-to or process sequence where order matters and each step has a title and description. For dated historical events use timeline instead.",
   iconName: "ListOrdered",
   family: "content",
   group: "publishing",

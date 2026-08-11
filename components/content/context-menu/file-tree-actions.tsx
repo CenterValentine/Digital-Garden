@@ -36,9 +36,12 @@ import {
   Captions,
   LampDesk,
   BookUp,
+  BookMarked,
+  BookMinus,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
+import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -81,6 +84,8 @@ export interface FileTreeContext {
     includeReferencedContent?: boolean; // Phase 2: Folder setting
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
+    isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
+    playbookDescription?: string; // v3.6: seeds the edit-description dialog
   };
   /** Callbacks */
   onRename?: (id: string) => void; // Triggers inline edit mode
@@ -279,19 +284,10 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           label: "Add",
           icon: <Plus className="h-4 w-4" />,
           submenu: newMenuItems.map(mapMenuItem),
-          divider: true,
-        },
-        {
-          // Import an Anthropic SKILL.md as a marked playbook note (AI v3.2
-          // T3, P5-import). Uses the same resolved `targetId` as the Add
-          // submenu — folder → into it, file → sibling, empty → root.
-          id: "import-skill-playbook",
-          label: "Import Skill as Playbook…",
-          icon: <BookUp className="h-4 w-4" />,
-          onClick: () => useImportSkillStore.getState().openDialog(targetId),
         },
       ],
     });
+    // "Import Skill as Playbook…" moved to the Playbook section below (v3.6).
   }
 
   if (isPeopleMount) {
@@ -307,6 +303,94 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       ],
     });
     return sections;
+  }
+
+  // --- Playbook (v3.6; consolidated off the editor context menu) ---
+  // Import Skill turns a pasted SKILL.md into a marked playbook note.
+  // Mark / Edit / Unmark act on a single note (or folder with a Notes payload);
+  // state-aware via clickedNode.isPlaybook so the menu shows the right verb.
+  // Editing details opens a centered modal — a modal never grows the menu past
+  // the viewport, unlike an inline input. The file's title is the playbook name
+  // and its `##` sections are the phases.
+  {
+    const playbookActions: ContextMenuAction[] = [];
+
+    if (
+      isSingleSelection &&
+      clickedId &&
+      clickedNode &&
+      (clickedNode.contentType === "note" || clickedNode.contentType === "folder")
+    ) {
+      const playbookTitle = clickedNode.title;
+      const contentId = clickedId;
+      if (clickedNode.isPlaybook) {
+        playbookActions.push(
+          {
+            id: "edit-playbook-details",
+            label: "Edit Playbook Details…",
+            icon: <BookMarked className="h-4 w-4" />,
+            onClick: () =>
+              usePlaybookDialogStore.getState().openDialog({
+                contentId,
+                title: playbookTitle,
+                description: clickedNode.playbookDescription ?? "",
+                editing: true,
+              }),
+          },
+          {
+            id: "unmark-playbook",
+            label: "Unmark Playbook",
+            icon: <BookMinus className="h-4 w-4" />,
+            onClick: async () => {
+              try {
+                const res = await fetch(
+                  `/api/content/playbooks/mark?contentId=${encodeURIComponent(contentId)}`,
+                  { method: "DELETE", credentials: "include" },
+                );
+                if (!res.ok) throw new Error("request failed");
+                window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                toast.success("Unmarked — removed from the /playbook picker");
+              } catch {
+                toast.error("Failed to unmark playbook");
+              }
+            },
+          },
+        );
+      } else {
+        playbookActions.push({
+          id: "mark-as-playbook",
+          label: "Mark as Playbook…",
+          icon: <BookMarked className="h-4 w-4" />,
+          onClick: () =>
+            usePlaybookDialogStore.getState().openDialog({
+              contentId,
+              title: playbookTitle,
+              editing: false,
+            }),
+        });
+      }
+    }
+
+    // Import Skill — available wherever new content can be created (single
+    // selection or empty space). Same target rule as the Add submenu:
+    // folder → into it, file/note → sibling, empty → root.
+    if (isSingleSelection || !clickedId) {
+      const importTarget: string | null = !clickedId
+        ? null
+        : isFolder
+          ? clickedId
+          : clickedNode?.parentId ?? null;
+      playbookActions.push({
+        id: "import-skill-playbook",
+        label: "Import Skill as Playbook…",
+        icon: <BookUp className="h-4 w-4" />,
+        onClick: () => useImportSkillStore.getState().openDialog(importTarget),
+      });
+    }
+
+    if (playbookActions.length > 0) {
+      sections.push({ title: "Playbook", actions: playbookActions });
+    }
   }
 
   // Section 2: Folder view mode (folder only, single selection)

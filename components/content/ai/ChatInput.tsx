@@ -75,6 +75,12 @@ interface ChatInputProps {
   commandItems?: SuggestionItem[];
   /** Called when a `/` selection is a playbook (contentType "playbook") — attach instead of inserting text. */
   onAttachPlaybook?: (item: SuggestionItem) => void;
+  /**
+   * Fires after a mention pill is inserted. Folder mentions use this to
+   * start the pre-flight context gate (plan Phase 4 / sweep B5) while the
+   * user is still typing.
+   */
+  onMentionInserted?: (item: SuggestionItem) => void;
   /** The playbook currently attached to this conversation, if any. */
   activePlaybook?: ActivePlaybook | null;
   /** Detach the active playbook (dismiss the chip). */
@@ -104,6 +110,7 @@ export function ChatInput({
   mentionResults = [],
   commandItems = [],
   onAttachPlaybook,
+  onMentionInserted,
   activePlaybook = null,
   onDetachPlaybook,
   footerLeading,
@@ -330,6 +337,7 @@ export function ChatInput({
         const space = document.createTextNode(" ");
         pill.after(space);
         placeCaretAfter(space);
+        onMentionInserted?.(item);
       } else if (item.contentType === "playbook") {
         // Attach, don't insert text — the trigger text was already deleted
         // above. The composer chip (below) shows what's attached.
@@ -344,7 +352,7 @@ export function ChatInput({
       emit();
       root.focus();
     },
-    [closeSuggestions, emit, onAttachPlaybook, suggestionMode],
+    [closeSuggestions, emit, onAttachPlaybook, onMentionInserted, suggestionMode],
   );
 
   // ── submit / keyboard ──
@@ -426,6 +434,41 @@ export function ChatInput({
         if (files.length > 0) {
           e.preventDefault();
           onAddFiles(files);
+          return;
+        }
+      }
+      // Tree-clipboard paste (owner spec 2026-08-10): a copied tree item
+      // carries a wiki-link html flavor — paste it as an @-mention pill (the
+      // chat's wikilink), same as dropping the node from the tree.
+      const html = e.clipboardData.getData("text/html");
+      if (html && html.includes('data-type="wiki-link"')) {
+        const root = editorRef.current;
+        const spans = new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelectorAll('span[data-type="wiki-link"][data-target-id]');
+        if (root && spans.length > 0) {
+          e.preventDefault();
+          const sel = window.getSelection();
+          const atCaret =
+            sel && sel.rangeCount > 0 && root.contains(sel.anchorNode);
+          spans.forEach((s) => {
+            const id = s.getAttribute("data-target-id") ?? "";
+            const title =
+              s.getAttribute("data-target-title") || s.textContent || id;
+            const pill = makeMentionPill(title, id);
+            if (atCaret && sel) {
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(pill);
+            } else {
+              appendToRoot(root, pill);
+            }
+            const space = document.createTextNode(" ");
+            pill.after(space);
+            placeCaretAfter(space);
+          });
+          root.focus();
+          emit();
           return;
         }
       }

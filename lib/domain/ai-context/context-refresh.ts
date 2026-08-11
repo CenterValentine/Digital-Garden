@@ -29,22 +29,28 @@
 import { generateObject } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
+import { ContextMode } from "@/lib/database/generated/prisma";
 import { getUserSettings } from "@/lib/features/settings";
 import { resolvePrimaryRoute } from "@/lib/domain/ai/features/router";
 import { resolveChatModelFromConnection } from "@/lib/domain/ai/providers/registry";
 import { stableHash } from "@/lib/core/stable-hash";
 import { logger } from "@/lib/core/logger";
-import { getStudioSettings } from "../settings";
+import { getAiContextSettings } from "./settings";
 import {
   applyGeneratedSections,
   assembleSourceText,
   computeSourceHash,
+  getGuidanceText,
   getStoredAiSections,
+  resolveContextGenerationRoute,
+  ONE_LINER_DESC,
+  SIGNALS_DESC,
   type MetadataNodeShape,
 } from "./metadata";
 import { createSourceContentResolver } from "./source-resolver";
 import { getGenLockedNodeIds } from "./gen-lock";
 import { getTodaySpend, recordSpend } from "./context-spend";
+import { resolveChildMode, resolveContextMode } from "./mode-resolve";
 
 // ── Budgets ───────────────────────────────────────────────────────────────
 
@@ -99,6 +105,8 @@ export type RefreshOutcome =
 interface ScopeNode extends MetadataNodeShape {
   parentId: string | null;
   depth: number;
+  /** Effective mode after inheritance (plan D6/D7) — what the drain acts on. */
+  resolvedMode: ContextMode;
   meta: {
     exists: boolean;
     contextDirty: boolean;
@@ -129,7 +137,7 @@ export async function refreshContextOnAccess(
   userId: string,
   rootId: string
 ): Promise<RefreshOutcome> {
-  const settings = getStudioSettings(await getUserSettings(userId));
+  const settings = getAiContextSettings(await getUserSettings(userId));
   if (settings.autoContextMode === "off") return { status: "off" };
   return refreshScope(userId, rootId);
 }
@@ -152,9 +160,77 @@ export async function refreshScope(
   if (inFlight.has(flightKey)) return { status: "skipped" };
   inFlight.add(flightKey);
   try {
-    return await runRefresh(userId, rootId, options);
+    // Cross-instance single-flight (sweep B2): the in-process set above only
+    // covers one serverless isolate; the claim stamp covers the rest.
+    if (!(await claimScope(rootId))) return { status: "skipped" };
+    try {
+      return await runRefresh(userId, rootId, options);
+    } finally {
+      await releaseScope(rootId);
+    }
   } finally {
     inFlight.delete(flightKey);
+  }
+}
+
+/** Cross-instance claim TTL — a crashed drain's claim expires after this. */
+const CLAIM_TTL_MS = 5 * 60_000;
+
+/**
+ * CAS-claim the scope root's `refreshClaimedAt` (sweep B2). A conditional
+ * updateMany takes the claim only when it is empty or expired — Postgres
+ * serializes the row write, so exactly one instance wins. Session-scoped
+ * advisory locks were rejected here: through a connection pool, consecutive
+ * $queryRaw calls can run on different connections and leak the lock. An
+ * uncovered root gets a bare metadata row created to carry the stamp; the
+ * unique constraint settles that race too.
+ */
+async function claimScope(rootId: string): Promise<boolean> {
+  const now = new Date();
+  const expiredBefore = new Date(now.getTime() - CLAIM_TTL_MS);
+  const claimed = await prisma.agenticMetadata.updateMany({
+    where: {
+      nodeId: rootId,
+      OR: [
+        { refreshClaimedAt: null },
+        { refreshClaimedAt: { lt: expiredBefore } },
+      ],
+    },
+    data: { refreshClaimedAt: now },
+  });
+  if (claimed.count === 1) return true;
+
+  const row = await prisma.agenticMetadata.findUnique({
+    where: { nodeId: rootId },
+    select: { refreshClaimedAt: true },
+  });
+  if (row) return false; // live claim held by another instance
+
+  try {
+    await prisma.agenticMetadata.create({
+      data: {
+        nodeId: rootId,
+        tiptapJson: { version: 1, sections: {} },
+        sectionsMeta: {},
+        derivedText: "",
+        contextDirty: true,
+        refreshClaimedAt: now,
+      },
+    });
+    return true;
+  } catch {
+    return false; // unique-constraint race: another instance created + claimed
+  }
+}
+
+async function releaseScope(rootId: string): Promise<void> {
+  try {
+    await prisma.agenticMetadata.updateMany({
+      where: { nodeId: rootId },
+      data: { refreshClaimedAt: null },
+    });
+  } catch {
+    // Never fail a drain on release — a stuck claim expires via the TTL.
   }
 }
 
@@ -169,7 +245,7 @@ async function runRefresh(
   // Daily spend ceiling — the last initiation gate before any scan/spend.
   // Checked again before every LLM call below; leftover work simply stays
   // dirty and drains after the UTC-midnight reset (or a raised cap).
-  const cap = getStudioSettings(await getUserSettings(userId)).dailyCallCap;
+  const cap = getAiContextSettings(await getUserSettings(userId)).dailyCallCap;
   let callsRemaining = cap - (await getTodaySpend(userId));
   if (callsRemaining <= 0) {
     logger.info({
@@ -185,6 +261,28 @@ async function runRefresh(
     route.connection,
     route.modelId
   );
+
+  // Enhanced-tier model, resolved lazily once per drain (plan D9). With the
+  // ai-context-enhanced route unconfigured this falls back to the standard
+  // route (sweep B6) — signals still generate, on the cheaper model.
+  let enhancedCache:
+    | { model: typeof model; modelId: string }
+    | null
+    | undefined;
+  const getEnhancedModel = async () => {
+    if (enhancedCache !== undefined) return enhancedCache;
+    const routing = await resolveContextGenerationRoute(userId, true);
+    enhancedCache = routing
+      ? {
+          model: await resolveChatModelFromConnection(
+            routing.route.connection,
+            routing.route.modelId
+          ),
+          modelId: routing.route.modelId,
+        }
+      : null;
+    return enhancedCache;
+  };
 
   const scope = await collectScope(userId, rootId);
   if (scope.length === 0) return { status: "skipped" };
@@ -226,6 +324,10 @@ async function runRefresh(
 
   const leafWork: ScopeNode[] = [];
   const bitClearOnly: string[] = [];
+  // READ-time source hashes for generation candidates — passed through to
+  // applyGeneratedSections, whose write-time revalidation (sweep B1) compares
+  // against a fresh recompute to catch edits landing during the LLM call.
+  const readHashes = new Map<string, string>();
   for (const node of leafCandidates) {
     if (genLocked.has(node.id)) continue; // studio outputs: never auto-covered
     if (!isSettled(node)) {
@@ -234,12 +336,11 @@ async function runRefresh(
     }
     // Leaf source hashes are pure functions of fields already in hand —
     // verify true staleness before spending. Over-marked bits clear free.
-    if (node.meta.exists) {
-      const currentHash = await computeSourceHash(node);
-      if (currentHash === node.meta.sourceContentHash) {
-        bitClearOnly.push(node.id);
-        continue;
-      }
+    const currentHash = await computeSourceHash(node);
+    readHashes.set(node.id, currentHash);
+    if (node.meta.exists && currentHash === node.meta.sourceContentHash) {
+      bitClearOnly.push(node.id);
+      continue;
     }
     leafWork.push(node);
   }
@@ -258,17 +359,41 @@ async function runRefresh(
 
   const resolver = createSourceContentResolver();
   const packable: Array<{ node: ScopeNode; text: string }> = [];
+  const emptyUncovered: string[] = [];
   for (const node of cappedLeaves) {
     const resolved = await resolver.resolve({
       id: node.id,
       contentType: node.contentType,
       title: node.title,
     });
-    // Uncovered + empty (images pre-vision-pass, blank notes): generating a
-    // "this is empty" summary wastes tokens and pollutes roll-ups — skip.
+    // Uncovered + empty (chats, images pre-vision-pass, blank notes):
+    // generating a "this is empty" summary wastes tokens and pollutes
+    // roll-ups — skip the LLM, but SETTLE the node with a bare row below.
     // Dirty + empty means content was REMOVED; regenerate honestly.
-    if (resolved.empty && !node.meta.exists) continue;
+    if (resolved.empty && !node.meta.exists) {
+      emptyUncovered.push(node.id);
+      continue;
+    }
     packable.push({ node, text: resolved.text });
+  }
+
+  // Sweep B10 (smoke find): a skip with no record is indistinguishable from
+  // "never visited", so folders holding chats/images read as uncovered
+  // FOREVER and every mention gate ended "stale". A bare row (dirty=false,
+  // no generatedAt) records "looked — nothing to say"; an edit that gives
+  // the node real content re-dirties it through the normal cascade.
+  if (emptyUncovered.length > 0) {
+    await prisma.agenticMetadata.createMany({
+      data: emptyUncovered.map((nodeId) => ({
+        nodeId,
+        tiptapJson: { version: 1, sections: {} },
+        sectionsMeta: {},
+        derivedText: "",
+        contextDirty: false,
+      })),
+      skipDuplicates: true,
+    });
+    stats.leavesDamped += emptyUncovered.length;
   }
 
   // Anchors: stored AI sections for covered work nodes (echo-verbatim
@@ -288,10 +413,15 @@ async function runRefresh(
 
   // Packs group by PARENT FOLDER: only siblings share a call. Related
   // context sharpens each summary; unrelated branches never co-mingle
-  // (the chocolate/lye rule).
+  // (the chocolate/lye rule). Mode splits the group too — ENHANCED items
+  // run a different schema and (possibly) a different model (plan D9/D10),
+  // and mixing schemas in one call is not possible. UUID keys can't contain
+  // "|", so the composite key is unambiguous.
   const packGroups = new Map<string, typeof packable>();
   for (const item of packable) {
-    const key = item.node.parentId ?? "__rootless__";
+    const modeKey =
+      item.node.resolvedMode === ContextMode.ENHANCED ? "e" : "s";
+    const key = `${item.node.parentId ?? "__rootless__"}|${modeKey}`;
     const list = packGroups.get(key) ?? [];
     list.push(item);
     packGroups.set(key, list);
@@ -299,8 +429,13 @@ async function runRefresh(
 
   const changedByParent = new Map<string, ChangedChild[]>();
 
-  for (const [parentKey, group] of packGroups) {
+  for (const [groupKey, group] of packGroups) {
     if (stats.budgetStopped) break;
+    const parentKey = groupKey.slice(0, groupKey.lastIndexOf("|"));
+    const groupEnhanced = groupKey.endsWith("|e");
+    const groupModel = groupEnhanced ? await getEnhancedModel() : null;
+    const batchModel = groupModel?.model ?? model;
+    const batchModelId = groupModel?.modelId ?? route.modelId;
     const parentNode = scopeById.get(parentKey);
     const orientation = {
       title: parentNode?.title,
@@ -316,7 +451,13 @@ async function runRefresh(
       callsRemaining -= 1;
       stats.generationCalls += 1;
       try {
-        const results = await generateLeafBatch(model, batch, anchors, orientation);
+        const results = await generateLeafBatch(
+          batchModel,
+          batch,
+          anchors,
+          orientation,
+          groupEnhanced
+        );
         for (const { node } of batch) {
           const generated = results.get(node.id);
           if (!generated) {
@@ -326,7 +467,8 @@ async function runRefresh(
           const { changed } = await applyGeneratedSections(
             node,
             generated,
-            route.modelId
+            batchModelId,
+            readHashes.get(node.id) ?? (await computeSourceHash(node))
           );
           if (changed) {
             stats.leavesRefreshed += 1;
@@ -359,10 +501,30 @@ async function runRefresh(
   }
 
   // ── Folders (deepest-first, after their children) ───────────────────────
+  // Reference-mode folders have no roll-up work class (plan D6): their
+  // capsule content is the child index + one-liners, both cheaper surfaces.
+  // A dirty bit on one is bookkeeping with nothing to spend on — clear it.
+  const referenceFolders = scope.filter(
+    (n) =>
+      n.contentType === "folder" &&
+      n.resolvedMode === ContextMode.REFERENCE &&
+      n.meta.exists &&
+      n.meta.contextDirty
+  );
+  if (referenceFolders.length > 0) {
+    await prisma.agenticMetadata.updateMany({
+      where: { nodeId: { in: referenceFolders.map((n) => n.id) } },
+      data: { contextDirty: false },
+    });
+    stats.foldersDamped += referenceFolders.length;
+  }
+
   const folderWork = scope
     .filter(
       (n) =>
-        n.contentType === "folder" && (!n.meta.exists || n.meta.contextDirty)
+        n.contentType === "folder" &&
+        n.resolvedMode !== ContextMode.REFERENCE &&
+        (!n.meta.exists || n.meta.contextDirty)
     )
     .filter((n) => {
       if (isSettled(n)) return true;
@@ -398,14 +560,23 @@ async function runRefresh(
 
       const anchor = folderAnchors.get(folder.id);
       const changed = changedByParent.get(folder.id) ?? [];
+      const folderEnhanced = folder.resolvedMode === ContextMode.ENHANCED;
+      const folderModel = folderEnhanced ? await getEnhancedModel() : null;
 
       // Incremental patch mode — only when PROVEN single-delta: substituting
       // the one changed child's OLD signal must reproduce the stored hash,
       // i.e. nothing else moved since the last roll-up. Prevents silent
       // drift from patches that would miss earlier unapplied child changes.
+      // ENHANCED folders always take the full rebuild: signals reason over
+      // the whole child set, which a single-delta patch can't see.
       let prompt: string | null = null;
       const single = changed.length === 1 ? changed[0] : null;
-      if (single?.oldSummaryHash && anchor?.summary && folder.meta.exists) {
+      if (
+        !folderEnhanced &&
+        single?.oldSummaryHash &&
+        anchor?.summary &&
+        folder.meta.exists
+      ) {
         const priorHash = await computeSourceHash(
           folder,
           new Map([[single.childId, single.oldSummaryHash]])
@@ -416,22 +587,60 @@ async function runRefresh(
       }
       if (!prompt) {
         const sourceText = await assembleSourceText(folder);
-        if (!sourceText.trim() && !folder.meta.exists) continue; // empty folder
-        prompt = buildFolderPrompt(folder, sourceText, anchor);
+        if (!sourceText.trim() && !folder.meta.exists) {
+          // Empty folder — settle with a bare row (sweep B10), same rule as
+          // empty leaves: no record made the gate read it as pending forever.
+          await prisma.agenticMetadata.createMany({
+            data: [
+              {
+                nodeId: folder.id,
+                tiptapJson: { version: 1, sections: {} },
+                sectionsMeta: {},
+                derivedText: "",
+                contextDirty: false,
+              },
+            ],
+            skipDuplicates: true,
+          });
+          stats.foldersDamped += 1;
+          continue;
+        }
+        const guidance = folderEnhanced
+          ? await getGuidanceText(folder.id)
+          : null;
+        prompt = buildFolderPrompt(folder, sourceText, anchor, guidance);
       }
 
       callsRemaining -= 1;
       stats.generationCalls += 1;
-      const { object } = await generateObject({
-        model,
-        schema: FolderSectionsSchema,
-        prompt,
-        temperature: 0,
-      });
+      let generatedFolder: {
+        summary: string;
+        structure: string;
+        oneLiner: string;
+        signals?: string;
+      };
+      if (folderEnhanced) {
+        const { object } = await generateObject({
+          model: folderModel?.model ?? model,
+          schema: EnhancedFolderSectionsSchema,
+          prompt,
+          temperature: 0,
+        });
+        generatedFolder = object;
+      } else {
+        const { object } = await generateObject({
+          model,
+          schema: FolderSectionsSchema,
+          prompt,
+          temperature: 0,
+        });
+        generatedFolder = object;
+      }
       const { changed: rollupChanged } = await applyGeneratedSections(
         folder,
-        object,
-        route.modelId
+        generatedFolder,
+        folderEnhanced ? (folderModel?.modelId ?? route.modelId) : route.modelId,
+        currentHash
       );
       if (rollupChanged) stats.foldersRefreshed += 1;
       else stats.foldersDamped += 1;
@@ -566,7 +775,7 @@ export async function runContextSweep(): Promise<SweepStats> {
     0,
     SWEEP_MAX_USERS
   )) {
-    const settings = getStudioSettings(await getUserSettings(ownerId));
+    const settings = getAiContextSettings(await getUserSettings(ownerId));
     if (settings.autoContextMode !== "on-access-sweep") continue;
     stats.usersSwept += 1;
 
@@ -617,16 +826,21 @@ async function collectScope(
           summaryHash: true,
           updatedAt: true,
           contextOptOut: true,
+          contextMode: true,
         },
       },
     },
   });
-  // Privacy: an opted-out root yields an empty scope — nothing is read.
-  if (!root || root.agenticMetadata?.contextOptOut) return [];
+  if (!root) return [];
+  // Mode resolution walks the root's ANCESTORS too — an inherited OPT_OUT
+  // shields this scope exactly like an explicit one (plan D7).
+  const rootMode = await resolveContextMode(rootId);
+  if (rootMode === ContextMode.OPT_OUT) return [];
 
   const toScopeNode = (
     node: typeof root & { parentId: string | null },
-    depth: number
+    depth: number,
+    resolvedMode: ContextMode
   ): ScopeNode => ({
     id: node.id,
     parentId: node.parentId,
@@ -635,6 +849,7 @@ async function collectScope(
     bodyHash: node.bodyHash,
     updatedAt: node.updatedAt,
     depth,
+    resolvedMode,
     meta: {
       exists: node.agenticMetadata !== null,
       contextDirty: node.agenticMetadata?.contextDirty ?? false,
@@ -645,8 +860,13 @@ async function collectScope(
     },
   });
 
-  const scope: ScopeNode[] = [toScopeNode(root, 0)];
+  const scope: ScopeNode[] = [toScopeNode(root, 0, rootMode)];
   if (root.contentType !== "folder") return scope;
+
+  // Top-down inheritance during BFS: a child's resolved mode is its explicit
+  // override or its parent's resolved mode — the parent's value already folds
+  // in everything above it, so no per-child ancestor walks are needed.
+  const resolvedByFolder = new Map<string, ContextMode>([[root.id, rootMode]]);
 
   let frontier = [root.id];
   let depth = 0;
@@ -668,6 +888,7 @@ async function collectScope(
             summaryHash: true,
             updatedAt: true,
             contextOptOut: true,
+            contextMode: true,
           },
         },
       },
@@ -677,11 +898,17 @@ async function collectScope(
     const nextFrontier: string[] = [];
     for (const child of children) {
       if (scope.length >= MAX_SCOPE_NODES) break;
+      const parentResolved =
+        resolvedByFolder.get(child.parentId ?? "") ?? ContextMode.STANDARD;
+      const childMode = resolveChildMode(child.agenticMetadata, parentResolved);
       // Privacy: opted-out nodes never enter the scope, and an opted-out
       // FOLDER shields its entire subtree (no descent).
-      if (child.agenticMetadata?.contextOptOut) continue;
-      scope.push(toScopeNode(child, depth));
-      if (child.contentType === "folder") nextFrontier.push(child.id);
+      if (childMode === ContextMode.OPT_OUT) continue;
+      scope.push(toScopeNode(child, depth, childMode));
+      if (child.contentType === "folder") {
+        resolvedByFolder.set(child.id, childMode);
+        nextFrontier.push(child.id);
+      }
     }
     frontier = nextFrontier;
   }
@@ -701,27 +928,39 @@ const FolderSectionsSchema = z.object({
     .describe(
       "How the content is organized — main parts and their flow, as short lines."
     ),
+  oneLiner: z.string().min(1).describe(ONE_LINER_DESC),
 });
 
+/** ENHANCED folders also produce signals (plan D10). */
+const EnhancedFolderSectionsSchema = FolderSectionsSchema.extend({
+  signals: z.string().describe(SIGNALS_DESC),
+});
+
+const leafItemShape = {
+  nodeId: z
+    .string()
+    .describe("The document's nodeId, copied exactly from the input."),
+  summary: z
+    .string()
+    .min(1)
+    .describe("2-4 sentences: what this document is about and what it covers."),
+  structure: z
+    .string()
+    .min(1)
+    .describe(
+      "How the document is organized — main parts/headings and their flow, as short lines."
+    ),
+  oneLiner: z.string().min(1).describe(ONE_LINER_DESC),
+};
+
 const LeafBatchSchema = z.object({
+  items: z.array(z.object(leafItemShape)),
+});
+
+/** ENHANCED leaves also produce per-document signals (plan D10). */
+const EnhancedLeafBatchSchema = z.object({
   items: z.array(
-    z.object({
-      nodeId: z
-        .string()
-        .describe("The document's nodeId, copied exactly from the input."),
-      summary: z
-        .string()
-        .min(1)
-        .describe(
-          "2-4 sentences: what this document is about and what it covers."
-        ),
-      structure: z
-        .string()
-        .min(1)
-        .describe(
-          "How the document is organized — main parts/headings and their flow, as short lines."
-        ),
-    })
+    z.object({ ...leafItemShape, signals: z.string().describe(SIGNALS_DESC) })
   ),
 });
 
@@ -737,12 +976,20 @@ const ANCHOR_RULE =
 function buildFolderPrompt(
   folder: ScopeNode,
   sourceText: string,
-  anchor?: { summary: string; structure: string }
+  anchor?: { summary: string; structure: string },
+  guidance?: { roleStrategy: string; directives: string } | null
 ): string {
+  const enhanced = folder.resolvedMode === ContextMode.ENHANCED;
   return [
     `You maintain a working "Context" document about one folder in a user's knowledge base.`,
     `Folder: "${folder.title}"`,
     `Summarize what this folder contains as a whole, based on its children's context below.`,
+    enhanced && guidance?.directives.trim()
+      ? `The user's standing directives for this folder (follow them, and flag content that conflicts with them in your signals):\n${guidance.directives.trim()}`
+      : "",
+    enhanced && guidance?.roleStrategy.trim()
+      ? `Accepted Role & Strategy for this folder (flag misalignment with the actual contents in your signals):\n${guidance.roleStrategy.trim()}`
+      : "",
     anchor?.summary
       ? `\nExisting summary:\n${anchor.summary}\nExisting structure:\n${anchor.structure}\n\n${ANCHOR_RULE}`
       : "",
@@ -785,9 +1032,15 @@ function buildFolderPatchPrompt(
 async function generateLeafBatch(
   model: Parameters<typeof generateObject>[0]["model"],
   batch: Array<{ node: ScopeNode; text: string }>,
-  anchors: Map<string, { summary: string; structure: string }>,
-  orientation: { title?: string; summary?: string }
-): Promise<Map<string, { summary: string; structure: string }>> {
+  anchors: Awaited<ReturnType<typeof getStoredAiSections>>,
+  orientation: { title?: string; summary?: string },
+  enhanced: boolean
+): Promise<
+  Map<
+    string,
+    { summary: string; structure: string; oneLiner: string; signals?: string }
+  >
+> {
   const docs = batch
     .map(({ node, text }) => {
       const anchor = anchors.get(node.id);
@@ -806,41 +1059,63 @@ async function generateLeafBatch(
     })
     .join("\n\n");
 
-  const { object } = await generateObject({
-    model,
-    schema: LeafBatchSchema,
-    prompt: [
-      `You maintain working "Context" documents about items in a user's knowledge base.`,
-      orientation.title
-        ? `The ${batch.length} documents below are siblings inside the folder "${orientation.title}". Use that shared setting to summarize each one well.`
-        : `Below are ${batch.length} documents.`,
-      orientation.summary
-        ? `About this folder: ${orientation.summary.slice(0, 400)}`
-        : "",
-      `For EACH document, return one item with its nodeId copied exactly.`,
-      "Keep every item strictly about its own document — never blend content, terminology, or claims across documents.",
-      ANCHOR_RULE,
-      "",
-      docs,
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    temperature: 0,
-  });
+  const prompt = [
+    `You maintain working "Context" documents about items in a user's knowledge base.`,
+    orientation.title
+      ? `The ${batch.length} documents below are siblings inside the folder "${orientation.title}". Use that shared setting to summarize each one well.`
+      : `Below are ${batch.length} documents.`,
+    orientation.summary
+      ? `About this folder: ${orientation.summary.slice(0, 400)}`
+      : "",
+    `For EACH document, return one item with its nodeId copied exactly.`,
+    "Keep every item strictly about its own document — never blend content, terminology, or claims across documents.",
+    ANCHOR_RULE,
+    "",
+    docs,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
-  const results = new Map<string, { summary: string; structure: string }>();
+  type LeafResult = {
+    summary: string;
+    structure: string;
+    oneLiner: string;
+    signals?: string;
+  };
+  let items: Array<LeafResult & { nodeId: string }>;
+  if (enhanced) {
+    const { object } = await generateObject({
+      model,
+      schema: EnhancedLeafBatchSchema,
+      prompt,
+      temperature: 0,
+    });
+    items = object.items;
+  } else {
+    const { object } = await generateObject({
+      model,
+      schema: LeafBatchSchema,
+      prompt,
+      temperature: 0,
+    });
+    items = object.items;
+  }
+
+  const results = new Map<string, LeafResult>();
   const validIds = new Set(batch.map(({ node }) => node.id));
-  for (const item of object.items) {
+  for (const item of items) {
     if (validIds.has(item.nodeId)) {
       results.set(item.nodeId, {
         summary: item.summary,
         structure: item.structure,
+        oneLiner: item.oneLiner,
+        signals: item.signals,
       });
     }
   }
   // Hallucination audit: hashing keeps the log line bounded regardless of
   // how creative the model got with unknown nodeIds.
-  const unknown = object.items.filter((i) => !validIds.has(i.nodeId));
+  const unknown = items.filter((i) => !validIds.has(i.nodeId));
   if (unknown.length > 0) {
     logger.warn({
       layer: "ai",

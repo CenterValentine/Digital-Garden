@@ -109,6 +109,67 @@ const EMBED_BRIDGE_SCRIPT = `
       window.parent.postMessage({ type: 'embed-unloading' }, '*');
     } catch (_) {}
   });
+
+  // ── 4. Inline image auth ──────────────────────────────────────────────────
+  // Native <img> loads bypass the fetch() wrapper in section 1 and cannot carry
+  // the /embed-scoped session cookie in a cross-site iframe, so authenticated
+  // inline note images (src = /api/.../download) would 401 and render broken.
+  // Append the embed session token as ?_t= to every same-origin /api/* image so
+  // the download route can authenticate them (it accepts _t as a fallback).
+  // Only runs when we actually hold a token; external/CDN images are untouched.
+  if (t) {
+    var authToken = t;
+    var needsToken = function (src) {
+      if (!src) return false;
+      var u;
+      try { u = new URL(src, window.location.href); } catch (_) { return false; }
+      if (u.origin !== window.location.origin) return false; // leave external images alone
+      if (u.pathname.indexOf('/api/') !== 0) return false;   // only our authed API surface
+      if (u.searchParams.has('_t')) return false;            // already tokenized — avoid loop
+      return true;
+    };
+    var authImage = function (img) {
+      try {
+        var raw = img.getAttribute('src');
+        if (!needsToken(raw)) return;
+        var u = new URL(raw, window.location.href);
+        u.searchParams.set('_t', authToken);
+        img.setAttribute('src', u.pathname + u.search); // keep relative/same-origin form
+      } catch (_) {}
+    };
+    var sweep = function (root) {
+      if (!root || !root.querySelectorAll) return;
+      var imgs = root.querySelectorAll('img[src]');
+      for (var i = 0; i < imgs.length; i++) authImage(imgs[i]);
+    };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function () { sweep(document); });
+    } else {
+      sweep(document);
+    }
+    // ProseMirror's image NodeView sets img.src on mount and swaps it after
+    // upload, so watch for both added <img> nodes and later src changes.
+    try {
+      var mo = new MutationObserver(function (records) {
+        for (var r = 0; r < records.length; r++) {
+          var rec = records[r];
+          if (rec.type === 'attributes' && rec.target && rec.target.tagName === 'IMG') {
+            authImage(rec.target);
+          } else if (rec.type === 'childList') {
+            for (var n = 0; n < rec.addedNodes.length; n++) {
+              var node = rec.addedNodes[n];
+              if (!node || node.nodeType !== 1) continue;
+              if (node.tagName === 'IMG') authImage(node);
+              else sweep(node);
+            }
+          }
+        }
+      });
+      mo.observe(document.documentElement, {
+        subtree: true, childList: true, attributes: true, attributeFilter: ['src'],
+      });
+    } catch (_) {}
+  }
 })();
 `;
 
@@ -123,7 +184,14 @@ export default async function EmbedLayout({
   return (
     <div
       id="embed-root"
-      className="embed-layout-page"
+      // `dark` forces the embedded content to render in dark mode to match the
+      // extension overlay's always-dark glass chrome. Every `.dark` rule in
+      // globals.css is a plain class selector, so this re-scopes the dark token
+      // set to this subtree without fighting the global ThemeProvider (which
+      // only toggles `.dark` on <html>). Necessary because a storage-partitioned
+      // cross-site iframe can't read the app's saved theme preference and would
+      // otherwise fall back to light — rendering dark text on a dark surface.
+      className="embed-layout-page dark"
       style={{
         position: "fixed",
         inset: 0,
@@ -135,6 +203,19 @@ export default async function EmbedLayout({
         // came out muddy/low-contrast. `--background` is the real themed
         // token and follows the resolved theme.
         background: "var(--background, #0d0d0d)",
+        // Pair the surface with its TEXT color from the SAME variable scope.
+        // Without this, elements with no explicit text class (e.g. tree row
+        // titles) inherit `color` as computed on <body> — which follows the
+        // <html>-level theme class, NOT this subtree's forced `dark`. A
+        // cross-origin iframe inherits prefers-color-scheme from the HOST
+        // page's color scheme, so on light host pages the html-level theme
+        // resolved light and inherited text rendered BLACK on this forced-dark
+        // surface (owner report 2026-08-10: black tree filenames).
+        color: "var(--foreground, #E5D4B0)",
+        // Tells the UA to render its own chrome (scrollbars, form controls,
+        // caret) dark, matching the forced `dark` class above. Without it the
+        // iframe's scrollbars render light against the dark surface.
+        colorScheme: "dark",
         overflow: "hidden",
         zIndex: 100,
       }}

@@ -17,6 +17,7 @@ import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
 import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
+import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,37 +29,17 @@ interface TocEntry {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function slugifyHeading(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, "")
-    .replace(/\s+/g, "-")
-    .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
+/**
+ * TOC anchors come from the shared derived-slug algorithm
+ * (lib/domain/content/heading-ids.ts) so they always equal the ids the editor
+ * stamps on headings and the ids the public post-processor assigns. The slug
+ * sequence is computed over ALL headings (dedup order is a document-wide
+ * fact), then filtered to maxDepth for display.
+ */
 function extractHeadings(doc: ProseMirrorNode, maxDepth: number): TocEntry[] {
-  const entries: TocEntry[] = [];
-  const seen = new Map<string, number>();
-
-  doc.descendants((node) => {
-    if (node.type.name !== "heading") return;
-    const level = node.attrs.level as number;
-    if (level > maxDepth) return;
-
-    const text = node.textContent;
-    if (!text.trim()) return;
-
-    const base = slugifyHeading(text) || `heading-${entries.length + 1}`;
-    const count = seen.get(base) ?? 0;
-    seen.set(base, count + 1);
-    const anchor = count === 0 ? base : `${base}-${count + 1}`;
-
-    entries.push({ level, text, anchor });
-  });
-
-  return entries;
+  return computeHeadingIds(doc)
+    .filter((h) => h.level <= maxDepth)
+    .map((h) => ({ level: h.level, text: h.text, anchor: h.slug }));
 }
 
 // ─── Schema ──────────────────────────────────────────────────────────────────

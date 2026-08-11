@@ -41,6 +41,15 @@ export interface BlockDefinition {
   label: string;
   /** Brief description for tooltips and AI */
   description: string;
+  /**
+   * Optional AI-facing description. When present, AI content-authoring shows a
+   * model this INSTEAD of `description` (see `effectiveAiDescription` in
+   * `ai-authoring.ts`). Use it to disambiguate near-identical siblings
+   * ("…for an externally attributed quote use testimonialCard") and to state
+   * WHEN to reach for the block — decision-support the terse UI tooltip can't
+   * carry. Omit when the tooltip already reads well for a model.
+   */
+  aiHint?: string;
   /** Lucide icon name */
   iconName: string;
   /** Block family for top-level grouping */

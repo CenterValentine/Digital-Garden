@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
-import { markContextDirty } from "@/extensions/studio/server/context-dirty";
+import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { prisma } from "@/lib/database/client";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { updateMaterializedPath } from "@/lib/domain/content";

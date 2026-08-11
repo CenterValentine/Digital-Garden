@@ -30,6 +30,44 @@ import {
   type UIMessage,
   type FileUIPart,
 } from "ai";
+import {
+  acquireUrlWithFallback,
+  launchTabAndRead,
+  isExtensionAcquireAvailable,
+} from "@/lib/domain/browser-extension/acquire-url";
+import { READ_PAGE_HEADLESS_OR_BROWSER } from "@/lib/domain/ai/tools/read-page-in-browser";
+import { OPEN_TAB_AND_READ } from "@/lib/domain/ai/tools/open-tab-and-read";
+import {
+  CO_BROWSE_OPEN,
+  CO_BROWSE_ACT,
+  READ_CURRENT_PAGE,
+  LIST_TABS,
+  stripTrackingParams,
+} from "@/lib/domain/ai/tools/co-browse-tools";
+import {
+  isCoBrowseAvailable,
+  coBrowseOpen,
+  coBrowseAttach,
+  coBrowseSnapshot,
+  coBrowseNavigate,
+  coBrowseClick,
+  coBrowseHover,
+  coBrowseType,
+  coBrowseScroll,
+  coBrowseCollect,
+  coBrowseBack,
+  coBrowseReveal,
+  coBrowseShowTimer,
+  coBrowseClearTimer,
+  coBrowseListTabs,
+  type CoBrowseNode,
+} from "@/lib/domain/browser-extension/co-browse";
+import { capturePageContent } from "@/lib/domain/browser-extension/panel-bridge";
+import {
+  markCoBrowseActive,
+  beginCoBrowseWait,
+  endCoBrowseWait,
+} from "@/state/co-browse-store";
 import { toast } from "sonner";
 import { convertHeicToJpegFile } from "@/lib/infrastructure/media/heic-convert";
 import type { ChatStatus } from "ai";
@@ -45,7 +83,11 @@ import {
 import type { SuggestionItem } from "@/components/content/ai/ChatSuggestionMenu";
 import { useSettingsStore } from "@/state/settings-store";
 import { compactToolOutputs } from "@/lib/domain/ai/compact-tool-outputs";
-import { getAttachedPageContext } from "@/state/panel-page-context-store";
+import {
+  getAttachedPageContext,
+  getCurrentPageHint,
+} from "@/state/panel-page-context-store";
+import { getActiveViewedContentHint } from "@/state/content-store";
 import {
   DEFAULT_OUTPUT_TARGET,
   createOutputTargetMessagePart,
@@ -56,6 +98,10 @@ import {
   type OutputTarget,
 } from "@/lib/domain/ai/output-target";
 import { createPlaybookMessageAttachmentPart } from "@/lib/domain/ai/playbooks/message-binding";
+import {
+  createFolderContextMentionPart,
+  type FolderContextMentionData,
+} from "@/lib/domain/ai-context/mention-part";
 import { stopPendingToolCalls } from "@/lib/domain/ai/repair-dangling-tools";
 import { getContentWriteRefreshTargets } from "@/lib/domain/ai/content-write-receipts";
 
@@ -173,6 +219,50 @@ const chatBodyResolvers = new Map<string, () => Record<string, unknown>>();
  * only when no turn has been sent yet in this chat instance.
  */
 const lastSentBodies = new Map<string, Record<string, unknown>>();
+
+/**
+ * Network-resilience knobs for auto-resuming a dropped stream (AI 3.3+).
+ *
+ * A transient client-side fetch failure (network blip, connection reset, a
+ * serverless response cut) is NOT fatal when resumable streams are configured:
+ * the server keeps producing into Redis via `result.consumeStream()`, decoupled
+ * from the client socket, so the client can reconnect with `resumeStream()` and
+ * continue receiving the SAME stream. Before this, that drop fired `onError` →
+ * a fatal toast, ending the run mid-iteration. These constants bound the retry
+ * so a genuinely-dead stream still surfaces an error instead of spinning
+ * forever. Backoff: 0.8s, 1.6s, 3.2s, 6.4s; each attempt watches ~2s for the
+ * stream to go active before giving up on that attempt.
+ */
+const MAX_RECONNECT_ATTEMPTS = 4;
+const RECONNECT_BACKOFF_MS = 800;
+const RECOVERY_POLL_MS = 400;
+const RECOVERY_POLL_COUNT = 5;
+
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+
+/**
+ * True only for the browser's transient network-failure TypeErrors — the class
+ * of error a stream resume can actually recover. Deliberately narrow: a real
+ * HTTP error (auth, provider, a 500 with a body) is NOT transient and must
+ * surface immediately rather than spin the reconnect loop. The message text
+ * varies by engine — Chrome "Failed to fetch", Safari "Load failed" / "network
+ * connection was lost", Firefox "NetworkError when attempting to fetch".
+ */
+function isTransientNetworkError(err: unknown): boolean {
+  const message = (
+    err instanceof Error ? err.message : String(err ?? "")
+  ).toLowerCase();
+  return (
+    message.includes("failed to fetch") ||
+    message.includes("load failed") ||
+    message.includes("network connection was lost") ||
+    message.includes("networkerror") ||
+    message.includes("network request failed")
+  );
+}
 
 const chatTransport = new DefaultChatTransport({
   api: "/api/ai/chat",
@@ -375,6 +465,15 @@ export interface UseConversationEngineResult {
   // ── suggestions ──
   mentionResults: SuggestionItem[];
   handleMentionSearch: (query: string) => void;
+  /**
+   * Pre-flight gate for folder mentions (plan Phase 4 / sweep B5): fires on
+   * pill insert so context refreshes while the user is still typing. Chip
+   * states keyed by folderId; snapshots ride the sent message as durable
+   * `data-folder-context` parts.
+   */
+  notifyMentionInserted: (item: SuggestionItem) => void;
+  /** Live folder-mention chip states for the composer row. */
+  folderGates: Record<string, FolderContextMentionData>;
   /** Tool-hint commands + playbook attach entries for the `/` menu. */
   commandItems: SuggestionItem[];
 
@@ -483,6 +582,355 @@ export interface ActivePlaybook {
   /** Phases completed so far — derived from resolved phase_checkpoint calls. */
   phaseIndex: number;
   phaseCount: number;
+}
+
+/**
+ * Auto-resume predicate for the client-executed `read_page_in_browser` tool
+ * (Agentic Browsing Phase 0). The server stops the stream at the tool call (no
+ * server `execute`); once `onToolCall` supplies the result via `addToolResult`,
+ * the loop must re-POST so the model can use it.
+ *
+ * Deliberately TARGETED to our tool only (the last step contains a resolved
+ * `read_page_in_browser`), NOT the SDK's
+ * `lastAssistantMessageIsCompleteWithToolCalls`: that also fires when a normal
+ * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
+ * which would defeat that bound and risk a runaway loop.
+ */
+function lastMessageHasResolvedBrowserRead({
+  messages,
+}: {
+  messages: UIMessage[];
+}): boolean {
+  const message = messages[messages.length - 1];
+  if (!message || message.role !== "assistant") return false;
+  const lastStepStart = message.parts.reduce(
+    (last, part, index) => (part.type === "step-start" ? index : last),
+    -1,
+  );
+  const browserReadParts = message.parts
+    .slice(lastStepStart + 1)
+    .filter(
+      (part) =>
+        part.type === `tool-${READ_PAGE_HEADLESS_OR_BROWSER}` ||
+        part.type === `tool-${OPEN_TAB_AND_READ}` ||
+        // Co-browse tools (Slice 5c) are client-executed the same way — resume the
+        // loop after their result so the model can act → look → act.
+        part.type === `tool-${CO_BROWSE_OPEN}` ||
+        part.type === `tool-${CO_BROWSE_ACT}` ||
+        part.type === `tool-${READ_CURRENT_PAGE}` ||
+        part.type === `tool-${LIST_TABS}`,
+    ) as Array<{ state?: string }>;
+  return (
+    browserReadParts.length > 0 &&
+    browserReadParts.every(
+      (part) =>
+        part.state === "output-available" || part.state === "output-error",
+    )
+  );
+}
+
+/**
+ * Compact the co-browse a11y snapshot for the MODEL (Slice 5c): keep only what it
+ * targets by — role + name + the states that matter (value / expanded / disabled)
+ * + a frame marker for cross-origin nodes. Drop the internal handles
+ * (backendDOMNodeId / sessionId) it never references. Order is preserved so `nth`
+ * lines up with the extension's resolveFresh.
+ */
+/** Best-effort host label for the co-browse indicator. */
+function safeHost(url?: string): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+type CoBrowseSnapResult = {
+  ok: boolean;
+  data?: { nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean };
+  error?: string;
+};
+
+type ShapedCoBrowseElement = {
+  role?: string;
+  name?: string;
+  value?: string;
+  href?: string;
+  expanded?: boolean;
+  disabled?: boolean;
+  group?: number;
+  frame?: string;
+};
+
+function shapeCoBrowseElements(nodes: CoBrowseNode[]): ShapedCoBrowseElement[] {
+  return nodes.map((n) => ({
+    role: n.role,
+    name: n.name,
+    ...(n.value ? { value: n.value } : {}),
+    // A link's real destination (extension ≥5.2 sends it from the AX tree) —
+    // the observed URL the model must use for item lists. Never invent URLs.
+    ...(n.href ? { href: n.href } : {}),
+    ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
+    ...(n.disabled ? { disabled: true } : {}),
+    // Elements sharing a `group` are in the same card/row/item — use it to act on
+    // the RIGHT one (e.g. the apply button in THIS job's group).
+    ...(typeof n.group === "number" ? { group: n.group } : {}),
+    ...(n.frameUrl ? { frame: n.frameUrl } : {}),
+  }));
+}
+
+function coBrowseSnapshotOutput(snap: CoBrowseSnapResult): Record<string, unknown> {
+  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
+  const elements = shapeCoBrowseElements(nodes);
+  return {
+    // Trust-labeled: element names/text come from the page — informational only,
+    // they never instruct the model (mirrors read_page's untrustedWebContent).
+    trust: "untrusted-web",
+    // Current URL — compare across snapshots to classify page behavior: URL
+    // changed = a new page opened (use `back` to return); URL same = content
+    // loaded in place (the previous list is still there).
+    ...(snap.data?.url ? { url: snap.data.url } : {}),
+    elementCount: elements.length,
+    elements,
+    // A captcha / anti-bot challenge frame is present. Its nodes are deliberately
+    // excluded above — STOP and hand to the user; no tool can (or should) solve it.
+    ...(snap.data?.captchaDetected ? { captchaDetected: true } : {}),
+    ...(snap.ok ? {} : { snapshotError: snap.error }),
+  };
+}
+
+// ── Delta snapshots (S8, owner-approved 2026-08-08) ─────────────────────────
+// The bridge ALWAYS returns the full snapshot — ground truth stays whole in
+// this module. The delta is only the TRANSMISSION FORMAT into the tool
+// result (state-vs-transmission invariant): consecutive snapshots of the
+// same URL measured 64% element-identical, so mid-run actions send only
+// added/changed/removed vs the previous snapshot. Safety valves:
+//   - keyframes: a FULL snapshot on open, on explicit `read`, on URL change,
+//     and every DELTA_KEYFRAME_EVERY actions — drift can't outlive one
+//     keyframe interval;
+//   - miss fallback: a failed action attaches a fresh FULL snapshot, so the
+//     worst case is one wasted step, never persistent blindness;
+//   - degenerate-delta bailout: if most elements changed, send full.
+// `group` ids are counter-assigned per snapshot and intentionally excluded
+// from change detection; they refresh on keyframes (noted to the model).
+const DELTA_KEYFRAME_EVERY = 5;
+const DELTA_MAX_CHANGED_RATIO = 0.6;
+let coBrowseDeltaBase: {
+  url: string;
+  byKey: Map<string, { sig: string; el: ShapedCoBrowseElement }>;
+  actsSinceKeyframe: number;
+} | null = null;
+
+// Unit separator as delimiter — element names freely contain "|" (e.g.
+// "AI Automation Engineer | Valsoft Corporation"), so a printable join
+// would collide/corrupt.
+function coBrowseElementKey(e: ShapedCoBrowseElement): string {
+  return `${e.role ?? ""}${e.name ?? ""}${e.frame ?? ""}`;
+}
+function coBrowseElementSig(e: ShapedCoBrowseElement): string {
+  // Everything targeting/state-relevant EXCEPT `group` (unstable by design).
+  return JSON.stringify([e.value ?? null, e.href ?? null, e.expanded ?? null, e.disabled ?? null]);
+}
+
+function resetCoBrowseDeltaBase(): void {
+  coBrowseDeltaBase = null;
+}
+
+function setCoBrowseDeltaBase(url: string, elements: ShapedCoBrowseElement[], actsSinceKeyframe: number): void {
+  const byKey = new Map<string, { sig: string; el: ShapedCoBrowseElement }>();
+  for (const e of elements) {
+    // First occurrence wins for duplicate keys — mirrors how the model
+    // disambiguates (nth) and keeps the map deterministic.
+    const k = coBrowseElementKey(e);
+    if (!byKey.has(k)) byKey.set(k, { sig: coBrowseElementSig(e), el: e });
+  }
+  coBrowseDeltaBase = { url, byKey, actsSinceKeyframe };
+}
+
+/**
+ * Shape a snapshot for the model as FULL or DELTA. `mode: "full"` forces a
+ * keyframe (open / explicit read / failure fallback); `mode: "auto"` sends a
+ * delta when the base is fresh enough and the page didn't change identity.
+ */
+function coBrowseSnapshotOrDelta(
+  snap: CoBrowseSnapResult,
+  mode: "full" | "auto",
+): Record<string, unknown> {
+  if (!snap.ok || !snap.data) {
+    resetCoBrowseDeltaBase();
+    return coBrowseSnapshotOutput(snap);
+  }
+  const url = snap.data.url ?? "";
+  const elements = shapeCoBrowseElements(snap.data.nodes ?? []);
+  const base = coBrowseDeltaBase;
+  const mustKeyframe =
+    mode === "full" ||
+    !base ||
+    base.url !== url ||
+    base.actsSinceKeyframe >= DELTA_KEYFRAME_EVERY;
+  if (mustKeyframe) {
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  const freshByKey = new Map<string, ShapedCoBrowseElement>();
+  for (const e of elements) {
+    const k = coBrowseElementKey(e);
+    if (!freshByKey.has(k)) freshByKey.set(k, e);
+  }
+  const added: ShapedCoBrowseElement[] = [];
+  const changed: ShapedCoBrowseElement[] = [];
+  for (const [k, e] of freshByKey) {
+    const prev = base.byKey.get(k);
+    if (prev === undefined) added.push(e);
+    else if (prev.sig !== coBrowseElementSig(e)) changed.push(e);
+  }
+  const removed: Array<{ role?: string; name?: string; frame?: string }> = [];
+  for (const [k, prev] of base.byKey) {
+    if (!freshByKey.has(k)) {
+      removed.push({
+        role: prev.el.role,
+        name: prev.el.name,
+        ...(prev.el.frame ? { frame: prev.el.frame } : {}),
+      });
+    }
+  }
+  const churn = added.length + changed.length + removed.length;
+  if (churn > DELTA_MAX_CHANGED_RATIO * Math.max(1, freshByKey.size)) {
+    // Page effectively replaced itself — a delta would be noise.
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  setCoBrowseDeltaBase(url, elements, base.actsSinceKeyframe + 1);
+  return {
+    trust: "untrusted-web",
+    ...(url ? { url } : {}),
+    snapshotDelta: true,
+    deltaNote:
+      "DELTA vs your previous snapshot of this page: apply added/changed/removed to what you last saw — unchanged elements are NOT re-listed and are still present and actionable. Use action \"read\" for a full re-snapshot. group ids refresh only on full snapshots.",
+    unchangedCount: freshByKey.size - added.length - changed.length,
+    addedCount: added.length,
+    changedCount: changed.length,
+    removedCount: removed.length,
+    ...(added.length > 0 ? { added } : {}),
+    ...(changed.length > 0 ? { changed } : {}),
+    ...(removed.length > 0 ? { removed } : {}),
+    ...(snap.data.captchaDetected ? { captchaDetected: true } : {}),
+  };
+}
+
+/**
+ * Agentic Browsing Phase 1 — derive the CURRENTLY-ACTIVE research run's page
+ * budget from the message history, or null if none is active. A run opens on an
+ * approved `propose_research_run` result and closes on a `record_research_findings`
+ * result; the latest un-closed proposal wins. Used to seed the client-side
+ * per-run budget lazily on the first read (before `onFinish` has run), and to
+ * detect closure — so the budget is scoped strictly to an active run and never
+ * touches a normal one-off read.
+ */
+function deriveActiveResearchRun(
+  messages: UIMessage[],
+): { pageBudget: number } | null {
+  let active: { pageBudget: number } | null = null;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (
+        p.type === "tool-propose_research_run" &&
+        p.state === "output-available"
+      ) {
+        const out = p.output as
+          | { ok?: boolean; pageBudget?: number }
+          | undefined;
+        if (out?.ok && typeof out.pageBudget === "number" && out.pageBudget > 0) {
+          active = { pageBudget: out.pageBudget };
+        }
+      } else if (
+        p.type === "tool-record_research_findings" &&
+        p.state === "output-available"
+      ) {
+        active = null; // run closed by its findings write
+      }
+    }
+  }
+  return active;
+}
+
+/**
+ * Per-item iteration (level-2 controller; see the iteration spec) — derive the
+ * CURRENTLY-ACTIVE iteration's item budget AND how many items are already
+ * recorded, straight from history. Opens on an approved `propose_item_iteration`
+ * result; every `record_item_result` counts against the budget; closes on
+ * `record_iteration_findings`. Recomputed from messages (not a mutable counter)
+ * because items are recorded by a SERVER tool — onToolCall never sees those
+ * calls, so a client-side increment would drift. The scan is the source of truth.
+ */
+function deriveActiveItemIteration(
+  messages: UIMessage[],
+): {
+  itemBudget: number;
+  itemsRecorded: number;
+  /** Batch cadence from the approved plan; null = single-batch run. */
+  batchSize: number | null;
+  /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
+  itemsAtLastCheckpoint: number;
+} | null {
+  let active: {
+    itemBudget: number;
+    itemsRecorded: number;
+    batchSize: number | null;
+    itemsAtLastCheckpoint: number;
+  } | null = null;
+  for (const m of messages) {
+    if (m.role !== "assistant") continue;
+    for (const part of m.parts) {
+      const p = part as { type?: string; state?: string; output?: unknown };
+      if (
+        p.type === "tool-propose_item_iteration" &&
+        p.state === "output-available"
+      ) {
+        const out = p.output as
+          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | undefined;
+        if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
+          active = {
+            itemBudget: out.itemBudget,
+            itemsRecorded: 0,
+            batchSize:
+              typeof out.batchSize === "number" && out.batchSize > 0
+                ? out.batchSize
+                : null,
+            itemsAtLastCheckpoint: 0,
+          };
+        }
+      } else if (
+        p.type === "tool-record_item_result" &&
+        p.state === "output-available" &&
+        active
+      ) {
+        const out = p.output as { ok?: boolean } | undefined;
+        if (out?.ok !== false) active.itemsRecorded += 1;
+      } else if (
+        p.type === "tool-record_batch_checkpoint" &&
+        p.state === "output-available" &&
+        active
+      ) {
+        // Any recorded checkpoint re-opens the batch gate — the tool returns
+        // ok:true even when the ledger write failed, so a run can never wedge
+        // at a batch boundary.
+        active.itemsAtLastCheckpoint = active.itemsRecorded;
+      } else if (
+        p.type === "tool-record_iteration_findings" &&
+        p.state === "output-available"
+      ) {
+        active = null; // run closed by its reconciliation write
+      }
+    }
+  }
+  return active;
 }
 
 export function useConversationEngine({
@@ -714,6 +1162,69 @@ export function useConversationEngine({
   const [mentionResults, setMentionResults] = useState<SuggestionItem[]>([]);
   const mentionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── folder-mention pre-flight gate (plan Phase 4 / sweep B5) ──
+  // Fires when a folder pill lands in the composer: the chip animates
+  // through checking → fresh/stale/none while the user is still typing, so
+  // the send-time server gate is usually a cheap coverage check.
+  const [folderGates, setFolderGates] = useState<
+    Record<string, FolderContextMentionData>
+  >({});
+
+  const notifyMentionInserted = useCallback((item: SuggestionItem) => {
+    if (item.contentType !== "folder") return;
+    const folderId = item.id;
+    setFolderGates((prev) => ({
+      ...prev,
+      [folderId]: {
+        folderId,
+        title: item.label,
+        status: "checking",
+        generationCalls: 0,
+        refreshedNodes: 0,
+      },
+    }));
+    fetch("/api/ai-context/gate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ folderId }),
+      credentials: "include",
+    })
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error);
+        const data = body.data as FolderContextMentionData & {
+          title?: string;
+        };
+        setFolderGates((prev) => ({
+          ...prev,
+          [folderId]: {
+            folderId,
+            title: data.title ?? item.label,
+            status: data.status,
+            generationCalls: data.generationCalls ?? 0,
+            refreshedNodes: data.refreshedNodes ?? 0,
+            reason: data.reason,
+            waitedMs: data.waitedMs,
+          },
+        }));
+      })
+      .catch(() => {
+        // Pre-flight is best-effort — the server gate at send is
+        // authoritative. Mark stale-unknown so the chip is honest.
+        setFolderGates((prev) => ({
+          ...prev,
+          [folderId]: {
+            folderId,
+            title: item.label,
+            status: "stale",
+            generationCalls: 0,
+            refreshedNodes: 0,
+            reason: "error",
+          },
+        }));
+      });
+  }, []);
+
   const handleMentionSearch = useCallback((query: string) => {
     if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
     mentionTimerRef.current = setTimeout(async () => {
@@ -916,6 +1427,10 @@ export function useConversationEngine({
    */
   const fetchFollowUps = useCallback(
     async (finalMessages: UIMessage[]) => {
+      // Context diet (S7-C4): no follow-up suggestions mid-iteration — a
+      // mechanical run has no reader for them, and each fetch is a separate
+      // model invocation billed outside the chat turn.
+      if (deriveActiveItemIteration(finalMessages)) return;
       const requestVersion = followUpRequestVersionRef.current + 1;
       followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
@@ -964,6 +1479,69 @@ export function useConversationEngine({
     [providerId, modelId],
   );
 
+  // Agentic Browsing Phase 1 — client-side per-run page budget. Non-null ONLY
+  // while a research run is active (opened by an approved propose_research_run,
+  // closed by record_research_findings or the next user turn). A ref, not state:
+  // it's read at send-time and mutated per read without needing a re-render.
+  // Fail-open by construction — when null, the budget path is never entered, so
+  // a normal one-off read is completely untouched.
+  const researchRunRef = useRef<{ pageBudget: number; pagesUsed: number } | null>(
+    null,
+  );
+
+  // ── network resilience (AI 3.3): auto-resume a dropped stream ──
+  // A transient network drop mid-stream would otherwise reach onError and
+  // toast fatally, ending the run. When the chat is conversation-bound AND
+  // resumable streams are configured, the server is still producing into
+  // Redis, so we reconnect (resumeStream) with bounded backoff and surface an
+  // error only if every attempt fails. Refs — not state — so the useChat
+  // onError closure and the async loop read live values off-render (no
+  // re-subscription, no stale capture). Populated by a sync effect below.
+  const resumeStreamRef = useRef<null | (() => Promise<void> | void)>(null);
+  const streamStatusRef = useRef<string>("ready");
+  const resumableEnabledRef = useRef<boolean>(true);
+  const conversationIdRef = useRef<string | null>(null);
+  const reconnectingRef = useRef<boolean>(false);
+  // Bumped by every fresh user send so an in-flight reconnect loop bails —
+  // otherwise its poll would read the NEW stream's "submitted" as a recovery.
+  const reconnectGenRef = useRef<number>(0);
+  const reconnectToastIdRef = useRef<string | number | null>(null);
+
+  const runReconnectLoop = useCallback(async () => {
+    const gen = reconnectGenRef.current;
+    for (let attempt = 1; attempt <= MAX_RECONNECT_ATTEMPTS; attempt++) {
+      reconnectToastIdRef.current = toast.loading(
+        `Connection interrupted — reconnecting (${attempt}/${MAX_RECONNECT_ATTEMPTS})…`,
+        reconnectToastIdRef.current != null
+          ? { id: reconnectToastIdRef.current }
+          : undefined,
+      );
+      await sleep(RECONNECT_BACKOFF_MS * 2 ** (attempt - 1));
+      if (reconnectGenRef.current !== gen) return; // superseded by a fresh send
+      // Reconnect to the server's buffered stream. Fire-and-forget: the safe
+      // reconnect URL (conversationId-bound) is built by the transport's
+      // prepareReconnectToStreamRequest; we detect success by polling status.
+      void resumeStreamRef.current?.();
+      for (let poll = 0; poll < RECOVERY_POLL_COUNT; poll++) {
+        await sleep(RECOVERY_POLL_MS);
+        if (reconnectGenRef.current !== gen) return;
+        const s = streamStatusRef.current;
+        if (s === "streaming" || s === "submitted") {
+          toast.success("Reconnected.", {
+            id: reconnectToastIdRef.current ?? undefined,
+          });
+          reconnectToastIdRef.current = null;
+          return;
+        }
+      }
+    }
+    toast.error(
+      "Connection lost — the response couldn't be restored. Send your message again to continue.",
+      { id: reconnectToastIdRef.current ?? undefined },
+    );
+    reconnectToastIdRef.current = null;
+  }, []);
+
   // ── useChat ──
   const chat = useChat({
     transport: chatTransport,
@@ -971,14 +1549,454 @@ export function useConversationEngine({
     messages: initialMessages,
     experimental_throttle: 100,
     // Resume the tool loop automatically once every pending needsApproval
-    // request on the last assistant message has been answered (AI v3 core
-    // S1). Without this, an approval response would sit in client state and
-    // never re-trigger the server.
-    sendAutomaticallyWhen: lastAssistantMessageIsCompleteWithApprovalResponses,
+    // request on the last assistant message has been answered (AI v3 core S1),
+    // OR once the client-executed read_page_in_browser tool has a result
+    // (Agentic Browsing Phase 0). Without this, either would sit in client
+    // state and never re-trigger the server.
+    sendAutomaticallyWhen: (options) =>
+      lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
+      lastMessageHasResolvedBrowserRead(options),
+    // Client-executed tools (no server `execute`): the model's tool call is
+    // streamed to the browser; run it here and post the result back. Phase 0:
+    // read_page_in_browser reads a page in the user's own session.
+    onToolCall: async ({ toolCall }) => {
+      // Agentic Browsing Phase 2b Slice 5c — client-executed co-browse tools. The
+      // model opens a tab and acts on it; we drive the extension's chrome.debugger
+      // engine via the panel bridge (co-browse.ts) and return the FRESH a11y
+      // snapshot so it can act → look → act.
+      if (
+        toolCall.toolName === CO_BROWSE_OPEN ||
+        toolCall.toolName === CO_BROWSE_ACT
+      ) {
+        const toolName = toolCall.toolName;
+        const input = (toolCall.input ?? {}) as {
+          url?: string;
+          action?: string;
+          role?: string;
+          name?: string;
+          nth?: number;
+          text?: string;
+          direction?: "down" | "up";
+          to?: "bottom" | "top";
+          seconds?: number;
+          label?: string;
+        };
+        try {
+          if (toolName === CO_BROWSE_OPEN) {
+            // No url = bind the tab the user is CURRENTLY on (owner ask
+            // 2026-08-10): they may have specific results in front of them —
+            // session-personalized lists, filters, stateful flows — that a
+            // fresh load would not reproduce. The background resolves the
+            // active tab; nothing opens, nothing reloads.
+            const opened = input.url
+              ? await coBrowseOpen(input.url)
+              : await coBrowseAttach();
+            if (!opened.ok) {
+              chat.addToolResult({
+                tool: toolName,
+                toolCallId: toolCall.toolCallId,
+                output: `Could not ${input.url ? "open the page" : "attach to the current tab"}: ${opened.error ?? "unknown error"}.`,
+              });
+              return;
+            }
+            const snap = await coBrowseSnapshot();
+            // 5d: light the in-app indicator — for attach-in-place the host
+            // comes from the bound tab's actual URL (the snapshot's), since no
+            // url was given.
+            markCoBrowseActive(safeHost(input.url ?? snap.data?.url ?? ""));
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
+                ...(input.url ? {} : { boundCurrentTab: true }),
+                // Session start = keyframe: full snapshot, delta base reset.
+                ...coBrowseSnapshotOrDelta(snap, "full"),
+              },
+            });
+            return;
+          }
+          // CO_BROWSE_ACT — read / click / hover / type / navigate / scroll / wait /
+          // back on the bound tab.
+          const action = input.action;
+          // wait — pause for the user to REVIEW this page, with an on-page
+          // countdown overlay (T1, timed iteration). The extension only injects
+          // the self-removing overlay and returns fast; the SLEEP happens here so
+          // the bridge round-trip isn't held open for the whole minute. No page
+          // change and no re-snapshot — it's a pure pause.
+          if (action === "wait") {
+            const seconds = Math.max(1, Math.min(3600, Math.round(input.seconds ?? 60)));
+            const label = input.label ?? null;
+            await coBrowseShowTimer(seconds, label ?? undefined);
+            beginCoBrowseWait(seconds, label);
+            try {
+              await new Promise((r) => setTimeout(r, seconds * 1000));
+            } finally {
+              endCoBrowseWait();
+              await coBrowseClearTimer().catch(() => {});
+            }
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                action: "wait",
+                waited: seconds,
+                note: `Paused ${seconds}s for the user to review the page.`,
+              },
+            });
+            return;
+          }
+          // collect — auto scroll-collect the whole list in one call (Slice 3d).
+          // Returns the merged, deduped set directly (not a fresh single snapshot).
+          if (action === "collect") {
+            const collected = await coBrowseCollect();
+            // Collect merges nodes across scrolls (not a viewport snapshot) —
+            // it can't serve as a delta base; the next snapshot keyframes.
+            resetCoBrowseDeltaBase();
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: { action: "collect", ...coBrowseSnapshotOutput(collected) },
+            });
+            return;
+          }
+          const target = { role: input.role, name: input.name, nth: input.nth };
+          let res: { ok: boolean; error?: string };
+          if (action === "read") res = { ok: true };
+          else if (action === "click") res = await coBrowseClick(target);
+          else if (action === "hover") res = await coBrowseHover(target);
+          else if (action === "type") res = await coBrowseType(target, input.text ?? "");
+          else if (action === "navigate")
+            res = input.url
+              ? await coBrowseNavigate(input.url)
+              : { ok: false, error: "navigate needs a url" };
+          else if (action === "scroll")
+            res = await coBrowseScroll({ direction: input.direction, to: input.to });
+          else if (action === "back") res = await coBrowseBack();
+          else if (action === "reveal") res = await coBrowseReveal();
+          else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
+          if (!res.ok) {
+            // Miss-triggered fallback (S8): a failed action restores FULL
+            // vision in the same result — the model's mental model may be
+            // stale (delta drift, page shift), and a fresh keyframe is how a
+            // targeting miss self-heals instead of compounding.
+            const failSnap = await coBrowseSnapshot().catch(() => null);
+            chat.addToolResult({
+              tool: toolName,
+              toolCallId: toolCall.toolCallId,
+              output: {
+                actionError: `Action "${action}" failed: ${res.error ?? "unknown error"}. A FRESH FULL snapshot is below — re-target from it and adapt; don't repeat the same action blindly.`,
+                ...(failSnap ? coBrowseSnapshotOrDelta(failSnap, "full") : {}),
+              },
+            });
+            return;
+          }
+          if (action === "navigate") markCoBrowseActive(safeHost(input.url)); // 5d: update indicator host
+          // Let a click/navigation settle before re-snapshotting so the model sees
+          // the RESULT, not a mid-transition page. Navigation (incl. back) needs longer.
+          await new Promise((r) =>
+            setTimeout(r, action === "navigate" || action === "back" ? 1200 : 500),
+          );
+          const snap = await coBrowseSnapshot();
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            // Explicit `read` = the model asking to LOOK → keyframe. Other
+            // actions ride the delta path (auto keyframes on URL change /
+            // every 5th act / degenerate churn).
+            output: {
+              action,
+              ...coBrowseSnapshotOrDelta(snap, action === "read" ? "full" : "auto"),
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "co-browse failed",
+          });
+        }
+        return;
+      }
+      // R1 — read the page the user is ALREADY on (the current tab), via the
+      // panel's content-script capture: no new tab, no re-fetch, no debugger
+      // banner. Distinct from read_page (refetches a URL) and co_browse_open
+      // (opens a fresh tab). For "summarize this page".
+      if (toolCall.toolName === READ_CURRENT_PAGE) {
+        try {
+          const captured = await capturePageContent("full");
+          if (!captured.ok || !captured.content) {
+            chat.addToolResult({
+              tool: READ_CURRENT_PAGE,
+              toolCallId: toolCall.toolCallId,
+              output: `Couldn't read the current page: ${captured.error ?? "no readable content"}.`,
+            });
+            return;
+          }
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: captured.url,
+              title: captured.title,
+              siteName: captured.siteName,
+              via: "current-tab",
+              // Trust-labeled (prompt-injection defense) — mirrors read_page.
+              untrustedWebContent: captured.content,
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: READ_CURRENT_PAGE,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "read current page failed",
+          });
+        }
+        return;
+      }
+      // list_tabs — tabs-as-curation enumeration (iteration spec, Enumeration
+      // sources). Lean title+URL only; the optional filter narrows client-side so
+      // the model sees the smallest slice that covers the ask. Privacy gate lives
+      // in the tool DESCRIPTION (explicit ask only) — by the time a call arrives
+      // here the model has judged the user asked for their tabs.
+      if (toolCall.toolName === LIST_TABS) {
+        const { filter } = (toolCall.input ?? {}) as { filter?: string };
+        try {
+          const res = await coBrowseListTabs();
+          if (!res.ok || !res.data) {
+            chat.addToolResult({
+              tool: LIST_TABS,
+              toolCallId: toolCall.toolCallId,
+              output: `Couldn't list tabs: ${res.error ?? "extension unavailable"}.`,
+            });
+            return;
+          }
+          const want = (filter ?? "").trim().toLowerCase();
+          const tabs = res.data.tabs
+            .filter((t) => /^https?:/.test(t.url))
+            .filter(
+              (t) =>
+                !want ||
+                t.title.toLowerCase().includes(want) ||
+                t.url.toLowerCase().includes(want),
+            )
+            .slice(0, 60)
+            // Tracking params stripped (S7-C1): they were the bulk of a
+            // measured ~20k-char list_tabs output and identify nothing.
+            .map((t) => ({ title: t.title, url: stripTrackingParams(t.url) }));
+          chat.addToolResult({
+            tool: LIST_TABS,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              count: tabs.length,
+              ...(want ? { filter: want } : {}),
+              tabs,
+              note:
+                "Tab titles/URLs are the user's own browser state. To read one, use read_page with its URL. Each tab's URL is its stable item key.",
+            },
+          });
+        } catch (err) {
+          chat.addToolResult({
+            tool: LIST_TABS,
+            toolCallId: toolCall.toolCallId,
+            state: "output-error",
+            errorText: err instanceof Error ? err.message : "list tabs failed",
+          });
+        }
+        return;
+      }
+      // Two client-executed read tools: read_page_in_browser (escalates
+      // P1→P3) and open_tab_and_read (Phase 2a launcher — forces a VISIBLE tab,
+      // used only after a normal read failed). Both share the budget + result
+      // plumbing below.
+      const isBrowserRead = toolCall.toolName === READ_PAGE_HEADLESS_OR_BROWSER;
+      const isTabLaunch = toolCall.toolName === OPEN_TAB_AND_READ;
+      if (!isBrowserRead && !isTabLaunch) return;
+      const toolName = toolCall.toolName;
+      const { url } = (toolCall.input ?? {}) as { url?: string };
+      if (!url) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: "no url provided",
+        });
+        return;
+      }
+      // Agentic Browsing Phase 1 — per-run page budget (client-side; the server
+      // has no `execute` to gate a client tool). Applies to BOTH client read
+      // tools. Lazily hydrate from the approved research plan in history so even
+      // the FIRST read is bounded. Null run = normal read, budget skipped.
+      if (researchRunRef.current === null) {
+        const active = deriveActiveResearchRun(chat.messages);
+        if (active) {
+          researchRunRef.current = { pageBudget: active.pageBudget, pagesUsed: 0 };
+        }
+      }
+      const run = researchRunRef.current;
+      if (run && run.pagesUsed >= run.pageBudget) {
+        // Soft stop, not an error: tell the model to wrap up with what it has.
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Research page budget reached (${run.pageBudget} pages read). Stop reading now — synthesize from what you already have (createNote with a summary + a markdown table), then call record_research_findings.`,
+        });
+        return;
+      }
+      // Per-item iteration budget (level-2 controller). Recomputed from history
+      // each time — items are recorded by a SERVER tool, so a client counter
+      // would drift; the message scan IS the source of truth. Enforced at the
+      // read tools only (a read is how the NEXT item starts) so mid-item acting
+      // is never broken. Fail-open: no active iteration → path skipped entirely.
+      const iteration = deriveActiveItemIteration(chat.messages);
+      if (iteration && iteration.itemsRecorded >= iteration.itemBudget) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
+        });
+        return;
+      }
+      // Batch cadence (batched runs only) — harness-owned batching, owner rule
+      // 2026-08-08: once a full batch is recorded since the last checkpoint,
+      // hold the NEXT item's read until record_batch_checkpoint is written.
+      // Same seam as the budget stop (reads are how the next item starts), so
+      // mid-item acting is never broken. Fail-open for unbatched runs.
+      if (
+        iteration &&
+        iteration.batchSize != null &&
+        iteration.itemsRecorded < iteration.itemBudget &&
+        iteration.itemsRecorded - iteration.itemsAtLastCheckpoint >=
+          iteration.batchSize
+      ) {
+        const batchNumber = Math.max(
+          1,
+          Math.floor(iteration.itemsRecorded / iteration.batchSize),
+        );
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Batch complete (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded; batch size ${iteration.batchSize}). Before starting the next item: dedupe this batch and call record_batch_checkpoint (batchNumber ${batchNumber}, itemsRecordedSoFar ${iteration.itemsRecorded}) — then continue with the next item.`,
+        });
+        return;
+      }
+      try {
+        let outcome = isTabLaunch
+          ? await launchTabAndRead(url)
+          : await acquireUrlWithFallback(url);
+        // Deterministic escalation (Phase 2a): if a background read (not the
+        // launcher itself) came back blocked or too thin, and we're NOT in a
+        // research run, auto-retry in a VISIBLE tab instead of hoping the model
+        // chooses to. The extension still gates the open on the user's setting
+        // (refused → keep the original), so a tab only opens when they've opted
+        // in; suppressed in research runs so a multi-source run can't pop a stack
+        // of tabs (there the model escalates explicitly via open_tab_and_read).
+        // Surface what the escalation did so the model can NARRATE it (owner:
+        // "I can't tell if the read attempt happened before the tab open").
+        let escalationNote: string | undefined;
+        if (isBrowserRead && !researchRunRef.current) {
+          const currentLen = outcome.content?.content?.trim().length ?? 0;
+          if (!outcome.ok || currentLen < 800) {
+            const launched = await launchTabAndRead(url);
+            const launchedLen = launched.content?.content?.trim().length ?? 0;
+            if (launched.ok && launchedLen > currentLen) {
+              outcome = launched;
+              escalationNote =
+                "A normal read came back blocked/thin, so I opened a VISIBLE tab and read it there.";
+            } else if (
+              launched.reason &&
+              /turned off|Browser (Bookmarks|Extension)/i.test(launched.reason)
+            ) {
+              escalationNote =
+                "A normal read was blocked, and opening a tab to read blocked pages is turned off in the user's Browser Extension and Cobrowse settings.";
+            } else if (launched.reason || launched.ok) {
+              escalationNote =
+                "A normal read was blocked, so I also opened a VISIBLE tab — but the page still couldn't be read (likely a human-verification captcha, which no tool can pass).";
+            }
+          }
+        }
+        if (outcome.ok && outcome.content) {
+          // Count only SUCCESSFUL reads — a blocked/empty page can't eat budget.
+          if (run) run.pagesUsed += 1;
+          const c = outcome.content;
+          // During an item iteration, a read that comes back near-empty (a search
+          // page, a 404, a stub) is still an ATTEMPTED item. Nudge the model to
+          // record it as unreadable BEFORE moving on — otherwise it silently skips
+          // it and the ledger under-counts (observed live: a 190-char page dropped
+          // from a 10-item run). Structural backstop to the prompt's "record every
+          // attempt" rule.
+          const thin = (c.content?.trim().length ?? 0) < 500;
+          const iterationNote =
+            iteration && thin
+              ? "This page has no substantial job description (near-empty). It is still an attempted item — call record_item_result with status=unreadable and a one-line reason BEFORE reading the next tab. Do not skip it."
+              : undefined;
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output: {
+              url: c.url,
+              title: c.title,
+              siteName: c.siteName,
+              via: outcome.via,
+              usedExtension: outcome.usedExtension,
+              // Trust-labeled field name is load-bearing (prompt-injection
+              // defense) — mirror read_page's `untrustedWebContent`.
+              untrustedWebContent: c.content,
+              // The escalation summary (if any) — the model relays it so the user
+              // sees the steps (normal read → visible-tab open) it actually took.
+              ...(escalationNote ? { escalationNote } : {}),
+              ...(iterationNote ? { iterationNote } : {}),
+            },
+          });
+        } else {
+          chat.addToolResult({
+            tool: toolName,
+            toolCallId: toolCall.toolCallId,
+            output:
+              (isTabLaunch
+                ? `Could not open a tab to read the page: ${outcome.reason ?? "unknown error"}.`
+                : `Could not read the page: ${outcome.reason ?? "unknown error"}.${escalationNote ? ` ${escalationNote}` : ""}`) +
+              // A failed read during an iteration is still an attempted item —
+              // record it, don't silently skip (keeps the ledger complete).
+              (iteration
+                ? " This is an attempted iteration item — call record_item_result with status=unreadable (or blocked) for it before moving to the next tab."
+                : ""),
+          });
+        }
+      } catch (err) {
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          state: "output-error",
+          errorText: err instanceof Error ? err.message : "browser read failed",
+        });
+      }
+    },
     onError: (err) => {
       if (onError) {
         onError(err);
-      } else {
+        return;
+      }
+      // Network resilience: a transient drop on a resumable, conversation-bound
+      // chat is recoverable — reconnect to the server's buffered stream instead
+      // of failing. Non-transient errors (auth, provider, server) and
+      // unbound/transient chats surface immediately, as before.
+      if (
+        isTransientNetworkError(err) &&
+        resumableEnabledRef.current &&
+        conversationIdRef.current &&
+        !reconnectingRef.current
+      ) {
+        reconnectingRef.current = true;
+        void runReconnectLoop().finally(() => {
+          reconnectingRef.current = false;
+        });
+        return;
+      }
+      // Don't stomp an in-flight reconnect's own toast with a duplicate.
+      if (!reconnectingRef.current) {
         toast.error(err.message || "Chat request failed");
       }
     },
@@ -989,6 +2007,19 @@ export function useConversationEngine({
         finishReason?: string;
         isAbort?: boolean;
       };
+      // Agentic Browsing Phase 1 — close the client-side research budget when its
+      // findings are recorded (precise signal: a record_research_findings result
+      // in the finished message). The next-user-turn backstop in handleSend
+      // covers a run the model never closed. onToolCall owns opening + counting;
+      // this only clears — so it can never mid-run reset the page count.
+      const closedResearchRun = (e.message?.parts ?? []).some((part) => {
+        const p = part as { type?: string; state?: string };
+        return (
+          p.type === "tool-record_research_findings" &&
+          p.state === "output-available"
+        );
+      });
+      if (closedResearchRun) researchRunRef.current = null;
       const isAbort = e.isAbort === true;
       const streamedMessages = e.messages ?? [];
       const finalMessages = isAbort
@@ -1145,6 +2176,13 @@ export function useConversationEngine({
       // where the shell attaches what the extension captured. Read at send
       // time so the freshest capture rides the turn.
       pageContext: getAttachedPageContext(),
+      // Lightweight current-page hint (url+title) so the model knows what page the
+      // user is viewing even without the attach toggle — for "summarize this page".
+      currentPage: getCurrentPageHint(),
+      // The garden doc the user is actively viewing (focused tab) — lets the chat
+      // resolve "this note/doc" without the user naming it (internal twin of
+      // currentPage). Null in the embed panel and when nothing readable is focused.
+      viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) — read at request time so approval
       // resumes / internal sends carry the same binding as the turn that
       // started them.
@@ -1155,6 +2193,11 @@ export function useConversationEngine({
       // Model pin (AI 3.4): true ⇒ the user's pick is the ladder's top rung
       // and playbook phase directives are ignored for this conversation.
       modelPinned,
+      // Agentic Browsing Phase 0: is the browser extension reachable right now?
+      // Gates the client-executed read_page_in_browser tool. Read at send time.
+      browserExtensionAvailable: isExtensionAcquireAvailable(),
+      // Slice 5c: co-browse is trust-gated to the side panel — true only there.
+      coBrowseAvailable: isCoBrowseAvailable(),
     }));
     return () => {
       chatBodyResolvers.delete(conversationKey);
@@ -1209,6 +2252,16 @@ export function useConversationEngine({
     status,
     resumeStream,
   ]);
+
+  // Keep the network-resilience refs current for the onError closure + the
+  // reconnect loop, which read them off-render. A no-dep effect (pure ref
+  // writes) is the compiler-safe way to mirror live values into refs.
+  useEffect(() => {
+    streamStatusRef.current = status;
+    resumeStreamRef.current = resumeStream;
+    resumableEnabledRef.current = resumableStreamsEnabled;
+    conversationIdRef.current = conversationId ?? null;
+  });
 
   const isActive = status === "streaming" || status === "submitted";
   const stop = useCallback(() => {
@@ -1434,6 +2487,17 @@ export function useConversationEngine({
     // A fresh user send has no buffered backlog — clear the resume flag so
     // this turn types normally (and un-stick the no-stream 204 case).
     streamStartedViaResumeRef.current = false;
+    // Supersede any in-flight reconnect loop: this new stream's "submitted"
+    // status must not be mistaken for a recovery of the dropped one.
+    reconnectGenRef.current += 1;
+    if (reconnectToastIdRef.current != null) {
+      toast.dismiss(reconnectToastIdRef.current);
+      reconnectToastIdRef.current = null;
+    }
+    // Agentic Browsing Phase 1 — a fresh user turn ends any prior research run
+    // (backstop for a run the model never closed via record_research_findings),
+    // so this turn's reads are never charged to a stale budget.
+    researchRunRef.current = null;
     const text = input.trim();
     const ready = attachments.filter((a) => a.status === "ready" && a.url);
     const hasImageParts = ready.some((a) => a.kind === "image");
@@ -1502,6 +2566,13 @@ export function useConversationEngine({
         }),
       );
     }
+    // Durable trace (plan D13): snapshot each mentioned folder's gate chip
+    // into a persisted data part rendered with the sent message. The server
+    // re-gates at send regardless (authoritative half of sweep B5).
+    for (const id of ids) {
+      const gate = folderGates[id];
+      if (gate) parts.push(createFolderContextMentionPart(gate));
+    }
     if (text) parts.push({ type: "text", text });
     for (const a of ready) {
       const part: FileUIPart = {
@@ -1532,6 +2603,8 @@ export function useConversationEngine({
 
     setInput("");
     setAttachments([]);
+    // Composer chips hand off to the durable message parts above.
+    setFolderGates({});
     // Sending implies the user wants to watch the reply — re-engage
     // auto-scroll even if they'd scrolled up reading earlier turns.
     pinnedRef.current = true;
@@ -1550,6 +2623,11 @@ export function useConversationEngine({
           // Lives on the explicit send body because that becomes the
           // snapshotted per-call body — the resolver is only a fallback.
           pageContext: getAttachedPageContext(),
+          currentPage: getCurrentPageHint(),
+          // The garden doc the user is actively viewing (focused tab) — lets the
+          // chat resolve "this note/doc" without the user naming it (internal twin
+          // of currentPage). Null in the embed panel / when nothing readable.
+          viewedContent: getActiveViewedContentHint(),
           // Attached playbook (AI v3.2 T3).
           playbookId: activePlaybookId,
           activePhaseIndex: resolvedPhaseIndex,
@@ -1560,6 +2638,10 @@ export function useConversationEngine({
           // resolver baseline is consulted, so a flag that lives only in
           // the resolver never reaches the server after a real send.
           modelPinned,
+          // Agentic Browsing Phase 0 — same per-call-body requirement as above.
+          browserExtensionAvailable: isExtensionAcquireAvailable(),
+          // Slice 5c co-browse gate — same per-call-body requirement.
+          coBrowseAvailable: isCoBrowseAvailable(),
         },
       },
     );
@@ -1567,6 +2649,7 @@ export function useConversationEngine({
     input,
     attachments,
     attachmentsUploading,
+    folderGates,
     supportsImageAttachments,
     supportsAudioAttachments,
     pendingUserPartsRef,
@@ -1596,6 +2679,11 @@ export function useConversationEngine({
       mentionedContentIds: [] as string[],
       // Edited/regenerated turns keep the attached page context too (B2).
       pageContext: getAttachedPageContext(),
+      currentPage: getCurrentPageHint(),
+      // The garden doc the user is actively viewing (focused tab) — lets the chat
+      // resolve "this note/doc" without the user naming it (internal twin of
+      // currentPage). Null in the embed panel and when nothing readable is focused.
+      viewedContent: getActiveViewedContentHint(),
       // Attached playbook (AI v3.2 T3) rides re-runs too, for continuity.
       playbookId: activePlaybookId,
       activePhaseIndex: resolvedPhaseIndex,
@@ -1731,6 +2819,8 @@ export function useConversationEngine({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    notifyMentionInserted,
+    folderGates,
     commandItems,
     activePlaybook,
     attachPlaybook,

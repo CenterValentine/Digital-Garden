@@ -102,7 +102,7 @@ export function SidebarChatTabs({
   };
 
   return (
-    <div className="flex shrink-0 items-end border-b border-black/10 dark:border-white/10 px-2 pt-1.5 gap-2">
+    <div className="dg-sidebar-chat-tabs flex shrink-0 items-end border-b border-black/10 dark:border-white/10 px-2 pt-1.5 gap-2">
       {/* Scrollable tab list — fills available width, scrolls horizontally
           on overflow. min-w-0 is critical to let flex-1 actually shrink
           past content width and trigger the inner overflow. y-axis is
@@ -301,7 +301,7 @@ function TabButton({
       tabIndex={active ? 0 : -1}
       aria-label={`Conversation: ${label}${active ? " (active)" : ""}`}
       className={cn(
-        "group/tab relative inline-flex items-center gap-1 px-2.5 py-1.5",
+        "dg-chat-tab group/tab relative inline-flex items-center gap-1 px-2.5 py-1.5",
         "rounded-t-md border border-b-0 text-[11px] transition-colors max-w-[180px] shrink-0",
         // Visible keyboard-focus ring for SR/keyboard users.
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60",

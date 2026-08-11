@@ -18,8 +18,14 @@ import type {
 } from "@/lib/domain/browser-extension/page-context";
 
 interface PanelPageContextState {
-  /** Latest captured context, or null when nothing is attached. */
+  /** Latest CAPTURED full context, or null. Written only by the capture flow. */
   pageContext: PanelPageContext | null;
+  /**
+   * Lightweight current page (url + title) the panel is beside — written on EVERY
+   * page-context message, regardless of capture/attach. Powers the current-page
+   * hint so the model knows what page the user is on without a full capture.
+   */
+  currentPage: { url: string; title: string } | null;
   /** Whether the user wants it included in chat turns. */
   attached: boolean;
   /** A capture is in flight (host → content script round-trip). */
@@ -33,6 +39,7 @@ interface PanelPageContextState {
   /** A screenshot capture is in flight. */
   screenshotBusy: boolean;
   setPageContext: (ctx: PanelPageContext | null) => void;
+  setCurrentPage: (page: { url: string; title: string } | null) => void;
   setAttached: (attached: boolean) => void;
   setBusy: (busy: boolean) => void;
   setError: (error: string | null) => void;
@@ -44,6 +51,7 @@ interface PanelPageContextState {
 
 export const usePanelPageContextStore = create<PanelPageContextState>((set) => ({
   pageContext: null,
+  currentPage: null,
   attached: false,
   busy: false,
   error: null,
@@ -51,6 +59,7 @@ export const usePanelPageContextStore = create<PanelPageContextState>((set) => (
   pendingScreenshot: null,
   screenshotBusy: false,
   setPageContext: (pageContext) => set({ pageContext }),
+  setCurrentPage: (currentPage) => set({ currentPage }),
   setAttached: (attached) => set({ attached }),
   setBusy: (busy) => set({ busy }),
   setError: (error) => set({ error }),
@@ -64,4 +73,17 @@ export const usePanelPageContextStore = create<PanelPageContextState>((set) => (
 export function getAttachedPageContext(): PanelPageContext | null {
   const { pageContext, attached } = usePanelPageContextStore.getState();
   return attached ? pageContext : null;
+}
+
+/**
+ * Lightweight current-page HINT (url + title) — available whenever the panel is on
+ * a page, regardless of the attach toggle. Lets the model know WHAT page the user
+ * is viewing so it can read it on request ("summarize this page") instead of
+ * saying it can't see it. The heavier full-content injection stays behind
+ * `getAttachedPageContext` (the attach toggle still governs sharing page CONTENT).
+ */
+export function getCurrentPageHint(): { url: string; title: string } | null {
+  const { currentPage } = usePanelPageContextStore.getState();
+  if (!currentPage?.url) return null;
+  return { url: currentPage.url, title: currentPage.title ?? "" };
 }

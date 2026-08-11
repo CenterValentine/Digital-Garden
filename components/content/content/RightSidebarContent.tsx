@@ -20,7 +20,7 @@ import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionRightSidebarPanel } from "@/lib/extensions/client-registry";
 import { PublishTab } from "@/extensions/publishing/components/sidebar/PublishTab";
 import { StudioTab } from "@/extensions/studio/components/StudioTab";
-import { ContextTab } from "@/extensions/studio/components/ContextTab";
+import { ContextTab } from "@/components/content/ai-context/ContextTab";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
 import type { ChatOutlineEntry } from "@/lib/domain/ai/chat-outline";
 import type { RightSidebarTab } from "@/state/right-sidebar-state-store";

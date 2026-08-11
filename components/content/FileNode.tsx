@@ -44,6 +44,7 @@ import {
   MessageCircle,
   User,
   Users,
+  BookMarked,
 } from "lucide-react";
 import { useLongPress } from "@/components/common/useLongPress";
 import { useContextMenuStore } from "@/state/context-menu-store";
@@ -56,6 +57,12 @@ import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/conte
 import { FileNameInput } from "@/components/common/FileNameInput";
 import { clientLogger } from "@/lib/core/logger/client";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
+import {
+  copyTreeItems,
+  pasteTreeClipboard,
+  hasTreeClipboard,
+  ensureAltTracker,
+} from "@/lib/features/content/tree-clipboard";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
@@ -425,6 +432,24 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       ? tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id]
       : [data.id];
 
+    // Tree clipboard (owner spec 2026-08-10): resolve ids to {id,title,type}
+    // for the clipboard payload — titles come from the live selection, with
+    // the clicked node as fallback.
+    ensureAltTracker(); // Alt at Copy-click = strictly the URL
+    const clipboardItems = (ids: string[]) => {
+      const byId = new Map(
+        (tree.selectedNodes ?? []).map((n: NodeApi<TreeNode>) => [n.id, n.data]),
+      );
+      return ids.map((id) => {
+        const d = id === data.id ? data : byId.get(id);
+        return {
+          id,
+          title: d?.title ?? "Untitled",
+          contentType: d?.contentType ?? "note",
+        };
+      });
+    };
+
     openMenu(
       "file-tree",
       { x: e.clientX, y: e.clientY },
@@ -441,6 +466,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           includeReferencedContent: data.folder?.includeReferencedContent || false, // Phase 2: Folder setting
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
+          isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
+          playbookDescription:
+            typeof data.note?.playbookDescription === "string"
+              ? data.note.playbookDescription
+              : "",
         },
         // Pass callbacks to context menu
         onRename: () => {
@@ -454,6 +484,23 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onDuplicate: onDuplicate ? async (ids: string[]) => {
           await onDuplicate(ids);
         } : undefined,
+        // Clipboard (owner spec 2026-08-10). People nodes are synthetic —
+        // no content ids to copy or move.
+        onCopy: !isPeopleNode ? (ids: string[]) => {
+          void copyTreeItems(clipboardItems(ids), "copy");
+        } : undefined,
+        onCut: !isPeopleNode ? (ids: string[]) => {
+          void copyTreeItems(clipboardItems(ids), "cut");
+        } : undefined,
+        onPaste: !isPeopleNode ? async () => {
+          await pasteTreeClipboard({
+            id: data.id,
+            parentId: data.parentId ?? null,
+            isFolder,
+            displayOrder: (data as { displayOrder?: number }).displayOrder,
+          });
+        } : undefined,
+        hasClipboard: hasTreeClipboard(),
         onChangeIcon: onChangeIcon ? (id: string) => {
           onChangeIcon(id);
         } : undefined,
@@ -583,15 +630,33 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       onContextMenu={handleContextMenu}
       {...longPressHandlers}
       onDragStart={() => {
-        // Record the dragged node so out-of-tree drop targets (the chat
-        // composer) can attach it as context. People nodes are synthetic
-        // and have no content id, so skip them.
+        // Record the dragged node(s) so out-of-tree drop targets (the chat
+        // composer, the workspace tab strips) can read them. People nodes are
+        // synthetic and have no content id, so skip them.
         if (isPeopleNode) return;
-        useTreeDragStore.getState().setDraggingNode({
+        const primary = {
           id: node.id,
           title: data.title,
           contentType: data.contentType,
-        });
+        };
+        // Mirror react-arborist's dragIds: a drag that starts on a selected
+        // row carries the whole selection (tree order), otherwise just the
+        // grabbed row.
+        const draggedNodes =
+          node.isSelected && tree.selectedNodes && tree.selectedNodes.length > 1
+            ? tree.selectedNodes
+                .filter(
+                  (selected: NodeApi<TreeNode>) =>
+                    selected.data.treeNodeKind !== "peopleGroup" &&
+                    selected.data.treeNodeKind !== "person"
+                )
+                .map((selected: NodeApi<TreeNode>) => ({
+                  id: selected.id,
+                  title: selected.data.title,
+                  contentType: selected.data.contentType,
+                }))
+            : [primary];
+        useTreeDragStore.getState().setDraggingNode(primary, draggedNodes);
       }}
       onDragEnd={() => useTreeDragStore.getState().setDraggingNode(null)}
       onPointerEnter={() => {
@@ -607,10 +672,22 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     >
       <div className="flex items-center gap-1">
         {getChevron()}
-        {/* Referenced rows get the OS-alias idiom: a small link badge on
-            the icon's corner — the semantic marker that reads the same
-            nested under a note or adjacent to primaries in a folder. */}
-        {data.role === "referenced" ? (
+        {/* Corner badges use the OS-alias idiom: a small glyph on the icon's
+            corner. Playbook takes precedence over the referenced marker — a
+            note that's both is more usefully surfaced as a playbook. Both share
+            the referenced badge's formatting; only the glyph differs (v3.6). */}
+        {data.note?.playbook ? (
+          <span data-file-icon className="relative inline-flex">
+            {getIcon()}
+            <span
+              aria-hidden
+              title="Playbook"
+              className="absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white text-indigo-500 shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:text-indigo-400 dark:ring-white/15"
+            >
+              <BookMarked className="h-2 w-2" />
+            </span>
+          </span>
+        ) : data.role === "referenced" ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
             <span

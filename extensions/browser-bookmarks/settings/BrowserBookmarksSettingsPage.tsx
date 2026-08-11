@@ -229,7 +229,13 @@ export default function BrowserBookmarksSettingsPage() {
     autoAssociate: boolean;
     navHistory: boolean;
     denylist: string[];
-  }>({ autoAssociate: false, navHistory: true, denylist: [] });
+    allowTabLaunch: boolean;
+  }>({
+    autoAssociate: false,
+    navHistory: true,
+    denylist: [],
+    allowTabLaunch: false,
+  });
   const [newDenylistEntry, setNewDenylistEntry] = useState("");
   const hasShownLoadError = useRef(false);
   const hasShownBridgeError = useRef(false);
@@ -432,7 +438,7 @@ export default function BrowserBookmarksSettingsPage() {
         installed: node.getAttribute("data-installed") === "true",
         extensionId: node.getAttribute("data-extension-id") || "",
         extensionName:
-          node.getAttribute("data-extension-name") || "Digital Garden Browser Bookmarks",
+          node.getAttribute("data-extension-name") || "Digital Garden Browser Extension",
         extensionVersion: node.getAttribute("data-extension-version") || "",
         installInstanceId: node.getAttribute("data-install-instance-id") || "",
         trustedInstallId: node.getAttribute("data-trusted-install-id") || null,
@@ -581,12 +587,14 @@ export default function BrowserBookmarksSettingsPage() {
           autoAssociate?: boolean;
           navHistory?: boolean;
           denylist?: string[];
+          allowTabLaunch?: boolean;
         }>("get-capture-settings", "capture-settings");
         if (cancelled) return;
         setCapture({
           autoAssociate: settings?.autoAssociate === true,
           navHistory: settings?.navHistory !== false,
           denylist: Array.isArray(settings?.denylist) ? settings.denylist : [],
+          allowTabLaunch: settings?.allowTabLaunch === true,
         });
       } catch {
         // Bridge not ready — leave conservative defaults; the card is disabled.
@@ -598,7 +606,12 @@ export default function BrowserBookmarksSettingsPage() {
   }, [bridgeState.status]);
 
   async function persistCapture(
-    patch: Partial<{ autoAssociate: boolean; navHistory: boolean; denylist: string[] }>
+    patch: Partial<{
+      autoAssociate: boolean;
+      navHistory: boolean;
+      denylist: string[];
+      allowTabLaunch: boolean;
+    }>
   ) {
     const next = { ...capture, ...patch };
     setCapture(next); // optimistic — settings edits are human-paced and sequential
@@ -884,7 +897,7 @@ export default function BrowserBookmarksSettingsPage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">Browser Bookmarks</h1>
+        <h1 className="text-3xl font-bold">Browser Extension and Cobrowse</h1>
         <p className="mt-2 text-muted-foreground">
           Trust browser installs, attach them to sync connections, and manage browser bookmark integration
           for Chrome and Vivaldi.
@@ -945,7 +958,7 @@ export default function BrowserBookmarksSettingsPage() {
             <div className="font-medium text-foreground">Install the browser extension first</div>
             <div className="mt-2 text-muted-foreground">
               This app page cannot read browser bookmarks on its own. Install the Digital Garden Browser
-              Bookmarks extension in your Chromium browser, then reload this page.
+              Extension in your Chromium browser, then reload this page.
             </div>
             <div className="mt-3 space-y-1 text-muted-foreground">
               <div>1. Open `chrome://extensions` or `vivaldi://extensions`.</div>
@@ -1115,6 +1128,27 @@ export default function BrowserBookmarksSettingsPage() {
                 Powers the Recents browser-history list in the side panel. Stored only in
                 this browser; it never reaches Digital Garden&apos;s servers and never
                 becomes a note.
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-black/5 px-3 py-3 text-sm">
+            <input
+              type="checkbox"
+              checked={capture.allowTabLaunch}
+              onChange={(event) =>
+                void persistCapture({ allowTabLaunch: event.target.checked })
+              }
+              className="mt-1"
+            />
+            <div className="min-w-0">
+              <div className="font-medium">Open a tab to read blocked pages</div>
+              <div className="text-xs text-muted-foreground">
+                When the assistant can&apos;t read a page a normal way (bot- or
+                device-blocked), let it open that page in a visible tab, read it,
+                and continue. Off by default. When off, the assistant simply skips
+                the blocked page. The same private-network / denylist protections
+                always apply.
               </div>
             </div>
           </label>

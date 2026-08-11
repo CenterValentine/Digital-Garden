@@ -6,18 +6,18 @@ export const BROWSER_BOOKMARKS_SETTINGS_PATH =
 
 export const browserBookmarksExtensionManifest: ExtensionManifest = {
   id: BROWSER_BOOKMARKS_EXTENSION_ID,
-  label: "Browser Bookmarks",
+  label: "Browser Extension",
   description:
-    "Sync your Chromium browser's activity as external links to your content folders.",
+    "Capture pages, co-browse with AI, and sync your Chromium browser activity as external links to your content folders.",
   iconName: "Bookmark",
   enabledByDefault: true,
   navItems: [],
   surfaces: [],
   settings: {
     path: BROWSER_BOOKMARKS_SETTINGS_PATH,
-    label: "Browser Bookmarks",
-    title: "Browser Bookmarks",
-    description: "Manage trusted browsers, sync connections, and bookmark metadata preferences.",
+    label: "Browser Extension and Cobrowse",
+    title: "Browser Extension and Cobrowse",
+    description: "Manage trusted browsers, sync connections, co-browsing, and page-capture preferences.",
     order: 72,
   },
 };

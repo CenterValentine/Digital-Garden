@@ -10,9 +10,11 @@ import {
   useTreeStateStore,
   type TreeStateSnapshot,
 } from "@/state/tree-state-store";
+import { useWorkspaceTabFilterStore } from "@/state/workspace-tab-filter-store";
 import type {
   ContentWorkspaceResponse,
   WorkspaceOpenConflict,
+  WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
 } from "@/extensions/workplaces/server";
 import type {
@@ -939,6 +941,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
+    // The Main Workspace is the unrestricted catchall: opens are never gated
+    // by other workspaces' claims and mint no claims, so skip the open-intent
+    // round trip entirely. The server enforces the same rule for stale-cache
+    // callers that POST anyway.
+    if (activeWorkspace.isMain) {
+      directOpenContent(contentId, options);
+      void get()
+        .persistActiveWorkspace()
+        .catch((error) => {
+          console.error(
+            "[Workspace Store] Failed to persist active workspace after open:",
+            error,
+          );
+        });
+      return;
+    }
+
     if (
       isContentAlreadyInWorkspace(activeWorkspace, contentId) ||
       useContentStore.getState().openContentIds.includes(contentId) ||
@@ -957,16 +976,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         contentId,
       }),
     });
-    const result = await parseResponse<{
-      allowed: boolean;
-      conflict: WorkspaceOpenConflict | null;
-    }>(response, "Failed to resolve workspace conflict");
+    const result = await parseResponse<WorkspaceOpenIntentResponse>(
+      response,
+      "Failed to resolve workspace conflict",
+    );
 
     if (result.allowed) {
-      await get().assignContentToWorkspace(activeWorkspace.id, contentId, {
-        assignmentType: "primary",
-        scope: "item",
-      });
+      // A covered open (direct assignment or a recursive folder claim held by
+      // this workspace) must not create a new item: the upsert would overwrite
+      // the existing claim's type (borrowed/shared → primary) or permanently
+      // pin a descendant of a folder that was only borrowed.
+      if (!result.alreadyCovered) {
+        await get().assignContentToWorkspace(activeWorkspace.id, contentId, {
+          assignmentType: "primary",
+          scope: "item",
+        });
+      }
       directOpenContent(contentId, options);
       void get()
         .persistActiveWorkspace()
@@ -1174,6 +1199,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 }));
+
+// Keep the tab-filter store scoped to the active workspace. A subscription
+// (rather than edits at each set() site) covers every path that changes the
+// active workspace: initial load, activate, archive fallback, background sync.
+if (typeof window !== "undefined") {
+  useWorkspaceTabFilterStore
+    .getState()
+    .setActiveWorkspace(useWorkspaceStore.getState().activeWorkspaceId);
+  useWorkspaceStore.subscribe((state, prevState) => {
+    if (state.activeWorkspaceId !== prevState.activeWorkspaceId) {
+      useWorkspaceTabFilterStore
+        .getState()
+        .setActiveWorkspace(state.activeWorkspaceId);
+    }
+  });
+}
 
 export function installWorkspaceOpenGuard() {
   if (typeof window === "undefined") return () => undefined;

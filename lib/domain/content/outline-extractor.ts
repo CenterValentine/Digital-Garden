@@ -8,47 +8,14 @@
  */
 
 import type { JSONContent } from "@tiptap/core";
+import { createSlugAssigner } from "@/lib/domain/content/heading-ids";
 
 export interface OutlineHeading {
-  id: string; // Auto-generated anchor ID
+  id: string; // Derived anchor slug (headings) or "accordion:"-prefixed key
   level: number; // 1-6 (H1-H6)
   text: string; // Heading text content
   position: number; // Node position in document (for scroll-to)
   kind?: "heading" | "accordion"; // source node type
-}
-
-/**
- * Generate a URL-safe anchor ID from heading text
- *
- * @param text - Heading text
- * @param existingIds - Set of already-used IDs (for uniqueness)
- * @returns URL-safe anchor ID
- */
-function generateAnchorId(text: string, existingIds: Set<string>): string {
-  // Convert to lowercase, replace spaces with hyphens, remove special chars
-  let baseId = text
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, "-") // Replace spaces with hyphens
-    .replace(/[^\w-]/g, "") // Remove non-word chars except hyphens
-    .replace(/--+/g, "-") // Replace multiple hyphens with single
-    .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
-
-  // If empty after sanitization, use a default
-  if (!baseId) {
-    baseId = "heading";
-  }
-
-  // Ensure uniqueness by appending numbers if needed
-  let anchorId = baseId;
-  let counter = 1;
-  while (existingIds.has(anchorId)) {
-    anchorId = `${baseId}-${counter}`;
-    counter++;
-  }
-
-  existingIds.add(anchorId);
-  return anchorId;
 }
 
 /**
@@ -80,7 +47,12 @@ function extractTextContent(node: JSONContent): string {
  */
 export function extractOutline(tiptapJson: JSONContent): OutlineHeading[] {
   const headings: OutlineHeading[] = [];
-  const existingIds = new Set<string>();
+  // Headings use the shared derived-slug sequence so outline ids equal the
+  // anchors the editor/TOC/published page derive. Accordion entries live in a
+  // prefixed namespace with their own sequence — they are panel-local keys,
+  // never anchors, and must not perturb the heading slug sequence.
+  const assignHeadingSlug = createSlugAssigner();
+  const assignAccordionSlug = createSlugAssigner();
   const position = 0;
 
   /**
@@ -93,11 +65,10 @@ export function extractOutline(tiptapJson: JSONContent): OutlineHeading[] {
     if (node.type === "heading" && node.attrs?.level) {
       const level = node.attrs.level;
       const text = extractTextContent(node);
+      const id = assignHeadingSlug(text);
 
-      // Only add headings with text content
-      if (text.trim()) {
-        const id = generateAnchorId(text, existingIds);
-
+      // Only add headings with text content (blank headings get no slug)
+      if (id !== null) {
         headings.push({
           id,
           level,
@@ -112,9 +83,15 @@ export function extractOutline(tiptapJson: JSONContent): OutlineHeading[] {
     if (node.type === "accordion" && node.attrs?.headerText) {
       const text = (node.attrs.headerText as string).trim();
       const level = parseInt((node.attrs.headerLevel as string) || "2", 10);
-      if (text) {
-        const id = generateAnchorId(text, existingIds);
-        headings.push({ id, level, text, position: pos, kind: "accordion" });
+      const slug = assignAccordionSlug(text);
+      if (slug !== null) {
+        headings.push({
+          id: `accordion:${slug}`,
+          level,
+          text,
+          position: pos,
+          kind: "accordion",
+        });
       }
     }
 

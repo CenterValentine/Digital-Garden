@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Digital Garden Browser Bookmarks",
-  "version": "0.1.0",
+  "name": "Digital Garden Browser Extension",
+  "version": "5.3.0",
   "description": "Sync your Chromium browser's activity as external links to your content folders.",
   "permissions": [
     "bookmarks",
@@ -12,7 +12,8 @@
     "contextMenus",
     "alarms",
     "scripting",
-    "sidePanel"
+    "sidePanel",
+    "debugger"
   ],
   "side_panel": {
     "default_path": "panel.html"
@@ -25,7 +26,9 @@
       "description": "Ask the Digital Garden AI about this page"
     }
   },
-  "host_permissions": ["<all_urls>"],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -37,7 +40,7 @@
     "type": "module"
   },
   "action": {
-    "default_title": "Digital Garden Bookmarks",
+    "default_title": "Digital Garden Browser Extension",
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -49,13 +52,25 @@
   "options_page": "options.html",
   "content_scripts": [
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
-      "js": ["dist/page-bridge.js"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*/*"
+      ],
+      "js": [
+        "dist/page-bridge.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["http://localhost/*", "http://127.0.0.1/*", "https://*/*"],
-      "js": ["dist/overlay.js"],
+      "matches": [
+        "http://localhost/*",
+        "http://127.0.0.1/*",
+        "https://*/*"
+      ],
+      "js": [
+        "dist/overlay.js"
+      ],
       "run_at": "document_idle"
     }
   ]

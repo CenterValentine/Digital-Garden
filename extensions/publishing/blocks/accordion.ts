@@ -50,6 +50,8 @@ registerBlock({
   type: "accordion",
   label: "Accordion",
   description: "Collapsible content section",
+  aiHint:
+    "A collapsible container whose body is hidden until the reader expands it — use for optional or secondary detail. For a dedicated Q&A list use faqAccordion; for an always-visible box use cardPanel.",
   iconName: "ChevronsUpDown",
   family: "content",
   group: "container",

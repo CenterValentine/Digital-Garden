@@ -17,8 +17,8 @@ import type {
   ResolvedSourceContent,
   ResolverNodeRef,
   SourceContentResolver,
-} from "../types";
-import { estimateTokens, truncateToTokens } from "../tokens";
+} from "./types";
+import { estimateTokens, truncateToTokens } from "./tokens";
 
 export interface SourceResolverOptions {
   /**

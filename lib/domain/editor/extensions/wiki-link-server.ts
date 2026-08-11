@@ -28,6 +28,13 @@ export const ServerWikiLink = Node.create({
         renderHTML: (attributes) =>
           attributes.displayText ? { "data-display-text": attributes.displayText } : {},
       },
+      // In-document heading target (derived slug) — see client WikiLink.
+      headingSlug: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-heading-slug"),
+        renderHTML: (attributes) =>
+          attributes.headingSlug ? { "data-heading-slug": attributes.headingSlug } : {},
+      },
     };
   },
 
@@ -47,10 +54,11 @@ export const ServerWikiLink = Node.create({
   },
 
   renderText({ node }) {
-    const { targetTitle, displayText } = node.attrs;
+    const { targetTitle, displayText, headingSlug } = node.attrs;
+    const title = `${headingSlug ? "#" : ""}${targetTitle ?? ""}`;
     if (displayText) {
-      return `[[${targetTitle}|${displayText}]]`;
+      return `[[${title}|${displayText}]]`;
     }
-    return `[[${targetTitle}]]`;
+    return `[[${title}]]`;
   },
 });

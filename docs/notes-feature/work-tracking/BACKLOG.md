@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-07-25
+last_updated: 2026-08-09
 ---
 
 # Sprint Backlog
@@ -7,6 +7,49 @@ last_updated: 2026-07-25
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Context diet — follow-ups (2026-08-09, after PR #156 Sprints 7–8; measurements in the `ai-reliability-fix-plan` memo)
+
+Owner direction: generalize beyond the shipped named-param stripping — review real sessions to find the NEXT bloat class, especially **non-informative fluff in the HTML/content itself**. Hard boundary from the elision analysis (see `read-elision-rejected` memory): every cut must be *provably absence-safe* — structural chrome and opaque tokens, never evidence the analysis might judge. Fuzzy/heuristic removal of content text stays banned.
+
+- [ ] **Learn-and-heal session audits.** Script the decomposition harness used in the 2026-08-08 analysis (chars by part type, resend curve, consecutive-snapshot repetition ratio) so it runs over recent co-browse conversations on demand. Each audit's findings graduate into concrete diet rules — this loop is what caught tracking params; it should catch whatever is next.
+- [ ] **Maintained tracking-param ruleset.** Replace the hand-named `TRACKING_PARAMS` sets (app `co-browse-tools.ts` + extension `snapshot.js` — keep them as fallback) with a vendored community ruleset (ClearURLs rules DB or AdGuard's tracking-params list) per the repo's prefer-maintained-standards rule. Skip value-length/entropy stripping for any URL the model may navigate to — presigned/filter URLs carry functional long values.
+- [ ] **HTML/content fluff pass.** Audit what still reaches the model after the existing filters (AX-tree interactable+orientation allowlist, readability extraction, overlay/embed-frame exclusion, delta snapshots): candidates are cookie/consent banner subtrees, skip-links, icon-only elements with verbose accessible names, repeated per-card action labels ("Dismiss job", "Save"), `banner`/`contentinfo` boilerplate in reads, and page-read text outside the readability main region. Measure first (via the audit script), cut only what classifies as chrome by ROLE/STRUCTURE — not by content similarity.
+- [ ] **Canonical-URL surfacing.** Extension reports `<link rel="canonical">` alongside the address-bar URL — clean ledger keys and dedup on tracking-heavy sites (LinkedIn job pages canonicalize to bare `/jobs/view/ID`). Display/dedup hint only; never substitute it for the navigation URL (pagination canonicals lie).
+
+## Folder Context Capsule — follow-ups (2026-08-06, branch `feat/ai-context-capsule`; plan: FOLDER-CONTEXT-CAPSULE-PLAN.md)
+
+- [ ] **Recent-activity projection in the capsule** — "what changed lately" derived from `updatedAt` columns; zero LLM cost; valuable "what the user is up to" context. Deferred by owner decision.
+- [ ] **Glossary section** — promote when the AI demonstrably fumbles folder-local vocabulary (acronyms, entity names). Interim home: `directives` prose.
+- [ ] **Conventions/patterns section** — "a well-formed item here has sections X/Y/Z"; promote when creation-tasks need it. Interim home: `directives`.
+- [ ] **`search_folder` probe tool** — scoped full-text search within a subtree (needle-shaped queries; cheaper than walking). Global `searchNotes` is the interim fallback.
+- [ ] **Latency-class warning in Feature Routing UI** — flag when a slow reasoning model is routed to a background-frequency route (`studio-metadata`, `ai-context-enhanced`). The gate's stale-serve ladder already prevents hangs; this is advisory.
+- [ ] **Contract migration: drop `contextOptOut`** — the expand/contract second half (sweep B4). After one release on `contextMode`, remove the boolean column + `explicitMode` transition logic.
+- [ ] **Settings relocation** — `autoContextMode`/`dailyCallCap` storage keys live under `settings.studio.*` and the UI under `/settings/extensions/studio`, while the engine is core domain now (D2 identifier stability). Relocate keys + surface when worth a settings migration.
+- [ ] **File-tree context-menu quick-set** for context modes (rail is the only surface today).
+- [ ] **Dev-DB reproducibility** — local dev Postgres predates the baseline squash and carries push-drift (`SearchConnection`/`SitePage`/StudioContextSpend FK) + stale `_prisma_migrations` rows; a `migrate reset` on a day dev data doesn't matter restores `migrate dev`. (The capsule migration was applied via `db execute` + `resolve` for this reason; its recorded checksum predates the final file — cosmetic, dev-only.)
+- [ ] **Anthropic template curation** — `claude-haiku-4-5` added (build gate requires suggestions ∈ template); the remaining entries (sonnet-4, sonnet-3-5, opus-4, retired haiku-3-5) are dated — refresh via the catalog-freshness pass.
+- [ ] **Cross-folder `relations` section** — edges like "Banks draws evidence from Experience"; revisit if root roll-ups prove insufficient.
+
+---
+
+## Per-item iteration + co-browse — follow-ups (2026-08-05, after the per-item-playbook-checkpoints PR)
+
+Surfaced during the reliability sweep; not blocking the PR:
+- **Restart-vs-recover by idempotency.** Co-browse session recovery re-attaches to the same tab (preserves in-progress state, e.g. a half-filled application). For URL-addressable/idempotent work (read iteration) a fresh re-open is simpler + safer; for stateful work (forms) re-attach is essential. Refinement: remember the last URL + whether an uncommitted action was in flight, and pick restart vs recover accordingly.
+- **Round-2 playbook chaining.** The URL-linked roll-up now *enables* "take the qualified set → run a resume-tailoring playbook over those exact pages" via the pasted-URLs enumeration source. New feature, not yet built.
+- **Broader NotePayload↔Y.Doc seam.** `updateNote` now reseeds the collab Y.Doc after a NotePayload write; audit other server write paths (imports, migrations, other tools) for the same "edit invisible in an open collab note" gap.
+- **PWA → extension co-browse handoff** (carried from Phase 2b) — co-browse is unavailable in the installed PWA (no side panel); a handoff to a browser tab is a nice-to-have.
+
+## AI Block Authoring — follow-ups (2026-08-03, after the insert_block feature wraps)
+
+The `insert_block` tool (Phases 0–2, branch `feat/ai-block-authoring`) lets the AI **create** rich editor/publishing blocks — leaf blocks plus containers (columns/tabs/accordion/cardPanel/listContainer) with nested content. Surfaced during smoke-testing; pick up **after** the current AI-blocks work ships:
+
+- [ ] **AI block EDITING (`update_block` tool).** Today the AI can only insert blocks — it has no way to modify an existing block's attributes. Asked to "rename these feature titles", it falls back to `apply_diff` (text edits), which can't touch block attrs, so it fails. Needs a tool that targets an existing block by `blockId` and patches its attrs (validated against the block schema, same as insert) — likely a `__editPayload` variant applied by the orchestrator via `updateAttributes` at the block's position. This is the "memory-edit-like" functionality; the natural Phase 3 of the feature. Owner-requested docket (2026-08-03).
+- [ ] **List-item sub-shape hints (fixes "undefined" item titles).** JSON-string list attrs (`featureList.items`, `pricingCard.features`, gallery images…) hold arrays of objects with a specific shape (`{title, description, icon?}`). The array→JSON-string coercion makes them parse, but the model guesses the object KEYS, so a wrong key (`name` vs `title`) renders as "undefined". Surface each list attr's item shape — via a `get_block_schema` tool (progressive disclosure) and/or documenting the shape in the attr's Zod `.describe()`.
+- [ ] **Phase 2b container richness.** Allow prose children (paragraph/heading with text) inside containers — currently only registered blocks can be children, so "a card with a paragraph of prose" isn't expressible. Plus custom tab labels (tabs auto-label "Tab 1/2" today).
 
 ---
 
@@ -23,6 +66,36 @@ last_updated: 2026-07-25
 
 - **Expand-to-full-view drops inherited chat settings.** Expanding a sidebar side-chat to the full-page viewer loses the target-folder and context chips (e.g. sidebar shows an inherited "AI Playbook Tests" folder target; the expanded view shows "No target"). Root cause: `ChatPanel` and `ChatViewer` each hold their **own** `targetFolder`/`activeContextId` state seeded from **different** sources — the sidebar derives an *inherited* target from ambient open-content context (`targetInherited`), while the full-page viewer seeds from `initialTargetLocation` / a `/api/conversations/:id` fetch and never re-derives the inherited value. The **model pin and output-target DO carry** (both keyed by the shared `dg:*:conv:${conversationId}` localStorage key). Fix: make target-folder + context single-sourced across the two surfaces (server-persist the inherited target on selection, or have the viewer re-derive it), so expand is loss-less. Touches `components/content/ai/ChatPanel.tsx`, `components/content/viewer/ChatViewer.tsx` (both `targetFolder`/`targetInherited`), and `handleOpenInPage`.
 - **Side-chat delete is undiscoverable + tab rail crowding.** The only delete path for a side-chat tab is the right-click action menu (`SidebarChatTabs.tsx` — the visible tab `X` is "Unpin from this content", hover-gated, not delete). Users can't find how to delete a side-chat. Partial mitigation already shipped (2026-07-25): the footer control rail scrolls horizontally instead of clipping (`ChatInput.tsx`), and the tab strip already has `overflow-x-auto`. **Enhancement wanted:** condense the tab strip + footer control rail (model picker, target/output/pin chips, expand) into a denser, less cluttered layout, and surface an always-discoverable delete affordance for side-chats (visible close `X` or a kebab menu), not right-click-only.
+
+---
+
+## Approval cards → rich, previewable (needsApproval overhaul) (2026-07-31)
+
+**Future overhaul — not now.** Today's `needsApproval` HITL cards render the
+thing-being-approved as flat text/JSON blocks. Overhaul so an approval **previews
+what it's approving** with content-type-appropriate affordances, so the user can
+tell *from presentation* what the action is and what it will produce:
+
+- **Rich-text / TipTap preview** when the payload is note content — render the
+  proposed TipTap (as it will look), not raw markdown/JSON.
+- **File-attachment affordance** for generated files — clicking the attachment
+  chip opens a preview (mirror the composer's attachment chip).
+- **Structured field previews** — e.g. a research-plan card showing objective /
+  sources / budget / target / ledger as organized, scannable fields (not a JSON
+  dump); a form-fill checkpoint showing the filled fields.
+- **Principle:** steer away from flat blocks of text; the approval should be
+  self-explanatory and let the user preview results readily before deciding.
+
+Surfaced while scoping **Agentic Browsing Phase 1** (its research-plan card
+reuses `needsApproval`). The same overhaul benefits `createNote`,
+`phase_checkpoint`, and the future co-browsing action checkpoints
+(`AGENTIC-BROWSING-PLAN.md` Phases 3–5), so it's a shared-surface investment.
+
+**Shipped so far (2026-08-01, from the Phase 1 smoke test):** the generic
+approval renderer now **humanizes field labels** (camelCase → "Spaced Label",
+`ChatMessage.tsx`). Still pending here: per-field **tooltips** (thread each
+tool's zod `.describe()` text to the client so a value's meaning is hoverable)
+and the richer per-tool previews above.
 
 ---
 
@@ -97,17 +170,9 @@ P1–P4 (parser, registry, `/playbook` picker, progressive-disclosure injection)
 
 ---
 
-## Browser Reach B3-A — workspaces in the panel (DEPRIORITIZED 2026-07-22)
+## Browser Reach B3-B — settle-then-associate + viewership (SHIPPED, PR #131, 2026-07-25)
 
-Dropped from the active B-series (owner call): the existing workspaces infra + `extensions/workplaces/` (WorkspaceSelector, workspace-store, ContentWorkspace API) already do the job, and users create sessions via existing affordances. The browser-specific value from the original 3.4/3.5 was pulled out into **B3-B** (settle-then-associate link affordance + browser-history-in-recents). Revisit only if browser-specific workspace UX becomes necessary.
-
-- [ ] Wire the panel's workspace chooser to list/switch real `ContentWorkspace`s (full-swap semantics). WorkspaceSelector already exists.
-- [ ] "Browser Sessions" as workspace items — auto-created, date/time-named, most-recent-active first; per-workspace target folder rides the `settings` JSON column (no schema change per C3).
-- [ ] Per-window active-workspace pointer (browser-side, keyed by `windowId`; app renders what the API returns).
-
-## Browser Reach B3-B — settle-then-associate + viewership (BUILT 2026-07-23, awaiting smoke test)
-
-Branch `feat/browser-reach-b3b-associations`. Gates green (typecheck + lint 0-err + full build + `pnpm extension:build`). NOT yet smoke-tested (owner deferred to after all building). Requires `pnpm extension:build` + reload the extension before testing.
+Merged via PR #131 (2026-07-25) and smoke-tested (settings card, browser-history capture, filter). Follow-on shipped in the same PR: Recents now interleaves notes/files + browser history under a **3-state cycling filter** (All / Notes & files / Browser history), replacing the earlier two-section Show/Hide toggle.
 
 Shipped:
 - **Capture policy** (`lib/domain/browser-extension/capture-policy.ts`) — pure `shouldCapturePage()` shared safety gate: blocks non-web schemes, browser-internal (Web Store), Digital Garden's own origins, mailboxes/auth/password-managers, and a user denylist. Applied at record time (extension) and display time (panel).
@@ -115,12 +180,36 @@ Shipped:
 - **Phase C — viewership → Recents**: the background records a capped, deduped page-history ring buffer to `chrome.storage.local` (record-time guards: navHistory on, not DG-origin, not denylisted). `RecentsPanel` gains a panel-only browser-history section behind a "Show/Hide history" filter (default shown in panel, absent in the app); clicking re-opens the URL in a new tab. Also fixed a dormant background bug: the catch-all `sendResponse` sat above `get-recent-viewed-tabs`/`send-note-to-tabs`, making both unreachable.
 - **Settings** — a "Capture & privacy" card in the browser-bookmarks extension settings page (killswitch, nav-history toggle, denylist editor, clear-history), stored in `chrome.storage` via the app↔extension bridge.
 
-⚠ **Deviation to confirm with owner**: browsing history lives in `chrome.storage` (never the server), because adding a server-side `PageView` table is blocked by the repo's schema guardrail (denied `Edit`/`Write` to `prisma/**` + `prisma` CLI) *and* the local DB's post-squash migration drift. Consequence: browser history is **panel-only** (not visible in the standalone app's Recents), and its toggle/filter live with the extension settings rather than general app settings. If owner wants app-side history visibility, that's the server-`PageView` follow-up — needs the schema guardrail lifted + the `MIGRATION-BASELINE-SQUASH.md` reconciliation.
+**Storage note**: browsing history lives in `chrome.storage` (never the server), so today it's panel-only and its controls sit with the extension settings. The schema guardrail that forced this has since been **lifted** (2026-07-25); owner scheduled the server-side unification as the FIRST task of B6 hardening (see followups).
 
 Followups:
-- [ ] Server-side `PageView` table (opt-in) for app-side Recents history visibility + cross-device sync. Needs schema change (guardrailed) + DB baseline reconciliation.
-- [ ] Refresh panel browser-history on visibility change (today it loads once per panel mount).
-- [ ] "a browser extension setting allows this default to be ON" — the killswitch default is currently a fixed OFF; a chrome.storage/popup override to flip the *default* is not yet wired.
+- [ ] **[B6 — first task, before other hardening] Server-side `PageView` → unify Recents across app + panel.** A server-persisted, opt-in page-view log gives the *standalone app's* Recents the same browser-history source the panel has today (plus cross-device sync). When it lands, apply the SAME mixed-list + 3-state cycling filter to the main-app Recents and **delete the `isPanelEmbedSurface()` isolation branch in `components/content/RecentsPanel.tsx`** — the app/panel fork collapses into one code path, and the panel's bridge-fetch (`requestPageHistory` + `page-history` message) becomes a normal authed API read. This is a net *removal* of access-code. Guardrail now lifted; still run the `MIGRATION-BASELINE-SQUASH.md` reconciliation and pick the app-side filter default (spec: browser-history OFF by default in the app, shown by default in the panel).
+- [ ] Refresh panel browser-history on visibility change (today it loads once per panel mount). Likely subsumed by the API-read above once history is server-side.
+- [ ] "a browser extension setting allows this default to be ON" — the killswitch default is a fixed OFF; a chrome.storage/popup override to flip the *default* is not yet wired.
+
+---
+
+## Browser Reach B5 followups (2026-07-25, branch `feat/browser-reach-b5-acquisition`)
+
+B5 (acquisition providers) shipped in that PR: P2 sw-fetch + P3 session-tab as remote providers, client-orchestrated P1→P2→P3 ladder, server builds the trusted envelope, "Read full content" on external-link nodes (with a press-and-hold quick-pick to force a provider), working in both the main app (page-bridge) and the side panel (panel-host channel). Two panel dialog-stacking fixes bundled.
+
+- [x] ~~**AI browser-acquisition tool (client-side, conditionally registered).**~~ — SHIPPED as **Agentic Browsing Phase 0** (2026-07-29), then hardened + grown into a research agent (Phase 1) and a deterministic reader + launcher (Phase 2a). The first client-executed chat tool: `browserExtensionAvailable` flag per turn → conditional registration → no server `execute` → `onToolCall` runs `acquireUrlWithFallback` → `addToolResult`; declines with a CTA when absent. Renamed `read_page_in_browser` → `read_page_headless_or_browser`. Full spec + followups now live in `AGENTIC-BROWSING-PLAN.md` (see the Agentic Browsing followups section below).
+- [ ] Clearer quick-pick labels: "Browser session" → "Signed-in fetch" (P2), "Background tab" → "Signed-in tab" (P3) — the current labels don't convey the cookies-vs-JS distinction.
+- [ ] Cache acquired content onto the external node's payload so "Read full content" doesn't re-fetch each view (today `hydrateExternalPayload` caches garden-side, but the viewer re-fetches per open).
+- [ ] Quick-pick menu positioning in a short panel — the non-portaled dropdown may clip near the bottom; portal + flip if it surfaces.
+
+---
+
+## Agentic Browsing Followups (2026-08-01, branch `feat/agentic-browsing`)
+
+Phase 0 + hardening + Phase 1 (research loop) + Phase 2a (launcher + one deterministic reader) shipped; full spec + phase roadmap in `AGENTIC-BROWSING-PLAN.md`. Deferred by owner during the build:
+
+- [ ] **[after Phase 2b] Layer #2 — in-chat read-mode toggle.** A composer control that biases the reader's default; per owner it **defaults to opening the browser** (visible tab) rather than a headless fetch, for the interactive scraping experience. Sits on top of the deterministic reader (the code still owns the ladder; the toggle only moves the default entry rung). Deferred until the ladder is proven through Phase 2b.
+- [ ] **[after Phase 2b] Layer #3 — live per-phase step display.** The read chip is action-expressive *after the fact* (it reads the result's `via`/`escalationNote`), but a tool call is atomic, so the intermediate rungs (headless → background → visible) are invisible *while they run*. Layer #3 threads a progress channel through the acquire ladder so the chip shows the current rung as it happens — **build shared with Phase 2b's navigation-step UI** (same "what is the agent doing right now" surface). This is the "show what phase it's in when it's in that phase, or when the first phase fails" ask.
+- [ ] **LinkedIn-grade extraction validation on a fair target.** Phase 0 hardening's settle-then-extract + main-landmark tier is confirmed live, but the original test target (LinkedIn job pages) is pathological (anti-automation + auth SPA never renders into a backgrounded tab). Validate rich extraction against a fair target (Greenhouse / Lever / news / Reddit) before the read-tool PR.
+- [ ] **[nice-to-have] PWA → extension co-browse handoff.** Co-browse is trust-gated to the extension's side-panel embed (`isPanelEmbedSurface`), which a standalone **PWA window doesn't have** (no side panel; not part of the browser tab strip; `chrome.debugger` drives browser tabs, not a PWA window). So co-browse is correctly UNAVAILABLE in the PWA and fails safe (the `co_browse_*` / `read_current_page` tools simply don't register — `coBrowseAvailable:false`). A future nicety: when the user asks to co-browse from the PWA, **hand off** to the browser — open/focus a regular browser window with the extension side panel and carry the conversation over. Owner: nice to have, not necessary now (co-browsing arguably belongs in the browser context anyway).
+- [ ] **`web_search_preview` + gpt-4 silent-hang model-gating.** The OpenAI `web_search_preview` tool isn't supported on `gpt-4` and hangs the turn silently (surfaced during Phase 1 smoke testing; worked around by switching to GPT-4o). Gate the tool off for unsupported models with a clear signal instead of a hang.
+- Rich, previewable approval cards (the research-plan card + future co-browsing checkpoints) are tracked in the **needsApproval overhaul** item above — a shared HITL-surface investment, not agentic-browsing-specific.
 
 ---
 

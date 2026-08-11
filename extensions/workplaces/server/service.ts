@@ -915,6 +915,7 @@ export async function resolveOpenIntent(
       select: {
         id: true,
         name: true,
+        isMain: true,
         isLocked: true,
         viewRootContentId: true,
         viewRoot: { select: { id: true, title: true } },
@@ -944,9 +945,39 @@ export async function resolveOpenIntent(
 
   if (!workspace) return { allowed: false, conflict: null };
   if (!content) return { allowed: false, conflict: null };
-  if (currentAssignment) return { allowed: true, conflict: null };
+
+  // The Main Workspace is the permanent catchall — opens from it are never
+  // gated by other workspaces' claims, and no claims are minted from it
+  // (alreadyCovered suppresses the client's auto-assignment).
+  if (workspace.isMain) {
+    return { allowed: true, alreadyCovered: true, conflict: null };
+  }
+
+  if (currentAssignment) {
+    return { allowed: true, alreadyCovered: true, conflict: null };
+  }
 
   const ancestorIds = await getAncestorIds(ownerId, contentId);
+
+  // A recursive claim held by THIS workspace on the content or any ancestor
+  // (primary folder claim, or a borrow/share taken with folder scope) is a
+  // standing decision covering the whole subtree — honor it before the view
+  // scope and overlap checks, or the conflict dialog re-asks for every
+  // descendant despite the user having chosen "apply to folder and all
+  // descendants". Expired borrows are already pruned by
+  // cleanupExpiredWorkspaces (via ensureMainWorkspace above), so any
+  // surviving claim is live.
+  const coveringClaim = await prisma.contentWorkspaceItem.findFirst({
+    where: {
+      workspaceId,
+      scope: "recursive",
+      contentId: { in: [contentId, ...ancestorIds] },
+    },
+    select: { id: true },
+  });
+  if (coveringClaim) {
+    return { allowed: true, alreadyCovered: true, conflict: null };
+  }
 
   // View scope enforcement: if active workspace is a view, content must be inside the view root subtree
   if (workspace.viewRootContentId) {
@@ -1037,6 +1068,20 @@ export async function resolveOpenIntent(
       workspace.viewRootContentId &&
       (viewRootAncestorIds.includes(candidate.contentId) ||
         workspace.viewRootContentId === candidate.contentId)
+    ) {
+      continue;
+    }
+
+    // Nested-view exception: the claiming workspace is a view rooted strictly
+    // above this view's root, so this view is a carve-out of that workspace's
+    // area. The content already passed view-scope enforcement, so it belongs
+    // to both views at once — the parent view's claims here (tab or folder)
+    // are vertical overlap by construction, not duplicate work. Same-root
+    // views still warn: that is horizontal duplication, not nesting.
+    if (
+      viewRootAncestorIds !== null &&
+      candidate.workspace.viewRootContentId &&
+      viewRootAncestorIds.includes(candidate.workspace.viewRootContentId)
     ) {
       continue;
     }

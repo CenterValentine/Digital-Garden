@@ -46,8 +46,10 @@ import {
   Volume2,
   Wrench,
   X,
+  FolderSearch,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
+import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -66,8 +68,15 @@ import {
 } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+// Direct path import — the ai-connections barrel would leak Prisma here.
+import {
+  computeTurnCost,
+  formatUsdEstimate,
+  readPersistedCost,
+} from "@/lib/features/ai-connections/usage/pricing";
 import { ReasoningRouter } from "./reasoning/ReasoningRouter";
 import { parsePlaybookMessageAttachment } from "@/lib/domain/ai/playbooks/message-binding";
+import { parseFolderContextMentionPart } from "@/lib/domain/ai-context/mention-part";
 import {
   parseContentWriteReceipts,
   type ContentWriteReceipt,
@@ -345,6 +354,21 @@ export const ChatMessage = memo(function ChatMessage({
     [message.parts],
   );
 
+  // Failure surface for this turn (output limit / tool errors / captcha) —
+  // derived from the durable transcript so live and reloaded views agree.
+  const messageAnomalies = useMemo(
+    () =>
+      isAssistant
+        ? deriveMessageAnomalies(
+            message.parts as unknown[],
+            (message as { metadata?: Record<string, unknown> }).metadata,
+            Boolean(messageText),
+            isStreaming,
+          )
+        : [],
+    [isAssistant, message, messageText, isStreaming],
+  );
+
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [copied, setCopied] = useState(false);
@@ -559,6 +583,27 @@ export const ChatMessage = memo(function ChatMessage({
     };
   }, [message.parts]);
 
+  // Whether to show a persistent "still working" cue at the END of a streaming
+  // assistant turn. True while streaming, no tool is running, AND the tail of the
+  // message isn't ACTIVELY producing visible output (growing text / non-empty
+  // reasoning). That captures every "model is thinking, nothing moving" gap —
+  // the pre-first-token phase (parts hold only an invisible `step-start`) AND the
+  // long reasoning AFTER a tool result (tool cards are visible, but nothing new
+  // is streaming). Reasoning models sit in these gaps for MINUTES, so a
+  // persistent animated cue is what separates "thinking" from "frozen". Running
+  // tools have their own ThinkingIndicator above, so they're excluded here.
+  const showWorking = useMemo(() => {
+    if (!isStreaming || !isAssistant || hasRunningTools) return false;
+    const last = message.parts[message.parts.length - 1] as
+      | { type?: string; text?: string }
+      | undefined;
+    const lastType = last?.type;
+    const lastActivelyStreaming =
+      (lastType === "text" && (last?.text ?? "").length > 0) ||
+      (lastType === "reasoning" && (last?.text ?? "").trim().length > 0);
+    return !lastActivelyStreaming;
+  }, [isStreaming, isAssistant, hasRunningTools, message.parts]);
+
   // Coalesce text runs into single render units (v3 ship fix, 2026-07-18):
   // provider-native web-search answers stream as MANY text parts — the
   // provider emits a new part per cited span, so bubble-per-part produced
@@ -760,6 +805,44 @@ export const ChatMessage = memo(function ChatMessage({
                     {phaseLabel}
                   </span>
                 )}
+              </div>
+            );
+          }
+
+          // Folder-mention durable trace (FOLDER-CONTEXT-CAPSULE-PLAN
+          // Phase 4 / D13): the gate outcome snapshot that rode the sent
+          // message — survives after the composer chip clears, so context
+          // spend stays auditable per turn.
+          if (part.type === "data-folder-context") {
+            const gate = parseFolderContextMentionPart(part);
+            if (!gate) return null;
+            const detail =
+              gate.status === "fresh"
+                ? gate.refreshedNodes > 0
+                  ? `context refreshed · ${gate.refreshedNodes} nodes${gate.generationCalls > 0 ? ` · ${gate.generationCalls} calls` : ""}`
+                  : "context fresh"
+                : gate.status === "stale"
+                  ? `stale context served${gate.reason ? ` (${gate.reason})` : ""}`
+                  : gate.status === "none"
+                    ? "no context available"
+                    : gate.status === "optedOut"
+                      ? "AI context disabled"
+                      : "context was still updating at send";
+            return (
+              <div
+                key={i}
+                title={`Folder mention: ${gate.title} — ${detail}`}
+                className={`inline-flex max-w-full items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs ${
+                  gate.status === "fresh"
+                    ? "border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-700 dark:text-emerald-300"
+                    : gate.status === "stale"
+                      ? "border-amber-500/30 bg-amber-500/[0.06] text-amber-700 dark:text-amber-300"
+                      : "border-black/15 bg-black/[0.03] text-gray-600 dark:border-white/15 dark:bg-white/[0.04] dark:text-gray-300"
+                }`}
+              >
+                <FolderSearch className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">{gate.title}</span>
+                <span className="shrink-0 opacity-75">· {detail}</span>
               </div>
             );
           }
@@ -1020,12 +1103,20 @@ export const ChatMessage = memo(function ChatMessage({
           <ThinkingIndicator />
         )}
 
-        {/* Fallback: streaming indicator when parts is empty */}
-        {isStreaming &&
-          isAssistant &&
-          message.parts.length === 0 && (
-            <StreamingIndicator indicator={theme.streamingIndicator} />
-          )}
+        {/* Persistent "working" cue for every thinking gap in the turn — the
+            pre-first-token phase AND the long reasoning after a tool result
+            (where cards are visible but nothing is streaming). Shows elapsed
+            time so a multi-minute reasoning model reads as alive, not frozen. */}
+        {showWorking && <WorkingIndicator />}
+
+        {/* Anomaly surfaces — the single failure pipeline for this turn:
+            interruptions render as quiet inline lines (model-switch-divider
+            grammar), turn failures (output limit, tool errors, ok:false
+            results, captcha) as pill chips. Derived from durable parts +
+            metadata, so live and reloaded transcripts always agree. */}
+        {isAssistant && messageAnomalies.length > 0 && (
+          <AnomalySurfaces anomalies={messageAnomalies} />
+        )}
 
         {/* Hover actions — icon-only, with tooltip + aria-label for a11y.
             Copy on every message; edit (user); regenerate + branch
@@ -1672,6 +1763,79 @@ function extractUsage(metadata: Record<string, unknown> | undefined): UsageShape
   };
 }
 
+/** The turn's generation wall time (ms), persisted on finish (see the route). */
+function extractDurationMs(
+  metadata: Record<string, unknown> | undefined,
+): number | undefined {
+  const d = (metadata as { durationMs?: unknown } | undefined)?.durationMs;
+  return typeof d === "number" && Number.isFinite(d) && d >= 0 ? d : undefined;
+}
+
+/**
+ * Estimated turn cost for display (COST-METERING-PLAN.md).
+ *
+ * Precedence:
+ *   1. Persisted `metadata.cost` — priced at write time, version-pinned.
+ *   2. Persisted unpriced marker — render "cost n/a", never $0.
+ *   3. Live/legacy fallback — price the visible usage at CURRENT rates
+ *      (streaming turns carry raw per-request metadata that hasn't been
+ *      through the accumulator yet; pre-feature history rows never will).
+ */
+type CostDisplay =
+  | { kind: "priced"; usd: number; current: boolean }
+  | { kind: "unpriced" }
+  | undefined;
+
+function extractCostDisplay(
+  metadata: Record<string, unknown> | undefined,
+  providerId: string | null | undefined,
+  modelId: string | null | undefined,
+): CostDisplay {
+  const raw = (metadata as { cost?: unknown } | undefined)?.cost;
+  const persisted = readPersistedCost(raw);
+  if (persisted) return { kind: "priced", usd: persisted.usd, current: false };
+  if (
+    raw &&
+    typeof raw === "object" &&
+    (raw as { unpriced?: unknown }).unpriced === true
+  ) {
+    return { kind: "unpriced" };
+  }
+  const usage = (metadata as { usage?: unknown } | undefined)?.usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const u = usage as Record<string, unknown>;
+  const num = (v: unknown): number | undefined =>
+    typeof v === "number" && Number.isFinite(v) ? v : undefined;
+  const inputTokens = num(u.inputTokens);
+  const outputTokens = num(u.outputTokens);
+  if (inputTokens == null && outputTokens == null) return undefined;
+  const computed = computeTurnCost(
+    {
+      inputTokens,
+      outputTokens,
+      cachedInputTokens: num(u.cachedInputTokens),
+      cacheWriteTokens: num(u.cacheWriteTokens),
+    },
+    modelId,
+    providerId,
+  );
+  return computed
+    ? { kind: "priced", usd: computed.usd, current: true }
+    : modelId
+      ? { kind: "unpriced" }
+      : undefined;
+}
+
+/** Human duration: "0.8s", "12s", "1m 05s". */
+function formatDuration(ms: number): string {
+  const totalSec = ms / 1000;
+  if (totalSec < 1) return `${ms}ms`;
+  if (totalSec < 60) return `${totalSec < 10 ? totalSec.toFixed(1) : Math.round(totalSec)}s`;
+  const m = Math.floor(totalSec / 60);
+  const s = Math.round(totalSec % 60);
+  return `${m}m ${s.toString().padStart(2, "0")}s`;
+}
+
 function AssistantAvatar({
   providerId,
   modelId,
@@ -1695,6 +1859,11 @@ function AssistantAvatar({
   const providerName = provider?.name ?? "AI assistant";
   const modelName = model?.name ?? modelId ?? null;
   const usage = useMemo(() => extractUsage(metadata), [metadata]);
+  const durationMs = useMemo(() => extractDurationMs(metadata), [metadata]);
+  const cost = useMemo(
+    () => extractCostDisplay(metadata, providerId, modelId),
+    [metadata, providerId, modelId],
+  );
 
   useEffect(() => {
     // One-shot SSR/hydration boundary marker so we only render the
@@ -1791,6 +1960,53 @@ function AssistantAvatar({
                     <span className="tabular-nums text-gray-700 dark:text-gray-300">
                       {usage.outputTokens.toLocaleString()}
                     </span>
+                  </span>
+                )}
+                {durationMs != null && (
+                  <span title="Generation time">
+                    <span className="text-gray-500">took</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {formatDuration(durationMs)}
+                    </span>
+                  </span>
+                )}
+              </div>
+            )}
+            {/* Duration alone (no token usage reported by the provider) still
+                shows, so the turn's cost-in-time is always visible. */}
+            {(!usage || (usage.inputTokens == null && usage.outputTokens == null)) &&
+              durationMs != null && (
+                <div className="mt-1 flex items-center gap-2 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                  <span title="Generation time">
+                    <span className="text-gray-500">took</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {formatDuration(durationMs)}
+                    </span>
+                  </span>
+                </div>
+              )}
+            {/* Estimated cost (COST-METERING-PLAN.md). Unpriced models say
+                so explicitly — an unknown price must never render as $0. */}
+            {cost && (
+              <div className="mt-1 border-t border-black/10 dark:border-white/10 pt-1 text-gray-500">
+                {cost.kind === "priced" ? (
+                  <span>
+                    <span className="text-gray-500">est. cost</span>{" "}
+                    <span className="tabular-nums text-gray-700 dark:text-gray-300">
+                      {cost.usd > 0 && cost.usd < 0.001
+                        ? "<$0.001"
+                        : formatUsdEstimate(cost.usd)}
+                    </span>
+                    {cost.current && (
+                      <span className="text-gray-400 dark:text-gray-500">
+                        {" "}
+                        (current rates)
+                      </span>
+                    )}
+                  </span>
+                ) : (
+                  <span className="text-gray-400 dark:text-gray-500">
+                    cost n/a — no price entry for this model
                   </span>
                 )}
               </div>
@@ -2149,6 +2365,28 @@ function ApprovalRawJson({ args }: { args: unknown }) {
   );
 }
 
+/** Bare hostname (no www.) from a tool call's `url` arg, or "" if absent/bad. */
+function hostFromToolArgs(args: unknown): string {
+  if (!args || typeof args !== "object") return "";
+  const url = (args as { url?: unknown }).url;
+  if (typeof url !== "string" || !url) return "";
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
+}
+
+/** camelCase / snake_case tool-arg key → a human "Spaced Label". */
+function humanizeApprovalKey(key: string): string {
+  return key
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/^\w/, (c) => c.toUpperCase());
+}
+
 /** Labeled key→value rows for shallow primitive args. */
 function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
   if (fields.length === 0) return null;
@@ -2156,7 +2394,7 @@ function ApprovalFieldRows({ fields }: { fields: Array<[string, string]> }) {
     <div className="mx-3 mb-1.5 space-y-0.5">
       {fields.map(([label, value]) => (
         <div key={label} className="flex gap-2 text-[11px]">
-          <span className="shrink-0 w-20 text-gray-500 dark:text-gray-500">
+          <span className="shrink-0 w-28 text-gray-500 dark:text-gray-500">
             {label}
           </span>
           <span className="min-w-0 break-words text-gray-700 dark:text-gray-300">
@@ -2187,6 +2425,7 @@ function ApprovalPreview({
   if (
     toolName === "createNote" ||
     toolName === "updateNote" ||
+    toolName === "renameNote" ||
     toolName === "create_docx"
   ) {
     const title = str("title") ?? str("fileName") ?? "(untitled)";
@@ -2283,7 +2522,10 @@ function ApprovalPreview({
       typeof value === "boolean"
     ) {
       const text = String(value);
-      fields.push([key, text.length > 140 ? `${text.slice(0, 140)}…` : text]);
+      fields.push([
+        humanizeApprovalKey(key),
+        text.length > 140 ? `${text.slice(0, 140)}…` : text,
+      ]);
     }
   }
   const hasComplexArgs = Object.values(a).some(
@@ -2493,6 +2735,81 @@ function ToolCallBubble({
           }
         }
       }
+      // Agentic Browsing — the single reader and the explicit launcher: express
+      // the ACTION taken (headless fetch vs. a background browser tab vs.
+      // escalated to a VISIBLE tab) so the chip shows what actually happened,
+      // not just the tool name.
+      if (toolName === "read_page_headless_or_browser") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        if (isRunning) return `Reading page${suffix}`;
+        const r =
+          result && typeof result === "object"
+            ? (result as { via?: string; escalationNote?: string })
+            : null;
+        if (r?.escalationNote) return `Read page — opened a browser tab${suffix}`;
+        if (r?.via === "session-tab") return `Read page in a browser tab${suffix}`;
+        return `Read page (headless)${suffix}`;
+      }
+      if (toolName === "open_tab_and_read") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a browser tab${suffix}`;
+      }
+      // R1 — read the CURRENT tab (no new tab). Host comes from the result (the
+      // tool takes no url arg), making the "no new tab" behavior visible.
+      if (toolName === "read_current_page") {
+        let host = "";
+        try {
+          const r = result as { url?: string } | null;
+          if (r?.url) host = new URL(r.url).hostname.replace(/^www\./, "");
+        } catch {
+          // best-effort host label
+        }
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Reading" : "Read"} the page you're on${suffix}`;
+      }
+      if (toolName === "co_browse_open") {
+        const host = hostFromToolArgs(args);
+        const suffix = host ? `: ${host}` : "";
+        return `${isRunning ? "Opening" : "Opened"} a co-browse tab${suffix}`;
+      }
+      if (toolName === "co_browse_act") {
+        const action =
+          args && typeof args === "object"
+            ? (args as { action?: string }).action
+            : undefined;
+        return `Co-browsing${action ? ` (${action})` : ""}`;
+      }
+      // Per-item iteration (spec): human labels for the loop's bookkeeping so the
+      // run reads as a checklist advancing, not raw tool names.
+      if (toolName === "list_tabs") {
+        const n = (result as { count?: number } | null)?.count;
+        return isRunning
+          ? "Looking through your open tabs"
+          : `Looked through your open tabs${typeof n === "number" ? ` (${n} matched)` : ""}`;
+      }
+      if (toolName === "propose_item_iteration") {
+        return "Proposed a per-item run";
+      }
+      if (toolName === "record_item_result") {
+        const label =
+          args && typeof args === "object"
+            ? (args as { itemLabel?: string; itemKey?: string }).itemLabel ??
+              (args as { itemKey?: string }).itemKey
+            : undefined;
+        return `Recorded item${label ? `: ${label}` : ""}`;
+      }
+      if (toolName === "record_batch_checkpoint") {
+        const n =
+          args && typeof args === "object"
+            ? (args as { batchNumber?: number }).batchNumber
+            : undefined;
+        return `Batch checkpoint${typeof n === "number" ? ` ${n}` : ""} recorded`;
+      }
+      if (toolName === "record_iteration_findings") {
+        return "Closed the run (reconciliation recorded)";
+      }
       // A stopped card names the action that was in progress rather than
       // claiming the tool completed successfully.
       return toolActionLabel(toolName, isRunning || wasStopped);
@@ -2648,6 +2965,8 @@ const TOOL_ACTION_LABELS: Record<string, [running: string, done: string]> = {
   searchNotes: ["Searching your notes", "Searched your notes"],
   getCurrentNote: ["Reading a note", "Read a note"],
   createNote: ["Creating a note", "Created a note"],
+  updateNote: ["Updating a note", "Updated a note"],
+  renameNote: ["Renaming", "Renamed"],
   generate_image: ["Generating an image", "Generated an image"],
 };
 
@@ -3236,6 +3555,52 @@ function StreamingIndicator({
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:150ms]" />
       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gray-400 [animation-delay:300ms]" />
+    </div>
+  );
+}
+
+/**
+ * Working indicator — the persistent "the model is thinking" cue shown in every
+ * gap of a streaming turn (before the first token, and during the long reasoning
+ * after a tool result). Counts up elapsed seconds so a slow reasoning model
+ * (gpt-5-pro can take minutes) visibly reads as ALIVE rather than frozen — the
+ * ticking number is the proof of life a static spinner can't give. The timer is
+ * scoped to the current thinking segment (it mounts/unmounts with the gap), which
+ * is exactly the "is it still going right now?" signal the user needs.
+ */
+function WorkingIndicator() {
+  const [elapsed, setElapsed] = useState(0);
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(
+      () => setElapsed(Math.floor((Date.now() - start) / 1000)),
+      1000,
+    );
+    return () => clearInterval(id);
+  }, []);
+  const mm = Math.floor(elapsed / 60);
+  const ss = elapsed % 60;
+  // Hold the time back for the first few seconds so quick replies don't flash a
+  // pointless "0:01"; once it's clearly a wait, the counter reassures.
+  const showTime = elapsed >= 3;
+  return (
+    <div
+      className="inline-flex items-center gap-2 rounded-xl bg-black/[0.03] dark:bg-white/5 border border-black/10 dark:border-white/10 px-3.5 py-2 text-xs text-gray-500"
+      aria-live="polite"
+      aria-label={`Working${showTime ? `, ${elapsed} seconds elapsed` : ""}`}
+    >
+      <BrainCircuit className="h-3.5 w-3.5 animate-pulse" />
+      <span>Working</span>
+      <span className="inline-flex gap-0.5" aria-hidden>
+        <span className="animate-bounce [animation-delay:0ms]">.</span>
+        <span className="animate-bounce [animation-delay:150ms]">.</span>
+        <span className="animate-bounce [animation-delay:300ms]">.</span>
+      </span>
+      {showTime && (
+        <span className="tabular-nums text-gray-500/70">
+          {mm}:{ss.toString().padStart(2, "0")}
+        </span>
+      )}
     </div>
   );
 }

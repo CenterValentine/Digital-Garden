@@ -1,4 +1,6 @@
 import { loadUrlPresets, resolvePreset, applyUrlStrategy, getStrategyOverrides, setStrategyOverride } from "../url-strategy.js";
+import * as cobrowse from "../agentic/cdp/index.js";
+import * as cobrowseSession from "../agentic/session.js";
 
 const STORAGE_KEYS = {
   config: "dgBrowserBookmarksConfig",
@@ -30,6 +32,10 @@ const DEFAULT_CONFIG = {
     autoAssociate: false,
     navHistory: true,
     denylist: [],
+    // Agentic Browsing read-completion launcher: when ON, the assistant may
+    // open a VISIBLE foreground tab to read a page a background session tab
+    // can't (bot/device-blocked). OFF by default — standing consent is opt-in.
+    allowTabLaunch: false,
   },
 };
 
@@ -1812,13 +1818,56 @@ chrome.runtime.onInstalled.addListener(async () => {
 // synchronous, so openAiChatPanel can branch without an await (which would
 // consume the user gesture that authorizes sidePanel.open).
 let panelPort = null;
+// Synchronous best-guess of the panel's open state so a gesture-sensitive path
+// (open-content) can decide WITHOUT an async storage read that would consume the
+// gesture. Mirrors the durable dgPanelOpen flag: seeded from it on SW startup,
+// updated on every change. Needed because `panelPort` alone is null after SW
+// eviction even while the panel is open.
+let panelOpenFlag = false;
+void chrome.storage.session
+  .get("dgPanelOpen")
+  .then((r) => {
+    panelOpenFlag = r?.dgPanelOpen === true;
+  })
+  .catch(() => {});
+
+// Push the side-panel open/closed state so each tab's overlay keeps a LOCAL
+// belief and never has to query it at click time. That matters because
+// chrome.sidePanel.open() needs a live user gesture, and an async state query
+// between the click and the open consumes the gesture — the open then silently
+// fails (the "both"/panel handle looks dead, especially after a manual close).
+// Also persists to chrome.storage.session so the belief survives service-worker
+// eviction (which nulls the in-memory `panelPort` even while the panel is open).
+function broadcastPanelState(open) {
+  panelOpenFlag = open;
+  void chrome.storage.session.set({ dgPanelOpen: open }).catch(() => {});
+  chrome.tabs.query({}, (tabs) => {
+    if (chrome.runtime.lastError) return;
+    for (const tab of tabs) {
+      if (tab.id == null) continue;
+      chrome.tabs.sendMessage(tab.id, { type: "dg-panel-state", open }, () => {
+        void chrome.runtime.lastError; // no overlay in that tab — ignore
+      });
+    }
+  });
+}
+
 chrome.runtime.onConnect.addListener((port) => {
   if (port.name !== "dg-panel") return;
   panelPort = port;
+  broadcastPanelState(true);
   port.onDisconnect.addListener(() => {
+    // A genuine close runs this in a live SW → false. An eviction kills the SW
+    // without firing it, so the persisted flag stays true across eviction.
     if (panelPort === port) panelPort = null;
+    broadcastPanelState(false);
   });
 });
+
+// Pin quick-add: an overlay's `pin-add` response is held open while the panel
+// resolves the target folder (it owns the selection) and posts `pin-resolved`
+// back. Keyed by the requesting tab id so concurrent tabs don't collide.
+const pendingPinResolves = new Map();
 
 // Open the side panel on the Chat view for `tab` — or, if the panel is already
 // open, switch it to Chat in place. Re-calling sidePanel.open() on an open
@@ -2079,6 +2128,371 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   pruneMruTab(tabId);
 });
 
+// ── Acquisition providers (BROWSER-REACH B5) ─────────────────────────────────
+// The extension is a *remote provider* for the app-side Acquisition Service: it
+// fetches a URL with the user's own session (cookies / JS rendering) that a
+// server-side fetch can't reach, and returns RAW material only. The server
+// builds the trusted AcquiredContent envelope — the extension never asserts
+// trust or provenance (it's untrusted input).
+//   P2 sw-fetch    — credentialed background fetch → raw HTML (server extracts).
+//   P3 session-tab — inactive tab + injected reader → readable extraction.
+// Every request clears a local policy gate first (SSRF/private-network block is
+// non-negotiable; the app-issued deny list + a per-window budget ride on top)
+// and shows a brief activity badge, so an automated fetch is never silent.
+
+const ACQUISITION_WINDOW_MS = 5 * 60 * 1000;
+const ACQUISITION_DEFAULT_MAX_PAGES = 10;
+const ACQUISITION_MAX_HTML_CHARS = 1_500_000;
+const ACQUISITION_TAB_LOAD_TIMEOUT_MS = 20_000;
+const ACQUISITION_TAB_SETTLE_MS = 1_500;
+const ACQUISITION_EXTRACT_TIMEOUT_MS = 12_000;
+// Settle-then-extract: a flat delay guesses wrong on client-rendered pages
+// (extract too early → nav/footer chrome only). Instead we poll-extract and
+// stop once Readability succeeds or the content length stabilizes (hydration
+// finished), capped by a max budget so a hostile page can't hang the read.
+const ACQUISITION_SETTLE_MAX_MS = 8_000; // total hydration-poll budget
+const ACQUISITION_SETTLE_POLL_MS = 700; // gap between re-extractions
+const ACQUISITION_SETTLE_STABLE_DELTA = 48; // chars: "content stopped growing"
+const ACQUISITION_SETTLE_MIN_CHARS = 400; // don't call a near-empty page "stable"
+const ACCEPTED_ACQUISITION_CONTENT_TYPES = [
+  "text/html",
+  "application/xhtml",
+  "text/plain",
+];
+
+// Rolling per-window budget (rate etiquette). Not persisted — a fresh SW starts
+// with a clean allowance; the app-issued `maxPages` caps it per 5-min window.
+let acquisitionBudget = { used: 0, windowStart: 0 };
+
+function isBlockedAcquisitionHost(hostname) {
+  if (!hostname) return true;
+  const host = hostname.toLowerCase();
+  if (host === "localhost" || host === "0.0.0.0" || host === "::1" || host === "[::1]")
+    return true;
+  if (
+    host.endsWith(".local") ||
+    host.endsWith(".internal") ||
+    host.endsWith(".localdomain")
+  )
+    return true;
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+  }
+  const v6 = host.replace(/^\[|\]$/g, "");
+  if (v6 === "::1") return true;
+  if (/^f[cd]/.test(v6)) return true; // fc00::/7 unique-local
+  if (/^fe[89ab]/.test(v6)) return true; // fe80::/10 link-local
+  return false;
+}
+
+// Local mirror of the server acquisition policy. The private-network block is
+// non-negotiable (no config re-enables it). The deny list + budget are the
+// app-issued policy passed on the request.
+function evaluateAcquisitionPolicy(url, policy, configDeny) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return { allowed: false, reason: "invalid URL" };
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    return { allowed: false, reason: "only http/https URLs can be acquired" };
+  }
+  if (isBlockedAcquisitionHost(parsed.hostname)) {
+    return { allowed: false, reason: "blocked host (private network)" };
+  }
+  const requestDeny = policy && Array.isArray(policy.deny) ? policy.deny : [];
+  // An app-issued deny list wins; otherwise fall back to the user's own capture
+  // denylist (B3-B "Never capture these sites") so it governs acquisition too.
+  const deny =
+    requestDeny.length > 0
+      ? requestDeny
+      : Array.isArray(configDeny)
+        ? configDeny
+        : [];
+  if (matchesCaptureDenylist(url, deny)) {
+    return { allowed: false, reason: "this domain is on your deny list" };
+  }
+  const maxPages =
+    policy && typeof policy.maxPages === "number"
+      ? policy.maxPages
+      : ACQUISITION_DEFAULT_MAX_PAGES;
+  const now = Date.now();
+  if (now - acquisitionBudget.windowStart > ACQUISITION_WINDOW_MS) {
+    acquisitionBudget = { used: 0, windowStart: now };
+  }
+  if (acquisitionBudget.used >= maxPages) {
+    return {
+      allowed: false,
+      reason: `acquisition budget reached (${maxPages} per 5 min)`,
+    };
+  }
+  acquisitionBudget.used += 1;
+  return { allowed: true };
+}
+
+function setAcquisitionBadge(active) {
+  try {
+    if (active) {
+      void chrome.action.setBadgeBackgroundColor({ color: "#2563eb" });
+      void chrome.action.setBadgeText({ text: "…" });
+    } else {
+      void chrome.action.setBadgeText({ text: "" });
+    }
+  } catch {
+    // Badge is best-effort.
+  }
+}
+
+async function acquireViaSwFetch(url) {
+  let response;
+  try {
+    response = await fetch(url, { credentials: "include", redirect: "follow" });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "fetch failed",
+    };
+  }
+  if (!response.ok) {
+    return { ok: false, reason: `fetch failed (${response.status})` };
+  }
+  const contentType = (response.headers.get("content-type") || "").toLowerCase();
+  if (!ACCEPTED_ACQUISITION_CONTENT_TYPES.some((t) => contentType.includes(t))) {
+    return {
+      ok: false,
+      reason: `unsupported content type: ${contentType || "unknown"}`,
+    };
+  }
+  const rawHtml = (await response.text()).slice(0, ACQUISITION_MAX_HTML_CHARS);
+  return { ok: true, mode: "sw-fetch", url, finalUrl: response.url || url, rawHtml };
+}
+
+function waitForTabComplete(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const finish = (fn) => {
+      if (done) return;
+      done = true;
+      chrome.tabs.onUpdated.removeListener(onUpdated);
+      clearTimeout(timer);
+      fn();
+    };
+    const onUpdated = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        finish(resolve);
+      }
+    };
+    const timer = setTimeout(
+      () => finish(() => reject(new Error("page load timed out"))),
+      timeoutMs
+    );
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    // Guard: the tab may already be "complete" before the listener attached.
+    chrome.tabs.get(tabId, (tab) => {
+      if (chrome.runtime.lastError) return;
+      if (tab && tab.status === "complete") finish(resolve);
+    });
+  });
+}
+
+function sendTabExtract(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      reject(new Error("extraction timed out"));
+    }, timeoutMs);
+    chrome.tabs.sendMessage(
+      tabId,
+      { type: "dg-extract-content", scope: "full" },
+      (response) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (!response || !response.ok) {
+          reject(new Error(response?.error || "extraction failed"));
+        } else {
+          resolve(response.data);
+        }
+      }
+    );
+  });
+}
+
+// Extract from a tab, injecting the lightweight reader on demand if nothing is
+// listening yet (mirrors the panel host's sendExtractWithInjectFallback). Avoids
+// a redundant listener when the overlay content script already handles it.
+async function extractFromTabWithInjectFallback(tabId) {
+  try {
+    return await sendTabExtract(tabId, ACQUISITION_EXTRACT_TIMEOUT_MS);
+  } catch (error) {
+    const msg = error instanceof Error ? error.message : "";
+    if (
+      /receiving end does not exist|could not establish connection/i.test(msg) &&
+      chrome.scripting
+    ) {
+      await chrome.scripting.executeScript({
+        target: { tabId },
+        files: ["dist/reader.js"],
+      });
+      return await sendTabExtract(tabId, ACQUISITION_EXTRACT_TIMEOUT_MS);
+    }
+    throw error;
+  }
+}
+
+// Poll-extract until the page has hydrated. A flat delay guesses wrong on
+// client-rendered pages — extract too early and you photograph nav/footer
+// chrome before the main content renders. Instead we re-extract on an interval
+// and stop as soon as Readability finds an article, or the extracted content
+// length stabilizes (hydration done), capped by ACQUISITION_SETTLE_MAX_MS.
+// The page-side extractor stays synchronous; the polling lives here.
+async function settleAndExtract(tabId) {
+  const deadline = Date.now() + ACQUISITION_SETTLE_MAX_MS;
+  // A small initial grace so first paint / hydration can begin before we look.
+  await new Promise((r) => setTimeout(r, ACQUISITION_TAB_SETTLE_MS));
+  let best = null;
+  let lastLen = -1;
+  let stable = 0;
+  while (Date.now() < deadline) {
+    let extracted = null;
+    try {
+      extracted = await extractFromTabWithInjectFallback(tabId);
+    } catch {
+      // The page may still be navigating/hydrating; retry after the poll gap.
+    }
+    if (extracted) {
+      // Readability found a real article — the best we can do, stop now.
+      if (extracted.quality === "readable" && (extracted.content?.length || 0) > 0) {
+        return extracted;
+      }
+      const len = extracted.content?.length || 0;
+      if (!best || len > (best.content?.length || 0)) best = extracted;
+      // Content stopped growing across two polls → treat hydration as done.
+      if (
+        len >= ACQUISITION_SETTLE_MIN_CHARS &&
+        Math.abs(len - lastLen) <= ACQUISITION_SETTLE_STABLE_DELTA
+      ) {
+        if (++stable >= 2) return best;
+      } else {
+        stable = 0;
+      }
+      lastLen = len;
+    }
+    await new Promise((r) => setTimeout(r, ACQUISITION_SETTLE_POLL_MS));
+  }
+  // Budget exhausted: return the best we saw, or make one final attempt so a
+  // genuine extraction failure still surfaces its real error to the caller.
+  return best ?? (await extractFromTabWithInjectFallback(tabId));
+}
+
+async function acquireViaSessionTab(url, visible = false) {
+  let tab;
+  try {
+    // A VISIBLE (foreground) tab clears many soft bot-blocks a background tab
+    // can't — used by the read-completion launcher (gated in handleAcquireUrl).
+    tab = await chrome.tabs.create({ url, active: !!visible });
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "couldn't open a tab",
+    };
+  }
+  const tabId = tab.id;
+  try {
+    await waitForTabComplete(tabId, ACQUISITION_TAB_LOAD_TIMEOUT_MS);
+    // Poll-extract until the page hydrates (see settleAndExtract) rather than a
+    // flat delay + single shot, which photographed client-rendered pages before
+    // their main content rendered (returned nav/footer chrome only).
+    const extracted = await settleAndExtract(tabId);
+    let finalUrl = url;
+    try {
+      const current = await chrome.tabs.get(tabId);
+      if (current && current.url) finalUrl = current.url;
+    } catch {
+      // keep the request URL
+    }
+    return { ok: true, mode: "session-tab", url, finalUrl, extracted };
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : "session extraction failed",
+    };
+  } finally {
+    try {
+      await chrome.tabs.remove(tabId);
+    } catch {
+      // tab may already be gone
+    }
+  }
+}
+
+async function handleAcquireUrl(payload) {
+  const url = payload && payload.url;
+  const mode = payload && payload.mode === "sw-fetch" ? "sw-fetch" : "session-tab";
+  if (!url) return { ok: false, reason: "no url provided" };
+  const config = await getConfig();
+  // Read-completion launcher: a VISIBLE foreground tab is only opened when the
+  // user has turned it on in Browser Bookmarks settings (standing consent). The
+  // SSRF / private-network / denylist policy gate below still runs either way —
+  // `visible` only changes how the tab opens, never whether the URL is allowed.
+  const visible = payload && payload.visible === true;
+  if (
+    visible &&
+    !(config.capture && config.capture.allowTabLaunch === true)
+  ) {
+    return {
+      ok: false,
+      reason:
+        "Opening a tab to read blocked pages is turned off. Turn on \"Open a tab to read blocked pages\" in Browser Bookmarks settings → Capture & privacy to allow it.",
+    };
+  }
+  const configDeny =
+    config.capture && Array.isArray(config.capture.denylist)
+      ? config.capture.denylist
+      : [];
+  const decision = evaluateAcquisitionPolicy(url, payload && payload.policy, configDeny);
+  if (!decision.allowed) return { ok: false, reason: decision.reason };
+  setAcquisitionBadge(true);
+  try {
+    return mode === "sw-fetch"
+      ? await acquireViaSwFetch(url)
+      : await acquireViaSessionTab(url, visible);
+  } finally {
+    setAcquisitionBadge(false);
+  }
+}
+
+// Resolve the tab a co-browse session should attach to when the caller gives no
+// explicit tabId AND there's no sender tab (the side panel isn't a tab). Default:
+// the active http(s) tab in the user's window. The Slice 5b session manager will
+// layer the real topology on top (agent-owned tab, metadata resolution, etc.).
+async function resolveCoBrowseTab() {
+  const tabs = await chrome.tabs.query({ active: true });
+  return (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
+}
+
+// Agentic co-browse: when a CDP session ends for ANY reason — the user clicking
+// "Cancel" on Chrome's debugging infobar (D-BANNER's Stop), the tab closing, or
+// devtools taking the target — broadcast it so any open app surface can drop its
+// co-browse indicator. Best-effort: sendMessage rejects when nobody's listening.
+cobrowse.setSessionEndHandler((reason, tabId) => {
+  console.info("[DG cobrowse] session ended", reason, tabId);
+  chrome.runtime
+    .sendMessage({ type: "cobrowse-session-ended", payload: { reason, tabId } })
+    .catch(() => {});
+});
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // sidePanel.open() must run before any await or the user-gesture context
   // that authorized it (launcher click → this message) is lost. Handle it
@@ -2090,9 +2504,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // tabId toggles/collapses it (learned in B2's chat-panel work); windowId
     // reveals it for the whole window. tabId is only a last resort.
     const target = windowId != null ? { windowId } : { tabId };
+    // Re-enable in case a previous close disabled the panel. Fire-and-forget (no
+    // await) so the gesture-critical open() below still runs synchronously.
+    chrome.sidePanel.setOptions({ path: "panel.html", enabled: true }).catch(() => {});
     chrome.sidePanel
       .open(target)
-      .then(() => sendResponse({ ok: true, data: true }))
+      .then(() => {
+        broadcastPanelState(true);
+        sendResponse({ ok: true, data: true });
+      })
       .catch((error) => {
         console.warn("[DG Bookmarks] open-side-panel failed", error, target);
         sendResponse({
@@ -2103,9 +2523,419 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // Panel-open state — only the background knows (via its port). The overlay's
+  // "both"/panel handles query this to decide open-vs-close.
+  if (message.type === "get-panel-state") {
+    // Prefer the live port; fall back to the durable flag so a service-worker
+    // eviction (panelPort reset to null while the panel is still open) doesn't
+    // wrongly report "closed" and make the "both" handle toggle the panel shut.
+    if (panelPort != null) {
+      sendResponse({ ok: true, data: { open: true } });
+      return true;
+    }
+    chrome.storage.session
+      .get("dgPanelOpen")
+      .then((r) => sendResponse({ ok: true, data: { open: r?.dgPanelOpen === true } }))
+      .catch(() => sendResponse({ ok: true, data: { open: false } }));
+    return true;
+  }
+
+  // Close the side panel. MV3 has no sidePanel.close(), and window.close() inside
+  // the panel page is ignored by many Chrome builds (the tree closed but the
+  // panel didn't). Disabling the panel closes it reliably; re-enable immediately
+  // after so it can be opened again (enabling does NOT auto-open it).
+  if (message.type === "close-side-panel") {
+    // setOptions({enabled:false}) does NOT close an open panel in every Chrome
+    // build (it didn't here). The reliable close is to tell the panel PAGE to
+    // close itself via window.close(), delivered by broadcast so it arrives
+    // regardless of the dg-panel port. Keep the disable as a belt-and-suspenders;
+    // the open path re-enables before opening.
+    chrome.runtime.sendMessage({ type: "dg-close-panel" }, () => void chrome.runtime.lastError);
+    chrome.sidePanel.setOptions({ enabled: false }).catch((error) => {
+      console.warn("[DG Bookmarks] close-side-panel failed", error);
+    });
+    panelPort = null;
+    broadcastPanelState(false);
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Pin quick-add (step 1): the overlay's pin fired. Only the panel knows the
+  // selection, so relay there and HOLD this response until the panel resolves
+  // the target folder (pin-resolved, step 2). Panel closed → no target; the
+  // overlay opens the tree so the user can pick a folder instead.
+  if (message.type === "pin-add") {
+    const tabId = sender.tab?.id ?? null;
+    if (!panelPort) {
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    pendingPinResolves.set(tabId, sendResponse);
+    try {
+      panelPort.postMessage({
+        type: "pin-add",
+        tabId,
+        mode: message.payload?.mode === "associate" ? "associate" : "folder",
+        url: message.payload?.url ?? null,
+        title: message.payload?.title ?? null,
+      });
+    } catch {
+      panelPort = null;
+      pendingPinResolves.delete(tabId);
+      sendResponse({ ok: true, data: { noTarget: true } });
+      return true;
+    }
+    return true; // keep the channel open for the panel's async pin-resolved
+  }
+
+  // Pin quick-add (step 2): the panel resolved the target folder. Create the
+  // external link with the bearer token (the panel is session-authed and can't),
+  // then fulfil the held overlay response so the pin can flash success/open tree.
+  if (message.type === "pin-resolved") {
+    const tabId = message.tabId ?? null;
+    const resolve = pendingPinResolves.get(tabId);
+    pendingPinResolves.delete(tabId);
+    if (!resolve) {
+      sendResponse({ ok: true, data: true });
+      return true;
+    }
+    if (message.noTarget) {
+      resolve({ ok: true, data: { noTarget: true } });
+    } else if (message.contentId) {
+      // Hold → link the page to the OPEN content. Resolve a webResourceId first
+      // (same as the note-link path), then associate — so the green means the
+      // link actually exists.
+      (async () => {
+        try {
+          const context = await fetchResourceContext({
+            url: message.url ?? null,
+            canonicalUrl: null,
+            title: message.title ?? null,
+            faviconUrl: null,
+            metadata: { source: "pin-associate" },
+          });
+          const webResourceId = context?.resource?.id;
+          if (!webResourceId) throw new Error("Couldn't resolve this page");
+          await createResourceAssociation({
+            webResourceId,
+            contentId: message.contentId,
+          });
+          resolve({ ok: true, data: { added: true } });
+        } catch {
+          resolve({ ok: false, data: { added: false } });
+        }
+      })();
+    } else {
+      // Tap → create the external link under the resolved parent folder.
+      createContentPickerItem({
+        parentId: message.parentId ?? null,
+        type: "external",
+        title: message.title ?? null,
+        url: message.url ?? null,
+      })
+        .then(() => resolve({ ok: true, data: { added: true } }))
+        .catch(() => resolve({ ok: false, data: { added: false } }));
+    }
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // PANEL-OVERLAY-PLAN Phase 1b: open a tree-clicked content in the side panel.
+  // Warm (panel open) → hand it straight to the embed via the dg-panel port.
+  // Cold (panel closed) → stash it for the panel boot to consume, then open the
+  // panel synchronously (gesture-preserving) — mirrors the ask-about-page path.
+  if (message.type === "open-content-in-side-panel") {
+    const contentId = message.payload?.contentId;
+    const contentType = message.payload?.contentType || null;
+    if (!contentId) {
+      sendResponse({ ok: false, error: "no contentId" });
+      return true;
+    }
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "open-content", contentId, contentType });
+        sendResponse({ ok: true, data: true });
+        return true;
+      } catch {
+        panelPort = null;
+      }
+    }
+    // panelPort is null. If the panel is nonetheless OPEN (SW was evicted while it
+    // stayed open — common), calling sidePanel.open() here would TOGGLE IT SHUT
+    // (the "sidebar collapses when I click a file" bug). Instead deliver the
+    // content by BROADCAST, which reaches the open panel page regardless of the
+    // dead port. Only when the panel is genuinely closed do we stash + open.
+    if (panelOpenFlag) {
+      chrome.runtime.sendMessage(
+        { type: "dg-open-content", contentId, contentType },
+        () => void chrome.runtime.lastError,
+      );
+      sendResponse({ ok: true, data: true });
+      return true;
+    }
+    // panelOpenFlag is seeded async on SW startup, so the FIRST message after an
+    // eviction can arrive before it loads. Confirm against the durable flag before
+    // risking a toggle-shut: if open → broadcast; only if genuinely closed →
+    // stash + open.
+    const openTabId = sender?.tab?.id;
+    const openWindowId = sender?.tab?.windowId;
+    const openTarget = openWindowId != null ? { windowId: openWindowId } : { tabId: openTabId };
+    chrome.storage.session
+      .get("dgPanelOpen")
+      .then((r) => {
+        if (r?.dgPanelOpen === true) {
+          panelOpenFlag = true;
+          chrome.runtime.sendMessage(
+            { type: "dg-open-content", contentId, contentType },
+            () => void chrome.runtime.lastError,
+          );
+          sendResponse({ ok: true, data: true });
+          return;
+        }
+        chrome.storage.session
+          .set({ dgPanelOpenContentId: contentId, dgPanelOpenContentType: contentType })
+          .catch(() => {});
+        chrome.sidePanel
+          .open(openTarget)
+          .then(() => sendResponse({ ok: true, data: true }))
+          .catch((error) => {
+            console.warn("[DG Bookmarks] open-content-in-side-panel failed", error, openTarget);
+            sendResponse({
+              ok: false,
+              error: error instanceof Error ? error.message : "Failed to open side panel",
+            });
+          });
+      })
+      .catch(() => sendResponse({ ok: false, error: "panel state read failed" }));
+    return true;
+  }
+
+  // Workspace sync hub: mirror a workspace switch to BOTH the panel (port) and
+  // the active tab's overlay (→ tree iframe). Each side applies only when the id
+  // differs, so the origin's own echo is a harmless no-op (no loop).
+  if (message.type === "workspace-sync" && message.workspaceId) {
+    const workspaceId = message.workspaceId;
+    // Persist the last active workspace so a freshly-opened panel/tree (a
+    // partitioned iframe with empty localStorage) can RESTORE it on boot instead
+    // of defaulting to Main — and uniformly, since both partitions read this one
+    // background-owned value.
+    void chrome.storage.local.set({ dgActiveWorkspace: workspaceId }).catch(() => {});
+    if (panelPort) {
+      try {
+        panelPort.postMessage({ type: "workspace-changed", workspaceId });
+      } catch {
+        panelPort = null;
+      }
+    }
+    chrome.tabs
+      .query({ active: true, lastFocusedWindow: true })
+      .then((tabs) => {
+        const tab = tabs[0];
+        if (tab?.id != null) {
+          chrome.tabs.sendMessage(
+            tab.id,
+            { type: "dg-workspace-changed", workspaceId },
+            () => void chrome.runtime.lastError,
+          );
+        }
+      })
+      .catch(() => {});
+    sendResponse({ ok: true, data: true });
+    return true;
+  }
+
+  // Boot restore: an embed (panel or tree) asks for the persisted active
+  // workspace so it can activate it instead of defaulting to Main.
+  if (message.type === "get-active-workspace") {
+    chrome.storage.local
+      .get("dgActiveWorkspace")
+      .then((r) =>
+        sendResponse({ ok: true, data: { workspaceId: r?.dgActiveWorkspace ?? null } }),
+      )
+      .catch(() => sendResponse({ ok: true, data: { workspaceId: null } }));
+    return true;
+  }
+
   (async () => {
     if (message.type === "get-config") {
       sendResponse({ ok: true, data: await getConfig() });
+      return;
+    }
+
+    // ── Agentic co-browse (Phase 2b) — raw CDP executor lifecycle ──────────
+    // Semantic operations only (attach/detach/status/navigate); there is NO
+    // generic "run any CDP command" passthrough reachable from a page message —
+    // each capability is its own validated handler (later slices add snapshot,
+    // click, scroll as their own types). The debuggee defaults to the SENDER's
+    // tab; an explicit payload.tabId lets the panel drive another tab.
+    if (message.type === "cobrowse-attach") {
+      try {
+        const tabId =
+          message.payload?.tabId ?? sender.tab?.id ?? (await resolveCoBrowseTab());
+        sendResponse({ ok: true, data: await cobrowse.attach(tabId) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "attach failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-detach") {
+      sendResponse({ ok: true, data: await cobrowse.detach() });
+      return;
+    }
+    if (message.type === "cobrowse-status") {
+      sendResponse({ ok: true, data: { session: cobrowse.getSession() } });
+      return;
+    }
+    if (message.type === "cobrowse-navigate") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network / denylist gate reads run — `Page.navigate`
+        // must not become an open redirect into internal hosts.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        sendResponse({ ok: true, data: await cobrowse.send("Page.navigate", { url }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "navigate failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-snapshot") {
+      try {
+        const [nodes, url] = await Promise.all([
+          cobrowse.getA11ySnapshot(),
+          cobrowse.currentUrl(),
+        ]);
+        // captchaDetected rides alongside so the model can pause and hand to the
+        // user; the captcha frame's own nodes are already excluded from `nodes`.
+        const { captchaDetected } = cobrowse.detectChallenges();
+        sendResponse({ ok: true, data: { nodes, url, captchaDetected } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-click") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.click(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "click failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-hover") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.hover(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "hover failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-type") {
+      try {
+        const { text, ...target } = message.payload || {};
+        sendResponse({ ok: true, data: await cobrowse.type(target, text) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "type failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-scroll") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.scroll(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "scroll failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-show-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.showTimer(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "show-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-clear-timer") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.clearTimer() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "clear-timer failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-back") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.back() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "back failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-collect") {
+      try {
+        sendResponse({ ok: true, data: await cobrowse.collectAll(message.payload || {}) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "collect failed" });
+      }
+      return;
+    }
+    // ── Session / tab manager (Slice 5b) ──────────────────────────────────
+    if (message.type === "cobrowse-open") {
+      try {
+        const url = message.payload?.url;
+        if (!url) {
+          sendResponse({ ok: false, error: "no url provided" });
+          return;
+        }
+        // Same SSRF / private-network gate as reads/navigate before we open+drive.
+        const config = await getConfig();
+        const configDeny =
+          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+        if (!decision.allowed) {
+          sendResponse({ ok: false, error: decision.reason });
+          return;
+        }
+        const active = message.payload?.active !== false;
+        sendResponse({ ok: true, data: await cobrowseSession.openAndAttach(url, { active }) });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "open failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-reveal") {
+      try {
+        sendResponse({ ok: true, data: await cobrowseSession.revealSession() });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "reveal failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-list-tabs") {
+      try {
+        sendResponse({ ok: true, data: { tabs: await cobrowseSession.listTabs() } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "list-tabs failed" });
+      }
+      return;
+    }
+    if (message.type === "cobrowse-resolve-tab") {
+      try {
+        const candidates = await cobrowseSession.resolveTab(message.payload?.query);
+        sendResponse({ ok: true, data: { candidates } });
+      } catch (error) {
+        sendResponse({ ok: false, error: error instanceof Error ? error.message : "resolve-tab failed" });
+      }
       return;
     }
     // Tab-scoped open-panel persistence: notes stay open as the user navigates
@@ -2421,6 +3251,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           autoAssociate: capture.autoAssociate === true,
           navHistory: capture.navHistory !== false,
           denylist: Array.isArray(capture.denylist) ? capture.denylist : [],
+          allowTabLaunch: capture.allowTabLaunch === true,
         },
       });
       return;
@@ -2445,6 +3276,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             : Array.isArray(prev.denylist)
               ? prev.denylist
               : [],
+          allowTabLaunch:
+            typeof patch.allowTabLaunch === "boolean"
+              ? patch.allowTabLaunch
+              : prev.allowTabLaunch === true,
         },
       };
       await saveConfig(next);
@@ -2458,6 +3293,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.type === "clear-page-history") {
       await chrome.storage.local.remove(STORAGE_KEYS.pageHistory);
       sendResponse({ ok: true, data: [] });
+      return;
+    }
+    if (message.type === "acquire-url") {
+      // The inner result carries its own ok/reason (policy denials, budget,
+      // fetch failures); the outer envelope reports message-handling success.
+      sendResponse({ ok: true, data: await handleAcquireUrl(message.payload || {}) });
       return;
     }
 

@@ -445,7 +445,7 @@ export function FileUploadDialog({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 backdrop-blur-[1px] flex items-center justify-center z-[200] p-4"
       onClick={(e) => {
         // Close dialog when clicking backdrop (not when uploading)
         if (e.target === e.currentTarget && !isUploading) {

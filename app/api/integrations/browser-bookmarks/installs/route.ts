@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
       extensionName:
         typeof body.extensionName === "string"
           ? body.extensionName
-          : "Digital Garden Browser Bookmarks",
+          : "Digital Garden Browser Extension",
       extensionVersion:
         typeof body.extensionVersion === "string" ? body.extensionVersion : "0.1.0",
       browserName: typeof body.browserName === "string" ? body.browserName : "Chromium Browser",

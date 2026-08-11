@@ -25,6 +25,8 @@ import { SnippetPicker } from "./SnippetPicker";
 import { TableBubbleMenu } from "./TableBubbleMenu";
 import { ImageBubbleMenu } from "./ImageBubbleMenu";
 import { extractOutline, type OutlineHeading } from "@/lib/domain/content/outline-extractor";
+import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
+import { expandFoldsContaining } from "@/lib/domain/editor/extensions/heading-fold";
 import { markdownPasteToTiptap } from "@/lib/domain/content/markdown";
 import {
   isLikelyMarkdown,
@@ -173,7 +175,7 @@ export interface MarkdownEditorProps {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
   /** Callback when a tag is clicked */
   onTagClick?: (tagId: string, tagName: string) => void;
   /** Fetch tags for tag autocomplete */
@@ -1044,23 +1046,46 @@ export function MarkdownEditor({
     if (!editor) return;
 
     const handleScrollToHeading = (e: Event) => {
-      const { text, level } = (e as CustomEvent).detail;
+      const { text, level, slug, id } = (e as CustomEvent).detail as {
+        text?: string;
+        level?: number;
+        slug?: string;
+        id?: string;
+      };
 
-      // Search for the heading by text + level (more reliable than position counter)
+      // Preferred: resolve by derived slug (outline heading ids ARE slugs,
+      // and in-document links carry one). Accordion outline entries use an
+      // "accordion:"-prefixed namespace and fall through to text matching.
+      const targetSlug =
+        slug ?? (id && !id.startsWith("accordion:") ? id : undefined);
       let targetPos: number | null = null;
-      editor.state.doc.descendants((node, pos) => {
-        if (targetPos !== null) return false; // Stop after first match
-        if (
-          node.type.name === "heading" &&
-          node.attrs.level === level &&
-          node.textContent.trim() === text.trim()
-        ) {
-          targetPos = pos;
-          return false;
-        }
-      });
+      if (targetSlug) {
+        targetPos =
+          computeHeadingIds(editor.state.doc).find((h) => h.slug === targetSlug)
+            ?.pos ?? null;
+      }
+
+      // Fallback: search by text + level (pre-slug event shape, accordions)
+      if (targetPos === null && text !== undefined) {
+        editor.state.doc.descendants((node, pos) => {
+          if (targetPos !== null) return false; // Stop after first match
+          if (
+            node.type.name === "heading" &&
+            node.attrs.level === level &&
+            node.textContent.trim() === text.trim()
+          ) {
+            targetPos = pos;
+            return false;
+          }
+        });
+      }
 
       if (targetPos !== null) {
+        // Expand any collapsed fold hiding the target before navigating, in
+        // the same transaction batch as the selection move.
+        const tr = editor.state.tr;
+        expandFoldsContaining(tr, targetPos);
+        if (tr.docChanged) editor.view.dispatch(tr);
         editor.chain().setTextSelection(targetPos).scrollIntoView().run();
       }
     };

@@ -296,6 +296,31 @@ async function saveDomainMemory(hostname, data, scope) {
   } catch { /* best-effort */ }
 }
 
+// ── Tree lock, per page (owner ask 2026-08-09) ──────────────────────────────
+// The tree overlay auto-collapses when the user interacts with the PAGE; a 3s
+// hold on the tree handle LOCKS it open for THIS page only. Keyed by
+// origin+pathname (query/hash are too volatile to be page identity) and
+// persisted in chrome.storage.local so the lock survives page refresh. A
+// single click on the handle releases the lock (business as usual after).
+function treeLockKey() {
+  return `dgTreeLock:${window.location.origin}${window.location.pathname}`;
+}
+async function loadTreeLock() {
+  try {
+    const key = treeLockKey();
+    const result = await chrome.storage.local.get(key);
+    return result[key] === true;
+  } catch {
+    return false;
+  }
+}
+function saveTreeLock(locked) {
+  try {
+    if (locked) void chrome.storage.local.set({ [treeLockKey()]: true });
+    else void chrome.storage.local.remove(treeLockKey());
+  } catch { /* best-effort */ }
+}
+
 async function saveDomainDefaultDeck(hostname, deckId) {
   try {
     const existing = await loadDomainMemory(hostname);
@@ -381,6 +406,62 @@ function applyFloatingPanelPosition(state) {
   state.snapPanel.style.top = `${top}px`;
   state.snapPanel.style.width = `${panelW}px`;
   state.snapPanel.style.height = `${panelH}px`;
+}
+
+function setTreeLocked(state, locked) {
+  state.treeLocked = locked;
+  saveTreeLock(locked);
+  if (state.handleTree) {
+    state.handleTree.setAttribute("data-locked", locked ? "true" : "false");
+    state.handleTree.title = locked
+      ? "File tree locked to this page — click once to release"
+      : "Open file tree (hold 3s to lock it to this page)";
+    state.handleTree.setAttribute("aria-label", state.handleTree.title);
+  }
+}
+
+function hideTreeOverlay(state) {
+  if (state.treeIframe) state.treeIframe.style.display = "none";
+  if (state.treeClose) state.treeClose.style.display = "none";
+  // Closing the tree always releases a page lock — a lock's only meaning is
+  // "keep it open"; a closed-but-locked tree would resurrect confusingly.
+  if (state.treeLocked) setTreeLocked(state, false);
+}
+
+/**
+ * Show the full app file tree in the right-side dock (PANEL-OVERLAY-PLAN Phase
+ * 1c). Loads /embed/tree lazily with a fresh embed session token (same auth flow
+ * as openEmbedForPanel). Toggles: a second trigger hides it.
+ */
+function showTreeOverlay(state, { toggle = true } = {}) {
+  const iframe = state.treeIframe;
+  if (!iframe || !state.config?.appBaseUrl) return;
+  if (iframe.style.display === "block") {
+    // Already open: the tree handle toggles it shut; "open both" keeps it open.
+    if (toggle) hideTreeOverlay(state);
+    return;
+  }
+  const reveal = () => {
+    iframe.style.display = "block";
+    if (state.treeClose) state.treeClose.style.display = "flex";
+    markActivity(state);
+  };
+  if (state.treeIframeLoaded) {
+    reveal();
+    return;
+  }
+  const baseUrl = state.config.appBaseUrl.replace(/\/$/, "");
+  chrome.runtime.sendMessage({ type: "refresh-embed-session" }, (response) => {
+    const token = response?.ok && response?.data ? response.data.token : null;
+    iframe.setAttribute(
+      "src",
+      token
+        ? `${baseUrl}/embed/tree?_t=${encodeURIComponent(token)}`
+        : `${baseUrl}/embed/tree`,
+    );
+    state.treeIframeLoaded = true;
+    reveal();
+  });
 }
 
 async function openSnapPanel(state) {
@@ -670,6 +751,55 @@ function overlayStyles() {
       display: flex; bottom: 0; left: 50%; transform: translateX(-50%);
       width: 48px; height: 14px; border-bottom: 0; border-radius: 8px 8px 0 0; cursor: ew-resize;
     }
+
+    /* ── Three-handle control (PANEL-OVERLAY-PLAN Phase 2) ──
+       Replaces the single launcher/edge-tab: open tree / open panel / open both.
+       Docked mid-height at the right edge; "both" is the most prominent. The
+       old launcher + edge-tab are hidden (kept in code for now). */
+    .dg-launcher-btn, .dg-edge-tab { display: none !important; }
+    .dg-handle-cluster {
+      position: fixed; right: 0; top: 50%; transform: translateY(-50%);
+      display: flex; flex-direction: column; gap: 4px;
+      z-index: 2147482400; pointer-events: auto; touch-action: none;
+    }
+    .dg-handle-cluster[data-dragging="true"] { cursor: grabbing; }
+    .dg-handle {
+      position: relative;
+      width: 26px; height: 34px;
+      border: 1px solid rgba(201,168,108,0.28); border-right: 0;
+      border-radius: 8px 0 0 8px;
+      background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82);
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: background .15s, color .15s; backdrop-filter: blur(10px);
+      padding: 0;
+    }
+    /* Hold-to-lock (tree handle): charging glow while the 3s hold arms, then
+       a quiet locked ring + dot. Lite signaling by design. */
+    .dg-handle[data-lock-charging="true"] {
+      background: rgba(201,168,108,0.34) !important;
+      box-shadow: inset 0 0 0 1.5px rgba(201,168,108,0.9);
+      transition: background 3s linear, box-shadow 3s linear;
+    }
+    .dg-handle[data-locked="true"] {
+      border-color: rgba(201,168,108,0.9);
+      color: #f6ead0;
+      box-shadow: 0 0 0 1.5px rgba(201,168,108,0.5), 0 0 9px rgba(201,168,108,0.32);
+    }
+    .dg-handle[data-locked="true"]::after {
+      content: ""; position: absolute; right: 3px; bottom: 3px;
+      width: 5px; height: 5px; border-radius: 50%;
+      background: #C9A86C; box-shadow: 0 0 4px rgba(201,168,108,0.8);
+    }
+    .dg-handle:hover { background: rgba(201,168,108,0.22); color: #f2e2b6; }
+    .dg-handle svg { width: 15px; height: 15px; }
+    .dg-handle[data-variant="both"] {
+      height: 46px; background: rgba(201,168,108,0.26);
+      border-color: rgba(201,168,108,0.52); color: #f6ead0;
+    }
+    .dg-handle[data-variant="both"]:hover { background: rgba(201,168,108,0.4); }
+    .dg-handle-disabled { opacity: 0.38; cursor: not-allowed; }
+    .dg-handle-disabled:hover { background: rgba(18,22,28,0.86); color: rgba(201,168,108,0.82); }
+    .dg-handle-success { background: rgba(52,199,89,0.32) !important; border-color: rgba(52,199,89,0.6) !important; color: #eafff0 !important; }
 
     /* ── Snap panel ── */
     .dg-snap-panel {
@@ -1075,6 +1205,14 @@ function createOverlayApp(state) {
     <div class="dg-overlay" data-snap="right" data-panel-open="false" data-idle="false">
       <button class="dg-launcher-btn" id="dg-launcher-btn" type="button" aria-label="Digital Garden">◌</button>
       <div class="dg-edge-tab" id="dg-edge-tab" role="button" tabindex="0" aria-label="Open Digital Garden panel"></div>
+      <div class="dg-handle-cluster" id="dg-handle-cluster">
+        <button class="dg-handle" data-variant="both" id="dg-handle-both" type="button" title="Open panel + file tree" aria-label="Open panel and file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M12 3v18"/></svg></button>
+        <button class="dg-handle" id="dg-handle-panel" type="button" title="Open panel" aria-label="Open panel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg></button>
+        <button class="dg-handle" id="dg-handle-tree" type="button" title="Open file tree" aria-label="Open file tree"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+        <button class="dg-handle" id="dg-handle-pin" type="button" title="Pin this page to the selected folder" aria-label="Pin this page to the selected folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg></button>
+        <button class="dg-handle" id="dg-handle-link" type="button" title="Link this page to the open content" aria-label="Link this page to the open content"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></button>
+        <button class="dg-handle dg-handle-disabled" id="dg-handle-ai" type="button" title="AI — coming soon" aria-label="AI (coming soon)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .962 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.582a.5.5 0 0 1 0 .962L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.962 0z"/><path d="M20 3v4"/><path d="M22 5h-4"/></svg></button>
+      </div>
       <div class="dg-snap-panel" id="dg-snap-panel">
         <div class="dg-panel-header">
           <select class="dg-workspace-select" id="dg-workspace-select">
@@ -1126,6 +1264,12 @@ function createOverlayApp(state) {
   state.root = shadow.querySelector(".dg-overlay");
   state.launcherBtn = shadow.getElementById("dg-launcher-btn");
   state.edgeTab = shadow.getElementById("dg-edge-tab");
+  state.handleCluster = shadow.getElementById("dg-handle-cluster");
+  state.handleTree = shadow.getElementById("dg-handle-tree");
+  state.handlePin = shadow.getElementById("dg-handle-pin");
+  state.handleLink = shadow.getElementById("dg-handle-link");
+  state.handlePanel = shadow.getElementById("dg-handle-panel");
+  state.handleBoth = shadow.getElementById("dg-handle-both");
   state.snapPanel = shadow.getElementById("dg-snap-panel");
   state.workspaceSelect = shadow.getElementById("dg-workspace-select");
   state.panelCloseBtn = shadow.getElementById("dg-panel-close-btn");
@@ -1158,6 +1302,87 @@ function createOverlayApp(state) {
     "position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;";
   shadow.appendChild(prewarmContainer);
   state.prewarmContainer = prewarmContainer;
+
+  // Dedicated right-docked iframe for the FULL app file tree (PANEL-OVERLAY-PLAN
+  // Phase 1c). Deliberately self-contained — independent of the snap panel (the
+  // native tree, kept in code for now) and the floating embed panels — so it
+  // can't disturb either. Loads /embed/tree; toggled by dg-show-tree-panel.
+  const treeIframe = document.createElement("iframe");
+  treeIframe.className = "dg-tree-iframe";
+  treeIframe.setAttribute("allow", "clipboard-read; clipboard-write");
+  treeIframe.style.cssText =
+    "position:fixed;top:0;right:0;width:340px;height:100vh;border:0;z-index:2147483000;background:#0d0d0d;display:none;box-shadow:-2px 0 12px rgba(0,0,0,0.35);";
+  shadow.appendChild(treeIframe);
+  state.treeIframe = treeIframe;
+  state.treeIframeLoaded = false;
+
+  // Collapse handle styled like the app's sidebar toggle (panel-collapse icon).
+  // Right-side mirror (PanelRightClose) since the tree docks right; clicking it
+  // closes the tree — matching the app's toggle look, per owner.
+  const treeClose = document.createElement("button");
+  treeClose.className = "dg-tree-close";
+  treeClose.type = "button";
+  treeClose.title = "Close file tree";
+  treeClose.innerHTML =
+    '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/><path d="m8 9 3 3-3 3"/></svg>';
+  treeClose.style.cssText =
+    "position:fixed;top:8px;right:348px;width:28px;height:28px;border:0;border-radius:6px;cursor:pointer;z-index:2147483001;background:rgba(255,255,255,0.1);color:#d1d5db;align-items:center;justify-content:center;transition:color .12s;display:none;";
+  treeClose.addEventListener("mouseenter", () => {
+    treeClose.style.color = "#C9A86C";
+  });
+  treeClose.addEventListener("mouseleave", () => {
+    treeClose.style.color = "#d1d5db";
+  });
+  treeClose.addEventListener("click", () => hideTreeOverlay(state));
+  shadow.appendChild(treeClose);
+  state.treeClose = treeClose;
+
+  // PANEL-OVERLAY-PLAN Phase 1b: the tree iframe relays a file-click here (its
+  // own listener — the embed-iframe listener gates on state.embedIframe). Default
+  // target = the side panel; hand it to the background, which opens the panel and
+  // routes the content to PanelShellClient.
+  window.addEventListener("message", (event) => {
+    if (!state.treeIframe || event.source !== state.treeIframe.contentWindow) return;
+    const data = event.data;
+    if (!data || typeof data !== "object" || data.source !== "dg-tree-embed") return;
+    if (data.type === "open-content" && data.payload?.contentId) {
+      chrome.runtime.sendMessage({
+        type: "open-content-in-side-panel",
+        payload: {
+          contentId: data.payload.contentId,
+          contentType: data.payload.contentType || null,
+        },
+      });
+    }
+    // Workspace sync: the tree switched workspace — relay to the background so the
+    // panel mirrors it.
+    if (data.type === "workspace-changed" && data.payload?.workspaceId) {
+      chrome.runtime.sendMessage({
+        type: "workspace-sync",
+        workspaceId: data.payload.workspaceId,
+      });
+    }
+    // Boot restore: the tree asks for the persisted active workspace. Fetch it
+    // from the background and post it back as `workspace-changed` (dg-tree-host)
+    // so TreeShellClient's existing handler activates it instead of Main.
+    if (data.type === "request-active-workspace") {
+      chrome.runtime.sendMessage({ type: "get-active-workspace" }, (resp) => {
+        if (chrome.runtime.lastError) return;
+        const workspaceId = resp?.ok ? resp.data?.workspaceId : null;
+        if (workspaceId) {
+          state.treeIframe?.contentWindow?.postMessage(
+            {
+              v: 1,
+              source: "dg-tree-host",
+              type: "workspace-changed",
+              payload: { workspaceId },
+            },
+            "*",
+          );
+        }
+      });
+    }
+  });
 }
 
 function schedulePersist(state, contentId) {
@@ -3065,6 +3290,13 @@ function wireRootEvents(state) {
     if (current === _lastTrackedHref) return;
     _lastTrackedHref = current;
 
+    // The pin/link persistent green is page-specific — leaving the page clears it.
+    if (state.pinnedHref && state.pinnedHref !== current) {
+      state.handlePin?.classList.remove("dg-handle-success");
+      state.handleLink?.classList.remove("dg-handle-success");
+      state.pinnedHref = null;
+    }
+
     const normalizedCurrent = applyUrlStrategyToHref(current);
 
     // Strategy says ignore this domain — clear context but don't re-fetch.
@@ -3253,18 +3485,42 @@ function wireRootEvents(state) {
       return true;
     }
 
+    if (message?.type === "dg-panel-state") {
+      // The background pushes the Chrome side-panel's open/closed state so the
+      // handle cluster can decide synchronously (no gesture-consuming query).
+      state.sidePanelOpen = message.open === true;
+      sendResponse?.({ ok: true });
+      return true;
+    }
+
     if (message?.type === "dg-show-tree-panel") {
-      void (async () => {
-        try {
-          await openSnapPanel(state);
-          sendResponse?.({ ok: true });
-        } catch (error) {
-          sendResponse?.({
-            ok: false,
-            error: error instanceof Error ? error.message : "Failed to open tree panel",
-          });
-        }
-      })();
+      // PANEL-OVERLAY-PLAN Phase 1c: show the FULL app tree (/embed/tree) in the
+      // right dock instead of the native snap-panel tree. openSnapPanel + the
+      // native tree stay in code for now (owner: keep it around).
+      try {
+        showTreeOverlay(state);
+        sendResponse?.({ ok: true });
+      } catch (error) {
+        sendResponse?.({
+          ok: false,
+          error: error instanceof Error ? error.message : "Failed to open tree panel",
+        });
+      }
+      return true;
+    }
+
+    if (message?.type === "dg-workspace-changed" && message.workspaceId) {
+      // Workspace switched elsewhere (the panel) — mirror it into the tree iframe.
+      state.treeIframe?.contentWindow?.postMessage(
+        {
+          v: 1,
+          source: "dg-tree-host",
+          type: "workspace-changed",
+          payload: { workspaceId: message.workspaceId },
+        },
+        "*",
+      );
+      sendResponse?.({ ok: true });
       return true;
     }
 
@@ -3335,6 +3591,231 @@ function wireRootEvents(state) {
       if (chrome.runtime.lastError) void openSnapPanel(state);
     });
   });
+
+  // ── Handle control: tree / panel / both (+ disabled AI) ──
+  // Optimistically flip the LOCAL belief the instant we act, so rapid clicks
+  // decide off the intended state; the background's dg-panel-state push confirms
+  // it shortly after.
+  const openPanelViaMessage = () => {
+    state.sidePanelOpen = true;
+    chrome.runtime.sendMessage({ type: "open-side-panel" }, () => {
+      if (chrome.runtime.lastError) void openSnapPanel(state);
+    });
+  };
+  const closePanelViaMessage = () => {
+    state.sidePanelOpen = false;
+    chrome.runtime.sendMessage({ type: "close-side-panel" }, () => {
+      void chrome.runtime.lastError;
+    });
+  };
+  // Seed the side-panel belief once at load (async is fine — not gesture
+  // critical). After that the background PUSHES dg-panel-state on every change,
+  // so the handles never need to query it at click time (a query would consume
+  // the user gesture that chrome.sidePanel.open() requires).
+  chrome.runtime.sendMessage({ type: "get-panel-state" }, (resp) => {
+    if (chrome.runtime.lastError) return;
+    state.sidePanelOpen = resp?.ok ? resp.data?.open === true : false;
+    // Seed the "both" alternation from reality at load: if ANYTHING is open the
+    // first click closes all; if all closed the first click opens all. After
+    // that it simply alternates.
+    state.bothOpen = state.sidePanelOpen || isTreeOpen();
+  });
+  const isTreeOpen = () => state.treeIframe?.style.display === "block";
+  // Guard: swallow the click that ends a drag so repositioning never fires a handle.
+  const handleGuarded = (fn) => () => {
+    if (Date.now() < (state.suppressHandleClickUntil ?? 0)) return;
+    fn();
+  };
+  // Tree / panel: each toggles ITS OWN pane. The side-panel decision reads the
+  // LOCAL belief synchronously so the open runs inside the click gesture.
+  // Tree-lock semantics (owner 2026-08-09): a LOCKED handle's single click
+  // ONLY releases the lock (tree stays open, business as usual after);
+  // unlocked clicks toggle as before.
+  state.handleTree?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      if (state.treeLocked) {
+        setTreeLocked(state, false);
+        return;
+      }
+      showTreeOverlay(state);
+    }),
+  );
+  // Hold-to-lock (3s): pointerdown arms a charge (the handle glows while it
+  // fills); releasing or dragging early cancels and the normal click
+  // proceeds. At 3s the tree opens (if needed) and LOCKS to this page; the
+  // release click is swallowed via the same suppress used by drag-end.
+  {
+    let treeLockTimer = null;
+    let chargeStart = null;
+    const cancelCharge = () => {
+      if (treeLockTimer) {
+        clearTimeout(treeLockTimer);
+        treeLockTimer = null;
+      }
+      chargeStart = null;
+      state.handleTree?.removeAttribute("data-lock-charging");
+    };
+    state.handleTree?.addEventListener("pointerdown", (event) => {
+      if (state.treeLocked) return; // locked → next CLICK releases; no re-arm
+      cancelCharge();
+      chargeStart = { x: event.clientX, y: event.clientY };
+      state.handleTree.setAttribute("data-lock-charging", "true");
+      treeLockTimer = setTimeout(() => {
+        treeLockTimer = null;
+        state.handleTree?.removeAttribute("data-lock-charging");
+        showTreeOverlay(state, { toggle: false });
+        setTreeLocked(state, true);
+        state.suppressHandleClickUntil = Date.now() + 800;
+      }, 3000);
+    });
+    state.handleTree?.addEventListener("pointermove", (event) => {
+      // A hold is stationary — >6px of travel is a drag, not a lock intent.
+      if (!chargeStart) return;
+      const dx = event.clientX - chargeStart.x;
+      const dy = event.clientY - chargeStart.y;
+      if (dx * dx + dy * dy > 36) cancelCharge();
+    });
+    ["pointerup", "pointerleave", "pointercancel"].forEach((ev) =>
+      state.handleTree?.addEventListener(ev, cancelCharge),
+    );
+  }
+  // Auto-collapse (owner 2026-08-09): interacting with the PAGE closes the
+  // tree overlay — unless it's locked to this page. Capture-phase pointerdown
+  // so page-side stopPropagation can't defeat it. Events originating inside
+  // the overlay surface with the closed-shadow HOST in composedPath(), so one
+  // includes() check separates page from overlay; presses inside the tree
+  // IFRAME never reach this document (cross-origin), so using the tree can't
+  // collapse it.
+  document.addEventListener(
+    "pointerdown",
+    (event) => {
+      if (!isTreeOpen() || state.treeLocked) return;
+      if (event.composedPath().includes(state.host)) return;
+      hideTreeOverlay(state);
+    },
+    true,
+  );
+  state.handlePanel?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      if (state.sidePanelOpen === true) closePanelViaMessage();
+      else openPanelViaMessage();
+    }),
+  );
+  // Both: all-or-nothing, never switching back and forth — if ANYTHING is open,
+  // close everything; only when both are closed does it open both.
+  // Both: a single OPEN-ALL / CLOSE-ALL signal that simply ALTERNATES. It does
+  // NOT read the individual pane states to decide (those reads were the source of
+  // the misfires) — it flips a local intent, seeded from reality at load. The
+  // ops are idempotent (open-by-windowId reveals; close disables the panel), so
+  // each click lands fully open or fully closed.
+  state.handleBoth?.addEventListener(
+    "click",
+    handleGuarded(() => {
+      if (state.bothOpen) {
+        hideTreeOverlay(state);
+        closePanelViaMessage();
+        state.bothOpen = false;
+      } else {
+        // Open the panel FIRST so sidePanel.open() runs synchronously inside the
+        // click gesture, then reveal the tree.
+        openPanelViaMessage();
+        showTreeOverlay(state, { toggle: false });
+        state.bothOpen = true;
+      }
+    }),
+  );
+
+  // Pin: quick-add the current page as an external link under the SELECTED
+  // folder (or the parent folder of the selected content). The panel owns the
+  // selection so it resolves the target; the background holds the bearer token
+  // so it creates the link. On success the pin flashes green in place. No
+  // selection / panel closed → open the tree so the user can pick a folder,
+  // mirroring what the folder handle does.
+  // Success flashes the ACTING handle green and PERSISTS as a "done from here"
+  // indicator — cleared only when the page URL changes (see _onUrlChange).
+  const flashHandleSuccess = (el) => {
+    if (!el) return;
+    el.classList.add("dg-handle-success");
+    state.pinnedHref = location.href;
+  };
+  // mode "folder" (pin): file the page under the selected folder, or the parent
+  // of the open content. mode "associate" (link): link the page to the content
+  // OPEN in the panel. On success the acting handle goes green; no target (or
+  // panel closed) → open the tree so the user can pick / open something.
+  const sendPin = (mode, el) => {
+    chrome.runtime.sendMessage(
+      { type: "pin-add", payload: { mode, url: location.href, title: document.title } },
+      (resp) => {
+        if (chrome.runtime.lastError) return;
+        const data = resp?.ok ? resp.data : null;
+        if (data?.added) flashHandleSuccess(el);
+        else if (data?.noTarget) showTreeOverlay(state, { toggle: false });
+      },
+    );
+  };
+  // Two explicit handles — plain clicks, no gesture ambiguity. Pin = quick-add
+  // under a folder; Link = associate with the open content.
+  state.handlePin?.addEventListener(
+    "click",
+    handleGuarded(() => sendPin("folder", state.handlePin)),
+  );
+  state.handleLink?.addEventListener(
+    "click",
+    handleGuarded(() => sendPin("associate", state.handleLink)),
+  );
+
+  // Drag the cluster vertically along the right wall. The offset is a fraction of
+  // viewport height, persisted globally (chrome.storage.local) so it holds across
+  // pages. Clamped so the cluster can't be dragged off-screen.
+  const applyClusterOffset = () => {
+    if (!state.handleCluster) return;
+    const frac = Math.min(0.92, Math.max(0.08, state.handleClusterOffset ?? 0.5));
+    state.handleCluster.style.top = `${frac * 100}%`;
+  };
+  chrome.storage.local
+    .get("dgHandleClusterOffset")
+    .then((r) => {
+      if (typeof r.dgHandleClusterOffset === "number") {
+        state.handleClusterOffset = r.dgHandleClusterOffset;
+        applyClusterOffset();
+      }
+    })
+    .catch(() => {});
+  if (state.handleCluster) {
+    let clusterDrag = null;
+    state.handleCluster.addEventListener("pointerdown", (event) => {
+      clusterDrag = { startY: event.clientY, moved: false };
+      const onMove = (moveEvent) => {
+        if (!clusterDrag) return;
+        if (!clusterDrag.moved && Math.abs(moveEvent.clientY - clusterDrag.startY) > 4) {
+          clusterDrag.moved = true;
+          state.handleCluster.setAttribute("data-dragging", "true");
+        }
+        if (!clusterDrag.moved) return;
+        state.handleClusterOffset = Math.min(
+          0.92,
+          Math.max(0.08, moveEvent.clientY / window.innerHeight),
+        );
+        applyClusterOffset();
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        state.handleCluster.removeAttribute("data-dragging");
+        if (clusterDrag?.moved) {
+          state.suppressHandleClickUntil = Date.now() + 250;
+          chrome.storage.local
+            .set({ dgHandleClusterOffset: state.handleClusterOffset })
+            .catch(() => {});
+        }
+        clusterDrag = null;
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    });
+  }
 
   let launcherDrag = null;
   state.launcherBtn.addEventListener("pointerdown", (event) => {
@@ -3965,6 +4446,16 @@ async function initOverlay() {
   state.edgeTabOffset = domainMemory.edgeTabOffset ?? 0.5;
   state.flashcard.defaultDeckId = domainMemory.defaultDeckId || null;
   setSnap(state, domainMemory.snap || "right");
+
+  // Per-page tree lock (owner 2026-08-09): a lock persists across refresh —
+  // restore the locked-open tree for this exact page.
+  loadTreeLock()
+    .then((locked) => {
+      if (!locked) return;
+      setTreeLocked(state, true);
+      showTreeOverlay(state, { toggle: false });
+    })
+    .catch(() => {});
 
   // Pre-load local flashcard history so it's ready when the panel opens
   loadLocalFlashcardHistory(hostname).then((h) => { state.localFlashcards = h; }).catch(() => { state.localFlashcards = []; });

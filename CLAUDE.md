@@ -19,9 +19,14 @@ pnpm lint             # ESLint with --max-warnings 175 ratchet (fails if count g
 pnpm build:tokens     # Regenerate CSS variables from design tokens
 pnpm db:seed          # Seed database with test ContentNode data
 pnpm collab:schema:check  # CI gate: validate collaboration schema covers all editor extensions
+pnpm ai:drift:check   # CI gate: AI parallel-table drift (provider catalog ↔ connection templates ↔ type unions ↔ settings enum; tool inventory ↔ settings metadata; prompt tool references; adapter branches)
+pnpm ai:matrix        # Regenerate docs/notes-feature/core/AI-CAPABILITY-MATRIX.md from the real provider/model tables
+pnpm ai:matrix:check  # CI gate: the committed capability matrix matches the code (run ai:matrix after model/provider changes)
 pnpm publishing:schema:check  # CI gate: validate every publishing block has Server* variant + correct registerBlock type
 pnpm publishing:audit:defaults  # Static drift detector: Zod defaults vs renderHTML fallbacks across publishing blocks
 pnpm publishing:audit:themes  # Static theme-coverage audit: flags `.public-prose .block-*` rules with extreme colors (white-ish / dark-ish) that lack a `.dark` companion. Triage required — theme-stable surfaces (pricing, testimonial, etc.) are intentional false positives.
+pnpm ai:pricing:check # CI gate: every reachable model id has a price row or an explicit unpriced-allowlist entry + cost-calculator fixtures (lib/features/ai-connections/usage/pricing.ts)
+pnpm showcase:figures # Sync README/docs figure slots with media in docs/media/figures/ + rewrite the FIGURES.md audit (see guides/showcase/SHOWCASE-MAINTENANCE.md; /update-showcase skill)
 pnpm test:e2e         # Playwright visual regression (assumes pnpm dev is running)
 pnpm test:e2e:update  # Regenerate baseline screenshots
 pnpm test:e2e:report  # Open last HTML run report
@@ -49,6 +54,7 @@ CI runners (GitHub Actions, Vercel) have larger heaps by default and don't need 
 **CI gates** (`.github/workflows/`):
 - **quality.yml** — runs `pnpm lint` (with the `--max-warnings 175` ratchet) and `pnpm typecheck` on every PR. Lint failures or warning count growth block merge.
 - **collaboration-hardening.yml** — runs `pnpm collab:schema:check` on collab-touching PRs. Scans all TipTap extension source files for `Node.create`/`Mark.create` and asserts every discovered node/mark is covered in `getCollaborationServerExtensions()`. Every new TipTap Node/Mark **must** export a `Server*` variant and be registered in `lib/domain/collaboration/extensions.ts`.
+- **ai-drift.yml** — runs `pnpm ai:drift:check` on AI-touching PRs (`lib/domain/ai/**`, `lib/features/ai-connections/**`, the chat route, settings validation). Guards the AI subsystem's parallel tables: every direct-vendor template model must have a `PROVIDER_CATALOG` entry (the catalog is load-bearing — it supplies the per-model output ceiling and reasoning config), contextWindows must agree across files, type unions/settings enum must match the catalog, every tool must be classified user-configurable (settings metadata) or harness-internal, prompt/description tool references must resolve, and every `AdapterKind` needs a resolver branch. Full rationale: `docs/notes-feature/work-tracking/AI-DRIFT-GATES-PLAN.md`.
 - **publishing-visual.yml** — runs on PRs touching the publishing surface (`extensions/publishing/`, `components/public/`, `app/(public)/`, `app/(test)/test/publishing-fixtures/`, `app/globals.css`, the publishing fixtures/spec/schema scripts). Two jobs: `schema` (typecheck + `publishing:schema:check` + `publishing:audit:defaults`) and `visual` (Playwright per-block snapshot suite against the synthetic fixture route). Visual job uploads diff PNGs as an artifact on failure. Hard-gate; failures block merge. Can be temporarily skipped via repo var `PUBLISHING_VISUAL_GATE=skip`.
 
 ## Visual Regression Testing (Playwright)
@@ -350,6 +356,10 @@ Custom OAuth with Google Sign-In. `lib/infrastructure/auth/` (barrel export via 
 
 AI SDK v6 integration with BYOK (Bring Your Own Key) support.
 
+**Orientation docs (read these before changing AI behavior):**
+- [docs/notes-feature/core/AI-ARCHITECTURE.md](docs/notes-feature/core/AI-ARCHITECTURE.md) — the request lifecycle (multi-request turns, resolution ladder, tool assembly, step budgets, resume predicate), the five parallel model tables and which code consumes each, and "changing things safely" checklists. Symbol-anchored; verified per branch.
+- [docs/notes-feature/core/AI-CAPABILITY-MATRIX.md](docs/notes-feature/core/AI-CAPABILITY-MATRIX.md) — **generated** (`pnpm ai:matrix`, guarded by `ai:matrix:check`): what every provider/model actually gets (ceilings, reasoning, search/PDF/caching, adapter coverage). Never edit by hand.
+
 **AI domain structure:**
 - `types.ts` — Chat types, model configuration
 - `providers/` — Model provider factories (Anthropic, OpenAI) using `createAnthropic()` / `createOpenAI()`
@@ -492,6 +502,7 @@ const glass0 = getSurfaceStyles("glass-0");
 - For Prisma JSON writes, use `as unknown as Prisma.InputJsonValue` (the cast goes through `unknown` because Prisma's input type is intentionally narrow)
 - For unused parameters/vars that must remain (kept-for-signature, caught errors), prefix with `_` — eslint is configured to ignore `_`-prefixed identifiers via `argsIgnorePattern`/`varsIgnorePattern`/`caughtErrorsIgnorePattern`. **Do NOT** add bare `// eslint-disable` for unused-vars; rename instead.
 - **Next.js 16 middleware is `proxy.ts`, not `middleware.ts`** — this repo renames it per Next.js 16 conventions. The function export is named `proxy`. Do not create `middleware.ts`; the build will fail if both files coexist.
+- **Prefer a reputable, maintained library/framework over a bespoke build.** Before writing a non-trivial subsystem (parsers, detectors, automation engines, schedulers, extraction, etc.), *check for an existing well-maintained option first* and prefer it; also prefer reusing an existing **web/platform standard** (e.g. the HTML `autocomplete` vocabulary for form-field classification) over hand-rolled heuristics. Build custom only when nothing fits, and record **why** (the specific gap) in a comment or the relevant `*-PLAN.md`. This isn't licence to add heavy deps casually — weigh bundle/maintenance cost, and note that "extensions/new layers are a heavyweight last resort" still applies — but "we reinvented X without checking whether X exists" is the anti-pattern to avoid.
 
 ### Before a PR that changes `schema.prisma` — have the migration ready
 
