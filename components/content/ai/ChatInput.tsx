@@ -437,6 +437,41 @@ export function ChatInput({
           return;
         }
       }
+      // Tree-clipboard paste (owner spec 2026-08-10): a copied tree item
+      // carries a wiki-link html flavor — paste it as an @-mention pill (the
+      // chat's wikilink), same as dropping the node from the tree.
+      const html = e.clipboardData.getData("text/html");
+      if (html && html.includes('data-type="wiki-link"')) {
+        const root = editorRef.current;
+        const spans = new DOMParser()
+          .parseFromString(html, "text/html")
+          .querySelectorAll('span[data-type="wiki-link"][data-target-id]');
+        if (root && spans.length > 0) {
+          e.preventDefault();
+          const sel = window.getSelection();
+          const atCaret =
+            sel && sel.rangeCount > 0 && root.contains(sel.anchorNode);
+          spans.forEach((s) => {
+            const id = s.getAttribute("data-target-id") ?? "";
+            const title =
+              s.getAttribute("data-target-title") || s.textContent || id;
+            const pill = makeMentionPill(title, id);
+            if (atCaret && sel) {
+              const range = sel.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(pill);
+            } else {
+              appendToRoot(root, pill);
+            }
+            const space = document.createTextNode(" ");
+            pill.after(space);
+            placeCaretAfter(space);
+          });
+          root.focus();
+          emit();
+          return;
+        }
+      }
       const text = e.clipboardData.getData("text/plain");
       if (text === "") return;
       e.preventDefault();
