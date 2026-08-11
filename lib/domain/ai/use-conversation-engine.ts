@@ -42,10 +42,12 @@ import {
   CO_BROWSE_ACT,
   READ_CURRENT_PAGE,
   LIST_TABS,
+  stripTrackingParams,
 } from "@/lib/domain/ai/tools/co-browse-tools";
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
+  coBrowseAttach,
   coBrowseSnapshot,
   coBrowseNavigate,
   coBrowseClick,
@@ -644,16 +646,31 @@ function safeHost(url?: string): string | null {
   }
 }
 
-function coBrowseSnapshotOutput(snap: {
+type CoBrowseSnapResult = {
   ok: boolean;
   data?: { nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean };
   error?: string;
-}): Record<string, unknown> {
-  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
-  const elements = nodes.map((n) => ({
+};
+
+type ShapedCoBrowseElement = {
+  role?: string;
+  name?: string;
+  value?: string;
+  href?: string;
+  expanded?: boolean;
+  disabled?: boolean;
+  group?: number;
+  frame?: string;
+};
+
+function shapeCoBrowseElements(nodes: CoBrowseNode[]): ShapedCoBrowseElement[] {
+  return nodes.map((n) => ({
     role: n.role,
     name: n.name,
     ...(n.value ? { value: n.value } : {}),
+    // A link's real destination (extension ≥5.2 sends it from the AX tree) —
+    // the observed URL the model must use for item lists. Never invent URLs.
+    ...(n.href ? { href: n.href } : {}),
     ...(n.expanded === true || n.expanded === false ? { expanded: n.expanded } : {}),
     ...(n.disabled ? { disabled: true } : {}),
     // Elements sharing a `group` are in the same card/row/item — use it to act on
@@ -661,6 +678,11 @@ function coBrowseSnapshotOutput(snap: {
     ...(typeof n.group === "number" ? { group: n.group } : {}),
     ...(n.frameUrl ? { frame: n.frameUrl } : {}),
   }));
+}
+
+function coBrowseSnapshotOutput(snap: CoBrowseSnapResult): Record<string, unknown> {
+  const nodes = snap.ok ? (snap.data?.nodes ?? []) : [];
+  const elements = shapeCoBrowseElements(nodes);
   return {
     // Trust-labeled: element names/text come from the page — informational only,
     // they never instruct the model (mirrors read_page's untrustedWebContent).
@@ -675,6 +697,127 @@ function coBrowseSnapshotOutput(snap: {
     // excluded above — STOP and hand to the user; no tool can (or should) solve it.
     ...(snap.data?.captchaDetected ? { captchaDetected: true } : {}),
     ...(snap.ok ? {} : { snapshotError: snap.error }),
+  };
+}
+
+// ── Delta snapshots (S8, owner-approved 2026-08-08) ─────────────────────────
+// The bridge ALWAYS returns the full snapshot — ground truth stays whole in
+// this module. The delta is only the TRANSMISSION FORMAT into the tool
+// result (state-vs-transmission invariant): consecutive snapshots of the
+// same URL measured 64% element-identical, so mid-run actions send only
+// added/changed/removed vs the previous snapshot. Safety valves:
+//   - keyframes: a FULL snapshot on open, on explicit `read`, on URL change,
+//     and every DELTA_KEYFRAME_EVERY actions — drift can't outlive one
+//     keyframe interval;
+//   - miss fallback: a failed action attaches a fresh FULL snapshot, so the
+//     worst case is one wasted step, never persistent blindness;
+//   - degenerate-delta bailout: if most elements changed, send full.
+// `group` ids are counter-assigned per snapshot and intentionally excluded
+// from change detection; they refresh on keyframes (noted to the model).
+const DELTA_KEYFRAME_EVERY = 5;
+const DELTA_MAX_CHANGED_RATIO = 0.6;
+let coBrowseDeltaBase: {
+  url: string;
+  byKey: Map<string, { sig: string; el: ShapedCoBrowseElement }>;
+  actsSinceKeyframe: number;
+} | null = null;
+
+// Unit separator as delimiter — element names freely contain "|" (e.g.
+// "AI Automation Engineer | Valsoft Corporation"), so a printable join
+// would collide/corrupt.
+function coBrowseElementKey(e: ShapedCoBrowseElement): string {
+  return `${e.role ?? ""}${e.name ?? ""}${e.frame ?? ""}`;
+}
+function coBrowseElementSig(e: ShapedCoBrowseElement): string {
+  // Everything targeting/state-relevant EXCEPT `group` (unstable by design).
+  return JSON.stringify([e.value ?? null, e.href ?? null, e.expanded ?? null, e.disabled ?? null]);
+}
+
+function resetCoBrowseDeltaBase(): void {
+  coBrowseDeltaBase = null;
+}
+
+function setCoBrowseDeltaBase(url: string, elements: ShapedCoBrowseElement[], actsSinceKeyframe: number): void {
+  const byKey = new Map<string, { sig: string; el: ShapedCoBrowseElement }>();
+  for (const e of elements) {
+    // First occurrence wins for duplicate keys — mirrors how the model
+    // disambiguates (nth) and keeps the map deterministic.
+    const k = coBrowseElementKey(e);
+    if (!byKey.has(k)) byKey.set(k, { sig: coBrowseElementSig(e), el: e });
+  }
+  coBrowseDeltaBase = { url, byKey, actsSinceKeyframe };
+}
+
+/**
+ * Shape a snapshot for the model as FULL or DELTA. `mode: "full"` forces a
+ * keyframe (open / explicit read / failure fallback); `mode: "auto"` sends a
+ * delta when the base is fresh enough and the page didn't change identity.
+ */
+function coBrowseSnapshotOrDelta(
+  snap: CoBrowseSnapResult,
+  mode: "full" | "auto",
+): Record<string, unknown> {
+  if (!snap.ok || !snap.data) {
+    resetCoBrowseDeltaBase();
+    return coBrowseSnapshotOutput(snap);
+  }
+  const url = snap.data.url ?? "";
+  const elements = shapeCoBrowseElements(snap.data.nodes ?? []);
+  const base = coBrowseDeltaBase;
+  const mustKeyframe =
+    mode === "full" ||
+    !base ||
+    base.url !== url ||
+    base.actsSinceKeyframe >= DELTA_KEYFRAME_EVERY;
+  if (mustKeyframe) {
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  const freshByKey = new Map<string, ShapedCoBrowseElement>();
+  for (const e of elements) {
+    const k = coBrowseElementKey(e);
+    if (!freshByKey.has(k)) freshByKey.set(k, e);
+  }
+  const added: ShapedCoBrowseElement[] = [];
+  const changed: ShapedCoBrowseElement[] = [];
+  for (const [k, e] of freshByKey) {
+    const prev = base.byKey.get(k);
+    if (prev === undefined) added.push(e);
+    else if (prev.sig !== coBrowseElementSig(e)) changed.push(e);
+  }
+  const removed: Array<{ role?: string; name?: string; frame?: string }> = [];
+  for (const [k, prev] of base.byKey) {
+    if (!freshByKey.has(k)) {
+      removed.push({
+        role: prev.el.role,
+        name: prev.el.name,
+        ...(prev.el.frame ? { frame: prev.el.frame } : {}),
+      });
+    }
+  }
+  const churn = added.length + changed.length + removed.length;
+  if (churn > DELTA_MAX_CHANGED_RATIO * Math.max(1, freshByKey.size)) {
+    // Page effectively replaced itself — a delta would be noise.
+    setCoBrowseDeltaBase(url, elements, 0);
+    return coBrowseSnapshotOutput(snap);
+  }
+
+  setCoBrowseDeltaBase(url, elements, base.actsSinceKeyframe + 1);
+  return {
+    trust: "untrusted-web",
+    ...(url ? { url } : {}),
+    snapshotDelta: true,
+    deltaNote:
+      "DELTA vs your previous snapshot of this page: apply added/changed/removed to what you last saw — unchanged elements are NOT re-listed and are still present and actionable. Use action \"read\" for a full re-snapshot. group ids refresh only on full snapshots.",
+    unchangedCount: freshByKey.size - added.length - changed.length,
+    addedCount: added.length,
+    changedCount: changed.length,
+    removedCount: removed.length,
+    ...(added.length > 0 ? { added } : {}),
+    ...(changed.length > 0 ? { changed } : {}),
+    ...(removed.length > 0 ? { removed } : {}),
+    ...(snap.data.captchaDetected ? { captchaDetected: true } : {}),
   };
 }
 
@@ -727,8 +870,20 @@ function deriveActiveResearchRun(
  */
 function deriveActiveItemIteration(
   messages: UIMessage[],
-): { itemBudget: number; itemsRecorded: number } | null {
-  let active: { itemBudget: number; itemsRecorded: number } | null = null;
+): {
+  itemBudget: number;
+  itemsRecorded: number;
+  /** Batch cadence from the approved plan; null = single-batch run. */
+  batchSize: number | null;
+  /** itemsRecorded value at the last record_batch_checkpoint (0 = none yet). */
+  itemsAtLastCheckpoint: number;
+} | null {
+  let active: {
+    itemBudget: number;
+    itemsRecorded: number;
+    batchSize: number | null;
+    itemsAtLastCheckpoint: number;
+  } | null = null;
   for (const m of messages) {
     if (m.role !== "assistant") continue;
     for (const part of m.parts) {
@@ -737,9 +892,19 @@ function deriveActiveItemIteration(
         p.type === "tool-propose_item_iteration" &&
         p.state === "output-available"
       ) {
-        const out = p.output as { ok?: boolean; itemBudget?: number } | undefined;
+        const out = p.output as
+          | { ok?: boolean; itemBudget?: number; batchSize?: number | null }
+          | undefined;
         if (out?.ok && typeof out.itemBudget === "number" && out.itemBudget > 0) {
-          active = { itemBudget: out.itemBudget, itemsRecorded: 0 };
+          active = {
+            itemBudget: out.itemBudget,
+            itemsRecorded: 0,
+            batchSize:
+              typeof out.batchSize === "number" && out.batchSize > 0
+                ? out.batchSize
+                : null,
+            itemsAtLastCheckpoint: 0,
+          };
         }
       } else if (
         p.type === "tool-record_item_result" &&
@@ -748,6 +913,15 @@ function deriveActiveItemIteration(
       ) {
         const out = p.output as { ok?: boolean } | undefined;
         if (out?.ok !== false) active.itemsRecorded += 1;
+      } else if (
+        p.type === "tool-record_batch_checkpoint" &&
+        p.state === "output-available" &&
+        active
+      ) {
+        // Any recorded checkpoint re-opens the batch gate — the tool returns
+        // ok:true even when the ledger write failed, so a run can never wedge
+        // at a batch boundary.
+        active.itemsAtLastCheckpoint = active.itemsRecorded;
       } else if (
         p.type === "tool-record_iteration_findings" &&
         p.state === "output-available"
@@ -1253,6 +1427,10 @@ export function useConversationEngine({
    */
   const fetchFollowUps = useCallback(
     async (finalMessages: UIMessage[]) => {
+      // Context diet (S7-C4): no follow-up suggestions mid-iteration — a
+      // mechanical run has no reader for them, and each fetch is a separate
+      // model invocation billed outside the chat turn.
+      if (deriveActiveItemIteration(finalMessages)) return;
       const requestVersion = followUpRequestVersionRef.current + 1;
       followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
@@ -1405,32 +1583,35 @@ export function useConversationEngine({
         };
         try {
           if (toolName === CO_BROWSE_OPEN) {
-            if (!input.url) {
-              chat.addToolResult({
-                tool: toolName,
-                toolCallId: toolCall.toolCallId,
-                state: "output-error",
-                errorText: "no url provided",
-              });
-              return;
-            }
-            const opened = await coBrowseOpen(input.url);
+            // No url = bind the tab the user is CURRENTLY on (owner ask
+            // 2026-08-10): they may have specific results in front of them —
+            // session-personalized lists, filters, stateful flows — that a
+            // fresh load would not reproduce. The background resolves the
+            // active tab; nothing opens, nothing reloads.
+            const opened = input.url
+              ? await coBrowseOpen(input.url)
+              : await coBrowseAttach();
             if (!opened.ok) {
               chat.addToolResult({
                 tool: toolName,
                 toolCallId: toolCall.toolCallId,
-                output: `Could not open the page: ${opened.error ?? "unknown error"}.`,
+                output: `Could not ${input.url ? "open the page" : "attach to the current tab"}: ${opened.error ?? "unknown error"}.`,
               });
               return;
             }
-            markCoBrowseActive(safeHost(input.url)); // 5d: light the in-app indicator
             const snap = await coBrowseSnapshot();
+            // 5d: light the in-app indicator — for attach-in-place the host
+            // comes from the bound tab's actual URL (the snapshot's), since no
+            // url was given.
+            markCoBrowseActive(safeHost(input.url ?? snap.data?.url ?? ""));
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
               output: {
                 tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
-                ...coBrowseSnapshotOutput(snap),
+                ...(input.url ? {} : { boundCurrentTab: true }),
+                // Session start = keyframe: full snapshot, delta base reset.
+                ...coBrowseSnapshotOrDelta(snap, "full"),
               },
             });
             return;
@@ -1469,6 +1650,9 @@ export function useConversationEngine({
           // Returns the merged, deduped set directly (not a fresh single snapshot).
           if (action === "collect") {
             const collected = await coBrowseCollect();
+            // Collect merges nodes across scrolls (not a viewport snapshot) —
+            // it can't serve as a delta base; the next snapshot keyframes.
+            resetCoBrowseDeltaBase();
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
@@ -1492,10 +1676,18 @@ export function useConversationEngine({
           else if (action === "reveal") res = await coBrowseReveal();
           else res = { ok: false, error: `unknown action: ${action ?? "(none)"}` };
           if (!res.ok) {
+            // Miss-triggered fallback (S8): a failed action restores FULL
+            // vision in the same result — the model's mental model may be
+            // stale (delta drift, page shift), and a fresh keyframe is how a
+            // targeting miss self-heals instead of compounding.
+            const failSnap = await coBrowseSnapshot().catch(() => null);
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
-              output: `Action "${action}" failed: ${res.error ?? "unknown error"}. Read the page again and adapt — don't repeat the same action blindly.`,
+              output: {
+                actionError: `Action "${action}" failed: ${res.error ?? "unknown error"}. A FRESH FULL snapshot is below — re-target from it and adapt; don't repeat the same action blindly.`,
+                ...(failSnap ? coBrowseSnapshotOrDelta(failSnap, "full") : {}),
+              },
             });
             return;
           }
@@ -1509,7 +1701,13 @@ export function useConversationEngine({
           chat.addToolResult({
             tool: toolName,
             toolCallId: toolCall.toolCallId,
-            output: { action, ...coBrowseSnapshotOutput(snap) },
+            // Explicit `read` = the model asking to LOOK → keyframe. Other
+            // actions ride the delta path (auto keyframes on URL change /
+            // every 5th act / degenerate churn).
+            output: {
+              action,
+              ...coBrowseSnapshotOrDelta(snap, action === "read" ? "full" : "auto"),
+            },
           });
         } catch (err) {
           chat.addToolResult({
@@ -1585,7 +1783,9 @@ export function useConversationEngine({
                 t.url.toLowerCase().includes(want),
             )
             .slice(0, 60)
-            .map((t) => ({ title: t.title, url: t.url }));
+            // Tracking params stripped (S7-C1): they were the bulk of a
+            // measured ~20k-char list_tabs output and identify nothing.
+            .map((t) => ({ title: t.title, url: stripTrackingParams(t.url) }));
           chat.addToolResult({
             tool: LIST_TABS,
             toolCallId: toolCall.toolCallId,
@@ -1656,6 +1856,29 @@ export function useConversationEngine({
           tool: toolName,
           toolCallId: toolCall.toolCallId,
           output: `Item budget reached (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded). Stop starting new items — write the roll-up now (createNote: summary + a markdown table of items/verdicts), then close with record_iteration_findings.`,
+        });
+        return;
+      }
+      // Batch cadence (batched runs only) — harness-owned batching, owner rule
+      // 2026-08-08: once a full batch is recorded since the last checkpoint,
+      // hold the NEXT item's read until record_batch_checkpoint is written.
+      // Same seam as the budget stop (reads are how the next item starts), so
+      // mid-item acting is never broken. Fail-open for unbatched runs.
+      if (
+        iteration &&
+        iteration.batchSize != null &&
+        iteration.itemsRecorded < iteration.itemBudget &&
+        iteration.itemsRecorded - iteration.itemsAtLastCheckpoint >=
+          iteration.batchSize
+      ) {
+        const batchNumber = Math.max(
+          1,
+          Math.floor(iteration.itemsRecorded / iteration.batchSize),
+        );
+        chat.addToolResult({
+          tool: toolName,
+          toolCallId: toolCall.toolCallId,
+          output: `Batch complete (${iteration.itemsRecorded}/${iteration.itemBudget} items recorded; batch size ${iteration.batchSize}). Before starting the next item: dedupe this batch and call record_batch_checkpoint (batchNumber ${batchNumber}, itemsRecordedSoFar ${iteration.itemsRecorded}) — then continue with the next item.`,
         });
         return;
       }

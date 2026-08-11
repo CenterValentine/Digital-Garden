@@ -57,6 +57,12 @@ import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/conte
 import { FileNameInput } from "@/components/common/FileNameInput";
 import { clientLogger } from "@/lib/core/logger/client";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
+import {
+  copyTreeItems,
+  pasteTreeClipboard,
+  hasTreeClipboard,
+  ensureAltTracker,
+} from "@/lib/features/content/tree-clipboard";
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
@@ -421,6 +427,24 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       ? tree.selectedNodes?.map((n: NodeApi<TreeNode>) => n.id) || [data.id]
       : [data.id];
 
+    // Tree clipboard (owner spec 2026-08-10): resolve ids to {id,title,type}
+    // for the clipboard payload — titles come from the live selection, with
+    // the clicked node as fallback.
+    ensureAltTracker(); // Alt at Copy-click = strictly the URL
+    const clipboardItems = (ids: string[]) => {
+      const byId = new Map(
+        (tree.selectedNodes ?? []).map((n: NodeApi<TreeNode>) => [n.id, n.data]),
+      );
+      return ids.map((id) => {
+        const d = id === data.id ? data : byId.get(id);
+        return {
+          id,
+          title: d?.title ?? "Untitled",
+          contentType: d?.contentType ?? "note",
+        };
+      });
+    };
+
     openMenu(
       "file-tree",
       { x: e.clientX, y: e.clientY },
@@ -455,6 +479,23 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onDuplicate: onDuplicate ? async (ids: string[]) => {
           await onDuplicate(ids);
         } : undefined,
+        // Clipboard (owner spec 2026-08-10). People nodes are synthetic —
+        // no content ids to copy or move.
+        onCopy: !isPeopleNode ? (ids: string[]) => {
+          void copyTreeItems(clipboardItems(ids), "copy");
+        } : undefined,
+        onCut: !isPeopleNode ? (ids: string[]) => {
+          void copyTreeItems(clipboardItems(ids), "cut");
+        } : undefined,
+        onPaste: !isPeopleNode ? async () => {
+          await pasteTreeClipboard({
+            id: data.id,
+            parentId: data.parentId ?? null,
+            isFolder,
+            displayOrder: (data as { displayOrder?: number }).displayOrder,
+          });
+        } : undefined,
+        hasClipboard: hasTreeClipboard(),
         onChangeIcon: onChangeIcon ? (id: string) => {
           onChangeIcon(id);
         } : undefined,

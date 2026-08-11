@@ -49,6 +49,7 @@ import {
   FolderSearch,
 } from "lucide-react";
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
+import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
@@ -345,6 +346,21 @@ export const ChatMessage = memo(function ChatMessage({
         .join("")
         .trim(),
     [message.parts],
+  );
+
+  // Failure surface for this turn (output limit / tool errors / captcha) —
+  // derived from the durable transcript so live and reloaded views agree.
+  const messageAnomalies = useMemo(
+    () =>
+      isAssistant
+        ? deriveMessageAnomalies(
+            message.parts as unknown[],
+            (message as { metadata?: Record<string, unknown> }).metadata,
+            Boolean(messageText),
+            isStreaming,
+          )
+        : [],
+    [isAssistant, message, messageText, isStreaming],
   );
 
   const [editing, setEditing] = useState(false);
@@ -1086,6 +1102,15 @@ export const ChatMessage = memo(function ChatMessage({
             (where cards are visible but nothing is streaming). Shows elapsed
             time so a multi-minute reasoning model reads as alive, not frozen. */}
         {showWorking && <WorkingIndicator />}
+
+        {/* Anomaly surfaces — the single failure pipeline for this turn:
+            interruptions render as quiet inline lines (model-switch-divider
+            grammar), turn failures (output limit, tool errors, ok:false
+            results, captcha) as pill chips. Derived from durable parts +
+            metadata, so live and reloaded transcripts always agree. */}
+        {isAssistant && messageAnomalies.length > 0 && (
+          <AnomalySurfaces anomalies={messageAnomalies} />
+        )}
 
         {/* Hover actions — icon-only, with tooltip + aria-label for a11y.
             Copy on every message; edit (user); regenerate + branch
@@ -2683,6 +2708,13 @@ function ToolCallBubble({
               (args as { itemKey?: string }).itemKey
             : undefined;
         return `Recorded item${label ? `: ${label}` : ""}`;
+      }
+      if (toolName === "record_batch_checkpoint") {
+        const n =
+          args && typeof args === "object"
+            ? (args as { batchNumber?: number }).batchNumber
+            : undefined;
+        return `Batch checkpoint${typeof n === "number" ? ` ${n}` : ""} recorded`;
       }
       if (toolName === "record_iteration_findings") {
         return "Closed the run (reconciliation recorded)";

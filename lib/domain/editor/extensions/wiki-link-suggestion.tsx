@@ -128,8 +128,8 @@ export function createWikiLinkSuggestion(
     },
 
     render: () => {
-      let component: ReactRenderer<WikiLinkListRef>;
-      let popup: TippyInstance[];
+      let component: ReactRenderer<WikiLinkListRef> | undefined;
+      let popup: TippyInstance[] | undefined;
 
       return {
         onStart: (props) => {
@@ -153,25 +153,30 @@ export function createWikiLinkSuggestion(
           });
         },
 
+        // `component`/`popup` only exist once onStart has run — but the
+        // suggestion plugin can deliver onUpdate/onKeyDown before that
+        // (items() is async) or after onExit tore them down. Guard every
+        // access (live crash: "Cannot read properties of undefined
+        // (reading 'ref')" on a keydown that raced onStart).
         onUpdate(props) {
-          component.updateProps(props);
+          component?.updateProps(props);
 
           if (!props.clientRect) {
             return;
           }
 
-          popup[0].setProps({
+          popup?.[0]?.setProps({
             getReferenceClientRect: props.clientRect as GetReferenceClientRect,
           });
         },
 
         onKeyDown(props) {
           if (props.event.key === "Escape") {
-            popup[0].hide();
+            popup?.[0]?.hide();
             return true;
           }
 
-          return component.ref?.onKeyDown(props) ?? false;
+          return component?.ref?.onKeyDown(props) ?? false;
         },
 
         onExit() {

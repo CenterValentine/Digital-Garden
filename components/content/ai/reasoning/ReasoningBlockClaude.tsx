@@ -9,16 +9,19 @@
 
 "use client";
 
-import { useState } from "react";
 import { Sparkles, ChevronDown, ChevronRight } from "lucide-react";
 import type { ReasoningBlockProps } from "./types";
+import {
+  useReasoningDisclosure,
+  formatReasoningElapsed,
+} from "./reasoning-disclosure";
 
 export function ReasoningBlockClaude({ text, streaming }: ReasoningBlockProps) {
-  // Expanded while streaming; auto-collapse once finished. A manual
-  // toggle pins `userPref`; until then `open` is derived from streaming.
-  // Derived (not effect-synced) so the React Compiler stays happy.
-  const [userPref, setUserPref] = useState<boolean | null>(null);
-  const open = userPref ?? Boolean(streaming);
+  // Shared disclosure (2026-08-08): one toggle expands/collapses EVERY
+  // reasoning block, scroll-anchored; auto-open while streaming until the
+  // user states a preference. Elapsed timer keeps long thinks legible.
+  const { open, toggle, headerRef, elapsed } = useReasoningDisclosure(streaming);
+  const elapsedLabel = formatReasoningElapsed(elapsed, streaming);
 
   return (
     <div
@@ -26,8 +29,9 @@ export function ReasoningBlockClaude({ text, streaming }: ReasoningBlockProps) {
       style={{ color: "#D4A574" }}
     >
       <button
+        ref={headerRef}
         type="button"
-        onClick={() => setUserPref(!open)}
+        onClick={toggle}
         className="flex w-full items-center gap-2 px-3 py-1.5 text-[11px] font-medium uppercase tracking-wide hover:bg-[#D4A574]/[0.08] transition-colors rounded-lg"
       >
         {open ? (
@@ -35,10 +39,17 @@ export function ReasoningBlockClaude({ text, streaming }: ReasoningBlockProps) {
         ) : (
           <ChevronRight className="h-3 w-3 opacity-70" />
         )}
-        <Sparkles className="h-3 w-3 opacity-70" />
-        <span className="opacity-90">
+        <Sparkles
+          className={`h-3 w-3 ${streaming ? "animate-pulse opacity-90" : "opacity-70"}`}
+        />
+        <span className={streaming ? "animate-pulse opacity-90" : "opacity-90"}>
           {streaming ? "Thinking…" : "Thought"}
         </span>
+        {elapsedLabel && (
+          <span className="ml-auto tabular-nums text-[10px] font-normal opacity-60">
+            {elapsedLabel}
+          </span>
+        )}
       </button>
       {open && (
         <div

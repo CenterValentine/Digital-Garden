@@ -381,6 +381,12 @@ function deriveMinimalTheme(
 const XAI = deriveMinimalTheme("xai", "xAI", "#FF4D4D", "#B93838");
 const MISTRAL = deriveMinimalTheme("mistral", "Mistral", "#FF6B35", "#B94A14");
 const GROQ = deriveMinimalTheme("groq", "Groq", "#F55036", "#BC3A20");
+const DEEPSEEK = deriveMinimalTheme(
+  "deepseek",
+  "DeepSeek",
+  "#4D6BFE",
+  "#3346BE",
+);
 
 // ────────────────────────────────────────────────────────────────────────────
 // Registry + lookup
@@ -393,6 +399,7 @@ const THEME_BY_ID: Record<AIProviderId, ProviderTheme> = {
   xai: XAI,
   mistral: MISTRAL,
   groq: GROQ,
+  deepseek: DEEPSEEK,
 };
 
 /** Provider IDs that get hot chips under the chat input. */

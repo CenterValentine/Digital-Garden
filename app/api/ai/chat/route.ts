@@ -52,7 +52,14 @@ import {
   BYOKRequiredError,
 } from "@/lib/domain/ai/providers/registry";
 import { isGatewayEnabled } from "@/lib/domain/ai/providers/gateway";
-import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
+import {
+  PROVIDER_CATALOG,
+  getModelMeta,
+} from "@/lib/domain/ai/providers/catalog";
+import {
+  stripReasoningForResend,
+  supersedeIterationHistory,
+} from "@/lib/domain/ai/context-diet";
 import { resolveModelTemperature } from "@/lib/domain/ai/model-constraints";
 import {
   DEFAULT_OUTPUT_TARGET,
@@ -69,13 +76,21 @@ import {
 function buildProviderOptions(
   providerId: string,
   modelId: string,
+  opts?: {
+    /**
+     * True when this turn runs inside an approved item-iteration — the
+     * steps are mechanical (read → record → next), so hybrid-thinking
+     * models get low reasoning effort instead of open-ended deliberation.
+     */
+    mechanicalRun?: boolean;
+  },
 ): AIProviderOptions | undefined {
   const model = PROVIDER_CATALOG
     .find((p) => p.id === providerId)
     ?.models.find((m) => m.id === modelId);
-  if (!model || model.reasoning !== "enabled") return undefined;
+  if (!model || !model.reasoning) return undefined;
 
-  if (providerId === "anthropic") {
+  if (providerId === "anthropic" && model.reasoning === "enabled") {
     return {
       anthropic: {
         thinking: {
@@ -85,10 +100,24 @@ function buildProviderOptions(
       },
     };
   }
-  if (providerId === "google") {
+  if (providerId === "google" && model.reasoning === "enabled") {
     return {
       google: {
         thinkingConfig: { includeThoughts: true },
+      },
+    };
+  }
+  if (providerId === "deepseek") {
+    // Hybrid-thinking control (@ai-sdk/deepseek): "adaptive" lets the model
+    // decide when to think; reasoningEffort caps how long. Effort is the
+    // regulator that actually limits thinking spend — output-token caps only
+    // truncate reasoning AFTER it is generated and billed, which is how the
+    // 2026-08-08 iteration run died. Outside mechanical runs the effort knob
+    // is omitted so the provider default applies.
+    return {
+      deepseek: {
+        thinking: { type: "adaptive" },
+        ...(opts?.mechanicalRun ? { reasoningEffort: "low" } : {}),
       },
     };
   }
@@ -576,8 +605,16 @@ export async function POST(request: Request) {
         body.modelId ?? aiSettings.modelId ?? "claude-sonnet-3-5";
       const temperature =
         body.temperature ?? aiSettings.temperature ?? 0.7;
-      const maxTokens =
-        body.maxTokens ?? aiSettings.maxTokens ?? 4096;
+      // Requested output ceiling. null = no user ceiling — resolved to the
+      // executed model's documented catalog maximum at middleware assembly,
+      // once routing has picked the model. Stored 4096 is the legacy imposed
+      // default (never a deliberate choice): normalize it to unset. A flat
+      // 4096 cap silently truncated reasoning-heavy turns — finishReason
+      // "length" with zero visible output (2026-08-08 DeepSeek run).
+      const rawRequestedMaxTokens =
+        body.maxTokens ?? aiSettings.maxTokens ?? null;
+      const requestedMaxTokens =
+        rawRequestedMaxTokens === 4096 ? null : rawRequestedMaxTokens;
 
       // Check if AI is enabled
       if (aiSettings.enabled === false) {
@@ -827,6 +864,15 @@ export async function POST(request: Request) {
         activeModelId,
         temperature,
       );
+
+      // Output ceiling actually sent: the user's explicit setting, else the
+      // executed model's documented maximum from the catalog. Never omitted
+      // for known models — providers substitute their own (often low)
+      // defaults when max_tokens is absent. Unknown models fall through to
+      // the provider default.
+      const maxTokens =
+        requestedMaxTokens ??
+        getModelMeta(executedBareModelId)?.model.maxOutput;
 
       const wrappedModel = await withSpan(
         { layer: "ai", name: "resolve_model" },
@@ -1096,6 +1142,9 @@ export async function POST(request: Request) {
       const toolCtx = {
         userId: session.user.id,
         runTokens: runTokenCounter,
+        // Filled in AFTER playbook resolution below (tools close over this
+        // object, so a later property assignment is visible at execute time).
+        activePlaybook: undefined as { contentId: string; title: string } | undefined,
         // Editor tools read this as "the document being edited"; workflow
         // tools read it as "the open workflow" (they verify contentType
         // themselves). editableContentId is deliberately undefined when a
@@ -1180,6 +1229,36 @@ export async function POST(request: Request) {
         ),
       );
 
+      // Context diet (S7-C5): during an APPROVED iteration run, narrow the
+      // schema set to the run's working tools. The full ~50-schema prefix
+      // measured ~36k tokens per request; the 128k window (not price) is the
+      // binding constraint on long runs. The set is stable for the whole run
+      // (itemIterationBudget stays non-null until record_iteration_findings),
+      // so the provider prefix cache re-warms once at run start. Pending
+      // approvals mid-run only occur for kept tools (createNote,
+      // phase_checkpoint).
+      if (itemIterationBudget != null) {
+        const ITERATION_RUN_TOOLS = new Set([
+          // browsing + enumeration
+          "co_browse_open", "co_browse_act", "read_current_page", "list_tabs",
+          "read_page_headless_or_browser", "open_tab_and_read", "read_page",
+          "search_web",
+          // the iteration harness itself
+          "propose_item_iteration", "record_item_result",
+          "record_batch_checkpoint", "record_iteration_findings",
+          // note output + grounding
+          "createNote", "updateNote", "renameNote", "getCurrentNote",
+          "searchNotes", "read_folder_context",
+          "read_first_chunk", "read_next_chunk", "read_previous_chunk",
+          // run/plumbing
+          "phase_checkpoint", "ask_user", "notify_user",
+          "finish_with_summary", "plan",
+        ]);
+        for (const id of Object.keys(tools)) {
+          if (!ITERATION_RUN_TOOLS.has(id)) delete tools[id];
+        }
+      }
+
       // P0 (AI v3 core S2): provider-native web search, resolved per active
       // provider at request composition. CRITICAL: key off the EXECUTED
       // provider, not the requested one — the resolver above may have landed
@@ -1244,8 +1323,21 @@ export async function POST(request: Request) {
       const repairedMessages = compactToolOutputs(
         repairDanglingToolCalls(messages),
       );
+      // Context diet (S7/S8): both transforms apply ONLY to this
+      // model-message path — repairedMessages stays intact for
+      // originalMessages/persistence.
+      //   - supersedeIterationHistory: raw perception outputs behind the
+      //     latest batch checkpoint collapse to stubs (the ledger is the
+      //     cross-batch memory); reclaims 128k-window space on long runs.
+      //   - stripReasoningForResend: reasoning parts are model OUTPUT with
+      //     no resend value for non-Anthropic providers, yet
+      //     convertToModelMessages forwards them as input verbatim (~100k
+      //     chars replayed per request in the measured DeepSeek run).
       const resolvedMessages = resolveAttachmentsForModel(
-        repairedMessages,
+        stripReasoningForResend(
+          supersedeIterationHistory(repairedMessages),
+          executedVendorId,
+        ),
         executedVendorId,
         audioCapable,
       );
@@ -1492,6 +1584,12 @@ export async function POST(request: Request) {
           ) {
             attachedPlaybookResolved = true;
             attachedPlaybookTitle = playbookNode.title;
+            // Context diet (S7-C2): getCurrentNote answers this id with a
+            // pointer — the body is already injected below.
+            toolCtx.activePlaybook = {
+              contentId: explicitPlaybookId,
+              title: playbookNode.title,
+            };
             const parsed = parsePlaybook(
               playbookNode.notePayload.tiptapJson as JSONContent,
             );
@@ -1601,6 +1699,11 @@ export async function POST(request: Request) {
             );
             rootedPlaybookResolved = true;
             attachedPlaybookTitle = rootedNode.title;
+            // Context diet (S7-C2): same pointer rule for rooted execution.
+            toolCtx.activePlaybook = {
+              contentId: rootedPlaybookId,
+              title: rootedNode.title,
+            };
             playbookOutputDirectives.push(
               ...extractPlaybookOutputDirectives(parsed),
             );
@@ -1891,6 +1994,7 @@ export async function POST(request: Request) {
       const reasoningProviderOptions = buildProviderOptions(
         executedVendorId,
         executedBareModelId,
+        { mechanicalRun: itemIterationBudget != null },
       );
       const providerOptions = mergeAIProviderOptions(
         reasoningProviderOptions,
@@ -2249,6 +2353,11 @@ export async function POST(request: Request) {
                 inputTokens: part.totalUsage?.inputTokens,
                 outputTokens: part.totalUsage?.outputTokens,
                 totalTokens: part.totalUsage?.totalTokens,
+                // Reasoning + provider-cache detail (DeepSeek/OpenAI report
+                // these; DeepSeek's context cache is automatic and this is
+                // the only place its hit rate becomes visible to the user).
+                reasoningTokens: part.totalUsage?.reasoningTokens,
+                cachedInputTokens: part.totalUsage?.cachedInputTokens,
               },
               // Generation wall time for the avatar tooltip (persisted with the
               // message, so it survives reload alongside usage).
