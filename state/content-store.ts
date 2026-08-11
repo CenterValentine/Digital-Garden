@@ -72,6 +72,13 @@ export interface ContentSelectionOptions {
   paneId?: WorkspacePaneId;
   temporary?: boolean;
   pin?: boolean;
+  /**
+   * Positional open (drag-drop onto a tab strip): insert the tab before this
+   * tab id, or append at the end when null. When set, a new tab never
+   * replaces the pane's preview (non-pinned) tab — the drop point is an
+   * explicit placement. Omit for the classic preview-replacement behavior.
+   */
+  beforeTabId?: string | null;
 }
 
 interface WorkspaceRestoreOptions {
@@ -1150,15 +1157,32 @@ export const useContentStore = create<ContentState>((set, get) => ({
           };
         }
 
-        if (!nextPane.tabIds.includes(existingTabId)) {
+        if (
+          options.beforeTabId !== undefined &&
+          options.beforeTabId !== existingTabId
+        ) {
+          nextPane.tabIds = insertTabId(
+            nextPane.tabIds,
+            existingTabId,
+            options.beforeTabId
+          );
+        } else if (!nextPane.tabIds.includes(existingTabId)) {
+          // Also the beforeTabId === existingTabId case: dropping a tab onto
+          // its own slot keeps it in place (or appends it if it was just
+          // pulled out of another pane).
           nextPane.tabIds.push(existingTabId);
         }
         nextPane.activeTabId = existingTabId;
       } else {
-        const replaceableTabId = nextPane.tabIds.find((tabId) => {
-          const tab = state.tabs[tabId];
-          return tab && !tab.isPinned;
-        });
+        // Positional opens land exactly where they were dropped, so the
+        // preview-replacement slot only applies when no beforeTabId is given.
+        const replaceableTabId =
+          options.beforeTabId === undefined
+            ? nextPane.tabIds.find((tabId) => {
+                const tab = state.tabs[tabId];
+                return tab && !tab.isPinned;
+              })
+            : undefined;
 
         const nextTab = applyPanePreferenceToTab(
           createTab(id, options),
@@ -1174,7 +1198,11 @@ export const useContentStore = create<ContentState>((set, get) => ({
           nextPane.activeTabId = nextTab.id;
         } else {
           nextTabs[nextTab.id] = nextTab;
-          nextPane.tabIds.push(nextTab.id);
+          nextPane.tabIds = insertTabId(
+            nextPane.tabIds,
+            nextTab.id,
+            options.beforeTabId ?? null
+          );
           nextPane.activeTabId = nextTab.id;
         }
       }

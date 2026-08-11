@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-06
+last_updated: 2026-08-11
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -53,7 +53,9 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
-**August 6, 2026**: **Heading folds + in-document heading links** (branch `feature/heading-ids-folding`; schema 1.14.0; typecheck/lint(151)/markdown/collab/publishing gates green; needs Hocuspocus redeploy post-merge)
+**August 11, 2026**: **Drag file-tree items onto pane tab strips** (branch `feature/heading-ids-folding`; typecheck/lint(151)/build gates green)
+
+Tree nodes can now be dragged onto any pane's tab strip to open them there — VS Code-style. Each strip is a react-dnd `NODE` drop target (native handlers alone are suppressed by the tree's drag manager; same constraint the chat composer documented). While a tree drag is in flight every strip shows a faint gold wash; the hovered strip shows a gold insertion caret at the exact slot (before/between/after tabs, computed from tab midpoints over the filtered `visibleTabs`). Drops open pinned, non-temporary tabs positioned via the new `ContentSelectionOptions.beforeTabId` — positional opens insert exactly at the caret and never evict the pane's preview tab; an already-open file's tab is moved/repositioned instead of duplicated. Multi-selection drags open every dragged node in selection order (`tree-drag-store` now carries the full `draggingNodes` set with title/contentType so tabs paint named, not "Loading..."). People nodes are excluded at the drag source, as before. (branch `feature/heading-ids-folding`; schema 1.14.0; typecheck/lint(151)/markdown/collab/publishing gates green; needs Hocuspocus redeploy post-merge)
 
 Headings get accordion-like collapse and linkable identity. Fold state is one stored boolean (`heading.collapsed` via `DGHeading`) — persists with the doc, shared in collaboration; the fold *range* (following siblings to the next heading of equal-or-higher rank; blank headings participate) is derived per edit and hidden with decorations, never restructured. A deterministic unfold-on-edit guard means nothing invisible is ever edited. The gutter chevron is a widget decoration in the left padding (zero flow presence, generous hit target). Heading anchor ids are **live slugs derived from text** (`lib/domain/content/heading-ids.ts` — unified the three previous slugifiers; published pages stop stamping ids on publishing-block headlines). `[[#` opens a heading-mode suggestion; links carry `headingSlug`, heal on rename via a deterministic appendTransaction, and break/un-break in real time via decorations when the target vanishes/returns. Source view shows `## Title {.collapsed}` (ids never appear — derivable); file exports stay clean. The accordion block moved to `extensions/publishing/blocks/` as the presentation-side collapse container (node type unchanged; published headings never collapse).
 
