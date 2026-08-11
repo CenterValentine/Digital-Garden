@@ -293,4 +293,141 @@ console.log("turn-diagnostics contract checks");
   });
 }
 
+// ---------------------------------------------------------------------------
+// Cost folds through the SAME accumulator as segments.
+//
+// Self-describing turns and cost metering were built on parallel branches,
+// each with its own copy of this fold; unifying them put cost here. These
+// checks pin the seam: cost must accrue PER REQUEST (long-context price
+// tiers key off one request's prompt size), unknown models must stay
+// unpriced rather than $0, and a reload-seeded merged blob must add its
+// persisted dollars instead of re-pricing summed usage.
+// ---------------------------------------------------------------------------
+{
+  /** A raw per-request blob carrying a priced model stamp. */
+  const pricedBlob = (
+    seg: TurnSegment,
+    usage: { inputTokens: number; outputTokens: number },
+    modelId: string | null = "deepseek-v4-flash",
+  ): Record<string, unknown> => ({
+    modelRoute: {
+      source: "default",
+      providerId: "deepseek",
+      ...(modelId ? { modelId } : {}),
+    },
+    usage: {
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      totalTokens: usage.inputTokens + usage.outputTokens,
+      reasoningTokens: 0,
+      cachedInputTokens: 0,
+    },
+    durationMs: seg.durationMs,
+    finishReason: seg.finishReason ?? undefined,
+    segment: seg,
+  });
+
+  const readCost = (m: Record<string, unknown>) =>
+    m.cost as {
+      usd?: number;
+      unpriced?: boolean;
+      estimated?: boolean;
+      priceVersion?: string;
+      breakdown?: Record<string, number>;
+    };
+
+  ok("a priced request folds an estimated cost into the turn", () => {
+    const accum = new Map<string, TurnUsageAccum>();
+    const merged = mergeTurnUsageMetadata(
+      accum,
+      "m-cost-1",
+      pricedBlob(segment({ startedAt: "2026-08-08T09:00:00.000Z" }), {
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      }),
+      [{ type: "text", text: "hi" }],
+    )!;
+    const cost = readCost(merged);
+    assert.equal(cost.unpriced, undefined);
+    assert.equal(cost.estimated, true);
+    // 1M in @ $0.14 + 1M out @ $0.28
+    assert.ok(Math.abs((cost.usd ?? 0) - 0.42) < 1e-9, `usd=${cost.usd}`);
+    assert.ok(typeof cost.priceVersion === "string");
+  });
+
+  ok("cost accrues per request across a multi-request turn", () => {
+    const accum = new Map<string, TurnUsageAccum>();
+    const parts = [{ type: "text", text: "hi" }];
+    mergeTurnUsageMetadata(
+      accum,
+      "m-cost-2",
+      pricedBlob(segment({ startedAt: "2026-08-08T09:00:00.000Z" }), {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+      }),
+      parts,
+    );
+    const merged = mergeTurnUsageMetadata(
+      accum,
+      "m-cost-2",
+      pricedBlob(segment({ startedAt: "2026-08-08T09:00:10.000Z" }), {
+        inputTokens: 0,
+        outputTokens: 1_000_000,
+      }),
+      parts,
+    )!;
+    const cost = readCost(merged);
+    assert.ok(Math.abs((cost.usd ?? 0) - 0.42) < 1e-9, `usd=${cost.usd}`);
+    assert.equal(accum.get("m-cost-2")!.requestCount, 2);
+  });
+
+  ok("an unpriced model reports unpriced, never $0", () => {
+    const accum = new Map<string, TurnUsageAccum>();
+    const merged = mergeTurnUsageMetadata(
+      accum,
+      "m-cost-3",
+      pricedBlob(
+        segment({ startedAt: "2026-08-08T09:00:00.000Z" }),
+        { inputTokens: 5000, outputTokens: 500 },
+        "totally-made-up-model",
+      ),
+      [{ type: "text", text: "hi" }],
+    )!;
+    const cost = readCost(merged);
+    assert.equal(cost.unpriced, true);
+    assert.equal(cost.usd, undefined);
+  });
+
+  ok("reload seeding adds persisted dollars without re-pricing", () => {
+    const accum = new Map<string, TurnUsageAccum>();
+    const parts = [{ type: "text", text: "hi" }];
+    // First pass produces a merged blob (as persisted on the row).
+    const persisted = mergeTurnUsageMetadata(
+      accum,
+      "m-cost-4",
+      pricedBlob(segment({ startedAt: "2026-08-08T09:00:00.000Z" }), {
+        inputTokens: 1_000_000,
+        outputTokens: 1_000_000,
+      }),
+      parts,
+    )!;
+    // A fresh accumulator seeded from that row, then one more live request.
+    const seeded = new Map<string, TurnUsageAccum>();
+    mergeTurnUsageMetadata(seeded, "m-cost-4", persisted, parts);
+    const after = mergeTurnUsageMetadata(
+      seeded,
+      "m-cost-4",
+      pricedBlob(segment({ startedAt: "2026-08-08T09:00:20.000Z" }), {
+        inputTokens: 1_000_000,
+        outputTokens: 0,
+      }),
+      parts,
+    )!;
+    // 0.42 restored + 0.14 for the new request — not a re-price of the sums.
+    assert.ok(Math.abs((readCost(after).usd ?? 0) - 0.56) < 1e-9, String(readCost(after).usd));
+    // Segments must not double-append on the seed pass either.
+    assert.equal(readTurnDiagnostics(after)!.segments.length, 2);
+  });
+}
+
 console.log(`\nturn-diagnostics: ${checks} checks passed`);

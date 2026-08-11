@@ -252,8 +252,17 @@ check("synthetic: dropped tool call is an error", () => {
       summedMetadata(60, "tool-calls", 1),
     ),
   );
-  assert.deepEqual(kindsOf(turn), ["unexecuted-tool-call"]);
-  assert.equal(turn.findings[0].severity, "error");
+  // Two findings, deliberately: the shared chip derivation reports the
+  // user-facing cause ("interrupted" — the turn ended while a tool was still
+  // in flight, warning), and the inspector adds the harness-side one
+  // ("unexecuted-tool-call" — the call was dropped, error). Same evidence,
+  // two causal stories; the inspector is where both belong. Assert by kind,
+  // not by index — findings order follows source (derived first), not severity.
+  assert.deepEqual(kindsOf(turn), ["interrupted", "unexecuted-tool-call"]);
+  assert.equal(
+    turn.findings.find((f) => f.kind === "unexecuted-tool-call")?.severity,
+    "error",
+  );
 });
 
 check("synthetic: seven settled-tool steps look like the step cap", () => {
