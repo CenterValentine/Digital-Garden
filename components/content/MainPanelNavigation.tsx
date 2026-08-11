@@ -29,6 +29,7 @@ import {
   useNavigationHistoryStore,
 } from "@/state/navigation-history-store";
 import { NavigationHistoryDropdown } from "./NavigationHistoryDropdown";
+import { WorkspaceTabFilters } from "./WorkspaceTabFilters";
 import {
   useExtensionShellNavigationControls,
   useExtensionShellNavigationTrailingControls,
@@ -321,6 +322,7 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             )}
           </div>
           )}
+          <WorkspaceTabFilters />
           {shellNavigationTrailingControls.map((Control) =>
             createElement(Control, {
               key: Control.displayName ?? Control.name,
