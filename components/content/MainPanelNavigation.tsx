@@ -322,13 +322,13 @@ export function MainPanelNavigation({ paneId }: MainPanelNavigationProps) {
             )}
           </div>
           )}
-          <WorkspaceTabFilters />
           {shellNavigationTrailingControls.map((Control) =>
             createElement(Control, {
               key: Control.displayName ?? Control.name,
               paneId,
             })
           )}
+          <WorkspaceTabFilters />
         </div>
       </div>
 

@@ -16,7 +16,10 @@ import {
 import { useWorkspaceStore } from "@/state/workspace-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import {
+  collectPaneAttachedTabs,
+  getEffectiveTabFilters,
   isTabGroupVisible,
+  selectActiveTabFilters,
   useWorkspaceTabFilterStore,
 } from "@/state/workspace-tab-filter-store";
 import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
@@ -274,6 +277,7 @@ export function MainPanelHeader({
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const pane = useContentStore((state) => state.panes[paneId]);
+  const allPanes = useContentStore((state) => state.panes);
   const tabsById = useContentStore((state) => state.tabs);
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
@@ -386,19 +390,20 @@ export function MainPanelHeader({
   );
   const tabMenuTab = tabMenu ? tabsById[tabMenu.tabId] : null;
 
-  const tabFilters = useWorkspaceTabFilterStore((state) => state.filters);
-  // Type filters apply workspace-wide, but only for types that still have an
-  // open tab somewhere — a filter whose affordance is gone from the bar must
-  // not keep hiding tabs. (WorkspaceTabFilters prunes those entries; this
-  // guard keeps the strip correct even when the bar isn't mounted.)
+  const tabFilters = useWorkspaceTabFilterStore(selectActiveTabFilters);
+  // The active workspace's filters apply, but only for types that still have
+  // a pane-attached tab — a saved filter whose affordance is gone from the
+  // bar must not keep hiding tabs (it stays stored and re-applies visibly
+  // when a tab of its type opens again). Pane-attached, not tabsById: the
+  // tabs record accumulates entries across workspace switches.
   const effectiveTabFilters = useMemo(() => {
     const presentKeys = new Set(
-      Object.values(tabsById).map((tab) => getTabIconGroupKey(tab.contentType))
+      collectPaneAttachedTabs(allPanes, tabsById).map((tab) =>
+        getTabIconGroupKey(tab.contentType)
+      )
     );
-    return Object.fromEntries(
-      Object.entries(tabFilters).filter(([key]) => presentKeys.has(key))
-    );
-  }, [tabFilters, tabsById]);
+    return getEffectiveTabFilters(tabFilters, presentKeys);
+  }, [tabFilters, allPanes, tabsById]);
   // View-only filter: hidden tabs stay open (and active content stays put);
   // they just don't render in the strip.
   const visibleTabs = useMemo(

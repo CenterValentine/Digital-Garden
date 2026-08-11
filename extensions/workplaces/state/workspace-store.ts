@@ -10,6 +10,7 @@ import {
   useTreeStateStore,
   type TreeStateSnapshot,
 } from "@/state/tree-state-store";
+import { useWorkspaceTabFilterStore } from "@/state/workspace-tab-filter-store";
 import type {
   ContentWorkspaceResponse,
   WorkspaceOpenConflict,
@@ -1198,6 +1199,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
   },
 }));
+
+// Keep the tab-filter store scoped to the active workspace. A subscription
+// (rather than edits at each set() site) covers every path that changes the
+// active workspace: initial load, activate, archive fallback, background sync.
+if (typeof window !== "undefined") {
+  useWorkspaceTabFilterStore
+    .getState()
+    .setActiveWorkspace(useWorkspaceStore.getState().activeWorkspaceId);
+  useWorkspaceStore.subscribe((state, prevState) => {
+    if (state.activeWorkspaceId !== prevState.activeWorkspaceId) {
+      useWorkspaceTabFilterStore
+        .getState()
+        .setActiveWorkspace(state.activeWorkspaceId);
+    }
+  });
+}
 
 export function installWorkspaceOpenGuard() {
   if (typeof window === "undefined") return () => undefined;
