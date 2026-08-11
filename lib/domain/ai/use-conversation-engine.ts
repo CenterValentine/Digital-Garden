@@ -47,6 +47,7 @@ import {
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
+  coBrowseAttach,
   coBrowseSnapshot,
   coBrowseNavigate,
   coBrowseClick,
@@ -1582,31 +1583,33 @@ export function useConversationEngine({
         };
         try {
           if (toolName === CO_BROWSE_OPEN) {
-            if (!input.url) {
-              chat.addToolResult({
-                tool: toolName,
-                toolCallId: toolCall.toolCallId,
-                state: "output-error",
-                errorText: "no url provided",
-              });
-              return;
-            }
-            const opened = await coBrowseOpen(input.url);
+            // No url = bind the tab the user is CURRENTLY on (owner ask
+            // 2026-08-10): they may have specific results in front of them —
+            // session-personalized lists, filters, stateful flows — that a
+            // fresh load would not reproduce. The background resolves the
+            // active tab; nothing opens, nothing reloads.
+            const opened = input.url
+              ? await coBrowseOpen(input.url)
+              : await coBrowseAttach();
             if (!opened.ok) {
               chat.addToolResult({
                 tool: toolName,
                 toolCallId: toolCall.toolCallId,
-                output: `Could not open the page: ${opened.error ?? "unknown error"}.`,
+                output: `Could not ${input.url ? "open the page" : "attach to the current tab"}: ${opened.error ?? "unknown error"}.`,
               });
               return;
             }
-            markCoBrowseActive(safeHost(input.url)); // 5d: light the in-app indicator
             const snap = await coBrowseSnapshot();
+            // 5d: light the in-app indicator — for attach-in-place the host
+            // comes from the bound tab's actual URL (the snapshot's), since no
+            // url was given.
+            markCoBrowseActive(safeHost(input.url ?? snap.data?.url ?? ""));
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
               output: {
                 tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
+                ...(input.url ? {} : { boundCurrentTab: true }),
                 // Session start = keyframe: full snapshot, delta base reset.
                 ...coBrowseSnapshotOrDelta(snap, "full"),
               },
