@@ -422,18 +422,26 @@ export function WorkspaceSelector() {
   } | null>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
   const settingsInitKeyRef = useRef("");
+  const [quickIconTarget, setQuickIconTarget] = useState<{
+    workspaceId: string;
+    position: { x: number; y: number };
+  } | null>(null);
+  const iconHoldTimerRef = useRef<number | null>(null);
+  const iconHoldFiredRef = useRef<string | null>(null);
 
   // Imperatively focus the rename input after Radix has released focus management.
   // autoFocus alone is unreliable here because createWorkspace is async and the
   // dropdown may still be in Radix's open animation when the input first mounts.
+  // menuOpen is a dependency so a rename that survives a menu close (unnamed
+  // workspace) regains focus when the menu reopens with the same editing id.
   useEffect(() => {
-    if (!editingWorkspaceId) return;
+    if (!editingWorkspaceId || !menuOpen) return;
     const raf = requestAnimationFrame(() => {
       renameInputRef.current?.focus();
       renameInputRef.current?.select();
     });
     return () => cancelAnimationFrame(raf);
-  }, [editingWorkspaceId]);
+  }, [editingWorkspaceId, menuOpen]);
 
   const recursiveFolderClaims = useMemo(
     () =>
@@ -958,6 +966,57 @@ export function WorkspaceSelector() {
     }
   };
 
+  const cancelIconHold = () => {
+    if (iconHoldTimerRef.current !== null) {
+      window.clearTimeout(iconHoldTimerRef.current);
+      iconHoldTimerRef.current = null;
+    }
+  };
+
+  const startIconHold = (
+    workspace: ContentWorkspaceResponse,
+    target: HTMLElement,
+  ) => {
+    cancelIconHold();
+    const rect = target.getBoundingClientRect();
+    iconHoldTimerRef.current = window.setTimeout(() => {
+      iconHoldTimerRef.current = null;
+      iconHoldFiredRef.current = workspace.id;
+      // The menu stays open (it's non-modal and its dismissal is guarded
+      // while the picker is up) so the row icon visibly updates on pick.
+      setQuickIconTarget({
+        workspaceId: workspace.id,
+        position: { x: rect.left, y: rect.bottom + 6 },
+      });
+    }, 450);
+  };
+
+  const handleQuickIconSelect = async (icon: string) => {
+    if (!quickIconTarget) return;
+    const workspace = workspaces.find(
+      (candidate) => candidate.id === quickIconTarget.workspaceId,
+    );
+    setQuickIconTarget(null);
+    if (!workspace) return;
+
+    try {
+      await updateWorkspace(workspace.id, {
+        settings: { ...workspace.settings, workspaceIcon: icon },
+      });
+      toast.success("Workspace icon updated");
+    } catch (error) {
+      console.error(
+        "[WorkspaceSelector] Failed to update workspace icon:",
+        error,
+      );
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to update workspace icon",
+      );
+    }
+  };
+
   const startInlineRename = (workspace: ContentWorkspaceResponse) => {
     setMenuOpen(true);
     setEditingWorkspaceId(workspace.id);
@@ -972,6 +1031,14 @@ export function WorkspaceSelector() {
       (candidate) => candidate.id === editingWorkspaceId,
     );
     const nextName = editingName.trim();
+    if (workspace && !nextName && isWorkspaceNamePending(workspace)) {
+      // Still-unnamed workspace: keep the rename form open instead of
+      // committing emptiness — a stolen-focus blur must not strand the
+      // workspace without a title. If the menu is closing the refocus is a
+      // no-op and the open-resume path picks the rename back up next time.
+      requestAnimationFrame(() => renameInputRef.current?.focus());
+      return;
+    }
     setEditingWorkspaceId(null);
     if (!workspace || !nextName || nextName === workspace.name) return;
 
@@ -1187,10 +1254,24 @@ export function WorkspaceSelector() {
   return (
     <>
       <DropdownMenu
+        // Non-modal so the portaled quick icon picker stays interactive while
+        // the menu remains open (modal mode pointer-locks everything outside).
+        modal={false}
         open={menuOpen}
         onOpenChange={(open) => {
           setMenuOpen(open);
-          if (open) triggerMenuOpenSync();
+          if (open) {
+            triggerMenuOpenSync();
+            iconHoldFiredRef.current = null;
+            // A workspace that never received a name keeps its rename form
+            // ready: re-enter edit mode every time the menu opens until the
+            // user actually names it.
+            const pendingName = workspaces.find(
+              (workspace) =>
+                !workspace.isMain && isWorkspaceNamePending(workspace),
+            );
+            if (pendingName) startInlineRename(pendingName);
+          }
         }}
       >
         <DropdownMenuTrigger asChild>
@@ -1217,6 +1298,18 @@ export function WorkspaceSelector() {
 
         <DropdownMenuContent
           align="start"
+          onInteractOutside={(event) => {
+            // While the quick icon picker is open, interacting with it (or
+            // anywhere else) must not dismiss the menu — the user should see
+            // the row icon change the moment they pick one.
+            if (quickIconTarget) event.preventDefault();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (quickIconTarget) {
+              event.preventDefault();
+              setQuickIconTarget(null);
+            }
+          }}
           className="min-w-72 border-white/10 bg-white/95 text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
         >
           <DropdownMenuLabel className="text-xs uppercase tracking-[0.18em] text-gray-500">
@@ -1235,6 +1328,7 @@ export function WorkspaceSelector() {
                 draggable={!workspace.isMain && !isEditing}
                 title={buildWorkspaceTitle(workspace)}
                 onDragStart={(event) => {
+                  cancelIconHold();
                   if (workspace.isMain || isEditing) {
                     event.preventDefault();
                     return;
@@ -1242,6 +1336,19 @@ export function WorkspaceSelector() {
                   event.dataTransfer.effectAllowed = "move";
                   event.dataTransfer.setData("text/plain", workspace.id);
                   setDraggedWorkspaceId(workspace.id);
+                }}
+                onPointerMove={(event) => {
+                  // Radix focuses menu items as the pointer moves over them.
+                  // While the inline rename input is open that roving focus
+                  // blurs the input, which used to commit an empty name the
+                  // instant the mouse drifted. Suspend hover-focus entirely
+                  // during a rename.
+                  if (editingWorkspaceId) event.preventDefault();
+                }}
+                onPointerLeave={(event) => {
+                  // Same guard for the leave side: Radix refocuses the menu
+                  // content when the pointer exits an item.
+                  if (editingWorkspaceId) event.preventDefault();
                 }}
                 onDragOver={(event) => {
                   if (workspace.isMain || !draggedWorkspaceId) return;
@@ -1276,6 +1383,12 @@ export function WorkspaceSelector() {
                 }}
                 onSelect={(event) => {
                   event.preventDefault();
+                  if (iconHoldFiredRef.current === workspace.id) {
+                    // This press already long-pressed into the icon picker;
+                    // don't also treat the release as a workspace switch.
+                    iconHoldFiredRef.current = null;
+                    return;
+                  }
                   const pendingRowAction = pendingWorkspaceRowActionRef.current;
                   pendingWorkspaceRowActionRef.current = null;
                   if (
@@ -1352,7 +1465,15 @@ export function WorkspaceSelector() {
                   />
                 ) : (
                   <>
-                    <span className="inline-flex h-4 w-4 items-center justify-center">
+                    <span
+                      className="inline-flex h-4 w-4 items-center justify-center"
+                      onPointerDown={(event) =>
+                        startIconHold(workspace, event.currentTarget)
+                      }
+                      onPointerUp={cancelIconHold}
+                      onPointerLeave={cancelIconHold}
+                      onPointerCancel={cancelIconHold}
+                    >
                       {renderWorkspaceIcon(
                         getWorkspaceIconValue(workspace),
                         "h-4 w-4",
@@ -1425,6 +1546,15 @@ export function WorkspaceSelector() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
+            onPointerMove={(event) => {
+              // Mirror of the row guard: the pointer usually still hovers this
+              // item right after clicking it, and Radix's hover-focus would
+              // immediately steal focus from the freshly-mounted rename input.
+              if (editingWorkspaceId) event.preventDefault();
+            }}
+            onPointerLeave={(event) => {
+              if (editingWorkspaceId) event.preventDefault();
+            }}
             onSelect={(event) => {
               event.preventDefault();
               requestCreateWorkspace();
@@ -1435,6 +1565,20 @@ export function WorkspaceSelector() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {quickIconTarget ? (
+        <IconSelector
+          isOpen
+          onClose={() => setQuickIconTarget(null)}
+          onSelectIcon={(icon) => void handleQuickIconSelect(icon)}
+          currentIcon={getWorkspaceIconValue(
+            workspaces.find(
+              (workspace) => workspace.id === quickIconTarget.workspaceId,
+            ) ?? null,
+          )}
+          triggerPosition={quickIconTarget.position}
+        />
+      ) : null}
 
       {workspaceContextMenu ? (
         <div
@@ -1484,7 +1628,11 @@ export function WorkspaceSelector() {
           </DialogHeader>
 
           {settingsWorkspace ? (
-            <div className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+            <>
+              {/* Icon + name live OUTSIDE the scroll container: the inline
+                  icon picker hangs below the icon button as an absolutely
+                  positioned panel, and an overflow-y-auto ancestor would clip
+                  it (the picker was getting cut off mid-panel). */}
               <div className="flex items-center gap-3">
                 <div className="relative shrink-0">
                   <button
@@ -1535,6 +1683,7 @@ export function WorkspaceSelector() {
                 ) : null}
               </div>
 
+              <div className="max-h-[60vh] space-y-4 overflow-y-auto pr-1">
               <div className="grid grid-cols-2 rounded-md border border-black/10 bg-black/[0.025] p-1 text-sm dark:border-white/10 dark:bg-white/[0.04]">
                 <button
                   type="button"
@@ -1821,7 +1970,8 @@ export function WorkspaceSelector() {
                   )}
                 </div>
               )}
-            </div>
+              </div>
+            </>
           ) : null}
 
           <DialogFooter className="gap-2 sm:gap-2">
