@@ -17,11 +17,10 @@ import tippy, { Instance as TippyInstance, GetReferenceClientRect } from "tippy.
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
 
-interface WikiLinkNoteItem {
+// Extends the fetcher's shape because note items are built by spreading it
+// (`{ kind: "note", ...note }`) — new fetcher fields flow through untouched.
+interface WikiLinkNoteItem extends WikiLinkSuggestionItem {
   kind: "note";
-  id: string;
-  title: string;
-  slug: string;
 }
 
 interface WikiLinkHeadingItem {
