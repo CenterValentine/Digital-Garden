@@ -20,6 +20,7 @@ import CharacterCount from "@tiptap/extension-character-count";
 import Underline from "@tiptap/extension-underline";
 import { common, createLowlight } from "lowlight";
 import { Callout } from "./extensions/callout";
+import { ServerDGHeading } from "./extensions/heading";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
 import { ServerImage } from "./extensions/image";
@@ -27,7 +28,6 @@ import { AiHighlight } from "./extensions/ai-highlight";
 import { ServerSectionHeader } from "./extensions/blocks/section-header";
 import { ServerCardPanel } from "./extensions/blocks/card-panel";
 import { ServerBlockDivider } from "./extensions/blocks/divider";
-import { ServerAccordion } from "./extensions/blocks/accordion";
 import { ServerColumn, ServerColumns } from "./extensions/blocks/columns";
 import { ServerBlockColumn, ServerBlockColumns } from "./extensions/blocks/block-columns";
 import { ServerTabPanel, ServerTabs } from "./extensions/blocks/tabs";
@@ -75,9 +75,8 @@ const lowlight = createLowlight(common);
 export function getServerExtensions(): Extensions {
   return [
     StarterKit.configure({
-      heading: {
-        levels: [1, 2, 3, 4, 5, 6],
-      },
+      // Disabled: replaced by ServerDGHeading (adds `collapsed`).
+      heading: false,
       codeBlock: false,
       blockquote: {},
       bulletList: {
@@ -97,6 +96,9 @@ export function getServerExtensions(): Extensions {
       horizontalRule: {},
       link: false,
     }),
+
+    // Heading with `collapsed` attr (heading folds).
+    ServerDGHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
 
     CodeBlockLowlight.configure({
       lowlight,
@@ -153,7 +155,6 @@ export function getServerExtensions(): Extensions {
     ServerSectionHeader,
     ServerCardPanel,
     ServerBlockDivider,
-    ServerAccordion,
     ServerColumn,
     ServerColumns,
     ServerBlockColumn,

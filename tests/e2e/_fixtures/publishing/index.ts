@@ -39,10 +39,12 @@ export const PUBLISHING_FIXTURE_BLOCKS = [
   "testimonial-card",
   "timeline",
   "video-embed",
+  // Presentation blocks (in extensions/publishing/blocks/) — relocated from
+  // the core editor set; heading folds are the editor-native collapse now.
+  "accordion",
   // Layout blocks (in lib/domain/editor/extensions/blocks/) — added 2026-05-20
   // to bring them under the same snapshot/CI coverage as publishing blocks
   // ahead of the R5 (editor uses publisher markup) work.
-  "accordion",
   "block-columns",
   "card-panel",
   "columns",

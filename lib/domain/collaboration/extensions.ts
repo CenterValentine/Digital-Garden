@@ -13,11 +13,11 @@ import { AiHighlight } from "@/lib/domain/editor/extensions/ai-highlight";
 import { Callout } from "@/lib/domain/editor/extensions/callout";
 import { ServerImage } from "@/lib/domain/editor/extensions/image";
 import { BlockquoteLineOnly } from "@/lib/domain/editor/extensions/blockquote-line-only";
+import { ServerDGHeading } from "@/lib/domain/editor/extensions/heading";
 import { HeadingHardbreakSplit } from "@/lib/domain/editor/extensions/heading-hardbreak-split";
 import { ServerSectionHeader } from "@/lib/domain/editor/extensions/blocks/section-header";
 import { ServerCardPanel } from "@/lib/domain/editor/extensions/blocks/card-panel";
 import { ServerBlockDivider } from "@/lib/domain/editor/extensions/blocks/divider";
-import { ServerAccordion } from "@/lib/domain/editor/extensions/blocks/accordion";
 import { ServerColumn, ServerColumns } from "@/lib/domain/editor/extensions/blocks/columns";
 import { ServerBlockColumn, ServerBlockColumns } from "@/lib/domain/editor/extensions/blocks/block-columns";
 import { ServerTabPanel, ServerTabs } from "@/lib/domain/editor/extensions/blocks/tabs";
@@ -58,7 +58,8 @@ export function getCollaborationServerExtensions(): Extensions {
   return [
     StarterKit.configure({
       codeBlock: {},
-      heading: { levels: [1, 2, 3, 4, 5, 6] },
+      // Disabled: replaced by ServerDGHeading (adds `collapsed`).
+      heading: false,
       bulletList: { keepMarks: true, keepAttributes: false },
       orderedList: { keepMarks: true, keepAttributes: false },
       hardBreak: { keepMarks: false },
@@ -67,6 +68,8 @@ export function getCollaborationServerExtensions(): Extensions {
       link: false,
       undoRedo: false,
     }),
+    // Heading with `collapsed` attr (heading folds).
+    ServerDGHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
     TaskList,
     TaskItem.configure({ nested: true }),
     Link.configure({
@@ -90,7 +93,6 @@ export function getCollaborationServerExtensions(): Extensions {
     ServerSectionHeader,
     ServerCardPanel,
     ServerBlockDivider,
-    ServerAccordion,
     ServerColumn,
     ServerColumns,
     ServerBlockColumn,

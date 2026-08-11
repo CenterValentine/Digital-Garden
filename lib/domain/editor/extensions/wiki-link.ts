@@ -14,6 +14,39 @@ import { Node, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { InputRule } from "@tiptap/core";
 import Suggestion from "@tiptap/suggestion";
+import { slugifyHeading } from "@/lib/domain/content/heading-ids";
+
+/**
+ * Attrs for a hand-typed [[...]] body. A leading `#` makes an in-document
+ * heading link: [[#Heading]] / [[#Heading|alias]] — the slug is derived from
+ * the text (no dedup context when typed by hand, so duplicate headings
+ * resolve to the first occurrence's slug).
+ */
+function attrsForTypedLink(
+  body: string,
+  displayText: string | null,
+): { targetTitle: string; displayText: string | null; headingSlug: string | null } | null {
+  if (body.startsWith("#")) {
+    const headingText = body.slice(1).trim();
+    if (!headingText) return null;
+    return {
+      targetTitle: headingText,
+      displayText,
+      headingSlug: slugifyHeading(headingText) || "heading",
+    };
+  }
+  return { targetTitle: body, displayText, headingSlug: null };
+}
+
+/** The [[...]] source text a link un-wraps back into (Backspace/Delete). */
+function wikiTextFor(attrs: {
+  targetTitle?: string | null;
+  displayText?: string | null;
+  headingSlug?: string | null;
+}): string {
+  const title = `${attrs.headingSlug ? "#" : ""}${attrs.targetTitle ?? ""}`;
+  return attrs.displayText ? `[[${title}|${attrs.displayText}]]` : `[[${title}]]`;
+}
 
 export interface WikiLinkSuggestionItem {
   id: string;
@@ -33,6 +66,12 @@ export interface WikiLinkClickTarget {
   targetId: string | null;
   /** The authored title — label, and fallback lookup key. */
   targetTitle: string;
+  /**
+   * Derived slug of an in-document heading target ([[#Heading]] links).
+   * When present (and targetId is null), the click is same-document
+   * navigation — scroll to the heading, expanding folds — not a note lookup.
+   */
+  headingSlug: string | null;
   /**
    * Persist a resolved id back into the clicked node. Called when resolution
    * fell back to a title search, so the link upgrades itself in place and the
@@ -123,6 +162,28 @@ export const WikiLink = Node.create<WikiLinkOptions>({
           };
         },
       },
+      /**
+       * Derived slug of an in-document heading target ([[#Heading]]).
+       *
+       * Heading ids are LIVE slugs (lib/domain/content/heading-ids.ts):
+       * renaming a heading changes its slug, and the heading-link-integrity
+       * extension rewrites this attr in the same edit. A slug with no
+       * matching heading is decorated as broken (never rewritten away —
+       * restoring the heading un-breaks the link). Absent renders no
+       * attribute, so pre-existing links serialize byte-identically.
+       */
+      headingSlug: {
+        default: null,
+        parseHTML: (element) => element.getAttribute("data-heading-slug"),
+        renderHTML: (attributes) => {
+          if (!attributes.headingSlug) {
+            return {};
+          }
+          return {
+            "data-heading-slug": attributes.headingSlug,
+          };
+        },
+      },
     };
   },
 
@@ -150,11 +211,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
   renderText({ node }) {
     // For markdown export, show the full wiki-link syntax
-    const { targetTitle, displayText } = node.attrs;
-    if (displayText) {
-      return `[[${targetTitle}|${displayText}]]`;
-    }
-    return `[[${targetTitle}]]`;
+    return wikiTextFor(node.attrs);
   },
 
   addInputRules() {
@@ -164,24 +221,19 @@ export const WikiLink = Node.create<WikiLinkOptions>({
       new InputRule({
         find: /\[\[([^\|\]]+)(?:\|([^\]]+))?\]\]$/,
         handler: ({ state, range, match }) => {
-          const targetTitle = match[1]?.trim();
+          const body = match[1]?.trim();
           const displayText = match[2]?.trim() || null;
 
-          if (!targetTitle) return null;
+          if (!body) return null;
+          const attrs = attrsForTypedLink(body, displayText);
+          if (!attrs) return null;
 
           const { tr } = state;
           const start = range.from;
           const end = range.to;
 
           // Replace the entire [[...]] text with a wiki-link node
-          tr.replaceWith(
-            start,
-            end,
-            this.type.create({
-              targetTitle,
-              displayText,
-            })
-          );
+          tr.replaceWith(start, end, this.type.create(attrs));
 
           return tr;
         },
@@ -230,10 +282,14 @@ export const WikiLink = Node.create<WikiLinkOptions>({
               return false;
             }
 
-            const targetTitle = match[1]?.trim();
+            const body = match[1]?.trim();
             const displayText = match[2]?.trim() || null;
 
-            if (!targetTitle) {
+            if (!body) {
+              return false;
+            }
+            const attrs = attrsForTypedLink(body, displayText);
+            if (!attrs) {
               return false;
             }
 
@@ -242,14 +298,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             const matchEnd = $from.start() + $from.parentOffset;
 
             // Replace with wiki-link node
-            const tr = state.tr.replaceWith(
-              matchStart,
-              matchEnd,
-              nodeType.create({
-                targetTitle,
-                displayText,
-              })
-            );
+            const tr = state.tr.replaceWith(matchStart, matchEnd, nodeType.create(attrs));
 
             // Insert the space/enter that triggered this
             if (event.key === " ") {
@@ -335,11 +384,13 @@ export const WikiLink = Node.create<WikiLinkOptions>({
               wikiLinkEl.classList.add("wiki-link-broken");
             };
 
+            const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+
             event.preventDefault();
             // Each attempt starts clean — a link that failed while offline
             // shouldn't stay marked once it resolves.
             wikiLinkEl.classList.remove("wiki-link-broken");
-            options.onClickLink({ targetId, targetTitle, heal, markBroken });
+            options.onClickLink({ targetId, targetTitle, headingSlug, heal, markBroken });
             return true;
           },
 
@@ -355,10 +406,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             if (event.key === "Backspace" && nodeBefore?.type.name === "wikiLink") {
               event.preventDefault();
 
-              const { targetTitle, displayText } = nodeBefore.attrs;
-              const wikiText = displayText
-                ? `[[${targetTitle}|${displayText}]]`
-                : `[[${targetTitle}]]`;
+              const wikiText = wikiTextFor(nodeBefore.attrs);
 
               const nodePos = $from.pos - nodeBefore.nodeSize;
               const transaction = view.state.tr.replaceWith(
@@ -375,10 +423,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
             if (event.key === "Delete" && nodeAfter?.type.name === "wikiLink") {
               event.preventDefault();
 
-              const { targetTitle, displayText } = nodeAfter.attrs;
-              const wikiText = displayText
-                ? `[[${targetTitle}|${displayText}]]`
-                : `[[${targetTitle}]]`;
+              const wikiText = wikiTextFor(nodeAfter.attrs);
 
               const nodePos = $from.pos;
               const transaction = view.state.tr.replaceWith(

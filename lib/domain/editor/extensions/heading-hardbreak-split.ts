@@ -67,9 +67,11 @@ export const HeadingHardbreakSplit = Extension.create({
             // Only split if there's content after the hardBreak
             if (afterContent.length === 0) return;
 
-            // Build the replacement: heading with before-content + paragraph with after-content
+            // Build the replacement: heading with before-content + paragraph
+            // with after-content. Spread the original attrs so optional ones
+            // (e.g. `collapsed`) survive the split.
             const headingNode = newState.schema.nodes.heading.create(
-              { level: node.attrs.level },
+              { ...node.attrs },
               beforeContent.length > 0 ? beforeContent : undefined
             );
             const paragraphNode = newState.schema.nodes.paragraph.create(

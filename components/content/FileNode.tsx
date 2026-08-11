@@ -619,15 +619,33 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       onContextMenu={handleContextMenu}
       {...longPressHandlers}
       onDragStart={() => {
-        // Record the dragged node so out-of-tree drop targets (the chat
-        // composer) can attach it as context. People nodes are synthetic
-        // and have no content id, so skip them.
+        // Record the dragged node(s) so out-of-tree drop targets (the chat
+        // composer, the workspace tab strips) can read them. People nodes are
+        // synthetic and have no content id, so skip them.
         if (isPeopleNode) return;
-        useTreeDragStore.getState().setDraggingNode({
+        const primary = {
           id: node.id,
           title: data.title,
           contentType: data.contentType,
-        });
+        };
+        // Mirror react-arborist's dragIds: a drag that starts on a selected
+        // row carries the whole selection (tree order), otherwise just the
+        // grabbed row.
+        const draggedNodes =
+          node.isSelected && tree.selectedNodes && tree.selectedNodes.length > 1
+            ? tree.selectedNodes
+                .filter(
+                  (selected: NodeApi<TreeNode>) =>
+                    selected.data.treeNodeKind !== "peopleGroup" &&
+                    selected.data.treeNodeKind !== "person"
+                )
+                .map((selected: NodeApi<TreeNode>) => ({
+                  id: selected.id,
+                  title: selected.data.title,
+                  contentType: selected.data.contentType,
+                }))
+            : [primary];
+        useTreeDragStore.getState().setDraggingNode(primary, draggedNodes);
       }}
       onDragEnd={() => useTreeDragStore.getState().setDraggingNode(null)}
       onPointerEnter={() => {

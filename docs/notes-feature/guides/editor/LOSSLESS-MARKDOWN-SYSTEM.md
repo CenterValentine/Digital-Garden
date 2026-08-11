@@ -157,6 +157,19 @@ which is your signal the codec isn't complete yet.
 pretty output that parses back to the wrong thing → self-verify rejects it →
 fence.
 
+**Variant — decorating a CORE node's serialization (the heading-fold lesson):**
+when the pretty form is "the default markdown plus a marker" on a node
+turndown already handles (heading folds: `## Title {.collapsed}` for
+`heading.collapsed`), put the serialize half in a **turndown rule** in
+`createTurndown()` that fires only for the decorated case (so the undecorated
+node keeps the stock path byte-identical), and register a codec whose
+`toMarkdown` returns `null` with only a real `reTag`. The codec registry is
+consulted for core types too, so the parse-side reconstruction slots in
+without touching the parser. Heading anchor ids are the counter-example:
+they're *derived* from heading text (`lib/domain/content/heading-ids.ts`), so
+they never appear in markdown at all — a round-trip regenerates them.
+Derivable state needs no syntax; only stored state does.
+
 ### 5b. The extension-symmetry prerequisite (the callout lesson)
 
 A codec (or Tier-2 HTML) can only round-trip if the block's **own

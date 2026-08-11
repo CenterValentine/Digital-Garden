@@ -1072,6 +1072,20 @@ export async function resolveOpenIntent(
       continue;
     }
 
+    // Nested-view exception: the claiming workspace is a view rooted strictly
+    // above this view's root, so this view is a carve-out of that workspace's
+    // area. The content already passed view-scope enforcement, so it belongs
+    // to both views at once — the parent view's claims here (tab or folder)
+    // are vertical overlap by construction, not duplicate work. Same-root
+    // views still warn: that is horizontal duplication, not nesting.
+    if (
+      viewRootAncestorIds !== null &&
+      candidate.workspace.viewRootContentId &&
+      viewRootAncestorIds.includes(candidate.workspace.viewRootContentId)
+    ) {
+      continue;
+    }
+
     claim = candidate;
     break;
   }

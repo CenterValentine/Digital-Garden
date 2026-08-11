@@ -2,18 +2,10 @@
 
 import { createElement, useEffect, useMemo, useState, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useDrop } from "react-dnd";
 import { usePathname } from "next/navigation";
 import { requestOverlayOpen } from "@/lib/domain/browser-extension/panel-bridge";
-import {
-  ExternalLink,
-  File,
-  FileCode,
-  FileText,
-  Folder,
-  MessageCircle,
-  MessagesSquare,
-  X,
-} from "lucide-react";
+import { X } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import {
@@ -22,6 +14,15 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useWorkspaceStore } from "@/state/workspace-store";
+import { useTreeDragStore } from "@/state/tree-drag-store";
+import {
+  collectPaneAttachedTabs,
+  getEffectiveTabFilters,
+  isTabGroupVisible,
+  selectActiveTabFilters,
+  useWorkspaceTabFilterStore,
+} from "@/state/workspace-tab-filter-store";
+import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
@@ -67,31 +68,22 @@ interface PresenceSnapshotResponse {
   };
 }
 
+// react-arborist's drag source type. Must match `type: "NODE"` in
+// node_modules/react-arborist/dist/main/dnd/drag-hook.js so the tab strip
+// registers as a valid drop target — otherwise react-dnd's window-level
+// dragover handler stamps dropEffect="none" and the browser silently
+// suppresses the drop event (same constraint as the chat composer's target).
+const ARBORIST_DRAG_TYPE = "NODE";
+
+interface ArboristDragItem {
+  id: string;
+  dragIds: string[];
+}
+
 const PRESENCE_POLL_INTERVAL_MS = 10_000;
 const VISITOR_ADJECTIVES = ["Silver", "Quiet", "Golden", "Bright", "Gentle", "Blue"];
 const VISITOR_TRAITS = ["Windy", "Curious", "Clever", "Sunny", "Brisk", "Calm"];
 const VISITOR_ANIMALS = ["Raccoon", "Fox", "Heron", "Otter", "Finch", "Badger"];
-
-function getTabIcon(contentType: string | null) {
-  switch (contentType) {
-    case "note":
-    case "page-template":
-      return FileText;
-    case "folder":
-      return Folder;
-    case "code":
-    case "html":
-      return FileCode;
-    case "external":
-      return ExternalLink;
-    case "chat":
-      return MessageCircle;
-    case "dm-thread":
-      return MessagesSquare;
-    default:
-      return File;
-  }
-}
 
 function hashString(value: string) {
   let hash = 0;
@@ -285,10 +277,15 @@ export function MainPanelHeader({
   const layoutMode = useContentStore((state) => state.layoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const pane = useContentStore((state) => state.panes[paneId]);
+  const allPanes = useContentStore((state) => state.panes);
   const tabsById = useContentStore((state) => state.tabs);
   const activateContentTab = useContentStore((state) => state.activateContentTab);
   const closeContentTab = useContentStore((state) => state.closeContentTab);
   const updateContentTab = useContentStore((state) => state.updateContentTab);
+  const openContentInPane = useContentStore((state) => state.openContentInPane);
+  // True while any file-tree node drag is in flight (people nodes never
+  // publish to the drag store, so they read as "no drag").
+  const isTreeNodeDragging = useTreeDragStore((state) => state.draggingNode !== null);
   // Gate the per-tab title back-fill until the workspace snapshot has resolved:
   // it names every open tab from contentMeta, so back-filling earlier would fire
   // one redundant content fetch per tab on every cold load.
@@ -310,6 +307,15 @@ export function MainPanelHeader({
   const [tabRects, setTabRects] = useState<Record<string, DOMRect | null>>({});
   const renameInputRef = useRef<HTMLInputElement>(null);
   const tabElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
+  const tabScrollerRef = useRef<HTMLDivElement | null>(null);
+  // Insertion point for a file-tree drag hovering this strip: `index` is the
+  // slot the tab would land in (0..tabs.length), `left` the caret's x offset
+  // in the scroller's content coordinates.
+  const [treeDropTarget, setTreeDropTarget] = useState<{
+    index: number;
+    left: number;
+  } | null>(null);
+  const treeDropIndexRef = useRef<number | null>(null);
   const isActivePane = activePaneId === paneId;
 
   const startRename = useCallback((tabId: string, currentTitle: string) => {
@@ -384,13 +390,133 @@ export function MainPanelHeader({
   );
   const tabMenuTab = tabMenu ? tabsById[tabMenu.tabId] : null;
 
+  const tabFilters = useWorkspaceTabFilterStore(selectActiveTabFilters);
+  // The active workspace's filters apply, but only for types that still have
+  // a pane-attached tab — a saved filter whose affordance is gone from the
+  // bar must not keep hiding tabs (it stays stored and re-applies visibly
+  // when a tab of its type opens again). Pane-attached, not tabsById: the
+  // tabs record accumulates entries across workspace switches.
+  const effectiveTabFilters = useMemo(() => {
+    const presentKeys = new Set(
+      collectPaneAttachedTabs(allPanes, tabsById).map((tab) =>
+        getTabIconGroupKey(tab.contentType)
+      )
+    );
+    return getEffectiveTabFilters(tabFilters, presentKeys);
+  }, [tabFilters, allPanes, tabsById]);
+  // View-only filter: hidden tabs stay open (and active content stays put);
+  // they just don't render in the strip.
+  const visibleTabs = useMemo(
+    () =>
+      tabs.filter((tab) =>
+        isTabGroupVisible(effectiveTabFilters, getTabIconGroupKey(tab.contentType))
+      ),
+    [tabs, effectiveTabFilters]
+  );
+
+  // Map a drag's viewport x to the tab slot it would insert into: a cursor
+  // past a tab's midpoint pushes the insertion point behind that tab. Also
+  // yields the caret position (boundary between the neighboring tabs) in the
+  // scroller's content coordinates, so the indicator scrolls with the tabs.
+  const computeTreeDropTarget = useCallback(
+    (clientX: number): { index: number; left: number } | null => {
+      const scroller = tabScrollerRef.current;
+      if (!scroller) return null;
+      const scrollerRect = scroller.getBoundingClientRect();
+      const toLocalX = (viewportX: number) =>
+        viewportX - scrollerRect.left + scroller.scrollLeft;
+
+      let index = 0;
+      let boundary = 5; // empty strip: caret sits at the leading edge
+      for (const tab of visibleTabs) {
+        const element = tabElementsRef.current.get(tab.id);
+        if (!element) continue;
+        const rect = element.getBoundingClientRect();
+        if (clientX >= rect.left + rect.width / 2) {
+          index += 1;
+          boundary = toLocalX(rect.right);
+        } else {
+          boundary = toLocalX(rect.left);
+          break;
+        }
+      }
+      return { index, left: Math.max(0, boundary - 1) };
+    },
+    [visibleTabs]
+  );
+
+  const handleTreeNodeDrop = useCallback(
+    (clientX: number) => {
+      const { draggingNode, draggingNodes } = useTreeDragStore.getState();
+      const nodesToOpen =
+        draggingNodes.length > 0
+          ? draggingNodes
+          : draggingNode
+            ? [draggingNode]
+            : [];
+      if (nodesToOpen.length === 0) return;
+
+      const target = computeTreeDropTarget(clientX);
+      const beforeTabId = target ? visibleTabs[target.index]?.id ?? null : null;
+
+      // Each node opens before the same anchor, so a multi-drag lands in
+      // selection order. Pinned + non-temporary: an explicit drop is a
+      // deliberate open, not a preview.
+      for (const dropped of nodesToOpen) {
+        openContentInPane(dropped.id, paneId, {
+          title: dropped.title,
+          contentType: dropped.contentType,
+          pin: true,
+          temporary: false,
+          beforeTabId,
+        });
+      }
+    },
+    [computeTreeDropTarget, openContentInPane, paneId, visibleTabs]
+  );
+
+  const [{ isTreeDropHover }, connectTreeDrop] = useDrop<
+    ArboristDragItem,
+    void,
+    { isTreeDropHover: boolean }
+  >(
+    () => ({
+      accept: ARBORIST_DRAG_TYPE,
+      canDrop: () => useTreeDragStore.getState().draggingNode !== null,
+      hover: (_item, monitor) => {
+        const offset = monitor.getClientOffset();
+        if (!offset) return;
+        const target = computeTreeDropTarget(offset.x);
+        if (!target) return;
+        if (treeDropIndexRef.current !== target.index) {
+          treeDropIndexRef.current = target.index;
+          setTreeDropTarget(target);
+        }
+      },
+      drop: (_item, monitor) => {
+        const offset = monitor.getClientOffset();
+        if (offset) handleTreeNodeDrop(offset.x);
+      },
+      collect: (monitor) => ({
+        isTreeDropHover: monitor.isOver() && monitor.canDrop(),
+      }),
+    }),
+    [computeTreeDropTarget, handleTreeNodeDrop]
+  );
+
+  useEffect(() => {
+    if (isTreeDropHover) return;
+    treeDropIndexRef.current = null;
+    setTreeDropTarget(null);
+  }, [isTreeDropHover]);
+
   const updateTabRects = useCallback(() => {
     const nextRects: Record<string, DOMRect | null> = {};
-    for (const tab of tabs) {
+    for (const tab of visibleTabs) {
       nextRects[tab.id] = tabElementsRef.current.get(tab.id)?.getBoundingClientRect() ?? null;
     }
     setTabRects(nextRects);
-  }, [tabs]);
+  }, [visibleTabs]);
 
   useEffect(() => {
     updateTabRects();
@@ -401,7 +527,7 @@ export function MainPanelHeader({
 
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? null : new ResizeObserver(handleWindowChange);
-    for (const tab of tabs) {
+    for (const tab of visibleTabs) {
       const element = tabElementsRef.current.get(tab.id);
       if (element) resizeObserver?.observe(element);
     }
@@ -411,7 +537,7 @@ export function MainPanelHeader({
       window.removeEventListener("scroll", handleWindowChange, true);
       resizeObserver?.disconnect();
     };
-  }, [tabs, updateTabRects]);
+  }, [visibleTabs, updateTabRects]);
 
   useEffect(() => {
     if (tabContentIds.length === 0) {
@@ -546,17 +672,31 @@ export function MainPanelHeader({
   return (
     <>
       <div
-        className="relative z-40 flex w-full max-w-full shrink-0 items-center overflow-hidden border-b border-white/10 bg-white/[0.06] dark:bg-black/[0.5]"
+        className={`relative z-40 flex w-full max-w-full shrink-0 items-center overflow-hidden border-b transition-colors ${
+          isTreeDropHover
+            ? "border-gold-primary/50 bg-gold-primary/[0.08] dark:bg-gold-primary/[0.12]"
+            : isTreeNodeDragging
+              ? "border-gold-primary/25 bg-gold-primary/[0.03] dark:bg-gold-primary/[0.06]"
+              : "border-white/10 bg-white/[0.06] dark:bg-black/[0.5]"
+        }`}
         style={{
           backdropFilter: glass1.backdropFilter,
         }}
       >
-        <div className="flex min-w-0 max-w-full flex-1 items-stretch overflow-x-auto scrollbar-hide pr-1">
-          {tabs.length === 0 ? (
+        <div
+          ref={(element) => {
+            tabScrollerRef.current = element;
+            connectTreeDrop(element);
+          }}
+          className="relative flex min-w-0 max-w-full flex-1 items-stretch overflow-x-auto scrollbar-hide pr-1"
+        >
+          {visibleTabs.length === 0 ? (
             <div className="flex items-center px-2 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
-              {getPaneLabel(layoutMode, paneId)}
+              {tabs.length === 0
+                ? getPaneLabel(layoutMode, paneId)
+                : `${tabs.length} ${tabs.length === 1 ? "tab" : "tabs"} hidden by filters`}
             </div>
-          ) : tabs.map((tab) => {
+          ) : visibleTabs.map((tab) => {
             const Icon = getTabIcon(tab.contentType);
             const isActive = tab.id === pane?.activeTabId;
             const isDragging = draggedTabId === tab.id;
@@ -658,6 +798,15 @@ export function MainPanelHeader({
               </div>
             );
           })}
+          {isTreeDropHover && treeDropTarget ? (
+            // Insertion caret for a file-tree drop: marks the exact slot the
+            // tab will land in — before a tab, between tabs, or at the end.
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-y-0.5 z-50 w-0.5 rounded-full bg-gold-primary shadow-[0_0_6px_rgba(201,168,108,0.6)]"
+              style={{ left: treeDropTarget.left }}
+            />
+          ) : null}
         </div>
       </div>
       {tabMenu && tabMenuTab ? (

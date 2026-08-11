@@ -678,6 +678,76 @@ nav[class*="fixed"] {
   color: #FFD700;
 }
 
+/* ── Heading folds (editor only — .public-prose never hides content) ──────
+   Positioning context for the gutter chevron widget. The widget is
+   absolutely positioned into the editor's left padding, so it has zero
+   document-flow presence and cannot shift text alignment. */
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  position: relative;
+}
+
+/* Blocks hidden by a collapsed heading fold. */
+.ProseMirror .dg-fold-hidden {
+  display: none;
+}
+
+/* Gutter fold affordance: fills the full gutter width × heading line box —
+   a generous hit target, not just the glyph. Hover-revealed; always visible
+   while collapsed. */
+.dg-fold-gutter {
+  position: absolute;
+  left: -1.5rem;
+  top: 0;
+  bottom: 0;
+  width: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ProseMirror h1:hover .dg-fold-gutter,
+.ProseMirror h2:hover .dg-fold-gutter,
+.ProseMirror h3:hover .dg-fold-gutter,
+.ProseMirror h4:hover .dg-fold-gutter,
+.ProseMirror h5:hover .dg-fold-gutter,
+.ProseMirror h6:hover .dg-fold-gutter,
+.ProseMirror .dg-heading-collapsed .dg-fold-gutter {
+  opacity: 1;
+}
+
+.dg-fold-chevron {
+  font-size: 0.8rem;
+  line-height: 1;
+  color: rgba(0, 0, 0, 0.4);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.dark .dg-fold-chevron {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.dg-fold-gutter:hover .dg-fold-chevron {
+  color: var(--gold-primary);
+}
+
+.dark .dg-fold-gutter:hover .dg-fold-chevron {
+  color: #ffd700;
+}
+
+/* Collapsed: rotate the chevron to point at the heading. */
+.ProseMirror .dg-heading-collapsed .dg-fold-chevron {
+  transform: rotate(-90deg);
+}
+
 /* Lists */
 .ProseMirror ul,
 .ProseMirror ol {
@@ -868,6 +938,22 @@ nav[class*="fixed"] {
 }
 
 .dark .ProseMirror .wiki-link.wiki-link-broken {
+  color: #f87171;
+}
+
+/* In-document heading link whose target heading no longer exists. Applied by
+   a DECORATION (heading-link-integrity) — dedicated class because the click
+   handler strips wiki-link-broken from the DOM and would fight a decoration.
+   Self-healing: the styling vanishes the moment the heading slug resolves
+   again (undo, retype). */
+.ProseMirror .wiki-link.wiki-link-heading-broken {
+  color: var(--color-danger, #b91c1c);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  opacity: 0.75;
+}
+
+.dark .ProseMirror .wiki-link.wiki-link-heading-broken {
   color: #f87171;
 }
 

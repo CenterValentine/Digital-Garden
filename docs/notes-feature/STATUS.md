@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-08
+last_updated: 2026-08-11
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -53,6 +53,10 @@ Durable offline editing for the **plain/REST save path** (continuous localStorag
 
 ## Recent Completions (Last 30 Days)
 
+**August 11, 2026**: **Workspace tab-type filters + drag file-tree items onto pane tab strips** (branch `integration/workspace-tab-filters`, carries `feature/heading-ids-folding` + PR #160; typecheck/lint(151)/build gates green; owner smoke pending)
+
+The workspace bar grows per-content-type filter toggles beside the clear-all control — one affordance per icon group that has an open tab anywhere in the workspace (icons inherited from the tab strip's canonical mapping, extracted to `components/content/headers/tab-icons.ts`, so icon changes propagate). Click cycles off → show-only → hide → off; all active filters compose as a strict AND, so overlapping/contradictory filters legitimately empty the strip (which then reads "N tabs hidden by filters"). View-only (hidden tabs stay open), not persisted, and a filter is pruned when its type's last tab closes. Separately, tree nodes can now be dragged onto any pane's tab strip to open them there — VS Code-style. Each strip is a react-dnd `NODE` drop target (native handlers alone are suppressed by the tree's drag manager; same constraint the chat composer documented). While a tree drag is in flight every strip shows a faint gold wash; the hovered strip shows a gold insertion caret at the exact slot (before/between/after tabs, computed from tab midpoints over the filtered `visibleTabs`). Drops open pinned, non-temporary tabs positioned via the new `ContentSelectionOptions.beforeTabId` — positional opens insert exactly at the caret and never evict the pane's preview tab; an already-open file's tab is moved/repositioned instead of duplicated. Multi-selection drags open every dragged node in selection order (`tree-drag-store` now carries the full `draggingNodes` set with title/contentType so tabs paint named, not "Loading..."). People nodes are excluded at the drag source, as before.
+
 **August 8, 2026**: **AI Cost Metering** (branch `AI-sys-improve/cost-metering`, stacked on `feat/ai-harness-reliability`; typecheck/lint(151)/full-build green incl. new `ai:pricing:check` gate; owner smoke pending)
 
 Pricing engine v2 in `lib/features/ai-connections/usage/pricing.ts`: 5-vendor seed table verified against official pages (Anthropic, OpenAI gpt-5.6 family incl. cache-write + >272K tier, Gemini incl. >200K Pro tier, DeepSeek hit/miss, Kimi via family-prefix matching), `PRICING_VERSION` stamping, null-not-zero unpriced contract. Cost computed **per request** in the turn accumulator (`mergeTurnUsageMetadata`) and persisted in message metadata; Anthropic cache-write tokens captured via `providerMetadata` in the chat route. Surfaces: avatar-tooltip est. cost (priced / current-rates / n-a states), per-connection meters now prefer persisted costs + exact `modelRoute.connectionId` attribution, run-ledger token stamps carry `~$` estimates, `ConversationDetail.spend` cumulative (API only — header line deferred to the inspector work). Gate: `pnpm ai:pricing:check` (coverage + calculator fixtures) wired into `build`. See `work-tracking/COST-METERING-PLAN.md`.
@@ -83,6 +87,10 @@ Mention a folder in chat or a playbook and the AI receives a **capsule** — pur
 - **AI Context rail (Phase 3)**: one mode selector replaces toggles; sections render per resolved mode; ContextTab/ContextAiPanel relocated to `components/content/ai-context/` and no longer follow studio enablement.
 - **Folder mentions (Phase 4)**: two-stage gate (composer pre-flight on pill insert drives live chips; server re-gates at send, authoritative); durable trace rides the sent message as a `data-folder-context` part.
 - **Walk tool (Phase 5)**: `read_folder_context` in the AI tool registry — progressive disclosure with the D17 frugality nudge.
+
+**August 6, 2026**: **Heading folds + in-document heading links** (branch `feature/heading-ids-folding`; schema 1.14.0; typecheck/lint(151)/markdown/collab/publishing gates green; needs Hocuspocus redeploy post-merge)
+
+Headings get accordion-like collapse and linkable identity. Fold state is one stored boolean (`heading.collapsed` via `DGHeading`) — persists with the doc, shared in collaboration; the fold *range* (following siblings to the next heading of equal-or-higher rank; blank headings participate) is derived per edit and hidden with decorations, never restructured. A deterministic unfold-on-edit guard means nothing invisible is ever edited. The gutter chevron is a widget decoration in the left padding (zero flow presence, generous hit target). Heading anchor ids are **live slugs derived from text** (`lib/domain/content/heading-ids.ts` — unified the three previous slugifiers; published pages stop stamping ids on publishing-block headlines). `[[#` opens a heading-mode suggestion; links carry `headingSlug`, heal on rename via a deterministic appendTransaction, and break/un-break in real time via decorations when the target vanishes/returns. Source view shows `## Title {.collapsed}` (ids never appear — derivable); file exports stay clean. The accordion block moved to `extensions/publishing/blocks/` as the presentation-side collapse container (node type unchanged; published headings never collapse).
 
 **August 5, 2026**: **Per-item playbook iteration + co-browse reliability sweep** (branch `feat/per-item-playbook-checkpoints`; typecheck/lint(151)/prompt-cache/collab/extension gates green; owner-smoke-validated on tabs + LinkedIn list; PR-ready)
 

@@ -115,6 +115,19 @@ export function createTurndown(
   // rule looks for an <input> that is a direct child of <li>, so it misses this
   // (the input is nested in a <label>). Emit `- [x]/[ ]` ourselves and drop the
   // checkbox UI. Parsed back by reTagTaskLists().
+  // Collapsed headings (heading folds) carry data-collapsed="true". Emit the
+  // pandoc-style attribute marker `{.collapsed}` so fold state survives the
+  // source-view round-trip; non-collapsed headings take the default atx rule
+  // untouched. Parsed back by the heading codec's reTag (markdown-block-codecs).
+  td.addRule("dgCollapsedHeading", {
+    filter: (node) =>
+      /^H[1-6]$/.test(node.nodeName) &&
+      node.getAttribute("data-collapsed") === "true",
+    replacement: (content, node) => {
+      const level = Number(node.nodeName.charAt(1));
+      return `\n\n${"#".repeat(level)} ${content} {.collapsed}\n\n`;
+    },
+  });
   td.addRule("dgTaskItem", {
     filter: (node) =>
       node.nodeName === "LI" && node.getAttribute("data-type") === "taskItem",

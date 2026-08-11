@@ -29,6 +29,9 @@ import { TaskListInputRule } from "./extensions/task-list";
 import { BulletListBackspace } from "./extensions/bullet-list";
 import { BlockBoundaryInsert } from "./extensions/block-boundary-insert";
 import { BlockSpacerGuard } from "./extensions/block-spacer-guard";
+import { DGHeading } from "./extensions/heading";
+import { HeadingFold } from "./extensions/heading-fold";
+import { HeadingLinkIntegrity } from "./extensions/heading-link-integrity";
 import { HeadingBackspace } from "./extensions/heading-backspace";
 import { HeadingHardbreakSplit } from "./extensions/heading-hardbreak-split";
 import { BlockquoteLineOnly } from "./extensions/blockquote-line-only";
@@ -46,7 +49,6 @@ import { BlockFocusExtension } from "./extensions/block-focus-ext";
 import { SectionHeader } from "./extensions/blocks/section-header";
 import { CardPanel } from "./extensions/blocks/card-panel";
 import { BlockDivider } from "./extensions/blocks/divider";
-import { Accordion } from "./extensions/blocks/accordion";
 import { Column, Columns } from "./extensions/blocks/columns";
 import { BlockColumn, BlockColumns } from "./extensions/blocks/block-columns";
 import { TabPanel, Tabs } from "./extensions/blocks/tabs";
@@ -122,10 +124,9 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
 
   return [
     StarterKit.configure({
-      // Heading levels with markdown shortcuts (# ## ###)
-      heading: {
-        levels: [1, 2, 3, 4, 5, 6],
-      },
+      // Disabled: replaced by DGHeading (adds `collapsed` for heading folds).
+      // Markdown shortcuts (# ##) and keyboard shortcuts are inherited.
+      heading: false,
       // Disable default code block (we use CodeBlockLowlight)
       codeBlock: false,
       // Enable blockquote with > markdown shortcut
@@ -152,6 +153,19 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
       link: false,
       undoRedo: collaboration ? false : {},
     }),
+
+    // Heading with `collapsed` attr (heading folds) — levels + markdown
+    // shortcuts (# ## ###) match the previous StarterKit config.
+    DGHeading.configure({ levels: [1, 2, 3, 4, 5, 6] }),
+
+    // Fold engine: derived fold ranges, hidden-range decorations, gutter
+    // chevron widgets, and the unfold-on-edit guards. Client-only — read-only
+    // surfaces render expanded (the extension detects editability itself).
+    HeadingFold,
+
+    // Heading-link integrity: heals [[#Heading]] links on rename, decorates
+    // links whose target heading is gone (non-destructive, self-healing).
+    HeadingLinkIntegrity,
 
     ...(collaboration
       ? [
@@ -279,7 +293,6 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     SectionHeader,
     CardPanel,
     BlockDivider,
-    Accordion,
     Column,
     Columns,
     BlockColumn,

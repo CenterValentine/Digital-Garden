@@ -1232,7 +1232,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // a miss did nothing at all, which read as a dead click).
   const handleWikiLinkClick = useCallback(
     async (target: WikiLinkClickTarget) => {
-      const { targetId, targetTitle, heal, markBroken } = target;
+      const { targetId, targetTitle, headingSlug, heal, markBroken } = target;
+
+      // In-document heading link: same-document navigation, no lookup. The
+      // scroll-to-heading listener expands any fold hiding the target. A
+      // slug with no matching heading is left to the integrity decorations
+      // (broken styling) — clicking it is a no-op, never destructive.
+      if (headingSlug && !targetId) {
+        window.dispatchEvent(
+          new CustomEvent("scroll-to-heading", { detail: { slug: headingSlug } })
+        );
+        return;
+      }
 
       const resolved = await resolveWikiLinkTarget({ targetId, targetTitle });
 
@@ -1270,12 +1281,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // this path resolves but doesn't write back.
   useEffect(() => {
     const handleOpen = (e: Event) => {
-      const { targetId, targetTitle } = (
-        e as CustomEvent<{ targetId?: string | null; targetTitle: string }>
+      const { targetId, targetTitle, headingSlug } = (
+        e as CustomEvent<{
+          targetId?: string | null;
+          targetTitle: string;
+          headingSlug?: string | null;
+        }>
       ).detail;
       void handleWikiLinkClick({
         targetId: targetId ?? null,
         targetTitle,
+        headingSlug: headingSlug ?? null,
         heal: () => {},
         markBroken: () => {},
       });

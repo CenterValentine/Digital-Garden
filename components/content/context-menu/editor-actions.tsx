@@ -633,7 +633,25 @@ export const editorActionProvider: ContextMenuActionProvider = (ctx) => {
   if (wikiLinkEl) {
     const targetTitle = wikiLinkEl.getAttribute("data-target-title");
     const targetId = wikiLinkEl.getAttribute("data-target-id");
-    if (targetTitle) {
+    const headingSlug = wikiLinkEl.getAttribute("data-heading-slug");
+
+    // In-document heading link: "Open" scrolls to the heading; opening in
+    // another pane is a note-level concept and doesn't apply.
+    if (headingSlug && !targetId && targetTitle) {
+      sections.push({
+        actions: [
+          {
+            id: "open-wiki-link",
+            label: "Open",
+            onClick: () => {
+              window.dispatchEvent(
+                new CustomEvent("scroll-to-heading", { detail: { slug: headingSlug } })
+              );
+            },
+          },
+        ],
+      });
+    } else if (targetTitle) {
       const { layoutMode } = useContentStore.getState();
       const visiblePaneIds = new Set(getVisiblePaneIds(layoutMode));
 

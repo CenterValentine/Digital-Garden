@@ -1,0 +1,20 @@
+{
+  "type": "doc",
+  "content": [
+    { "type": "heading", "attrs": { "level": 1 }, "content": [{ "type": "text", "text": "Alpha" }] },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "alpha intro" }] },
+    { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Beta" }] },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "beta body one" }] },
+    { "type": "paragraph" },
+    { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "Gamma" }] },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "gamma body" }] },
+    { "type": "heading", "attrs": { "level": 2 }, "content": [{ "type": "text", "text": "Delta" }] },
+    { "type": "paragraph", "content": [
+      { "type": "text", "text": "see " },
+      { "type": "wikiLink", "attrs": { "targetTitle": "Beta", "headingSlug": "beta" } },
+      { "type": "text", "text": " for setup" }
+    ] },
+    { "type": "heading", "attrs": { "level": 2 } },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "after blank" }] }
+  ]
+}
