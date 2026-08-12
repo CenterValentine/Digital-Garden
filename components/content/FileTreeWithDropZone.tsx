@@ -43,6 +43,8 @@ interface FileTreeWithDropZoneProps {
   editingNodeId?: string;
   expandNodeId?: string | null;
   onExpandComplete?: () => void;
+  revealNodeId?: string | null;
+  onRevealComplete?: () => void;
   /**
    * Called with the validated files and the folder they were dropped into
    * (`null` = vault root). See `lib/domain/content/tree-drop-target.ts` for

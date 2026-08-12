@@ -183,6 +183,7 @@ export function LeftSidebarContent({
     fromTemplateId?: string;
   } | null>(null);
   const [expandNodeId, setExpandNodeId] = useState<string | null>(null);
+  const [revealNodeId, setRevealNodeId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     ids: string[];
     title: string;
@@ -536,6 +537,19 @@ export function LeftSidebarContent({
 
     window.addEventListener("dg:tree-expand", handleExpandRequest);
     return () => window.removeEventListener("dg:tree-expand", handleExpandRequest);
+  }, []);
+
+  // Imperative reveal request from outside the tree (main-panel path
+  // breadcrumb): open the node's ancestors, scroll to it, and select it —
+  // the tree-side half of "select this node as if clicked in the tree".
+  useEffect(() => {
+    const handleRevealRequest = (event: Event) => {
+      const id = (event as CustomEvent<{ id?: string | null }>).detail?.id;
+      if (id) setRevealNodeId(id);
+    };
+
+    window.addEventListener("dg:tree-reveal", handleRevealRequest);
+    return () => window.removeEventListener("dg:tree-reveal", handleRevealRequest);
   }, []);
 
   useEffect(() => {
@@ -897,6 +911,13 @@ export function LeftSidebarContent({
         toast.error("Failed to move item", { description: desc });
         throw new Error(desc);
       }
+
+      // Drag-moves refresh the tree locally (optimistic update above), so
+      // outside listeners — the main-panel path breadcrumb — need their own
+      // signal that ancestry may have changed.
+      window.dispatchEvent(
+        new CustomEvent("dg:content-moved", { detail: { ids: dragIds } }),
+      );
 
       if (peopleDragged.length > 0) {
         window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
@@ -2499,6 +2520,8 @@ export function LeftSidebarContent({
             editingNodeId={creatingItem?.tempId}
             expandNodeId={expandNodeId}
             onExpandComplete={() => setExpandNodeId(null)}
+            revealNodeId={revealNodeId}
+            onRevealComplete={() => setRevealNodeId(null)}
             onFileDrop={onFileDrop}
           />
         </div>

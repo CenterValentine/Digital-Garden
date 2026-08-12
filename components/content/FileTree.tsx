@@ -52,6 +52,8 @@ interface FileTreeProps {
   editingNodeId?: string; // If set, automatically triggers edit mode on this node
   expandNodeId?: string | null; // If set, imperatively expands this node
   onExpandComplete?: () => void; // Called after expansion completes
+  revealNodeId?: string | null; // If set, opens ancestors, scrolls to, and selects this node
+  onRevealComplete?: () => void; // Called after the reveal request is consumed
   dndManager?: unknown; // Optional: DndManager from parent DndProvider; opaque pass-through
 }
 
@@ -76,6 +78,8 @@ export function FileTree({
   editingNodeId,
   expandNodeId,
   onExpandComplete,
+  revealNodeId,
+  onRevealComplete,
   dndManager,
 }: FileTreeProps) {
   const treeRef = useRef<TreeApi<TreeNode> | null>(null);
@@ -507,6 +511,30 @@ export function FileTree({
     // for the same node.
     onExpandComplete?.();
   }, [expandNodeId, onExpandComplete, setExpanded]);
+
+  // Reveal request from outside the tree (breadcrumb path click): mirror a
+  // real selection of the node. scrollTo opens every ancestor (firing
+  // onToggle per folder, which keeps the persisted expandedIds store in
+  // sync), waits for the row to appear, and scrolls it into view. Selection
+  // deliberately happens AFTER the row exists: tree.select on a still-hidden
+  // node fires onSelect against a stale visible-row index, reporting an
+  // empty selection and wiping the store selection the caller just set.
+  // A node absent from this tree (workspace-scoped view, stale id) makes
+  // scrollTo's internal wait give up after ~1s and the select is skipped.
+  useEffect(() => {
+    if (!revealNodeId) return;
+
+    const tree = treeRef.current;
+    if (tree) {
+      Promise.resolve(tree.scrollTo(revealNodeId, "center")).then(() => {
+        treeRef.current?.get(revealNodeId)?.select();
+      });
+    }
+
+    // Clear the request either way so the next reveal for the same node
+    // isn't swallowed.
+    onRevealComplete?.();
+  }, [revealNodeId, onRevealComplete]);
 
   // Auto-trigger edit mode when editingNodeId changes (for inline creation)
   useEffect(() => {

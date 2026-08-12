@@ -37,6 +37,7 @@ import {
   clearConflictDraft,
 } from "@/state/save-conflict-store";
 import { SaveConflictBanner } from "./SaveConflictBanner";
+import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
@@ -2194,7 +2195,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
               />
             ) : (
-              <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
+              <div className="mr-4 flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 items-start gap-3">
                 <h1
                   className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
                     isReadOnlyPageTemplate
@@ -2237,6 +2239,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                     </Tooltip>
                   </TooltipProvider>
                 ) : null}
+                </div>
+                {selectedContentId && (
+                  <ContentPathBreadcrumb
+                    contentId={selectedContentId}
+                    currentTitle={noteTitle}
+                    currentContentType={contentType}
+                    paneId={paneId}
+                  />
+                )}
               </div>
             )}
             <div className="flex flex-none items-center gap-1">
