@@ -593,23 +593,29 @@ export function MainPanelHeader({
     };
   }, [tabMenu]);
 
+  // Close the active tab. Cmd+W and Cmd+Shift+W never reach the page — browsers
+  // reserve them for Close Tab / Close Window — so we bind the two W chords that
+  // do survive:
+  //   Cmd+Alt+W  / Ctrl+Alt+W — primary; unbound in Chrome, Vivaldi, Edge, Firefox
+  //   Cmd+Ctrl+W             — macOS fallback, since Safari takes Cmd+Alt+W
+  //                            for Close Other Tabs
+  // Deliberately no isTyping guard: neither chord means anything to a text field,
+  // and the tab you want to close is usually the one you're editing.
   useEffect(() => {
+    if (!isActivePane) return;
+    const activeTabId = pane?.activeTabId;
+    if (!activeTabId) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isActivePane) return;
-      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) {
-        return;
-      }
-      if (event.key.toLowerCase() !== "e") return;
+      if (event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
 
-      const target = event.target as HTMLElement | null;
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-      if (isTyping) return;
+      // Alt rewrites event.key on macOS (Alt+W yields "∑"), so match the physical
+      // key first and fall back to the character for non-QWERTY layouts.
+      if (event.code !== "KeyW" && event.key.toLowerCase() !== "w") return;
 
-      const activeTabId = pane?.activeTabId;
-      if (!activeTabId) return;
+      // Cmd+Alt+W / Ctrl+Alt+W, or Cmd+Ctrl+W on macOS.
+      if (!event.altKey && !(event.metaKey && event.ctrlKey)) return;
 
       event.preventDefault();
       closeContentTab(activeTabId);
