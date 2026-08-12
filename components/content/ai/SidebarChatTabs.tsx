@@ -102,7 +102,7 @@ export function SidebarChatTabs({
   };
 
   return (
-    <div className="dg-sidebar-chat-tabs flex shrink-0 items-end border-b border-black/10 dark:border-white/10 px-2 pt-1.5 gap-2">
+    <div className="dg-sidebar-chat-tabs flex shrink-0 items-end border-b border-[color:var(--border-secondary)] px-2 pt-1.5 gap-2">
       {/* Scrollable tab list — fills available width, scrolls horizontally
           on overflow. min-w-0 is critical to let flex-1 actually shrink
           past content width and trigger the inner overflow. y-axis is

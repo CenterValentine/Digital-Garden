@@ -350,7 +350,7 @@ body:has(.embed-layout-page) [data-sonner-toaster][data-y-position="top"] {
   --accent-foreground: #3D5A5B;
   --destructive: #E57373;
   --destructive-foreground: #ffffff;
-  --border: rgba(229, 212, 176, 0.2);
+  --border: rgba(229, 212, 176, 0.28);
   --input: transparent;
   --ring: #81C784;
 
@@ -358,19 +358,19 @@ body:has(.embed-layout-page) [data-sonner-toaster][data-y-position="top"] {
   --text-primary: rgba(229, 212, 176, 0.95);
   --text-secondary: rgba(229, 212, 176, 0.85);
   --text-tertiary: rgba(229, 212, 176, 0.6);
-  --border-secondary: rgba(229, 212, 176, 0.18);
+  --border-secondary: rgba(229, 212, 176, 0.26);
   --surface-input: rgba(0, 0, 0, 0.28);
   --surface-secondary: rgba(255, 255, 255, 0.04);
 
   /* Liquid Glass surfaces (dark mode). */
   --surface-glass-0-bg: rgba(0, 0, 0, 0.3);
-  --surface-glass-0-border: 1px solid rgba(255, 255, 255, 0.06);
+  --surface-glass-0-border: 1px solid rgba(255, 255, 255, 0.10);
   --surface-glass-0-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
   --surface-glass-1-bg: rgba(0, 0, 0, 0.4);
-  --surface-glass-1-border: 1px solid rgba(255, 255, 255, 0.08);
+  --surface-glass-1-border: 1px solid rgba(255, 255, 255, 0.13);
   --surface-glass-1-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
   --surface-glass-2-bg: rgba(0, 0, 0, 0.5);
-  --surface-glass-2-border: 1px solid rgba(255, 255, 255, 0.12);
+  --surface-glass-2-border: 1px solid rgba(255, 255, 255, 0.17);
   --surface-glass-2-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
 
   /* Scrollbar tokens (dark) — warm beige tint matches foreground palette. */
