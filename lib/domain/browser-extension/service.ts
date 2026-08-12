@@ -3,14 +3,12 @@ import type { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content";
 import { normalizeUrl } from "@/lib/domain/content/external-validation";
 import { markdownToTiptapResult, tiptapToMarkdown } from "@/lib/domain/content/markdown";
-import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
 import { syncContentTags } from "@/lib/domain/content/tag-sync";
 import { syncImageReferences } from "@/lib/domain/content/image-refs";
 import { syncPersonMentions } from "@/lib/domain/content/person-mention-sync";
 import { getServerExtensions } from "@/lib/domain/editor/extensions-server";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
-import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
-import { logger } from "@/lib/core/logger";
+import { writeNoteContent } from "@/lib/domain/content/write-note-content";
 import { generateJSON, type JSONContent } from "@tiptap/core";
 
 function asIsoString(value: Date | null | undefined) {
@@ -1055,58 +1053,55 @@ export async function updateExtensionNoteContent(
       ? markdownResult.json
       : (input.tiptapJson as JSONContent);
   const json = sanitizeTipTapJsonWithExtensions(parsedJson, getServerExtensions()).json;
-  const searchText = extractSearchTextFromTipTap(json);
-  const wordCount = searchText.split(/\s+/).filter(Boolean).length;
-  // Degradation flag (v3.2 T1) — consistent with the AI note tools.
+  // Degradation flag (v3.2 T1) — consistent with the AI note tools. searchText and
+  // the word/char counts are computed by writeNoteContent, which owns payload metadata.
   const degradedMeta = markdownResult?.degraded
     ? { markdownDegraded: true, degradedReason: markdownResult.reason }
     : {};
 
-  await prisma.notePayload.upsert({
-    where: { contentId },
-    update: {
-      tiptapJson: json,
-      searchText,
-      metadata: {
-        wordCount,
-        characterCount: searchText.length,
-        readingTime: Math.ceil(wordCount / 200),
-        ...degradedMeta,
-      },
-    },
-    create: {
-      contentId,
-      tiptapJson: json,
-      searchText,
-      metadata: {
-        wordCount,
-        characterCount: searchText.length,
-        readingTime: Math.ceil(wordCount / 200),
-        ...degradedMeta,
-      },
-    },
+  // Shared out-of-band write path (AI collab write path, Slice 1). Replaces a bare
+  // NotePayload upsert + unconditional reseed with the state-aware branch: apply
+  // THROUGH the live document when a collaborative copy exists, write the payload
+  // when none does. Two fixes come along for free —
+  //   1. an extension edit is no longer masked (and later destroyed) by an open
+  //      editor, the same seam confirmed for AI writes on 2026-08-12;
+  //   2. the old unconditional reseed UPSERTED a CollaborationDocument, quietly
+  //      enabling collaboration on notes that had never been opened. The helper
+  //      only reseeds when a row already exists.
+  //
+  // `destructiveApproved` is true because a human authored this content directly in
+  // the extension; the shrink guard exists to catch a model resending a fragment,
+  // and must never refuse a user's own deletion.
+  await writeNoteContent({
+    contentId,
+    ownerId: userId,
+    mode: "replace",
+    content: json,
+    destructiveApproved: true,
   });
+
+  if (Object.keys(degradedMeta).length > 0) {
+    // The helper owns the standard metadata; the degradation flag is extension-
+    // specific, so merge it without clobbering what was just written.
+    const payload = await prisma.notePayload.findUnique({
+      where: { contentId },
+      select: { metadata: true },
+    });
+    const base =
+      payload?.metadata && typeof payload.metadata === "object"
+        ? (payload.metadata as Record<string, unknown>)
+        : {};
+    await prisma.notePayload.update({
+      where: { contentId },
+      data: {
+        metadata: { ...base, ...degradedMeta } as unknown as Prisma.InputJsonValue,
+      },
+    });
+  }
 
   await syncContentTags(contentId, json, userId);
   await syncImageReferences(contentId, json, userId);
   await syncPersonMentions(contentId, json, userId);
-
-  // Realign the collaborative Y.Doc with the payload we just wrote. This write
-  // path bypasses collaboration, so without a reseed a stale-but-non-empty
-  // CollaborationDocument would win at bootstrap and mask this edit (stale/blank
-  // note when later opened in the app). Non-fatal: the NotePayload above is the
-  // durable source of truth, so a reseed failure must not fail the note write.
-  try {
-    await reseedCollaborationDocumentFromNote(prisma, contentId);
-  } catch (error) {
-    logger.error({
-      layer: "browser_ext",
-      event: "note_content_update:reseed_failed",
-      summary: "failed to reseed collaboration doc after extension note write",
-      attrs: { content_id: contentId },
-      error,
-    });
-  }
 
   return getExtensionNoteContent(userId, contentId);
 }

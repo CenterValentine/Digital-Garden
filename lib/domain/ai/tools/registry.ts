@@ -29,7 +29,6 @@ import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
 import type { JSONContent } from "@tiptap/core";
 import { listPlaybooks, isPlaybookMetadata } from "@/lib/domain/ai/playbooks/registry";
-import type { Prisma } from "@/lib/database/generated/prisma";
 import {
   generateUniqueSlug,
   extractSearchTextFromTipTap,
@@ -59,7 +58,16 @@ import {
 } from "./output-placement";
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
-import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
+import {
+  SHRINK_GUARD_MIN_CHARS,
+  SHRINK_RETAIN_FLOOR,
+} from "@/lib/domain/collaboration/note-edit-ops";
+import {
+  writeNoteContent,
+  NoteEditRefused,
+  type WriteNoteContentResult,
+} from "@/lib/domain/content/write-note-content";
+import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { logger } from "@/lib/core/logger";
 import { ensureFolderContextFresh } from "@/lib/domain/ai-context/gate";
 import { assembleFolderCapsule } from "@/lib/domain/ai-context/capsule";
@@ -1618,14 +1626,42 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "UUID of the content whose notes to update. For 'this chat's notes' this is the CHAT's contentId, not a separate note.",
           ),
+        mode: z
+          .enum(["append", "replace"])
+          .default("append")
+          .describe(
+            "append (DEFAULT, strongly preferred): `content` holds ONLY the new material, added at the end. Cheap, and it cannot destroy what is already there. " +
+              "replace: `content` must be the ENTIRE new document — anything you omit is deleted. Use it only for a genuine rewrite the user asked for.",
+          ),
         content: z
           .string()
           .min(1)
           .describe(
-            "Full new markdown content for the notes. This replaces the current notes; if the user wants to append, include the existing content in this string.",
+            "Markdown. In append mode this is JUST the new material to add at the end (do NOT repeat the existing note). In replace mode it is the complete new document.",
           ),
       }),
-      execute: async ({ contentId, content }) => {
+      // Destructive rewrites pause for the user; ordinary edits do not. Gated on
+      // SHRINK, not on mode: a replace that preserves or grows the document is
+      // normal editing, while one that drops most of it is the failure mode where a
+      // weak model resends a fragment. The in-transact guard is the hard backstop —
+      // this only decides whether a card is shown (async predicates are supported:
+      // `boolean | PromiseLike<boolean>`).
+      needsApproval: async ({ contentId, mode, content }) => {
+        if (mode !== "replace") return false;
+        try {
+          const existing = await prisma.notePayload.findUnique({
+            where: { contentId },
+            select: { searchText: true },
+          });
+          const before = existing?.searchText?.length ?? 0;
+          if (before < SHRINK_GUARD_MIN_CHARS) return false;
+          return content.length < before * SHRINK_RETAIN_FLOOR;
+        } catch {
+          // Never let the pre-check decide by accident — the backstop still holds.
+          return false;
+        }
+      },
+      execute: async ({ contentId, mode, content }) => {
         // Allow updateNote against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
         // The legacy filter of `contentType: "note"` was the cause of the
@@ -1653,66 +1689,33 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         // capsule-injecting for folders). The global markdown parser stays
         // untouched — this is an authoring-seam upgrade only.
         const tiptapJson = linkifyWikiRefsInTiptap(conversion.json);
+
+        // ONE write path for every out-of-band writer. It decides between writing
+        // NotePayload (no collaborative copy exists) and applying THROUGH the live
+        // document via Hocuspocus (one does) — the seam that made AI edits invisible
+        // in an open editor and then destroyed them. Markdown→TipTap stays here so
+        // the Hocuspocus image never needs the parser.
+        let write: WriteNoteContentResult;
+        try {
+          write = await writeNoteContent({
+            contentId,
+            ownerId: ctx.userId,
+            mode,
+            content: tiptapJson,
+            // The approval card (needsApproval above) is the user's authorization
+            // for a destructive rewrite; reaching execute means it was granted.
+            destructiveApproved: mode === "replace",
+          });
+        } catch (error) {
+          if (error instanceof NoteEditRefused) {
+            // Actionable refusal, not a crash: tell the model what to do instead.
+            return error.message;
+          }
+          throw error;
+        }
+
         const searchText = extractSearchTextFromTipTap(tiptapJson);
         const wordCount = searchText.split(/\s+/).filter(Boolean).length;
-        const degradedMeta = conversion.degraded
-          ? { markdownDegraded: true, degradedReason: conversion.reason }
-          : {};
-
-        // Upsert (not nested update) because non-note content types may
-        // not have a NotePayload row yet. Mirrors the PATCH route's
-        // unified write path.
-        await prisma.notePayload.upsert({
-          where: { contentId },
-          update: {
-            tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
-            searchText,
-            metadata: {
-              wordCount,
-              characterCount: searchText.length,
-              readingTime: Math.ceil(wordCount / 200),
-              ...degradedMeta,
-            },
-          },
-          create: {
-            contentId,
-            tiptapJson: tiptapJson as unknown as Prisma.InputJsonValue,
-            searchText,
-            metadata: {
-              wordCount,
-              characterCount: searchText.length,
-              readingTime: Math.ceil(wordCount / 200),
-              ...degradedMeta,
-            },
-          },
-        });
-
-        // Realign the collaborative Y.Doc with the payload we just wrote.
-        // updateNote writes NotePayload directly (bypassing collab), so for a
-        // collab-enabled note a stale-but-non-empty CollaborationDocument wins at
-        // bootstrap and the AI's edit stays INVISIBLE in the open editor — the
-        // NotePayload↔Y.Doc seam (DB-confirmed live). Guarded to notes that
-        // ALREADY have a collab doc: that's the only case divergence can happen
-        // (a note with no collab doc seeds fresh FROM NotePayload on first open),
-        // so we never enable collab on a note that wasn't. Non-fatal: NotePayload
-        // is the durable source of truth, so a reseed failure can't fail the write.
-        try {
-          const hasCollabDoc = await prisma.collaborationDocument.findUnique({
-            where: { contentId },
-            select: { contentId: true },
-          });
-          if (hasCollabDoc) {
-            await reseedCollaborationDocumentFromNote(prisma, contentId);
-          }
-        } catch (error) {
-          logger.error({
-            layer: "ai",
-            event: "update_note:reseed_failed",
-            summary: "failed to reseed collaboration doc after updateNote write",
-            attrs: { content_id: contentId },
-            error,
-          });
-        }
 
         return JSON.stringify({
           __notePayload: true,
@@ -1721,6 +1724,23 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           title: existing.title, // unchanged — updateNote never renames
           wordCount,
           targetKind: existing.contentType,
+          // Route + delta make the receipt self-diagnosing. The 2026-08-12 incident
+          // cost a long investigation because the receipt only said "updated".
+          editMode: mode,
+          route: write.route,
+          blocksBefore: write.blocksBefore,
+          blocksAfter: write.blocksAfter,
+          charsBefore: write.charsBefore,
+          charsAfter: write.charsAfter,
+          ...(write.mayBeMaskedInOpenEditor
+            ? { mayBeMaskedInOpenEditor: true }
+            : {}),
+          ...(conversion.degraded
+            ? { markdownDegraded: true, degradedReason: conversion.reason }
+            : {}),
+          // Pre-write document for the Undo chip. Stripped from model-visible
+          // history by compactToolOutputs — see REVERT_SNAPSHOT_KEY.
+          ...(write.snapshot ? { [REVERT_SNAPSHOT_KEY]: write.snapshot } : {}),
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
             existing.id,
