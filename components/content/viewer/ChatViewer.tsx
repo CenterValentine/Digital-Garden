@@ -220,6 +220,11 @@ function ChatViewerInner({
   // bound conversation below, forwarded to the engine per turn).
   const [activeContextId, setActiveContextId] = useState<string | null>(null);
 
+  // Hoisted above BOTH hooks: the binding (which loads history) mounts after
+  // the engine (which reattaches to in-flight streams), so readiness has to
+  // travel through the parent. The engine holds its resume until this is true.
+  const [historyReady, setHistoryReady] = useState(false);
+
   const {
     messages,
     setMessages,
@@ -267,6 +272,7 @@ function ChatViewerInner({
     conversationId: conversationId ?? undefined,
     activeContextId,
     initialMessages,
+    historyReady,
     onFinish: (event) => {
       // Forward the SDK's fresh assistant message (with metadata) so
       // persistTurns can read it directly rather than from a stale
@@ -306,6 +312,7 @@ function ChatViewerInner({
       persistRef,
       truncateRef,
       pendingUserPartsRef,
+      onHistoryReady: setHistoryReady,
     });
 
   // Seed local context selection from the bound conversation on (re)load.

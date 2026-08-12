@@ -30,6 +30,7 @@ import {
 } from "./ModelSwitchDivider";
 import { ModelPinToggle } from "./ModelPinToggle";
 import { computeModelRouteDecorations } from "@/lib/domain/ai/model-directive";
+import { REVERT_SNAPSHOT_KEY } from "@/lib/domain/ai/compact-tool-outputs";
 import { TargetFolderChip } from "./TargetFolderChip";
 import { OutputTargetChip } from "./OutputTargetChip";
 import { ChatInput } from "./ChatInput";
@@ -169,6 +170,11 @@ export function ChatPanel({
   // engine so each turn carries it to the chat route.
   const [activeContextId, setActiveContextId] = useState<string | null>(null);
 
+  // Hoisted above BOTH hooks: the binding (which loads history) mounts after
+  // the engine (which reattaches to in-flight streams), so readiness has to
+  // travel through the parent. The engine holds its resume until this is true.
+  const [historyReady, setHistoryReady] = useState(false);
+
   const {
     messages,
     status,
@@ -216,6 +222,7 @@ export function ChatPanel({
     contentId,
     conversationId,
     activeContextId,
+    historyReady,
     onFinish: conversationId
       ? (event) => {
           // Forward the SDK's fresh assistant message so persistTurns
@@ -260,6 +267,7 @@ export function ChatPanel({
     pendingUserPartsRef,
     onTitleChanged,
     skipNextLoadRef,
+    onHistoryReady: setHistoryReady,
   });
 
   // Seed the local context selection from the bound conversation whenever
@@ -645,6 +653,60 @@ export function ChatPanel({
           }
         }
       }
+    }
+  }, [messages]);
+
+  // Undo-chip parity for write tools (AI collab write path, D10).
+  //
+  // Orchestrator edits register their pre-edit snapshot via onEditResult above. A
+  // write applied server-side through the collaborative document never reaches the
+  // orchestrator, so before this it had no Undo chip — and once those writes became
+  // VISIBLE (they used to be masked by the open editor) the missing affordance
+  // became conspicuous. The snapshot rides in the tool output under
+  // REVERT_SNAPSHOT_KEY and is stripped from the wire and from persistence, so it
+  // exists only here, in memory, exactly like the orchestrator's.
+  //
+  // Functional setState + a ref-tracked seen-set keeps this effect idempotent and
+  // lets it bail out (returns prev) when there is nothing new to register.
+  const registeredSnapshotIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    let added = false;
+    for (const message of messages) {
+      if (message.role !== "assistant") continue;
+      for (const part of message.parts) {
+        if (
+          !("toolCallId" in part) ||
+          !("state" in part) ||
+          (part as { state: string }).state !== "output-available" ||
+          !("output" in part)
+        ) {
+          continue;
+        }
+        const toolPart = part as { toolCallId: string; output: unknown };
+        if (typeof toolPart.output !== "string") continue;
+        if (registeredSnapshotIdsRef.current.has(toolPart.toolCallId)) continue;
+        if (!toolPart.output.includes(REVERT_SNAPSHOT_KEY)) continue;
+
+        try {
+          const parsed = JSON.parse(toolPart.output) as Record<string, unknown>;
+          const snapshot = parsed[REVERT_SNAPSHOT_KEY];
+          if (!snapshot || typeof snapshot !== "object") continue;
+          registeredSnapshotIdsRef.current.add(toolPart.toolCallId);
+          revertSnapshotsRef.current.set(toolPart.toolCallId, {
+            snapshot: snapshot as JSONContent,
+            action:
+              typeof parsed.editMode === "string"
+                ? `${parsed.editMode} note`
+                : "update note",
+          });
+          added = true;
+        } catch {
+          /* not JSON — nothing to register */
+        }
+      }
+    }
+    if (added) {
+      setRevertableToolIds(new Set(revertSnapshotsRef.current.keys()));
     }
   }, [messages]);
 

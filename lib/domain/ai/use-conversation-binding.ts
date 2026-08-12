@@ -30,6 +30,7 @@ import { clientLogger } from "@/lib/core/logger/client";
 import { useAIChatStore } from "@/state/ai-chat-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { normalizePersistedToolParts } from "@/lib/domain/ai/tool-state-persistence";
+import { stripRevertSnapshotFromParts } from "@/lib/domain/ai/compact-tool-outputs";
 // Usage, segments AND cost all fold in one place — turn-diagnostics owns
 // the per-request accumulator (it imports the client-safe pricing module
 // by direct path, never the Prisma-bearing ai-connections barrel).
@@ -75,6 +76,32 @@ function computeTextCache(parts: unknown): string | null {
   return text || null;
 }
 
+/**
+ * Does this message carry anything worth a durable row? Any tool call, file,
+ * reasoning or data part counts; text counts only when non-blank; `step-start`
+ * is stream scaffolding and never counts on its own.
+ *
+ * Why this gate exists (2026-08-11): a stream that dies mid-apply leaves an
+ * assistant message holding nothing but scaffolding. Persisting it appends a
+ * permanently empty turn AFTER the real one — and because approval cards are
+ * position-gated (`i === messages.length - 1` in the chat surfaces), that
+ * silently expires every pending approval on the message above it. The user
+ * sees "this action never ran" for an action that ran.
+ */
+function hasPersistableContent(parts: unknown): boolean {
+  if (!Array.isArray(parts)) return false;
+  return parts.some((part) => {
+    const type = (part as { type?: unknown } | null)?.type;
+    if (typeof type !== "string") return false;
+    if (type === "step-start") return false;
+    if (type === "text") {
+      const text = (part as { text?: unknown }).text;
+      return typeof text === "string" && text.trim().length > 0;
+    }
+    return true;
+  });
+}
+
 interface MessageLike {
   id: string;
   role: string;
@@ -112,6 +139,14 @@ interface UseConversationBindingParams {
   truncateRef?: RefObject<
     (clientId: string, inclusive: boolean) => Promise<void>
   >;
+  /**
+   * Announces whether this hook's persisted transcript is in the chat yet.
+   * `false` while a load is pending, `true` once messages are seeded (or the
+   * load resolved to nothing). The engine's resumable-stream reattach waits on
+   * it — see `historyReady` in useConversationEngine. Surfaces thread it
+   * through a state hoisted ABOVE both hooks, since this one mounts second.
+   */
+  onHistoryReady?: (ready: boolean) => void;
   /**
    * Exact parts of the just-sent user turn (set by the engine). Used to
    * persist attachment file parts reliably, since AI SDK may drop them
@@ -170,6 +205,7 @@ export function useConversationBinding({
   pendingUserPartsRef,
   onTitleChanged,
   skipNextLoadRef,
+  onHistoryReady,
 }: UseConversationBindingParams): UseConversationBindingResult {
   // Ids already persisted to the DB — populated on load + each append.
   const savedIdsRef = useRef<Set<string>>(new Set());
@@ -222,6 +258,8 @@ export function useConversationBinding({
       setInitialTargetFolder(null);
       setInitialTargetInherited(false);
       setInitialTargetLocation(null);
+      // Nothing to load ⇒ nothing to wait for.
+      onHistoryReady?.(true);
       return;
     }
     // Stage 2 — transient promote: when the caller just created this
@@ -237,6 +275,8 @@ export function useConversationBinding({
       savedPartsSigRef.current = new Map();
       usageAccumRef.current = new Map();
       setLoadingInitial(false);
+      // The in-memory chat IS the history on this path.
+      onHistoryReady?.(true);
       return;
     }
     savedIdsRef.current = new Set();
@@ -244,6 +284,9 @@ export function useConversationBinding({
     savedPartsSigRef.current = new Map();
     usageAccumRef.current = new Map();
     setLoadingInitial(true);
+    // A pending load means the chat's transcript is not yet authoritative;
+    // anything gated on it (stream resume) must hold until the finally below.
+    onHistoryReady?.(false);
     let cancelled = false;
     (async () => {
       try {
@@ -424,7 +467,14 @@ export function useConversationBinding({
           }));
         setMessages(ui);
       } finally {
-        if (!cancelled) setLoadingInitial(false);
+        if (!cancelled) {
+          setLoadingInitial(false);
+          // Single choke point for every outcome — seeded, empty, or failed.
+          // A failed load still releases the gate: the resume then applies to
+          // whatever the chat holds, which is the same risk as before this
+          // hook existed, and never a permanent stall.
+          onHistoryReady?.(true);
+        }
       }
     })();
     return () => {
@@ -436,6 +486,7 @@ export function useConversationBinding({
     setActiveModelSelection,
     seedMessageStamps,
     skipNextLoadRef,
+    onHistoryReady,
   ]);
 
   // ─── Persist-on-finish ───
@@ -447,9 +498,19 @@ export function useConversationBinding({
         m.role === "assistant" &&
         payload?.freshAssistant?.id === m.id &&
         Array.isArray(payload.freshAssistant.parts);
-      const effectiveParts = freshAssistantMatches
-        ? payload.freshAssistant!.parts!
-        : m.parts;
+      const effectiveParts = stripRevertSnapshotFromParts(
+        freshAssistantMatches ? payload.freshAssistant!.parts! : m.parts,
+      ) as typeof m.parts;
+      // Revert snapshots are client-only: a whole pre-write document per write tool
+      // call would bloat every conversation row, and the Undo chip is session-scoped
+      // by design (same as the orchestrator's). Stripped here as well as on the wire.
+      // Never create OR overwrite an assistant row with an empty turn — see
+      // hasPersistableContent. Guards both branches below: the create path
+      // (no stray trailing turn) and the continuation PATCH (a good row is
+      // never blanked by a stream that died before producing anything).
+      if (m.role === "assistant" && !hasPersistableContent(effectiveParts)) {
+        continue;
+      }
       // Metadata read order (see the read-order comment below): prefer the
       // SDK's fresh onFinish copy, fall back to the closure message. Fold
       // assistant metadata through the per-turn accumulator so multi-request
