@@ -234,18 +234,30 @@ interface InternalApplyBody {
   expectedOwnerId?: string;
 }
 
+/**
+ * A malformed request, not a server failure.
+ *
+ * The distinction is load-bearing rather than cosmetic: the caller falls back to
+ * writing NotePayload when this endpoint 5xxs, so reporting a bad request as 500
+ * would let a bug in our own request construction silently degrade every write to
+ * the masked-by-an-open-editor path instead of showing up as a 4xx in logs.
+ */
+class BadApplyRequest extends Error {}
+
 function parseInternalApplyBody(raw: unknown): InternalApplyBody {
-  if (!raw || typeof raw !== "object") throw new Error("Body must be an object");
+  if (!raw || typeof raw !== "object") {
+    throw new BadApplyRequest("Body must be an object");
+  }
   const body = raw as Record<string, unknown>;
   const { contentId, mode, content } = body;
   if (typeof contentId !== "string" || contentId.length === 0) {
-    throw new Error("contentId is required");
+    throw new BadApplyRequest("contentId is required");
   }
   if (mode !== "append" && mode !== "replace") {
-    throw new Error('mode must be "append" or "replace"');
+    throw new BadApplyRequest('mode must be "append" or "replace"');
   }
   if (!content || typeof content !== "object") {
-    throw new Error("content must be a TipTap document object");
+    throw new BadApplyRequest("content must be a TipTap document object");
   }
   return {
     contentId,
@@ -342,6 +354,9 @@ async function handleInternalApplyRequest(data: onRequestPayload) {
     if (error instanceof NoteEditRefused) {
       status = 409;
       payload = { ok: false, refused: error.reason, error: error.message };
+    } else if (error instanceof BadApplyRequest) {
+      status = 400;
+      payload = { ok: false, error: error.message };
     } else {
       status = 500;
       payload = { ok: false, error: getErrorMessage(error) };
