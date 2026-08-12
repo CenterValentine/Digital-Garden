@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-09
+last_updated: 2026-08-12
 ---
 
 # Sprint Backlog
@@ -9,6 +9,13 @@ last_updated: 2026-08-09
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Collab write path — Slices 2–4 + the server-side edit executor (2026-08-12, after `feat/collab-write-path`; plan: AI-COLLAB-WRITE-PATH-PLAN.md)
+
+- **Slice 2 — `firstOpenedInEditorAt`** (migration + backfill). Slice 1 uses the `CollaborationDocument` row as the "does another copy exist" discriminator. It is a leaky proxy: the client creates an IndexedDB cache unconditionally on open, so a note first opened while Hocuspocus was unreachable has a cache but no row, and an AI write to it takes the payload path and can still be masked. The stamp is set inside the existing `POST /api/collaboration/state` (no new request), backfilled from notes that already have a row.
+- **Slice 3 — advisory lock** closing the check-then-write race. The AI reads the discriminator, then a user opens the note before the write lands, and the fresh bootstrap masks it. A Postgres advisory lock keyed on contentId, taken by both the bootstrap fetch hook and `writeNoteContent`, makes the two orderings the only outcomes. Must be `try`-flavoured with fall-through, DB-scoped, and **never held across the Hocuspocus HTTP call** — this is the only change in the plan that could stop a document from opening.
+- **Slice 4 — `readNote` → `tiptapToMarkdown`.** The AI read path returns flattened plain text (no headings, no structure) while `replace` mode asks the model for a faithful full document. Measure the context-cost delta against the diet budget before shipping.
+- **A server-side executor for the existing edit ops (the "(ii)" decision).** Targeted editing already exists client-side — `apply_diff`, `update_block`, `insert_block`, `list_document_blocks`, chunked reads — but is gated to the chat's rooted document (`editableContentId = contentId && !isChatContent && !openWorkflowTitle`, chat route ~line 991). So a sidebar chat on a note gets precise edits while a **full-page chat, i.e. the playbook flow, gets only `updateNote`**. Giving those ops a server-side executor is what makes modification (not just addition) affordable on any document: `replace` costs O(document) tokens per edit in both directions. Two real design questions first: what an AI edit should look like when it arrives as a *remote* Y update rather than a local one (the orchestrator's animation and editor lock assume it causes the change), and how the orchestrator's application semantics separate from its UI entanglement. Slice 1's `append` overlaps a future server-executed `insert_block` — absorb or deprecate it, never a third path.
 
 ## Context diet — follow-ups (2026-08-09, after PR #156 Sprints 7–8; measurements in the `ai-reliability-fix-plan` memo)
 
