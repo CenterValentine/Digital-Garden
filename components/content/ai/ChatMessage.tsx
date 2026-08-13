@@ -147,6 +147,11 @@ interface NotePayload {
   title: string;
   parentId?: string | null;
   wordCount?: number;
+  /**
+   * How the write reached the document (AI collab write path). Absent on payloads
+   * from tools that don't route through `writeNoteContent`.
+   */
+  route?: "collaboration" | "payload" | "payload-fallback";
 }
 
 /** Shape of the image payload returned by generate_image tool */
@@ -3174,9 +3179,21 @@ function NotePayloadCard({
   const subline = isSelfEdit
     ? `${verb} this chat's notes${wordCount} · click to view`
     : `${verb} ${noun}${wordCount} · click to ${midRunPaneOpen ? "open in split pane" : "open"}`;
+  // Which path the write took, in plain words. Without this the only symptom of a
+  // write that landed in NotePayload but not the live document is "the editor looks
+  // unchanged", which is indistinguishable from the tool not having run — the exact
+  // ambiguity that made the 2026-08-12 seam expensive to diagnose.
+  const routeNote =
+    payload.route === "collaboration"
+      ? "\nApplied through the live document."
+      : payload.route === "payload-fallback"
+        ? "\n⚠ Written to storage only (collaboration server unreachable) — an open editor may still show the old text until reloaded."
+        : payload.route === "payload"
+          ? "\nWritten to storage (this document has no collaborative copy)."
+          : "";
   const tooltipText = isSelfEdit
-    ? "View the updated notes for this chat"
-    : `Open "${payload.title}"${midRunPaneOpen ? " in a split pane" : ""} — right-click for options`;
+    ? `View the updated notes for this chat${routeNote}`
+    : `Open "${payload.title}"${midRunPaneOpen ? " in a split pane" : ""} — right-click for options${routeNote}`;
 
   return (
     <>

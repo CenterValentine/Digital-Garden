@@ -1634,7 +1634,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .string()
           .min(1)
           .describe(
-            "Markdown. In append mode this is JUST the new material to add at the end (do NOT repeat the existing note). In replace mode it is the complete new document.",
+            "Markdown. In append mode this is JUST the new material to add at the end (do NOT repeat the existing note). In replace mode it is the complete new document. " +
+              "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is a soft line break and will render as one continuous paragraph — asking for 'two lines' and sending 'one\\ntwo' produces 'one two'.",
           ),
       }),
       // Destructive rewrites pause for the user; ordinary edits do not. Gated on

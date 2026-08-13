@@ -439,7 +439,10 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           .describe("The exact text to find in the document. Must match exactly (case-sensitive). Include enough context for a unique match."),
         after: z
           .string()
-          .describe("The replacement text. Can be empty to delete the matched text."),
+          .describe(
+            "The replacement text. Can be empty to delete the matched text. " +
+              "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is inserted as plain text and will NOT start a new paragraph — 'one\\ntwo' becomes 'one two' on one line."
+          ),
       }),
     }),
 
