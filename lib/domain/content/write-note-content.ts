@@ -203,16 +203,38 @@ export async function writeNoteContent(
         // A refusal is a decision, not a transport failure — do not fall back and
         // silently perform the destructive write the guard just blocked.
         if (error instanceof NoteEditRefused) throw error;
+
+        // REFUSE rather than fall back (owner decision, 2026-08-13, after watching
+        // it happen). Falling back to NotePayload here looks like a save and is not
+        // one: bootstrap trusts a meaningful stored Y state OVER the payload, so the
+        // change is invisible — and the moment that editor reconnects, its snapshot
+        // is written back over the payload and the change is GONE. Reporting success
+        // for a write scheduled to be destroyed is the same dishonesty this branch
+        // exists to remove, just with a longer fuse.
+        //
+        // The payload IS durable when no collaborative copy exists; that path is
+        // untouched below. This refusal is only for "a copy exists and we could not
+        // reach it".
         logger.warn({
           layer: "ai",
-          event: "collab_write:fallback",
+          event: "collab_write:refused_unavailable",
           summary:
-            "collaborative apply failed — falling back to a payload write (may be masked in an open editor)",
+            "collaborative apply failed and a collaborative copy exists — refusing rather than writing a payload that would be overwritten",
           attrs: { content_id: contentId },
           error,
         });
+        throw new NoteEditRefused(
+          "collaboration-unavailable",
+          "Not saved: the collaboration server could not be reached, and this document has a live collaborative copy. " +
+            "Writing to storage instead would be overwritten as soon as the document reconnects, so nothing was changed. Try again in a moment.",
+        );
       }
     }
+    // No `url` means the write-through path is not configured in this environment
+    // (COLLABORATION_WRITE_SECRET unset). That is the feature being OFF, not an
+    // outage, so behavior stays exactly as it was before this branch: write the
+    // payload and flag that it may be masked. Refusing here would break every AI
+    // write to a previously-opened note in an unconfigured deployment.
   }
 
   // Payload path. S2 (no collaborative copy) reaches here by design; S3 only

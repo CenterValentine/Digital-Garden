@@ -3187,7 +3187,7 @@ function NotePayloadCard({
     payload.route === "collaboration"
       ? "\nApplied through the live document."
       : payload.route === "payload-fallback"
-        ? "\n⚠ Written to storage only (collaboration server unreachable) — an open editor may still show the old text until reloaded."
+        ? "\n⚠ Written to storage only (live collaboration is not configured here) — an open editor may still show the old text until reloaded."
         : payload.route === "payload"
           ? "\nWritten to storage (this document has no collaborative copy)."
           : "";

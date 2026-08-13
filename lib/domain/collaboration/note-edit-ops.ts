@@ -100,7 +100,12 @@ export interface NoteEditOutcome {
 
 export class NoteEditRefused extends Error {
   constructor(
-    readonly reason: "shrink",
+    /**
+     * `shrink` — would destroy most of the document without approval.
+     * `collaboration-unavailable` — a collaborative copy exists but could not be
+     * reached, so the change cannot be applied where it would survive.
+     */
+    readonly reason: "shrink" | "collaboration-unavailable",
     message: string,
   ) {
     super(message);
