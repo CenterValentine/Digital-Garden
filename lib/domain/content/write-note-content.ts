@@ -172,6 +172,24 @@ export async function writeNoteContent(
     if (url) {
       try {
         const applied = await applyThroughCollaboration(url, request);
+        // Log SUCCESS, not just failure. Only failures logged before, so a write
+        // that behaved unexpectedly left no trace at all and every diagnosis had to
+        // be inferred from the document's final state — which cost several rounds
+        // of guessing during the first smoke. mode + sizes make "it appended when I
+        // asked it to shorten" readable at a glance.
+        logger.info({
+          layer: "ai",
+          event: "collab_write:applied",
+          summary: `${request.mode} applied through the live document`,
+          attrs: {
+            content_id: contentId,
+            mode: request.mode,
+            chars_before: applied.charsBefore,
+            chars_after: applied.charsAfter,
+            blocks_before: applied.blocksBefore,
+            blocks_after: applied.blocksAfter,
+          },
+        });
         return {
           route: "collaboration",
           charsBefore: applied.charsBefore ?? 0,
@@ -206,6 +224,21 @@ export async function writeNoteContent(
     content,
     destructiveApproved,
   });
+  logger.info({
+    layer: "ai",
+    event: "collab_write:applied",
+    summary: `${mode} written to the payload`,
+    attrs: {
+      content_id: contentId,
+      mode,
+      route: collabDoc ? "payload-fallback" : "payload",
+      chars_before: result.charsBefore,
+      chars_after: result.charsAfter,
+      blocks_before: result.blocksBefore,
+      blocks_after: result.blocksAfter,
+    },
+  });
+
   return {
     ...result,
     route: collabDoc ? "payload-fallback" : "payload",

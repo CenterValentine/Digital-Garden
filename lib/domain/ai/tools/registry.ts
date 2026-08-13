@@ -1627,8 +1627,10 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .enum(["append", "replace"])
           .default("append")
           .describe(
-            "append (DEFAULT, strongly preferred): `content` holds ONLY the new material, added at the end. Cheap, and it cannot destroy what is already there. " +
-              "replace: `content` must be the ENTIRE new document — anything you omit is deleted. Use it only for a genuine rewrite the user asked for.",
+            "append: `content` holds ONLY the new material, added at the end. It can ONLY ADD — it cannot shorten, reword, delete, reorder, or change anything already in the document. Prefer it whenever the user is purely adding. " +
+              "replace: `content` must be the ENTIRE new document, including every part you are keeping — anything you omit is deleted. " +
+              "REQUIRED for any change to existing text: shortening, trimming, rewriting, summarizing, fixing, removing, or reordering. " +
+              "Choosing append for one of those silently leaves the original text in place and adds a second copy of your version — the user sees a document that grew when they asked for it to shrink.",
           ),
         content: z
           .string()
