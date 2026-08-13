@@ -20,10 +20,14 @@ import "server-only";
  * Confirmed in production 2026-08-12: an AI append reached NotePayload (visible in
  * export) but never the editor, because the open session's snapshot won.
  *
- * Slice 1 uses the CollaborationDocument row as the S2/S3 discriminator. It is a
- * LEAKY proxy — a browser creates an IndexedDB cache unconditionally on open, so a
- * note first opened while Hocuspocus was unreachable has a cache but no row. Slice 2
- * replaces it with a `firstOpenedInEditorAt` stamp. See
+ * The CollaborationDocument row is the S2/S3 discriminator, and it is a better proxy
+ * than first assumed: `POST /api/collaboration/state` upserts the row when it
+ * bootstraps from the payload, in Next.js and independent of Hocuspocus — so a note
+ * opened while the collab server was down still has one. The residual gap is only a
+ * canonical-state fetch that fails outright.
+ *
+ * NOTE: this path never reseeds the collaborative snapshot. See the comment at the
+ * end of `writeNotePayload` for why that operation corrupts documents here. See
  * docs/notes-feature/work-tracking/AI-COLLAB-WRITE-PATH-PLAN.md.
  */
 
@@ -33,7 +37,6 @@ import { prisma } from "@/lib/database/client";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { logger } from "@/lib/core/logger";
 import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
-import { reseedCollaborationDocumentFromNote } from "@/lib/domain/collaboration/documents";
 import {
   buildNoteEditTarget,
   NoteEditRefused,
@@ -280,26 +283,23 @@ async function writeNotePayload({
     },
   });
 
-  // Race closer, not the mechanism (D9): if a collaborative copy appeared between
-  // the discriminator read and this write, realign the stored snapshot. It cannot
-  // reach a live in-memory session — that is what the collaborative route is for.
-  try {
-    const appeared = await prisma.collaborationDocument.findUnique({
-      where: { contentId },
-      select: { contentId: true },
-    });
-    if (appeared) {
-      await reseedCollaborationDocumentFromNote(prisma, contentId);
-    }
-  } catch (error) {
-    logger.error({
-      layer: "ai",
-      event: "collab_write:reseed_failed",
-      summary: "post-write reseed failed — payload remains authoritative",
-      attrs: { content_id: contentId, owner_id: ownerId },
-      error,
-    });
-  }
+  // NO RESEED HERE — removed 2026-08-13 after it corrupted a document in testing.
+  //
+  // Reseeding was the old "race closer": if a collaborative copy appeared, realign
+  // the stored snapshot from the payload. But `reseedCollaborationDocumentFromNote`
+  // builds a BRAND-NEW Y.Doc (fresh client/item ids), so it is a rival document
+  // rather than a newer version. Y.js merge is additive, so when any surviving copy
+  // — a live session, or a browser's IndexedDB cache — later syncs, the two bodies
+  // COMBINE. Observed: a note's original content appended to itself after a
+  // disconnected editor reconnected, then written back to the payload by the store
+  // hook.
+  //
+  // The condition under which we would reseed (a CollaborationDocument row exists)
+  // is precisely the condition under which another copy exists, so the operation is
+  // never safe here. Being masked in an open editor is recoverable — the reader can
+  // reload; duplicating a document is not. We flag `mayBeMaskedInOpenEditor` on the
+  // receipt instead and let the collaborative route own that note from now on.
+  void ownerId;
 
   return {
     charsBefore,
