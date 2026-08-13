@@ -46,15 +46,30 @@ export const AI_WRITE_ORIGIN = "ai-collab-write";
 export type NoteEditMode = "append" | "replace";
 
 /**
- * A replace whose result retains less than this fraction of the original text is
- * treated as destructive. Chosen (not tuned) as "obviously losing most of the
- * document" — the guard exists to catch a model that resends a fragment while in
- * replace mode, not to police ordinary trimming.
+ * A replace retaining less than this fraction of the original text is destructive
+ * enough to confirm with the user. The guard exists to catch a model that resends a
+ * fragment while in replace mode, not to police ordinary trimming.
  */
 export const SHRINK_RETAIN_FLOOR = 0.5;
 
-/** Minimum character count before the shrink guard applies at all. */
-export const SHRINK_GUARD_MIN_CHARS = 400;
+/**
+ * Minimum character count before the shrink guard applies at all. Losing 100
+ * characters is an undo; losing 4,000 is a disaster, and the floor is where that
+ * stops being true. Lowered from 400 on 2026-08-13 — a one-sentence rewrite of a
+ * 250-character note is still a destructive act the user should see.
+ */
+export const SHRINK_GUARD_MIN_CHARS = 200;
+
+/**
+ * The HARD refusal threshold, deliberately LOWER than SHRINK_RETAIN_FLOOR.
+ *
+ * The approval card and this backstop must not compete: the card is driven by a
+ * cheap pre-check against the stored payload, while this compares extracted text
+ * inside the transaction, so the two can disagree at the margin. Keeping the
+ * refusal threshold well below the card threshold means anything reaching it is
+ * unambiguously catastrophic — and an approved rewrite skips this path entirely.
+ */
+export const SHRINK_HARD_REFUSE_FLOOR = 0.25;
 
 export interface NoteEditRequest {
   mode: NoteEditMode;
@@ -164,7 +179,7 @@ export function applyNoteEdit(
   if (
     !request.destructiveApproved &&
     charsBefore >= SHRINK_GUARD_MIN_CHARS &&
-    charsAfter < charsBefore * SHRINK_RETAIN_FLOOR
+    charsAfter < charsBefore * SHRINK_HARD_REFUSE_FLOOR
   ) {
     throw new NoteEditRefused(
       "shrink",

@@ -59,11 +59,8 @@ import {
 import { resolvePlaybookOutputLocation } from "../playbooks/output-directives";
 import { getPhaseCheckpointGateStatus } from "../playbooks/checkpoint-gate";
 import {
-  SHRINK_GUARD_MIN_CHARS,
-  SHRINK_RETAIN_FLOOR,
-} from "@/lib/domain/collaboration/note-edit-ops";
-import {
   writeNoteContent,
+  isDestructiveRewrite,
   NoteEditRefused,
   type WriteNoteContentResult,
 } from "@/lib/domain/content/write-note-content";
@@ -1646,21 +1643,8 @@ export function createBaseTools(ctx: ToolExecuteContext) {
       // weak model resends a fragment. The in-transact guard is the hard backstop —
       // this only decides whether a card is shown (async predicates are supported:
       // `boolean | PromiseLike<boolean>`).
-      needsApproval: async ({ contentId, mode, content }) => {
-        if (mode !== "replace") return false;
-        try {
-          const existing = await prisma.notePayload.findUnique({
-            where: { contentId },
-            select: { searchText: true },
-          });
-          const before = existing?.searchText?.length ?? 0;
-          if (before < SHRINK_GUARD_MIN_CHARS) return false;
-          return content.length < before * SHRINK_RETAIN_FLOOR;
-        } catch {
-          // Never let the pre-check decide by accident — the backstop still holds.
-          return false;
-        }
-      },
+      needsApproval: async ({ contentId, mode, content }) =>
+        isDestructiveRewrite({ contentId, mode, contentLength: content.length }),
       execute: async ({ contentId, mode, content }) => {
         // Allow updateNote against ANY content type the user owns —
         // notes, chats (their 'Add notes' sidecar), folders, files, etc.
@@ -1702,9 +1686,16 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ownerId: ctx.userId,
             mode,
             content: tiptapJson,
-            // The approval card (needsApproval above) is the user's authorization
-            // for a destructive rewrite; reaching execute means it was granted.
-            destructiveApproved: mode === "replace",
+            // Re-ask the SAME question needsApproval asked. True here means a card
+            // was raised, and the SDK only runs execute once it was answered — so
+            // this is genuine authorization. `mode === "replace"` was WRONG: it
+            // asserted approval for every replace, including ones that never
+            // showed a card, which also disabled the in-transaction backstop.
+            destructiveApproved: await isDestructiveRewrite({
+              contentId,
+              mode,
+              contentLength: content.length,
+            }),
           });
         } catch (error) {
           if (error instanceof NoteEditRefused) {

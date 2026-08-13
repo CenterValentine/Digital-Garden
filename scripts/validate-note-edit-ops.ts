@@ -25,6 +25,8 @@ import {
   COLLAB_FRAGMENT_FIELD,
   NoteEditRefused,
   SHRINK_GUARD_MIN_CHARS,
+  SHRINK_HARD_REFUSE_FLOOR,
+  SHRINK_RETAIN_FLOOR,
 } from "../lib/domain/collaboration/note-edit-ops";
 import { getCollaborationServerExtensions } from "../lib/domain/collaboration/extensions";
 
@@ -162,6 +164,19 @@ function textsOf(doc: JSONContent): string[] {
   });
   assert.equal(nonEmpty.appendedIntoEmptyDocument, false);
   assert.deepEqual(textsOf(nonEmpty.target), ["has content", "more"]);
+}
+
+// ── 5b. The refusal threshold must stay BELOW the approval-card threshold ────
+// If they crossed, a rewrite could be hard-refused without the user ever being
+// offered the card — an unresolvable dead end, since the model has no way to
+// escalate. Asserted rather than commented because the two live in different
+// decisions (a Prisma pre-check vs an in-transaction compare) and will drift.
+
+{
+  assert.ok(
+    SHRINK_HARD_REFUSE_FLOOR < SHRINK_RETAIN_FLOOR,
+    "the hard-refuse floor must be strictly below the approval floor, or a write can be refused with no way to approve it",
+  );
 }
 
 // ── 6. Shrink guard refuses unapproved destruction, allows approved ──────────

@@ -77,6 +77,44 @@ export interface WriteNoteContentResult {
 export { NoteEditRefused };
 
 /**
+ * Would this write destroy enough of the document to need the user's say-so?
+ *
+ * ONE function drives two decisions that must never disagree: whether the tool
+ * raises an approval card (`needsApproval`), and whether execute may declare the
+ * destruction approved. Splitting them is what broke this on 2026-08-13 — execute
+ * asserted `destructiveApproved: mode === "replace"`, which is true even when no
+ * card was ever shown, so a replace that slipped past the pre-check also disabled
+ * the hard backstop. Reaching execute with this returning true means the card was
+ * shown AND answered, because the SDK does not run execute otherwise.
+ *
+ * Deliberately cheap (one indexed read, no markdown parsing) because it runs on the
+ * approval path of every replace. It compares the incoming markdown's length against
+ * the stored plaintext, which slightly UNDERSTATES the shrink — markdown carries
+ * syntax the text does not. That bias is why the in-transaction backstop uses a
+ * lower, text-vs-text threshold rather than trusting this number.
+ */
+export async function isDestructiveRewrite(opts: {
+  contentId: string;
+  mode: NoteEditMode;
+  contentLength: number;
+}): Promise<boolean> {
+  if (opts.mode !== "replace") return false;
+  try {
+    const existing = await prisma.notePayload.findUnique({
+      where: { contentId: opts.contentId },
+      select: { searchText: true },
+    });
+    const before = existing?.searchText?.length ?? 0;
+    if (before < SHRINK_GUARD_MIN_CHARS) return false;
+    return opts.contentLength < before * SHRINK_RETAIN_FLOOR;
+  } catch {
+    // Never let a read failure silently authorize destruction: no card, and
+    // execute will pass destructiveApproved=false so the backstop still applies.
+    return false;
+  }
+}
+
+/**
  * Budget for the collaborative apply before falling back to a payload write.
  *
  * A constant, not an env knob: Cloud Run runs at `min-instances=0`, so the only
