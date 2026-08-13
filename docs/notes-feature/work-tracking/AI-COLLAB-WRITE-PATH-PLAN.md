@@ -212,8 +212,32 @@ So the real architecture is:
 
 | Target | Path today | Correct? |
 |---|---|---|
-| The chat's **rooted** document | editor-tools → orchestrator → live editor → Y.js | ✅ front door, targeted, revertable |
+| The chat's **rooted** document | editor-tools → orchestrator → live editor → Y.js | ⚠️ front door and targeted, but see the smoke findings below |
 | **Any other** document | `updateNote` → `NotePayload` + reseed | ❌ the seam; this incident |
+
+### Smoke findings, 2026-08-12 — the rooted path was NOT sound
+
+The first owner smoke ran against a docked chat, so it exercised editor-tools rather
+than Slice 1, and found two defects there. Recorded because the original version of
+this section called that path "✅ correct", which was wrong and would have mis-scoped (ii).
+
+1. **The edit tools announced success before attempting anything.** `apply_diff`'s
+   server `execute` returned an edit payload *plus* a `getContentWriteReceiptEnvelope`
+   receipt. The model read it as done and the receipt chip rendered "Updated note X",
+   while the client had failed and written nothing. Only a toast told the truth, and a
+   toast leaves no trace in the transcript. **Fixed** by converting `apply_diff` to
+   client execution: no server `execute`, the engine runs it against the live document
+   via an `editExecutorRef` the surface populates, and the tool result is the real
+   outcome. A receipt is emitted only after the edit lands.
+2. **Validation and application read different representations.** The server counted
+   matches in `tiptapToMarkdown` output; the client searched rendered text runs. A
+   block falling back to verbatim HTML (`<p xmlns="http://www.w3.org/1999/xhtml">`)
+   exists in the former and never the latter, so the server approved matches the
+   client could not find — and the model had been *shown* that markup to quote back.
+   **Fixed by the same change**, which removes the split rather than patching it.
+
+**Still outstanding:** `replace_document`, `insert_block`, `update_block` and
+`insert_image` pre-announce success the same way. They want the same conversion.
 
 The shortlist was not the rooted document of that chat, so the model reached for the blunt path.
 
