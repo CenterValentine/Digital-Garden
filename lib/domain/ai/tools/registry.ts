@@ -1635,7 +1635,9 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .min(1)
           .describe(
             "Markdown. In append mode this is JUST the new material to add at the end (do NOT repeat the existing note). In replace mode it is the complete new document. " +
-              "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is a soft line break and will render as one continuous paragraph — asking for 'two lines' and sending 'one\\ntwo' produces 'one two'.",
+              "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is a soft line break and will render as one continuous paragraph — asking for 'two lines' and sending 'one\\ntwo' produces 'one two'. " +
+              "You CANNOT create an empty line: markdown treats any run of blank lines as one separator, so extra newlines are discarded. If the user asks for a blank line or vertical spacing, tell them it isn't expressible here rather than reporting that you added one. " +
+              "The result reports how many blocks the document ended with — describe what you actually wrote, not what was requested.",
           ),
       }),
       // Destructive rewrites pause for the user; ordinary edits do not. Gated on
