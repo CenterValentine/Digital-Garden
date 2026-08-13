@@ -384,7 +384,7 @@ const GROQ = deriveMinimalTheme("groq", "Groq", "#F55036", "#BC3A20");
 const DEEPSEEK = deriveMinimalTheme(
   "deepseek",
   "DeepSeek",
-  "#4D6BFE",
+  "#9DB2FF", // periwinkle: brand #4D6BFE reads 1.6:1 on the dark slate — unreadable
   "#3346BE",
 );
 

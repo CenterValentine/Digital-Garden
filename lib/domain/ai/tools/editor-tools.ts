@@ -8,8 +8,13 @@
  *   2. read_next_chunk   — Paginate forward
  *   3. read_previous_chunk — Navigate backward
  *
- * Editing (return payloads — client applies to live TipTap editor):
- *   4. apply_diff         — Targeted before/after text replacement
+ * Editing:
+ *   4. apply_diff         — Targeted before/after text replacement.
+ *                           CLIENT-EXECUTED (no server `execute`): it runs in the
+ *                           browser against the live document, so it validates in
+ *                           the same representation it applies to and its tool
+ *                           result is the edit's real outcome. See the comment on
+ *                           the tool itself for the two bugs that motivated it.
  *   5. replace_document   — Replace entire document content
  *   6. insert_image       — Insert image from URL (source: ai-generated)
  *
@@ -18,16 +23,18 @@
  *   8. ask_user           — Prompt user for clarification
  *   9. finish_with_summary — Signal completion with change summary
  *
- * Edit tools return structured payloads instead of writing to DB.
- * The chat panel intercepts these payloads and applies edits to the
- * live TipTap editor instance with animation. Auto-save handles persistence.
+ * The remaining edit tools return structured payloads instead of writing to the DB;
+ * the chat panel intercepts them and applies them to the live TipTap editor with
+ * animation, and auto-save handles persistence. NOTE that a returned payload is NOT
+ * evidence the edit applied — the model receives it as the tool result either way.
+ * `apply_diff` was converted to client execution for exactly that reason; the other
+ * four still pre-announce success and should follow.
  */
 
 import "server-only";
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
-import { tiptapToMarkdown } from "@/lib/domain/content/markdown";
 import { chunkDocument, getChunk, formatChunkOutput } from "./chunking";
 import type { JSONContent } from "@tiptap/core";
 import { getContentWriteReceiptEnvelope } from "@/lib/domain/ai/content-write-receipts.server";
@@ -401,9 +408,30 @@ export function createEditorTools(ctx: ToolExecuteContext) {
     // Returns a structured edit payload. The client finds the `before`
     // text in the live ProseMirror document and replaces it with animation.
     // Server validates the text exists in the markdown representation.
+    // CLIENT-EXECUTED — deliberately no `execute` (2026-08-12).
+    //
+    // It used to run server-side: it validated `before` against
+    // `tiptapToMarkdown(payload.tiptapJson)`, then returned an `__editPayload`
+    // *plus a write receipt* for the client to apply. Two defects followed from
+    // that shape, both confirmed in a live run:
+    //
+    //   1. The receipt and the payload told the model (and the receipt chip) that
+    //      the note was "updated" BEFORE the client had attempted anything, and the
+    //      client's real outcome never travelled back. A failed edit produced
+    //      "Done — appended…" in the transcript and an "Updated note" chip while
+    //      the document was untouched. Only a toast told the truth.
+    //   2. Validation read the MARKDOWN serialization while application searched
+    //      the RENDERED text. Any block that falls back to verbatim HTML (the
+    //      lossless serializer emits `<p xmlns="http://www.w3.org/1999/xhtml">`)
+    //      matches server-side and can never match client-side.
+    //
+    // Without `execute`, the SDK streams the call to the browser, where the engine
+    // runs it against the LIVE ProseMirror document — one representation, one place,
+    // and the tool's return value is the edit's actual outcome. See
+    // `resolveEditToolCall` in use-conversation-engine.ts.
     apply_diff: tool({
       description:
-        "Apply a targeted text replacement to the document. Specify the exact text to find and what to replace it with. The match must be unique in the document. Read the document first to see the exact text.",
+        "Apply a targeted text replacement to the open document. Specify the exact text to find and what to replace it with. The match must be unique. Read the document first with read_first_chunk and quote the text EXACTLY as that result shows it — the match is made against the document's rendered text, so markdown syntax and HTML markup are not part of it. The result reports whether the edit actually applied; if it says the text was not found, re-read and try again rather than assuming success.",
       inputSchema: z.object({
         before: z
           .string()
@@ -411,46 +439,11 @@ export function createEditorTools(ctx: ToolExecuteContext) {
           .describe("The exact text to find in the document. Must match exactly (case-sensitive). Include enough context for a unique match."),
         after: z
           .string()
-          .describe("The replacement text. Can be empty to delete the matched text."),
+          .describe(
+            "The replacement text. Can be empty to delete the matched text. " +
+              "PARAGRAPHS: separate them with a BLANK LINE (\\n\\n). A single newline is inserted as plain text and will NOT start a new paragraph — 'one\\ntwo' becomes 'one two' on one line."
+          ),
       }),
-      execute: async ({ before, after }) => {
-        const result = await loadNote();
-        if ("error" in result) return result.error;
-
-        const { node, payload } = result;
-        const tiptapJson = payload.tiptapJson as unknown as JSONContent;
-
-        // Convert to markdown to validate the match exists
-        const markdown = tiptapToMarkdown(tiptapJson);
-
-        const matchCount = markdown.split(before).length - 1;
-        if (matchCount === 0) {
-          return `Text not found in document. Make sure you're using the exact text from a read_first_chunk or read_next_chunk result. The text to find was:\n\n"${before.slice(0, 200)}"`;
-        }
-        if (matchCount > 1) {
-          return `Found ${matchCount} occurrences of the text. Please provide more surrounding context to make the match unique.`;
-        }
-
-        // Return structured payload for client-side application
-        const action = after === ""
-          ? `Deleted "${before.slice(0, 50)}${before.length > 50 ? "..." : ""}"`
-          : `Replaced "${before.slice(0, 50)}${before.length > 50 ? "..." : ""}" → "${after.slice(0, 50)}${after.length > 50 ? "..." : ""}"`;
-
-        return JSON.stringify({
-          __editPayload: true,
-          type: "apply_diff",
-          before,
-          after,
-          documentTitle: node.title,
-          action,
-          ...(await getContentWriteReceiptEnvelope(
-            ctx.userId,
-            node.id,
-            "updated",
-            "note",
-          )),
-        });
-      },
     }),
 
     // ─── Gate 5: Replace Document (Client-Side) ──────────────

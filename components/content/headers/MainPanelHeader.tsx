@@ -717,6 +717,13 @@ export function MainPanelHeader({
                     : "text-gray-600 hover:bg-black/[0.035] hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/[0.05] dark:hover:text-white"
                 } ${isDragging ? "cursor-grabbing opacity-60" : "cursor-grab"}`}
                 data-pane-id={paneId}
+                // Tabs truncate at 22rem — hover reveals the full title. Same
+                // native-title convention as the sidebar chat tabs.
+                title={
+                  editingTabId === tab.id
+                    ? "Rename — Enter to save, Esc to cancel"
+                    : tab.title
+                }
                 draggable
                 onPointerEnter={() => {
                   // Best-effort prefetch for inactive tabs — the active tab
@@ -790,6 +797,9 @@ export function MainPanelHeader({
                         : "bg-white text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:bg-[#1e2830] dark:text-gray-300 dark:hover:bg-[#253340]"
                     }`}
                     aria-label={`Close ${tab.title}`}
+                    // Overrides the tab's own title so hovering the X reads as
+                    // "close", not as the filename tooltip.
+                    title={`Close ${tab.title}`}
                     onClick={() => closeContentTab(tab.id)}
                   >
                     <X className="h-3 w-3" aria-hidden="true" />

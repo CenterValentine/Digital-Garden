@@ -50,7 +50,7 @@ steps:
       # cut every browser off from collaboration.
       - --allow-unauthenticated
       - --set-env-vars=NODE_ENV=production
-      - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=digital-garden-collaboration-token-secret:2
+      - --update-secrets=DATABASE_URL=DATABASE_URL:latest,COLLABORATION_TOKEN_SECRET=digital-garden-collaboration-token-secret:2,COLLABORATION_WRITE_SECRET=digital-garden-collaboration-write-secret:1
 
 
 images:

@@ -27,9 +27,12 @@ import { useChat } from "@ai-sdk/react";
 import {
   DefaultChatTransport,
   lastAssistantMessageIsCompleteWithApprovalResponses,
+  UIMessageStreamError,
   type UIMessage,
   type FileUIPart,
 } from "ai";
+import { clientLogger } from "@/lib/core/logger/client";
+import { COLLAB_REMOTE_WRITE_EVENT } from "@/lib/domain/collaboration/runtime";
 import {
   acquireUrlWithFallback,
   launchTabAndRead,
@@ -119,6 +122,40 @@ export type { OutputTarget } from "@/lib/domain/ai/output-target";
  */
 const dispatchedArtifactToolCalls = new Set<string>();
 
+/**
+ * Ask a slept editor to reconnect after a write landed in the live document.
+ *
+ * Sleep disconnects an idle editor by design, and an editor sitting open while the
+ * user chats IS idle — so the common case for an AI write is a client that cannot
+ * receive the broadcast carrying it. Observed 2026-08-13: the write applied, the
+ * stored document was correct, and the pane kept showing the old text until reload.
+ *
+ * Gated on `route === "collaboration"`. A payload-route write did NOT change the Y
+ * document, so waking would connect the editor, bootstrap it from a Y state without
+ * the change, and risk that session storing its stale snapshot back over the payload
+ * we just wrote.
+ */
+function maybeWakeCollaborators(output: unknown): void {
+  if (typeof output !== "string" || !output.includes("__notePayload")) return;
+  try {
+    const parsed = JSON.parse(output) as {
+      __notePayload?: boolean;
+      contentId?: unknown;
+      route?: unknown;
+    };
+    if (!parsed.__notePayload) return;
+    if (parsed.route !== "collaboration") return;
+    if (typeof parsed.contentId !== "string" || !parsed.contentId) return;
+    window.dispatchEvent(
+      new CustomEvent(COLLAB_REMOTE_WRITE_EVENT, {
+        detail: { contentId: parsed.contentId },
+      }),
+    );
+  } catch {
+    /* not JSON — nothing to wake */
+  }
+}
+
 function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
   if (typeof window === "undefined") return;
   const p = part as { toolCallId?: string; output?: unknown };
@@ -144,6 +181,7 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
         }),
       );
     }
+    maybeWakeCollaborators(p.output);
     return;
   }
 
@@ -365,6 +403,26 @@ export interface UseConversationEngineParams {
    * page chat loads a previously-persisted conversation on mount).
    */
   initialMessages?: UIMessage[];
+  /**
+   * False until the surface's persisted transcript has been loaded into the
+   * chat. Resumable-stream reattach WAITS for this (2026-08-11): the binding
+   * hook that loads history mounts AFTER this one, so a resume fired at mount
+   * snapshots an EMPTY message list. A post-approval continuation stream is
+   * not self-describing — its first tool chunk carries a toolCallId minted in
+   * the PREVIOUS request — so applying it to an empty list throws
+   * `No tool invocation found for tool call ID` and kills the stream. Surfaces
+   * that never load history can leave this at its default.
+   */
+  historyReady?: boolean;
+  /**
+   * Stable ref the surface populates with a function that applies a client-executed
+   * document edit against its LIVE editor and reports what actually happened. Left
+   * unset by surfaces with no editor: the tool then returns an honest "no editor
+   * available" rather than a fabricated success.
+   */
+  editExecutorRef?: React.RefObject<
+    ((request: ClientEditRequest) => Promise<ClientEditOutcome>) | null
+  >;
   /**
    * Called when an assistant turn completes. Surfaces use this to
    * persist, refresh derived UI, etc. AI SDK 6.0.163+ payload.
@@ -596,6 +654,59 @@ export interface ActivePlaybook {
  * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
  * which would defeat that bound and risk a runaway loop.
  */
+/** The one client-executed document-edit tool (see editor-tools.ts). */
+export const EDIT_TOOL_APPLY_DIFF = "apply_diff";
+
+/** A document edit the engine hands to the surface that owns the live editor. */
+export interface ClientEditRequest {
+  type: "apply_diff";
+  toolCallId: string;
+  before: string;
+  after: string;
+}
+
+/**
+ * The honest outcome of a client-executed edit.
+ *
+ * `message` becomes the tool result the model sees, so a failure must be
+ * ACTIONABLE — say what went wrong and what the document actually contains, or the
+ * model will simply repeat the same unmatchable `before` string.
+ */
+export interface ClientEditOutcome {
+  applied: boolean;
+  message: string;
+}
+
+/**
+ * True once every client-executed edit in the current step has a result, so the
+ * tool loop can continue. Mirrors `lastMessageHasResolvedBrowserRead`; kept
+ * separate because an edit resolving is a different event from a read resolving.
+ */
+function lastMessageHasResolvedEdit({
+  messages,
+}: {
+  messages: UIMessage[];
+}): boolean {
+  const message = messages[messages.length - 1];
+  if (!message || message.role !== "assistant") return false;
+  const lastStepStart = message.parts.reduce(
+    (last, part, index) => (part.type === "step-start" ? index : last),
+    -1,
+  );
+  const editParts = message.parts
+    .slice(lastStepStart + 1)
+    .filter((part) => part.type === `tool-${EDIT_TOOL_APPLY_DIFF}`) as Array<{
+    state?: string;
+  }>;
+  return (
+    editParts.length > 0 &&
+    editParts.every(
+      (part) =>
+        part.state === "output-available" || part.state === "output-error",
+    )
+  );
+}
+
 function lastMessageHasResolvedBrowserRead({
   messages,
 }: {
@@ -939,6 +1050,8 @@ export function useConversationEngine({
   conversationId,
   activeContextId,
   initialMessages,
+  historyReady = true,
+  editExecutorRef,
   onFinish,
   onError,
   truncateRef,
@@ -1502,6 +1615,20 @@ export function useConversationEngine({
   const resumableEnabledRef = useRef<boolean>(true);
   const conversationIdRef = useRef<string | null>(null);
   const reconnectingRef = useRef<boolean>(false);
+  // Live transcript, read off-render by the resume effect (to capture its
+  // restore point) and by the onError closure (to restore it).
+  const messagesRef = useRef<UIMessage[]>([]);
+  // True while the active stream began as a resume (reload / second tab)
+  // rather than a fresh send. Consumed by ChatPanel → ChatMessage so the
+  // buffered flood renders settled instead of re-typing (AI 3.3). Reset
+  // by every fresh user send (which has no buffer); this also clears the
+  // no-stream 204 case, where the resume returns nothing and status never
+  // leaves "ready". Declared here (with the other refs the onError closure
+  // reads) rather than beside the resume effect below.
+  const streamStartedViaResumeRef = useRef(false);
+  // The transcript as it stood when the resume was fired — the restore point
+  // if the replay turns out not to be applicable to this client's state.
+  const resumeBaselineRef = useRef<UIMessage[] | null>(null);
   // Bumped by every fresh user send so an in-flight reconnect loop bails —
   // otherwise its poll would read the NEW stream's "submitted" as a recovery.
   const reconnectGenRef = useRef<number>(0);
@@ -1555,11 +1682,38 @@ export function useConversationEngine({
     // state and never re-trigger the server.
     sendAutomaticallyWhen: (options) =>
       lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
-      lastMessageHasResolvedBrowserRead(options),
+      lastMessageHasResolvedBrowserRead(options) ||
+      lastMessageHasResolvedEdit(options),
     // Client-executed tools (no server `execute`): the model's tool call is
     // streamed to the browser; run it here and post the result back. Phase 0:
     // read_page_in_browser reads a page in the user's own session.
     onToolCall: async ({ toolCall }) => {
+      // Document edits (2026-08-12). `apply_diff` has no server `execute`: it runs
+      // HERE, against the live ProseMirror document, so the text it matches is the
+      // text the model was shown and the tool's return value is the edit's ACTUAL
+      // outcome. Previously the server returned an edit payload plus a write
+      // receipt, so the model and the receipt chip both reported success before the
+      // client had tried — and a failure never travelled back at all.
+      if (toolCall.toolName === EDIT_TOOL_APPLY_DIFF) {
+        const input = (toolCall.input ?? {}) as { before?: string; after?: string };
+        const execute = editExecutorRef?.current;
+        const output = execute
+          ? (
+              await execute({
+                type: "apply_diff",
+                toolCallId: toolCall.toolCallId,
+                before: input.before ?? "",
+                after: input.after ?? "",
+              })
+            ).message
+          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with updateNote instead.";
+        chat.addToolResult({
+          tool: EDIT_TOOL_APPLY_DIFF,
+          toolCallId: toolCall.toolCallId,
+          output,
+        });
+        return;
+      }
       // Agentic Browsing Phase 2b Slice 5c — client-executed co-browse tools. The
       // model opens a tab and acts on it; we drive the extension's chrome.debugger
       // engine via the panel bridge (co-browse.ts) and return the FRESH a11y
@@ -1975,6 +2129,45 @@ export function useConversationEngine({
       }
     },
     onError: (err) => {
+      // An inapplicable replay is not a chat failure. A resumed stream whose
+      // chunks reference a tool call this transcript never saw (continuation
+      // buffers are not self-describing) throws mid-apply, having already
+      // pushed a partial message. Restore the pre-resume transcript and stay
+      // quiet: the durable history is the truth, and the run is still
+      // completing server-side. Runs before the surface's own onError because
+      // this is a state invariant, not a presentation choice.
+      if (
+        streamStartedViaResumeRef.current &&
+        UIMessageStreamError.isInstance(err)
+      ) {
+        // Never restore an EMPTY baseline over a populated transcript — that
+        // would turn a recoverable glitch into data loss on screen. An empty
+        // capture means the resume beat hydration, which the gate now
+        // prevents; the guard keeps that assumption from being load-bearing.
+        const baseline = resumeBaselineRef.current;
+        const restore = baseline != null && baseline.length > 0;
+        if (restore) chat.setMessages(baseline);
+        resumeBaselineRef.current = null;
+        streamStartedViaResumeRef.current = false;
+        // The SDK sets `status: "error"` immediately AFTER this callback
+        // returns, so clearing inline would be overwritten and the surface
+        // would still paint its error banner. A microtask lands after that
+        // synchronous write; clearError() also restores status to "ready".
+        queueMicrotask(() => chat.clearError());
+        clientLogger.warn({
+          layer: "ui",
+          event: "resumable:replay_not_applicable",
+          summary:
+            "discarded a resumed stream whose chunks did not match this transcript",
+          attrs: {
+            conversation_id: conversationIdRef.current ?? undefined,
+            chunk_type: err.chunkType,
+            chunk_id: err.chunkId,
+            restored: restore,
+          },
+        });
+        return;
+      }
       if (onError) {
         onError(err);
         return;
@@ -2231,37 +2424,45 @@ export function useConversationEngine({
     (s) => s.ai?.resumableStreams !== false,
   );
   const resumeAttemptedForKeyRef = useRef<string | null>(null);
-  // True while the active stream began as a resume (reload / second tab)
-  // rather than a fresh send. Consumed by ChatPanel → ChatMessage so the
-  // buffered flood renders settled instead of re-typing (AI 3.3). Reset
-  // by every fresh user send (which has no buffer); this also clears the
-  // no-stream 204 case, where the resume returns nothing and status never
-  // leaves "ready".
-  const streamStartedViaResumeRef = useRef(false);
-  useEffect(() => {
-    if (!resumableStreamsEnabled || !conversationId) return;
-    if (status === "streaming" || status === "submitted") return;
-    if (resumeAttemptedForKeyRef.current === conversationKey) return;
-    resumeAttemptedForKeyRef.current = conversationKey;
-    streamStartedViaResumeRef.current = true;
-    void resumeStream();
-  }, [
-    resumableStreamsEnabled,
-    conversationId,
-    conversationKey,
-    status,
-    resumeStream,
-  ]);
-
+  // `streamStartedViaResumeRef` + `resumeBaselineRef` are declared above, with
+  // the other refs the useChat onError closure reads.
+  //
   // Keep the network-resilience refs current for the onError closure + the
   // reconnect loop, which read them off-render. A no-dep effect (pure ref
-  // writes) is the compiler-safe way to mirror live values into refs.
+  // writes) is the compiler-safe way to mirror live values into refs. This
+  // MUST stay declared above the resume effect below: effects run in
+  // declaration order, and hydration commits `setMessages(history)` in the
+  // same batch that flips `historyReady`, so the resume would otherwise
+  // capture last render's (empty) transcript as its restore point.
   useEffect(() => {
     streamStatusRef.current = status;
     resumeStreamRef.current = resumeStream;
     resumableEnabledRef.current = resumableStreamsEnabled;
     conversationIdRef.current = conversationId ?? null;
+    messagesRef.current = messages;
   });
+
+  useEffect(() => {
+    if (!resumableStreamsEnabled || !conversationId) return;
+    // WAIT for persisted history rather than skipping the resume: the replay
+    // buffer is only self-describing for the FIRST request of a turn, so a
+    // continuation must land on a transcript that already holds the pending
+    // tool call. Flipping true re-runs this effect, which is the resume.
+    if (!historyReady) return;
+    if (status === "streaming" || status === "submitted") return;
+    if (resumeAttemptedForKeyRef.current === conversationKey) return;
+    resumeAttemptedForKeyRef.current = conversationKey;
+    streamStartedViaResumeRef.current = true;
+    resumeBaselineRef.current = messagesRef.current;
+    void resumeStream();
+  }, [
+    resumableStreamsEnabled,
+    conversationId,
+    conversationKey,
+    historyReady,
+    status,
+    resumeStream,
+  ]);
 
   const isActive = status === "streaming" || status === "submitted";
   const stop = useCallback(() => {
