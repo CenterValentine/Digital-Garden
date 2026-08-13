@@ -32,6 +32,7 @@ import {
   type FileUIPart,
 } from "ai";
 import { clientLogger } from "@/lib/core/logger/client";
+import { COLLAB_REMOTE_WRITE_EVENT } from "@/lib/domain/collaboration/runtime";
 import {
   acquireUrlWithFallback,
   launchTabAndRead,
@@ -121,6 +122,40 @@ export type { OutputTarget } from "@/lib/domain/ai/output-target";
  */
 const dispatchedArtifactToolCalls = new Set<string>();
 
+/**
+ * Ask a slept editor to reconnect after a write landed in the live document.
+ *
+ * Sleep disconnects an idle editor by design, and an editor sitting open while the
+ * user chats IS idle — so the common case for an AI write is a client that cannot
+ * receive the broadcast carrying it. Observed 2026-08-13: the write applied, the
+ * stored document was correct, and the pane kept showing the old text until reload.
+ *
+ * Gated on `route === "collaboration"`. A payload-route write did NOT change the Y
+ * document, so waking would connect the editor, bootstrap it from a Y state without
+ * the change, and risk that session storing its stale snapshot back over the payload
+ * we just wrote.
+ */
+function maybeWakeCollaborators(output: unknown): void {
+  if (typeof output !== "string" || !output.includes("__notePayload")) return;
+  try {
+    const parsed = JSON.parse(output) as {
+      __notePayload?: boolean;
+      contentId?: unknown;
+      route?: unknown;
+    };
+    if (!parsed.__notePayload) return;
+    if (parsed.route !== "collaboration") return;
+    if (typeof parsed.contentId !== "string" || !parsed.contentId) return;
+    window.dispatchEvent(
+      new CustomEvent(COLLAB_REMOTE_WRITE_EVENT, {
+        detail: { contentId: parsed.contentId },
+      }),
+    );
+  } catch {
+    /* not JSON — nothing to wake */
+  }
+}
+
 function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
   if (typeof window === "undefined") return;
   const p = part as { toolCallId?: string; output?: unknown };
@@ -146,6 +181,7 @@ function maybeDispatchArtifactRefresh(part: unknown, seen: Set<string>): void {
         }),
       );
     }
+    maybeWakeCollaborators(p.output);
     return;
   }
 

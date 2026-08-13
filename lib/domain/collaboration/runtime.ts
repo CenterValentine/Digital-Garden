@@ -92,7 +92,12 @@ export type PromotionReason =
   | "browser-multi-session"
   | "remote-presence"
   | "explicit-live-workflow"
-  | "reconnect-after-offline";
+  | "reconnect-after-offline"
+  // A server-side write (AI / extension) landed in this document while nobody was
+  // editing it. Sleep is deliberate — an idle editor disconnects to keep Cloud Run
+  // cold — but a disconnected client cannot receive the broadcast that carries the
+  // change, so it sits showing stale text until the user happens to interact.
+  | "remote-write";
 export type CollaborationEditPolicyReason =
   | "local-ready"
   | "degraded-local-fallback"
@@ -571,6 +576,14 @@ async function readJsonResponse<T>(response: Response): Promise<T | null> {
   }
 }
 
+/**
+ * Fired when a server-side write has been applied THROUGH the live collaborative
+ * document, so any slept client holding it should reconnect and resync. Carries
+ * `{ contentId }`. Dispatched only for the collaboration route — never for a write
+ * that landed in NotePayload alone.
+ */
+export const COLLAB_REMOTE_WRITE_EVENT = "dg:collab-remote-write";
+
 export function getContentCollaborationCapability(
   contentType: string | null | undefined
 ): ContentCollaborationCapability | null {
@@ -582,6 +595,43 @@ class CollaborationRuntimeManager {
   private entries = new Map<string, DocumentRuntimeEntry>();
   private browserContextId = getSessionStorageId("dg-collab-browser-context-id", "browser");
   private sessionId = getSessionStorageId("dg-collab-session-id", "session");
+
+  constructor() {
+    // Wake-on-write. The AI/extension write path applies edits through the live
+    // document on the server, which broadcasts to CONNECTED clients — but sleep
+    // deliberately disconnects idle editors, and an editor sitting open while the
+    // user chats is idle by definition. So the common case for an AI write is a
+    // client that cannot hear it. This listener closes that gap for the tab that
+    // caused the write; other tabs wake on their own interaction, as before.
+    if (typeof window !== "undefined") {
+      window.addEventListener(COLLAB_REMOTE_WRITE_EVENT, (event) => {
+        const contentId = (event as CustomEvent<{ contentId?: string }>).detail
+          ?.contentId;
+        if (typeof contentId === "string" && contentId) {
+          this.wakeForRemoteWrite(contentId);
+        }
+      });
+    }
+  }
+
+  /**
+   * Reconnect a slept session because the server-side document changed.
+   *
+   * No-ops when nobody has the document open (nothing to wake) and when the
+   * session is already live (it received the broadcast). Deliberately does NOT
+   * fire for writes that landed in NotePayload rather than the live document —
+   * see the dispatch site — because waking there would bootstrap from a Y state
+   * that does not contain the change, and that session's next store could write
+   * its stale snapshot back over the payload.
+   */
+  wakeForRemoteWrite(contentId: string) {
+    const entry = this.entries.get(contentId);
+    if (!entry) return;
+    const { connectionState } = entry.state;
+    if (connectionState === "connected" || connectionState === "synced") return;
+    entry.lastActivityAt = Date.now();
+    void this.promote(entry, "remote-write");
+  }
 
   acquire(
     contentId: string,
