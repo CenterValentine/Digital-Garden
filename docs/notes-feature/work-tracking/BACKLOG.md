@@ -15,6 +15,26 @@ last_updated: 2026-08-12
 - **Slice 2 — `firstOpenedInEditorAt`** (migration + backfill). Slice 1 uses the `CollaborationDocument` row as the "does another copy exist" discriminator. It is a leaky proxy: the client creates an IndexedDB cache unconditionally on open, so a note first opened while Hocuspocus was unreachable has a cache but no row, and an AI write to it takes the payload path and can still be masked. The stamp is set inside the existing `POST /api/collaboration/state` (no new request), backfilled from notes that already have a row.
 - **Slice 3 — advisory lock** closing the check-then-write race. The AI reads the discriminator, then a user opens the note before the write lands, and the fresh bootstrap masks it. A Postgres advisory lock keyed on contentId, taken by both the bootstrap fetch hook and `writeNoteContent`, makes the two orderings the only outcomes. Must be `try`-flavoured with fall-through, DB-scoped, and **never held across the Hocuspocus HTTP call** — this is the only change in the plan that could stop a document from opening.
 - **Slice 4 — `readNote` → `tiptapToMarkdown`.** The AI read path returns flattened plain text (no headings, no structure) while `replace` mode asks the model for a faithful full document. Measure the context-cost delta against the diet budget before shipping.
+- **Wake slept clients on OTHER devices via a presence-heartbeat hint.** Wake-on-write
+  (shipped 2026-08-13) covers the tab that caused the write. A second browser or device
+  holding the same document open-but-slept still shows stale text, and — checked, not
+  assumed — returning to that tab does **not** fix it: the visibility handler re-promotes
+  only when `browserSessionTopology === "multiSession"` or `remoteCollaborationTopology
+  === "remotePresent"` ([runtime.ts:2165-2173](../../../lib/domain/collaboration/runtime.ts)),
+  so a solo user's second device stays local-only and keeps its IndexedDB copy. Only a
+  reload (fresh bootstrap re-fetches canonical state) or a promotion converges it. That
+  gate is correct for the cost design — it just predates server-side writes being possible
+  at all.
+  **Design:** the presence heartbeat already runs on a dormant cadence while slept, so it
+  is an existing client↔server channel that costs nothing extra. Return the document's
+  server-side version on the heartbeat response (`CollaborationDocument.updatedAt` is
+  sufficient and already stored); the client records that value whenever it is
+  connected/synced (by definition up to date), and if a heartbeat while slept reports a
+  NEWER value, it promotes itself with the existing `"remote-write"` reason. No new
+  transport, no keepalive sockets, no change to sleep thresholds; convergence latency is
+  one dormant heartbeat interval.
+  **Rejected alternative:** a server→client push channel to disconnected clients — that is
+  precisely what sleep exists to avoid.
 - **Convert the four remaining edit tools to client execution.** `apply_diff` was
   converted 2026-08-12 after a smoke run showed it announcing success before the client
   attempted the edit (payload + write receipt returned from the server `execute`), so a
