@@ -33,7 +33,7 @@ text) did not cause this either. The seam is the whole bug.
 | 2 | Bootstrap **trusts a meaningful stored Y state over the payload**. That is the masking mechanism. It self-heals only when the stored state is empty. | [documents.ts:40-52](../../../lib/domain/collaboration/documents.ts) |
 | 3 | The bootstrap *fetch* hook **writes** — it upserts the `CollaborationDocument` row. So "first open" is a write, and any lock must cover the fetch path. | [documents.ts:54-81](../../../lib/domain/collaboration/documents.ts) |
 | 4 | Reseeding mints a **rival document** (`TiptapTransformer.toYdoc` → fresh client/item ids). Y.js merge is additive, so merging a reseed with any surviving copy **duplicates** rather than replaces. Reseed is only sound when no other copy exists anywhere. | [documents.ts:130-135](../../../lib/domain/collaboration/documents.ts) |
-| 5 | The client creates `IndexeddbPersistence` **unconditionally** at entry creation, before any provider connects. A browser cache can therefore exist with **no server row** (`localFallback` opens). The row is a leaky proxy for "a copy exists". | [runtime.ts:658](../../../lib/domain/collaboration/runtime.ts) |
+| 5 | The client creates `IndexeddbPersistence` **unconditionally** at entry creation, before any provider connects — so a browser cache can exist before any server state does. **Corrected 2026-08-12:** the row is a much better proxy than first claimed. `POST /api/collaboration/state` runs `loadCollaborationYDocState`, which **upserts the row** when it bootstraps from the payload — in Next.js, independent of Hocuspocus. So a note opened while Hocuspocus was merely unreachable DOES get a row. The leak is narrower: only when the canonical-state fetch itself fails. | [runtime.ts:658](../../../lib/domain/collaboration/runtime.ts), [documents.ts:54-81](../../../lib/domain/collaboration/documents.ts), [state/route.ts:59](../../../app/api/collaboration/state/route.ts) |
 | 6 | `openDirectConnection` + `transact` mutates the live doc, **broadcasts to every connection**, then forces an **immediate** store (`immediately=true` bypasses the debounce) and unloads. No browser required, no session held. | `@hocuspocus/server` 3.4.4 `DirectConnection.transact`, `storeDocumentHooks` |
 | 7 | `y-prosemirror` exports **`updateYFragment(y, fragment, pmNode, meta)`** — an incremental diff that applies only what changed. `prosemirrorJSONToYXmlFragment` is the wrong tool (its own docstring: "should not be used to rehydrate a Y.Doc … once collaboration has begun as all history will be lost"). | `y-prosemirror/dist/y-prosemirror.cjs:1219,2210` |
 | 8 | Non-note content types are filtered out of **both** collab hooks (`contentType: "note"`), so folder/chat notes are not collaborative and the payload write is correct for them. | [documents.ts:23,113,173](../../../lib/domain/collaboration/documents.ts) |
@@ -165,6 +165,12 @@ requests, zero client-side change, nothing new on the path a user feels when ope
 Residual leak (accepted, narrower than the row proxy): if that state fetch itself fails, the
 runtime entry — and its IndexedDB cache — can still exist without a timestamp. That is a failed
 bootstrap, not merely an unreachable Hocuspocus.
+
+**⚠ Slice 2's value is now in question (2026-08-12).** Fact 5's correction shows the row is
+created by the same Next.js request that would carry the stamp, so the two signals fire at the
+same moment and differ only when that request FAILS. A migration buys very little over the row
+proxy. Recommendation: **do not take the migration yet.** Ship the advisory lock (Slice 3), and
+revisit only if a real "cache exists but no row" case shows up in practice.
 
 - **Gate 2a:** migration applied by owner (§9) **before** the code deploy.
 - **Gate 2b:** stamping must not change the route's response shape, latency budget, or failure
