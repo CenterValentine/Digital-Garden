@@ -379,6 +379,15 @@ export interface UseConversationEngineParams {
    */
   historyReady?: boolean;
   /**
+   * Stable ref the surface populates with a function that applies a client-executed
+   * document edit against its LIVE editor and reports what actually happened. Left
+   * unset by surfaces with no editor: the tool then returns an honest "no editor
+   * available" rather than a fabricated success.
+   */
+  editExecutorRef?: React.RefObject<
+    ((request: ClientEditRequest) => Promise<ClientEditOutcome>) | null
+  >;
+  /**
    * Called when an assistant turn completes. Surfaces use this to
    * persist, refresh derived UI, etc. AI SDK 6.0.163+ payload.
    */
@@ -609,6 +618,59 @@ export interface ActivePlaybook {
  * server-tool turn stops on a resolved tool at the `stopWhen` step-count limit,
  * which would defeat that bound and risk a runaway loop.
  */
+/** The one client-executed document-edit tool (see editor-tools.ts). */
+export const EDIT_TOOL_APPLY_DIFF = "apply_diff";
+
+/** A document edit the engine hands to the surface that owns the live editor. */
+export interface ClientEditRequest {
+  type: "apply_diff";
+  toolCallId: string;
+  before: string;
+  after: string;
+}
+
+/**
+ * The honest outcome of a client-executed edit.
+ *
+ * `message` becomes the tool result the model sees, so a failure must be
+ * ACTIONABLE — say what went wrong and what the document actually contains, or the
+ * model will simply repeat the same unmatchable `before` string.
+ */
+export interface ClientEditOutcome {
+  applied: boolean;
+  message: string;
+}
+
+/**
+ * True once every client-executed edit in the current step has a result, so the
+ * tool loop can continue. Mirrors `lastMessageHasResolvedBrowserRead`; kept
+ * separate because an edit resolving is a different event from a read resolving.
+ */
+function lastMessageHasResolvedEdit({
+  messages,
+}: {
+  messages: UIMessage[];
+}): boolean {
+  const message = messages[messages.length - 1];
+  if (!message || message.role !== "assistant") return false;
+  const lastStepStart = message.parts.reduce(
+    (last, part, index) => (part.type === "step-start" ? index : last),
+    -1,
+  );
+  const editParts = message.parts
+    .slice(lastStepStart + 1)
+    .filter((part) => part.type === `tool-${EDIT_TOOL_APPLY_DIFF}`) as Array<{
+    state?: string;
+  }>;
+  return (
+    editParts.length > 0 &&
+    editParts.every(
+      (part) =>
+        part.state === "output-available" || part.state === "output-error",
+    )
+  );
+}
+
 function lastMessageHasResolvedBrowserRead({
   messages,
 }: {
@@ -953,6 +1015,7 @@ export function useConversationEngine({
   activeContextId,
   initialMessages,
   historyReady = true,
+  editExecutorRef,
   onFinish,
   onError,
   truncateRef,
@@ -1583,11 +1646,38 @@ export function useConversationEngine({
     // state and never re-trigger the server.
     sendAutomaticallyWhen: (options) =>
       lastAssistantMessageIsCompleteWithApprovalResponses(options) ||
-      lastMessageHasResolvedBrowserRead(options),
+      lastMessageHasResolvedBrowserRead(options) ||
+      lastMessageHasResolvedEdit(options),
     // Client-executed tools (no server `execute`): the model's tool call is
     // streamed to the browser; run it here and post the result back. Phase 0:
     // read_page_in_browser reads a page in the user's own session.
     onToolCall: async ({ toolCall }) => {
+      // Document edits (2026-08-12). `apply_diff` has no server `execute`: it runs
+      // HERE, against the live ProseMirror document, so the text it matches is the
+      // text the model was shown and the tool's return value is the edit's ACTUAL
+      // outcome. Previously the server returned an edit payload plus a write
+      // receipt, so the model and the receipt chip both reported success before the
+      // client had tried — and a failure never travelled back at all.
+      if (toolCall.toolName === EDIT_TOOL_APPLY_DIFF) {
+        const input = (toolCall.input ?? {}) as { before?: string; after?: string };
+        const execute = editExecutorRef?.current;
+        const output = execute
+          ? (
+              await execute({
+                type: "apply_diff",
+                toolCallId: toolCall.toolCallId,
+                before: input.before ?? "",
+                after: input.after ?? "",
+              })
+            ).message
+          : "No document editor is available in this surface, so the edit was not applied. Ask the user to open the document, or write to it with updateNote instead.";
+        chat.addToolResult({
+          tool: EDIT_TOOL_APPLY_DIFF,
+          toolCallId: toolCall.toolCallId,
+          output,
+        });
+        return;
+      }
       // Agentic Browsing Phase 2b Slice 5c — client-executed co-browse tools. The
       // model opens a tab and acts on it; we drive the extension's chrome.debugger
       // engine via the panel bridge (co-browse.ts) and return the FRESH a11y

@@ -22,7 +22,11 @@ import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
 import { ProviderIcon } from "./ProviderIcon";
 import { toast } from "sonner";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
-import { AiEditOrchestrator, parseEditPayload } from "@/lib/domain/editor/ai";
+import {
+  AiEditOrchestrator,
+  findTextInDoc,
+  parseEditPayload,
+} from "@/lib/domain/editor/ai";
 import { ChatMessage } from "./ChatMessage";
 import {
   ModelSwitchDivider,
@@ -39,7 +43,11 @@ import { FollowUpsStrip } from "./FollowUpsStrip";
 import { ChatErrorBanner } from "./ChatErrorBanner";
 import { MakeAndModelPicker } from "./MakeAndModelPicker";
 import { ChatContextPicker } from "./ChatContextPicker";
-import { useConversationEngine } from "@/lib/domain/ai/use-conversation-engine";
+import {
+  useConversationEngine,
+  type ClientEditOutcome,
+  type ClientEditRequest,
+} from "@/lib/domain/ai/use-conversation-engine";
 import {
   useConversationBinding,
   type PersistFinishPayload,
@@ -175,6 +183,13 @@ export function ChatPanel({
   // travel through the parent. The engine holds its resume until this is true.
   const [historyReady, setHistoryReady] = useState(false);
 
+  // Applies a client-executed document edit and reports what ACTUALLY happened.
+  // Populated below, once the orchestrator exists; the engine calls it from
+  // onToolCall and returns `message` to the model verbatim.
+  const editExecutorRef = useRef<
+    ((request: ClientEditRequest) => Promise<ClientEditOutcome>) | null
+  >(null);
+
   const {
     messages,
     status,
@@ -223,6 +238,7 @@ export function ChatPanel({
     conversationId,
     activeContextId,
     historyReady,
+    editExecutorRef,
     onFinish: conversationId
       ? (event) => {
           // Forward the SDK's fresh assistant message so persistTurns
@@ -614,6 +630,99 @@ export function ChatPanel({
     return () => {
       orchestrator.destroy();
       orchestratorRef.current = null;
+    };
+  }, []);
+
+  // ─── Client-executed document edits ───────────────────────────────────────
+  //
+  // `apply_diff` runs here rather than on the server, so validation happens in the
+  // same representation as application: the live ProseMirror document's rendered
+  // text. The server version validated against `tiptapToMarkdown` output, which for
+  // any block falling back to verbatim HTML contains markup (`<p xmlns=…>`) that
+  // cannot exist in the document's text — it approved matches the client could
+  // never find, then reported success anyway.
+  useEffect(() => {
+    // Read off-store rather than subscribing: the executor runs inside a tool call,
+    // not a render, so a live read is both correct and cheaper than a subscription.
+    const documentTitle = (): string => {
+      const id = contentIdRef.current;
+      if (!id) return "the document";
+      return (
+        useContentStore.getState().tabs[`tab:${id}`]?.title ?? "the document"
+      );
+    };
+
+    editExecutorRef.current = async (request) => {
+      const orchestrator = orchestratorRef.current;
+      const editor = useEditorInstanceStore
+        .getState()
+        .getEditor(contentIdRef.current);
+
+      if (!editor || !orchestrator) {
+        return {
+          applied: false,
+          message:
+            "The document is not open in an editor right now, so nothing was changed. Ask the user to open it, or use updateNote to write to it directly.",
+        };
+      }
+
+      // Pre-check in the SAME representation the orchestrator searches, so the
+      // model gets a specific reason plus the text it should have quoted.
+      const found = findTextInDoc(editor.state.doc, request.before);
+      if (!found || "count" in found) {
+        const actual = editor.state.doc.textBetween(
+          0,
+          Math.min(editor.state.doc.content.size, 4000),
+          "\n",
+        );
+        const reason =
+          found && "count" in found
+            ? `Found ${found.count} occurrences of that text, so the target is ambiguous. Include more surrounding context.`
+            : "That exact text does not appear in the document. NOTE: matching is against the document's rendered text — markdown syntax (#, **, -) and any HTML markup you saw are not part of it.";
+        return {
+          applied: false,
+          message: `Edit NOT applied. ${reason}\n\nThe document currently reads:\n"""\n${actual}\n"""`,
+        };
+      }
+
+      const action =
+        request.after === ""
+          ? `Deleted "${request.before.slice(0, 50)}"`
+          : `Replaced "${request.before.slice(0, 50)}" → "${request.after.slice(0, 50)}"`;
+
+      const result = await orchestrator.applyAndWait({
+        __editPayload: true,
+        type: "apply_diff",
+        before: request.before,
+        after: request.after,
+        documentTitle: documentTitle(),
+        action,
+        toolCallId: request.toolCallId,
+      });
+
+      if (!result.success) {
+        return {
+          applied: false,
+          message: `Edit NOT applied: ${result.error ?? "unknown error"}. Re-read the document before trying again.`,
+        };
+      }
+
+      // Only NOW is a write receipt truthful. Shaped as a note payload so the
+      // existing chip + content-refresh path pick it up.
+      return {
+        applied: true,
+        message: JSON.stringify({
+          __notePayload: true,
+          kind: "updated",
+          contentId: contentIdRef.current,
+          title: documentTitle(),
+          editMode: "apply_diff",
+          applied: true,
+        }),
+      };
+    };
+    return () => {
+      editExecutorRef.current = null;
     };
   }, []);
 
