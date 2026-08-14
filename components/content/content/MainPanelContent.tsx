@@ -37,6 +37,7 @@ import {
   clearConflictDraft,
 } from "@/state/save-conflict-store";
 import { SaveConflictBanner } from "./SaveConflictBanner";
+import { ContentPathBreadcrumb } from "./ContentPathBreadcrumb";
 import { EditorSkeleton } from "@/components/content/skeletons/EditorSkeleton";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import {
@@ -1303,38 +1304,18 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     };
   }, [handleWikiLinkClick]);
 
-  // Fetch notes for wiki-link autocomplete
+  // Fetch notes for wiki-link autocomplete. Throws on failure — the
+  // suggestion popup distinguishes "search unavailable" from "no matches",
+  // so failures must not be flattened into an empty result.
   const fetchNotesForWikiLink = useCallback(
     async (query: string) => {
+      let response: Response;
+      let result: { success?: boolean; data?: { items?: unknown } };
       try {
-        const response = await tracedFetch(`/api/content/content?search=${encodeURIComponent(query)}`, {
+        response = await tracedFetch(`/api/content/content?search=${encodeURIComponent(query)}`, {
           credentials: "include",
         });
-
-        const result = await response.json();
-
-        if (!response.ok || !result.success) {
-          clientLogger.error({
-            layer: "fetch",
-            event: "wiki_link_autocomplete:failed",
-            summary: "failed to fetch notes for wiki-link autocomplete",
-            attrs: { query, status: response.status },
-          });
-          return [];
-        }
-
-        type NoteItem = { id: string; title: string; slug: string; contentType: string };
-        // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
-        // wiki-link navigates to the folder and, in playbooks/chat, injects
-        // its context capsule like a chat mention.
-        return ((result.data?.items as NoteItem[] | undefined) || [])
-          .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
-          .map((item) => ({
-            id: item.id,
-            title: item.title,
-            slug: item.slug,
-            contentType: item.contentType,
-          }));
+        result = await response.json();
       } catch (err) {
         clientLogger.error({
           layer: "fetch",
@@ -1343,8 +1324,31 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           attrs: { query },
           error: err,
         });
-        return [];
+        throw err;
       }
+
+      if (!response.ok || !result.success) {
+        clientLogger.error({
+          layer: "fetch",
+          event: "wiki_link_autocomplete:failed",
+          summary: "failed to fetch notes for wiki-link autocomplete",
+          attrs: { query, status: response.status },
+        });
+        throw new Error(`Wiki-link search failed with status ${response.status}`);
+      }
+
+      type NoteItem = { id: string; title: string; slug: string; contentType: string };
+      // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
+      // wiki-link navigates to the folder and, in playbooks/chat, injects
+      // its context capsule like a chat mention.
+      return ((result.data?.items as NoteItem[] | undefined) || [])
+        .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
+        .map((item) => ({
+          id: item.id,
+          title: item.title,
+          slug: item.slug,
+          contentType: item.contentType,
+        }));
     },
     []
   );
@@ -2191,7 +2195,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 className="flex-1 text-3xl font-semibold text-foreground bg-transparent border-b border-primary/40 focus:border-primary focus:outline-none mb-0 mr-4"
               />
             ) : (
-              <div className="mr-4 flex min-w-0 flex-1 items-start gap-3">
+              <div className="mr-4 flex min-w-0 flex-1 flex-col">
+                <div className="flex min-w-0 items-start gap-3">
                 <h1
                   className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
                     isReadOnlyPageTemplate
@@ -2234,6 +2239,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                     </Tooltip>
                   </TooltipProvider>
                 ) : null}
+                </div>
+                {selectedContentId && (
+                  <ContentPathBreadcrumb
+                    contentId={selectedContentId}
+                    currentTitle={noteTitle}
+                    currentContentType={contentType}
+                    paneId={paneId}
+                  />
+                )}
               </div>
             )}
             <div className="flex flex-none items-center gap-1">

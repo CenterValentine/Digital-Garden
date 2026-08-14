@@ -46,6 +46,7 @@ import {
   Users,
   BookMarked,
 } from "lucide-react";
+import { format } from "date-fns";
 import { useLongPress } from "@/components/common/useLongPress";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
@@ -63,6 +64,32 @@ import {
   hasTreeClipboard,
   ensureAltTracker,
 } from "@/lib/features/content/tree-clipboard";
+
+/**
+ * Row hover tooltip: modified + created, Obsidian-style. Answers "which of
+ * these similarly-named files is the one I want?" during a scan of the tree,
+ * without opening anything.
+ *
+ * `TreeNode` types these as `Date`, but the tree arrives over JSON so at
+ * runtime they are ISO strings — parse rather than trusting the annotation.
+ * A missing or unparseable date drops its line instead of rendering
+ * "Invalid Date".
+ */
+function formatNodeTimestamps(data: TreeNode): string | undefined {
+  const lines: string[] = [];
+
+  const addLine = (label: string, value: Date | string | null | undefined) => {
+    if (!value) return;
+    const parsed = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(parsed.getTime())) return;
+    lines.push(`${label}: ${format(parsed, "MMM d, yyyy 'at' h:mm a")}`);
+  };
+
+  addLine("Last modified", data.updatedAt);
+  addLine("Created", data.createdAt);
+
+  return lines.length > 0 ? lines.join("\n") : undefined;
+}
 
 interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
@@ -117,6 +144,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // 3. Multi-selected: Part of multi-selection (subtle)
   const isActive = data.id === selectedContentId;
   const isOpenInTab = openContentIds.includes(data.id);
+  // External (OS file) drag destination — selector returns a boolean so only
+  // the rows whose target status flips re-render as the pointer moves.
+  const isExternalDropTarget = useTreeDragStore(
+    (state) => state.externalDropTargetId === data.id,
+  );
   const isSelected = node.isSelected;
   const tree = node.tree;
   const isMultiSelected = isSelected && tree.selectedNodes && tree.selectedNodes.length > 1;
@@ -588,6 +620,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (node.state.willReceiveDrop && isFolder) {
       return "bg-primary/30 ring-1 ring-primary/50"; // Drop target
     }
+    if (isExternalDropTarget) {
+      return "bg-primary/30 ring-1 ring-primary/50"; // External file drop target
+    }
     if (isActive) {
       return "bg-primary/20 text-primary font-medium"; // Active in panel (brightest)
     }
@@ -607,6 +642,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     <div
       ref={dragHandle}
       style={style}
+      // Row identity for pointer hit-testing during external file drags
+      // (react-arborist's row wrapper carries no id attribute).
+      data-tree-node-id={data.id}
+      // Native tooltip rather than a Radix one: this renders per row in a
+      // virtualized tree, so a portal-backed tooltip per node would be a
+      // real cost for a hover hint. Child badges keep their own `title`
+      // (playbook, upload-failed, draft) and win when hovered directly.
+      title={formatNodeTimestamps(data)}
       className={`
         touch-callout-none
         flex items-center gap-2 px-2 py-1 cursor-pointer

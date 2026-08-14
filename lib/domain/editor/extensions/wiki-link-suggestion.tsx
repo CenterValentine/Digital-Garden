@@ -12,7 +12,7 @@
 "use client";
 
 import { ReactRenderer } from "@tiptap/react";
-import { SuggestionOptions } from "@tiptap/suggestion";
+import { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
 import tippy, { Instance as TippyInstance, GetReferenceClientRect } from "tippy.js";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import { computeHeadingIds } from "@/lib/domain/content/heading-ids";
@@ -41,9 +41,12 @@ export interface WikiLinkSuggestionItem {
   contentType?: string;
 }
 
+type WikiLinkSearchStatus = "loading" | "ready" | "error";
+
 interface WikiLinkListProps {
   items: WikiLinkItem[];
   command: (item: WikiLinkItem) => void;
+  status: WikiLinkSearchStatus;
 }
 
 interface WikiLinkListRef {
@@ -97,6 +100,30 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
   }));
 
   if (props.items.length === 0) {
+    if (props.status === "loading") {
+      return (
+        <div className="rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-sm">
+          <div className="flex items-center gap-2 text-sm text-gray-400">
+            <span
+              aria-hidden
+              className="h-3 w-3 animate-spin rounded-full border border-gray-500 border-t-transparent"
+            />
+            Searching notes…
+          </div>
+        </div>
+      );
+    }
+
+    if (props.status === "error") {
+      return (
+        <div className="rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-sm">
+          <div className="text-sm text-amber-300">
+            Unable to search notes — check your connection and try again.
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="rounded-lg border border-white/10 bg-gray-900/95 p-3 shadow-xl backdrop-blur-sm">
         <div className="text-sm text-gray-400">No matches found</div>
@@ -149,6 +176,15 @@ WikiLinkList.displayName = "WikiLinkList";
 export function createWikiLinkSuggestion(
   fetchNotes: (query: string) => Promise<WikiLinkSuggestionItem[]>
 ): Omit<SuggestionOptions, "editor"> {
+  // Only the newest request may set the settled status — a slow stale
+  // response must not overwrite what the latest query reported.
+  let requestSeq = 0;
+  let latestSettled = true;
+  let latestFailed = false;
+
+  const currentStatus = (): WikiLinkSearchStatus =>
+    !latestSettled ? "loading" : latestFailed ? "error" : "ready";
+
   return {
     char: "[[",
 
@@ -156,8 +192,11 @@ export function createWikiLinkSuggestion(
 
     items: async ({ query, editor }): Promise<WikiLinkItem[]> => {
       // [[# → in-document heading mode: list the current doc's headings by
-      // derived slug. No fetch — the document is already in memory.
+      // derived slug. No fetch — the document is already in memory, so the
+      // search state settles immediately and can never be the failed one.
       if (query.startsWith("#")) {
+        latestSettled = true;
+        latestFailed = false;
         const headingQuery = query.slice(1).toLowerCase();
         return computeHeadingIds(editor.state.doc)
           .filter(
@@ -172,34 +211,87 @@ export function createWikiLinkSuggestion(
           }));
       }
 
-      const notes = await fetchNotes(query);
-      return notes.map((note) => ({ kind: "note" as const, ...note }));
+      // Sequence the fetches so a slow earlier request can't overwrite a
+      // later one's status: only the most recent request may settle it.
+      const requestId = ++requestSeq;
+      latestSettled = false;
+      try {
+        const notes = await fetchNotes(query);
+        if (requestId === requestSeq) {
+          latestSettled = true;
+          latestFailed = false;
+        }
+        return notes.map((note) => ({ kind: "note" as const, ...note }));
+      } catch {
+        if (requestId === requestSeq) {
+          latestSettled = true;
+          latestFailed = true;
+        }
+        return [];
+      }
     },
 
     render: () => {
       let component: ReactRenderer<WikiLinkListRef> | undefined;
       let popup: TippyInstance[] | undefined;
 
-      return {
-        onStart: (props) => {
-          component = new ReactRenderer(WikiLinkList, {
-            props,
-            editor: props.editor,
-          });
+      const destroyPopup = () => {
+        popup?.[0]?.destroy();
+        popup = undefined;
+        component?.destroy();
+        component = undefined;
+      };
 
-          if (!props.clientRect) {
+      const createPopup = (props: SuggestionProps, status: WikiLinkSearchStatus) => {
+        component = new ReactRenderer(WikiLinkList, {
+          props: { ...props, status },
+          editor: props.editor,
+        });
+
+        if (!props.clientRect) {
+          return;
+        }
+
+        popup = tippy("body", {
+          getReferenceClientRect: props.clientRect as GetReferenceClientRect,
+          appendTo: () => document.body,
+          content: component.element,
+          showOnCreate: true,
+          interactive: true,
+          trigger: "manual",
+          placement: "bottom-start",
+        });
+      };
+
+      return {
+        // Fires before the first fetch resolves, so the popup opens on its
+        // loading surface instead of waiting silently for the response.
+        onBeforeStart: (props) => {
+          destroyPopup();
+          createPopup(props, "loading");
+        },
+
+        onStart: (props) => {
+          // A moved+changed cycle runs onExit between onBeforeStart and here.
+          if (!component) {
+            createPopup(props, currentStatus());
             return;
           }
 
-          popup = tippy("body", {
-            getReferenceClientRect: props.clientRect as GetReferenceClientRect,
-            appendTo: () => document.body,
-            content: component.element,
-            showOnCreate: true,
-            interactive: true,
-            trigger: "manual",
-            placement: "bottom-start",
-          });
+          component.updateProps({ ...props, status: currentStatus() });
+
+          if (props.clientRect) {
+            popup?.[0]?.setProps({
+              getReferenceClientRect: props.clientRect as GetReferenceClientRect,
+            });
+          }
+        },
+
+        // Keep the previous results visible while the next fetch is in
+        // flight; only the status flips, so an empty list reads as
+        // searching rather than "No notes found".
+        onBeforeUpdate: () => {
+          component?.updateProps({ status: "loading" });
         },
 
         // `component`/`popup` only exist once onStart has run — but the
@@ -208,7 +300,7 @@ export function createWikiLinkSuggestion(
         // access (live crash: "Cannot read properties of undefined
         // (reading 'ref')" on a keydown that raced onStart).
         onUpdate(props) {
-          component?.updateProps(props);
+          component?.updateProps({ ...props, status: currentStatus() });
 
           if (!props.clientRect) {
             return;
@@ -229,12 +321,7 @@ export function createWikiLinkSuggestion(
         },
 
         onExit() {
-          if (popup && popup[0]) {
-            popup[0].destroy();
-          }
-          if (component) {
-            component.destroy();
-          }
+          destroyPopup();
         },
       };
     },
