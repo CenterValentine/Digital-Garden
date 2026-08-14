@@ -11,6 +11,7 @@
  */
 
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { getCurrentSession } from "@/lib/infrastructure/auth/middleware";
 import { prisma } from "@/lib/database/client";
@@ -27,7 +28,6 @@ const PRIMARY = {
 const SECONDARY = [
   { href: "/settings/ai", title: "AI Setup", desc: "Connect models & API keys" },
   { href: "/settings", title: "Settings", desc: "Account, storage, preferences" },
-  { href: "/sign-in", title: "Sign in", desc: "If you're not logged in yet" },
 ];
 
 function formatDate(value: Date): string {
@@ -40,15 +40,20 @@ function formatDate(value: Date): string {
 export default async function MobileHomePage() {
   const userId = (await getCurrentSession())?.user?.id ?? null;
 
+  // Auth gates the menu: an unauthenticated shell goes straight to sign-in
+  // (which round-trips back here via the standard ?redirect= param). No
+  // sign-in, no menu.
+  if (!userId) {
+    redirect("/sign-in?redirect=/mobile");
+  }
+
   // Most-recently-edited notes, deep-linked into the mobile reader.
-  const recentNotes = userId
-    ? await prisma.contentNode.findMany({
-        where: { ownerId: userId, contentType: "note", deletedAt: null },
-        orderBy: { updatedAt: "desc" },
-        take: 8,
-        select: { id: true, title: true, updatedAt: true },
-      })
-    : [];
+  const recentNotes = await prisma.contentNode.findMany({
+    where: { ownerId: userId, contentType: "note", deletedAt: null },
+    orderBy: { updatedAt: "desc" },
+    take: 8,
+    select: { id: true, title: true, updatedAt: true },
+  });
 
   return (
     <div className={styles.main}>
