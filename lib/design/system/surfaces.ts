@@ -46,15 +46,15 @@ export type Surface = keyof typeof surfaces;
 export const surfacesDark = {
   "glass-0": {
     background: "rgba(0, 0, 0, 0.3)",
-    border: "1px solid rgba(255, 255, 255, 0.06)",
+    border: "1px solid rgba(255, 255, 255, 0.10)",
   },
   "glass-1": {
     background: "rgba(0, 0, 0, 0.4)",
-    border: "1px solid rgba(255, 255, 255, 0.08)",
+    border: "1px solid rgba(255, 255, 255, 0.13)",
   },
   "glass-2": {
     background: "rgba(0, 0, 0, 0.5)",
-    border: "1px solid rgba(255, 255, 255, 0.12)",
+    border: "1px solid rgba(255, 255, 255, 0.17)",
   },
 } as const;
 

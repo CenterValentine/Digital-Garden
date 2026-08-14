@@ -1,0 +1,404 @@
+import "server-only";
+
+/**
+ * The one way to write note content from outside the editor (AI collab write path).
+ *
+ * Every out-of-band writer — AI tools, the browser extension, maintenance scripts —
+ * should route through here rather than upserting `NotePayload` itself, because the
+ * correct write path depends on whether a collaborative copy of the document exists:
+ *
+ *   S2  no CollaborationDocument row  →  NotePayload is the only copy. Write it.
+ *                                        Zero Hocuspocus contact (the resource rule:
+ *                                        never wake collab for a document nobody has
+ *                                        ever opened).
+ *   S3  row exists                    →  a Y.Doc — and possibly browser caches —
+ *                                        exist. Write THROUGH the document via
+ *                                        Hocuspocus, or the edit is masked in any
+ *                                        open editor and destroyed by that session's
+ *                                        next store.
+ *
+ * Confirmed in production 2026-08-12: an AI append reached NotePayload (visible in
+ * export) but never the editor, because the open session's snapshot won.
+ *
+ * The CollaborationDocument row is the S2/S3 discriminator, and it is a better proxy
+ * than first assumed: `POST /api/collaboration/state` upserts the row when it
+ * bootstraps from the payload, in Next.js and independent of Hocuspocus — so a note
+ * opened while the collab server was down still has one. The residual gap is only a
+ * canonical-state fetch that fails outright.
+ *
+ * NOTE: this path never reseeds the collaborative snapshot. See the comment at the
+ * end of `writeNotePayload` for why that operation corrupts documents here. See
+ * docs/notes-feature/work-tracking/AI-COLLAB-WRITE-PATH-PLAN.md.
+ */
+
+import type { JSONContent } from "@tiptap/core";
+
+import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
+import { logger } from "@/lib/core/logger";
+import { extractSearchTextFromTipTap } from "@/lib/domain/content/search-text";
+import {
+  buildNoteEditTarget,
+  NoteEditRefused,
+  SHRINK_GUARD_MIN_CHARS,
+  SHRINK_RETAIN_FLOOR,
+  type NoteEditMode,
+} from "@/lib/domain/collaboration/note-edit-ops";
+
+/** How the write reached the document — surfaced in receipts, not cosmetic. */
+export type NoteWriteRoute = "collaboration" | "payload" | "payload-fallback";
+
+export interface WriteNoteContentRequest {
+  contentId: string;
+  ownerId: string;
+  mode: NoteEditMode;
+  /** For `replace`, the whole document. For `append`, the blocks to add. */
+  content: JSONContent;
+  /** True when the user approved a destructive rewrite via the approval card. */
+  destructiveApproved?: boolean;
+}
+
+export interface WriteNoteContentResult {
+  route: NoteWriteRoute;
+  charsBefore: number;
+  charsAfter: number;
+  blocksBefore: number;
+  blocksAfter: number;
+  /** Pre-write document, for the Undo chip. Never sent to the model. */
+  snapshot: JSONContent | null;
+  /**
+   * Set when the write landed in NotePayload while a collaborative copy exists —
+   * i.e. it may be invisible in an open editor. Receipts must say so.
+   */
+  mayBeMaskedInOpenEditor: boolean;
+}
+
+/** Refusal surfaced to the caller as an actionable tool error. */
+export { NoteEditRefused };
+
+/**
+ * Would this write destroy enough of the document to need the user's say-so?
+ *
+ * ONE function drives two decisions that must never disagree: whether the tool
+ * raises an approval card (`needsApproval`), and whether execute may declare the
+ * destruction approved. Splitting them is what broke this on 2026-08-13 — execute
+ * asserted `destructiveApproved: mode === "replace"`, which is true even when no
+ * card was ever shown, so a replace that slipped past the pre-check also disabled
+ * the hard backstop. Reaching execute with this returning true means the card was
+ * shown AND answered, because the SDK does not run execute otherwise.
+ *
+ * Deliberately cheap (one indexed read, no markdown parsing) because it runs on the
+ * approval path of every replace. It compares the incoming markdown's length against
+ * the stored plaintext, which slightly UNDERSTATES the shrink — markdown carries
+ * syntax the text does not. That bias is why the in-transaction backstop uses a
+ * lower, text-vs-text threshold rather than trusting this number.
+ */
+export async function isDestructiveRewrite(opts: {
+  contentId: string;
+  mode: NoteEditMode;
+  contentLength: number;
+}): Promise<boolean> {
+  if (opts.mode !== "replace") return false;
+  try {
+    const existing = await prisma.notePayload.findUnique({
+      where: { contentId: opts.contentId },
+      select: { searchText: true },
+    });
+    const before = existing?.searchText?.length ?? 0;
+    if (before < SHRINK_GUARD_MIN_CHARS) return false;
+    return opts.contentLength < before * SHRINK_RETAIN_FLOOR;
+  } catch {
+    // Never let a read failure silently authorize destruction: no card, and
+    // execute will pass destructiveApproved=false so the backstop still applies.
+    return false;
+  }
+}
+
+/**
+ * Budget for the collaborative apply before falling back to a payload write.
+ *
+ * A constant, not an env knob: Cloud Run runs at `min-instances=0`, so the only
+ * real question is whether a cold start fits — and on Vercel an env change needs a
+ * redeploy anyway, so a variable would buy nothing a code edit doesn't.
+ */
+const APPLY_TIMEOUT_MS = 8000;
+
+/**
+ * The collaboration server is one service, so this reads the one URL that names it.
+ * (An override var existed briefly for pointing server-to-server traffic at a
+ * different address; nothing in this topology needs that.) `NEXT_PUBLIC_` is only a
+ * build-time inlining hint for the client — the value is a normal env var here, and
+ * it is the same host the browser opens its websocket to. ws→http because the client
+ * var is a websocket URL.
+ */
+function internalApplyUrl(): string | null {
+  if (!process.env.COLLABORATION_WRITE_SECRET) return null;
+  const base = process.env.NEXT_PUBLIC_HOCUSPOCUS_URL;
+  if (!base) return null;
+  const http = base.replace(/^ws:/, "http:").replace(/^wss:/, "https:");
+  return `${http.replace(/\/$/, "")}/internal/apply`;
+}
+
+interface ApplyResponse {
+  ok?: boolean;
+  refused?: string;
+  error?: string;
+  before?: JSONContent;
+  charsBefore?: number;
+  charsAfter?: number;
+  blocksBefore?: number;
+  blocksAfter?: number;
+}
+
+/**
+ * Write note content by the route the document's state requires.
+ *
+ * @throws NoteEditRefused when the shrink guard trips without approval. Every other
+ *   failure degrades to the payload path rather than failing the caller — NotePayload
+ *   remains the durable store, so a Hocuspocus outage must not block a write.
+ */
+export async function writeNoteContent(
+  request: WriteNoteContentRequest,
+): Promise<WriteNoteContentResult> {
+  const { contentId, ownerId, mode, content, destructiveApproved } = request;
+
+  const collabDoc = await prisma.collaborationDocument.findUnique({
+    where: { contentId },
+    select: { contentId: true },
+  });
+
+  if (collabDoc) {
+    const url = internalApplyUrl();
+    if (url) {
+      try {
+        const applied = await applyThroughCollaboration(url, request);
+        // Log SUCCESS, not just failure. Only failures logged before, so a write
+        // that behaved unexpectedly left no trace at all and every diagnosis had to
+        // be inferred from the document's final state — which cost several rounds
+        // of guessing during the first smoke. mode + sizes make "it appended when I
+        // asked it to shorten" readable at a glance.
+        logger.info({
+          layer: "ai",
+          event: "collab_write:applied",
+          summary: `${request.mode} applied through the live document`,
+          attrs: {
+            content_id: contentId,
+            mode: request.mode,
+            chars_before: applied.charsBefore,
+            chars_after: applied.charsAfter,
+            blocks_before: applied.blocksBefore,
+            blocks_after: applied.blocksAfter,
+          },
+        });
+        return {
+          route: "collaboration",
+          charsBefore: applied.charsBefore ?? 0,
+          charsAfter: applied.charsAfter ?? 0,
+          blocksBefore: applied.blocksBefore ?? 0,
+          blocksAfter: applied.blocksAfter ?? 0,
+          snapshot: applied.before ?? null,
+          mayBeMaskedInOpenEditor: false,
+        };
+      } catch (error) {
+        // A refusal is a decision, not a transport failure — do not fall back and
+        // silently perform the destructive write the guard just blocked.
+        if (error instanceof NoteEditRefused) throw error;
+
+        // REFUSE rather than fall back (owner decision, 2026-08-13, after watching
+        // it happen). Falling back to NotePayload here looks like a save and is not
+        // one: bootstrap trusts a meaningful stored Y state OVER the payload, so the
+        // change is invisible — and the moment that editor reconnects, its snapshot
+        // is written back over the payload and the change is GONE. Reporting success
+        // for a write scheduled to be destroyed is the same dishonesty this branch
+        // exists to remove, just with a longer fuse.
+        //
+        // The payload IS durable when no collaborative copy exists; that path is
+        // untouched below. This refusal is only for "a copy exists and we could not
+        // reach it".
+        logger.warn({
+          layer: "ai",
+          event: "collab_write:refused_unavailable",
+          summary:
+            "collaborative apply failed and a collaborative copy exists — refusing rather than writing a payload that would be overwritten",
+          attrs: { content_id: contentId },
+          error,
+        });
+        throw new NoteEditRefused(
+          "collaboration-unavailable",
+          "Not saved: the collaboration server could not be reached, and this document has a live collaborative copy. " +
+            "Writing to storage instead would be overwritten as soon as the document reconnects, so nothing was changed. Try again in a moment.",
+        );
+      }
+    }
+    // No `url` means the write-through path is not configured in this environment
+    // (COLLABORATION_WRITE_SECRET unset). That is the feature being OFF, not an
+    // outage, so behavior stays exactly as it was before this branch: write the
+    // payload and flag that it may be masked. Refusing here would break every AI
+    // write to a previously-opened note in an unconfigured deployment.
+  }
+
+  // Payload path. S2 (no collaborative copy) reaches here by design; S3 only
+  // reaches it when Hocuspocus is unconfigured or unreachable.
+  const result = await writeNotePayload({
+    contentId,
+    ownerId,
+    mode,
+    content,
+    destructiveApproved,
+  });
+  logger.info({
+    layer: "ai",
+    event: "collab_write:applied",
+    summary: `${mode} written to the payload`,
+    attrs: {
+      content_id: contentId,
+      mode,
+      route: collabDoc ? "payload-fallback" : "payload",
+      chars_before: result.charsBefore,
+      chars_after: result.charsAfter,
+      blocks_before: result.blocksBefore,
+      blocks_after: result.blocksAfter,
+    },
+  });
+
+  return {
+    ...result,
+    route: collabDoc ? "payload-fallback" : "payload",
+    mayBeMaskedInOpenEditor: Boolean(collabDoc),
+  };
+}
+
+async function applyThroughCollaboration(
+  url: string,
+  request: WriteNoteContentRequest,
+): Promise<ApplyResponse> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), APPLY_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        "x-dg-collab-write": process.env.COLLABORATION_WRITE_SECRET ?? "",
+      },
+      body: JSON.stringify({
+        contentId: request.contentId,
+        mode: request.mode,
+        content: request.content,
+        destructiveApproved: request.destructiveApproved === true,
+        expectedOwnerId: request.ownerId,
+      }),
+    });
+
+    const body = (await response.json().catch(() => null)) as
+      | ApplyResponse
+      | null;
+
+    if (response.status === 409 && body?.refused === "shrink") {
+      throw new NoteEditRefused("shrink", body.error ?? "refused");
+    }
+    if (!response.ok || !body?.ok) {
+      throw new Error(
+        `internal apply failed (${response.status}): ${body?.error ?? "no body"}`,
+      );
+    }
+    return body;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * The payload write, with the same op semantics as the collaborative path so both
+ * routes behave identically from the caller's perspective.
+ */
+async function writeNotePayload({
+  contentId,
+  ownerId,
+  mode,
+  content,
+  destructiveApproved,
+}: WriteNoteContentRequest): Promise<
+  Omit<WriteNoteContentResult, "route" | "mayBeMaskedInOpenEditor">
+> {
+  const existing = await prisma.notePayload.findUnique({
+    where: { contentId },
+    select: { tiptapJson: true },
+  });
+  const before = (existing?.tiptapJson as JSONContent | undefined) ?? {
+    type: "doc",
+    content: [],
+  };
+
+  const { target } = buildNoteEditTarget(before, {
+    mode,
+    content,
+    destructiveApproved,
+  });
+
+  const charsBefore = extractSearchTextFromTipTap(before).length;
+  const searchText = extractSearchTextFromTipTap(target);
+
+  // Same guard as the collaborative path — a fallback must not become the loophole
+  // through which an unapproved rewrite lands.
+  if (
+    !destructiveApproved &&
+    charsBefore >= SHRINK_GUARD_MIN_CHARS &&
+    searchText.length < charsBefore * SHRINK_RETAIN_FLOOR
+  ) {
+    throw new NoteEditRefused(
+      "shrink",
+      `Refused: this would cut the document from ${charsBefore} to ${searchText.length} characters. ` +
+        `Send the full intended content, or ask the user to confirm a rewrite.`,
+    );
+  }
+
+  const wordCount = searchText.split(/\s+/).filter(Boolean).length;
+  const metadata = {
+    wordCount,
+    characterCount: searchText.length,
+    readingTime: Math.ceil(wordCount / 200),
+  };
+
+  await prisma.notePayload.upsert({
+    where: { contentId },
+    update: {
+      tiptapJson: target as unknown as Prisma.InputJsonValue,
+      searchText,
+      metadata,
+    },
+    create: {
+      contentId,
+      tiptapJson: target as unknown as Prisma.InputJsonValue,
+      searchText,
+      metadata,
+    },
+  });
+
+  // NO RESEED HERE — removed 2026-08-13 after it corrupted a document in testing.
+  //
+  // Reseeding was the old "race closer": if a collaborative copy appeared, realign
+  // the stored snapshot from the payload. But `reseedCollaborationDocumentFromNote`
+  // builds a BRAND-NEW Y.Doc (fresh client/item ids), so it is a rival document
+  // rather than a newer version. Y.js merge is additive, so when any surviving copy
+  // — a live session, or a browser's IndexedDB cache — later syncs, the two bodies
+  // COMBINE. Observed: a note's original content appended to itself after a
+  // disconnected editor reconnected, then written back to the payload by the store
+  // hook.
+  //
+  // The condition under which we would reseed (a CollaborationDocument row exists)
+  // is precisely the condition under which another copy exists, so the operation is
+  // never safe here. Being masked in an open editor is recoverable — the reader can
+  // reload; duplicating a document is not. We flag `mayBeMaskedInOpenEditor` on the
+  // receipt instead and let the collaborative route own that note from now on.
+  void ownerId;
+
+  return {
+    charsBefore,
+    charsAfter: searchText.length,
+    blocksBefore: Array.isArray(before.content) ? before.content.length : 0,
+    blocksAfter: Array.isArray(target.content) ? target.content.length : 0,
+    snapshot: before,
+  };
+}

@@ -217,6 +217,8 @@ export class AiEditOrchestrator {
   private timeoutId: ReturnType<typeof setTimeout> | null = null;
   private onStateChange: (editing: boolean) => void;
   private onEditResult: (result: EditResult) => void;
+  /** toolCallId → resolver, for callers awaiting a specific edit's outcome. */
+  private awaiters = new Map<string, (result: EditResult) => void>();
 
   constructor(
     private getEditor: () => Editor | null,
@@ -229,11 +231,52 @@ export class AiEditOrchestrator {
     this.onEditResult = callbacks.onEditResult;
   }
 
-  /** Enqueue an edit payload for processing */
-  enqueue(payload: EditPayload): void {
+  /**
+   * Enqueue an edit and await ITS outcome.
+   *
+   * `enqueue` is fire-and-forget with a single global `onEditResult` callback,
+   * which is fine for a payload that arrived inside a tool result the model has
+   * already been told about. It is NOT enough for a **client-executed** tool: there
+   * the model is still waiting, and the honest outcome has to become the tool's
+   * return value. Without this, a failed edit was reported to the model as success
+   * (2026-08-12: "Done — appended…" while the client had toasted
+   * "Could not locate the text to edit" and written nothing).
+   *
+   * Resolves with the same EditResult that `onEditResult` receives, so the caller
+   * can turn it into a truthful tool result.
+   */
+  applyAndWait(payload: EditPayload): Promise<EditResult> {
+    const id = payload.toolCallId;
+    if (!id) {
+      // Nothing to correlate a result to; fall back to fire-and-forget.
+      this.enqueue(payload);
+      return Promise.resolve({ success: true, action: payload.action });
+    }
+    const pending = new Promise<EditResult>((resolve) => {
+      this.awaiters.set(id, resolve);
+    });
+    if (!this.enqueue(payload)) {
+      // Dropped as a duplicate — no result will ever be emitted for it.
+      this.awaiters.delete(id);
+      return Promise.resolve({
+        success: false,
+        action: payload.action,
+        error: "This edit was already applied.",
+      });
+    }
+    return pending;
+  }
+
+  /**
+   * Enqueue an edit payload for processing.
+   *
+   * Returns false when the payload was dropped (duplicate tool call, or a repeated
+   * identical block) so `applyAndWait` never hangs on a result that will not come.
+   */
+  enqueue(payload: EditPayload): boolean {
     // Idempotency: never apply the same tool call's edit twice.
     if (payload.toolCallId) {
-      if (appliedToolCallIds.has(payload.toolCallId)) return;
+      if (appliedToolCallIds.has(payload.toolCallId)) return false;
       appliedToolCallIds.add(payload.toolCallId);
     }
     // Content dedupe: drop a redundant identical block from parallel/repeat
@@ -242,13 +285,14 @@ export class AiEditOrchestrator {
       const sig = blockContentSignature(payload);
       const now = Date.now();
       const last = recentBlockInserts.get(sig);
-      if (last !== undefined && now - last < BLOCK_DEDUP_WINDOW_MS) return;
+      if (last !== undefined && now - last < BLOCK_DEDUP_WINDOW_MS) return false;
       recentBlockInserts.set(sig, now);
     }
     this.queue.push(payload);
     if (!this.processing) {
       this.processQueue();
     }
+    return true;
   }
 
   /** Abort all pending edits and unlock the editor */
@@ -257,11 +301,37 @@ export class AiEditOrchestrator {
     this.queue = [];
     this.clearTimeout();
     this.unlock();
+    // Anything queued behind the abort will never produce a result. A
+    // client-executed tool has the model blocked on that result, so settle every
+    // awaiter rather than leaving the run hung.
+    this.settleAllAwaiters(
+      "Editing was interrupted before this change was applied.",
+    );
   }
 
   /** Clean up — call on unmount or document navigation */
   destroy(): void {
     this.abort();
+  }
+
+  /** Resolve a caller waiting on this specific edit, if any. */
+  private settleAwaiter(
+    toolCallId: string | undefined,
+    result: EditResult,
+  ): void {
+    if (!toolCallId) return;
+    const resolve = this.awaiters.get(toolCallId);
+    if (!resolve) return;
+    this.awaiters.delete(toolCallId);
+    resolve(result);
+  }
+
+  /** Settle every outstanding awaiter — used when the queue is torn down. */
+  private settleAllAwaiters(error: string): void {
+    for (const [id, resolve] of this.awaiters) {
+      this.awaiters.delete(id);
+      resolve({ success: false, action: "Edit interrupted", error });
+    }
   }
 
   // ─── Queue processing ──────────────────────────────────────
@@ -283,6 +353,7 @@ export class AiEditOrchestrator {
 
       const result = await this.executeEdit(payload);
       this.onEditResult(result);
+      this.settleAwaiter(payload.toolCallId, result);
 
       this.clearTimeout();
 
