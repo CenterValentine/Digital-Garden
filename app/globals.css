@@ -549,6 +549,22 @@ nav[class*="fixed"] {
   }
 }
 
+/* iOS auto-zooms the page when a focused form control's font-size is under
+ * 16px — and the zoom STICKS after blur, leaving fixed-position dialogs
+ * clipped off-screen (observed: Upload dialog folder <select>, P0 shell
+ * smoke 2026-08-14). Flooring controls at 16px on coarse pointers removes
+ * the trigger without disabling pinch-zoom (the accessibility cost a
+ * maximum-scale=1 viewport would impose). !important is required to beat
+ * utility classes like .text-sm — that override is the entire point here.
+ * Tradeoff: also caps rare larger-than-16px inputs down to 16px on touch. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 @media (pointer: coarse) {
   .touch-callout-none {
     -webkit-user-select: none;
