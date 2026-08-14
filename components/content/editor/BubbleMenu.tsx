@@ -64,6 +64,17 @@ const IS_COARSE_POINTER =
   window.matchMedia?.("(pointer: coarse)").matches === true;
 
 /**
+ * MUST be a module-level constant, not an inline literal at the render site.
+ * TipTap's BubbleMenu re-initializes its floating plugin whenever the
+ * `options` identity changes; an inline `{ placement: "bottom" }` is a fresh
+ * object every render → plugin update → state change → re-render → infinite
+ * loop ("Maximum update depth exceeded"). Desktop never hit it because its
+ * options are `undefined` (stable) — the loop only armed on coarse-pointer
+ * devices (caught in the P0 shell smoke, 2026-08-14).
+ */
+const COARSE_POINTER_MENU_OPTIONS = { placement: "bottom" as const };
+
+/**
  * Prevent focus theft — keeps editor selection alive when clicking toolbar buttons.
  * Only preventDefault is needed — this stops the browser from moving focus to the
  * clicked button. Do NOT use stopPropagation here: TipTap's BubbleMenu plugin
@@ -476,7 +487,7 @@ export function BubbleMenu({ editor, onLinkClick }: BubbleMenuProps) {
       pluginKey={textFormattingBubbleMenuKey}
       updateDelay={100}
       shouldShow={shouldShow}
-      options={IS_COARSE_POINTER ? { placement: "bottom" } : undefined}
+      options={IS_COARSE_POINTER ? COARSE_POINTER_MENU_OPTIONS : undefined}
       className="flex flex-col gap-2 rounded-lg border border-white/10 bg-black/80 p-2 shadow-lg backdrop-blur-md"
     >
       <div className="flex items-center gap-1">
