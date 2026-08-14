@@ -15,11 +15,14 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   scheme: "digitalgarden",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
-  // Config plugins for the core runtime modules Expo's Metro/asset pipeline
-  // expects. Required here because a dynamic (app.config.ts) config can't be
-  // auto-edited by `expo install`.
-  plugins: ["expo-asset", "expo-font"],
+  // (SDK 57 note: `newArchEnabled` was removed — the New Architecture is
+  // always on and the opt-in flag no longer exists in ExpoConfig.)
+  // Config plugins for modules that ship one. Required here because a dynamic
+  // (app.config.ts) config can't be auto-edited by `expo install`. As of SDK
+  // 57, expo-asset/expo-font plugins are built into expo itself; status-bar
+  // and web-browser now ship their own (this is the exact list
+  // `expo install --fix` prescribed on the 52→57 upgrade).
+  plugins: ["expo-status-bar", "expo-web-browser"],
   ios: {
     // iPhone-first per the spike brief.
     bundleIdentifier: "com.centervalentine.digitalgarden",
