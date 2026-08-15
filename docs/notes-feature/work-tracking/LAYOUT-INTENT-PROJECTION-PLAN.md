@@ -1,118 +1,150 @@
-# Layout Intent / Projection — Intent Taxonomy & Infra Plan
+# Layout Intent / Projection — Behavioral Spec v2 & Infra Plan
 
-**Status:** Taxonomy v1 (this doc) — gating the workspace-infra update.
+**Status:** v2 — owner behavioral requirements encoded (2026-08-14). Supersedes the v1 pure-taxonomy draft; v1's class system and ghost-writer audit remain valid and are folded in below.
 **Branch:** `feat/layout-intent-projection`.
-**Owner rulings so far:** (1) active-tab syncing is **decoupled — device-local**; (2) active workspace selection is **device-local**; (3) phones support single + one orientation-adaptive 2-pane split, and rendering constraints must **never write back** into shared state (no "phone coercion writes"); (4) one rule set, no per-device exceptions — exceptions dissolve by classifying state correctly, not by branching sync.
 
-## 1. Principle
-
-Every piece of "workspace state" is exactly one of four classes:
+## 1. Principle (unchanged from v1)
 
 | Class | Name | Storage | Sync |
 |---|---|---|---|
-| **I** | **Workspace intent** — what the workspace *is* | Workspace record (server) | ✅ across devices |
-| **II** | **Projection** — how *this device class* renders the intent | Nowhere — pure function of (intent, device class, orientation, surface) | ❌ never stored |
-| **III** | **Device navigation** — where *this device* is within the intent | Device-local (zustand/localStorage/URL), may be namespaced per workspace | ❌ never synced |
-| **IV** | **User preference** — cross-workspace taste | Settings (server, per user) | ✅ via settings |
+| **I** | **Workspace intent** | Workspace record (server) | ✅ |
+| **II** | **Projection** — how a surface renders intent | Pure function, never stored | ❌ |
+| **III** | **Device navigation** | Device-local (+ per-device *layout records*, server-listed for adoption) | ❌ (readable by others for inheritance/adoption) |
+| **IV** | **User preference** | Settings | ✅ (device-scoped subset local) |
 
-Rules: **sync intents, derive projections, keep navigation local.** Composition/content = intent. Geometry/arrangement/position = projection or navigation. A projection may read anything; it may write **nothing**.
+Sync intents, derive projections, keep navigation local. A projection may write nothing.
 
-## 2. What syncs today (audit of `WorkspaceStatePayload`)
+## 2. Behavioral requirements (owner, 2026-08-14)
 
-`extensions/workplaces/server/types.ts` — pushed by `persistActiveWorkspace()` (`workspace-store.ts:895`, PATCH `/api/content/workspaces/[id]/state`), triggered by `WorkplacesShellController` on every workspace-snapshot change:
+**R1 — Tab membership always syncs, per workspace.** Content opened anywhere appears as a tab in every session of that workspace, on every surface. Content closed anywhere (tab ✕ or any close path) disappears everywhere. Membership is **workspace-scoped, not pane-scoped**.
 
-| Field | Today | Target class | Note |
-|---|---|---|---|
-| `layoutMode` | synced | **I** | The intent. Phones render a projection of it; quad remains legal intent everywhere. |
-| `activePaneId` | synced | **III** | Owner ruling. Move to per-device slice. |
-| `activeContentId` (global) | synced | **III** | "Active tab" — owner ruling. Per-device. |
-| `paneTabContentIds[pane].contentIds` | synced | **I** | The tab **set + order** per pane is composition — stays synced. |
-| `paneTabContentIds[pane].activeContentId` | synced | **III** | Per-pane active tab — per-device, keyed (workspaceId, paneId). |
+**R2 — Layout + tab order couple across DESKTOP only.** Two desktop windows on the same workspace mirror pane layout and tab order live. Every other surface — native phone, native tablet, web-mobile phone, web-mobile tablet, and **each extension surface individually** (no cross-extension coupling) — keeps an independent layout. Decoupled is the default posture; desktop is the one platform designed to couple, and only on the same workspace.
 
-Adjacent server-owned intent (unchanged by this plan): workspace identity/name/archive, item assignments & claims (`WorkspaceOpenConflict` machinery), view roots/folder scopes, folder view settings (per-folder config).
+**R3 — Active view NEVER syncs.** Active tab / active pane never propagate — not even between coupled desktops. Two sessions on one workspace may deviate in what they're looking at. Active view is only **inherited** as a seed when a layout is adopted/inherited (roll over the source's last-active to infer where the user was).
 
-## 3. Full state taxonomy
+**R4 — New tabs land via a compatibility layer.** A tab opened into a pane on one layout lands in the *closest compatible pane* on each other layout (see §4). Final fallback of the chain: **top-left (main) pane**.
 
-### Class I — Workspace intent (synced)
-| Item | Where today | Notes |
-|---|---|---|
-| `layoutMode` (single / dual-v / dual-h / quad) | content-store → payload | Set from ANY device writes through (incl. phone — a phone user *choosing* a layout edits intent; the phone then renders its projection of it). |
-| Pane tab sets + order | content-store → payload | |
-| Pinned tabs (`isPinned`) | content-store tab state | Pinning is composition. Verify it round-trips the payload today. |
-| Pane content assignment (which note in which pane) | payload | Write-through from projections allowed (composition rule). |
-| Workspace membership/claims/scopes | server | Already server-owned. |
+**R5 — Memoryless sessions inherit.** A session opening a workspace with no local layout record adopts: most recent **desktop** layout → else most recent **extension** → else most recent **mobile**. The inherited record's last-active view seeds the initial active view.
 
-### Class II — Projection (derived, never stored, never written back)
-| Projection | Surface(s) | Replaces |
-|---|---|---|
-| quad → 2-pane (panes 1–2 + "2 more" hint) on phones | phone web, shell | the deleted coercion write |
-| dual-v ⇄ dual-h orientation mapping | phone web, shell | the deleted rotation write |
-| 3-pane shell → single pane + drawers + bottom nav | phone web, shell | (already render-only via `useIsMobile`/`useIsPhone`) |
-| Landscape nav auto-hide + focus-mode chrome hiding | phone web, shell | (render-only today — `chromePeek`/`focusMode` are Class III inputs) |
-| Forced single-pane, no workspace bar | extension side-panel iframe | today achieved by mounting patterns — must ALSO stop persisting (see §5) |
-| Forced single pane + collapsed right sidebar | `/content/focus/[id]` route | today `FocusContentWorkspace` **writes** `restoreWorkspace({layoutMode:"single"})` + `setCollapsed(true)` — ghost writes to replace with a projection input (route → projection) |
-| Fullscreen visualization (no chrome) | `/content/*/fullscreen` | render-only today ✓ |
-| Right-sidebar auto-collapse under 960px | narrow desktop | today an effect writing collapse store (`ResizablePanels`) — acceptable (writes Class III, not intent) but should become pure projection with the redesign |
-| Native-shell chrome hiding (`html[data-native-shell]`) | shell | CSS-only ✓ |
+**R6 — Workspace selection NEVER syncs.** Which workspace a session has open is strictly per-session/device. (Historical bug; the infra must make it structurally impossible, not just avoided.)
 
-### Class III — Device navigation (local; namespace per workspace where noted)
-| Item | Store today | Keying |
-|---|---|---|
-| Active workspace id | workspace-store (synced-ish via restore flows) | device |
-| `activePaneId` | content-store → **synced (to move)** | device × workspace |
-| Per-pane active tab | content-store → **synced (to move)** | device × workspace × pane |
-| Temporary tabs (`isTemporary`) | content-store (already guarded from URL/localStorage — `content-store.ts:895` comment) | device |
-| Tab-title cache (`workspaceTabTitles`), tab preferences, `LAST_SELECTED_KEY`, `?content=` URL param | localStorage/URL | device |
-| Sidebar widths & visibility | panel-store (localStorage v3) | device |
-| Left/right collapse modes, left view (files/search/…) | collapse/view stores | device |
-| Drawer open, `focusMode`, `chromePeek` | mobile-ui-store (ephemeral) | device |
-| Tree expansion snapshot | `saveTreeSnapshotForWorkspace` (local) | device × workspace ✓ already |
-| Navigation history, search query/results, outline, editor stats | respective stores | device |
-| Scroll positions, selection, editor focus | component state | device |
+**R7 — Quad allowed everywhere except extensions.** Extensions never render/offer quad. Mobile keeps quad for now (on the chopping block, undecided) — rendered via projection if the layout says so.
 
-### Class IV — User preference (settings-synced)
-Theme, editor preferences, periodic-notes config, etc. **Future candidates:** user-tunable projection parameters (e.g. "phones always open single-pane") — these are preferences *about* projections, not workspace state; they belong in settings, keeping the no-exceptions rule intact.
+**R8 — Order is read-at-open, not actively pushed** (outside the live desktop coupling of R2). Sessions write their own layout records as they change; others consume those records only at workspace-open (R5) or explicit adoption (F2).
 
-## 4. Surfaces coverage matrix
+### New features
 
-| Surface | Intent read | Intent write | Projection | Notes |
+**F1 — Main-workspace-only "adopt into new workspace".** A quick affordance (Main workspace only) that snapshots the current tab layout into a brand-new workspace: quick name + icon assignment. No other workspace offers this.
+
+**F2 — Cross-device layout adoption ("sync affordance").** Any workspace view can adopt another device's layout for the same workspace (e.g. desktop adopts the phone's single-pane + its active tab). The affordance opens a dropdown of **unique per-device layout records, recency < 30 days** (stale layouts are forgotten). A radio selects the **lead layout** — overriding the default inheritance chain (R5) for this workspace; if the lead device's record expires, the default chain wins again.
+
+## 3. Data model
+
+### Workspace intent (Class I — always synced)
+```
+WorkspaceTabMembership {
+  workspaceId
+  tabs: [{ contentId, affinity: { h: left|right, v: top|bottom },  // placement hint, from origin pane
+           isPinned, addedAt }]
+  // NO layoutMode, NO order, NO active fields at workspace level
+}
+```
+Open/close events mutate this set and fan out to all sessions (R1). The existing per-tab `preferredHorizontal`/`preferredVertical` fields in `WorkspaceTabState` are the affinity carriers — already in the codebase.
+
+### Layout records (Class III — per surface family, server-listed for R5/F2)
+```
+WorkspaceLayoutRecord {
+  workspaceId
+  family: "desktop" | "native-phone" | "native-tablet" | "web-phone" | "web-tablet"
+        | "ext:<extensionSurfaceId>"          // every extension surface unique (R2)
+  deviceId: string | null                      // null for the shared desktop record
+  layoutMode, paneOrder: [{ paneOrdinal, tabOrder: contentId[] }]
+  lastActive: { paneOrdinal, contentId }       // inheritance seed ONLY (R3)
+  updatedAt                                    // 30-day recency filter (F2)
+}
+```
+- **Desktop = one shared record per workspace** (that *is* the coupling; concurrent desktops live-follow it).
+- All other families: one record per device, written by that device, read by others only at open/adopt.
+- Retention: records older than 30 days drop out of the F2 picker; a lead-layout pointer to an expired record falls back to the R5 chain.
+
+### Explicitly NOT stored anywhere shared
+Active tab/pane (except the `lastActive` seed), scroll, focus mode, drawers, sidebar geometry, which workspace is open (R6 — there is simply no field for it in any synced record).
+
+## 4. Pane compatibility matrix (R4)
+
+Panes have **ordinals** (primary=TL, secondary, tertiary, quaternary) per layout:
+
+| Layout | 1º | 2º | 3º | 4º |
 |---|---|---|---|---|
-| Desktop ≥960px | ✓ | ✓ | identity | baseline |
-| Desktop narrow window | ✓ | ✓ | mobile layout via `useIsMobile` | user keeps chosen layout (no phone coercion) |
-| Tablet (any orientation) | ✓ | ✓ | identity (all panes) | owner ruling: tablets = full panes |
-| Phone web portrait / landscape | ✓ | ✓ (composition only) | dual orientation mapping; quad→dual+hint | coercion writes deleted |
-| **Native shell (WebView)** | ✓ | ✓ (composition only) | same as phone web + shell chrome CSS | same web code path; bridge adds nothing stateful |
-| **Extension side-panel iframe** (`/embed/panel`) | ✓ | **✗ — must not persist** | forced single-pane, no workspace bar | mounts `MainPanelWorkspace` + real stores today; `WorkplacesShellController` persist path must be inert here (see §5) |
-| **Extension overlay iframe** | ✓ | ✗ | projection of panel surface | same embed family; verify which shell controllers mount |
-| `/content/focus/[id]` | ✓ | ✗ | forced single + collapsed right | replace today's ghost writes |
-| `/mobile` launcher + `/mobile/note/[id]` reader | ✗ (own simple pages) | ✗ | n/a | no workspace state; safe |
-| Published/public pages | ✗ | ✗ | n/a | out of scope |
+| single | TL | — | — | — |
+| dual-vertical (side-by-side) | TL | TR | — | — |
+| dual-horizontal (stacked) | TL | BL | — | — |
+| quad | TL | TR | BL | BR |
 
-## 5. Known ghost-writers to eliminate (evidence)
+**Landing rule** for a tab with origin ordinal *n* arriving at a layout with *k* panes:
+1. Land at ordinal **min(n, k)** — so side-by-side *right* (2º) ↔ stacked *bottom* (2º), the owner's canonical example.
+2. Quad refines with stored affinity `(h, v)` → exact quadrant; affinity is also back-filled cross-axis (right⇒bottom, left⇒top and inverse) so dual↔dual mappings stay stable.
+3. Anything unresolvable → **top-left** (main target pane; R4's worst case).
 
-1. **Phone coercion effect** — `MobileNotesLayout` `setLayoutMode()` on orientation/quad (PR #113): rendering constraint mutating intent. → delete; replace with projection fn.
-2. **Focus route** — `FocusContentWorkspace` `restoreWorkspace({layoutMode:"single"})` + `setCollapsed(true)`: route projection expressed as writes. → projection input.
-3. **Embed panel persistence — CONFIRMED** — `/embed/panel` mounts `MainPanelWorkspace`, whose `shellControllers` render gated only on `!isFocusMode` (`MainPanelWorkspace.tsx:716`), and `WorkplacesShellController` (the `persistActiveWorkspace` trigger, registered `extensions/workplaces/client.tsx:13`) therefore runs inside the extension iframe: any tab activity in the panel PATCHes workspace state and, with today's payload, overwrites `activeContentId`/`activePaneId` chosen on desktop. → embed surfaces get a read-only sync mode (no persist controller). Overlay iframe: same family — verify its mount set in the infra pass.
-4. **Right-sidebar <960px auto-collapse** — writes a Class III store from a viewport condition; lowest priority (never syncs), fold into projection when touched.
-5. **Workspace-sync restore echo** — `restoreContentWorkspace(workspace)` re-applies server payload over live local state (the revert-fight). With III-fields removed from the payload, the echo can no longer fight the device's own navigation.
+Projection composes with this: a phone projecting quad→dual applies the same rule against its projected pane count.
 
-## 6. Infra update (next step, after owner review)
+## 5. Inheritance & adoption chain (R5, F2)
 
-1. **Split the payload**: `WorkspaceStatePayload` drops `activePaneId` + both `activeContentId`s → they move to a per-device slice (`localStorage`, keyed `dg:ws-nav:{workspaceId}`) with a migration that seeds device slices from the last synced values (no data loss; server keeps ignoring-but-accepting old fields during rollout for stale clients).
-2. **`useProjectedLayout()`**: pure fn of (intent.layoutMode, isPhone, isLandscape, surface) consumed by `MainPanelWorkspace`; delete ghost-writers 1–2.
-3. **Embed read-only mode**: surface flag (embed/overlay) gates the persist controller.
-4. **First-open default** (decision below) for a device that has never opened the workspace.
+```
+open workspace on a session:
+  local layout record for (workspace, family, deviceId)?   → use it
+  else lead-layout pointer set AND record fresh (<30d)?    → adopt lead (incl. lastActive seed)
+  else most recent desktop record?                         → adopt
+  else most recent extension record?                       → adopt      (extension > mobile)
+  else most recent mobile record?                          → adopt
+  else                                                     → default single, all tabs TL, first tab active
+```
+Adoption copies the record into the session's own local record; from then on the session diverges freely (R8).
 
-### Open decisions (owner)
-- **D1 — First-open seed:** new device opens a workspace: land on (a) first pane/first tab, or (b) a synced *hint* (`lastActiveContentId` kept server-side as advisory-only, never re-applied to a device with its own slice)? Lean: (b) — cheap continuity without the echo.
-- **D2 — Phone layout switcher scope:** phone offers single + the one orientation-appropriate dual in its switcher; quad intent set elsewhere still renders (projected). Confirm switcher should *hide* quad on phones vs. allow setting it blind.
-- **D3 — Pane sizes:** Allotment sizes as Class III per device (recommended) vs. Class I synced geometry.
-- **D4 — Tree expansion:** stays device×workspace local (today's behavior) — confirm.
+## 6. Ghost-writers to eliminate (v1 audit — all still apply)
 
-## 7. Verification plan (for the infra PR)
+1. Phone coercion effect (`MobileNotesLayout` `setLayoutMode`) → delete; projection replaces it.
+2. Focus route writes (`FocusContentWorkspace` `restoreWorkspace single` + `setCollapsed`) → projection input.
+3. **CONFIRMED:** embed panel mounts the workspace persist controller (`MainPanelWorkspace.tsx:716` gates shell controllers only on `!isFocusMode`; `WorkplacesShellController` registered `extensions/workplaces/client.tsx:13`) — the extension iframe PATCHes workspace state today. Under v2, extension surfaces write **only their own `ext:*` layout records**, never workspace intent fields beyond R1 membership events.
+4. Right-sidebar <960px auto-collapse effect → fold into projection when touched.
+5. Sync-restore echo (`restoreContentWorkspace` re-applying server payload over live local state) → dissolves: the only always-synced stream is membership (R1); layout arrives solely at open/adopt.
 
-- Two-device fight test: phone + desktop on one workspace; rotate phone, switch tabs on both — desktop layout/active tab must never move; tab set changes must appear on both.
-- Embed test: change tabs in the extension panel → desktop workspace state unchanged after reload; panel still follows tab-set changes from desktop.
-- Focus route: open/leave `/content/focus/x` → workspace layoutMode + right-sidebar state unchanged.
-- Reload persistence: per-device slice restores active pane/tab per workspace; fresh device gets D1 behavior.
-- Stale client: old app version PATCHing legacy fields must not clobber (server accepts + ignores III fields).
+## 7. Settings classification (Class IV split)
+
+Three buckets; "universal" changes propagate passively on next settings fetch.
+
+**Device-scoped (local to the device, never synced):**
+sidebar widths & collapse states (already local) · editor font scale / zoom · reduced-motion & animation toggles · phone projection preferences (default-single-pane, hide-quad-in-switcher if D2 lands that way) · landscape nav auto-hide on/off · haptics (shell) · notification sound/vibration per device · on-device media autoplay · dev worktree banner · collapse-handle positions.
+
+**Universal (account-wide, synced):**
+AI connections/keys & feature routing · default templates & periodic-notes config · tag colors · flashcard scheduling parameters · publishing config · timestamp/week-start/locale formats · spellcheck/language · trash retention · wiki-link behavior · TTS voice + speed.
+
+**Universal with per-device override (base synced; device may pin its own):**
+theme (dark on OLED phone, light on desktop) · editor density/line-width · font family. Override lives device-local; clearing it re-follows the universal base.
+
+## 8. Infra phases (build order, after owner sign-off on this spec)
+
+1. **P1 — Membership split:** extract `WorkspaceTabMembership` (R1) from the layout payload; open/close fan-out; affinity capture on placement. Server accepts+ignores legacy fields during rollout.
+2. **P2 — Layout records:** `WorkspaceLayoutRecord` table + per-family write paths; desktop shared record = the coupling (R2); kill ghost-writers 1–3; active-view fields removed from all shared writes (R3); R6 enforced by schema absence.
+3. **P3 — Compatibility layer:** ordinal+affinity landing (§4) applied on membership fan-in and layout switches; `useProjectedLayout()` for phone/extension/focus projections (R7 extension quad ban lives here).
+4. **P4 — Inheritance chain (R5/R8)** + 30-day recency.
+5. **P5 — Features:** F2 sync affordance (dropdown + lead radio) → F1 Main-workspace adopt-into-new-workspace.
+6. **P6 — Settings split (§7)** — can run parallel to P4/P5.
+
+### Open items for owner
+- Confirm interpretation: desktop coupling is *platform behavior*, not a user toggle.
+- Confirm R8 reading: desktop couples LIVE while concurrently open; all other families read-at-open only.
+- D2 (phone switcher: hide quad?) still open — mobile quad "on the chopping block."
+- D3 pane sizes: proposed device-local (geometry) — confirm.
+- F1 icon/name picker: reuse the existing workspace-create dialog components?
+
+## 9. Verification plan (infra PR gate)
+
+- **R1:** open/close on phone ↔ appears/disappears on desktop + extension panel.
+- **R2:** two desktop windows mirror layout+order live; phone/extension layout changes never move desktop.
+- **R3:** active tab changes propagate nowhere — including desktop↔desktop.
+- **R4:** side-by-side right-pane open lands stacked-bottom on the other device; all-miss lands TL.
+- **R5/R8:** fresh device inherits per chain (desktop > extension > mobile) incl. lastActive seed, then diverges.
+- **R6:** switching workspace on device A provably cannot affect device B (no schema path).
+- **F2:** picker lists only <30-day records, one per device; lead radio overrides chain; expiry falls back.
+- Embed clobber regression: tab activity in the extension panel never PATCHes desktop-visible state beyond R1 membership.
