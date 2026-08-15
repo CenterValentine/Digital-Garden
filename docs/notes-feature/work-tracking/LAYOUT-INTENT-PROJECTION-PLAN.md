@@ -131,12 +131,11 @@ theme (dark on OLED phone, light on desktop) · editor density/line-width · fon
 5. **P5 — Features:** F2 sync affordance (dropdown + lead radio) → F1 Main-workspace adopt-into-new-workspace.
 6. **P6 — Settings split (§7)** — can run parallel to P4/P5.
 
-### Open items for owner
-- Confirm interpretation: desktop coupling is *platform behavior*, not a user toggle.
-- Confirm R8 reading: desktop couples LIVE while concurrently open; all other families read-at-open only.
-- D2 (phone switcher: hide quad?) still open — mobile quad "on the chopping block."
-- D3 pane sizes: proposed device-local (geometry) — confirm.
-- F1 icon/name picker: reuse the existing workspace-create dialog components?
+### Owner decisions (2026-08-15 — all confirmed)
+- ✅ Desktop coupling is platform behavior (not a toggle); live only among concurrently-open desktops. All other families read layout at workspace-open only, **new opens targeting ordinally to preference** (affinity-guided ordinal landing, §4).
+- ✅ D2: **mobile keeps quad** — build it, but architect for a cheap future chop (quad availability must be a per-family projection capability flag, not scattered conditionals; chopping = flipping the flag for phone families).
+- ✅ D3: pane sizes are device-local geometry.
+- F1 icon/name picker: reuse the existing workspace-create dialog components (implementation detail, P5).
 
 ## 9. Verification plan (infra PR gate)
 
