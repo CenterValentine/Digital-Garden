@@ -145,6 +145,7 @@ export interface RuntimeConsumerDescriptor {
     | "person-workspace"
     | "right-sidebar"
     | "share-view"
+    | "note-window"
     | "other";
   workspaceId?: string | null;
   paneId?: string | null;

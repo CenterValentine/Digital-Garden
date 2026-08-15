@@ -341,5 +341,91 @@ if (ids.length === 2 && ids[0] !== ids[1] && ids[0] === "dup1") {
   fail(`blockId de-dupe (${JSON.stringify(ids)})`);
 }
 
+// ── 6. HTML round-trip strictness — no chrome text leaks into content ────────
+//
+// The accordion "▶Title" paste bug (2026-08-14): renderHTML emitted the
+// summary row (chevron glyph + title text) BESIDE the content hole, and
+// parseHTML had no contentElement, so generateJSON(generateHTML(node))
+// absorbed the chrome text INTO the node's content. Layers 1-5 never saw
+// it because `norm()` runs the same broken serializer on both sides of
+// every comparison — the corruption was baked into the baseline.
+//
+// This layer asserts, WITHOUT the norm() pre-pass, that a hole-bearing
+// block's body text survives HTML round-trip byte-identically: no header
+// text, no attribution, no glyphs leaking in. String attrs that default
+// to "" get a LEAK sentinel so any attr-derived chrome text is visible.
+// Atom nodes are skipped by construction (no content hole to pollute).
+//
+// If this layer surfaces a NEW asymmetry: fix the block's parseHTML
+// (contentElement) or renderHTML — allowlist with a TODO only when the
+// asymmetry is deliberate and documented.
+console.log("\n  ── HTML round-trip strictness (no chrome text in content) ──");
+const BODY_TEXT = "BODYTEXT";
+const collectText = (n: JSONContent): string => {
+  let out = "";
+  const walk = (node: JSONContent) => {
+    if (typeof node.text === "string") out += node.text;
+    (node.content ?? []).forEach(walk);
+  };
+  walk(n);
+  return out;
+};
+for (const type of nodeNames) {
+  if (["doc", "text", "paragraph"].includes(type)) continue;
+  const nodeType = schema.nodes[type];
+  if (!nodeType || !nodeType.spec.content) continue; // atoms: no hole
+  const specAttrs = nodeType.spec.attrs ?? {};
+  const attrs: Record<string, unknown> = {};
+  for (const [key, def] of Object.entries(specAttrs)) {
+    const dv = (def as { default?: unknown }).default;
+    if (dv === "") attrs[key] = "LEAK"; // attr-derived chrome text becomes visible
+  }
+  // Probe shape follows the content model: block-content nodes wrap the
+  // text in a paragraph, inline-content nodes (e.g. pullQuote) hold it
+  // directly — check() validates the guess.
+  let probeJson: JSONContent | null = null;
+  for (const content of [
+    [{ type: "paragraph", content: [{ type: "text", text: BODY_TEXT }] }],
+    [{ type: "text", text: BODY_TEXT }],
+  ] as JSONContent[][]) {
+    try {
+      const candidate = schema.nodeFromJSON({ type, attrs, content });
+      candidate.check();
+      probeJson = candidate.toJSON() as JSONContent;
+      break;
+    } catch {
+      // try the next content shape
+    }
+  }
+  if (!probeJson) {
+    pass(`${type} (skipped: no simple content probe)`);
+    continue;
+  }
+  // Child-only structural nodes are covered via their parents (layer 1):
+  // if the schema coerces the standalone probe away, skip.
+  const coerced = (norm({ type: "doc", content: [probeJson] }).content ?? [])[0];
+  if (!coerced || coerced.type !== type) {
+    pass(`${type} (child-only, tested via parent)`);
+    continue;
+  }
+  try {
+    const round = generateJSON(
+      generateHTML({ type: "doc", content: [probeJson] }, ext),
+      ext,
+    ) as JSONContent;
+    const first = (round.content ?? [])[0];
+    const text = first ? collectText(first) : "";
+    if (first && first.type === type && text === BODY_TEXT) {
+      pass(`${type} — body text survives, no chrome leak`);
+    } else {
+      fail(
+        `${type} — HTML round-trip polluted content (type=${first?.type}, text=${JSON.stringify(text)})`,
+      );
+    }
+  } catch (e) {
+    fail(`${type} — HTML round-trip error ${(e as Error).message.slice(0, 60)}`);
+  }
+}
+
 console.log(fails === 0 ? "\nmarkdown block-safety: all passed" : `\nmarkdown block-safety: ${fails} failed`);
 process.exit(fails === 0 ? 0 : 1);

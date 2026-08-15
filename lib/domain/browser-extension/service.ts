@@ -902,6 +902,8 @@ async function listNoteBacklinks(
     slug: string;
     excerpt: string;
     linkText: string;
+    /** How the source note references the target — text link vs embedded Note Window. */
+    kind: "wikiLink" | "noteWindow";
     updatedAt: string;
   }> = [];
 
@@ -920,6 +922,7 @@ async function listNoteBacklinks(
       slug: note.slug,
       excerpt: matches[0].context,
       linkText: matches[0].linkText,
+      kind: matches[0].kind,
       updatedAt: note.updatedAt.toISOString(),
     });
   }
@@ -935,7 +938,11 @@ function findLinksInTipTap(
   targetId: string
 ) {
   if (!node) return [];
-  const matches: Array<{ linkText: string; context: string }> = [];
+  const matches: Array<{
+    linkText: string;
+    context: string;
+    kind: "wikiLink" | "noteWindow";
+  }> = [];
 
   function extractText(n: JSONContent): string {
     if (n.type === "text") return n.text || "";
@@ -958,8 +965,24 @@ function findLinksInTipTap(
         matches.push({
           linkText: display,
           context: parentContext.trim() || display,
+          kind: "wikiLink",
         });
       }
+    }
+
+    // A Note Window targeting this content counts as a link (id-only —
+    // the wikiLink targetTitle guard doesn't apply). The node is an atom
+    // (flattens to no text), so linkText doubles as the excerpt fallback.
+    if (n.type === "noteWindow" && n.attrs?.targetContentId === targetId) {
+      const label =
+        typeof n.attrs.targetTitle === "string" && n.attrs.targetTitle
+          ? n.attrs.targetTitle
+          : targetTitle;
+      matches.push({
+        linkText: `Windowed: ${label}`,
+        context: parentContext.trim() || `Windowed: ${label}`,
+        kind: "noteWindow",
+      });
     }
 
     if (n.type === "text" && Array.isArray(n.marks)) {
@@ -973,6 +996,7 @@ function findLinksInTipTap(
           matches.push({
             linkText: n.text || targetTitle,
             context: parentContext.trim() || n.text || targetTitle,
+            kind: "wikiLink",
           });
         }
       }

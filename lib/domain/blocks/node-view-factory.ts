@@ -21,6 +21,7 @@ import type { EditorView } from "@tiptap/pm/view";
 import type { Editor } from "@tiptap/core";
 import { useBlockStore } from "@/state/block-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { getAllSlashBlocks, getBlockDefinition } from "./registry";
 import { calculateMenuPosition } from "@/lib/core/menu-positioning";
 import { applyWrapAttrs } from "./wrap-size";
@@ -408,6 +409,16 @@ export function buildBlockInsertJson(blockType: string): Record<string, unknown>
           },
         ],
       };
+    case "noteWindow": {
+      // Height honors the user's persisted default (the last height they
+      // set on any window) — same behavior as the "/" insert path.
+      const storedHeight =
+        useSettingsStore.getState().editor?.noteWindowDefaultHeight;
+      return {
+        type: blockType,
+        attrs: storedHeight ? { ...baseAttrs, height: storedHeight } : baseAttrs,
+      };
+    }
     default: {
       if (def?.atom || def?.contentModel === null) {
         return { type: blockType, attrs: baseAttrs };
@@ -776,7 +787,8 @@ export function createBlockNodeView(options: BlockNodeViewOptions) {
         // Any interactive mount (canvas, iframe, React-rendered diagram) gets full event control
         if (
           target.closest(".block-excalidraw-mount") ||
-          target.closest(".block-mermaid-mount")
+          target.closest(".block-mermaid-mount") ||
+          target.closest(".block-note-window-mount")
         ) {
           return true;
         }

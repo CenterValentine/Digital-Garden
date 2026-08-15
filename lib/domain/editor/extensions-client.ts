@@ -69,6 +69,8 @@ import { Stopwatch } from "./extensions/blocks/stopwatch";
 import { PullQuote } from "./extensions/blocks/pull-quote";
 import { TableOfContents } from "./extensions/blocks/table-of-contents";
 import { FlashcardEmbed } from "./extensions/blocks/flashcard-embed-client";
+import { NoteWindow } from "./extensions/blocks/note-window-client";
+import { BlockIdPasteHygiene } from "./extensions/block-id-paste-hygiene";
 import { AudioEmbed } from "./extensions/blocks/audio-embed-client";
 import { FlashcardSelect } from "./extensions/flashcard-select";
 import { ClozeDeletion } from "./extensions/cloze-deletion";
@@ -111,6 +113,17 @@ export interface EditorExtensionsOptions {
   fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
   /** Callback when a person mention is clicked */
   onPersonMentionClick?: (personId: string) => void;
+  /**
+   * Note Window nesting depth for this editor instance. 0 (default) for
+   * top-level editors; a Note Window NodeView creates its nested editor
+   * with depth + 1 so inner windows render collapsed/chipped instead of
+   * recursing. See note-window-client.tsx.
+   */
+  noteWindowDepth?: number;
+  /** Windowed target ids above this editor (cycle guard for Note Windows). */
+  noteWindowAncestorTargetIds?: string[];
+  /** Stale-proof resolver for the contentId this editor is showing (Note Window self-embed guard). */
+  getHostContentId?: () => string | undefined;
 }
 
 /**
@@ -317,6 +330,11 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     PullQuote,
     TableOfContents,
     FlashcardEmbed,
+    NoteWindow.configure({
+      depth: options?.noteWindowDepth ?? 0,
+      ancestorTargetIds: options?.noteWindowAncestorTargetIds ?? [],
+      getHostContentId: options?.getHostContentId ?? null,
+    }),
     AudioEmbed,
     FlashcardSelect,
     ClozeDeletion,
@@ -344,6 +362,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     // "RangeError: Unknown node type: inlineTimestamp".
     InlineTimestamp,
     Clipboard,
+    // Collision-scoped blockId re-id on paste — keeps per-instance block
+    // state (excalidraw/mermaid sub-maps, Note Window history) from being
+    // shared by two nodes after a same-note copy/paste.
+    BlockIdPasteHygiene,
   ];
 }
 

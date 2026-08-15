@@ -53,6 +53,10 @@ const editorSettingsSchema = z
     spellCheck: z.boolean().optional(),
     wordWrap: z.boolean().optional(),
     betaBlocks: z.boolean().optional(),
+    // Note Window: the last height the user set becomes the default for
+    // newly inserted windows (range mirrors the block schema). Unset =
+    // the block's built-in default.
+    noteWindowDefaultHeight: z.number().int().min(160).max(1200).optional(),
   })
   .optional();
 
