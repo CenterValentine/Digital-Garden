@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-11
+last_updated: 2026-08-14
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 14, 2026**: **Mobile app shell Phase 0 — Expo WebView shell revived on SDK 57, auth + in-shell UX hardened** (branch `feat/mobile-shell-p0`; typecheck/lint(151) green; full owner smoke passed on iPhone 16 Plus simulator)
+
+The June spike's native shell (`mobile/`) runs again on current tooling: Expo 52→57 (React 19.2, RN 0.86, TS 6; expo-doctor 21/21), with the three SDK-57 API breaks fixed (`newArchEnabled` removed, `absoluteFill` rename, `babel-preset-expo` now an explicit devDep) and WKWebView content-process termination recovery wired (silent reload once; error screen if it thrashes). Auth is end-to-end validated in-shell: `/mobile` is now auth-gated server-side (no sign-in, no menu), Google OAuth completes **inside** the WebView via a nav-policy allowlist for `accounts.google.com` (externalizing it stranded the session cookie in the Safari sheet's jar — the allowlist decision the spike README deferred), and the cookie survives app termination (simctl kill + relaunch → authed menu). In-shell smoke surfaced and fixed three web-side bugs: a coarse-pointer-only BubbleMenu infinite loop (inline options object identity — live on main for all touch web users), the nav logo dead-linking to `/` in-shell (now routes to the `/mobile` launcher), and the Upload dialog unusable on phones (iOS sticky auto-zoom from sub-16px form controls — global 16px floor on coarse pointers — plus dark-authored text on theme-aware glass — subtree now scoped `dark`). Full plan: memory `mobile-app-shell-plan` + "Garden Shell" artifact; next phase is EAS Build → TestFlight. Layout revert-fight observed during smoke is deliberately out of scope here (owned by the layout intent/projection fork).
 
 **August 12, 2026**: **AI writes land in the document you're looking at** (branch `feat/collab-write-path`; typecheck/lint(149)/collab:schema:check/note-edit:check green; owner smoke pending)
 
