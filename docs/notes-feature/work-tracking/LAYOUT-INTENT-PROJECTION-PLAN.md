@@ -57,7 +57,9 @@ WorkspaceLayoutRecord {
   workspaceId
   family: "desktop" | "native-phone" | "native-tablet" | "web-phone" | "web-tablet"
         | "ext:<extensionSurfaceId>"          // every extension surface unique (R2)
-  deviceId: string | null                      // null for the shared desktop record
+  deviceId: string                             // sentinel "shared" for the desktop record —
+                                               // NOT nullable: Postgres unique indexes treat
+                                               // NULLs as distinct, permitting duplicate rows
   layoutMode, paneOrder: [{ paneOrdinal, tabOrder: contentId[] }]
   lastActive: { paneOrdinal, contentId }       // inheritance seed ONLY (R3)
   updatedAt                                    // 30-day recency filter (F2)
