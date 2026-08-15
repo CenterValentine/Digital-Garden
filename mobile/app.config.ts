@@ -7,6 +7,17 @@ import type { ExpoConfig, ConfigContext } from "expo/config";
  * runtime from `EXPO_PUBLIC_DIGITAL_GARDEN_URL` (see src/config.ts). This
  * config only carries native identity + iOS-friendly defaults.
  */
+const webUrl =
+  process.env.EXPO_PUBLIC_DIGITAL_GARDEN_URL ?? "http://localhost:3015/mobile";
+
+/**
+ * The ATS local-networking exception exists ONLY for http:// dev servers.
+ * Deriving it from the target URL's scheme makes "remove the exception for
+ * release" structural: a build pointed at https (production) simply never
+ * carries it, so it can't ship by mistake.
+ */
+const needsLocalNetworking = webUrl.startsWith("http://");
+
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: "Digital Garden",
@@ -27,13 +38,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     // iPhone-first per the spike brief.
     bundleIdentifier: "com.centervalentine.digitalgarden",
     supportsTablet: true,
-    // Allow http://localhost during development. Tighten/remove for the
-    // production build, which should only ever load an https origin.
-    infoPlist: {
-      NSAppTransportSecurity: {
-        NSAllowsLocalNetworking: true,
-      },
-    },
+    // http:// dev target only — see needsLocalNetworking above.
+    ...(needsLocalNetworking
+      ? {
+          infoPlist: {
+            NSAppTransportSecurity: {
+              NSAllowsLocalNetworking: true,
+            },
+          },
+        }
+      : {}),
   },
   android: {
     package: "com.centervalentine.digitalgarden",
