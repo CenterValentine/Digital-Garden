@@ -10,6 +10,14 @@ last_updated: 2026-08-12
 
 ---
 
+## Nested-editor event-routing examination (2026-08-14, after Note Window; owner-requested)
+
+Systematic study of focus/selection/drag/keyboard/IME routing through **stacked ProseMirror editors** at depth ≥2: the `stopEvent` allowlist in `node-view-factory.ts`, `.block-note-window-mount` boundaries, BubbleMenu/suggestion-plugin scoping (which editor's slash menu / wiki-link autocomplete fires when nested?), and the `noteWindowDepth`/`noteWindowAncestorTargetIds` plumbing. **Plus the window-CustomEvent addressing audit**: the 2026-08-15 mermaid-multiplication regression proved window-level events with no editor addressing fan out to every mounted MarkdownEditor. `create-diagram-block`, `embed-diagram-create`, and `block-attrs-change` are fixed (editor in detail + listener guard); still unaddressed and needing the same treatment or an explicit single-instance argument: `editor-image-upload`, `editor-open-ai-image`, `insert-ai-image`, `insert-ai-audio`, `scroll-to-heading`. Goal: a safe plan for reducing bugs when editors get nested. **Prerequisite before ever relaxing the Note Window depth cap (currently: depth 1-2 collapsed→snapshot, depth ≥3 chip) or making nested windows editable.** Context: the Note Window v1 deliberately keeps nested windows read-only/never-runtime-acquiring precisely because two-editors-deep event routing is where embedded-editor bugs breed.
+
+(The diagram-header rename desync — excalidraw/mermaid titles never PATCHing the real file — was a backlog candidate here but got fixed in-scope with the Note Window work, 2026-08-14.)
+
+---
+
 ## Collab write path — Slices 2–4 + the server-side edit executor (2026-08-12, after `feat/collab-write-path`; plan: AI-COLLAB-WRITE-PATH-PLAN.md)
 
 - **Slice 2 — `firstOpenedInEditorAt`** (migration + backfill). Slice 1 uses the `CollaborationDocument` row as the "does another copy exist" discriminator. It is a leaky proxy: the client creates an IndexedDB cache unconditionally on open, so a note first opened while Hocuspocus was unreachable has a cache but no row, and an AI write to it takes the payload path and can still be masked. The stamp is set inside the existing `POST /api/collaboration/state` (no new request), backfilled from notes that already have a row.

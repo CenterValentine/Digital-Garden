@@ -248,6 +248,21 @@ function findLinksInTipTap(
       }
     }
 
+    // Parity with the LIVE walker in lib/domain/browser-extension/service.ts
+    // (this route currently has no in-app callers, but a divergent copy is a
+    // copy-paste trap): a Note Window targeting this content counts as a link.
+    if (n.type === 'noteWindow' && n.attrs?.targetContentId === targetId) {
+      const label =
+        typeof n.attrs.targetTitle === 'string' && n.attrs.targetTitle
+          ? n.attrs.targetTitle
+          : targetTitle;
+      matches.push({
+        linkText: `Windowed: ${label}`,
+        href: targetSlug,
+        context: parentContext.trim() || `Windowed: ${label}`,
+      });
+    }
+
     if (n.type === 'text' && n.marks) {
       const linkMark = n.marks.find((mark) => mark.type === 'link');
 

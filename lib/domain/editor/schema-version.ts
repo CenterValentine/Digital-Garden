@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.14.0";
+export const TIPTAP_SCHEMA_VERSION = "1.15.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.15.0",
+    date: "2026-08-14",
+    changes: [
+      {
+        type: "add",
+        target: "node",
+        name: "noteWindow",
+        description:
+          "Note Window block: atom node windowing another ContentNode's note content in place (view, edit, retarget, create). Attrs: targetContentId (nullable pointer), targetTitle (cached label), height, showBorder, plus base blockId/blockType. Per-instance retarget history lives OUTSIDE attrs in the host note's Y.Doc (blockNoteWindow:{blockId}) so it never travels with copy/paste. Server renderHTML emits a title-only placeholder — target UUID deliberately never reaches published HTML. No markdown codec: round-trips as dg-block fence.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.14.0",
     date: "2026-08-06",
@@ -629,6 +645,7 @@ export function getCurrentSchemaSnapshot() {
       "metricsStrip",
       "processSteps",
       "flashcardEmbed",
+      "noteWindow",
       "audioEmbed",
       "unsupportedBlock",
       "unsupportedInline",
@@ -680,6 +697,7 @@ export function getCurrentSchemaSnapshot() {
       "WeeklySummary",
       "HabitTracker",
       "FlashcardEmbed",
+      "NoteWindow",
       "AudioEmbed",
       "FlashcardSelect",
       "ClozeDeletion",

@@ -9,9 +9,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import type { Prisma } from "@/lib/database/generated/prisma";
+import type { JSONContent } from "@tiptap/core";
 import { getSession } from "@/lib/infrastructure/auth/session";
 import { prisma } from "@/lib/database/client";
 import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger";
+import { regenerateAllBlockIds } from "@/lib/domain/blocks/block-id-walk";
 
 const ROUTE_PATH = "/api/content/content/duplicate";
 
@@ -175,7 +178,15 @@ async function duplicateNode(
       ...(original.notePayload && {
         notePayload: {
           create: {
-            tiptapJson: original.notePayload.tiptapJson,
+            // Fresh blockIds for every copied block: per-instance state
+            // keyed by blockId (excalidraw/mermaid sub-maps, Note Window
+            // history) must never be shared between original and copy.
+            // The duplicate has no Y.Doc, so there is no sub-map data on
+            // the copy to orphan — unconditional re-id is safe here
+            // (unlike paste, which is collision-scoped).
+            tiptapJson: regenerateAllBlockIds(
+              original.notePayload.tiptapJson as unknown as JSONContent,
+            ) as unknown as Prisma.InputJsonValue,
             markdownText: original.notePayload.markdownText,
             searchText: original.notePayload.searchText,
             metadata: original.notePayload.metadata || {},

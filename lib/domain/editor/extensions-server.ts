@@ -49,6 +49,7 @@ import { ServerStopwatch } from "./extensions/blocks/stopwatch";
 import { ServerPullQuote } from "./extensions/blocks/pull-quote";
 import { ServerTableOfContents } from "./extensions/blocks/table-of-contents";
 import { ServerFlashcardEmbed } from "./extensions/blocks/flashcard-embed";
+import { ServerNoteWindow } from "./extensions/blocks/note-window";
 import { ServerAudioEmbed } from "./extensions/blocks/audio-embed";
 import { ServerFlashcardSelect } from "./extensions/flashcard-select";
 import { ServerClozeDeletion } from "./extensions/cloze-deletion";
@@ -177,6 +178,7 @@ export function getServerExtensions(): Extensions {
     ServerPullQuote,
     ServerTableOfContents,
     ServerFlashcardEmbed,
+    ServerNoteWindow,
     ServerAudioEmbed,
     ServerFlashcardSelect,
     ServerClozeDeletion,
