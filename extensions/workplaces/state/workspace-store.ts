@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import {
   useContentStore,
   type ContentSelectionOptions,
+  type WorkspaceLayoutMode,
+  type WorkspacePaneId,
 } from "@/state/content-store";
 import {
   useTreeStateStore,
@@ -13,6 +15,7 @@ import {
 import { useWorkspaceTabFilterStore } from "@/state/workspace-tab-filter-store";
 import type {
   ContentWorkspaceResponse,
+  WorkspaceLayoutRecordSummary,
   WorkspaceOpenConflict,
   WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
@@ -335,6 +338,37 @@ async function putLayoutRecord(
   }
 }
 
+/** Spec §4 pane ordinals per layout (1-indexed; primary = top-left). */
+const ORDINAL_PANE_IDS: Record<WorkspaceLayoutMode, WorkspacePaneId[]> = {
+  single: ["top-left"],
+  "dual-vertical": ["top-left", "top-right"],
+  "dual-horizontal": ["top-left", "bottom-left"],
+  quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+};
+
+/**
+ * R5 inheritance chain (spec §5): this surface's own record → the shared
+ * desktop record → most recent extension → most recent mobile. Records arrive
+ * newest-first from the server (and pre-filtered to <30d), so `find` returns
+ * the freshest match per rung. Null = fall through to the legacy blob.
+ */
+function pickInheritedLayout(
+  records: WorkspaceLayoutRecordSummary[] | undefined,
+): WorkspaceLayoutRecordSummary | null {
+  if (!records?.length) return null;
+  const family = detectWorkspaceSurfaceFamily();
+  const deviceId = family === "desktop" ? "shared" : getDeviceId();
+  return (
+    records.find((r) => r.family === family && r.deviceId === deviceId) ??
+    records.find((r) => r.family === "desktop") ??
+    records.find((r) => r.family.startsWith("ext:")) ??
+    records.find(
+      (r) => r.family.startsWith("native-") || r.family.startsWith("web-"),
+    ) ??
+    null
+  );
+}
+
 function restoreContentWorkspace(
   workspace: ContentWorkspaceResponse,
   // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
@@ -385,21 +419,65 @@ function restoreContentWorkspace(
   const tabMeta = workspace.contentMeta ?? {};
 
   // Reconcile mode: keep this session's own arrangement (R3) — only the tab
-  // set and titles refresh. Falls back to local state's current values so the
-  // restore call is a no-op for layout/pane.
+  // set and titles refresh. Open mode: run the R5 inheritance chain over the
+  // fresh layout records; the legacy blob is the terminal fallback (and stays
+  // authoritative for the tab SET either way).
   const local = useContentStore.getState();
-  const applyLayoutMode =
+  let applyLayoutMode =
     mode === "reconcile" ? local.layoutMode : workspace.paneState.layoutMode;
-  const applyActivePaneId =
+  let applyActivePaneId =
     mode === "reconcile" ? local.activePaneId : workspace.paneState.activePaneId;
+  let applyPaneTabContentIds = paneTabContentIds;
+  let applyActiveContentId = activeContentId;
+
+  const inherited =
+    mode === "open" ? pickInheritedLayout(workspace.layoutRecords) : null;
+  if (inherited) {
+    const panes = ORDINAL_PANE_IDS[inherited.layoutMode] ?? ORDINAL_PANE_IDS.single;
+    const membershipSet = new Set(openTabIds);
+    const placed = new Set<string>();
+    const rebuilt: Partial<Record<WorkspacePaneId, string[]>> = {};
+    for (const pane of inherited.paneOrder) {
+      const paneId =
+        panes[Math.min(Math.max(pane.paneOrdinal, 1), panes.length) - 1];
+      for (const id of pane.tabOrder) {
+        if (!membershipSet.has(id) || placed.has(id)) continue;
+        (rebuilt[paneId] ??= []).push(id);
+        placed.add(id);
+      }
+    }
+    // Membership tabs the record predates land in the primary pane (§4's
+    // terminal fallback: top-left).
+    for (const id of openTabIds) {
+      if (!placed.has(id)) {
+        (rebuilt[panes[0]] ??= []).push(id);
+        placed.add(id);
+      }
+    }
+    applyLayoutMode = inherited.layoutMode;
+    applyPaneTabContentIds = rebuilt as typeof paneTabContentIds;
+    const seed = inherited.lastActive;
+    applyActivePaneId = seed
+      ? panes[Math.min(Math.max(seed.paneOrdinal, 1), panes.length) - 1]
+      : panes[0];
+    // Active-tab precedence is unchanged (URL deep-link, then local
+    // preference); the record's lastActive is only the seed of last resort —
+    // R3: inherited, never synced.
+    if (!preferStillOpen && !urlContentBelongsToWorkspace) {
+      applyActiveContentId =
+        seed && membershipSet.has(seed.contentId)
+          ? seed.contentId
+          : activeContentId;
+    }
+  }
 
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
-      activeContentId,
+      activeContentId: applyActiveContentId,
       activePaneId: applyActivePaneId,
       layoutMode: applyLayoutMode,
-      paneTabContentIds,
+      paneTabContentIds: applyPaneTabContentIds,
       tabMeta,
     });
   } finally {
