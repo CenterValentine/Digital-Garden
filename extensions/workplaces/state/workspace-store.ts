@@ -22,6 +22,10 @@ import type {
   ContentWorkspaceItemScope,
 } from "@/lib/database/generated/prisma";
 import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
+import {
+  detectWorkspaceSurfaceFamily,
+  getDeviceId,
+} from "./surface-family";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -916,6 +920,56 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       return;
     }
+
+    // Layout-intent P2: alongside the legacy snapshot PATCH, persist THIS
+    // surface's per-family layout record (R2/R8 — desktop writes the shared
+    // coupling row, everything else its own device row). Ordinal mapping per
+    // spec §4. Best-effort: record failures never break the primary persist,
+    // which stays source of truth during rollout.
+    void (async () => {
+      try {
+        const ordinalPanes: Record<string, string[]> = {
+          single: ["top-left"],
+          "dual-vertical": ["top-left", "top-right"],
+          "dual-horizontal": ["top-left", "bottom-left"],
+          quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+        };
+        const panes = ordinalPanes[snapshot.layoutMode] ?? ordinalPanes.single;
+        const paneOrder = panes.map((paneId, index) => ({
+          paneOrdinal: index + 1,
+          tabOrder:
+            snapshot.paneTabContentIds[
+              paneId as keyof typeof snapshot.paneTabContentIds
+            ]?.contentIds ?? [],
+        }));
+        const activeOrdinal = Math.max(1, panes.indexOf(snapshot.activePaneId) + 1);
+        const activeContentId =
+          snapshot.paneTabContentIds[snapshot.activePaneId]?.activeContentId ??
+          snapshot.activeContentId;
+        await fetch(
+          `/api/content/workspaces/${activeWorkspaceId}/layout-records`,
+          {
+            method: "PUT",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              family: detectWorkspaceSurfaceFamily(),
+              deviceId: getDeviceId(),
+              record: {
+                layoutMode: snapshot.layoutMode,
+                paneOrder,
+                lastActive: activeContentId
+                  ? { paneOrdinal: activeOrdinal, contentId: activeContentId }
+                  : null,
+              },
+            }),
+          },
+        );
+      } catch {
+        // Best-effort by design; see comment above.
+      }
+    })();
+
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     set((state) => ({
       workspaces: state.workspaces.map((candidate) =>

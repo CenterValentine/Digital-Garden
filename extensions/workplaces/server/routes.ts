@@ -20,6 +20,7 @@ import {
   updateWorkspace,
 } from "./service";
 import { openWorkspaceTab, closeWorkspaceTab } from "./membership";
+import { upsertLayoutRecord, listLayoutRecords } from "./layout-records";
 
 type WorkspaceParams = Promise<{ id: string }>;
 type WorkspaceAssignmentParams = Promise<{ id: string; contentId: string }>;
@@ -358,6 +359,77 @@ export async function handleCloseWorkspaceTab(
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_tab_close:caught", summary: "DELETE caught", error });
       return errorResponse(error, "Failed to close workspace tab");
+    }
+  });
+}
+
+/**
+ * R2/R5/F2 layout records (layout-intent P2). PUT upserts THIS surface's
+ * record ({family, deviceId, layoutMode, paneOrder, lastActive}); GET lists
+ * fresh records (<30d) for the inheritance chain and the F2 adoption picker.
+ */
+export async function handleUpsertWorkspaceLayoutRecord(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/layout-records" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as {
+        family?: unknown;
+        deviceId?: unknown;
+        record?: unknown;
+      };
+      const data = await upsertLayoutRecord(
+        session.user.id,
+        id,
+        body.family,
+        body.deviceId,
+        body.record
+      );
+      if (!data) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "BAD_REQUEST",
+              message: "Invalid family/deviceId/record, or workspace not found",
+            },
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_layout_record_upsert:caught", summary: "PUT caught", error });
+      return errorResponse(error, "Failed to save layout record");
+    }
+  });
+}
+
+export async function handleListWorkspaceLayoutRecords(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/layout-records" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const data = await listLayoutRecords(session.user.id, id);
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_layout_records_list:caught", summary: "GET caught", error });
+      return errorResponse(error, "Failed to list layout records");
     }
   });
 }
