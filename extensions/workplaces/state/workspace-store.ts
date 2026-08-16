@@ -285,6 +285,56 @@ function readContentIdFromUrl(): string | null {
   return value && value.length > 0 ? value : null;
 }
 
+/**
+ * Layout-intent P2: persist THIS surface's per-family layout record
+ * (R2/R8). Ordinal mapping per spec §4. Best-effort by design — a record
+ * failure must never break the primary persist path.
+ */
+async function putLayoutRecord(
+  workspaceId: string,
+  family: string,
+  snapshot: WorkspaceStatePayload,
+) {
+  try {
+    const ordinalPanes: Record<string, string[]> = {
+      single: ["top-left"],
+      "dual-vertical": ["top-left", "top-right"],
+      "dual-horizontal": ["top-left", "bottom-left"],
+      quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+    };
+    const panes = ordinalPanes[snapshot.layoutMode] ?? ordinalPanes.single;
+    const paneOrder = panes.map((paneId, index) => ({
+      paneOrdinal: index + 1,
+      tabOrder:
+        snapshot.paneTabContentIds[
+          paneId as keyof typeof snapshot.paneTabContentIds
+        ]?.contentIds ?? [],
+    }));
+    const activeOrdinal = Math.max(1, panes.indexOf(snapshot.activePaneId) + 1);
+    const activeContentId =
+      snapshot.paneTabContentIds[snapshot.activePaneId]?.activeContentId ??
+      snapshot.activeContentId;
+    await fetch(`/api/content/workspaces/${workspaceId}/layout-records`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        family,
+        deviceId: getDeviceId(),
+        record: {
+          layoutMode: snapshot.layoutMode,
+          paneOrder,
+          lastActive: activeContentId
+            ? { paneOrdinal: activeOrdinal, contentId: activeContentId }
+            : null,
+        },
+      }),
+    });
+  } catch {
+    // Best-effort by design; see docstring.
+  }
+}
+
 function restoreContentWorkspace(
   workspace: ContentWorkspaceResponse,
   // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
@@ -293,6 +343,12 @@ function restoreContentWorkspace(
   // When set and still an open tab in the snapshot, this wins as the active
   // selection, so a poll/visibility refresh can't revert a fresh tab click.
   preferActiveContentId?: string | null,
+  // Layout-intent P2b (R3): background reconciles sync the open-tab SET only.
+  // "reconcile" preserves this session's layoutMode + activePaneId — another
+  // surface persisting its layout must never re-arrange the one you're
+  // looking at (the phone↔desktop revert fight, ghost-writer #5). "open"
+  // (workspace open/switch/reset) applies the full stored state.
+  mode: "open" | "reconcile" = "open",
 ) {
   const paneTabContentIds = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
@@ -328,12 +384,21 @@ function restoreContentWorkspace(
   // aren't formal workspace assignments are still named.
   const tabMeta = workspace.contentMeta ?? {};
 
+  // Reconcile mode: keep this session's own arrangement (R3) — only the tab
+  // set and titles refresh. Falls back to local state's current values so the
+  // restore call is a no-op for layout/pane.
+  const local = useContentStore.getState();
+  const applyLayoutMode =
+    mode === "reconcile" ? local.layoutMode : workspace.paneState.layoutMode;
+  const applyActivePaneId =
+    mode === "reconcile" ? local.activePaneId : workspace.paneState.activePaneId;
+
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
       activeContentId,
-      activePaneId: workspace.paneState.activePaneId,
-      layoutMode: workspace.paneState.layoutMode,
+      activePaneId: applyActivePaneId,
+      layoutMode: applyLayoutMode,
       paneTabContentIds,
       tabMeta,
     });
@@ -888,6 +953,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+
+    // Spec §6.3 (ghost-writer #3): extension iframes never write workspace
+    // intent. No legacy PATCH — which would also reconcile R1 membership down
+    // to the panel's narrow single-pane snapshot, pruning every other tab —
+    // and no shared columns. They persist ONLY their own ext:* layout record,
+    // so R5/F2 can still see how the panel arranged itself.
+    const surfaceFamily = detectWorkspaceSurfaceFamily();
+    if (surfaceFamily.startsWith("ext:")) {
+      await putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
+      return;
+    }
+
     let workspace: ContentWorkspaceResponse;
     try {
       const response = await fetch(
@@ -921,54 +998,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
 
-    // Layout-intent P2: alongside the legacy snapshot PATCH, persist THIS
-    // surface's per-family layout record (R2/R8 — desktop writes the shared
-    // coupling row, everything else its own device row). Ordinal mapping per
-    // spec §4. Best-effort: record failures never break the primary persist,
-    // which stays source of truth during rollout.
-    void (async () => {
-      try {
-        const ordinalPanes: Record<string, string[]> = {
-          single: ["top-left"],
-          "dual-vertical": ["top-left", "top-right"],
-          "dual-horizontal": ["top-left", "bottom-left"],
-          quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
-        };
-        const panes = ordinalPanes[snapshot.layoutMode] ?? ordinalPanes.single;
-        const paneOrder = panes.map((paneId, index) => ({
-          paneOrdinal: index + 1,
-          tabOrder:
-            snapshot.paneTabContentIds[
-              paneId as keyof typeof snapshot.paneTabContentIds
-            ]?.contentIds ?? [],
-        }));
-        const activeOrdinal = Math.max(1, panes.indexOf(snapshot.activePaneId) + 1);
-        const activeContentId =
-          snapshot.paneTabContentIds[snapshot.activePaneId]?.activeContentId ??
-          snapshot.activeContentId;
-        await fetch(
-          `/api/content/workspaces/${activeWorkspaceId}/layout-records`,
-          {
-            method: "PUT",
-            credentials: "include",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              family: detectWorkspaceSurfaceFamily(),
-              deviceId: getDeviceId(),
-              record: {
-                layoutMode: snapshot.layoutMode,
-                paneOrder,
-                lastActive: activeContentId
-                  ? { paneOrdinal: activeOrdinal, contentId: activeContentId }
-                  : null,
-              },
-            }),
-          },
-        );
-      } catch {
-        // Best-effort by design; see comment above.
-      }
-    })();
+    // Layout-intent P2: beside the legacy PATCH, persist THIS surface's
+    // per-family layout record (desktop → the shared coupling row).
+    void putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
 
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     set((state) => ({
@@ -1223,7 +1255,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         // set, but must not revert what the user is currently viewing (e.g. a
         // tab they just clicked after reload).
         const localActive = useContentStore.getState().selectedContentId;
-        restoreContentWorkspace(incomingActive, localActive);
+        restoreContentWorkspace(incomingActive, localActive, "reconcile");
       }
     }
 
