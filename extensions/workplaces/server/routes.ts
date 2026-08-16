@@ -19,6 +19,7 @@ import {
   unassignContentFromWorkspace,
   updateWorkspace,
 } from "./service";
+import { openWorkspaceTab, closeWorkspaceTab } from "./membership";
 
 type WorkspaceParams = Promise<{ id: string }>;
 type WorkspaceAssignmentParams = Promise<{ id: string; contentId: string }>;
@@ -271,6 +272,92 @@ export async function handleSaveWorkplaceState(
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_state_save:caught", summary: "PATCH caught", error });
       return errorResponse(error, "Failed to save workspace state");
+    }
+  });
+}
+
+/**
+ * R1 membership events (layout-intent P1). POST = open (idempotent upsert with
+ * optional affinity hint), DELETE = close (idempotent, ?contentId= query).
+ * These are the new-client path; legacy clients reach the same truth via the
+ * dual-write in saveWorkspaceState.
+ */
+export async function handleOpenWorkspaceTab(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as {
+        contentId?: unknown;
+        affinity?: unknown;
+      };
+      if (typeof body.contentId !== "string" || !body.contentId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "BAD_REQUEST", message: "contentId is required" },
+          },
+          { status: 400 }
+        );
+      }
+      const data = await openWorkspaceTab(
+        session.user.id,
+        id,
+        body.contentId,
+        body.affinity
+      );
+      if (!data) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace or content not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tab_open:caught", summary: "POST caught", error });
+      return errorResponse(error, "Failed to open workspace tab");
+    }
+  });
+}
+
+export async function handleCloseWorkspaceTab(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const contentId = request.nextUrl.searchParams.get("contentId");
+      if (!contentId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "BAD_REQUEST", message: "contentId query param is required" },
+          },
+          { status: 400 }
+        );
+      }
+      const data = await closeWorkspaceTab(session.user.id, id, contentId);
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tab_close:caught", summary: "DELETE caught", error });
+      return errorResponse(error, "Failed to close workspace tab");
     }
   });
 }

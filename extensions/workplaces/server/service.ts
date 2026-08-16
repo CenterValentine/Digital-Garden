@@ -8,6 +8,7 @@ import {
   type Prisma,
 } from "@/lib/database/generated/prisma";
 import { generateSlug } from "@/lib/domain/content";
+import { reconcileMembershipFromSnapshot } from "./membership";
 import type {
   ContentWorkspaceResponse,
   WorkspaceOpenIntentResponse,
@@ -760,6 +761,18 @@ export async function saveWorkspaceState(
     normalizedState,
     allowedContentIds,
   );
+
+  // Rollout dual-write (layout-intent P1): membership (R1 truth) follows the
+  // legacy snapshot's tab union, so old snapshot-writing clients and new
+  // membership-event clients converge on the same ContentWorkspaceTab set.
+  // Runs on the already-ownership-filtered state.
+  const paneContentIds = Object.fromEntries(
+    Object.entries(filteredState.paneTabContentIds).map(([paneId, pane]) => [
+      paneId,
+      pane?.contentIds ?? [],
+    ]),
+  );
+  await reconcileMembershipFromSnapshot(workspaceId, paneContentIds);
 
   const updatedWorkspace = await prisma.contentWorkspace.update({
     where: { id: workspaceId },
