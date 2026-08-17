@@ -173,6 +173,7 @@ model ContentNode {
   viewGrants                   ViewGrant[]
   calendarEvents               CalendarEvent[]
   workspaceItems               ContentWorkspaceItem[]
+  workspaceTabs                ContentWorkspaceTab[]
   viewWorkspaces               ContentWorkspace[]        @relation("WorkspaceViewRoot")
   periodicNoteIndexes          PeriodicNoteIndex[]
   sourceFlashcards             Flashcard[]               @relation("FlashcardSourceContent")
@@ -609,9 +610,11 @@ model ContentWorkspace {
   createdAt         DateTime               @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
 
-  owner    User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  viewRoot ContentNode?           @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
-  items    ContentWorkspaceItem[]
+  owner         User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  viewRoot      ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
+  items         ContentWorkspaceItem[]
+  tabs          ContentWorkspaceTab[]
+  layoutRecords ContentWorkspaceLayoutRecord[]
 
   @@unique([ownerId, slug])
   @@index([ownerId, status])
@@ -636,6 +639,53 @@ model ContentWorkspaceItem {
   @@index([contentId, assignmentType, expiresAt])
   @@index([workspaceId, assignmentType])
   @@index([expiresAt])
+}
+
+/// R1 (layout-intent spec): workspace-scoped tab MEMBERSHIP - the always-synced
+/// set of open content per workspace. Pane placement and order deliberately
+/// absent: those live in per-family ContentWorkspaceLayoutRecord rows. Affinity
+/// is the placement hint captured from the origin pane, consumed by the ordinal
+/// compatibility layer (spec section 4). Legacy paneState JSON stays accepted
+/// for old clients during rollout; new writes dual-write both.
+model ContentWorkspaceTab {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @db.Uuid
+  contentId   String   @db.Uuid
+  affinityH   String?  @db.VarChar(8)
+  affinityV   String?  @db.VarChar(8)
+  isPinned    Boolean  @default(false)
+  addedAt     DateTime @default(now()) @db.Timestamptz(6)
+
+  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  content   ContentNode      @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, contentId])
+  @@index([contentId])
+}
+
+/// R2/R5/F2 (layout-intent spec): per-family layout records. The single
+/// deviceId="shared" "desktop" row per workspace IS the desktop coupling
+/// (sentinel, NOT nullable: Postgres unique indexes treat NULLs as distinct,
+/// which would permit duplicate shared rows); every other family
+/// ("native-phone", "web-tablet", "ext:<surface>", ...) writes one row per
+/// device. Read at workspace-open (inheritance chain) or explicit adoption
+/// only - never live-pushed. lastActive is an inheritance SEED only
+/// (R3: active view never syncs). updatedAt drives the 30-day recency filter.
+model ContentWorkspaceLayoutRecord {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @db.Uuid
+  family      String   @db.VarChar(48)
+  deviceId    String   @db.VarChar(64)
+  layoutMode  String   @default("single") @db.VarChar(32)
+  paneOrder   Json     @default("[]")
+  lastActive  Json?
+  createdAt   DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(6)
+
+  workspace ContentWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, family, deviceId])
+  @@index([workspaceId, updatedAt])
 }
 
 model Category {

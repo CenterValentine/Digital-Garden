@@ -80,6 +80,22 @@ export interface ContentWorkspaceResponse {
    * read paths (list/get); may be empty on mutation responses.
    */
   contentMeta: Record<string, { title: string; contentType: string }>;
+  /**
+   * Fresh (<30d) per-family layout records for the R5 inheritance chain and
+   * the F2 adoption picker (layout-intent spec). Newest first. Populated on
+   * read paths (list/get); may be absent on mutation responses — consumers
+   * must fall back to the legacy paneState blob when undefined/empty.
+   */
+  layoutRecords?: WorkspaceLayoutRecordSummary[];
+}
+
+export interface WorkspaceLayoutRecordSummary {
+  family: string;
+  deviceId: string;
+  layoutMode: WorkspaceLayoutMode;
+  paneOrder: Array<{ paneOrdinal: number; tabOrder: string[] }>;
+  lastActive: { paneOrdinal: number; contentId: string } | null;
+  updatedAt: string;
 }
 
 export interface WorkspaceOpenConflict {

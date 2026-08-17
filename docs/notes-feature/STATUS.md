@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-14
+last_updated: 2026-08-16
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 16, 2026**: **Workspace layout intent/projection — behavioral spec + P1–P3 infra** (branch `feat/layout-intent-projection`; typecheck/lint(151)/build + full CI chain green at every commit; migration `20260815120000_workspace_membership_and_layout_records` applied to local dev, ⚠ **`npx prisma migrate deploy` against Neon required before the Vercel preview or prod can serve workspace endpoints** — the list include queries the new tables)
+
+Workspace state is reclassified into intent (synced) / projection (derived, never stored) / device navigation (local) per `work-tracking/LAYOUT-INTENT-PROJECTION-PLAN.md` (owner requirements R1–R8 + F1/F2 encoded, all decisions recorded). **P1:** `ContentWorkspaceTab` — workspace-scoped tab membership (R1: opens/closes sync everywhere) with per-tab pane-affinity hints; legacy snapshot PATCHes dual-write it (set-reconcile, DB-verified idempotent), and new-client `POST/DELETE …/tabs` endpoints exist. **P2:** `ContentWorkspaceLayoutRecord` — per-family layouts (`desktop` couples via one `deviceId="shared"` row; native/web phone/tablet and each extension surface write their own rows; 30-day freshness). Ghost-writers killed: the extension side-panel can no longer PATCH workspace intent (it was about to prune membership to its single pane post-P1 — gated at `persistActiveWorkspace`), and background sync-restores now run "reconcile" (tab set + titles only), ending the cross-device layout/active-view revert fight (R3). **P3:** `useProjectedLayout()` — phone orientation mapping (side-by-side ⇄ stacked; quad passes per owner D2 with a one-line chop point), focus-route + single-content embeds project to `single`, panel embed gets only the R7 quad ban; the MobileNotesLayout `setLayoutMode` coercion effect and FocusContentWorkspace's `restoreWorkspace`/`setCollapsed` ghost-writes are deleted. Workspace opens run the R5 inheritance chain (own record → shared desktop → newest extension → newest mobile → legacy blob) with `lastActive` applied only as a last-resort seed. Deferred: F1/F2 UI affordances, client-side tab events (P4), settings split (P6), legacy-field cleanup, live membership fan-in.
 
 **August 14, 2026**: **Note Window block ("window another note in place") + clipboard round-trip fixes** (main working tree; typecheck/lint(149)/collab:schema/markdown:blocks/blockid:hygiene/extensions gates green; owner smoke pending; ⚠ **Hocuspocus redeploy required post-merge** — new `noteWindow` node type)
 

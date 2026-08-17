@@ -14,6 +14,7 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
+import { useProjectedLayout } from "@/components/common/useProjectedLayout";
 import { MainPanelNavigation } from "./MainPanelNavigation";
 import { PanelOverlayCornerTargets } from "./PanelOverlayCornerTargets";
 import { MainPanelHeader } from "./headers/MainPanelHeader";
@@ -56,7 +57,10 @@ function WorkspacePane({
   onTabDrop: (request: TabDropRequest) => void;
   initialContent: InitialContent;
 }) {
-  const layoutMode = useContentStore((state) => state.layoutMode);
+  // Render from the PROJECTED layout (intent stays in the store untouched —
+  // layout-intent spec: projections are rendering, never state).
+  const intentLayoutMode = useContentStore((state) => state.layoutMode);
+  const layoutMode = useProjectedLayout(intentLayoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const focusPane = useContentStore((state) => state.focusPane);
   // Hide the per-pane tab strip in the mobile focus toggle (the grab handle
@@ -429,7 +433,11 @@ export function MainPanelWorkspace({
   initialContent = null,
 }: { initialContent?: InitialContent } = {}) {
   const pathname = usePathname();
-  const layoutMode = useContentStore((state) => state.layoutMode);
+  // Render from the PROJECTED layout; the store keeps intent (spec §8-P3).
+  // Intent writes (layout picker, tab-drop requestedLayoutMode) still go
+  // through the store — projection only shapes what THIS surface draws.
+  const intentLayoutMode = useContentStore((state) => state.layoutMode);
+  const layoutMode = useProjectedLayout(intentLayoutMode);
   const activePaneId = useContentStore((state) => state.activePaneId);
   const openContentIds = useContentStore((state) => state.openContentIds);
   const moveContentTabToPane = useContentStore((state) => state.moveContentTabToPane);
