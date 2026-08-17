@@ -347,6 +347,42 @@ const ORDINAL_PANE_IDS: Record<WorkspaceLayoutMode, WorkspacePaneId[]> = {
 };
 
 /**
+ * Rebuild pane assignments from a layout record against the CURRENT membership
+ * set (ordinal mapping per spec §4; membership tabs the record predates land
+ * in the primary pane). Shared by open-time inheritance (R5) and the live
+ * desktop coupling reconcile (R2).
+ */
+function buildPanesFromLayoutRecord(
+  record: WorkspaceLayoutRecordSummary,
+  openTabIds: string[],
+): {
+  layoutMode: WorkspaceLayoutMode;
+  panes: WorkspacePaneId[];
+  paneTabContentIds: Partial<Record<WorkspacePaneId, string[]>>;
+} {
+  const panes = ORDINAL_PANE_IDS[record.layoutMode] ?? ORDINAL_PANE_IDS.single;
+  const membershipSet = new Set(openTabIds);
+  const placed = new Set<string>();
+  const rebuilt: Partial<Record<WorkspacePaneId, string[]>> = {};
+  for (const pane of record.paneOrder) {
+    const paneId =
+      panes[Math.min(Math.max(pane.paneOrdinal, 1), panes.length) - 1];
+    for (const id of pane.tabOrder) {
+      if (!membershipSet.has(id) || placed.has(id)) continue;
+      (rebuilt[paneId] ??= []).push(id);
+      placed.add(id);
+    }
+  }
+  for (const id of openTabIds) {
+    if (!placed.has(id)) {
+      (rebuilt[panes[0]] ??= []).push(id);
+      placed.add(id);
+    }
+  }
+  return { layoutMode: record.layoutMode, panes, paneTabContentIds: rebuilt };
+}
+
+/**
  * R5 inheritance chain (spec §5): this surface's own record → the shared
  * desktop record → most recent extension → most recent mobile. Records arrive
  * newest-first from the server (and pre-filtered to <30d), so `find` returns
@@ -433,41 +469,45 @@ function restoreContentWorkspace(
   const inherited =
     mode === "open" ? pickInheritedLayout(workspace.layoutRecords) : null;
   if (inherited) {
-    const panes = ORDINAL_PANE_IDS[inherited.layoutMode] ?? ORDINAL_PANE_IDS.single;
-    const membershipSet = new Set(openTabIds);
-    const placed = new Set<string>();
-    const rebuilt: Partial<Record<WorkspacePaneId, string[]>> = {};
-    for (const pane of inherited.paneOrder) {
-      const paneId =
-        panes[Math.min(Math.max(pane.paneOrdinal, 1), panes.length) - 1];
-      for (const id of pane.tabOrder) {
-        if (!membershipSet.has(id) || placed.has(id)) continue;
-        (rebuilt[paneId] ??= []).push(id);
-        placed.add(id);
-      }
-    }
-    // Membership tabs the record predates land in the primary pane (§4's
-    // terminal fallback: top-left).
-    for (const id of openTabIds) {
-      if (!placed.has(id)) {
-        (rebuilt[panes[0]] ??= []).push(id);
-        placed.add(id);
-      }
-    }
-    applyLayoutMode = inherited.layoutMode;
-    applyPaneTabContentIds = rebuilt as typeof paneTabContentIds;
+    const built = buildPanesFromLayoutRecord(inherited, openTabIds);
+    applyLayoutMode = built.layoutMode;
+    applyPaneTabContentIds = built.paneTabContentIds as typeof paneTabContentIds;
     const seed = inherited.lastActive;
     applyActivePaneId = seed
-      ? panes[Math.min(Math.max(seed.paneOrdinal, 1), panes.length) - 1]
-      : panes[0];
+      ? built.panes[
+          Math.min(Math.max(seed.paneOrdinal, 1), built.panes.length) - 1
+        ]
+      : built.panes[0];
     // Active-tab precedence is unchanged (URL deep-link, then local
     // preference); the record's lastActive is only the seed of last resort —
     // R3: inherited, never synced.
     if (!preferStillOpen && !urlContentBelongsToWorkspace) {
       applyActiveContentId =
-        seed && membershipSet.has(seed.contentId)
+        seed && new Set(openTabIds).has(seed.contentId)
           ? seed.contentId
           : activeContentId;
+    }
+  }
+
+  // R2 live desktop coupling: concurrently-open desktop windows mirror the
+  // shared desktop record's layout + pane order. The background reconcile
+  // (fired when another window's save bumps updatedAt) follows the record for
+  // ARRANGEMENT only — the active tab/pane stay this window's own (R3 keeps
+  // active views independent "even on matching desktop"). Non-desktop
+  // families keep the pure set-only reconcile.
+  if (mode === "reconcile" && detectWorkspaceSurfaceFamily() === "desktop") {
+    const desktopRecord = workspace.layoutRecords?.find(
+      (r) => r.family === "desktop",
+    );
+    if (desktopRecord) {
+      const built = buildPanesFromLayoutRecord(desktopRecord, openTabIds);
+      applyLayoutMode = built.layoutMode;
+      applyPaneTabContentIds = built.paneTabContentIds as typeof paneTabContentIds;
+      // Keep this window's active pane when it still exists in the incoming
+      // layout; otherwise clamp to the primary pane.
+      if (!built.panes.includes(applyActivePaneId)) {
+        applyActivePaneId = built.panes[0];
+      }
     }
   }
 
