@@ -10,6 +10,15 @@ last_updated: 2026-08-12
 
 ---
 
+## Layout intent/projection — follow-ups (2026-08-16, after P1–P3 on `feat/layout-intent-projection`; spec: LAYOUT-INTENT-PROJECTION-PLAN.md)
+
+- **F2 sync affordance** — workspace-bar dropdown of per-device layout records (<30d, data already in `ContentWorkspaceResponse.layoutRecords`), radio to pick the lead layout overriding the R5 chain; expiry falls back to default.
+- **F1 Main-workspace-only "adopt into new workspace"** — snapshot current tab layout into a new workspace (quick name + icon; reuse the workspace-create dialog).
+- **P4 client tab events** — call `POST/DELETE …/tabs` from open/close actions directly (today R1 truth rides the legacy PATCH dual-write); then live membership fan-in (presence-poll channel is the natural carrier).
+- **P6 settings split** — device / universal / universal-with-override buckets (spec §7).
+- **Legacy cleanup (expand-contract "contract")** — once all clients write records: stop applying/writing `layoutMode`/`activePaneId`/`paneState` blob, then drop the columns with a migration.
+- **Right-sidebar <960px auto-collapse** — fold into projection when next touched (lowest priority; writes only device-local state).
+
 ## Nested-editor event-routing examination (2026-08-14, after Note Window; owner-requested)
 
 Systematic study of focus/selection/drag/keyboard/IME routing through **stacked ProseMirror editors** at depth ≥2: the `stopEvent` allowlist in `node-view-factory.ts`, `.block-note-window-mount` boundaries, BubbleMenu/suggestion-plugin scoping (which editor's slash menu / wiki-link autocomplete fires when nested?), and the `noteWindowDepth`/`noteWindowAncestorTargetIds` plumbing. **Plus the window-CustomEvent addressing audit**: the 2026-08-15 mermaid-multiplication regression proved window-level events with no editor addressing fan out to every mounted MarkdownEditor. `create-diagram-block`, `embed-diagram-create`, and `block-attrs-change` are fixed (editor in detail + listener guard); still unaddressed and needing the same treatment or an explicit single-instance argument: `editor-image-upload`, `editor-open-ai-image`, `insert-ai-image`, `insert-ai-audio`, `scroll-to-heading`. Goal: a safe plan for reducing bugs when editors get nested. **Prerequisite before ever relaxing the Note Window depth cap (currently: depth 1-2 collapsed→snapshot, depth ≥3 chip) or making nested windows editable.** Context: the Note Window v1 deliberately keeps nested windows read-only/never-runtime-acquiring precisely because two-editors-deep event routing is where embedded-editor bugs breed.
