@@ -8,7 +8,7 @@
 
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { ResizablePanels } from "./ResizablePanels";
 import { LeftSidebar } from "./LeftSidebar";
@@ -37,6 +37,21 @@ export function ConditionalNotesLayout({
   glass0,
 }: ConditionalNotesLayoutProps) {
   const pathname = usePathname();
+
+  // Wake the collaboration server alongside page load instead of on first
+  // edit. Cloud Run scales Hocuspocus to zero (sleep is a deliberate cost
+  // feature), so after idle the FIRST editor pays the cold start and drops to
+  // local-fallback meanwhile — with several surfaces editing at once that
+  // briefly forks the doc per device (observed in preview smoke 2026-08-16;
+  // the divergence defenses held, this just shrinks the window). Opaque
+  // no-cors fetch: we only need the side effect of an instance spinning up.
+  useEffect(() => {
+    const wsUrl = process.env.NEXT_PUBLIC_HOCUSPOCUS_URL;
+    if (!wsUrl) return;
+    const httpUrl = wsUrl.replace(/^ws/, "http");
+    void fetch(`${httpUrl}/readyz`, { mode: "no-cors" }).catch(() => {});
+  }, []);
+
   // Engage the single-pane mobile layout for narrow viewports (responsive
   // desktop windows) AND for phones in any orientation — a landscape phone is
   // ~844px wide, so the width-only check alone would drop it into the desktop

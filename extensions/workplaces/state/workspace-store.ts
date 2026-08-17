@@ -110,6 +110,18 @@ let isBypassingWorkspaceGuard = false;
 // Tracks the updatedAt we last applied from this tab so receiveRefreshedWorkspaces
 // can detect when another tab saved a newer pane state.
 const lastAppliedUpdatedAt: Record<string, string> = {};
+
+/**
+ * Echo suppression (preview smoke 2026-08-16): after restoreContentWorkspace
+ * applies remote state, the resulting snapshot-key change fires the persist
+ * controller — the follower would re-persist content it just adopted. Benign
+ * when both windows run the same code, but it's the fuel any adopt/persist
+ * loop runs on (observed as layout ping-pong during a mixed-bundle rolling
+ * deploy). Recording the post-apply snapshot lets persistActiveWorkspace skip
+ * the write when nothing changed beyond the adoption itself; the moment the
+ * user makes a real change, the snapshot differs and persistence resumes.
+ */
+const lastAppliedSnapshotJson: Record<string, string> = {};
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
 export function registerMutationBroadcast(fn: () => void) {
@@ -523,6 +535,13 @@ function restoreContentWorkspace(
   } finally {
     isBypassingWorkspaceGuard = false;
   }
+
+  // Echo suppression: record what this apply produced so the persist
+  // controller's follow-up fire can recognize "nothing changed but the
+  // adoption" and skip the write (see lastAppliedSnapshotJson).
+  lastAppliedSnapshotJson[workspace.id] = JSON.stringify(
+    useContentStore.getState().getWorkspaceStateSnapshot(),
+  );
 }
 
 function syncWorkspaceUrl(workspaceId: string | null) {
@@ -1071,6 +1090,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+
+    // Echo suppression: if this snapshot is byte-identical to what we just
+    // adopted from remote, there is nothing new to say — skip the write
+    // (kills the adopt→persist echo; see lastAppliedSnapshotJson).
+    if (
+      JSON.stringify(snapshot) === lastAppliedSnapshotJson[activeWorkspaceId]
+    ) {
+      return;
+    }
 
     // Spec §6.3 (ghost-writer #3): extension iframes never write workspace
     // intent. No legacy PATCH — which would also reconcile R1 membership down
