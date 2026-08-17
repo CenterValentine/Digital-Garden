@@ -20,7 +20,13 @@ export interface WikiLinkRef {
   targetTitle: string;
 }
 
-/** Collect distinct wikiLink-node refs anywhere in a TipTap doc. */
+/**
+ * Collect distinct wikiLink-node refs anywhere in a TipTap doc.
+ *
+ * Note Windows count too ("windows are links"): a `noteWindow` block's
+ * `targetContentId` is an id-first ref, so chat context that pulls
+ * wiki-linked notes also pulls windowed notes.
+ */
 export function collectWikiLinkRefs(doc: JSONContent | null | undefined): WikiLinkRef[] {
   const out: WikiLinkRef[] = [];
   const seen = new Set<string>();
@@ -37,6 +43,20 @@ export function collectWikiLinkRefs(doc: JSONContent | null | undefined): WikiLi
         if (!seen.has(key)) {
           seen.add(key);
           out.push({ targetId: attrs.targetId ?? null, targetTitle: title });
+        }
+      }
+    }
+    if (node.type === "noteWindow") {
+      const attrs = (node.attrs ?? {}) as {
+        targetContentId?: string | null;
+        targetTitle?: string | null;
+      };
+      if (attrs.targetContentId) {
+        const title = (attrs.targetTitle ?? "").trim() || "Untitled";
+        const key = `${attrs.targetContentId}::${title.toLowerCase()}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          out.push({ targetId: attrs.targetContentId, targetTitle: title });
         }
       }
     }

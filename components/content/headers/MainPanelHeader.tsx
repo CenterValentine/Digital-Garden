@@ -23,6 +23,7 @@ import {
   useWorkspaceTabFilterStore,
 } from "@/state/workspace-tab-filter-store";
 import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
+import { PaneTabAddButton } from "./PaneTabAddButton";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
@@ -814,6 +815,16 @@ export function MainPanelHeader({
               </div>
             );
           })}
+          {/* "+" — add content to this pane via the canonical tree picker.
+              Sits to the right of the last tab, scrolling with the strip. */}
+          <PaneTabAddButton
+            onOpen={(target) =>
+              openContentInPane(target.id, paneId, {
+                title: target.title,
+                contentType: target.contentType,
+              })
+            }
+          />
           {isTreeDropHover && treeDropTarget ? (
             // Insertion caret for a file-tree drop: marks the exact slot the
             // tab will land in — before a tab, between tabs, or at the end.

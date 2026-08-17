@@ -300,7 +300,18 @@ export const Accordion = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="accordion"]' }];
+    // contentElement scopes parsing to the body div. Without it, the
+    // summary row renderHTML emits BESIDE the content hole (chevron glyph
+    // + title spans) is re-parsed as literal content on paste — the
+    // stray "▶Title" paragraph bug. PM serializes the clipboard via
+    // renderHTML for BOTH node selections and native selections, so this
+    // is the serialization contract fix, not a paste-only patch.
+    return [
+      {
+        tag: 'div[data-block-type="accordion"]',
+        contentElement: "div.block-accordion-body",
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {
@@ -860,7 +871,18 @@ export const ServerAccordion = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="accordion"]' }];
+    // contentElement scopes parsing to the body div. Without it, the
+    // summary row renderHTML emits BESIDE the content hole (chevron glyph
+    // + title spans) is re-parsed as literal content on paste — the
+    // stray "▶Title" paragraph bug. PM serializes the clipboard via
+    // renderHTML for BOTH node selections and native selections, so this
+    // is the serialization contract fix, not a paste-only patch.
+    return [
+      {
+        tag: 'div[data-block-type="accordion"]',
+        contentElement: "div.block-accordion-body",
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {

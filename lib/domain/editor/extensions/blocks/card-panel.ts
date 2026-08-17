@@ -79,7 +79,17 @@ export const CardPanel = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="cardPanel"]' }];
+    // contentElement scopes parsing to the content div — without it, the
+    // block-card-header div (headerText beside the content hole) re-parses
+    // as a duplicate text line on paste. Same defect class as accordion's
+    // "▶Title" bug; renderHTML always emits the content div, so the plain
+    // selector is safe.
+    return [
+      {
+        tag: 'div[data-block-type="cardPanel"]',
+        contentElement: "div.block-card-panel-content",
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {
@@ -190,7 +200,17 @@ export const ServerCardPanel = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'div[data-block-type="cardPanel"]' }];
+    // contentElement scopes parsing to the content div — without it, the
+    // block-card-header div (headerText beside the content hole) re-parses
+    // as a duplicate text line on paste. Same defect class as accordion's
+    // "▶Title" bug; renderHTML always emits the content div, so the plain
+    // selector is safe.
+    return [
+      {
+        tag: 'div[data-block-type="cardPanel"]',
+        contentElement: "div.block-card-panel-content",
+      },
+    ];
   },
 
   renderHTML({ node, HTMLAttributes }) {

@@ -27,8 +27,16 @@ export const BlockFocusExtension = Extension.create({
 
     // Listen for block attribute changes from PropertiesPanel or inline editors
     const handleAttrsChange = (e: Event) => {
-      const { blockId, key, value } = (e as CustomEvent).detail;
+      const { blockId, key, value, editor: sourceEditor } = (e as CustomEvent).detail;
       if (!blockId || !key) return;
+      // ADDRESSING GUARD (2026-08-15): with Note Windows, multiple editors
+      // are mounted at once, and blockIds are only de-duped WITHIN a
+      // document — a block pasted across notes legitimately keeps its id,
+      // so a blockId search alone can match in two live editors and
+      // cross-write attrs between documents. Dispatchers that know their
+      // editor address the event; unaddressed dispatchers (PropertiesPanel,
+      // legacy inline fields) keep the old broadcast behavior.
+      if (sourceEditor && sourceEditor !== editor) return;
 
       // Walk the document to find the node with matching blockId
       const { doc, tr } = editor.state;

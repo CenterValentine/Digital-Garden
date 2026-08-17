@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Columns3,
   LayoutList,
+  AppWindow,
 } from "lucide-react";
 
 /** Map block type to a Lucide icon component */
@@ -30,6 +31,7 @@ const BLOCK_ICONS: Record<string, React.ComponentType<{ className?: string }>> =
     accordion: ChevronDown,
     columns: Columns3,
     tabs: LayoutList,
+    noteWindow: AppWindow,
   };
 
 function PaletteItem({ definition }: { definition: BlockDefinition }) {
