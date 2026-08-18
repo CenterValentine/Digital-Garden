@@ -432,11 +432,29 @@ function restoreContentWorkspace(
   // (workspace open/switch/reset) applies the full stored state.
   mode: "open" | "reconcile" = "open",
 ) {
-  const paneTabContentIds = Object.fromEntries(
+  const paneTabContentIds: Record<string, string[]> = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
       ([paneId, pane]) => [paneId, pane?.contentIds ?? []],
     ),
   );
+
+  // R1: membership is the source of truth for the tab SET. Union in any
+  // membership id the legacy blob lacks — tabs opened by surfaces that don't
+  // write the blob (extension iframes) — landing them in the primary pane
+  // (spec §4 terminal fallback). Layout records (open-inherit / desktop
+  // coupling below) then re-place them if they carry an ordinal for the id.
+  if (workspace.membershipContentIds?.length) {
+    const inBlob = new Set(Object.values(paneTabContentIds).flat());
+    const missing = workspace.membershipContentIds.filter(
+      (id) => !inBlob.has(id),
+    );
+    if (missing.length) {
+      paneTabContentIds["top-left"] = [
+        ...(paneTabContentIds["top-left"] ?? []),
+        ...missing,
+      ];
+    }
+  }
 
   // Cold-load race: the workspace API can resolve before
   // MainPanelWorkspace's URL parser runs. If the URL specifies a
@@ -1107,7 +1125,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     // so R5/F2 can still see how the panel arranged itself.
     const surfaceFamily = detectWorkspaceSurfaceFamily();
     if (surfaceFamily.startsWith("ext:")) {
-      await putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
+      // R1 still applies to extension surfaces: their opens must reach
+      // membership. The legacy PATCH (which dual-writes membership) is
+      // skipped here by design, so sync membership explicitly — additive on
+      // the server, since the panel is a narrow projection and must never
+      // prune tabs only wider surfaces have open. (Prod fix: extension-
+      // originated tabs were invisible to PWA/desktop after PR #166.)
+      const paneContentIds = Object.fromEntries(
+        Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
+          paneId,
+          pane?.contentIds ?? [],
+        ]),
+      );
+      await Promise.all([
+        fetch(`/api/content/workspaces/${activeWorkspaceId}/tabs`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paneContentIds }),
+        }).catch(() => {}),
+        putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot),
+      ]);
       return;
     }
 

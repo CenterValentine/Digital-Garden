@@ -38,6 +38,8 @@ type WorkspaceWithItems = ContentWorkspace & {
   >;
   viewRoot: Pick<ContentNode, "id" | "title"> | null;
   // Present on read paths that include fresh layout records (R5/F2).
+  // R1 membership rows (read paths).
+  tabs?: Array<{ contentId: string }>;
   layoutRecords?: Array<{
     family: string;
     deviceId: string;
@@ -305,6 +307,7 @@ export function formatWorkspace(
       },
     })),
     contentMeta,
+    membershipContentIds: workspace.tabs?.map((tab) => tab.contentId),
     layoutRecords: workspace.layoutRecords?.map((record) => ({
       family: record.family,
       deviceId: record.deviceId,
@@ -474,6 +477,12 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
         orderBy: { updatedAt: "desc" },
       },
       viewRoot: { select: { id: true, title: true } },
+      // R1 membership rides the list: source of truth for the tab SET on
+      // read (unioned with the legacy blob client-side).
+      tabs: {
+        where: { content: { ownerId, deletedAt: null } },
+        select: { contentId: true },
+      },
       // Fresh layout records ride the list so the client's R5 inheritance
       // chain can run synchronously at workspace open (layout-intent P3).
       layoutRecords: {

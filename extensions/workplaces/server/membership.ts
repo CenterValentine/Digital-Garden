@@ -123,10 +123,16 @@ export async function listWorkspaceTabs(ownerId: string, workspaceId: string) {
  * (with pane-derived affinity), deletes rows absent from the snapshot, and
  * leaves existing rows' affinity untouched. Caller has already verified
  * workspace ownership and filtered content ids to owned, live content.
+ *
+ * `additive: true` skips deletion — for surfaces whose snapshot is a NARROW
+ * view of the workspace (the extension side panel projects to few panes),
+ * so their opens must reach membership without pruning tabs that only wider
+ * surfaces have open.
  */
 export async function reconcileMembershipFromSnapshot(
   workspaceId: string,
   paneContentIds: Partial<Record<WorkspacePaneId, string[]>>,
+  options: { additive?: boolean } = {},
 ) {
   const desired = new Map<string, WorkspaceTabAffinity>();
   for (const [paneId, contentIds] of Object.entries(paneContentIds)) {
@@ -144,7 +150,9 @@ export async function reconcileMembershipFromSnapshot(
   const have = new Set(existing.map((row) => row.contentId));
 
   const toCreate = [...desired.entries()].filter(([id]) => !have.has(id));
-  const toDelete = [...have].filter((id) => !desired.has(id));
+  const toDelete = options.additive
+    ? []
+    : [...have].filter((id) => !desired.has(id));
   if (!toCreate.length && !toDelete.length) return;
 
   await prisma.$transaction([
@@ -169,4 +177,69 @@ export async function reconcileMembershipFromSnapshot(
         ]
       : []),
   ]);
+}
+
+/**
+ * Membership-only sync for surfaces that must NOT write workspace layout
+ * (extension iframes — spec §6.3). Takes the surface's pane snapshot, filters
+ * content ids to the owner's live content, and reconciles membership
+ * ADDITIVELY: the panel is a narrow projection, so it may add tabs it opened
+ * but never prune tabs only wider surfaces have open. Explicit closes are
+ * their own event (closeWorkspaceTab), not inferred from absence.
+ *
+ * Fixes the prod R1 gap where extension-originated opens were invisible to
+ * other surfaces: the ext:* persist path bypasses the legacy PATCH (correctly,
+ * for layout) and thus bypassed the dual-write that carried membership.
+ */
+export async function syncMembershipFromSurfaceSnapshot(
+  ownerId: string,
+  workspaceId: string,
+  paneContentIds: unknown,
+) {
+  const workspace = await findOwnedActiveWorkspace(ownerId, workspaceId);
+  if (!workspace) return null;
+
+  const requested: Partial<Record<WorkspacePaneId, string[]>> = {};
+  const allIds = new Set<string>();
+  if (typeof paneContentIds === "object" && paneContentIds !== null) {
+    for (const [paneId, ids] of Object.entries(
+      paneContentIds as Record<string, unknown>,
+    )) {
+      if (!Array.isArray(ids)) continue;
+      const clean = ids.filter((id): id is string => typeof id === "string");
+      requested[paneId as WorkspacePaneId] = clean;
+      for (const id of clean) allIds.add(id);
+    }
+  }
+  if (!allIds.size) return { added: 0 };
+
+  const owned = await prisma.contentNode.findMany({
+    where: { id: { in: [...allIds] }, ownerId, deletedAt: null },
+    select: { id: true },
+  });
+  const ownedSet = new Set(owned.map((row) => row.id));
+  const filtered: Partial<Record<WorkspacePaneId, string[]>> = {};
+  for (const [paneId, ids] of Object.entries(requested)) {
+    filtered[paneId as WorkspacePaneId] = (ids ?? []).filter((id) =>
+      ownedSet.has(id),
+    );
+  }
+
+  const before = await prisma.contentWorkspaceTab.count({ where: { workspaceId } });
+  await reconcileMembershipFromSnapshot(workspaceId, filtered, { additive: true });
+  const after = await prisma.contentWorkspaceTab.count({ where: { workspaceId } });
+  const added = after - before;
+
+  // Other surfaces detect change via ContentWorkspace.updatedAt (the client
+  // reconcile is keyed on it). Membership rows live in their own table, so a
+  // membership-only change would otherwise never trigger anyone's refresh —
+  // bump the workspace's timestamp when membership actually changed. Honest:
+  // the workspace's synced state did change.
+  if (added !== 0) {
+    await prisma.contentWorkspace.update({
+      where: { id: workspaceId },
+      data: { updatedAt: new Date() },
+    });
+  }
+  return { added };
 }

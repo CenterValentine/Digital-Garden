@@ -87,6 +87,14 @@ export interface ContentWorkspaceResponse {
    * must fall back to the legacy paneState blob when undefined/empty.
    */
   layoutRecords?: WorkspaceLayoutRecordSummary[];
+  /**
+   * R1 membership — the workspace-scoped set of open content ids
+   * (ContentWorkspaceTab), source of truth for the tab SET on read. Clients
+   * union this with the legacy paneState blob so tabs opened by surfaces that
+   * don't write the blob (extension iframes) still appear everywhere.
+   * Populated on read paths; may be absent on mutation responses.
+   */
+  membershipContentIds?: string[];
 }
 
 export interface WorkspaceLayoutRecordSummary {
