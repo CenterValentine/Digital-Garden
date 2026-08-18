@@ -320,13 +320,31 @@ export async function getA11ySnapshot() {
   return out;
 }
 
-// The bound tab's current top-frame URL — so the agent can classify page behavior
-// (URL changed = new page → use `back` to return; URL same = in-place, the list is
-// still there) across snapshots. Best-effort.
+// The bound tab's current top-frame URL — one input to "what happened after that
+// click" (paired with `currentDocId` below). Best-effort.
 export async function currentUrl() {
   try {
     const r = await send("Runtime.evaluate", { expression: "location.href", returnByValue: true });
     return (r && r.result && typeof r.result.value === "string" && r.result.value) || "";
+  } catch {
+    return "";
+  }
+}
+
+// DOCUMENT identity — the top frame's CDP `loaderId`, which changes exactly when
+// a new document loads and stays put across in-place SPA updates (pushState /
+// query-string mutations, hash changes). "Did the URL change?" is a lossy proxy
+// for "did a new page open?": results pages routinely rewrite the query string
+// while loading a detail IN PLACE (the list is still there — no `back` needed),
+// and `history.back()` after a real navigation reloads a list page that may
+// re-rank. Comparing docIds across snapshots is the site-agnostic answer; the
+// engine turns it into `documentChanged` for the model. Best-effort ("" when
+// unavailable — callers treat unknown as "compare URLs").
+export async function currentDocId() {
+  try {
+    const r = await send("Page.getFrameTree");
+    const id = r && r.frameTree && r.frameTree.frame && r.frameTree.frame.loaderId;
+    return typeof id === "string" ? id : "";
   } catch {
     return "";
   }

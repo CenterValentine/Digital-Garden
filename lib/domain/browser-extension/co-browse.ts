@@ -72,7 +72,7 @@ export function coBrowseStatus(): Promise<CoBrowseResult<{ session: unknown }>> 
  * and hand to the user (captcha = detect + human, never act).
  */
 export function coBrowseSnapshot(): Promise<
-  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean }>
+  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string; docId?: string; captchaDetected?: boolean }>
 > {
   return requestCoBrowse("snapshot");
 }
@@ -97,16 +97,22 @@ export function coBrowseType(target: CoBrowseTarget, text: string): Promise<CoBr
   return requestCoBrowse("type", { ...target, text });
 }
 
-/** Scroll the page to reveal lazy/virtualized content. Returns `atBottom`. */
+/**
+ * Scroll the page's PRIMARY scroller (the window, or the dominant inner list
+ * container on two-pane/mail/dashboard layouts) to reveal lazy/virtualized
+ * content. Returns `atBottom` for that scroller and `scroller` (what moved).
+ */
 export function coBrowseScroll(opts?: {
   direction?: "down" | "up";
   to?: "bottom" | "top";
-}): Promise<CoBrowseResult<{ atBottom: boolean }>> {
+}): Promise<CoBrowseResult<{ atBottom: boolean; scroller?: string; moved?: number }>> {
   return requestCoBrowse("scroll", { ...(opts ?? {}) });
 }
 
 /** Auto scroll-collect a long/virtualized list in one call (dedup by role+name+value). */
-export function coBrowseCollect(): Promise<CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string }>> {
+export function coBrowseCollect(): Promise<
+  CoBrowseResult<{ nodes: CoBrowseNode[]; url?: string; docId?: string; scroller?: string; scrolls?: number }>
+> {
   return requestCoBrowse("collect");
 }
 
@@ -137,13 +143,42 @@ export interface CoBrowseTab {
   windowId: number;
 }
 
+/** How a co-browse session was started (extension `startSession`). */
+export interface CoBrowseOpenResult {
+  tabId: number;
+  /** true = a fresh agent-owned tab was created; false = an existing tab was bound. */
+  opened: boolean;
+  /**
+   * "active" = bound the user's current tab; "session" = kept driving the tab an
+   * existing session was already on; null = opened a new tab.
+   */
+  bound: "active" | "session" | null;
+  /** The bound/opened tab's URL at start. */
+  url: string;
+  /** Set when a session on another tab was replaced by this bind. */
+  previousTabId?: number;
+  alreadyAttached?: boolean;
+}
+
 /**
- * Open a NEW agent-owned tab and drive it (the default topology). Foregrounds it
- * by default so the user sees the agent start; focus emulation keeps it live if
- * they switch away. Replaces any current session.
+ * Start (or continue) a co-browse session, BIND-FIRST (topology as amended
+ * 2026-08-17): with no `url`, or a `url` on the same site as the user's current
+ * tab, the extension binds that tab in place (no new tab, no reload — their page
+ * state survives); an existing session's tab is kept when it's the same-site
+ * match; a NEW agent-owned tab is opened only for a different site or an explicit
+ * `newTab`. The decision is made extension-side from real tab facts, so no
+ * prompt phrasing or retry can spawn a duplicate tab. `active` foregrounds a
+ * newly opened tab.
  */
-export function coBrowseOpen(url: string, opts?: { active?: boolean }): Promise<CoBrowseResult<{ tabId: number }>> {
-  return requestCoBrowse("open", { url, active: opts?.active !== false });
+export function coBrowseOpen(
+  url?: string,
+  opts?: { active?: boolean; newTab?: boolean },
+): Promise<CoBrowseResult<CoBrowseOpenResult>> {
+  return requestCoBrowse("open", {
+    ...(url ? { url } : {}),
+    active: opts?.active !== false,
+    ...(opts?.newTab ? { newTab: true } : {}),
+  });
 }
 
 /** Teleport the bound tab (and its window) to the foreground — "show me." */

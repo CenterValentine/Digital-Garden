@@ -145,8 +145,9 @@ export async function showTimer({ seconds = 60, label } = {}) {
   const expr = `(function(){
     var id='dg-cobrowse-timer';
     var old=document.getElementById(id); if(old&&old.__dgIv){clearInterval(old.__dgIv);} if(old){old.remove();}
-    var el=document.createElement('div'); el.id=id;
-    el.style.cssText='position:fixed;top:12px;right:12px;z-index:2147483647;background:rgba(180,83,9,.96);color:#fff;font:600 13px/1 system-ui,-apple-system,sans-serif;padding:9px 13px;border-radius:9999px;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.2px';
+    var el=document.createElement('div'); el.id=id; el.setAttribute('aria-hidden','true');
+    var top=document.getElementById('dg-cobrowse-banner')?38:12;
+    el.style.cssText='position:fixed;top:'+top+'px;right:12px;z-index:2147483647;background:rgba(180,83,9,.96);color:#fff;font:600 13px/1 system-ui,-apple-system,sans-serif;padding:9px 13px;border-radius:9999px;box-shadow:0 2px 10px rgba(0,0,0,.35);pointer-events:none;letter-spacing:.2px';
     document.documentElement.appendChild(el);
     var left=${s};
     function fmt(n){var m=Math.floor(n/60),x=n%60;return m+':'+(x<10?'0':'')+x;}
@@ -174,28 +175,81 @@ export async function clearTimer() {
   return { ok: true };
 }
 
+// Page-side scroller selection. Many pages don't scroll at the WINDOW: two-pane
+// results layouts (a job/search list in a left pane beside a detail pane), mail
+// clients, dashboards, docs apps — the list lives in an inner `overflow:auto`
+// container and `window.scrollBy` moves nothing, so a window-only scroll reports
+// `atBottom` immediately and `collect` sees just the rows already rendered. This
+// picks the PRIMARY scroller generically (no site knowledge): the window when it
+// still has meaningful travel, else the largest VISIBLE scrollable element that
+// covers a real share of the viewport (≥25% — a narrow sidebar or a code block
+// never wins over the page). Candidacy is by total overflow (so "up" still works
+// at the bottom); `atBottom` is that scroller's own position.
+const SCROLLER_JS = `
+(function(op, dy, to){
+  function isScrollable(el){
+    var cs = getComputedStyle(el); var oy = cs.overflowY;
+    return oy === 'auto' || oy === 'scroll' || oy === 'overlay';
+  }
+  function pick(){
+    var de = document.documentElement, body = document.body;
+    var docH = Math.max(de.scrollHeight, body ? body.scrollHeight : 0);
+    var winTravel = docH - window.innerHeight;
+    var vw = window.innerWidth, vh = window.innerHeight, minArea = vw * vh * 0.25;
+    var best = null, bestScore = 0;
+    var all = document.querySelectorAll('*');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.clientHeight < 120 || el.clientWidth < 120) continue;
+      var overflow = el.scrollHeight - el.clientHeight;
+      if (overflow < 100) continue;
+      if (!isScrollable(el)) continue;
+      var r = el.getBoundingClientRect();
+      if (r.bottom <= 0 || r.right <= 0 || r.top >= vh || r.left >= vw) continue;
+      var area = Math.max(0, Math.min(r.right, vw) - Math.max(r.left, 0)) * Math.max(0, Math.min(r.bottom, vh) - Math.max(r.top, 0));
+      if (area < minArea) continue;
+      // Prefer the bigger visible region; break near-ties by more content to travel.
+      var score = area + Math.min(overflow, 20000);
+      if (score > bestScore) { bestScore = score; best = el; }
+    }
+    // The window keeps priority only while it has real travel left AND no large
+    // inner scroller carries more content than the window itself does.
+    if (winTravel > 200 && (!best || (best.scrollHeight - best.clientHeight) <= winTravel)) return null;
+    return best;
+  }
+  var el = pick();
+  var isWin = !el;
+  var top = isWin ? (window.scrollY || document.documentElement.scrollTop || 0) : el.scrollTop;
+  var height = isWin ? Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0) : el.scrollHeight;
+  var view = isWin ? window.innerHeight : el.clientHeight;
+  var target = to === 'bottom' ? height : to === 'top' ? 0 : top + dy;
+  if (isWin) window.scrollTo(0, target); else el.scrollTop = target;
+  var after = isWin ? (window.scrollY || document.documentElement.scrollTop || 0) : el.scrollTop;
+  var hint = isWin ? 'window' : (el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (el.getAttribute('role') ? '[role=' + el.getAttribute('role') + ']' : ''));
+  return { scrollTop: Math.round(after), scrollHeight: height, clientHeight: view, scroller: hint,
+           atBottom: after + view >= height - 5, atTop: after <= 0, moved: Math.round(after - top) };
+})`;
+
 // Scroll the page to reveal lazy / virtualized content (R2 "assess & adapt"). A
-// viewport-step scroll via the page's own scroller; the caller re-snapshots after
-// to see what newly rendered. `to:"bottom"|"top"` jumps to an end. Returns
-// `atBottom` so the agent knows when there's nothing left to reveal.
+// viewport-step scroll of the page's PRIMARY scroller (see SCROLLER_JS — window
+// or the dominant inner list container); the caller re-snapshots after to see
+// what newly rendered. `to:"bottom"|"top"` jumps to an end. Returns `atBottom` so
+// the agent knows when there's nothing left to reveal, plus `scroller` (what was
+// scrolled) so a "nothing moved" is diagnosable.
 export async function scroll({ direction = "down", to } = {}) {
-  const expr =
-    to === "bottom"
-      ? "window.scrollTo(0, document.body.scrollHeight)"
-      : to === "top"
-        ? "window.scrollTo(0, 0)"
-        : `window.scrollBy(0, ${direction === "up" ? -900 : 900})`;
+  const dy = direction === "up" ? -900 : 900;
   const evalResult = await send("Runtime.evaluate", {
-    expression: `(function(){ ${expr}; return { scrollY: Math.round(window.scrollY), scrollHeight: document.body.scrollHeight, innerHeight: window.innerHeight }; })()`,
+    expression: `${SCROLLER_JS}(${JSON.stringify(to ? "to" : "by")}, ${dy}, ${JSON.stringify(to || null)})`,
     returnByValue: true,
   });
   const v = (evalResult && evalResult.result && evalResult.result.value) || {};
-  const atBottom =
-    typeof v.scrollY === "number" &&
-    typeof v.innerHeight === "number" &&
-    typeof v.scrollHeight === "number" &&
-    v.scrollY + v.innerHeight >= v.scrollHeight - 5;
-  return { ok: true, atBottom };
+  const atBottom = v.atBottom === true;
+  return {
+    ok: true,
+    atBottom,
+    ...(typeof v.scroller === "string" ? { scroller: v.scroller } : {}),
+    ...(typeof v.moved === "number" ? { moved: v.moved } : {}),
+  };
 }
 
 // Slice 3d — AUTOMATIC scroll-collect: gather a long / virtualized list in ONE
@@ -213,9 +267,13 @@ export async function collectAll({ maxScrolls = 20 } = {}) {
   };
   let lastSize = -1;
   let stable = 0;
+  let scroller;
+  let scrolls = 0;
   for (let i = 0; i < maxScrolls; i++) {
     absorb(await getA11ySnapshot());
-    const res = await scroll({ direction: "down" });
+    const res = await scroll({ direction: "down" }); // primary scroller (window OR inner list)
+    scrolls++;
+    if (res.scroller) scroller = res.scroller;
     await new Promise((r) => setTimeout(r, 550)); // let lazy rows render
     if (res.atBottom) {
       absorb(await getA11ySnapshot()); // one more after reaching the end
@@ -228,7 +286,12 @@ export async function collectAll({ maxScrolls = 20 } = {}) {
       lastSize = seen.size;
     }
   }
-  return { nodes: [...seen.values()], url: await currentUrl() };
+  return {
+    nodes: [...seen.values()],
+    url: await currentUrl(),
+    ...(scroller ? { scroller } : {}),
+    scrolls,
+  };
 }
 
 // Basic text entry: focus (click) then insertText. Good enough for plain inputs /

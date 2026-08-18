@@ -12,6 +12,8 @@
 // the a11y snapshot, and cross-frame (OOPIF) attach all land in later slices
 // ON TOP of send() — this module is deliberately just the primitive.
 
+import { showBanner, hideBanner } from "./banner.js";
+
 const PROTOCOL_VERSION = "1.3";
 
 // Domains we drive. Enabled best-effort on attach so one unsupported/failed
@@ -96,12 +98,17 @@ export async function attach(tabId) {
     );
   }
   if (session && session.tabId === tabId) {
+    void showBanner(tabId); // idempotent refresh (a reload may have dropped it)
     return { tabId, alreadyAttached: true };
   }
   await attachDebugger({ tabId }, PROTOCOL_VERSION);
   session = { tabId, startedAt: Date.now() };
   childSessions.clear();
   persistSessionTab(tabId); // survive MV3 SW eviction / app reload (see ensureSession)
+  // Our per-page "agent is driving THIS tab" signal — see banner.js for why it is
+  // scripting-injected rather than CDP-injected, and why the global infobar
+  // can't do this job.
+  void showBanner(tabId);
   for (const domain of DOMAINS_ON_ATTACH) {
     try {
       await sendCommand({ tabId }, domain);
@@ -138,6 +145,7 @@ export async function detach() {
   const { tabId } = session;
   session = null;
   childSessions.clear();
+  await hideBanner(tabId);
   await detachDebugger({ tabId });
   return { detached: true, tabId };
 }
@@ -226,10 +234,12 @@ export async function send(method, params, sessionId) {
 }
 
 // Actionable no-session message (recovery already tried + failed): the previous
-// co-browse tab is genuinely gone, so tell the model to START FRESH rather than
-// stall. It has co_browse_open; "attach" is not a tool it can call.
+// co-browse tab is genuinely gone, so tell the model how to CONTINUE rather than
+// stall — bind-first: the user very likely still has the page open in front of
+// them, so re-bind it (co_browse_open with no url) before ever opening a fresh
+// tab. "attach" is not a tool the model can call; co_browse_open is.
 export const NO_SESSION_MESSAGE =
-  "No active co-browse session — the previous co-browse tab is gone (e.g. the browser was restarted or the tab was closed). Start a new session by opening the page with co_browse_open, then continue.";
+  "No active co-browse session — the previous co-browse tab is gone (e.g. the browser was restarted or the tab was closed). Continue by calling co_browse_open with NO url to bind the page the user currently has open (no new tab); pass a url only if that page is gone.";
 
 // The top-left of a child frame's viewport in ROOT coordinates — the sum of the
 // owning <iframe> element offsets from this frame up to the top (Slice 3c-2). For
@@ -277,6 +287,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
     session = null;
     childSessions.clear();
     clearSessionTab(); // authoritative end (banner cancel / tab closed) — no recovery
+    void hideBanner(endedTab); // reachable via scripting even though CDP is gone
     if (onSessionEnd) {
       try {
         onSessionEnd(reason, endedTab);
@@ -285,6 +296,19 @@ chrome.debugger.onDetach.addListener((source, reason) => {
       }
     }
   }
+});
+
+// The banner lives in the page's DOM, so every navigation of the driven tab wipes
+// it — re-paint on load. Falls back to the persisted tab id when the in-memory
+// session was lost to SW eviction: the banner tracks the SESSION (like the panel's
+// amber bar), not the moment-to-moment debugger attachment. `loading` paints early
+// (documentElement exists), `complete` covers documents that replaced the early one.
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status !== "loading" && changeInfo.status !== "complete") return;
+  void (async () => {
+    const driven = session ? session.tabId : await readSessionTab();
+    if (driven === tabId) await showBanner(tabId);
+  })();
 });
 
 // Cross-frame discovery: with flat auto-attach on, each cross-origin (OOPIF) frame
