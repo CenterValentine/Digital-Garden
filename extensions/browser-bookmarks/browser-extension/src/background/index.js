@@ -2474,12 +2474,15 @@ async function handleAcquireUrl(payload) {
 }
 
 // Resolve the tab a co-browse session should attach to when the caller gives no
-// explicit tabId AND there's no sender tab (the side panel isn't a tab). Default:
-// the active http(s) tab in the user's window. The Slice 5b session manager will
-// layer the real topology on top (agent-owned tab, metadata resolution, etc.).
-async function resolveCoBrowseTab() {
-  const tabs = await chrome.tabs.query({ active: true });
-  return (tabs.find((t) => /^https?:/.test(t.url || "")) || tabs[0])?.id;
+// explicit tabId AND there's no sender tab (the side panel isn't a tab): the
+// active web-page tab of the PANEL's window (`windowId` from the panel host).
+// `chrome.tabs.query({active:true})` alone returns one tab PER WINDOW, and the
+// first http(s) hit could be another window's — that mis-bind is how "use the
+// page I'm on" used to end in a fresh tab. Returns undefined when the active tab
+// isn't a web page (chrome://, the app's own PWA, …).
+async function resolveCoBrowseTab(windowId) {
+  const tab = await cobrowseSession.resolveActiveTab(windowId);
+  return tab && /^https?:/.test(tab.url || "") ? tab.id : undefined;
 }
 
 // Agentic co-browse: when a CDP session ends for ANY reason — the user clicking
@@ -2770,9 +2773,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // tab; an explicit payload.tabId lets the panel drive another tab.
     if (message.type === "cobrowse-attach") {
       try {
+        // Explicit tabId → bind exactly that tab. Otherwise the user's ACTIVE tab
+        // in the PANEL's window (payload.panelWindowId, relayed by the panel host)
+        // — never "the active tab of whichever window comes first". Either way a
+        // session on some other tab is replaced, not a refusal (bindTab).
+        const explicit = message.payload?.tabId ?? sender.tab?.id;
         const tabId =
-          message.payload?.tabId ?? sender.tab?.id ?? (await resolveCoBrowseTab());
-        sendResponse({ ok: true, data: await cobrowse.attach(tabId) });
+          typeof explicit === "number"
+            ? explicit
+            : await resolveCoBrowseTab(message.payload?.panelWindowId);
+        if (typeof tabId !== "number") {
+          sendResponse({ ok: false, error: "no tab to bind (the user's current tab is not a web page)" });
+          return;
+        }
+        sendResponse({ ok: true, data: await cobrowseSession.bindTab(tabId) });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "attach failed" });
       }
@@ -2811,14 +2825,17 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "cobrowse-snapshot") {
       try {
-        const [nodes, url] = await Promise.all([
+        const [nodes, url, docId] = await Promise.all([
           cobrowse.getA11ySnapshot(),
           cobrowse.currentUrl(),
+          cobrowse.currentDocId(),
         ]);
         // captchaDetected rides alongside so the model can pause and hand to the
         // user; the captcha frame's own nodes are already excluded from `nodes`.
+        // docId = document identity (loaderId) — the engine derives
+        // `documentChanged` from it (new page vs in-place update).
         const { captchaDetected } = cobrowse.detectChallenges();
-        sendResponse({ ok: true, data: { nodes, url, captchaDetected } });
+        sendResponse({ ok: true, data: { nodes, url, docId, captchaDetected } });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "snapshot failed" });
       }
@@ -2883,7 +2900,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
     if (message.type === "cobrowse-collect") {
       try {
-        sendResponse({ ok: true, data: await cobrowse.collectAll(message.payload || {}) });
+        const collected = await cobrowse.collectAll(message.payload || {});
+        sendResponse({ ok: true, data: { ...collected, docId: await cobrowse.currentDocId() } });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "collect failed" });
       }
@@ -2892,22 +2910,35 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     // ── Session / tab manager (Slice 5b) ──────────────────────────────────
     if (message.type === "cobrowse-open") {
       try {
-        const url = message.payload?.url;
-        if (!url) {
-          sendResponse({ ok: false, error: "no url provided" });
+        // Bind-first (session.js startSession): `url` is OPTIONAL — no url binds
+        // the user's active tab; a url on the same site as that tab ALSO binds it
+        // (no reload, their page state survives); only a different site, or an
+        // explicit `newTab`, opens an agent-owned tab. panelWindowId scopes "the
+        // user's active tab" to the panel's own window.
+        const url = typeof message.payload?.url === "string" ? message.payload.url : undefined;
+        const newTab = message.payload?.newTab === true;
+        if (newTab && !url) {
+          sendResponse({ ok: false, error: "newTab needs a url" });
           return;
         }
-        // Same SSRF / private-network gate as reads/navigate before we open+drive.
-        const config = await getConfig();
-        const configDeny =
-          config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
-        const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
-        if (!decision.allowed) {
-          sendResponse({ ok: false, error: decision.reason });
-          return;
+        if (url) {
+          // Same SSRF / private-network gate as reads/navigate before we open+drive.
+          const config = await getConfig();
+          const configDeny =
+            config.capture && Array.isArray(config.capture.denylist) ? config.capture.denylist : [];
+          const decision = evaluateAcquisitionPolicy(url, message.payload?.policy, configDeny);
+          if (!decision.allowed) {
+            sendResponse({ ok: false, error: decision.reason });
+            return;
+          }
         }
         const active = message.payload?.active !== false;
-        sendResponse({ ok: true, data: await cobrowseSession.openAndAttach(url, { active }) });
+        const windowId =
+          typeof message.payload?.panelWindowId === "number" ? message.payload.panelWindowId : undefined;
+        sendResponse({
+          ok: true,
+          data: await cobrowseSession.startSession(url, { active, newTab, windowId }),
+        });
       } catch (error) {
         sendResponse({ ok: false, error: error instanceof Error ? error.message : "open failed" });
       }

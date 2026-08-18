@@ -510,7 +510,20 @@ window.addEventListener("message", (event) => {
         return;
       }
       try {
-        const result = await sendRuntimeMessage({ type: `cobrowse-${op}`, payload: args || {} });
+        let payload = args || {};
+        // Tab-binding ops need to know WHICH window "the user's current tab" means:
+        // the side panel is per-window, and the user's focus can be in another
+        // window mid-run. Stamp this panel's window so the background scopes its
+        // active-tab lookup to it (never trusted from the embed — derived here).
+        if (op === "open" || op === "attach") {
+          try {
+            const win = await chrome.windows.getCurrent();
+            if (win && typeof win.id === "number") payload = { ...payload, panelWindowId: win.id };
+          } catch {
+            // best-effort: the background falls back to the last-focused window
+          }
+        }
+        const result = await sendRuntimeMessage({ type: `cobrowse-${op}`, payload });
         postToEmbed("cobrowse-result", { id, result: { ok: true, data: result } });
       } catch (error) {
         postToEmbed("cobrowse-result", {

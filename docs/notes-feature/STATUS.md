@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-16
+last_updated: 2026-08-18
 current_epoch: 18
 current_sprint: 58
 sprint_status: in-progress
@@ -52,6 +52,10 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 18, 2026**: **Co-browse performance — bind-first tab topology, document-identity navigation, primary-scroller enumeration** (branch `feat/cobrowse-bind-first`; typecheck/lint(149)/prompt-cache/ai:drift/extension build green; owner smoke pending; extension **5.4.0** — reload at `chrome://extensions` after pulling)
+
+The AI's co-browsing now defaults to the page the user is on. `co_browse_open` is bind-first and the decision is made in code from real tab facts (`session.js startSession`): no url, or a url on the same site as the user's active tab, binds that tab in place (no reload, their filters/personalized list survive); an existing session's tab is kept for a same-site re-open (a mid-run re-open or a post-eviction recovery can no longer spawn a sibling tab); a fresh agent-owned tab opens only for a different site or an explicit `newTab: true`. "The user's active tab" is scoped to the panel's own window (`panelWindowId` stamped by the panel host — the old `tabs.query({active:true})` returned one tab per window), and binding replaces a session on another tab instead of refusing. The prompt, tool descriptions, and the `NO_SESSION` recovery text were rewritten to the same default. Two page-agnostic perception upgrades ride along: every act reports **`documentChanged`** from the top frame's CDP `loaderId` (real navigation vs an in-place update whose query string changed — trusts document identity, not URL text — so `back` is used only after real navigations, and results lists aren't reloaded/re-ranked between items), and `scroll`/`collect` drive the page's **primary scroller** (the window when it has travel, else the dominant visible inner list container — two-pane results layouts, mail, dashboards now enumerate fully instead of `atBottom` on an unmoving window; `atBottom`/`scroller` are now actually forwarded to the model, which the engine had been dropping). Timed and per-item iteration now freeze the enumerated list (by observed `href`) as the itinerary and never re-derive "next" from a re-read list. Companion in the same PR: the on-page co-browse banner (`banner.js`, `--silent-debugger-extension-api` note) and chat-panel interface polish (mention-pill ⌘/Ctrl+click open, associated-content chip overflow menu, breadcrumb menu via `use-anchored-menu`). Plan amendment: `AGENTIC-BROWSING-PLAN.md` §"Co-browsing presence".
 
 **August 16, 2026**: **Workspace layout intent/projection — behavioral spec + P1–P3 infra** (branch `feat/layout-intent-projection`; typecheck/lint(151)/build + full CI chain green at every commit; migration `20260815120000_workspace_membership_and_layout_records` applied to local dev, ⚠ **`npx prisma migrate deploy` against Neon required before the Vercel preview or prod can serve workspace endpoints** — the list include queries the new tables)
 
