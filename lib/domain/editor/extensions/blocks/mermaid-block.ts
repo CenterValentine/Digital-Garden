@@ -20,7 +20,6 @@
 
 import { Node, mergeAttributes, type Editor } from "@tiptap/core";
 import { z } from "zod";
-import type * as Y from "yjs";
 import type { Root as ReactRoot } from "react-dom/client";
 import { createBlockSchema } from "@/lib/domain/blocks/schema";
 import { registerBlock } from "@/lib/domain/blocks/registry";
@@ -28,6 +27,12 @@ import { blockIdAttr } from "@/lib/domain/blocks/data-attr";
 import { createBlockNodeView } from "@/lib/domain/blocks/node-view-factory";
 import { consumePendingDiagramCreate } from "./pending-diagram-creates";
 import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
+import { resolveNoteYdoc } from "@/lib/domain/blocks/resolve-note-ydoc";
+import {
+  syncEditableField,
+  onlyFieldChanged,
+  attachTitleRenameOnBlur,
+} from "@/lib/domain/blocks/inline-edit";
 
 /**
  * NodeView contentDom carries React lifecycle handles attached during render.
@@ -36,6 +41,10 @@ import { makeWrapAttrs } from "@/lib/domain/blocks/wrap-size";
 type BlockContentDom = HTMLElement & {
   __cleanup?: () => void;
   __reactRoot?: ReactRoot;
+  /** Persistent header title element — synced in place on title-only updates. */
+  __titleEl?: HTMLElement;
+  /** Full node.attrs from the last render, for the title-only fast path. */
+  __lastAttrs?: Record<string, unknown>;
 };
 
 /**
@@ -54,23 +63,6 @@ export function mermaidEmbedSubTextKey(blockId: string): string {
  * we only fire once per block until the contentId lands back in attrs.
  */
 const pendingCreateBlockIds = new Set<string>();
-
-/**
- * Look up the note's Y.Doc via the Collaboration extension's options. This is
- * reliable at NodeView mount time, which a useEffect-populated
- * editor.storage.noteYdoc is not.
- */
-function resolveNoteYdoc(editor: Editor): Y.Doc | null {
-  try {
-    const ext = editor?.extensionManager?.extensions?.find(
-      (e: { name: string }) => e.name === "collaboration"
-    );
-    const doc = (ext?.options as { document?: Y.Doc } | undefined)?.document ?? null;
-    return doc ?? null;
-  } catch {
-    return null;
-  }
-}
 
 const { schema: mermaidBlockSchema, defaults: mermaidBlockDefaults } =
   createBlockSchema("mermaidBlock", {
@@ -196,18 +188,35 @@ export const MermaidBlock = Node.create({
       },
 
       updateContent(node, contentDom, editor, getPos) {
+        const d = contentDom as BlockContentDom;
+        // Title-only change (per-keystroke header rename): sync the
+        // persistent title element in place instead of tearing down the
+        // DOM — the rebuild below destroys the focused contentEditable,
+        // which ate the caret between every typed character.
+        const nextAttrs = node.attrs as Record<string, unknown>;
+        if (
+          d.__lastAttrs &&
+          d.__titleEl &&
+          d.__titleEl.isConnected &&
+          onlyFieldChanged(d.__lastAttrs, nextAttrs, "title")
+        ) {
+          d.__lastAttrs = nextAttrs;
+          syncEditableField(d.__titleEl, String(nextAttrs.title ?? ""));
+          return true;
+        }
         // Run cleanup (unmount) before clearing DOM
-        const cleanup = (contentDom as BlockContentDom).__cleanup;
+        const cleanup = d.__cleanup;
         if (cleanup) {
           try { cleanup(); } catch {}
-          delete (contentDom as BlockContentDom).__cleanup;
+          delete d.__cleanup;
         }
         // Also unmount any root not yet cleaned up
-        const existingRoot = (contentDom as BlockContentDom).__reactRoot;
+        const existingRoot = d.__reactRoot;
         if (existingRoot) {
           try { existingRoot.unmount(); } catch {}
-          delete (contentDom as BlockContentDom).__reactRoot;
+          delete d.__reactRoot;
         }
+        delete d.__titleEl;
         contentDom.innerHTML = "";
         renderMermaidBlock(node.attrs as MermaidBlockAttrs, contentDom, editor, getPos);
         return true;
@@ -377,7 +386,11 @@ function renderMermaidBlock(
   titleSpan.setAttribute("data-header-level", "3");
   titleSpan.addEventListener("mousedown", (e) => e.stopPropagation());
   titleSpan.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      e.stopPropagation();
+      titleSpan.blur(); // commit — the focusout handler PATCHes the file
+    }
     if (e.key === "Backspace") {
       const sel = window.getSelection();
       const atStart = sel?.rangeCount && sel.isCollapsed && sel.getRangeAt(0).startOffset === 0;
@@ -389,9 +402,25 @@ function renderMermaidBlock(
     const blockId = attrs.blockId;
     if (!blockId) return;
     window.dispatchEvent(new CustomEvent("block-attrs-change", {
-      detail: { blockId, key: "title", value: titleSpan.textContent || "" },
+      // `editor` addresses the event to THIS block's editor — blockIds can
+      // legitimately repeat across documents (cross-note paste keeps them),
+      // and multiple editors are mounted at once with Note Windows.
+      detail: { blockId, key: "title", value: titleSpan.textContent || "", editor },
     }));
   });
+  // Blur/Enter commits the rename to the ACTUAL visualization file (the
+  // per-keystroke event above only writes the node attr — the file title
+  // desynced forever after creation before this).
+  attachTitleRenameOnBlur(titleSpan, () => {
+    const d = contentDom as BlockContentDom;
+    return (d.__lastAttrs?.contentId as string | null) ?? attrs.contentId;
+  });
+  // Persistent handles for updateContent's title-only fast path.
+  {
+    const d = contentDom as BlockContentDom;
+    d.__titleEl = titleSpan;
+    d.__lastAttrs = attrs as unknown as Record<string, unknown>;
+  }
 
   // Live character count pulled from the note's sub-Y.Text (Path A).
   // Same motivation as excalidraw-block: editor.storage.noteYdoc lags (set in

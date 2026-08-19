@@ -4,8 +4,6 @@ import { useEffect, type ReactNode } from "react";
 import { useMobileUiStore } from "@/state/mobile-ui-store";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useRightPanelCollapseStore } from "@/state/right-panel-collapse-store";
-import { useContentStore } from "@/state/content-store";
-import { useIsPhone, useIsLandscape } from "@/components/common/useViewport";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { MobileDrawer } from "./MobileDrawer";
 import { MobileFocusControls } from "./MobileFocusControls";
@@ -63,24 +61,13 @@ export function MobileNotesLayout({
     }
   }, [openDrawer, rightCollapsed, closeDrawer, setRightCollapsed]);
 
-  // Phones support only `single` and ONE 2-pane split, oriented to the device:
-  // portrait → stacked (dual-horizontal), landscape → side-by-side
-  // (dual-vertical). `quad` is never phone-appropriate. Coerce incompatible
-  // layouts through the store's own setLayoutMode (same path the layout picker
-  // uses, so tab redistribution is handled). Only phones — narrow desktop
-  // windows keep whatever layout the user chose. No loop: once coerced, the
-  // layout is compatible and the guards fall through.
-  const isPhone = useIsPhone();
-  const isLandscape = useIsLandscape();
-  const layoutMode = useContentStore((s) => s.layoutMode);
-  const setLayoutMode = useContentStore((s) => s.setLayoutMode);
-  useEffect(() => {
-    if (!isPhone) return;
-    const desiredDual = isLandscape ? "dual-vertical" : "dual-horizontal";
-    if (layoutMode === "quad") setLayoutMode(desiredDual);
-    else if (layoutMode === "dual-vertical" && !isLandscape) setLayoutMode("dual-horizontal");
-    else if (layoutMode === "dual-horizontal" && isLandscape) setLayoutMode("dual-vertical");
-  }, [isPhone, isLandscape, layoutMode, setLayoutMode]);
+  // Phone orientation adaptation now happens in useProjectedLayout (consumed
+  // by MainPanelWorkspace): side-by-side renders stacked in portrait and vice
+  // versa, quad passes through (owner decision D2). The setLayoutMode coercion
+  // effect that used to live here was ghost-writer #1 in the layout-intent
+  // spec — a rendering constraint mutating synced intent (a phone glancing at
+  // a quad workspace destroyed the desktop quad). Deleted; projection is
+  // render-only by construction.
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">

@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-12
+last_updated: 2026-08-18
 ---
 
 # Sprint Backlog
@@ -7,6 +7,32 @@ last_updated: 2026-08-12
 **Prioritized work items for upcoming sprints, organized by epoch.**
 
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
+
+---
+
+## Co-browse bind-first + navigation awareness — follow-ups (2026-08-18, after `feat/cobrowse-bind-first`)
+
+Surfaced while building bind-first topology / `documentChanged` / primary-scroller enumeration; not blocking:
+- **Same-site vs same-page bind heuristic.** `startSession` binds the user's tab for any same-site url (host modulo `www.`). If smoke shows the model passing a same-site url for a genuinely different task ("now search X" while the user sits on an unrelated page of the same site), consider a `bindPolicy` hint or a path-distance rule — but only with evidence; the current rule deliberately favors the user's page state.
+- **Scroll a NAMED container.** `scroll`/`collect` pick the primary scroller heuristically (window vs dominant inner pane). A `role`/`name` target on `scroll` ("scroll the container holding this element", via `DOM.scrollIntoViewIfNeeded` on the last collected item) would make virtualized side-lists that don't dominate the viewport enumerable too. Add when a real page needs it.
+- **Harness-enforced item itinerary.** Per-item runs now freeze the enumerated list by observed `href` at the prompt level; the ledger already tiers url > label. If drift persists, have `propose_item_iteration` reject/flag "next" items whose keys aren't in the approved set (code guarantee over prompt).
+- **`documentChanged` for OOPIF-hosted lists.** `docId` is the TOP frame's loaderId; a results list living inside an embedded ATS iframe (Greenhouse/Lever) navigates the child frame only. Extend `currentDocId` to include child-session loaderIds when Slice-4 targets show it matters.
+- **Pre-existing:** the engine had been dropping `scroll`'s `atBottom` (lived in `res.data`); now forwarded. Audit other act ops for the same `res.data`-vs-`res` shape assumption.
+
+## Layout intent/projection — follow-ups (2026-08-16, after P1–P3 on `feat/layout-intent-projection`; spec: LAYOUT-INTENT-PROJECTION-PLAN.md)
+
+- **F2 sync affordance** — workspace-bar dropdown of per-device layout records (<30d, data already in `ContentWorkspaceResponse.layoutRecords`), radio to pick the lead layout overriding the R5 chain; expiry falls back to default.
+- **F1 Main-workspace-only "adopt into new workspace"** — snapshot current tab layout into a new workspace (quick name + icon; reuse the workspace-create dialog).
+- **P4 client tab events** — call `POST/DELETE …/tabs` from open/close actions directly (today R1 truth rides the legacy PATCH dual-write); then live membership fan-in (presence-poll channel is the natural carrier).
+- **P6 settings split** — device / universal / universal-with-override buckets (spec §7).
+- **Legacy cleanup (expand-contract "contract")** — once all clients write records: stop applying/writing `layoutMode`/`activePaneId`/`paneState` blob, then drop the columns with a migration.
+- **Right-sidebar <960px auto-collapse** — fold into projection when next touched (lowest priority; writes only device-local state).
+
+## Nested-editor event-routing examination (2026-08-14, after Note Window; owner-requested)
+
+Systematic study of focus/selection/drag/keyboard/IME routing through **stacked ProseMirror editors** at depth ≥2: the `stopEvent` allowlist in `node-view-factory.ts`, `.block-note-window-mount` boundaries, BubbleMenu/suggestion-plugin scoping (which editor's slash menu / wiki-link autocomplete fires when nested?), and the `noteWindowDepth`/`noteWindowAncestorTargetIds` plumbing. **Plus the window-CustomEvent addressing audit**: the 2026-08-15 mermaid-multiplication regression proved window-level events with no editor addressing fan out to every mounted MarkdownEditor. `create-diagram-block`, `embed-diagram-create`, and `block-attrs-change` are fixed (editor in detail + listener guard); still unaddressed and needing the same treatment or an explicit single-instance argument: `editor-image-upload`, `editor-open-ai-image`, `insert-ai-image`, `insert-ai-audio`, `scroll-to-heading`. Goal: a safe plan for reducing bugs when editors get nested. **Prerequisite before ever relaxing the Note Window depth cap (currently: depth 1-2 collapsed→snapshot, depth ≥3 chip) or making nested windows editable.** Context: the Note Window v1 deliberately keeps nested windows read-only/never-runtime-acquiring precisely because two-editors-deep event routing is where embedded-editor bugs breed.
+
+(The diagram-header rename desync — excalidraw/mermaid titles never PATCHing the real file — was a backlog candidate here but got fixed in-scope with the Note Window work, 2026-08-14.)
 
 ---
 

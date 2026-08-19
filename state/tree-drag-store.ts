@@ -30,6 +30,14 @@ interface TreeDragState {
     node: DraggingTreeNode | null,
     nodes?: DraggingTreeNode[]
   ) => void;
+  /**
+   * Folder the in-flight EXTERNAL file drag would land in (OS files dragged
+   * onto the tree). react-arborist's `willReceiveDrop` only covers its own
+   * internal DnD, so the drop zone publishes the resolved destination here
+   * and the matching row highlights itself.
+   */
+  externalDropTargetId: string | null;
+  setExternalDropTargetId: (id: string | null) => void;
 }
 
 export const useTreeDragStore = create<TreeDragState>((set) => ({
@@ -40,4 +48,6 @@ export const useTreeDragStore = create<TreeDragState>((set) => ({
       draggingNode: node,
       draggingNodes: node ? (nodes && nodes.length > 0 ? nodes : [node]) : [],
     }),
+  externalDropTargetId: null,
+  setExternalDropTargetId: (id) => set({ externalDropTargetId: id }),
 }));

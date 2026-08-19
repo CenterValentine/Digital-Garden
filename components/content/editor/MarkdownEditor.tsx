@@ -204,6 +204,14 @@ export interface MarkdownEditorProps {
   }) => void;
   /** Compact mode for secondary/embedded editors (less padding, smaller prose) */
   compact?: boolean;
+  /**
+   * Note Window nesting depth. 0 (default) for top-level editors; a Note
+   * Window NodeView passes depth + 1 into its nested editor so inner
+   * windows render collapsed/chipped instead of recursing freely.
+   */
+  noteWindowDepth?: number;
+  /** Windowed target ids above this editor (Note Window cycle guard). */
+  noteWindowAncestorTargetIds?: string[];
   /** Edge-to-edge mode for the browser-extension iframe note surface */
   edgeToEdge?: boolean;
   /** Placeholder text when editor is empty */
@@ -235,6 +243,8 @@ export function MarkdownEditor({
   onCollaborationSyncChange,
   compact = false,
   edgeToEdge = false,
+  noteWindowDepth = 0,
+  noteWindowAncestorTargetIds,
   className = "",
 }: MarkdownEditorProps) {
   const openMenu = useContextMenuStore((s) => s.openMenu);
@@ -525,6 +535,12 @@ export function MarkdownEditor({
       onTagSelect,
       fetchPeopleMentions,
       onPersonMentionClick,
+      noteWindowDepth,
+      noteWindowAncestorTargetIds,
+      // Ref-read, not a snapshot: this editor instance can be re-bound to
+      // a different document (contentId prop changes without recreation),
+      // and the Note Window self-embed guard must always see the current one.
+      getHostContentId: () => contentIdRef.current ?? undefined,
     }),
     content: collaborationState ? undefined : safeContent,
     editable: effectiveEditable,
@@ -1121,6 +1137,13 @@ export function MarkdownEditor({
       const { engine, blockId, defaultTitle, getPos, editor: blockEditor } =
         (e as CustomEvent).detail;
 
+      // ADDRESSING GUARD (2026-08-15 regression fix): window-level event,
+      // every mounted MarkdownEditor hears it. Unaddressed, each instance
+      // POSTed its own visualization create (ownership scattered across
+      // whichever notes happened to be mounted). The dispatching NodeView
+      // carries its editor in the detail — only that instance handles it.
+      if (!blockEditor || blockEditor !== editor) return;
+
       try {
         const response = await fetch("/api/content/content", {
           method: "POST",
@@ -1213,7 +1236,16 @@ export function MarkdownEditor({
   // dropped/sanitized before its contentId lands.
   useEffect(() => {
     const handleCreateDiagramBlock = async (e: Event) => {
-      const { engine, defaultTitle } = (e as CustomEvent).detail;
+      const { engine, defaultTitle, editor: sourceEditor } = (e as CustomEvent).detail;
+
+      // ADDRESSING GUARD (2026-08-15 regression fix): this is a window-level
+      // event and EVERY mounted MarkdownEditor hears it — the host note plus
+      // one per Note Window (and one per split pane). Before this guard,
+      // each instance created its own visualization (owned by ITS note!)
+      // and inserted a block into ITS document: N windows meant N+1
+      // mermaids scattered across unrelated notes. Only the editor the
+      // slash command was typed into may handle the event.
+      if (!sourceEditor || sourceEditor !== editor) return;
 
       const toastId = toast.loading(
         engine === "excalidraw" ? "Creating drawing…" : "Creating diagram…"

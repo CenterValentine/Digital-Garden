@@ -313,24 +313,76 @@ never bypass it. (Per-document `plainFallback` — the emergency last resort whe
 single doc genuinely cannot load into a Y.Doc — is a safety net, not a mode
 choice, and is fine.)
 
-### 9.4 Freshness contract — writes that bypass the Y.Doc
+### 9.4 Freshness contract — the two representations must not silently diverge
 
-Any server path that updates `NotePayload` **without** going through the
-collaborative Y.Doc MUST realign the `CollaborationDocument` afterward, or a
-stale-but-non-empty Y.Doc will win at bootstrap and mask the write (stale/blank
-note on next open). Use `reseedCollaborationDocumentFromNote(prisma, contentId)`.
-- **Known bypassing writers:** browser extension `updateExtensionNoteContent`
-  (wired 2026-07-02). **Any** future out-of-band note writer (bulk import, AI
-  edits, a REST mobile client) must do the same — this is a checklist item for
-  new note-write endpoints.
-- The reseed is **non-fatal**: `NotePayload` is the durable truth, so a reseed
-  failure logs and does not fail the write.
-- **Known residual (out of scope):** an out-of-band REST write racing a *live*
-  Hocuspocus session on the same note is the inherent two-writers conflict;
-  reseed does not resolve it (the live session re-persists its own state).
-  Proper reconciliation (revision vectors / last-writer-by-timestamp across the
-  two representations) is future work. Related: the destructive-PATCH guard
-  history in `storeCollaborationYDocState`.
+The two representations (§9.1) can legitimately diverge, and history shows
+**staleness has been more damaging than overwrites**: a stale-but-non-empty
+Y.Doc used to win at bootstrap unconditionally, so any content that reached
+`NotePayload` outside the collab path was masked on every open until someone
+ran a manual reseed. Three layers now hold the contract; know which one you
+are relying on.
+
+**Layer 1 — write THROUGH the Y.Doc (preferred; PR #161).** Every server-side
+note writer (AI `updateNote`, extension writes) applies its edit via
+Hocuspocus `POST /internal/apply` when a `CollaborationDocument` exists, so
+connected editors see it live and the store hook mirrors it to the payload
+normally. **Do NOT reseed after a payload write** — the reseed produces a rival
+Y.Doc with fresh identity that *unions* with any surviving copy on reconnect
+(duplicated content — Fact 4 in `AI-COLLAB-WRITE-PATH-PLAN.md`). The old
+"reseed after out-of-band write" rule that lived here is retired.
+
+**Layer 2 — bootstrap freshness (self-healing on open; PR #168,
+2026-08-18).** `loadCollaborationYDocState` no longer trusts a meaningful
+stored Y state unconditionally. `payloadIsNewerThanCollaborativeCopy` makes
+the payload win bootstrap when ALL of:
+1. the payload was written **after the Y.Doc last mirrored into it** — every
+   store-hook mirror stamps `metadata.collaborationSnapshotAt`; a payload with
+   `updatedAt` past that stamp (>1s slack), or with the stamp **missing** while
+   a Y.Doc exists, was written outside the collab path (the offline / REST
+   fallback path replaces `metadata` wholesale, so a wiped stamp is itself the
+   tell);
+2. the payload is meaningful (`hasMeaningfulTipTapContent`);
+3. the payload is **not a strict shrink** of the Y.Doc's own `snapshotJson`
+   (top-level block count) — a smaller-but-newer payload is far more likely a
+   partial/failed write than a legitimate edit, so the Y.Doc is kept and the
+   divergence banner still surfaces it.
+When it fires, the fall-through path builds a fresh Y.Doc from the payload —
+the same code first-open uses — so nothing new is invented. **Why the stamp,
+not `updatedAt` vs `updatedAt`:** the store hook writes the payload a hair
+*after* the Y.Doc, so a naive comparison would reseed on every ordinary open.
+The stamp is semantically exact ("when did the Y.Doc last mirror into me?").
+
+**Layer 3 — don't stay detached (PR #168).** A `localOnly` session used to
+re-promote on typing only when *another* session was present; a solo editor
+that opened a note while Hocuspocus was cold stayed detached for hours, its
+edits landing in IndexedDB + the REST fallback (presence showed
+`transportState=localOnly` throughout — the exact origin of the 2026-08-18
+incident). It now also re-promotes when online with dirty/unsynced local
+state, so the window in which the payload can run ahead of the Y.Doc closes
+on the user's next keystroke.
+
+**Where this is useful beyond the incident.** Layer 2 is a general-purpose
+safety net for *any* future path that lands content in `NotePayload` without
+a Y.Doc write — bulk import, a REST-only mobile client, a migration script, a
+restore-from-export — none of them need to know about the Y.Doc at all: the
+next open reconciles. It also makes the manual repair playbook (verify
+presence `surfaceCount=0` → reseed → clear the client's `dg:content:<id>`
+IndexedDB → reopen) a last resort rather than the routine fix.
+
+**What this is NOT:** a merge. Bootstrap *chooses* the fresher representation;
+if one session writes the Y.Doc while another writes the payload offline in
+the same window, the shrink guard keeps the larger and the other side loses at
+next open. Genuine reconciliation (revision vectors / a "resolve divergence"
+UI) remains future work — but with every writer on Layer 1, that window is now
+"a solo offline editor whose edits also somehow reached the payload while
+another session edited live", which Layer 3 makes rare.
+
+**Diagnosing a suspected divergence (read-only prod access):** compare
+`NotePayload.updatedAt` / `metadata->>'collaborationSnapshotAt'` against
+`CollaborationDocument.updatedAt`, and `jsonb_array_length(tiptapJson->'content')`
+vs `jsonb_array_length(snapshotJson->'content')`; the AI's tool receipts in
+`ConversationMessage.parts` carry `route: collaboration | payload-fallback |
+payload` per write, which dates *which layer* a write took.
 
 ### 9.5 Verification (offline & context matrix)
 

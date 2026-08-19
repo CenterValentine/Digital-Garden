@@ -20,6 +20,8 @@ interface BacklinkItem {
   slug: string;
   excerpt: string;
   linkText: string;
+  /** How the source references this note — wiki-link text vs embedded Note Window. */
+  kind?: "wikiLink" | "noteWindow";
   updatedAt: string;
 }
 
@@ -214,6 +216,11 @@ export function BacklinksPanel({ contentId }: BacklinksPanelProps) {
                   <div className="truncate text-sm font-medium text-gray-200">
                     {backlink.title}
                   </div>
+                  {backlink.kind === "noteWindow" && (
+                    <span className="ml-auto shrink-0 rounded border border-black/10 dark:border-white/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      window
+                    </span>
+                  )}
                 </div>
                 {backlink.linkText && (
                   <div className="mb-1 text-xs text-primary">

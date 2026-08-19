@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import {
   useContentStore,
   type ContentSelectionOptions,
+  type WorkspaceLayoutMode,
+  type WorkspacePaneId,
 } from "@/state/content-store";
 import {
   useTreeStateStore,
@@ -13,6 +15,7 @@ import {
 import { useWorkspaceTabFilterStore } from "@/state/workspace-tab-filter-store";
 import type {
   ContentWorkspaceResponse,
+  WorkspaceLayoutRecordSummary,
   WorkspaceOpenConflict,
   WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
@@ -22,6 +25,10 @@ import type {
   ContentWorkspaceItemScope,
 } from "@/lib/database/generated/prisma";
 import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
+import {
+  detectWorkspaceSurfaceFamily,
+  getDeviceId,
+} from "./surface-family";
 
 type ApiResponse<T> = {
   success: boolean;
@@ -103,6 +110,18 @@ let isBypassingWorkspaceGuard = false;
 // Tracks the updatedAt we last applied from this tab so receiveRefreshedWorkspaces
 // can detect when another tab saved a newer pane state.
 const lastAppliedUpdatedAt: Record<string, string> = {};
+
+/**
+ * Echo suppression (preview smoke 2026-08-16): after restoreContentWorkspace
+ * applies remote state, the resulting snapshot-key change fires the persist
+ * controller — the follower would re-persist content it just adopted. Benign
+ * when both windows run the same code, but it's the fuel any adopt/persist
+ * loop runs on (observed as layout ping-pong during a mixed-bundle rolling
+ * deploy). Recording the post-apply snapshot lets persistActiveWorkspace skip
+ * the write when nothing changed beyond the adoption itself; the moment the
+ * user makes a real change, the snapshot differs and persistence resumes.
+ */
+const lastAppliedSnapshotJson: Record<string, string> = {};
 let onMutationBroadcast: (() => void) | null = null;
 const WORKSPACE_MUTATION_TIMEOUT_MS = 12_000;
 export function registerMutationBroadcast(fn: () => void) {
@@ -281,6 +300,123 @@ function readContentIdFromUrl(): string | null {
   return value && value.length > 0 ? value : null;
 }
 
+/**
+ * Layout-intent P2: persist THIS surface's per-family layout record
+ * (R2/R8). Ordinal mapping per spec §4. Best-effort by design — a record
+ * failure must never break the primary persist path.
+ */
+async function putLayoutRecord(
+  workspaceId: string,
+  family: string,
+  snapshot: WorkspaceStatePayload,
+) {
+  try {
+    const ordinalPanes: Record<string, string[]> = {
+      single: ["top-left"],
+      "dual-vertical": ["top-left", "top-right"],
+      "dual-horizontal": ["top-left", "bottom-left"],
+      quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+    };
+    const panes = ordinalPanes[snapshot.layoutMode] ?? ordinalPanes.single;
+    const paneOrder = panes.map((paneId, index) => ({
+      paneOrdinal: index + 1,
+      tabOrder:
+        snapshot.paneTabContentIds[
+          paneId as keyof typeof snapshot.paneTabContentIds
+        ]?.contentIds ?? [],
+    }));
+    const activeOrdinal = Math.max(1, panes.indexOf(snapshot.activePaneId) + 1);
+    const activeContentId =
+      snapshot.paneTabContentIds[snapshot.activePaneId]?.activeContentId ??
+      snapshot.activeContentId;
+    await fetch(`/api/content/workspaces/${workspaceId}/layout-records`, {
+      method: "PUT",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        family,
+        deviceId: getDeviceId(),
+        record: {
+          layoutMode: snapshot.layoutMode,
+          paneOrder,
+          lastActive: activeContentId
+            ? { paneOrdinal: activeOrdinal, contentId: activeContentId }
+            : null,
+        },
+      }),
+    });
+  } catch {
+    // Best-effort by design; see docstring.
+  }
+}
+
+/** Spec §4 pane ordinals per layout (1-indexed; primary = top-left). */
+const ORDINAL_PANE_IDS: Record<WorkspaceLayoutMode, WorkspacePaneId[]> = {
+  single: ["top-left"],
+  "dual-vertical": ["top-left", "top-right"],
+  "dual-horizontal": ["top-left", "bottom-left"],
+  quad: ["top-left", "top-right", "bottom-left", "bottom-right"],
+};
+
+/**
+ * Rebuild pane assignments from a layout record against the CURRENT membership
+ * set (ordinal mapping per spec §4; membership tabs the record predates land
+ * in the primary pane). Shared by open-time inheritance (R5) and the live
+ * desktop coupling reconcile (R2).
+ */
+function buildPanesFromLayoutRecord(
+  record: WorkspaceLayoutRecordSummary,
+  openTabIds: string[],
+): {
+  layoutMode: WorkspaceLayoutMode;
+  panes: WorkspacePaneId[];
+  paneTabContentIds: Partial<Record<WorkspacePaneId, string[]>>;
+} {
+  const panes = ORDINAL_PANE_IDS[record.layoutMode] ?? ORDINAL_PANE_IDS.single;
+  const membershipSet = new Set(openTabIds);
+  const placed = new Set<string>();
+  const rebuilt: Partial<Record<WorkspacePaneId, string[]>> = {};
+  for (const pane of record.paneOrder) {
+    const paneId =
+      panes[Math.min(Math.max(pane.paneOrdinal, 1), panes.length) - 1];
+    for (const id of pane.tabOrder) {
+      if (!membershipSet.has(id) || placed.has(id)) continue;
+      (rebuilt[paneId] ??= []).push(id);
+      placed.add(id);
+    }
+  }
+  for (const id of openTabIds) {
+    if (!placed.has(id)) {
+      (rebuilt[panes[0]] ??= []).push(id);
+      placed.add(id);
+    }
+  }
+  return { layoutMode: record.layoutMode, panes, paneTabContentIds: rebuilt };
+}
+
+/**
+ * R5 inheritance chain (spec §5): this surface's own record → the shared
+ * desktop record → most recent extension → most recent mobile. Records arrive
+ * newest-first from the server (and pre-filtered to <30d), so `find` returns
+ * the freshest match per rung. Null = fall through to the legacy blob.
+ */
+function pickInheritedLayout(
+  records: WorkspaceLayoutRecordSummary[] | undefined,
+): WorkspaceLayoutRecordSummary | null {
+  if (!records?.length) return null;
+  const family = detectWorkspaceSurfaceFamily();
+  const deviceId = family === "desktop" ? "shared" : getDeviceId();
+  return (
+    records.find((r) => r.family === family && r.deviceId === deviceId) ??
+    records.find((r) => r.family === "desktop") ??
+    records.find((r) => r.family.startsWith("ext:")) ??
+    records.find(
+      (r) => r.family.startsWith("native-") || r.family.startsWith("web-"),
+    ) ??
+    null
+  );
+}
+
 function restoreContentWorkspace(
   workspace: ContentWorkspaceResponse,
   // Background reconcile (receiveRefreshedWorkspaces) re-applies the remote
@@ -289,12 +425,36 @@ function restoreContentWorkspace(
   // When set and still an open tab in the snapshot, this wins as the active
   // selection, so a poll/visibility refresh can't revert a fresh tab click.
   preferActiveContentId?: string | null,
+  // Layout-intent P2b (R3): background reconciles sync the open-tab SET only.
+  // "reconcile" preserves this session's layoutMode + activePaneId — another
+  // surface persisting its layout must never re-arrange the one you're
+  // looking at (the phone↔desktop revert fight, ghost-writer #5). "open"
+  // (workspace open/switch/reset) applies the full stored state.
+  mode: "open" | "reconcile" = "open",
 ) {
-  const paneTabContentIds = Object.fromEntries(
+  const paneTabContentIds: Record<string, string[]> = Object.fromEntries(
     Object.entries(workspace.paneState.paneTabContentIds).map(
       ([paneId, pane]) => [paneId, pane?.contentIds ?? []],
     ),
   );
+
+  // R1: membership is the source of truth for the tab SET. Union in any
+  // membership id the legacy blob lacks — tabs opened by surfaces that don't
+  // write the blob (extension iframes) — landing them in the primary pane
+  // (spec §4 terminal fallback). Layout records (open-inherit / desktop
+  // coupling below) then re-place them if they carry an ordinal for the id.
+  if (workspace.membershipContentIds?.length) {
+    const inBlob = new Set(Object.values(paneTabContentIds).flat());
+    const missing = workspace.membershipContentIds.filter(
+      (id) => !inBlob.has(id),
+    );
+    if (missing.length) {
+      paneTabContentIds["top-left"] = [
+        ...(paneTabContentIds["top-left"] ?? []),
+        ...missing,
+      ];
+    }
+  }
 
   // Cold-load race: the workspace API can resolve before
   // MainPanelWorkspace's URL parser runs. If the URL specifies a
@@ -324,18 +484,82 @@ function restoreContentWorkspace(
   // aren't formal workspace assignments are still named.
   const tabMeta = workspace.contentMeta ?? {};
 
+  // Reconcile mode: keep this session's own arrangement (R3) — only the tab
+  // set and titles refresh. Open mode: run the R5 inheritance chain over the
+  // fresh layout records; the legacy blob is the terminal fallback (and stays
+  // authoritative for the tab SET either way).
+  const local = useContentStore.getState();
+  let applyLayoutMode =
+    mode === "reconcile" ? local.layoutMode : workspace.paneState.layoutMode;
+  let applyActivePaneId =
+    mode === "reconcile" ? local.activePaneId : workspace.paneState.activePaneId;
+  let applyPaneTabContentIds = paneTabContentIds;
+  let applyActiveContentId = activeContentId;
+
+  const inherited =
+    mode === "open" ? pickInheritedLayout(workspace.layoutRecords) : null;
+  if (inherited) {
+    const built = buildPanesFromLayoutRecord(inherited, openTabIds);
+    applyLayoutMode = built.layoutMode;
+    applyPaneTabContentIds = built.paneTabContentIds as typeof paneTabContentIds;
+    const seed = inherited.lastActive;
+    applyActivePaneId = seed
+      ? built.panes[
+          Math.min(Math.max(seed.paneOrdinal, 1), built.panes.length) - 1
+        ]
+      : built.panes[0];
+    // Active-tab precedence is unchanged (URL deep-link, then local
+    // preference); the record's lastActive is only the seed of last resort —
+    // R3: inherited, never synced.
+    if (!preferStillOpen && !urlContentBelongsToWorkspace) {
+      applyActiveContentId =
+        seed && new Set(openTabIds).has(seed.contentId)
+          ? seed.contentId
+          : activeContentId;
+    }
+  }
+
+  // R2 live desktop coupling: concurrently-open desktop windows mirror the
+  // shared desktop record's layout + pane order. The background reconcile
+  // (fired when another window's save bumps updatedAt) follows the record for
+  // ARRANGEMENT only — the active tab/pane stay this window's own (R3 keeps
+  // active views independent "even on matching desktop"). Non-desktop
+  // families keep the pure set-only reconcile.
+  if (mode === "reconcile" && detectWorkspaceSurfaceFamily() === "desktop") {
+    const desktopRecord = workspace.layoutRecords?.find(
+      (r) => r.family === "desktop",
+    );
+    if (desktopRecord) {
+      const built = buildPanesFromLayoutRecord(desktopRecord, openTabIds);
+      applyLayoutMode = built.layoutMode;
+      applyPaneTabContentIds = built.paneTabContentIds as typeof paneTabContentIds;
+      // Keep this window's active pane when it still exists in the incoming
+      // layout; otherwise clamp to the primary pane.
+      if (!built.panes.includes(applyActivePaneId)) {
+        applyActivePaneId = built.panes[0];
+      }
+    }
+  }
+
   isBypassingWorkspaceGuard = true;
   try {
     useContentStore.getState().restoreWorkspace({
-      activeContentId,
-      activePaneId: workspace.paneState.activePaneId,
-      layoutMode: workspace.paneState.layoutMode,
-      paneTabContentIds,
+      activeContentId: applyActiveContentId,
+      activePaneId: applyActivePaneId,
+      layoutMode: applyLayoutMode,
+      paneTabContentIds: applyPaneTabContentIds,
       tabMeta,
     });
   } finally {
     isBypassingWorkspaceGuard = false;
   }
+
+  // Echo suppression: record what this apply produced so the persist
+  // controller's follow-up fire can recognize "nothing changed but the
+  // adoption" and skip the write (see lastAppliedSnapshotJson).
+  lastAppliedSnapshotJson[workspace.id] = JSON.stringify(
+    useContentStore.getState().getWorkspaceStateSnapshot(),
+  );
 }
 
 function syncWorkspaceUrl(workspaceId: string | null) {
@@ -884,6 +1108,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
 
     const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+
+    // Echo suppression: if this snapshot is byte-identical to what we just
+    // adopted from remote, there is nothing new to say — skip the write
+    // (kills the adopt→persist echo; see lastAppliedSnapshotJson).
+    if (
+      JSON.stringify(snapshot) === lastAppliedSnapshotJson[activeWorkspaceId]
+    ) {
+      return;
+    }
+
+    // Spec §6.3 (ghost-writer #3): extension iframes never write workspace
+    // intent. No legacy PATCH — which would also reconcile R1 membership down
+    // to the panel's narrow single-pane snapshot, pruning every other tab —
+    // and no shared columns. They persist ONLY their own ext:* layout record,
+    // so R5/F2 can still see how the panel arranged itself.
+    const surfaceFamily = detectWorkspaceSurfaceFamily();
+    if (surfaceFamily.startsWith("ext:")) {
+      // R1 still applies to extension surfaces: their opens must reach
+      // membership. The legacy PATCH (which dual-writes membership) is
+      // skipped here by design, so sync membership explicitly — additive on
+      // the server, since the panel is a narrow projection and must never
+      // prune tabs only wider surfaces have open. (Prod fix: extension-
+      // originated tabs were invisible to PWA/desktop after PR #166.)
+      const paneContentIds = Object.fromEntries(
+        Object.entries(snapshot.paneTabContentIds).map(([paneId, pane]) => [
+          paneId,
+          pane?.contentIds ?? [],
+        ]),
+      );
+      await Promise.all([
+        fetch(`/api/content/workspaces/${activeWorkspaceId}/tabs`, {
+          method: "PUT",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ paneContentIds }),
+        }).catch(() => {}),
+        putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot),
+      ]);
+      return;
+    }
+
     let workspace: ContentWorkspaceResponse;
     try {
       const response = await fetch(
@@ -916,6 +1181,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       return;
     }
+
+    // Layout-intent P2: beside the legacy PATCH, persist THIS surface's
+    // per-family layout record (desktop → the shared coupling row).
+    void putLayoutRecord(activeWorkspaceId, surfaceFamily, snapshot);
+
     lastAppliedUpdatedAt[workspace.id] = workspace.updatedAt;
     set((state) => ({
       workspaces: state.workspaces.map((candidate) =>
@@ -1169,7 +1439,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         // set, but must not revert what the user is currently viewing (e.g. a
         // tab they just clicked after reload).
         const localActive = useContentStore.getState().selectedContentId;
-        restoreContentWorkspace(incomingActive, localActive);
+        restoreContentWorkspace(incomingActive, localActive, "reconcile");
       }
     }
 

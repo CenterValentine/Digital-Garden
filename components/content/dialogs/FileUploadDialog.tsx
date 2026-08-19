@@ -26,7 +26,8 @@ interface FileUploadDialogProps {
   parentId: string | null;
   peopleGroupId?: string | null;
   personId?: string | null;
-  onSuccess: (fileId: string) => void;
+  /** `parentId` is the folder the files actually landed in (`null` = root). */
+  onSuccess: (fileId: string, parentId?: string | null) => void;
   onCancel: () => void;
   initialFiles?: File[];
 }
@@ -322,12 +323,12 @@ export function FileUploadDialog({
       setError(`${successCount}/${totalCount} file(s) uploaded successfully`);
       // Still call onSuccess to refresh tree
       setTimeout(() => {
-        onSuccess("");
+        onSuccess("", selectedFolderId);
       }, 2000);
     } else {
       // All succeeded - close dialog after brief delay
       setTimeout(() => {
-        onSuccess("");
+        onSuccess("", selectedFolderId);
       }, 1000);
     }
   };

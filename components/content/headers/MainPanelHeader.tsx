@@ -23,6 +23,7 @@ import {
   useWorkspaceTabFilterStore,
 } from "@/state/workspace-tab-filter-store";
 import { getTabIcon, getTabIconGroupKey } from "./tab-icons";
+import { PaneTabAddButton } from "./PaneTabAddButton";
 import { useExtensionShellTabMenuSections } from "@/lib/extensions/client-registry";
 import { getCollaborationBrowserSessionId } from "@/lib/domain/collaboration/runtime";
 import { prefetchContent } from "@/lib/domain/content/prefetch";
@@ -593,23 +594,29 @@ export function MainPanelHeader({
     };
   }, [tabMenu]);
 
+  // Close the active tab. Cmd+W and Cmd+Shift+W never reach the page — browsers
+  // reserve them for Close Tab / Close Window — so we bind the two W chords that
+  // do survive:
+  //   Cmd+Alt+W  / Ctrl+Alt+W — primary; unbound in Chrome, Vivaldi, Edge, Firefox
+  //   Cmd+Ctrl+W             — macOS fallback, since Safari takes Cmd+Alt+W
+  //                            for Close Other Tabs
+  // Deliberately no isTyping guard: neither chord means anything to a text field,
+  // and the tab you want to close is usually the one you're editing.
   useEffect(() => {
+    if (!isActivePane) return;
+    const activeTabId = pane?.activeTabId;
+    if (!activeTabId) return;
+
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isActivePane) return;
-      if (!(event.metaKey || event.ctrlKey) || event.shiftKey || event.altKey) {
-        return;
-      }
-      if (event.key.toLowerCase() !== "e") return;
+      if (event.shiftKey) return;
+      if (!(event.metaKey || event.ctrlKey)) return;
 
-      const target = event.target as HTMLElement | null;
-      const isTyping =
-        target?.tagName === "INPUT" ||
-        target?.tagName === "TEXTAREA" ||
-        target?.isContentEditable;
-      if (isTyping) return;
+      // Alt rewrites event.key on macOS (Alt+W yields "∑"), so match the physical
+      // key first and fall back to the character for non-QWERTY layouts.
+      if (event.code !== "KeyW" && event.key.toLowerCase() !== "w") return;
 
-      const activeTabId = pane?.activeTabId;
-      if (!activeTabId) return;
+      // Cmd+Alt+W / Ctrl+Alt+W, or Cmd+Ctrl+W on macOS.
+      if (!event.altKey && !(event.metaKey && event.ctrlKey)) return;
 
       event.preventDefault();
       closeContentTab(activeTabId);
@@ -808,6 +815,16 @@ export function MainPanelHeader({
               </div>
             );
           })}
+          {/* "+" — add content to this pane via the canonical tree picker.
+              Sits to the right of the last tab, scrolling with the strip. */}
+          <PaneTabAddButton
+            onOpen={(target) =>
+              openContentInPane(target.id, paneId, {
+                title: target.title,
+                contentType: target.contentType,
+              })
+            }
+          />
           {isTreeDropHover && treeDropTarget ? (
             // Insertion caret for a file-tree drop: marks the exact slot the
             // tab will land in — before a tab, between tabs, or at the end.

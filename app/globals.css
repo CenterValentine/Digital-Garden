@@ -2642,6 +2642,120 @@ mark {
   margin-bottom: 0.25rem;
 }
 
+/* ─── Note Window ─── */
+
+.ProseMirror .block-note-window-content {
+  border-radius: 8px;
+  border: 1px solid var(--border-secondary);
+  background: var(--surface-secondary);
+  overflow: hidden; /* keeps the body squared against the rounded frame */
+}
+
+/* Header: .block-card-header treatment + rounded top corners + flex layout.
+   All colors ride theme-switched tokens — no .dark companions needed. */
+.ProseMirror .nw-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-secondary);
+  border-radius: 8px 8px 0 0;
+}
+
+.ProseMirror .nw-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.ProseMirror .nw-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Mid-saturation status colors read correctly on both themes;
+   deliberately no white-ish/dark-ish extremes here. */
+.ProseMirror .nw-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  flex-shrink: 0;
+  background: #9ca3af; /* default: dormant/snapshot grey */
+}
+.ProseMirror .nw-status-dot[data-status="editable"] {
+  background: #22c55e;
+}
+.ProseMirror .nw-status-dot[data-status="live-elsewhere"] {
+  background: #f59e0b;
+}
+
+.ProseMirror .nw-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Hover-visible refresh: revealed on window hover or keyboard focus. */
+.ProseMirror .nw-refresh {
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.ProseMirror .block-note-window-content:hover .nw-refresh,
+.ProseMirror .block-note-window-content:focus-within .nw-refresh {
+  opacity: 1;
+}
+/* Touch devices have no hover — the refresh affordance must be always
+   visible there or it's unreachable (mobile web view). */
+@media (hover: none) {
+  .ProseMirror .nw-refresh {
+    opacity: 1;
+  }
+}
+
+.ProseMirror .nw-body {
+  max-height: var(--nw-height, 245px);
+  overflow-y: auto;
+}
+
+/* Advisory strips inside the body (live-elsewhere, save conflict). */
+.ProseMirror .nw-banner {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-secondary);
+  background: color-mix(in srgb, #f59e0b 8%, transparent);
+}
+.ProseMirror .nw-banner[data-tone="warning"] {
+  background: color-mix(in srgb, #ef4444 8%, transparent);
+}
+
+/* Placeholder / chip / collapsed states share quiet token styling. */
+.ProseMirror .nw-placeholder {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+/* Published-page placeholder: title only, no target id, both themes via tokens. */
+.public-prose .block-note-window-public {
+  display: inline-block;
+  padding: 0.375rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
 /* ─── Divider (Sprint 44) ─── */
 
 .ProseMirror .block-divider-content {

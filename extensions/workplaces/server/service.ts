@@ -8,6 +8,8 @@ import {
   type Prisma,
 } from "@/lib/database/generated/prisma";
 import { generateSlug } from "@/lib/domain/content";
+import { reconcileMembershipFromSnapshot } from "./membership";
+import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
   WorkspaceOpenIntentResponse,
@@ -35,7 +37,49 @@ type WorkspaceWithItems = ContentWorkspace & {
     }
   >;
   viewRoot: Pick<ContentNode, "id" | "title"> | null;
+  // Present on read paths that include fresh layout records (R5/F2).
+  // R1 membership rows (read paths).
+  tabs?: Array<{ contentId: string }>;
+  layoutRecords?: Array<{
+    family: string;
+    deviceId: string;
+    layoutMode: string;
+    paneOrder: Prisma.JsonValue;
+    lastActive: Prisma.JsonValue;
+    updatedAt: Date;
+  }>;
 };
+
+/** Narrow a stored paneOrder JSON back to the summary shape (defensive). */
+function normalizeStoredPaneOrder(
+  value: Prisma.JsonValue,
+): Array<{ paneOrdinal: number; tabOrder: string[] }> {
+  if (!Array.isArray(value)) return [];
+  const result: Array<{ paneOrdinal: number; tabOrder: string[] }> = [];
+  for (const entry of value) {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) continue;
+    const pane = entry as Record<string, unknown>;
+    if (typeof pane.paneOrdinal !== "number") continue;
+    result.push({
+      paneOrdinal: pane.paneOrdinal,
+      tabOrder: Array.isArray(pane.tabOrder)
+        ? pane.tabOrder.filter((id): id is string => typeof id === "string")
+        : [],
+    });
+  }
+  return result;
+}
+
+function normalizeStoredLastActive(
+  value: Prisma.JsonValue,
+): { paneOrdinal: number; contentId: string } | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const seed = value as Record<string, unknown>;
+  if (typeof seed.paneOrdinal !== "number" || typeof seed.contentId !== "string") {
+    return null;
+  }
+  return { paneOrdinal: seed.paneOrdinal, contentId: seed.contentId };
+}
 
 function emptyPaneState(): WorkspacePaneStatePayload {
   return {
@@ -263,6 +307,20 @@ export function formatWorkspace(
       },
     })),
     contentMeta,
+    membershipContentIds: workspace.tabs?.map((tab) => tab.contentId),
+    layoutRecords: workspace.layoutRecords?.map((record) => ({
+      family: record.family,
+      deviceId: record.deviceId,
+      layoutMode:
+        record.layoutMode === "dual-vertical" ||
+        record.layoutMode === "dual-horizontal" ||
+        record.layoutMode === "quad"
+          ? record.layoutMode
+          : "single",
+      paneOrder: normalizeStoredPaneOrder(record.paneOrder),
+      lastActive: normalizeStoredLastActive(record.lastActive),
+      updatedAt: record.updatedAt.toISOString(),
+    })),
   };
 }
 
@@ -419,6 +477,32 @@ export async function listWorkspaces(ownerId: string, includeArchived = false) {
         orderBy: { updatedAt: "desc" },
       },
       viewRoot: { select: { id: true, title: true } },
+      // R1 membership rides the list: source of truth for the tab SET on
+      // read (unioned with the legacy blob client-side).
+      tabs: {
+        where: { content: { ownerId, deletedAt: null } },
+        select: { contentId: true },
+      },
+      // Fresh layout records ride the list so the client's R5 inheritance
+      // chain can run synchronously at workspace open (layout-intent P3).
+      layoutRecords: {
+        where: {
+          updatedAt: {
+            gte: new Date(
+              Date.now() - LAYOUT_RECORD_MAX_AGE_DAYS * 24 * 60 * 60 * 1000,
+            ),
+          },
+        },
+        orderBy: { updatedAt: "desc" },
+        select: {
+          family: true,
+          deviceId: true,
+          layoutMode: true,
+          paneOrder: true,
+          lastActive: true,
+          updatedAt: true,
+        },
+      },
     },
     orderBy: [{ isMain: "desc" }, { updatedAt: "desc" }],
   });
@@ -760,6 +844,18 @@ export async function saveWorkspaceState(
     normalizedState,
     allowedContentIds,
   );
+
+  // Rollout dual-write (layout-intent P1): membership (R1 truth) follows the
+  // legacy snapshot's tab union, so old snapshot-writing clients and new
+  // membership-event clients converge on the same ContentWorkspaceTab set.
+  // Runs on the already-ownership-filtered state.
+  const paneContentIds = Object.fromEntries(
+    Object.entries(filteredState.paneTabContentIds).map(([paneId, pane]) => [
+      paneId,
+      pane?.contentIds ?? [],
+    ]),
+  );
+  await reconcileMembershipFromSnapshot(workspaceId, paneContentIds);
 
   const updatedWorkspace = await prisma.contentWorkspace.update({
     where: { id: workspaceId },

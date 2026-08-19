@@ -67,6 +67,7 @@ const AUTHORING_MODE: Record<string, BlockAuthoringMode> = {
 
   // --- Reference: must point at existing content. ---
   recentPosts: "reference",
+  noteWindow: "reference", // targetContentId must be a real ContentNode id; never invented
 
   // --- Seed: inserted empty; media payload supplied later. ---
   gallery: "seed",

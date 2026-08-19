@@ -19,6 +19,7 @@ import { PeopleMountPickerDialog } from "./people/PeopleMountPickerDialog";
 import { FileUploadDialog } from "./dialogs/FileUploadDialog";
 import { AiImageGenDialog } from "./ai/AiImageGenDialog";
 import { useContentStore } from "@/state/content-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
@@ -232,10 +233,17 @@ export function LeftSidebar() {
   //   setCreateTrigger({ type: "workflow", timestamp: Date.now() });
   // }, []);
 
-  const handleFileUploadSuccess = useCallback((_fileId: string) => {
+  const handleFileUploadSuccess = useCallback((_fileId: string, parentId?: string | null) => {
     setShowFileUpload(false);
     setFileUploadParentId(null);
     setDraggedFiles(null);  // Clear dragged files to prevent re-upload
+    // Expand the destination folder so the refreshed tree actually shows the
+    // upload instead of hiding it inside a collapsed folder. The store keeps
+    // it expanded across remounts; the event opens the live tree now.
+    if (parentId) {
+      useTreeStateStore.getState().setExpanded(parentId, true);
+      window.dispatchEvent(new CustomEvent("dg:tree-expand", { detail: { id: parentId } }));
+    }
     // Refresh tree to show new file
     setRefreshTrigger((prev) => prev + 1);
   }, []);
@@ -246,10 +254,12 @@ export function LeftSidebar() {
     setDraggedFiles(null);
   }, []);
 
-  // Handle file drops from LeftSidebarContent
-  const handleFileDrop = useCallback((files: File[]) => {
+  // Handle file drops from LeftSidebarContent. The tree resolves the
+  // destination folder from the pointer / selection / open content, so the
+  // upload dialog opens pre-targeted instead of defaulting to the root.
+  const handleFileDrop = useCallback((files: File[], parentId: string | null) => {
     setDraggedFiles(files);
-    setFileUploadParentId(null); // TODO: Could get from current selection
+    setFileUploadParentId(parentId);
     setShowFileUpload(true);
   }, []);
 

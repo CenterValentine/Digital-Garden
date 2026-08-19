@@ -17,6 +17,7 @@ import tippy, { Instance as TippyInstance } from "tippy.js";
 import { SlashCommandsList, type SlashCommandsListRef } from "./slash-commands-menu";
 import { getExtensionSlashCommands } from "@/lib/extensions/editor-client-registry";
 import { useTimestampFormatStore } from "@/state/timestamp-format-store";
+import { useSettingsStore } from "@/state/settings-store";
 import { getDefaultPeriodicSummaryDate } from "@/lib/domain/periodic-summary";
 import { createDefaultStopwatchAttrs } from "@/lib/domain/stopwatch";
 import { createDefaultHabitTrackerAttrs } from "../extensions/blocks/habit-tracker";
@@ -235,6 +236,38 @@ export function getSlashCommands(): SlashCommand[] {
         "fsrs",
         "spaced",
         "repetition",
+      ],
+    },
+    {
+      title: "Note Window",
+      description:
+        "Window another note's content in place — view, edit, retarget, or create a new note",
+      icon: "🪟",
+      command: ({ editor, range }) => {
+        // Insert with targetContentId=null; the NodeView shows the target
+        // picker until the user aims the window at a note. Height honors
+        // the user's persisted default (last height they set) when present.
+        const storedHeight =
+          useSettingsStore.getState().editor?.noteWindowDefaultHeight;
+        editor
+          .chain()
+          .focus()
+          .deleteRange(range)
+          .insertContent({
+            type: "noteWindow",
+            attrs: storedHeight ? { height: storedHeight } : {},
+          })
+          .run();
+      },
+      aliases: [
+        "window",
+        "notewindow",
+        "embed",
+        "mirror",
+        "portal",
+        "note",
+        "transclude",
+        "transclusion",
       ],
     },
     {
@@ -1021,7 +1054,11 @@ export function getSlashCommands(): SlashCommand[] {
         editor.chain().focus().deleteRange(range).run();
         window.dispatchEvent(
           new CustomEvent("create-diagram-block", {
-            detail: { engine: "excalidraw", defaultTitle: "Untitled Drawing" },
+            // `editor` addresses the event: with Note Windows (and split
+            // panes) MULTIPLE MarkdownEditors are mounted and all hear
+            // this window-level event — only the originating editor may
+            // handle it, or every open document gets a diagram inserted.
+            detail: { engine: "excalidraw", defaultTitle: "Untitled Drawing", editor },
           })
         );
       },
@@ -1035,7 +1072,8 @@ export function getSlashCommands(): SlashCommand[] {
         editor.chain().focus().deleteRange(range).run();
         window.dispatchEvent(
           new CustomEvent("create-diagram-block", {
-            detail: { engine: "mermaid", defaultTitle: "Untitled Diagram" },
+            // Addressed to the originating editor — see the Drawing entry.
+            detail: { engine: "mermaid", defaultTitle: "Untitled Diagram", editor },
           })
         );
       },

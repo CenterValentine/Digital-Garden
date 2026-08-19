@@ -84,7 +84,28 @@ export const PullQuote = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'blockquote[data-block-type="pullQuote"]' }];
+    // Two fixes here (2026-08-14 clipboard round-trip audit):
+    //
+    // priority: StarterKit's Blockquote parses bare `blockquote` and was
+    // WINNING over this attribute-qualified rule — a copied pullQuote
+    // pasted back as a plain blockquote (type degradation). 51 beats the
+    // default 50 so the more specific rule runs first.
+    //
+    // contentElement: with attribution set, the server renderHTML wraps
+    // the quote text in span.block-pull-quote-text and emits the
+    // "— attribution" footer as a sibling — without contentElement, that
+    // footer re-parses INTO the quote's inline content. The hole moves to
+    // the bare blockquote when attribution is empty, hence the function
+    // form with fallback.
+    return [
+      {
+        tag: 'blockquote[data-block-type="pullQuote"]',
+        priority: 51,
+        contentElement: (el: HTMLElement) =>
+          el.querySelector<HTMLElement>(":scope > span.block-pull-quote-text") ??
+          el,
+      },
+    ];
   },
 
   renderHTML({ HTMLAttributes }) {
@@ -181,7 +202,28 @@ export const ServerPullQuote = Node.create({
   },
 
   parseHTML() {
-    return [{ tag: 'blockquote[data-block-type="pullQuote"]' }];
+    // Two fixes here (2026-08-14 clipboard round-trip audit):
+    //
+    // priority: StarterKit's Blockquote parses bare `blockquote` and was
+    // WINNING over this attribute-qualified rule — a copied pullQuote
+    // pasted back as a plain blockquote (type degradation). 51 beats the
+    // default 50 so the more specific rule runs first.
+    //
+    // contentElement: with attribution set, the server renderHTML wraps
+    // the quote text in span.block-pull-quote-text and emits the
+    // "— attribution" footer as a sibling — without contentElement, that
+    // footer re-parses INTO the quote's inline content. The hole moves to
+    // the bare blockquote when attribution is empty, hence the function
+    // form with fallback.
+    return [
+      {
+        tag: 'blockquote[data-block-type="pullQuote"]',
+        priority: 51,
+        contentElement: (el: HTMLElement) =>
+          el.querySelector<HTMLElement>(":scope > span.block-pull-quote-text") ??
+          el,
+      },
+    ];
   },
 
   renderHTML({ HTMLAttributes }) {
