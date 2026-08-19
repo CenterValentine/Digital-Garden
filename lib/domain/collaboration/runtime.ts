@@ -813,12 +813,22 @@ class CollaborationRuntimeManager {
       }
 
       // If we slept (localOnly, no reconnectIntent) and the user starts typing,
-      // re-promote if there's another session present.
+      // re-promote if there's another session present — OR if this solo session
+      // has unsynced local edits and the network is back. Without the second
+      // clause a solo editor that fell to localOnly (collab server cold/
+      // unreachable when the note opened) stayed detached for hours while its
+      // edits accumulated in IndexedDB + the REST-fallback payload; the Y.Doc
+      // never learned about them and served STALE content on the next open
+      // (stale-Y.Doc incident, db80c857, 2026-08-18). Typing with dirty local
+      // state is the strongest possible signal that the user wants those edits
+      // to reach the collaborative copy.
       if (
         entry.state.connectionState === "localOnly" &&
         !entry.state.reconnectIntent &&
         (entry.state.browserSessionTopology === "multiSession" ||
-          entry.state.remoteCollaborationTopology === "remotePresent")
+          entry.state.remoteCollaborationTopology === "remotePresent" ||
+          (entry.state.networkState === "online" &&
+            (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0)))
       ) {
         void this.promote(entry, "reconnect-after-offline");
       }

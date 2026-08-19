@@ -19,7 +19,11 @@ import {
   unassignContentFromWorkspace,
   updateWorkspace,
 } from "./service";
-import { openWorkspaceTab, closeWorkspaceTab } from "./membership";
+import {
+  openWorkspaceTab,
+  closeWorkspaceTab,
+  syncMembershipFromSurfaceSnapshot,
+} from "./membership";
 import { upsertLayoutRecord, listLayoutRecords } from "./layout-records";
 
 type WorkspaceParams = Promise<{ id: string }>;
@@ -323,6 +327,42 @@ export async function handleOpenWorkspaceTab(
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_tab_open:caught", summary: "POST caught", error });
       return errorResponse(error, "Failed to open workspace tab");
+    }
+  });
+}
+
+/**
+ * PUT = membership-only sync from a surface snapshot (additive). Used by
+ * extension iframes, which persist their own layout record but must never
+ * write workspace layout — this carries their opens into R1 membership.
+ */
+export async function handleSyncWorkspaceTabs(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as { paneContentIds?: unknown };
+      const data = await syncMembershipFromSurfaceSnapshot(
+        session.user.id,
+        id,
+        body.paneContentIds
+      );
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tabs_sync:caught", summary: "PUT caught", error });
+      return errorResponse(error, "Failed to sync workspace tabs");
     }
   });
 }

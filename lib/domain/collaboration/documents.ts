@@ -12,6 +12,57 @@ import { getCollaborationServerExtensions } from "./extensions";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
 import { getCollaborationDocumentName } from "./tokens";
 
+/**
+ * Bootstrap freshness check (fixes the stale-Y.Doc class of bug, 2026-08-18).
+ *
+ * The store hook mirrors every Y.Doc save into NotePayload and stamps
+ * `metadata.collaborationSnapshotAt`. A payload written OUTSIDE the collab
+ * path (offline/localOnly REST fallback while the collab server was down)
+ * advances `updatedAt` past that stamp — or wipes the stamp entirely, since
+ * that write path replaces `metadata` wholesale. Either way the payload then
+ * holds content the Y.Doc does not, and the old rule ("a meaningful stored
+ * Y state is trusted over the payload") served the STALE copy forever until a
+ * manual reseed. Observed on db80c857: 63 blocks in the Y.Doc, 167 in the
+ * payload, mirror stamp erased.
+ *
+ * Returns true when the payload should win bootstrap. Guarded so a rich Y.Doc
+ * is never traded for a degenerate payload: the payload must be meaningful
+ * and must not be a strict SHRINK of the Y.Doc's own last snapshot (a shorter
+ * payload with a newer timestamp is far more likely a partial/failed write
+ * than a legitimate edit — in that ambiguous case we keep the Y.Doc, and the
+ * existing divergence banner still surfaces it to the user).
+ */
+function payloadIsNewerThanCollaborativeCopy(
+  payload: { updatedAt: Date; metadata: unknown },
+  payloadContent: JSONContent,
+  record: { updatedAt: Date; snapshotJson: unknown },
+): boolean {
+  if (!hasMeaningfulTipTapContent(payloadContent)) return false;
+
+  const meta =
+    typeof payload.metadata === "object" && payload.metadata !== null
+      ? (payload.metadata as Record<string, unknown>)
+      : {};
+  const stampRaw = meta.collaborationSnapshotAt;
+  const lastMirror =
+    typeof stampRaw === "string" ? new Date(stampRaw) : null;
+
+  // Written after the last mirror (or never mirrored at all): the payload has
+  // moved independently of the collaborative copy.
+  const payloadWrittenOutsideCollab = lastMirror
+    ? payload.updatedAt.getTime() > lastMirror.getTime() + 1000
+    : payload.updatedAt.getTime() > record.updatedAt.getTime() + 1000;
+  if (!payloadWrittenOutsideCollab) return false;
+
+  // Shrink guard: don't let a smaller newer payload displace a larger Y.Doc.
+  const payloadBlocks = Array.isArray(payloadContent.content)
+    ? payloadContent.content.length
+    : 0;
+  const snapshot = record.snapshotJson as JSONContent | null | undefined;
+  const ydocBlocks = Array.isArray(snapshot?.content) ? snapshot.content.length : 0;
+  return payloadBlocks >= ydocBlocks;
+}
+
 export async function loadCollaborationYDocState(
   prisma: PrismaClient,
   documentName: string
@@ -34,7 +85,7 @@ export async function loadCollaborationYDocState(
 
   const record = await prisma.collaborationDocument.findUnique({
     where: { documentName },
-    select: { ydocState: true },
+    select: { ydocState: true, updatedAt: true, snapshotJson: true },
   });
 
   if (record?.ydocState) {
@@ -44,8 +95,9 @@ export async function loadCollaborationYDocState(
       getCollaborationServerExtensions()
     ).json;
     if (
-      ydocUpdateHasMeaningfulDefaultContent(state) ||
-      !hasMeaningfulTipTapContent(noteContent)
+      (ydocUpdateHasMeaningfulDefaultContent(state) ||
+        !hasMeaningfulTipTapContent(noteContent)) &&
+      !payloadIsNewerThanCollaborativeCopy(content.notePayload, noteContent, record)
     ) {
       return state;
     }
