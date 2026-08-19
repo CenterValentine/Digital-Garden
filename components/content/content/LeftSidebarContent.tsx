@@ -24,7 +24,6 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
-import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -40,7 +39,6 @@ interface TreeApiResponse {
       maxDepth: number;
       byType: Record<string, number>;
     };
-    hiddenReferencedCount?: number;
   };
   error?: {
     code: string;
@@ -165,14 +163,6 @@ export function LeftSidebarContent({
   onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
-  // Referenced-content visibility + the hidden-count hint (Session 5b).
-  const showReferencedContent = useFileTreeFilterStore(
-    (s) => s.showReferencedContent,
-  );
-  const setShowReferencedContent = useFileTreeFilterStore(
-    (s) => s.setShowReferencedContent,
-  );
-  const [hiddenReferencedCount, setHiddenReferencedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -291,10 +281,6 @@ export function LeftSidebarContent({
       if (activeWorkspaceIsView && activeViewRootContentId && !viewBypassed) {
         url.searchParams.set("viewRootContentId", activeViewRootContentId);
       }
-      if (showReferencedContent) {
-        url.searchParams.set("showReferencedContent", "true");
-      }
-
       const response = await fetch(url.toString(), {
         credentials: "include",
       });
@@ -319,7 +305,6 @@ export function LeftSidebarContent({
       }
 
       setTreeData(result.data.tree);
-      setHiddenReferencedCount(result.data.hiddenReferencedCount ?? 0);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -332,7 +317,7 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed, showReferencedContent]);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -2110,48 +2095,6 @@ export function LeftSidebarContent({
     }
   };
 
-  /** Phase 2: Handler for toggling referenced content visibility for folder */
-  const handleToggleReferencedContent = async (id: string, currentValue: boolean) => {
-    try {
-      const newValue = !currentValue;
-
-      // Call API to persist setting
-      const response = await fetch(`/api/content/folder/${id}/view`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ includeReferencedContent: newValue }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || "Failed to update folder setting");
-      }
-
-      await response.json();
-
-      // Show success toast
-      toast.success(newValue ? "Showing referenced content" : "Hiding referenced content", {
-        description: "Folder setting has been saved",
-      });
-
-      // Refresh tree to reflect changes in main panel
-      await fetchTree();
-    } catch (err) {
-      clientLogger.error({
-        layer: "ui",
-        event: "folder_referenced_toggle:caught",
-        summary: "toggle referenced content handler caught",
-        attrs: { content_id: id },
-        error: err,
-      });
-      toast.error("Failed to update folder setting", {
-        description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
-      });
-    }
-  };
-
   // Handler: Change icon for content
   const handleChangeIcon = (id: string) => {
     // Find node to get current icon
@@ -2510,7 +2453,6 @@ export function LeftSidebarContent({
             onDownload={handleDownload}
             onChangeIcon={handleChangeIcon}
             onSetFolderView={handleSetFolderView}
-            onToggleReferencedContent={handleToggleReferencedContent}
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
@@ -2526,23 +2468,9 @@ export function LeftSidebarContent({
           />
         </div>
 
-        {/* Referenced-content hint — surfaces when hidden referenced
-            content exists, so the user can reveal it (also toggleable via
-            the file-tree right-click menu). */}
-        {!showReferencedContent && hiddenReferencedCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowReferencedContent(true)}
-            className="flex w-full items-center gap-1.5 border-t border-black/5 dark:border-white/5 px-3 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
-            title="Show referenced content (attachments, linked files)"
-          >
-            <span className="opacity-70">
-              {hiddenReferencedCount} referenced item
-              {hiddenReferencedCount === 1 ? "" : "s"} hidden
-            </span>
-            <span className="ml-auto font-medium">Show</span>
-          </button>
-        )}
+        {/* The "N referenced items hidden · Show" hint lived here. It's gone
+            with the global filter: nothing is hidden tree-wide any more, and
+            each parent reports its own references on its count chip. */}
 
         {/* Status bar */}
         {/* <LeftSidebarStatusBar

@@ -13,6 +13,58 @@ import { logger, spanPayload, withRouteTrace, withSpan } from "@/lib/core/logger
 
 const ROUTE_PATH = "/api/content/content/tree";
 
+/**
+ * Row status-dot state.
+ *
+ * Replaces the old `!isPublished` dot, which fired on essentially every node:
+ * `ContentNode.isPublished` is a legacy share-link boolean that the publishing
+ * extension never writes, so it stays false forever and the dot carried no
+ * information. Real publish history lives on PublicItem, which lets us tell
+ * "never published" (silent) apart from "was live, now withdrawn" (worth a dot).
+ */
+type PublishStateBadge = "none" | "live" | "withdrawn";
+
+function derivePublishState(
+  isPublished: boolean,
+  publicItems: { state: string; firstPublishedAt: Date | null }[],
+): PublishStateBadge {
+  // `isPublished` still gates /share/[id], so a legacy share counts as live.
+  if (isPublished || publicItems.some((item) => item.state === "published")) {
+    return "live";
+  }
+  return publicItems.some((item) => item.firstPublishedAt !== null)
+    ? "withdrawn"
+    : "none";
+}
+
+/**
+ * Split referenced children out of `children` into `references`, depth-first.
+ *
+ * Root-level references are deliberately left alone: a reference with no parent
+ * has no row to hang a chip on, and hiding it would orphan it entirely — the
+ * "where did my resume go?" failure this whole feature exists to avoid.
+ */
+function partitionReferences(nodes: ContentTreeNode[]): void {
+  for (const node of nodes) {
+    const primary: ContentTreeNode[] = [];
+    const references: ContentTreeNode[] = [];
+
+    for (const child of node.children) {
+      if (child.role === "referenced") {
+        references.push(child);
+      } else {
+        primary.push(child);
+      }
+    }
+
+    node.children = primary;
+    node.references = references;
+
+    partitionReferences(primary);
+    partitionReferences(references);
+  }
+}
+
 type ContentTreeNode = {
   id: string;
   title: string;
@@ -28,6 +80,18 @@ type ContentTreeNode = {
   treeNodeKind: "content" | "peopleGroup" | "person";
   role: string;
   children: ContentTreeNode[];
+  /**
+   * Referenced children, partitioned OUT of `children` so the tree renders
+   * attachments as a separate nested block behind the parent's count chip
+   * instead of interleaving them with real content. The client splices these
+   * back into `children` when the parent's `refs:<id>` chip is expanded.
+   */
+  references: ContentTreeNode[];
+  /**
+   * Publish state for the row's status dot. "none" (never published) renders
+   * nothing — see derivePublishState.
+   */
+  publishState: PublishStateBadge;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -104,7 +168,6 @@ export async function GET(request: NextRequest) {
 
       const { searchParams } = new URL(request.url);
       const includeDeleted = searchParams.get("includeDeleted") === "true";
-      const showReferencedContent = searchParams.get("showReferencedContent") === "true";
       const workspaceId = searchParams.get("workspaceId");
       const directViewRootContentId = searchParams.get("viewRootContentId");
 
@@ -122,43 +185,21 @@ export async function GET(request: NextRequest) {
       const allContent = await withSpan(
         { layer: "tree", name: "fetch" },
         {
-          attrs: { include_deleted: includeDeleted, show_referenced: showReferencedContent },
+          attrs: { include_deleted: includeDeleted },
         },
         async (span) => {
           const result = await prisma.contentNode.findMany({
             where: {
               ownerId: session.user.id,
               deletedAt: includeDeleted ? undefined : null,
-              ...(showReferencedContent
-                ? { role: { in: ["primary", "referenced"] } }
-                : {
-                    // Chat Outputs & References plan (WS3): a chat's generated
-                    // deliverables are role:"referenced" + ownedByNoteId = the
-                    // chat, so a naive `role:"primary"` filter would hide them
-                    // until the user flips the global "show referenced" toggle
-                    // (default off) — the "where did my resume go?" failure.
-                    // Surface deliverables (referenced content whose OWNER is a
-                    // chat) under their chat by default, while embedded media
-                    // (referenced, owned via the embed graph with no
-                    // ownedByNoteId, or owned by a NOTE) stays hidden until
-                    // toggled — that's why it's hidden (a note with 10 images
-                    // shouldn't spray 10 tree children).
-                    OR: [
-                      { role: "primary" as const },
-                      // WS3 deliverables: referenced content OWNED BY a chat.
-                      {
-                        role: "referenced" as const,
-                        ownedByNote: { contentType: "chat" as const },
-                      },
-                      // WS6 side chats: a chat is ITSELF referenced content
-                      // nested under its origin — surface it so every side
-                      // chat appears under the content it was started from.
-                      {
-                        role: "referenced" as const,
-                        contentType: "chat" as const,
-                      },
-                    ],
-                  }),
+              // Always fetch both roles. Referenced content is no longer
+              // filtered out server-side — it's partitioned into each parent's
+              // `references` array and revealed by that parent's count chip.
+              // This retired the WS3 carve-out that had to exempt chat-owned
+              // deliverables from the old hide-everything filter: a deliverable
+              // now lands in its chat's reference block like any other
+              // attachment, so it can't be orphaned in the first place.
+              role: { in: ["primary", "referenced"] },
             },
             select: {
               id: true,
@@ -206,6 +247,12 @@ export async function GET(request: NextRequest) {
                 },
               },
               visualizationPayload: { select: { engine: true } },
+              // Publish history for the status dot. Indexed on contentNodeId;
+              // soft-deleted publications don't count as history.
+              publicItems: {
+                where: { deletedAt: null },
+                select: { state: true, firstPublishedAt: true },
+              },
             },
           });
           span.attr("nodes", result.length).summary(`${result.length} nodes`);
@@ -355,6 +402,8 @@ export async function GET(request: NextRequest) {
           treeNodeKind: "content",
           role: item.role,
           children: [],
+          references: [],
+          publishState: derivePublishState(item.isPublished, item.publicItems),
           createdAt: item.createdAt,
           updatedAt: item.updatedAt,
           deletedAt: item.deletedAt,
@@ -462,6 +511,8 @@ export async function GET(request: NextRequest) {
           treeNodeKind: "peopleGroup",
           role: "primary",
           children: [],
+          references: [],
+          publishState: "none",
           createdAt: group.createdAt,
           updatedAt: group.updatedAt,
           deletedAt: null,
@@ -532,6 +583,8 @@ export async function GET(request: NextRequest) {
           treeNodeKind: "person",
           role: "primary",
           children: [],
+          references: [],
+          publishState: "none",
           createdAt: person.createdAt,
           updatedAt: person.updatedAt,
           deletedAt: null,
@@ -611,6 +664,10 @@ export async function GET(request: NextRequest) {
 
       sortChildren(rootNodes);
 
+      // Sort first, partition second — references keep the parent's sort order
+      // among themselves instead of needing their own comparator.
+      partitionReferences(rootNodes);
+
       const stats = {
         totalNodes: nodeMap.size,
         rootNodes: rootNodes.length,
@@ -629,33 +686,15 @@ export async function GET(request: NextRequest) {
         stats.byType[node.contentType] = (stats.byType[node.contentType] ?? 0) + 1;
       }
 
-      // When referenced content is hidden, report how many referenced
-      // items exist so the file tree can offer to reveal them. Excludes
-      // chat-owned deliverables (WS3) — those are already shown under their
-      // chat above, so they aren't "hidden" and mustn't inflate this count.
-      let hiddenReferencedCount = 0;
-      if (!showReferencedContent) {
-        hiddenReferencedCount = await prisma.contentNode.count({
-          where: {
-            ownerId: session.user.id,
-            deletedAt: null,
-            role: "referenced",
-            // Exclude what's already shown above: chat-owned deliverables (WS3)
-            // and side chats themselves (WS6).
-            NOT: [
-              { ownedByNote: { contentType: "chat" } },
-              { contentType: "chat" },
-            ],
-          },
-        });
-      }
-
+      // The old `hiddenReferencedCount` + "N referenced items hidden" hint is
+      // gone with the global filter: nothing is hidden any more. Each parent's
+      // count chip reports its own references in place, so there's no
+      // tree-wide "where did my content go?" gap left to paper over.
       return NextResponse.json({
         success: true,
         data: {
           tree: rootNodes,
           stats,
-          hiddenReferencedCount,
         },
       });
     } catch (error) {
