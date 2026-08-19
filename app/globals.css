@@ -547,6 +547,40 @@ nav[class*="fixed"] {
     padding-top: 0.5rem;
     padding-bottom: 0.375rem;
   }
+
+  /* Long titles must not wrap on a phone — a three-line header pushes the
+   * document below the fold. One line, and the overflow is reachable by
+   * swiping the title horizontally.
+   *
+   * Swipe rather than tap-to-expand because tapping the title already starts
+   * a rename; a reveal gesture there would collide with it (and risk edits).
+   *
+   * The right-edge mask is the "there's more" affordance. It is self-hiding:
+   * it fades the element's last 2rem, so a short title — whose text never
+   * reaches that far — shows no fade at all.
+   *
+   * Smaller than desktop's text-3xl but still emphatically a header: 1.375rem
+   * against 1rem body, weight and color unchanged. */
+  .doc-title-text {
+    font-size: 1.375rem;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      #000 calc(100% - 2rem),
+      transparent 100%
+    );
+  }
+  .doc-title-text::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* iOS auto-zooms the page when a focused form control's font-size is under
