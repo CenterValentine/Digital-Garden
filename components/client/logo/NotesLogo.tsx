@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { isNativeShell } from "@/lib/mobile-bridge/client";
 import StaticCompactLogo from "./StaticCompactLogo";
 
 /**
@@ -16,10 +20,21 @@ export default function NotesLogo() {
   const RENDER_SIZE = 176;
   const DISPLAY_SIZE = 44;
   const scale = DISPLAY_SIZE / RENDER_SIZE;
+  const router = useRouter();
 
   return (
     <Link
       href="/"
+      // In the native shell, "home" means the /mobile launcher, not the public
+      // site root (which just re-resolves into the workspace for a signed-in
+      // user — a dead button). Runtime intercept keeps the server-rendered
+      // href stable, so there's no hydration mismatch.
+      onClick={(e) => {
+        if (isNativeShell()) {
+          e.preventDefault();
+          router.push("/mobile");
+        }
+      }}
       className="flex items-center gap-2 group no-underline"
       aria-label="Digital Garden Home"
     >

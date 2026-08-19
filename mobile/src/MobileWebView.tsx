@@ -39,6 +39,11 @@ interface MobileWebViewProps {
  *   • pull-to-refresh
  *   • cookie/session persistence (so the web app's session_token survives)
  *   • external-link handling via the navigation policy in nativeBridge
+ *   • content-process recovery: iOS reclaims WKWebView web processes under
+ *     memory pressure while the app is backgrounded; without a handler the
+ *     user returns to a white screen. We reload once automatically; a second
+ *     kill within 30s means a memory-pressure loop, so we stop and show the
+ *     error screen instead of thrashing.
  */
 
 // Runs before each document loads. Marks the page as living inside the native
@@ -97,6 +102,23 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
     setReloadKey((k) => k + 1);
   }, []);
 
+  // iOS killed the WebView's content process (memory pressure while
+  // backgrounded). The page is gone but the app is alive — reload once,
+  // silently. A second kill within 30s means the system is thrashing;
+  // surface the error screen instead of fighting it.
+  const lastTerminationAtRef = useRef(0);
+  const handleContentProcessTerminated = useCallback(() => {
+    const now = Date.now();
+    if (now - lastTerminationAtRef.current < 30_000) {
+      setLoading(false);
+      setErrored(true);
+      return;
+    }
+    lastTerminationAtRef.current = now;
+    setLoading(true);
+    setReloadKey((k) => k + 1);
+  }, []);
+
   if (errored) {
     return (
       <View style={[styles.center, { paddingTop: insets.top }]}>
@@ -138,6 +160,7 @@ export function MobileWebView({ url = DEFAULT_WEB_URL }: MobileWebViewProps) {
           // Leave soft HTTP errors (e.g. the app's own 401→/sign-in redirect)
           // to the web app; only hard load failures trip the error screen.
         }}
+        onContentProcessDidTerminate={handleContentProcessTerminated}
         // Capability flags
         javaScriptEnabled
         domStorageEnabled
@@ -173,7 +196,8 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    // RN 0.86 removed `absoluteFillObject`; `absoluteFill` is the spreadable form now.
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
