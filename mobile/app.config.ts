@@ -25,6 +25,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   version: "0.1.0",
   orientation: "portrait",
   scheme: "digitalgarden",
+  // Generated from the committed brand art (public/images/logo-neuron-tree.png):
+  // trimmed of its transparent margin, composited on a deep-slate radial ground
+  // derived from the app's dark --background, and flattened with the alpha
+  // channel REMOVED (App Store validation rejects icons that carry alpha).
+  icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   // (SDK 57 note: `newArchEnabled` was removed — the New Architecture is
   // always on and the opt-in flag no longer exists in ExpoConfig.)
