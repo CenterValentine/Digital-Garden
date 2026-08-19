@@ -139,6 +139,20 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const referencesAtStart = useTreeStateStore((state) =>
     state.referencesAtStartIds.has(data.id),
   );
+  /**
+   * Whether this row has any content of its own to order the reference block
+   * against. Reads the post-transform children: when the block is open its
+   * rows are tagged `isNestedReference`, so filtering them leaves exactly the
+   * primary children in both the open and closed states.
+   *
+   * A row whose ONLY children are references has nothing to reorder — the
+   * block is the whole list, so it sits at the top either way. Showing a
+   * placement control there offers a swap that visibly does nothing, which
+   * reads as broken rather than as a no-op.
+   */
+  const hasPrimaryChildren = (data.children ?? []).some(
+    (child) => !child.isNestedReference,
+  );
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
   const toggleReferencePosition = useTreeStateStore(
@@ -515,6 +529,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // what clicking will do.
           referencesExpanded: referencesExpanded && isOpen,
           referencesAtStart,
+          // Gates the placement entry the same way the chip's arrow is gated,
+          // so the menu never offers a reorder the row can't show.
+          hasPrimaryChildren,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
           isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
@@ -902,10 +919,11 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
             {referenceCount}
           </button>
 
-          {/* Placement toggle. Only rendered while the block is open — the
-              control has no visible effect on a collapsed block, and showing
-              it anyway would put a dead button on every parent row. */}
-          {referencesExpanded && (
+          {/* Placement toggle. Rendered only while the block is open AND this
+              row has primary children to order it against — on a collapsed
+              block, or a row that holds nothing but references, the control
+              offers a swap with no visible outcome. */}
+          {referencesExpanded && hasPrimaryChildren && (
             <button
               type="button"
               onClick={(e) => {

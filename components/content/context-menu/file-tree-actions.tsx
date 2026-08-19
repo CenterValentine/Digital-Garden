@@ -87,6 +87,11 @@ export interface FileTreeContext {
     referencesExpanded?: boolean;
     /** Whether this row's reference block sits before its primary children. */
     referencesAtStart?: boolean;
+    /**
+     * Whether the row has content of its own to order references against. A
+     * row holding nothing but references has nothing to reorder.
+     */
+    hasPrimaryChildren?: boolean;
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
     isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
@@ -425,7 +430,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
           ),
           onClick: () => onToggleReferences(clickedId),
         },
-        ...(onToggleReferencePosition
+        ...(onToggleReferencePosition && clickedNode?.hasPrimaryChildren
           ? [
               {
                 id: "toggle-reference-position",
