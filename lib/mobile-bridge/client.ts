@@ -20,6 +20,21 @@ export type WebToNativeMessage =
   | { type: "web:request-microphone" }
   | { type: "web:request-location" };
 
+/** Mirror of `mobile/src/bridge/messages.ts` (`NativeToWebMessage`). */
+export type NativeToWebMessage =
+  | { type: "native:ready" }
+  | { type: "native:app-state"; state: "active" | "background" | "inactive" }
+  | { type: "native:permission-result"; permission: string; granted: boolean };
+
+/**
+ * Event name the shell dispatches on `window` for native→web messages.
+ * A CustomEvent (rather than a global callback the page must register first)
+ * means a message that arrives before any listener mounts is simply missed
+ * rather than lost in a race — acceptable because every native→web message so
+ * far is a state *transition*, and the next one re-establishes the truth.
+ */
+const NATIVE_MESSAGE_EVENT = "dg:native-message";
+
 interface ReactNativeWebViewBridge {
   postMessage: (data: string) => void;
 }
@@ -55,4 +70,39 @@ export function openExternalUrl(url: string): void {
   if (typeof window !== "undefined") {
     window.open(url, "_blank", "noopener,noreferrer");
   }
+}
+
+/** Narrow an arbitrary payload to a NativeToWebMessage, or null. */
+function parseNativeToWebMessage(raw: unknown): NativeToWebMessage | null {
+  let data: unknown = raw;
+  if (typeof raw === "string") {
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof data !== "object" || data === null) return null;
+  const type = (data as { type?: unknown }).type;
+  if (typeof type !== "string" || !type.startsWith("native:")) return null;
+  return data as NativeToWebMessage;
+}
+
+/**
+ * Subscribe to messages from the native shell. Returns an unsubscribe fn.
+ * No-ops (returning a no-op unsubscriber) outside the shell and on the server,
+ * so callers can wire it unconditionally.
+ */
+export function onNativeMessage(
+  handler: (message: NativeToWebMessage) => void
+): () => void {
+  if (typeof window === "undefined") return () => {};
+  const listener = (event: Event) => {
+    const message = parseNativeToWebMessage(
+      (event as CustomEvent<unknown>).detail
+    );
+    if (message) handler(message);
+  };
+  window.addEventListener(NATIVE_MESSAGE_EVENT, listener);
+  return () => window.removeEventListener(NATIVE_MESSAGE_EVENT, listener);
 }
