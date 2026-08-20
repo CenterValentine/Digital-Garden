@@ -10,7 +10,7 @@
 
 import { createElement, useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Code2, FileText } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { ToolSurfaceProvider } from "@/lib/domain/tools";
 import { InboxMainWorkspace } from "@/components/client/inbox/InboxMainWorkspace";
 import { DmThreadTab } from "@/components/client/inbox/DmThreadTab";
@@ -1993,7 +1993,15 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     "copy-link": handleCopyLink,
     "save-as-template": handleSaveAsTemplate,
     "share": handleShareOpen,
-  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen]);
+    "markdown-source": toggleSourceMode,
+  }), [handleImportMarkdown, handleExportMarkdown, handleExportChat, handleCopyLink, handleSaveAsTemplate, handleShareOpen, toggleSourceMode]);
+
+  // Toggle state for the toolbar. Unlike handlers (held in a ref), this must
+  // flow as a prop so the pressed styling re-renders when the mode flips.
+  const activeToolIds = useMemo(
+    () => (sourceMode ? ["markdown-source"] : []),
+    [sourceMode]
+  );
 
   // Extension workspace — shown in pane 1 when an extension view is active
   const ExtensionMainWorkspace = useExtensionMainWorkspace(activeView);
@@ -2198,7 +2206,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               <div className="mr-4 flex min-w-0 flex-1 flex-col">
                 <div className="flex min-w-0 items-start gap-3">
                 <h1
-                  className={`min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
+                  className={`doc-title-text min-w-0 text-3xl font-semibold text-foreground mb-0 transition-opacity ${
                     isReadOnlyPageTemplate
                       ? "cursor-default"
                       : "cursor-text hover:opacity-80"
@@ -2250,33 +2258,11 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 )}
               </div>
             )}
+            {/* The markdown source toggle used to live here. It moved to the
+                toolbar (TOOL_REGISTRY "markdown-source", order 10) — it is a
+                view control like the rest of the toolbar, and the title row
+                needs its width back on phones. */}
             <div className="flex flex-none items-center gap-1">
-              {contentType === "note" && (
-                <button
-                  type="button"
-                  onClick={toggleSourceMode}
-                  aria-pressed={sourceMode}
-                  className={`flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                    sourceMode
-                      ? "bg-muted text-foreground"
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
-                  title={
-                    sourceMode
-                      ? "Apply markdown and return to rich text"
-                      : "Edit markdown source"
-                  }
-                >
-                  {sourceMode ? (
-                    <FileText className="h-4 w-4" />
-                  ) : (
-                    <Code2 className="h-4 w-4" />
-                  )}
-                  <span className="whitespace-nowrap">
-                    {sourceMode ? "Rich text" : "Markdown"}
-                  </span>
-                </button>
-              )}
               {process.env.NODE_ENV === "development" && !isMultiPane && <DebugViewToggle />}
             </div>
           </div>
@@ -2375,6 +2361,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           : (contentType as ToolContentType) ?? null
       }
       handlers={toolHandlers}
+      activeToolIds={activeToolIds}
     >
       <div
         className="flex h-full min-h-0 flex-col overflow-hidden"
