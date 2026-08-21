@@ -11,6 +11,21 @@ import type { ToolDefinition, ToolQuery, ToolSurface } from "./types";
 const TOOL_REGISTRY: ToolDefinition[] = [
   // ─── TOOLBAR: Content header actions ───
   {
+    // Lives in the toolbar rather than beside the document title: it is a view
+    // control like the rest of the toolbar, and the title row needs its width
+    // back on phones. Order 10 keeps it in the leftmost position.
+    id: "markdown-source",
+    label: "Edit markdown source",
+    activeLabel: "Apply markdown and return to rich text",
+    iconName: "Code2",
+    surfaces: ["toolbar"],
+    contentTypes: ["note"],
+    order: 10,
+    group: "view",
+    iconOnly: true,
+    isToggle: true,
+  },
+  {
     id: "copy-link",
     label: "Copy Link",
     iconName: "Link2",

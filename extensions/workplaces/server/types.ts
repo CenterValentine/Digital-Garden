@@ -80,6 +80,30 @@ export interface ContentWorkspaceResponse {
    * read paths (list/get); may be empty on mutation responses.
    */
   contentMeta: Record<string, { title: string; contentType: string }>;
+  /**
+   * Fresh (<30d) per-family layout records for the R5 inheritance chain and
+   * the F2 adoption picker (layout-intent spec). Newest first. Populated on
+   * read paths (list/get); may be absent on mutation responses — consumers
+   * must fall back to the legacy paneState blob when undefined/empty.
+   */
+  layoutRecords?: WorkspaceLayoutRecordSummary[];
+  /**
+   * R1 membership — the workspace-scoped set of open content ids
+   * (ContentWorkspaceTab), source of truth for the tab SET on read. Clients
+   * union this with the legacy paneState blob so tabs opened by surfaces that
+   * don't write the blob (extension iframes) still appear everywhere.
+   * Populated on read paths; may be absent on mutation responses.
+   */
+  membershipContentIds?: string[];
+}
+
+export interface WorkspaceLayoutRecordSummary {
+  family: string;
+  deviceId: string;
+  layoutMode: WorkspaceLayoutMode;
+  paneOrder: Array<{ paneOrdinal: number; tabOrder: string[] }>;
+  lastActive: { paneOrdinal: number; contentId: string } | null;
+  updatedAt: string;
 }
 
 export interface WorkspaceOpenConflict {

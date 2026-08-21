@@ -19,6 +19,12 @@ import {
   unassignContentFromWorkspace,
   updateWorkspace,
 } from "./service";
+import {
+  openWorkspaceTab,
+  closeWorkspaceTab,
+  syncMembershipFromSurfaceSnapshot,
+} from "./membership";
+import { upsertLayoutRecord, listLayoutRecords } from "./layout-records";
 
 type WorkspaceParams = Promise<{ id: string }>;
 type WorkspaceAssignmentParams = Promise<{ id: string; contentId: string }>;
@@ -271,6 +277,199 @@ export async function handleSaveWorkplaceState(
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_state_save:caught", summary: "PATCH caught", error });
       return errorResponse(error, "Failed to save workspace state");
+    }
+  });
+}
+
+/**
+ * R1 membership events (layout-intent P1). POST = open (idempotent upsert with
+ * optional affinity hint), DELETE = close (idempotent, ?contentId= query).
+ * These are the new-client path; legacy clients reach the same truth via the
+ * dual-write in saveWorkspaceState.
+ */
+export async function handleOpenWorkspaceTab(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as {
+        contentId?: unknown;
+        affinity?: unknown;
+      };
+      if (typeof body.contentId !== "string" || !body.contentId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "BAD_REQUEST", message: "contentId is required" },
+          },
+          { status: 400 }
+        );
+      }
+      const data = await openWorkspaceTab(
+        session.user.id,
+        id,
+        body.contentId,
+        body.affinity
+      );
+      if (!data) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace or content not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tab_open:caught", summary: "POST caught", error });
+      return errorResponse(error, "Failed to open workspace tab");
+    }
+  });
+}
+
+/**
+ * PUT = membership-only sync from a surface snapshot (additive). Used by
+ * extension iframes, which persist their own layout record but must never
+ * write workspace layout — this carries their opens into R1 membership.
+ */
+export async function handleSyncWorkspaceTabs(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as { paneContentIds?: unknown };
+      const data = await syncMembershipFromSurfaceSnapshot(
+        session.user.id,
+        id,
+        body.paneContentIds
+      );
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tabs_sync:caught", summary: "PUT caught", error });
+      return errorResponse(error, "Failed to sync workspace tabs");
+    }
+  });
+}
+
+export async function handleCloseWorkspaceTab(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/tabs" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const contentId = request.nextUrl.searchParams.get("contentId");
+      if (!contentId) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "BAD_REQUEST", message: "contentId query param is required" },
+          },
+          { status: 400 }
+        );
+      }
+      const data = await closeWorkspaceTab(session.user.id, id, contentId);
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_tab_close:caught", summary: "DELETE caught", error });
+      return errorResponse(error, "Failed to close workspace tab");
+    }
+  });
+}
+
+/**
+ * R2/R5/F2 layout records (layout-intent P2). PUT upserts THIS surface's
+ * record ({family, deviceId, layoutMode, paneOrder, lastActive}); GET lists
+ * fresh records (<30d) for the inheritance chain and the F2 adoption picker.
+ */
+export async function handleUpsertWorkspaceLayoutRecord(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/layout-records" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const body = (await request.json()) as {
+        family?: unknown;
+        deviceId?: unknown;
+        record?: unknown;
+      };
+      const data = await upsertLayoutRecord(
+        session.user.id,
+        id,
+        body.family,
+        body.deviceId,
+        body.record
+      );
+      if (!data) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "BAD_REQUEST",
+              message: "Invalid family/deviceId/record, or workspace not found",
+            },
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_layout_record_upsert:caught", summary: "PUT caught", error });
+      return errorResponse(error, "Failed to save layout record");
+    }
+  });
+}
+
+export async function handleListWorkspaceLayoutRecords(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(request, { route: "/api/content/workspaces/[id]/layout-records" }, async () => {
+    try {
+      const session = await requireAuth();
+      const { id } = await params;
+      const data = await listLayoutRecords(session.user.id, id);
+      if (data === null) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: { code: "NOT_FOUND", message: "Workspace not found" },
+          },
+          { status: 404 }
+        );
+      }
+      return NextResponse.json({ success: true, data });
+    } catch (error) {
+      logger.error({ layer: "content", event: "workspaces_layout_records_list:caught", summary: "GET caught", error });
+      return errorResponse(error, "Failed to list layout records");
     }
   });
 }

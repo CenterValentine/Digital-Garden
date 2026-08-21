@@ -454,7 +454,12 @@ export function FileUploadDialog({
       }}
     >
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 border border-white/10 rounded-lg relative"
+        // `dark` scope: this dialog's text/borders are authored dark-only
+        // (text-white, border-white/10), but glass1 resolves theme-aware CSS
+        // vars — in light theme that produced white text on white glass
+        // (unreadable, caught in the P0 shell smoke). Scoping the subtree
+        // dark rebases the surface vars to match the authored text.
+        className="dark w-full max-w-lg max-h-[90vh] overflow-y-auto p-6 border border-white/10 rounded-lg relative"
         style={{
           background: glass1.background,
           backdropFilter: glass1.backdropFilter,

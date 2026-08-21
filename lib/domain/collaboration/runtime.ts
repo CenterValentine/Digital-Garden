@@ -14,6 +14,7 @@ import {
 } from "@/lib/domain/collaboration/content-safety";
 import { getCollaborationServerExtensions } from "@/lib/domain/collaboration/extensions";
 import { sanitizeTipTapJsonWithExtensions } from "@/lib/domain/editor/unsupported-content";
+import { onNativeMessage } from "@/lib/mobile-bridge/client";
 import { clientLogger } from "@/lib/core/logger/client";
 
 // Initial-promote deferral.
@@ -813,12 +814,22 @@ class CollaborationRuntimeManager {
       }
 
       // If we slept (localOnly, no reconnectIntent) and the user starts typing,
-      // re-promote if there's another session present.
+      // re-promote if there's another session present — OR if this solo session
+      // has unsynced local edits and the network is back. Without the second
+      // clause a solo editor that fell to localOnly (collab server cold/
+      // unreachable when the note opened) stayed detached for hours while its
+      // edits accumulated in IndexedDB + the REST-fallback payload; the Y.Doc
+      // never learned about them and served STALE content on the next open
+      // (stale-Y.Doc incident, db80c857, 2026-08-18). Typing with dirty local
+      // state is the strongest possible signal that the user wants those edits
+      // to reach the collaborative copy.
       if (
         entry.state.connectionState === "localOnly" &&
         !entry.state.reconnectIntent &&
         (entry.state.browserSessionTopology === "multiSession" ||
-          entry.state.remoteCollaborationTopology === "remotePresent")
+          entry.state.remoteCollaborationTopology === "remotePresent" ||
+          (entry.state.networkState === "online" &&
+            (entry.state.localDirty || entry.state.unsyncedUpdateCount > 0)))
       ) {
         void this.promote(entry, "reconnect-after-offline");
       }
@@ -2140,42 +2151,84 @@ class CollaborationRuntimeManager {
       if (!entry.visibilitySleepTimer) {
         entry.visibilitySleepTimer = setTimeout(() => {
           entry.visibilitySleepTimer = null;
-          // Deep-hidden: stop the SSE presence stream (kills the server-side
-          // 10s Postgres poll) and drop to the dormant heartbeat cadence.
-          entry.presenceStreamSuspended = true;
-          this.closePresenceStream(entry);
-          this.maybeEnterSleepMode(entry);
+          this.enterDeepHidden(entry);
         }, VISIBILITY_SLEEP_DELAY_MS);
       }
     } else {
-      // Tab became visible — cancel any pending sleep countdown.
-      if (entry.visibilitySleepTimer) {
-        clearTimeout(entry.visibilitySleepTimer);
-        entry.visibilitySleepTimer = null;
-      }
-      // Reset activity clock so inactivity timer gets a fresh window.
-      entry.lastActivityAt = Date.now();
-      // Lift deep-hidden suspension: reopen the presence stream (if leader)
-      // and heartbeat immediately so our record refreshes and we re-learn who
-      // else is here without waiting out a dormant-cadence interval.
-      if (entry.presenceStreamSuspended) {
-        entry.presenceStreamSuspended = false;
-        this.syncPresenceTransport(entry);
-        this.schedulePresenceHeartbeat(entry, 0);
-      }
-      // If we slept and came back to an active session, re-promote.
-      if (
-        entry.state.connectionState === "localOnly" &&
-        !entry.state.reconnectIntent &&
-        (entry.state.browserSessionTopology === "multiSession" ||
-          entry.state.remoteCollaborationTopology === "remotePresent")
-      ) {
-        void this.promote(entry, "reconnect-after-offline");
-      }
+      this.handleBecameVisible(entry);
+    }
+  }
 
-      // If Hocuspocus dropped unexpectedly (passive backoff timer running),
-      // jump straight to reconnect now that the user is back on the tab.
-      this.activityTriggeredReconnect(entry);
+  /**
+   * Deep-hidden: stop the SSE presence stream (kills the server-side 10s
+   * Postgres poll), drop to the dormant heartbeat cadence, and sleep the
+   * transport. Reached either by outlasting the visibility countdown or,
+   * in the native shell, by the host app actually backgrounding.
+   */
+  private enterDeepHidden(entry: DocumentRuntimeEntry) {
+    entry.presenceStreamSuspended = true;
+    this.closePresenceStream(entry);
+    this.maybeEnterSleepMode(entry);
+  }
+
+  /** The surface came back to the foreground: cancel sleep, resync, re-promote. */
+  private handleBecameVisible(entry: DocumentRuntimeEntry) {
+    // Cancel any pending sleep countdown.
+    if (entry.visibilitySleepTimer) {
+      clearTimeout(entry.visibilitySleepTimer);
+      entry.visibilitySleepTimer = null;
+    }
+    // Reset activity clock so inactivity timer gets a fresh window.
+    entry.lastActivityAt = Date.now();
+    // Lift deep-hidden suspension: reopen the presence stream (if leader)
+    // and heartbeat immediately so our record refreshes and we re-learn who
+    // else is here without waiting out a dormant-cadence interval.
+    if (entry.presenceStreamSuspended) {
+      entry.presenceStreamSuspended = false;
+      this.syncPresenceTransport(entry);
+      this.schedulePresenceHeartbeat(entry, 0);
+    }
+    // If we slept and came back to an active session, re-promote.
+    if (
+      entry.state.connectionState === "localOnly" &&
+      !entry.state.reconnectIntent &&
+      (entry.state.browserSessionTopology === "multiSession" ||
+        entry.state.remoteCollaborationTopology === "remotePresent")
+    ) {
+      void this.promote(entry, "reconnect-after-offline");
+    }
+
+    // If Hocuspocus dropped unexpectedly (passive backoff timer running),
+    // jump straight to reconnect now that the user is back on the tab.
+    this.activityTriggeredReconnect(entry);
+  }
+
+  /**
+   * Host-app lifecycle, reported by the native shell (`native:app-state`).
+   *
+   * iOS suspends the app process within seconds of backgrounding: JS stops
+   * dead, so the visibility sleep countdown never runs — while the OS tears
+   * the WebSocket down regardless. The session is then left believing it is
+   * connected over a socket that no longer exists, and nothing re-checks on
+   * return. The native signal is authoritative where the WebView's own
+   * visibility events are not.
+   *
+   * `background` sleeps immediately: there is no point scheduling a countdown
+   * the OS is about to freeze, and sleeping sooner is strictly cheaper (sleep
+   * is a deliberate cost feature, not a bug). `active` runs the same wake path
+   * a tab-visible transition would — including its topology guards, so a solo
+   * editor still stays local-only and doesn't reconnect Cloud Run for nothing.
+   *
+   * `inactive` is deliberately ignored: iOS emits it for transient overlays
+   * (app switcher, Control Center, an incoming call), and sleeping on those
+   * would thrash the transport every time the user peeks away.
+   */
+  handleHostAppStateChange(state: "active" | "background" | "inactive") {
+    if (state === "inactive") return;
+    for (const entry of this.entries.values()) {
+      if (entry.consumers.size === 0) continue;
+      if (state === "active") this.handleBecameVisible(entry);
+      else this.enterDeepHidden(entry);
     }
   }
 
@@ -2400,6 +2453,16 @@ export const collaborationRuntimeManager = new CollaborationRuntimeManager();
 if (typeof navigator !== "undefined" && "storage" in navigator && "persist" in navigator.storage) {
   void navigator.storage.persist();
 }
+
+// Subscribe to host-app lifecycle from the native shell. Wired here rather than
+// in a component so no surface has to remember to do it — the runtime owns its
+// own input sources, exactly as it does for visibilitychange/online/offline.
+// Outside the native shell this is inert: the event simply never fires.
+onNativeMessage((message) => {
+  if (message.type === "native:app-state") {
+    collaborationRuntimeManager.handleHostAppStateChange(message.state);
+  }
+});
 
 export function useCollaborationRuntime({
   contentId,
