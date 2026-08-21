@@ -644,22 +644,31 @@ export function LeftSidebarContent({
     let originalParentId: string | null = null;
     let originalIndex: number = -1;
 
+    // Both arrays have to be walked. Referenced children are partitioned out
+    // of `children` into `references` by the tree API, so a node dragged out
+    // of a reference block is only findable there — searching `children`
+    // alone left `movedNode` null and silently no-op'd the whole optimistic
+    // update, leaving the drop invisible until a reload.
     const removeNode = (nodes: TreeNode[], parentId: string | null = null): TreeNode[] => {
       return nodes
-        .map((node, index) => {
+        .map((node, index): TreeNode | null => {
           if (node.id === nodeId) {
             movedNode = node;
             originalParentId = parentId;
             originalIndex = index;
             return null; // Remove this node
           }
-          if (node.children && node.children.length > 0) {
-            return {
-              ...node,
-              children: removeNode(node.children, node.id),
-            };
-          }
-          return node;
+          return {
+            ...node,
+            children:
+              node.children && node.children.length > 0
+                ? removeNode(node.children, node.id)
+                : (node.children ?? []),
+            references:
+              node.references && node.references.length > 0
+                ? removeNode(node.references, node.id)
+                : node.references,
+          };
         })
         .filter((node): node is TreeNode => node !== null);
     };
@@ -680,33 +689,66 @@ export function LeftSidebarContent({
     }
 
 
+    // Mirror the server's partition: a referenced node lands in the target's
+    // `references`, not its `children`. Inserting into `children` rendered the
+    // drop as an ordinary row and left the parent's count chip stale until a
+    // reload re-fetched the partitioned tree.
+    //
+    // Root is the exception on purpose — the API never partitions the root
+    // array, because there is no row there to host a block. A reference
+    // dropped at root is meant to sit ungrouped, which is the "unassigned"
+    // state the root drop deliberately produces.
+    const relocated = movedNode as TreeNode;
+    const landsInReferences =
+      newParentId !== null && relocated.role === "referenced";
+
     // Insert the node at its new location
     const insertNode = (nodes: TreeNode[]): TreeNode[] => {
       // If this is the target parent (or root if newParentId is null)
       if (newParentId === null) {
         // Insert at root level
         const newNodes = [...nodes];
-        newNodes.splice(adjustedIndex, 0, movedNode!);
+        newNodes.splice(adjustedIndex, 0, relocated);
         return newNodes;
       }
 
       return nodes.map((node) => {
         if (node.id === newParentId) {
+          const landing = { ...relocated, parentId: newParentId };
+          if (landsInReferences) {
+            const newReferences = [...(node.references ?? [])];
+            // react-arborist's index counts rendered rows (primary children
+            // plus any spliced-in references), so it can overshoot this
+            // array. Clamp rather than relying on splice's silent append —
+            // the server re-sorts by displayOrder on the next fetch anyway.
+            newReferences.splice(
+              Math.min(adjustedIndex, newReferences.length),
+              0,
+              landing,
+            );
+            return { ...node, references: newReferences };
+          }
           // Found the target parent, insert into its children
           const newChildren = [...(node.children || [])];
-          newChildren.splice(adjustedIndex, 0, { ...movedNode!, parentId: newParentId });
+          newChildren.splice(adjustedIndex, 0, landing);
           return {
             ...node,
             children: newChildren,
           };
         }
-        if (node.children && node.children.length > 0) {
-          return {
-            ...node,
-            children: insertNode(node.children),
-          };
-        }
-        return node;
+        // Recurse through both arrays — the target may itself be a reference
+        // (a side chat inside a block that owns its own deliverables).
+        return {
+          ...node,
+          children:
+            node.children && node.children.length > 0
+              ? insertNode(node.children)
+              : (node.children ?? []),
+          references:
+            node.references && node.references.length > 0
+              ? insertNode(node.references)
+              : node.references,
+        };
       });
     };
 
