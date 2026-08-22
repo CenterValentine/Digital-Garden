@@ -20,6 +20,7 @@ import { FileNode } from "./FileNode";
 import { useTreeStateStore } from "@/state/tree-state-store";
 import { clientLogger } from "@/lib/core/logger/client";
 import type { TreeNode } from "@/lib/domain/content/types";
+import { expandReferences } from "@/lib/features/content/reference-group";
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -40,8 +41,6 @@ interface FileTreeProps {
   onChangeIcon?: (id: string) => void; // Change custom icon
   /** Phase 2: Folder view mode switching */
   onSetFolderView?: (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => Promise<void>;
-  /** Phase 2: Toggle referenced content visibility for folder */
-  onToggleReferencedContent?: (id: string, currentValue: boolean) => Promise<void>;
   /** Visualization engine-specific creators */
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
@@ -68,7 +67,6 @@ export function FileTree({
   onDownload,
   onChangeIcon,
   onSetFolderView,
-  onToggleReferencedContent,
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
@@ -86,6 +84,7 @@ export function FileTree({
   const containerRef = useRef<HTMLDivElement>(null);
   const {
     expandedIds,
+    referencesAtStartIds,
     setExpanded,
     selectedIds,
     setSelectedIds,
@@ -251,7 +250,6 @@ export function FileTree({
         onDownload={onDownload}
         onChangeIcon={onChangeIcon}
         onSetFolderView={onSetFolderView}
-        onToggleReferencedContent={onToggleReferencedContent}
         onCreateVisualizationMermaid={onCreateVisualizationMermaid}
         onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw}
         onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet}
@@ -263,6 +261,14 @@ export function FileTree({
       />
     );
   };
+
+  // Reference blocks are a DATA transform, not tree open-state: the chip
+  // rewrites what `children` contains rather than asking react-arborist to
+  // open anything, which is why references need no node of their own.
+  const treeData = useMemo(
+    () => expandReferences(data, expandedIds, referencesAtStartIds),
+    [data, expandedIds, referencesAtStartIds],
+  );
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {
@@ -568,7 +574,7 @@ export function FileTree({
       <Tree
         key={restoreVersion}
         ref={treeRef}
-        data={data}
+        data={treeData}
         openByDefault={false}
         initialOpenState={initialOpenState}
         disableMultiSelection={false}

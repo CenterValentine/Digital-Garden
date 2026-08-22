@@ -13,6 +13,15 @@ import { persist } from "zustand/middleware";
 interface TreeStateStore {
   /** Set of expanded node IDs */
   expandedIds: Set<string>;
+  /**
+   * Node IDs whose reference block renders BEFORE their primary children.
+   *
+   * Kept as its own set rather than folded into `expandedIds` under a prefix:
+   * "is expanded" and "sits at the start" are independent facts about a row,
+   * and overloading one set to mean both makes every read ambiguous. Absence
+   * means the default — references render after primary content.
+   */
+  referencesAtStartIds: Set<string>;
   /** Array of selected node IDs (for highlighting and active state) */
   selectedIds: string[];
   /** Virtualized tree scroll offset */
@@ -21,6 +30,8 @@ interface TreeStateStore {
   restoreVersion: number;
   /** Toggle expansion state */
   toggleExpanded: (id: string) => void;
+  /** Flip this row's reference block between start and end of its children */
+  toggleReferencePosition: (id: string) => void;
   /** Set expanded state */
   setExpanded: (id: string, expanded: boolean) => void;
   /** Expand multiple nodes */
@@ -41,6 +52,7 @@ interface TreeStateStore {
 
 export interface TreeStateSnapshot {
   expandedIds: string[];
+  referencesAtStartIds: string[];
   selectedIds: string[];
   scrollOffset: number;
 }
@@ -49,6 +61,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
   persist(
     (set, get) => ({
       expandedIds: new Set<string>(),
+      referencesAtStartIds: new Set<string>(),
       selectedIds: [],
       scrollOffset: 0,
       restoreVersion: 0,
@@ -62,6 +75,18 @@ export const useTreeStateStore = create<TreeStateStore>()(
             newExpanded.add(id);
           }
           return { expandedIds: newExpanded };
+        });
+      },
+
+      toggleReferencePosition: (id) => {
+        set((state) => {
+          const next = new Set(state.referencesAtStartIds);
+          if (next.has(id)) {
+            next.delete(id);
+          } else {
+            next.add(id);
+          }
+          return { referencesAtStartIds: next };
         });
       },
 
@@ -103,6 +128,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
 
       getSnapshot: () => ({
         expandedIds: Array.from(get().expandedIds),
+        referencesAtStartIds: Array.from(get().referencesAtStartIds),
         selectedIds: get().selectedIds,
         scrollOffset: get().scrollOffset,
       }),
@@ -110,6 +136,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
       restoreSnapshot: (snapshot) => {
         set((state) => ({
           expandedIds: new Set(snapshot?.expandedIds ?? []),
+          referencesAtStartIds: new Set(snapshot?.referencesAtStartIds ?? []),
           selectedIds: snapshot?.selectedIds ?? [],
           scrollOffset: snapshot?.scrollOffset ?? 0,
           restoreVersion: state.restoreVersion + 1,
@@ -118,7 +145,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
     }),
     {
       name: "tree-state-storage",
-      version: 2, // Increment version for new selectedIds field
+      version: 3, // v3: referencesAtStartIds (reference block placement)
       // Custom serialization for Set
       storage: {
         getItem: (name) => {
@@ -129,6 +156,9 @@ export const useTreeStateStore = create<TreeStateStore>()(
             state: {
                 ...state,
                 expandedIds: new Set(state.expandedIds || []),
+                // Absent in v2 payloads — an empty set means "every reference
+                // block sits at the end", which is the pre-existing behaviour.
+                referencesAtStartIds: new Set(state.referencesAtStartIds || []),
                 selectedIds: state.selectedIds || [],
                 scrollOffset: state.scrollOffset || 0,
                 restoreVersion: state.restoreVersion || 0,
@@ -143,6 +173,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
               state: {
                 ...state,
                 expandedIds: Array.from(state.expandedIds),
+                referencesAtStartIds: Array.from(state.referencesAtStartIds),
                 selectedIds: state.selectedIds,
                 scrollOffset: state.scrollOffset,
               },

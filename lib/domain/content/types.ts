@@ -42,11 +42,31 @@ export interface TreeNode {
   slug: string;
   parentId: string | null;
   /**
-   * Visibility role. "referenced" nodes are owned media/attachments; in the
-   * tree they display as CHILDREN of their owning note (ownedByNoteId), or
-   * adjacent to normal content in their folder when no note owns them.
+   * Visibility role. "referenced" nodes are owned media/attachments. In the
+   * tree they are partitioned out of `children` into the parent's
+   * `references` array and revealed by that parent's count chip, so they
+   * never interleave with primary content.
    */
   role?: "primary" | "referenced";
+  /**
+   * Referenced children, held apart from `children`. The tree splices these
+   * back in (flagged via `isNestedReference`) when the parent's chip is
+   * expanded — see `expandReferences` in FileTree.
+   */
+  references?: TreeNode[];
+  /**
+   * Set by the client transform, not the API: marks a node as currently
+   * rendered inside a parent's reference block so FileNode can draw the wash,
+   * rail and extra indent.
+   */
+  isNestedReference?: boolean;
+  /** Position within the reference block, for rounding the block's corners. */
+  referenceEdge?: "first" | "last" | "only" | "middle";
+  /**
+   * Status-dot state. "none" renders nothing — the overwhelming majority of
+   * nodes, which have never been published and need no status.
+   */
+  publishState?: "none" | "live" | "withdrawn";
   peopleGroupId?: string | null;
   personId?: string | null;
   displayOrder: number;
