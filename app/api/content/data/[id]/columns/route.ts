@@ -138,15 +138,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         name?: string;
         description?: string | null;
         config?: DataColumnConfig;
+        position?: string;
       };
 
       if (!body.columnId) return badRequest("`columnId` is required");
       if (
         body.name === undefined &&
         body.description === undefined &&
-        body.config === undefined
+        body.config === undefined &&
+        body.position === undefined
       ) {
         return badRequest("Nothing to update");
+      }
+      if (
+        body.position !== undefined &&
+        (typeof body.position !== "string" ||
+          body.position.length === 0 ||
+          body.position.length > 64)
+      ) {
+        return badRequest("`position` must be a fractional key");
       }
       if (body.name !== undefined && !body.name.trim()) {
         return badRequest("A column needs a name");
@@ -161,6 +171,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         name: body.name?.trim(),
         description: body.description,
         config: body.config,
+        position: body.position,
       });
 
       return NextResponse.json({ success: true, data: { columnId: body.columnId } });

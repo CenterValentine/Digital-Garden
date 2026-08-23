@@ -25,6 +25,7 @@ import {
   createUndoStack,
   describeOp,
   diffRow,
+  keyForMove,
   pushOp,
   redo as redoStack,
   undo as undoStack,
@@ -80,6 +81,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(600);
   const [openColumnId, setOpenColumnId] = useState<string | null>(null);
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{
+    columnId: string;
+    side: "left" | "right";
+  } | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   /**
@@ -485,6 +491,89 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [columnRequest]
   );
 
+  // ── Column drag reorder ────────────────────────────────────────────────
+  //
+  // Fractional keys mean the whole gesture is ONE column's position write
+  // (plan D7). The insertion index is computed in the without-the-mover
+  // frame, which is the frame keyForMove expects.
+
+  const dropSideFor = (e: React.DragEvent): "left" | "right" => {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    return e.clientX < rect.left + rect.width / 2 ? "left" : "right";
+  };
+
+  const handleColumnDragStart = useCallback(
+    (e: React.DragEvent, columnId: string) => {
+      e.dataTransfer.effectAllowed = "move";
+      // Firefox refuses to start a drag without payload data.
+      e.dataTransfer.setData("text/plain", columnId);
+      setDragColumnId(columnId);
+      setOpenColumnId(null);
+    },
+    []
+  );
+
+  const handleColumnDragOver = useCallback(
+    (e: React.DragEvent, columnId: string) => {
+      if (!dragColumnId || columnId === dragColumnId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      const side = dropSideFor(e);
+      setDropTarget((cur) =>
+        cur && cur.columnId === columnId && cur.side === side
+          ? cur
+          : { columnId, side }
+      );
+    },
+    [dragColumnId]
+  );
+
+  const handleColumnDragEnd = useCallback(() => {
+    setDragColumnId(null);
+    setDropTarget(null);
+  }, []);
+
+  const handleColumnDrop = useCallback(
+    async (e: React.DragEvent, targetColumnId: string) => {
+      e.preventDefault();
+      const moving = dragColumnId;
+      const side = dropSideFor(e);
+      setDragColumnId(null);
+      setDropTarget(null);
+      if (!moving || moving === targetColumnId) return;
+
+      const without = columns.filter((c) => c.id !== moving);
+      const targetIdx = without.findIndex((c) => c.id === targetColumnId);
+      if (targetIdx === -1) return;
+      const insertion = side === "left" ? targetIdx : targetIdx + 1;
+
+      const position = keyForMove(
+        columns.map((c) => ({ id: c.id, sortKey: c.position })),
+        moving,
+        insertion
+      );
+
+      // Optimistic: the column lands immediately; columnRequest reloads the
+      // schema afterwards, so the server stays the truth.
+      setState((s) => {
+        if (!s.table) return s;
+        const cols = s.table.columns
+          .map((c) => (c.id === moving ? { ...c, position } : c))
+          .sort((a, b) =>
+            a.position === b.position
+              ? a.id.localeCompare(b.id)
+              : a.position < b.position
+                ? -1
+                : 1
+          );
+        return { ...s, table: { ...s.table, columns: cols } };
+      });
+
+      await columnRequest("PATCH", { columnId: moving, position });
+    },
+    [dragColumnId, columns, columnRequest]
+  );
+
   const toggleRow = useCallback((rowId: string) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
@@ -588,6 +677,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                     current === columnId ? null : columnId
                   )
                 }
+                isDragSource={dragColumnId === column.id}
+                dropIndicator={
+                  dropTarget?.columnId === column.id ? dropTarget.side : null
+                }
+                onColumnDragStart={handleColumnDragStart}
+                onColumnDragOver={handleColumnDragOver}
+                onColumnDrop={handleColumnDrop}
+                onColumnDragEnd={handleColumnDragEnd}
               >
                 {openColumnId === column.id && (
                   <ColumnMenu

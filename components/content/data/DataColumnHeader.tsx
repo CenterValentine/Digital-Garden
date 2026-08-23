@@ -43,6 +43,14 @@ interface DataColumnHeaderProps {
   editable?: boolean;
   menuOpen?: boolean;
   onToggleMenu?: (columnId: string) => void;
+  /** True while THIS column is being dragged — dims it in place. */
+  isDragSource?: boolean;
+  /** Which edge shows the insertion line while another column hovers here. */
+  dropIndicator?: "left" | "right" | null;
+  onColumnDragStart?: (e: React.DragEvent, columnId: string) => void;
+  onColumnDragOver?: (e: React.DragEvent, columnId: string) => void;
+  onColumnDrop?: (e: React.DragEvent, columnId: string) => void;
+  onColumnDragEnd?: () => void;
   /** Rendered by the parent so the popover is not clipped by this cell. */
   children?: React.ReactNode;
 }
@@ -53,6 +61,12 @@ export function DataColumnHeader({
   editable = false,
   menuOpen = false,
   onToggleMenu,
+  isDragSource = false,
+  dropIndicator = null,
+  onColumnDragStart,
+  onColumnDragOver,
+  onColumnDrop,
+  onColumnDragEnd,
   children,
 }: DataColumnHeaderProps) {
   const glyph = TYPE_GLYPH[column.type] ?? "·";
@@ -63,11 +77,32 @@ export function DataColumnHeader({
         "relative flex shrink-0 items-center gap-2 border-r border-border/60 px-3 py-2",
         "text-xs font-medium text-muted-foreground",
         editable && "cursor-pointer hover:bg-muted/60",
-        menuOpen && "bg-muted/60"
+        menuOpen && "bg-muted/60",
+        isDragSource && "opacity-40"
       )}
       style={{ width }}
       onClick={editable ? () => onToggleMenu?.(column.id) : undefined}
+      // Native HTML5 drag: a completed drag suppresses the click, so the
+      // menu toggle above stays safe without a movement threshold.
+      draggable={editable && !!onColumnDragStart}
+      onDragStart={
+        onColumnDragStart ? (e) => onColumnDragStart(e, column.id) : undefined
+      }
+      onDragOver={
+        onColumnDragOver ? (e) => onColumnDragOver(e, column.id) : undefined
+      }
+      onDrop={onColumnDrop ? (e) => onColumnDrop(e, column.id) : undefined}
+      onDragEnd={onColumnDragEnd}
     >
+      {dropIndicator && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            "pointer-events-none absolute inset-y-0 w-0.5 bg-primary",
+            dropIndicator === "left" ? "left-0" : "right-0"
+          )}
+        />
+      )}
       <span
         aria-hidden="true"
         className="font-mono text-[10px] leading-none opacity-60"

@@ -389,6 +389,8 @@ export async function updateColumn(
     name?: string;
     description?: string | null;
     config?: DataColumnConfig;
+    /** Fractional key. A drag rewrites ONE column — the point of D7. */
+    position?: string;
   }
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
@@ -401,6 +403,9 @@ export async function updateColumn(
           : {}),
         ...(patch.config !== undefined
           ? { config: patch.config as unknown as Prisma.InputJsonValue }
+          : {}),
+        ...(patch.position !== undefined
+          ? { position: patch.position.slice(0, 64) }
           : {}),
       },
       select: { tableId: true },
