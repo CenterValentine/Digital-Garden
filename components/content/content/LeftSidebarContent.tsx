@@ -99,13 +99,20 @@ function patchTreeNodeTitle(
       return { ...node, title: newTitle };
     }
 
-    if (!node.children?.length) {
+    // Both arrays — a rename of content sitting in a parent's reference block
+    // has to patch there too, or the optimistic title never updates for it.
+    if (!node.children?.length && !node.references?.length) {
       return node;
     }
 
     return {
       ...node,
-      children: patchTreeNodeTitle(node.children, contentId, newTitle),
+      children: node.children?.length
+        ? patchTreeNodeTitle(node.children, contentId, newTitle)
+        : (node.children ?? []),
+      references: node.references?.length
+        ? patchTreeNodeTitle(node.references, contentId, newTitle)
+        : node.references,
     };
   });
 }
@@ -777,6 +784,11 @@ export function LeftSidebarContent({
       string,
       { currentParentId: string | null; currentIndex: number }
     >();
+    // Walks both arrays: a row inside a parent's reference block is a
+    // perfectly ordinary drag source, and skipping `references` left it
+    // without a recorded position. The index it yields is within whichever
+    // array held it — only consulted for same-parent reordering, where the
+    // server re-sorts by displayOrder anyway.
     const findPositions = (nodes: TreeNode[], parent: string | null = null) => {
       for (let i = 0; i < nodes.length; i++) {
         if (dragIds.includes(nodes[i].id)) {
@@ -784,6 +796,9 @@ export function LeftSidebarContent({
         }
         if (nodes[i].children && nodes[i].children.length > 0) {
           findPositions(nodes[i].children, nodes[i].id);
+        }
+        if (nodes[i].references && nodes[i].references.length > 0) {
+          findPositions(nodes[i].references, nodes[i].id);
         }
       }
     };

@@ -35,10 +35,22 @@ export const ROOT_DROP_TARGET: UploadDropTarget = {
   source: "root",
 };
 
+/**
+ * Depth-first lookup across BOTH child arrays.
+ *
+ * Referenced children are partitioned out of `children` into `references` by
+ * the tree API, so searching `children` alone makes anything inside a
+ * reference block invisible to every caller of this helper. That included the
+ * drag handler's pre-flight resolve, which bails when a dragged id can't be
+ * found — so a reference dropped into a folder became unmovable: the guard
+ * rejected it before any request was sent.
+ */
 export function findTreeNodeById(nodes: TreeNode[], id: string): TreeNode | null {
   for (const node of nodes) {
     if (node.id === id) return node;
-    const found = node.children ? findTreeNodeById(node.children, id) : null;
+    const found =
+      (node.children ? findTreeNodeById(node.children, id) : null) ??
+      (node.references ? findTreeNodeById(node.references, id) : null);
     if (found) return found;
   }
   return null;

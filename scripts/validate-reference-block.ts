@@ -28,6 +28,7 @@ import {
   expandReferences,
   referenceGroupKey,
 } from "@/lib/features/content/reference-group";
+import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import type { TreeNode } from "@/lib/domain/content/types";
 
 let failures = 0;
@@ -212,6 +213,55 @@ const EMPTY = new Set<string>();
     "inner block opens independently",
     ids(both[0].children[0].children) === "deliverable",
     ids(both[0].children[0].children),
+  );
+}
+
+// --- Lookup reaches into reference blocks --------------------------------
+//
+// Shared tree walkers must search `references` as well as `children`. The
+// drag handler resolves every dragged id through findTreeNodeById and BAILS
+// when one is missing ("could not be found in the current tree"), so a
+// children-only walk made anything inside a reference block permanently
+// unmovable — the move request was never even sent. Same omission silently
+// pruned referenced rows from the persisted selection and skipped optimistic
+// renames. Any new tree walker has to handle both arrays.
+{
+  const data = fixture();
+  check(
+    "findTreeNodeById finds a node inside references",
+    findTreeNodeById(data, "ref-2")?.id === "ref-2",
+    "children-only walk — reference block is unreachable",
+  );
+  check(
+    "findTreeNodeById still finds primary children",
+    findTreeNodeById(data, "note-b")?.id === "note-b",
+  );
+  check(
+    "findTreeNodeById returns null for an absent id",
+    findTreeNodeById(data, "nope") === null,
+  );
+}
+
+{
+  // A reference that itself owns references — the deliverable-under-side-chat
+  // shape. Lookup has to recurse through a references array, not just into one.
+  const data = [
+    node("folder", {
+      contentType: "folder",
+      children: [],
+      references: [
+        node("chat", {
+          contentType: "chat",
+          role: "referenced",
+          children: [],
+          references: [node("deliverable", { role: "referenced" })],
+        }),
+      ],
+    }),
+  ];
+  check(
+    "findTreeNodeById recurses through nested references",
+    findTreeNodeById(data, "deliverable")?.id === "deliverable",
   );
 }
 
