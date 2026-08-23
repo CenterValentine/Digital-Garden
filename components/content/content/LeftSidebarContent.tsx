@@ -1371,6 +1371,9 @@ export function LeftSidebarContent({
         requestBody.chatMetadata = {};
       } else if (type === "workflow") {
         requestBody.contentType = "workflow";
+      } else if (type === "data") {
+        // The server seeds the column + view; the client sends only the intent.
+        requestBody.contentType = "data";
       } else if (type === "visualization") {
         requestBody.engine = config.payload?.engine;
         requestBody.chartConfig = config.payload?.config || {};

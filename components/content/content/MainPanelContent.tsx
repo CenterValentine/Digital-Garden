@@ -66,6 +66,7 @@ import { FolderViewer } from "../viewer/FolderViewer";
 import { ExternalViewer } from "../viewer/ExternalViewer";
 import { ChatViewer } from "../viewer/ChatViewer";
 import { VisualizationViewer } from "../viewer/VisualizationViewer";
+import { DataTableViewer } from "../data/DataTableViewer";
 import { DataViewer } from "../viewer/DataViewer";
 import { HopeViewer } from "../viewer/HopeViewer";
 import { WorkflowViewer } from "../viewer/WorkflowViewer";
@@ -2113,6 +2114,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         messages={contentData?.messages || []}
         metadata={contentData?.metadata}
       />
+    );
+  } else if (contentType === "data" && selectedContentId) {
+    contentElement = (
+      <DataTableViewer contentId={selectedContentId} title={noteTitle} />
     );
   } else if (contentType === "visualization") {
     contentElement = (

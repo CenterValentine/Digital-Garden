@@ -221,9 +221,9 @@ export function LeftSidebar() {
     }));
   }, []);
 
-  // const handleCreateData = useCallback(() => {
-  //   setCreateTrigger({ type: "data", timestamp: Date.now() });
-  // }, []);
+  const handleCreateData = useCallback(() => {
+    setCreateTrigger({ type: "data", timestamp: Date.now() });
+  }, []);
 
   // const handleCreateHope = useCallback(() => {
   //   setCreateTrigger({ type: "hope", timestamp: Date.now() });
@@ -290,6 +290,7 @@ export function LeftSidebar() {
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onCreateData={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateData}
           onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
           onCreateN8nWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateN8nWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}

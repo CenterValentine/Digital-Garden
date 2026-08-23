@@ -795,6 +795,64 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (requestedContentType === "data") {
+      // User-defined database (DATABASE-CONTENT-TYPE-PLAN → Phase 1a).
+      //
+      // Seeded with ONE text column named "Name" and one grid view —
+      // deliberately not Notion's Name/Tags/Date. Columns a user did not ask
+      // for are noise they must delete before they can start, and the primary
+      // column has to exist because titles and promotion depend on it.
+      contentType = "data";
+      const { buildDefaultColumns, buildDefaultView, deriveTableSearchText } =
+        await import("@/lib/domain/data");
+
+      const seedColumns = buildDefaultColumns();
+      const seedView = buildDefaultView();
+
+      payloadData = {
+        dataPayload: {
+          create: {
+            mode: "inline",
+            source: {} as unknown as Prisma.InputJsonValue,
+            searchText: deriveTableSearchText(
+              title,
+              seedColumns.map((c) => ({
+                ...c,
+                id: "",
+                deletedAt: null,
+              }))
+            ),
+            columns: {
+              create: seedColumns.map((c) => ({
+                key: c.key,
+                name: c.name,
+                type: c.type,
+                position: c.position,
+                isPrimary: c.isPrimary,
+                config: c.config as unknown as Prisma.InputJsonValue,
+                description: c.description,
+              })),
+            },
+            views: {
+              create: [
+                {
+                  ownerId: session.user.id,
+                  name: seedView.name,
+                  mode: seedView.mode,
+                  access: seedView.access,
+                  section: seedView.section,
+                  filters: seedView.filters as unknown as Prisma.InputJsonValue,
+                  sorts: seedView.sorts as unknown as Prisma.InputJsonValue,
+                  groupByColumnId: seedView.groupByColumnId,
+                  columnPrefs: seedView.columnPrefs as unknown as Prisma.InputJsonValue,
+                  config: seedView.config as unknown as Prisma.InputJsonValue,
+                  position: seedView.position,
+                },
+              ],
+            },
+          },
+        },
+      };
     } else if (requestedContentType === "workflow") {
       // User-authored workflow — seeded with the job-application starter
       // graph; edited in the builder (workflows extension content viewer).

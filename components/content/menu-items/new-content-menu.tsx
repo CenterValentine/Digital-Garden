@@ -400,15 +400,16 @@ export function getNewContentMenuItems(
     disabled: !callbacks.onAddPeopleTarget,
   });
 
-  // Stubs — defined but not implemented yet.
-
+  // Database — user-defined tables (DATABASE-CONTENT-TYPE-PLAN).
   items.push({
     id: "new-data",
-    label: "Data Table",
+    label: "Database",
     icon: <Table className="h-4 w-4" />,
     onClick: () => callbacks.onCreateData?.(normalizedParentId),
-    disabled: true,
+    disabled: !callbacks.onCreateData,
   });
+
+  // Stubs — defined but not implemented yet.
 
   items.push({
     id: "new-hope",

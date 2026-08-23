@@ -1,0 +1,1277 @@
+<title>Database Surfaces</title>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-text" viewBox="0 0 16 16"><path d="M3 4h10M3 8h10M3 12h6" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="i-num" viewBox="0 0 16 16"><path d="M6 2.5 4.5 13.5M11.5 2.5 10 13.5M2.5 5.5h11M2 10.5h11" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="i-select" viewBox="0 0 16 16"><rect x="2.2" y="3.2" width="11.6" height="9.6" rx="2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M5.5 7.2 8 9.6l2.5-2.4" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-status" viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" stroke="currentColor" stroke-width="1.4" fill="none"/><circle cx="8" cy="8" r="2.4" fill="currentColor"/></symbol>
+    <symbol id="i-date" viewBox="0 0 16 16"><rect x="2.2" y="3.4" width="11.6" height="10.4" rx="1.8" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M2.4 6.6h11.2M5.4 2.2v2.6M10.6 2.2v2.6" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="i-url" viewBox="0 0 16 16"><path d="M6.6 9.4a2.8 2.8 0 0 0 4.1.3l2-2a2.8 2.8 0 0 0-4-4l-1 1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M9.4 6.6a2.8 2.8 0 0 0-4.1-.3l-2 2a2.8 2.8 0 0 0 4 4l1-1" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/></symbol>
+    <symbol id="i-rel" viewBox="0 0 16 16"><path d="M2.5 5.5h7a3 3 0 0 1 0 6H6" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round"/><path d="M8 9 5.6 11.5 8 14" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" stroke="currentColor" stroke-width="1.3" fill="none"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".95" fill="currentColor"/></symbol>
+    <symbol id="i-db" viewBox="0 0 16 16"><ellipse cx="8" cy="4" rx="5.4" ry="2.2" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M2.6 4v8c0 1.2 2.4 2.2 5.4 2.2s5.4-1 5.4-2.2V4" stroke="currentColor" stroke-width="1.4" fill="none"/><path d="M2.6 8c0 1.2 2.4 2.2 5.4 2.2s5.4-1 5.4-2.2" stroke="currentColor" stroke-width="1.4" fill="none"/></symbol>
+    <symbol id="i-note" viewBox="0 0 16 16"><path d="M3.4 2.2h6l3.2 3.2v8.4H3.4z" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linejoin="round"/><path d="M9.2 2.4v3.2h3.2" stroke="currentColor" stroke-width="1.4" fill="none"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 16 16"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<style>
+:root {
+  --bg:            hsl(220 22% 96.5%);
+  --ground:        hsl(220 24% 92%);
+  --panel:         hsl(0 0% 100%);
+  --panel-2:       hsl(220 26% 97.5%);
+  --line:          hsl(220 16% 87%);
+  --line-soft:     hsl(220 18% 91.5%);
+  --ink:           hsl(223 26% 13%);
+  --ink-2:         hsl(221 13% 38%);
+  --ink-3:         hsl(220 11% 55%);
+  --accent:        hsl(222 47% 51%);
+  --accent-soft:   hsl(222 60% 95%);
+  --accent-line:   hsl(222 50% 78%);
+  --ok:            hsl(142 60% 34%);
+  --ok-soft:       hsl(142 52% 92%);
+  --warn:          hsl(33 82% 38%);
+  --warn-soft:     hsl(38 88% 91%);
+  --idle-soft:     hsl(220 16% 92%);
+  --idle-ink:      hsl(220 12% 42%);
+  --shadow:        0 1px 2px hsl(222 30% 20% / .06), 0 8px 24px -12px hsl(222 30% 20% / .18);
+  --shadow-lift:   0 2px 6px hsl(222 30% 20% / .09), 0 18px 44px -18px hsl(222 30% 20% / .28);
+
+  --ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, "Cascadia Mono", monospace;
+  --r: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:          hsl(224 24% 8.5%);
+    --ground:      hsl(224 22% 11%);
+    --panel:       hsl(223 20% 13.5%);
+    --panel-2:     hsl(223 19% 16.5%);
+    --line:        hsl(222 14% 25%);
+    --line-soft:   hsl(222 15% 20%);
+    --ink:         hsl(220 22% 93%);
+    --ink-2:       hsl(220 12% 68%);
+    --ink-3:       hsl(220 10% 54%);
+    --accent:      hsl(222 62% 68%);
+    --accent-soft: hsl(222 40% 20%);
+    --accent-line: hsl(222 38% 36%);
+    --ok:          hsl(142 52% 62%);
+    --ok-soft:     hsl(146 34% 18%);
+    --warn:        hsl(38 78% 64%);
+    --warn-soft:   hsl(35 40% 18%);
+    --idle-soft:   hsl(222 14% 21%);
+    --idle-ink:    hsl(220 12% 66%);
+    --shadow:      0 1px 2px hsl(0 0% 0% / .4), 0 10px 28px -14px hsl(0 0% 0% / .7);
+    --shadow-lift: 0 2px 8px hsl(0 0% 0% / .5), 0 22px 50px -20px hsl(0 0% 0% / .8);
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg:          hsl(224 24% 8.5%);
+  --ground:      hsl(224 22% 11%);
+  --panel:       hsl(223 20% 13.5%);
+  --panel-2:     hsl(223 19% 16.5%);
+  --line:        hsl(222 14% 25%);
+  --line-soft:   hsl(222 15% 20%);
+  --ink:         hsl(220 22% 93%);
+  --ink-2:       hsl(220 12% 68%);
+  --ink-3:       hsl(220 10% 54%);
+  --accent:      hsl(222 62% 68%);
+  --accent-soft: hsl(222 40% 20%);
+  --accent-line: hsl(222 38% 36%);
+  --ok:          hsl(142 52% 62%);
+  --ok-soft:     hsl(146 34% 18%);
+  --warn:        hsl(38 78% 64%);
+  --warn-soft:   hsl(35 40% 18%);
+  --idle-soft:   hsl(222 14% 21%);
+  --idle-ink:    hsl(220 12% 66%);
+  --shadow:      0 1px 2px hsl(0 0% 0% / .4), 0 10px 28px -14px hsl(0 0% 0% / .7);
+  --shadow-lift: 0 2px 8px hsl(0 0% 0% / .5), 0 22px 50px -20px hsl(0 0% 0% / .8);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+.wrap { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+
+/* ── masthead ─────────────────────────────────────── */
+.masthead { padding: 64px 0 40px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+.eyebrow {
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .13em;
+  text-transform: uppercase; color: var(--ink-3); margin: 0 0 18px;
+}
+.masthead h1 {
+  font-size: clamp(34px, 5.2vw, 52px); line-height: 1.06; letter-spacing: -.028em;
+  font-weight: 660; margin: 0 0 20px; text-wrap: balance; max-width: 18ch;
+}
+.lede { font-size: 17.5px; color: var(--ink-2); max-width: 62ch; margin: 0 0 28px; }
+.lede strong { color: var(--ink); font-weight: 600; }
+
+.meta-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.meta-chip {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+  padding: 5px 12px;
+}
+
+/* ── sections ─────────────────────────────────────── */
+.sec { padding: 56px 0 8px; border-top: 1px solid var(--line-soft); }
+.sec:first-of-type { border-top: 0; }
+.sec-head { display: flex; gap: 16px; align-items: baseline; margin-bottom: 10px; }
+.sec-tag {
+  font-family: var(--mono); font-size: 11.5px; color: var(--accent);
+  letter-spacing: .1em; text-transform: uppercase; white-space: nowrap; padding-top: 6px;
+}
+.sec h2 { font-size: 27px; letter-spacing: -.02em; font-weight: 640; margin: 0; text-wrap: balance; }
+.sec-note { color: var(--ink-2); max-width: 66ch; margin: 0 0 26px; }
+.sec-note code {
+  font-family: var(--mono); font-size: .87em; background: var(--panel-2);
+  border: 1px solid var(--line-soft); border-radius: 5px; padding: 1px 5px; color: var(--ink);
+}
+
+/* ── app frame ────────────────────────────────────── */
+.frame {
+  background: var(--ground); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.frame + .caption { margin-top: 14px; }
+.caption {
+  font-size: 13.5px; color: var(--ink-3); max-width: 68ch;
+  padding-left: 14px; border-left: 2px solid var(--accent-line);
+}
+.caption b { color: var(--ink-2); font-weight: 600; }
+
+/* ── tab strip ────────────────────────────────────── */
+.tabstrip { display: flex; align-items: stretch; background: var(--ground); border-bottom: 1px solid var(--line); overflow-x: auto; }
+.wtab {
+  display: flex; align-items: center; gap: 7px; padding: 9px 14px; font-size: 13px;
+  color: var(--ink-2); border-right: 1px solid var(--line); white-space: nowrap;
+  background: transparent; border-top: 2px solid transparent;
+}
+.wtab svg { width: 13px; height: 13px; opacity: .75; flex: none; }
+.wtab.on { background: var(--panel); color: var(--ink); border-top-color: var(--accent); }
+.wtab .pin { font-size: 10px; color: var(--accent); font-family: var(--mono); }
+.wtab .sub { color: var(--ink-3); font-family: var(--mono); font-size: 11px; }
+
+/* ── database header + view bar ───────────────────── */
+.dbhead { background: var(--panel); padding: 18px 20px 0; }
+.dbtitle { display: flex; align-items: center; gap: 10px; margin-bottom: 3px; }
+.dbtitle svg { width: 17px; height: 17px; color: var(--ink-3); }
+.dbtitle h3 { margin: 0; font-size: 20px; font-weight: 620; letter-spacing: -.015em; }
+.dbdesc { font-size: 13px; color: var(--ink-3); margin: 0 0 14px 27px; max-width: 58ch; }
+
+.viewbar { display: flex; gap: 2px; align-items: center; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.vtab {
+  appearance: none; background: none; border: 0; cursor: pointer; font: inherit;
+  font-size: 13.5px; color: var(--ink-3); padding: 8px 12px 10px; white-space: nowrap;
+  border-bottom: 2px solid transparent; margin-bottom: -1px; border-radius: 6px 6px 0 0;
+}
+.vtab:hover { color: var(--ink); background: var(--panel-2); }
+.vtab[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); font-weight: 560; }
+.vtab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vtab .n { font-family: var(--mono); font-size: 11px; color: var(--ink-3); margin-left: 6px; }
+.vadd { color: var(--ink-3); font-size: 17px; padding: 6px 11px; }
+
+.toolrow {
+  display: flex; align-items: center; gap: 8px; padding: 9px 20px;
+  background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap;
+}
+.pillbtn {
+  font-size: 12.5px; color: var(--ink-2); background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 7px; padding: 4px 10px;
+}
+.pillbtn.act { color: var(--accent); border-color: var(--accent-line); background: var(--accent-soft); }
+.spacer { flex: 1; }
+
+/* ── grid ─────────────────────────────────────────── */
+.gridscroll { overflow-x: auto; background: var(--panel); }
+table.grid { border-collapse: collapse; width: 100%; min-width: 780px; font-size: 13.5px; }
+table.grid th {
+  text-align: left; font-weight: 500; color: var(--ink-2); font-size: 12.5px;
+  padding: 8px 12px; border-bottom: 1px solid var(--line); border-right: 1px solid var(--line-soft);
+  background: var(--panel-2); white-space: nowrap; vertical-align: middle;
+}
+table.grid th .thin { display: flex; align-items: center; gap: 7px; }
+table.grid th svg.ty { width: 13px; height: 13px; color: var(--ink-3); flex: none; }
+table.grid th svg.nfo { width: 12px; height: 12px; color: var(--accent); flex: none; opacity: .85; }
+table.grid td {
+  padding: 8px 12px; border-bottom: 1px solid var(--line-soft);
+  border-right: 1px solid var(--line-soft); vertical-align: middle;
+}
+table.grid tr:hover td { background: var(--panel-2); }
+.rowbtn {
+  appearance: none; background: none; border: 0; font: inherit; cursor: pointer; padding: 0;
+  color: var(--ink); font-weight: 540; text-align: left; border-bottom: 1px solid transparent;
+}
+.rowbtn:hover { border-bottom-color: var(--accent-line); color: var(--accent); }
+.rowbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-2); }
+.muted { color: var(--ink-3); }
+.linkcell { color: var(--accent); font-size: 12.5px; text-decoration: none; border-bottom: 1px solid var(--accent-line); }
+.addrow td { color: var(--ink-3); font-size: 13px; }
+.addrow:hover td { background: var(--panel-2); }
+
+.pill {
+  display: inline-block; font-size: 11.5px; padding: 2px 9px; border-radius: 999px;
+  font-weight: 540; white-space: nowrap;
+}
+.p-done { background: var(--ok-soft); color: var(--ok); }
+.p-act  { background: var(--accent-soft); color: var(--accent); }
+.p-idle { background: var(--idle-soft); color: var(--idle-ink); }
+.p-hold { background: var(--warn-soft); color: var(--warn); }
+.stars { color: var(--accent); font-size: 12px; letter-spacing: 1px; }
+
+/* ── board ────────────────────────────────────────── */
+.board { display: flex; gap: 12px; padding: 16px; overflow-x: auto; background: var(--panel); }
+.col { flex: 0 0 216px; display: flex; flex-direction: column; gap: 8px; }
+.colhead { display: flex; align-items: center; gap: 8px; padding: 0 2px 2px; }
+.colhead .n { font-family: var(--mono); font-size: 11px; color: var(--ink-3); }
+.card {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 9px;
+  padding: 10px 11px; box-shadow: var(--shadow);
+}
+.card .t { font-size: 13.5px; font-weight: 560; margin-bottom: 3px; line-height: 1.35; }
+.card .a { font-size: 12px; color: var(--ink-3); }
+.card .f { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.ghostcard {
+  border: 1px dashed var(--line); border-radius: 9px; padding: 9px 11px;
+  font-size: 12.5px; color: var(--ink-3);
+}
+
+/* ── gallery ──────────────────────────────────────── */
+.gal { display: grid; grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); gap: 13px; padding: 16px; background: var(--panel); }
+.gcard { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--panel-2); }
+.cover { height: 92px; display: flex; align-items: flex-end; padding: 9px; }
+.gbody { padding: 9px 11px 11px; }
+.gbody .t { font-size: 13px; font-weight: 560; line-height: 1.3; margin-bottom: 4px; }
+.gbody .a { font-size: 11.5px; color: var(--ink-3); margin-bottom: 7px; }
+
+/* ── list ─────────────────────────────────────────── */
+.listv { background: var(--panel); padding: 6px 0; }
+.lrow {
+  display: flex; align-items: center; gap: 12px; padding: 9px 20px;
+  border-bottom: 1px solid var(--line-soft); font-size: 13.5px;
+}
+.lrow:last-child { border-bottom: 0; }
+.lrow:hover { background: var(--panel-2); }
+.lrow .t { font-weight: 540; }
+
+/* ── peek panel ───────────────────────────────────── */
+.peekwrap { display: grid; grid-template-columns: 1fr; }
+@media (min-width: 860px) { .peekwrap.split { grid-template-columns: 1fr 328px; } }
+.peek { background: var(--panel); border-left: 1px solid var(--line); }
+.peekhead { padding: 16px 18px 12px; border-bottom: 1px solid var(--line-soft); }
+.peekhead .kick { font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.peekhead h4 { margin: 0; font-size: 18px; font-weight: 620; letter-spacing: -.015em; line-height: 1.25; }
+.fields { padding: 6px 18px 16px; display: flex; flex-direction: column; }
+.fld { padding: 10px 0; border-bottom: 1px solid var(--line-soft); }
+.fld:last-child { border-bottom: 0; }
+.flab { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--ink-2); margin-bottom: 5px; }
+.flab svg { width: 12px; height: 12px; color: var(--ink-3); flex: none; }
+.fhelp { font-size: 11.5px; color: var(--ink-3); font-style: italic; margin-top: 4px; line-height: 1.45; }
+.fval { font-size: 13.5px; }
+.emptyval { color: var(--ink-3); font-size: 13px; }
+.bodyslot {
+  margin: 4px 18px 18px; border: 1px dashed var(--line); border-radius: 9px;
+  padding: 14px; font-size: 12.5px; color: var(--ink-3); background: var(--panel-2);
+}
+.bodyslot b { color: var(--ink-2); font-weight: 600; }
+
+/* ── promoted row page ────────────────────────────── */
+.subhead { font-size: 17px; font-weight: 600; letter-spacing: -.012em; margin: 40px 0 8px; }
+.rowpage { background: var(--panel); padding: 14px 26px 22px; }
+.crumbs { display: flex; align-items: center; gap: 7px; font-size: 12.5px; padding-bottom: 14px; }
+.crumbs a { color: var(--ink-2); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+.crumbs a:hover { color: var(--accent); }
+.crumbs a svg { width: 13px; height: 13px; opacity: .8; }
+.crumbs svg.sep { width: 11px; height: 11px; color: var(--ink-3); opacity: .6; }
+.crumbs .here { color: var(--ink-3); }
+.rptitle { font-size: 29px; font-weight: 640; letter-spacing: -.022em; margin: 0 0 18px; line-height: 1.15; }
+.proprail { display: flex; flex-direction: column; gap: 2px; padding-bottom: 18px; border-bottom: 1px solid var(--line-soft); margin-bottom: 18px; }
+.prop { display: flex; gap: 14px; align-items: center; font-size: 13.5px; }
+.pk { display: flex; align-items: center; gap: 7px; color: var(--ink-2); font-size: 12.5px; min-width: 108px; }
+.pk svg { width: 12px; height: 12px; color: var(--ink-3); flex: none; }
+.rpbody p { font-size: 14.5px; color: var(--ink-2); max-width: 62ch; margin: 0 0 12px; }
+.wl { color: var(--accent); border-bottom: 1px solid var(--accent-line); }
+.rpfoot { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line-soft); }
+.fmeta { font-size: 12px; color: var(--ink-3); display: flex; align-items: center; gap: 6px; }
+.fdot { width: 3px; height: 3px; border-radius: 50%; background: var(--ink-3); opacity: .5; }
+
+/* ── popover ──────────────────────────────────────── */
+.pop {
+  width: 288px; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 11px; box-shadow: var(--shadow-lift); overflow: hidden;
+}
+.popsec { padding: 11px 13px; border-bottom: 1px solid var(--line-soft); }
+.popsec:last-child { border-bottom: 0; }
+.poplab { font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 7px; }
+.field {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px;
+  padding: 6px 9px; font-size: 13px;
+}
+.typerow { display: flex; align-items: center; gap: 8px; }
+.typerow svg { width: 13px; height: 13px; color: var(--ink-3); }
+.typerow .chev { margin-left: auto; width: 12px; height: 12px; }
+.helpfield { min-height: 46px; color: var(--ink-2); font-size: 12.5px; line-height: 1.5; }
+.counter { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); text-align: right; margin-top: 5px; }
+.opt { display: flex; align-items: center; gap: 8px; padding: 4px 0; font-size: 12.5px; }
+.grip { font-family: var(--mono); color: var(--ink-3); font-size: 11px; }
+
+.popstage { padding: 26px; background: var(--ground); display: flex; justify-content: center; }
+
+/* ── tree ─────────────────────────────────────────── */
+.tree { background: var(--panel); padding: 12px 0; font-size: 13.5px; }
+.tnode { display: flex; align-items: center; gap: 8px; padding: 5px 20px; color: var(--ink-2); }
+.tnode:hover { background: var(--panel-2); }
+.tnode svg { width: 13px; height: 13px; flex: none; opacity: .8; }
+.tnode.sel { background: var(--accent-soft); color: var(--accent); }
+.tnode.sel svg { opacity: 1; }
+.d1 { padding-left: 38px; } .d2 { padding-left: 56px; }
+.vdot { width: 5px; height: 5px; border-radius: 50%; background: var(--ink-3); flex: none; margin: 0 4px; }
+.tnode.sel .vdot { background: var(--accent); }
+.tflag { font-family: var(--mono); font-size: 10px; color: var(--ink-3); margin-left: auto; }
+
+/* ── left rail ────────────────────────────────────── */
+.railwrap { display: flex; background: var(--panel); min-height: 428px; }
+.iconrail {
+  width: 48px; flex: none; background: var(--ground); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0;
+}
+.irbtn {
+  width: 32px; height: 32px; border-radius: 8px; display: grid; place-items: center;
+  color: var(--ink-3);
+}
+.irbtn svg { width: 16px; height: 16px; }
+.irbtn.on { background: var(--accent-soft); color: var(--accent); }
+.railpanel { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.railhead {
+  display: flex; align-items: center; gap: 8px; padding: 11px 14px 10px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.railhead .rt { font-family: var(--mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.railhead .add { margin-left: auto; color: var(--ink-3); font-size: 16px; line-height: 1; }
+.railbody { padding: 8px 0; flex: 1; overflow-y: auto; }
+.railsearch { padding: 9px 12px 8px; border-bottom: 1px solid var(--line-soft); }
+.rsfield {
+  display: flex; align-items: center; gap: 8px; background: var(--panel-2);
+  border: 1px solid var(--line); border-radius: 7px; padding: 5px 9px; font-size: 12.5px;
+  color: var(--ink-3);
+}
+.rsfield svg { width: 12px; height: 12px; flex: none; }
+.rsfield .typed { color: var(--ink); font-family: var(--mono); font-size: 12px; }
+.rscaret { width: 1.5px; height: 13px; background: var(--accent); display: inline-block; }
+.hitkind {
+  font-family: var(--mono); font-size: 9.5px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink-3); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px;
+  margin-left: auto; flex: none;
+}
+.ritem mark { background: var(--accent-soft); color: var(--accent); border-radius: 3px; padding: 0 1px; }
+.gapline { position: relative; height: 15px; display: flex; align-items: center; padding-left: 26px; gap: 8px; }
+.gapline::after { content: ""; position: absolute; left: 42px; right: 14px; height: 1px; background: var(--line); }
+.gapline.on::after { background: var(--accent); height: 1.5px; }
+.gapplus {
+  width: 15px; height: 15px; border-radius: 4px; display: grid; place-items: center;
+  font-size: 11px; line-height: 1; color: var(--ink-3); border: 1px solid var(--line);
+  background: var(--panel); position: relative; z-index: 1;
+}
+.gapline.on .gapplus { color: var(--accent); border-color: var(--accent); }
+.gaphint {
+  font-size: 10.5px; color: var(--accent); background: var(--panel); position: relative;
+  z-index: 1; padding-right: 5px; font-family: var(--mono);
+}
+.rgroup { padding: 4px 0 8px; }
+.rdb {
+  display: flex; align-items: center; gap: 8px; padding: 5px 14px; font-size: 13.5px;
+  font-weight: 560; color: var(--ink);
+}
+.rdb svg.cv { width: 11px; height: 11px; color: var(--ink-3); flex: none; }
+.rdb svg.db { width: 14px; height: 14px; color: var(--ink-3); flex: none; }
+.rsub {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink-3); padding: 7px 14px 3px 34px;
+}
+.ritem {
+  display: flex; align-items: center; gap: 9px; padding: 4px 14px 4px 34px;
+  font-size: 13px; color: var(--ink-2);
+}
+.ritem:hover { background: var(--panel-2); color: var(--ink); }
+.ritem.on { background: var(--accent-soft); color: var(--accent); font-weight: 540; }
+.ritem svg { width: 12px; height: 12px; flex: none; opacity: .8; }
+.ritem .ct { margin-left: auto; font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+.ritem.on .ct { color: var(--accent); }
+.railfoot { border-top: 1px solid var(--line-soft); padding: 9px 14px 12px; }
+.rfl { font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3); margin-bottom: 6px; }
+.rrecent { font-size: 12.5px; color: var(--ink-2); padding: 3px 0; display: flex; align-items: center; gap: 7px; }
+.rrecent .dim { color: var(--ink-3); }
+.railstage { flex: 1; min-width: 0; border-left: 1px solid var(--line); display: none; }
+@media (min-width: 780px) { .railstage { display: block; } }
+
+/* ── form view ────────────────────────────────────── */
+.formstage { background: var(--panel); padding: 22px; display: flex; justify-content: center; }
+.formcard { width: 100%; max-width: 452px; }
+.formtitle { font-size: 21px; font-weight: 630; letter-spacing: -.018em; margin: 0 0 5px; }
+.formsub { font-size: 13.5px; color: var(--ink-3); margin: 0 0 20px; }
+.ffield { margin-bottom: 16px; }
+.flabel { font-size: 13.5px; font-weight: 550; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+.freq { color: var(--warn); font-size: 12px; }
+.fdesc { font-size: 12px; color: var(--ink-3); margin-bottom: 7px; line-height: 1.45; }
+.finput {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 11px; font-size: 13.5px; color: var(--ink-3);
+}
+.finput.tall { min-height: 62px; }
+.fchips { display: flex; gap: 7px; flex-wrap: wrap; }
+.fchip {
+  border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px; font-size: 12.5px;
+  color: var(--ink-2); background: var(--panel-2);
+}
+.fchip.sel { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.fsubmit {
+  background: var(--accent); color: hsl(0 0% 100%); border-radius: 8px; padding: 9px 18px;
+  font-size: 13.5px; font-weight: 560; display: inline-block; margin-top: 4px;
+}
+:root[data-theme="dark"] .fsubmit { color: hsl(224 30% 12%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fsubmit { color: hsl(224 30% 12%); } }
+.maprow {
+  display: grid; grid-template-columns: 1fr 18px 1fr; gap: 10px; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid var(--line-soft); font-size: 12.5px;
+}
+.maprow:last-child { border-bottom: 0; }
+.mapsrc { color: var(--ink-3); font-family: var(--mono); font-size: 11.5px; }
+.maparrow { color: var(--ink-3); text-align: center; }
+.mapdst { color: var(--ink); }
+
+/* ── access chips ─────────────────────────────────── */
+.acc { display: flex; gap: 8px; flex-wrap: wrap; padding: 14px 18px; background: var(--panel); }
+.acard { flex: 1 1 168px; border: 1px solid var(--line); border-radius: 9px; padding: 11px 12px; background: var(--panel-2); }
+.acard.on { border-color: var(--accent-line); background: var(--accent-soft); }
+.aname { font-size: 13px; font-weight: 570; margin-bottom: 3px; display: flex; align-items: center; gap: 7px; }
+.acard.on .aname { color: var(--accent); }
+.adesc { font-size: 11.5px; color: var(--ink-3); line-height: 1.45; }
+
+/* ── split view ───────────────────────────────────── */
+.splitv { display: grid; grid-template-columns: 1fr; background: var(--panel); }
+@media (min-width: 720px) { .splitv { grid-template-columns: 246px 1fr; } }
+.splitlist { border-right: 1px solid var(--line); }
+.slrow { padding: 9px 14px; border-bottom: 1px solid var(--line-soft); font-size: 13px; }
+.slrow:hover { background: var(--panel-2); }
+.slrow.on { background: var(--accent-soft); }
+.slrow .st { font-weight: 550; margin-bottom: 2px; line-height: 1.3; }
+.slrow.on .st { color: var(--accent); }
+.slrow .sa { font-size: 11.5px; color: var(--ink-3); }
+.splitdetail { padding: 18px 20px; }
+
+/* ── embedded view ────────────────────────────────── */
+.embedview { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; background: var(--panel-2); max-width: 620px; }
+.evhead { display: flex; align-items: center; gap: 9px; padding: 9px 13px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.evhead svg { width: 14px; height: 14px; color: var(--ink-3); flex: none; }
+.evt { font-size: 13px; font-weight: 570; }
+.evv { font-family: var(--mono); font-size: 10.5px; color: var(--ink-3); }
+.evopen { font-size: 11.5px; color: var(--accent); }
+
+/* ── block card ───────────────────────────────────── */
+.notestage { background: var(--panel); padding: 24px 26px 28px; }
+.notestage p { font-size: 14.5px; color: var(--ink-2); max-width: 60ch; margin: 0 0 14px; }
+.blockcard {
+  display: flex; align-items: center; gap: 12px; border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px 14px; background: var(--panel-2); max-width: 460px;
+}
+.blockcard svg.lead { width: 18px; height: 18px; color: var(--ink-3); flex: none; }
+.blockcard .bt { font-size: 14px; font-weight: 560; }
+.blockcard .bs { font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+
+/* ── decision ledger ──────────────────────────────── */
+.ledger { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--panel); }
+.drow { display: grid; grid-template-columns: 54px 1fr; gap: 16px; padding: 15px 18px; border-bottom: 1px solid var(--line-soft); }
+.drow:last-child { border-bottom: 0; }
+.did { font-family: var(--mono); font-size: 12px; color: var(--accent); font-weight: 600; padding-top: 1px; }
+.dq { font-size: 14.5px; font-weight: 560; margin-bottom: 4px; }
+.da { font-size: 13.5px; color: var(--ink-2); }
+.da em { color: var(--ink); font-style: normal; font-weight: 560; }
+
+footer { margin-top: 60px; padding-top: 24px; border-top: 1px solid var(--line); font-size: 13px; color: var(--ink-3); }
+footer code { font-family: var(--mono); font-size: .9em; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+.vtab, .rowbtn, .tnode { transition: background .12s ease, color .12s ease; }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <p class="eyebrow">Phase −1 · Surface preview</p>
+  <h1>Database Surfaces</h1>
+  <p class="lede">
+    Every surface the database build will produce, at real fidelity, before any of it is wired.
+    Same seven books across all four views — that repetition is the point. <strong>React to
+    anything here and it costs minutes; react to it after Phase 2 and it costs days.</strong>
+  </p>
+  <div class="meta-row">
+    <span class="meta-chip">U1 · Reading list fixture</span>
+    <span class="meta-chip">4 view modes</span>
+    <span class="meta-chip">8 surfaces</span>
+    <span class="meta-chip">Resolves O1–O16</span>
+    <span class="meta-chip">Interactive: view tabs, rows</span>
+  </div>
+</header>
+
+<!-- ══ 1. GRID + VIEWS ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 01</span><h2>The grid and its view bar</h2></div>
+  <p class="sec-note">
+    The view bar is the Notion-parity surface: one click between saved views once you are here.
+    Switch modes below — the data never changes, only the projection. Column headers carry a
+    type glyph, and an <code>ⓘ</code> appears only on columns that have a description.
+  </p>
+
+  <div class="frame">
+    <div class="tabstrip">
+      <span class="wtab"><svg><use href="#i-note"/></svg>Weekly review</span>
+      <span class="wtab on"><svg><use href="#i-db"/></svg>Reading list <span class="sub">· Reading now</span> <span class="pin">PINNED</span></span>
+      <span class="wtab"><svg><use href="#i-note"/></svg>Alexander, notes</span>
+    </div>
+
+    <div class="dbhead">
+      <div class="dbtitle"><svg><use href="#i-db"/></svg><h3>Reading list</h3></div>
+      <p class="dbdesc">Books I am reading or mean to. Status drives the board; finished date is only set when status is Finished.</p>
+      <div class="viewbar" role="tablist">
+        <button class="vtab" role="tab" aria-selected="false" data-v="grid">All books <span class="n">7</span></button>
+        <button class="vtab" role="tab" aria-selected="true" data-v="board">Reading now <span class="n">7</span></button>
+        <button class="vtab" role="tab" aria-selected="false" data-v="gal">Covers <span class="n">7</span></button>
+        <button class="vtab" role="tab" aria-selected="false" data-v="list">Queue <span class="n">3</span></button>
+        <span class="vtab vadd">+</span>
+      </div>
+    </div>
+
+    <div class="toolrow">
+      <span class="pillbtn act">Group · Status</span>
+      <span class="pillbtn">Filter</span>
+      <span class="pillbtn">Sort · Author</span>
+      <span class="spacer"></span>
+      <span class="pillbtn">New</span>
+    </div>
+
+    <!-- grid -->
+    <div class="gridscroll" data-view="grid" hidden>
+      <table class="grid">
+        <thead><tr>
+          <th style="min-width:238px"><span class="thin"><svg class="ty"><use href="#i-text"/></svg>Title</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-text"/></svg>Author</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-status"/></svg>Status<svg class="nfo"><use href="#i-info"/></svg></span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-num"/></svg>Rating</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-date"/></svg>Finished<svg class="nfo"><use href="#i-info"/></svg></span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-url"/></svg>Source</span></th>
+        </tr></thead>
+        <tbody>
+          <tr><td><button class="rowbtn" data-row="norman">The Design of Everyday Things</button></td><td>Don Norman</td><td><span class="pill p-done">Finished</span></td><td><span class="stars">★★★★★</span></td><td class="num">2026-01-14</td><td><a class="linkcell" href="#s1">nngroup.com</a></td></tr>
+          <tr><td><button class="rowbtn" data-row="meadows">Thinking in Systems</button></td><td>Donella Meadows</td><td><span class="pill p-act">Reading</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td><button class="rowbtn" data-row="apl">A Pattern Language</button></td><td>Christopher Alexander</td><td><span class="pill p-done">Finished</span></td><td><span class="stars">★★★★★</span></td><td class="num">2025-11-02</td><td class="muted">—</td></tr>
+          <tr><td><button class="rowbtn" data-row="kent">Data and Reality</button></td><td>William Kent</td><td><span class="pill p-done">Finished</span></td><td><span class="stars">★★★★</span></td><td class="num">2026-03-08</td><td><a class="linkcell" href="#s1">archive.org</a></td></tr>
+          <tr><td><button class="rowbtn" data-row="timeless">The Timeless Way of Building</button></td><td>Christopher Alexander</td><td><span class="pill p-act">Reading</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td><button class="rowbtn" data-row="hamming">The Art of Doing Science and Engineering</button></td><td>Richard Hamming</td><td><span class="pill p-hold">Paused</span></td><td><span class="stars">★★★★</span></td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr><td><button class="rowbtn" data-row="scott">Seeing Like a State</button></td><td>James C. Scott</td><td><span class="pill p-idle">Want to read</span></td><td class="muted">—</td><td class="muted">—</td><td class="muted">—</td></tr>
+          <tr class="addrow"><td colspan="6">+ New row</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- board -->
+    <div class="board" data-view="board">
+      <div class="col">
+        <div class="colhead"><span class="pill p-idle">Want to read</span><span class="n">1</span></div>
+        <div class="card"><div class="t">Seeing Like a State</div><div class="a">James C. Scott</div></div>
+        <div class="ghostcard">+ New</div>
+      </div>
+      <div class="col">
+        <div class="colhead"><span class="pill p-act">Reading</span><span class="n">2</span></div>
+        <div class="card"><div class="t">Thinking in Systems</div><div class="a">Donella Meadows</div></div>
+        <div class="card"><div class="t">The Timeless Way of Building</div><div class="a">Christopher Alexander</div></div>
+        <div class="ghostcard">+ New</div>
+      </div>
+      <div class="col">
+        <div class="colhead"><span class="pill p-hold">Paused</span><span class="n">1</span></div>
+        <div class="card"><div class="t">The Art of Doing Science and Engineering</div><div class="a">Richard Hamming</div><div class="f"><span class="stars">★★★★</span></div></div>
+        <div class="ghostcard">+ New</div>
+      </div>
+      <div class="col">
+        <div class="colhead"><span class="pill p-done">Finished</span><span class="n">3</span></div>
+        <div class="card"><div class="t">The Design of Everyday Things</div><div class="a">Don Norman</div><div class="f"><span class="stars">★★★★★</span><span class="num muted">2026-01-14</span></div></div>
+        <div class="card"><div class="t">A Pattern Language</div><div class="a">Christopher Alexander</div><div class="f"><span class="stars">★★★★★</span><span class="num muted">2025-11-02</span></div></div>
+        <div class="card"><div class="t">Data and Reality</div><div class="a">William Kent</div><div class="f"><span class="stars">★★★★</span><span class="num muted">2026-03-08</span></div></div>
+      </div>
+    </div>
+
+    <!-- gallery -->
+    <div class="gal" data-view="gal" hidden>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(222 47% 51%),hsl(222 47% 34%))"><span class="pill p-done">Finished</span></div><div class="gbody"><div class="t">The Design of Everyday Things</div><div class="a">Don Norman</div><span class="stars">★★★★★</span></div></div>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(142 45% 42%),hsl(160 46% 26%))"><span class="pill p-act">Reading</span></div><div class="gbody"><div class="t">Thinking in Systems</div><div class="a">Donella Meadows</div><span class="emptyval">Not rated</span></div></div>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(28 62% 50%),hsl(14 58% 34%))"><span class="pill p-done">Finished</span></div><div class="gbody"><div class="t">A Pattern Language</div><div class="a">Christopher Alexander</div><span class="stars">★★★★★</span></div></div>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(266 38% 50%),hsl(280 40% 32%))"><span class="pill p-done">Finished</span></div><div class="gbody"><div class="t">Data and Reality</div><div class="a">William Kent</div><span class="stars">★★★★</span></div></div>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(200 48% 46%),hsl(208 50% 30%))"><span class="pill p-act">Reading</span></div><div class="gbody"><div class="t">The Timeless Way of Building</div><div class="a">Christopher Alexander</div><span class="emptyval">Not rated</span></div></div>
+      <div class="gcard"><div class="cover" style="background:linear-gradient(150deg,hsl(38 62% 48%),hsl(30 56% 32%))"><span class="pill p-hold">Paused</span></div><div class="gbody"><div class="t">The Art of Doing Science and Engineering</div><div class="a">Richard Hamming</div><span class="stars">★★★★</span></div></div>
+    </div>
+
+    <!-- list -->
+    <div class="listv" data-view="list" hidden>
+      <div class="lrow"><span class="pill p-idle">Want to read</span><span class="t">Seeing Like a State</span><span class="muted">James C. Scott</span></div>
+      <div class="lrow"><span class="pill p-act">Reading</span><span class="t">Thinking in Systems</span><span class="muted">Donella Meadows</span></div>
+      <div class="lrow"><span class="pill p-act">Reading</span><span class="t">The Timeless Way of Building</span><span class="muted">Christopher Alexander</span></div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Settles O8.</b> Board earns Phase 2 because it is the only mode that forces group-by —
+    and it is what makes <code>status</code> worth having as its own type instead of a flat
+    <code>select</code>. Gallery and list came nearly free once grid and board existed.
+  </p>
+</section>
+
+<!-- ══ 2. ROW PEEK ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 02</span><h2>Row peek, and what promotion changes</h2></div>
+  <p class="sec-note">
+    Clicking any row title in the grid above opens this. It works for <em>every</em> row from
+    day one — no <code>ContentNode</code>, no promotion. Column descriptions surface here as
+    inline help, which is the main reason they earn their keep.
+  </p>
+
+  <div class="frame">
+    <div class="peekwrap split">
+      <div class="listv">
+        <div class="lrow"><span class="t">The Design of Everyday Things</span><span class="muted">Don Norman</span><span class="spacer"></span><span class="pill p-done">Finished</span></div>
+        <div class="lrow" style="background:var(--accent-soft)"><span class="t" style="color:var(--accent)">Data and Reality</span><span class="muted">William Kent</span><span class="spacer"></span><span class="pill p-done">Finished</span></div>
+        <div class="lrow"><span class="t">Thinking in Systems</span><span class="muted">Donella Meadows</span><span class="spacer"></span><span class="pill p-act">Reading</span></div>
+        <div class="lrow"><span class="t">A Pattern Language</span><span class="muted">C. Alexander</span><span class="spacer"></span><span class="pill p-done">Finished</span></div>
+      </div>
+
+      <aside class="peek">
+        <div class="peekhead">
+          <div class="kick"><span>Row 4 of 7</span><span>·</span><span>Not promoted</span></div>
+          <h4>Data and Reality</h4>
+        </div>
+        <div class="fields">
+          <div class="fld"><div class="flab"><svg><use href="#i-text"/></svg>Author</div><div class="fval">William Kent</div></div>
+          <div class="fld">
+            <div class="flab"><svg><use href="#i-status"/></svg>Status</div>
+            <div class="fval"><span class="pill p-done">Finished</span></div>
+            <div class="fhelp">Where it sits in the pipeline. Paused means started and set down, not abandoned.</div>
+          </div>
+          <div class="fld"><div class="flab"><svg><use href="#i-num"/></svg>Rating</div><div class="fval"><span class="stars">★★★★</span></div></div>
+          <div class="fld">
+            <div class="flab"><svg><use href="#i-date"/></svg>Finished</div>
+            <div class="fval num">2026-03-08</div>
+            <div class="fhelp">Only set when status is Finished. Left empty otherwise.</div>
+          </div>
+          <div class="fld"><div class="flab"><svg><use href="#i-url"/></svg>Source</div><div class="fval"><a class="linkcell" href="#s2">archive.org</a></div></div>
+          <div class="fld"><div class="flab"><svg><use href="#i-rel"/></svg>Related notes</div><div class="fval emptyval">Empty — needs Phase 4</div></div>
+        </div>
+        <div class="bodyslot">
+          <b>Add a note →</b> writing here promotes this row to a real page: it gains a title,
+          a slug, backlinks, tags, and trash behaviour. Until then it stays a plain row.
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Settles D12.</b> Promoted and un-promoted rows are the same screen. The only visible
+    difference is whether there is a body and an identity — which is exactly what lets us keep
+    Notion's experience without Notion's every-row-is-a-page storage cost.
+  </p>
+
+  <h3 class="subhead">After promotion: where the page lives</h3>
+  <p class="sec-note">
+    Once promoted, the row is a real content node — search, backlinks, wiki-links, mentions and
+    history all find it, and if you promoted it <em>deliberately</em> it appears in the file
+    tree under its database. The breadcrumb is what keeps it from reading as an orphan note with
+    a strange title.
+  </p>
+
+  <div class="frame">
+    <div class="tabstrip">
+      <span class="wtab"><svg><use href="#i-db"/></svg>Reading list <span class="sub">· Reading now</span> <span class="pin">PINNED</span></span>
+      <span class="wtab on"><svg><use href="#i-note"/></svg>Data and Reality</span>
+    </div>
+    <div class="rowpage">
+      <nav class="crumbs">
+        <a href="#s4"><svg><use href="#i-db"/></svg>Reading list</a>
+        <svg class="sep"><use href="#i-chev"/></svg>
+        <a href="#s4">Reading now</a>
+        <svg class="sep"><use href="#i-chev"/></svg>
+        <span class="here">Row</span>
+        <span class="spacer"></span>
+        <span class="pillbtn">Open in table</span>
+      </nav>
+      <h4 class="rptitle">Data and Reality</h4>
+      <div class="proprail">
+        <div class="prop"><span class="pk"><svg><use href="#i-text"/></svg>Author</span><span class="pv">William Kent</span></div>
+        <div class="prop"><span class="pk"><svg><use href="#i-status"/></svg>Status</span><span class="pv"><span class="pill p-done">Finished</span></span></div>
+        <div class="prop"><span class="pk"><svg><use href="#i-num"/></svg>Rating</span><span class="pv"><span class="stars">★★★★</span></span></div>
+        <div class="prop"><span class="pk"><svg><use href="#i-date"/></svg>Finished</span><span class="pv num">2026-03-08</span></div>
+      </div>
+      <div class="rpbody">
+        <p>Kent's argument is that the hard part was never the storage — it is that two people
+        never quite mean the same thing by "customer". Which is the whole case for column
+        descriptions living next to the column.</p>
+        <p>Worth rereading against <span class="wl">[[A Pattern Language]]</span> — both are
+        really about shared vocabulary as infrastructure.</p>
+      </div>
+      <div class="rpfoot">
+        <span class="fmeta">2 backlinks</span><span class="fdot"></span>
+        <span class="fmeta">Tagged <span class="pill p-idle">book</span></span><span class="fdot"></span>
+        <span class="fmeta">In tree · promoted deliberately</span>
+      </div>
+    </div>
+    <div class="tree" style="border-top:1px solid var(--line)">
+      <div class="tnode d1"><svg><use href="#i-db"/></svg>Reading list</div>
+      <div class="tnode d2"><span class="vdot"></span>Reading now</div>
+      <div class="tnode d2"><span class="vdot"></span>All books</div>
+      <div class="tnode d2 sel"><svg><use href="#i-note"/></svg>Data and Reality <span class="tflag">row</span></div>
+      <div class="tnode d2"><svg><use href="#i-note"/></svg>A Pattern Language <span class="tflag">row</span></div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Revised — and it needs no schema change.</b> An earlier draft hid every promoted row from
+    the tree by analogy to note-owned images. Wrong analogy: promotion is <em>already</em> the
+    filter, so a 500-row table never had 500 tree candidates. The real distinction is
+    <em>deliberate</em> promotion (gave it a body, dragged it to the tree) versus
+    <em>incidental</em> (a wiki-link happened to point at it) — which is exactly what
+    <code>ContentRole</code> already means. Deliberate lands <code>primary</code> and shows;
+    incidental lands <code>referenced</code> and stays quiet.
+  </p>
+</section>
+
+<!-- ══ 3. COLUMN CONFIG ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 03</span><h2>Column configuration</h2></div>
+  <p class="sec-note">
+    Reached from the column header menu. The description field is the one addition Notion does
+    not have in this position — capped at 280 characters so it cannot become prose that blows
+    the AI capsule budget.
+  </p>
+
+  <div class="frame"><div class="popstage">
+    <div class="pop">
+      <div class="popsec">
+        <div class="poplab">Name</div>
+        <div class="field">Status</div>
+      </div>
+      <div class="popsec">
+        <div class="poplab">Type</div>
+        <div class="field typerow"><svg><use href="#i-status"/></svg><span>Status</span><svg class="chev"><use href="#i-chev"/></svg></div>
+      </div>
+      <div class="popsec">
+        <div class="poplab">Description · optional</div>
+        <div class="field helpfield">Where it sits in the pipeline. Paused means started and set down, not abandoned.</div>
+        <div class="counter">94 / 280</div>
+      </div>
+      <div class="popsec">
+        <div class="poplab">Options · grouped</div>
+        <div class="opt"><span class="grip">⠿</span><span class="pill p-idle">Want to read</span><span class="muted" style="margin-left:auto;font-size:11px">To-do</span></div>
+        <div class="opt"><span class="grip">⠿</span><span class="pill p-act">Reading</span><span class="muted" style="margin-left:auto;font-size:11px">In progress</span></div>
+        <div class="opt"><span class="grip">⠿</span><span class="pill p-hold">Paused</span><span class="muted" style="margin-left:auto;font-size:11px">In progress</span></div>
+        <div class="opt"><span class="grip">⠿</span><span class="pill p-done">Finished</span><span class="muted" style="margin-left:auto;font-size:11px">Complete</span></div>
+      </div>
+    </div>
+  </div></div>
+
+  <p class="caption">
+    <b>Settles D9 and O4.</b> Description text lands inside <code>sourceContentHash</code>, so
+    editing it refreshes AI context while cell edits never do. Type is shown as a picker but
+    changing it is blocked — create a new column instead.
+  </p>
+</section>
+
+<!-- ══ 4. NAVIGATION ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 04</span><h2>Reaching a view without navigating to it</h2></div>
+  <p class="sec-note">
+    Where this departs from Notion hardest. Views appear as tree children and as pinnable
+    workspace tabs, so a saved view is reachable in <em>zero</em> actions rather than
+    "navigate to database, then click". Notion offers neither.
+  </p>
+
+  <div class="frame">
+    <div class="tabstrip">
+      <span class="wtab on"><svg><use href="#i-db"/></svg>Reading list <span class="sub">· Reading now</span> <span class="pin">PINNED</span></span>
+      <span class="wtab"><svg><use href="#i-db"/></svg>Reading list <span class="sub">· Covers</span></span>
+      <span class="wtab"><svg><use href="#i-note"/></svg>Weekly review</span>
+    </div>
+    <div class="tree">
+      <div class="tnode"><svg><use href="#i-chev"/></svg>Library</div>
+      <div class="tnode d1"><svg><use href="#i-db"/></svg>Reading list</div>
+      <div class="tnode d2 sel"><span class="vdot"></span>Reading now</div>
+      <div class="tnode d2"><span class="vdot"></span>All books</div>
+      <div class="tnode d2"><span class="vdot"></span>Covers</div>
+      <div class="tnode d2"><span class="vdot"></span>Queue</div>
+      <div class="tnode d2"><svg><use href="#i-note"/></svg>Data and Reality <span class="tflag">row</span></div>
+      <div class="tnode d2"><svg><use href="#i-note"/></svg>A Pattern Language <span class="tflag">row</span></div>
+      <div class="tnode d1"><svg><use href="#i-note"/></svg>Alexander, notes</div>
+      <div class="tnode d2"><svg><use href="#i-db"/></svg>Pattern index <span class="tflag">referenced</span></div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Settles O9 and B7.</b> Two tabs are the same database at different views — which needs
+    <code>WorkspaceTabState</code> keyed by <code>contentId + viewId</code>, since today it is
+    <code>contentId</code> alone. The database node has <b>mixed children</b>: dot-marked views
+    are virtual, row pages are real nodes — they must carry visibly different context menus or
+    the tree teaches the wrong model. <em>Pattern index</em> is a database created inside a
+    note: nested, individually openable, cascade-deleted with its host.
+  </p>
+</section>
+
+<!-- ══ 5. LEFT RAIL ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 05</span><h2>The databases rail</h2></div>
+  <p class="sec-note">
+    The file tree answers "where does this live". It does not answer "show me my tables". A
+    dedicated left-panel view does — every database, its views and its row pages, without
+    expanding anything in the tree. <code>LeftPanelView</code> is already an open union, so this
+    is a new view, not a new mechanism.
+  </p>
+
+  <div class="frame">
+    <div class="railwrap">
+      <nav class="iconrail">
+        <span class="irbtn"><svg><use href="#i-note"/></svg></span>
+        <span class="irbtn"><svg><use href="#i-text"/></svg></span>
+        <span class="irbtn on"><svg><use href="#i-db"/></svg></span>
+        <span class="irbtn"><svg><use href="#i-rel"/></svg></span>
+      </nav>
+
+      <div class="railpanel">
+        <div class="railhead"><span class="rt">Databases</span><span class="add">+</span></div>
+        <div class="railsearch">
+          <div class="rsfield"><svg><use href="#i-text"/></svg><span>Search databases, views, pages</span></div>
+        </div>
+        <div class="railbody">
+          <div class="rgroup">
+            <div class="rdb"><svg class="cv" style="transform:rotate(90deg)"><use href="#i-chev"/></svg><svg class="db"><use href="#i-db"/></svg>Reading list</div>
+            <div class="rsub">Views</div>
+            <div class="ritem on"><span class="vdot"></span>Reading now<span class="ct">7</span></div>
+            <div class="ritem"><span class="vdot"></span>All books<span class="ct">7</span></div>
+            <div class="ritem"><span class="vdot"></span>Covers<span class="ct">7</span></div>
+            <div class="ritem"><span class="vdot"></span>Queue<span class="ct">3</span></div>
+            <div class="ritem"><span class="vdot"></span>Patterns to revisit<span class="ct">3</span></div>
+            <div class="rsub">Pages</div>
+            <div class="ritem"><svg><use href="#i-note"/></svg>Data and Reality</div>
+            <div class="ritem"><svg><use href="#i-note"/></svg>A Pattern Language</div>
+          </div>
+          <div class="rgroup">
+            <div class="rdb"><svg class="cv" style="transform:rotate(90deg)"><use href="#i-chev"/></svg><svg class="db"><use href="#i-db"/></svg>Projects</div>
+            <div class="rsub">Views</div>
+            <div class="ritem"><span class="vdot"></span>Board<span class="ct">12</span></div>
+            <div class="ritem"><span class="vdot"></span>By quarter<span class="ct">12</span></div>
+          </div>
+          <div class="rgroup">
+            <div class="rdb"><svg class="cv"><use href="#i-chev"/></svg><svg class="db"><use href="#i-db"/></svg>Pattern index</div>
+          </div>
+          <div class="rgroup">
+            <div class="rdb"><svg class="cv"><use href="#i-chev"/></svg><svg class="db"><use href="#i-db"/></svg>Everything tagged #book</div>
+          </div>
+        </div>
+        <div class="railfoot">
+          <div class="rfl">Recent</div>
+          <div class="rrecent">Reading list <span class="dim">· Covers</span></div>
+          <div class="rrecent">Projects <span class="dim">· Board</span></div>
+        </div>
+      </div>
+
+      <div class="railstage">
+        <div class="dbhead" style="padding-top:14px">
+          <div class="dbtitle"><svg><use href="#i-db"/></svg><h3>Reading list</h3></div>
+          <p class="dbdesc">Books I am reading or mean to.</p>
+          <div class="viewbar"><button class="vtab" aria-selected="true">Reading now <span class="n">7</span></button><span class="vtab vadd">+</span></div>
+        </div>
+        <div class="board" style="padding:14px">
+          <div class="col" style="flex:0 0 178px">
+            <div class="colhead"><span class="pill p-act">Reading</span><span class="n">2</span></div>
+            <div class="card"><div class="t">Thinking in Systems</div><div class="a">Donella Meadows</div></div>
+            <div class="card"><div class="t">The Timeless Way of Building</div><div class="a">C. Alexander</div></div>
+          </div>
+          <div class="col" style="flex:0 0 178px">
+            <div class="colhead"><span class="pill p-done">Finished</span><span class="n">3</span></div>
+            <div class="card"><div class="t">Data and Reality</div><div class="a">William Kent</div></div>
+            <div class="card"><div class="t">A Pattern Language</div><div class="a">C. Alexander</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Views and pages are separate groups here</b> — which also resolves the mixed-children
+    problem from Surface 04. In the rail they are visibly distinct with distinct affordances,
+    rather than one undifferentiated child list. A query table (<em>Everything tagged #book</em>)
+    sits alongside real tables, because from this surface the distinction does not matter.
+  </p>
+
+  <h3 class="subhead">One field, three name-spaces</h3>
+  <p class="sec-note">
+    Typing filters database names, view names and page titles together. Client-side over the
+    list the rail already holds — no new endpoint, because the counts are small by construction.
+    It cannot reuse the picker's search, which hits the server and returns content nodes:
+    <b>views are virtual and have no node</b>, so they would be structurally unfindable.
+  </p>
+
+  <div class="frame" style="max-width:340px">
+    <div class="railpanel">
+      <div class="railhead"><span class="rt">Databases</span><span class="add">+</span></div>
+      <div class="railsearch">
+        <div class="rsfield"><svg><use href="#i-text"/></svg><span class="typed">pattern</span><span class="rscaret"></span></div>
+      </div>
+      <div class="railbody">
+        <div class="ritem" style="padding-left:14px"><svg><use href="#i-db"/></svg><mark>Pattern</mark> index<span class="hitkind">Database</span></div>
+        <div class="ritem" style="padding-left:14px"><span class="vdot"></span><mark>Pattern</mark>s to revisit<span class="hitkind">View</span></div>
+        <div class="ritem" style="padding-left:14px"><svg><use href="#i-note"/></svg>A <mark>Pattern</mark> Language<span class="hitkind">Page</span></div>
+      </div>
+    </div>
+  </div>
+
+  <h3 class="subhead">Quick add reuses the canonical picker</h3>
+  <p class="sec-note">
+    The rail's <code>+</code> opens <code>ContentTreePicker</code> — the shared picker whose own
+    header says <em>"Reuse THIS — do not build new pickers."</em> It already carries the scope
+    switcher and <b>insertion gaps between every sibling slot</b>, which is exactly the
+    "make the user place it deliberately" behaviour. One additive change is needed: the create
+    affordance is hardcoded to <em>+ New Note</em> and needs a kind parameter.
+  </p>
+
+  <div class="frame"><div class="popstage">
+    <div class="pop" style="width:320px">
+      <div class="popsec">
+        <div class="poplab">New database · choose a home</div>
+        <div class="field typerow"><svg><use href="#i-text"/></svg><span class="muted">Search</span></div>
+      </div>
+      <div class="popsec" style="padding:8px 0">
+        <div class="ritem" style="padding-left:13px"><svg><use href="#i-chev"/></svg>Root <span class="hitkind">Scope</span></div>
+        <div class="gapline"><span class="gapplus">+</span></div>
+        <div class="ritem" style="padding-left:26px"><svg><use href="#i-note"/></svg>Alexander, notes</div>
+        <div class="gapline on"><span class="gapplus">+</span><span class="gaphint">New database here</span></div>
+        <div class="ritem" style="padding-left:26px"><svg><use href="#i-db"/></svg>Reading list</div>
+        <div class="gapline"><span class="gapplus">+</span></div>
+        <div class="ritem" style="padding-left:26px"><svg><use href="#i-note"/></svg>Weekly review</div>
+      </div>
+    </div>
+  </div></div>
+
+  <p class="caption">
+    <b>Placement is the point.</b> The gap marks the exact slot, so a new database lands where
+    the user put it rather than at the root. <code>ContentTreePicker</code> already has two
+    consumers — Note Window retarget and the pane tab-strip <code>+</code> — so the kind
+    parameter must be additive and default to today's behaviour.
+  </p>
+</section>
+
+<!-- ══ 6. QUERY MODE + BLOCK ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 06</span><h2>Query mode, and the in-note reference</h2></div>
+  <p class="sec-note">
+    A query table owns nothing — it is a saved search rendered as a table. Deliberately the
+    same surface as Surface 01; only the column provenance differs. Below it, the
+    <code>DatabaseBlock</code> card as it appears inside a note before the rich block exists.
+  </p>
+
+  <div class="frame">
+    <div class="dbhead">
+      <div class="dbtitle"><svg><use href="#i-db"/></svg><h3>Everything tagged #book</h3></div>
+      <p class="dbdesc">Live query over notes. Rows are the notes themselves — nothing is copied here.</p>
+      <div class="viewbar"><button class="vtab" aria-selected="true">Table <span class="n">4</span></button><span class="vtab vadd">+</span></div>
+    </div>
+    <div class="toolrow">
+      <span class="pillbtn act">Query · tag = book</span>
+      <span class="pillbtn">Sort · Last edited</span>
+      <span class="spacer"></span>
+      <span class="pillbtn">Read-only</span>
+    </div>
+    <div class="gridscroll">
+      <table class="grid">
+        <thead><tr>
+          <th style="min-width:238px"><span class="thin"><svg class="ty"><use href="#i-note"/></svg>Note</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-select"/></svg>Tags</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-date"/></svg>Last edited</span></th>
+          <th><span class="thin"><svg class="ty"><use href="#i-rel"/></svg>Backlinks</span></th>
+        </tr></thead>
+        <tbody>
+          <tr><td><span style="font-weight:540">Alexander, notes</span></td><td><span class="pill p-idle">book</span> <span class="pill p-idle">architecture</span></td><td class="num">2026-08-11</td><td class="num">6</td></tr>
+          <tr><td><span style="font-weight:540">Systems thinking primer</span></td><td><span class="pill p-idle">book</span> <span class="pill p-idle">systems</span></td><td class="num">2026-08-04</td><td class="num">3</td></tr>
+          <tr><td><span style="font-weight:540">Data modelling, first principles</span></td><td><span class="pill p-idle">book</span></td><td class="num">2026-07-29</td><td class="num">11</td></tr>
+          <tr><td><span style="font-weight:540">Affordances, collected</span></td><td><span class="pill p-idle">book</span> <span class="pill p-idle">design</span></td><td class="num">2026-06-17</td><td class="num">2</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="notestage">
+      <p>…which is why I keep the pattern index separate from the prose. The full table:</p>
+      <div class="embedview">
+        <div class="evhead">
+          <svg><use href="#i-db"/></svg>
+          <span class="evt">Reading list</span>
+          <span class="evv">Reading now · board</span>
+          <span class="spacer"></span>
+          <span class="evopen">Open ↗</span>
+        </div>
+        <div class="board" style="padding:12px; background:transparent">
+          <div class="col" style="flex:0 0 162px">
+            <div class="colhead"><span class="pill p-act">Reading</span><span class="n">2</span></div>
+            <div class="card"><div class="t">Thinking in Systems</div><div class="a">Donella Meadows</div></div>
+            <div class="card"><div class="t">The Timeless Way of Building</div><div class="a">C. Alexander</div></div>
+          </div>
+          <div class="col" style="flex:0 0 162px">
+            <div class="colhead"><span class="pill p-hold">Paused</span><span class="n">1</span></div>
+            <div class="card"><div class="t">The Art of Doing Science and Engineering</div><div class="a">R. Hamming</div></div>
+          </div>
+          <div class="col" style="flex:0 0 162px">
+            <div class="colhead"><span class="pill p-done">Finished</span><span class="n">3</span></div>
+            <div class="card"><div class="t">Data and Reality</div><div class="a">William Kent</div></div>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top:18px">And the one book that changed how I think about columns:</p>
+      <div class="blockcard">
+        <svg class="lead"><use href="#i-note"/></svg>
+        <div><div class="bt">Data and Reality</div><div class="bs">row · Reading list &nbsp;·&nbsp; Finished ★★★★</div></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Settles O2, and scopes row embedding.</b> No "add row" affordance and an explicit
+    read-only chip — you create a note, and it appears. One block type carries three optional
+    targets: <code>contentId</code> alone is the whole database, <code>+ viewId</code> is a
+    linked view, <code>+ rowId</code> is an embedded row page. All three attrs ship in the first
+    commit; adding one later costs another schema bump and another Hocuspocus redeploy.
+  </p>
+</section>
+
+<!-- ══ 7. FORM ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 07</span><h2>Form view — the mode that writes</h2></div>
+  <p class="sec-note">
+    Every other mode reads rows. A form creates them, which makes it orthogonal to the view list
+    rather than another entry in it. Labels and help resolve through a fallback chain, so a form
+    is usable the moment it is created and configurable when it is not.
+  </p>
+
+  <div class="frame">
+    <div class="dbhead" style="padding-bottom:0">
+      <div class="viewbar">
+        <button class="vtab" aria-selected="false">All books <span class="n">7</span></button>
+        <button class="vtab" aria-selected="false">Reading now <span class="n">7</span></button>
+        <button class="vtab" aria-selected="true">Add a book</button>
+        <span class="vtab vadd">+</span>
+      </div>
+    </div>
+    <div class="formstage">
+      <div class="formcard">
+        <h4 class="formtitle">Add a book</h4>
+        <p class="formsub">Anything you want me to read. I check this weekly.</p>
+
+        <div class="ffield">
+          <div class="flabel">Title <span class="freq">required</span></div>
+          <div class="finput">The book's title</div>
+        </div>
+        <div class="ffield">
+          <div class="flabel">Author</div>
+          <div class="finput">Who wrote it</div>
+        </div>
+        <div class="ffield">
+          <div class="flabel">Where can I find it?</div>
+          <div class="fdesc">A link to buy, borrow, or read it online. Optional.</div>
+          <div class="finput">https://</div>
+        </div>
+        <div class="ffield">
+          <div class="flabel">Why this one?</div>
+          <div class="fdesc">A sentence is plenty — it helps me decide what to pick up next.</div>
+          <div class="finput tall"></div>
+        </div>
+        <div class="ffield">
+          <div class="flabel">How urgent is it?</div>
+          <div class="fchips">
+            <span class="fchip">Whenever</span>
+            <span class="fchip sel">Sometime soon</span>
+            <span class="fchip">Read this next</span>
+          </div>
+        </div>
+        <span class="fsubmit">Send it over</span>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Two labels above are overridden, three are not.</b> <em>Title</em> and <em>Author</em> use
+    the column names verbatim. <em>Where can I find it?</em> overrides a column called
+    <code>Source</code>, because a header is terse by necessity and a form label can afford a
+    sentence.
+  </p>
+
+  <h3 class="subhead">Why the overrides live on the view, not the column</h3>
+  <p class="sec-note">
+    The column description is written for the AI that maintains the table. Form help is written
+    for whoever is filling it in. Same column, different audiences — so the default is a
+    convenience and the override is a requirement.
+  </p>
+
+  <div class="frame"><div style="padding:16px 20px; background:var(--panel)">
+    <div class="maprow"><span class="mapsrc">column.name</span><span class="maparrow">→</span><span class="mapdst">Status</span></div>
+    <div class="maprow"><span class="mapsrc">column.description</span><span class="maparrow">→</span><span class="mapdst muted">Pipeline stage; set 'blocked' only when waiting on someone else <b style="color:var(--ink-3);font-weight:500">(AI-facing)</b></span></div>
+    <div class="maprow"><span class="mapsrc">view.config.label</span><span class="maparrow">→</span><span class="mapdst">How urgent is it?</span></div>
+    <div class="maprow"><span class="mapsrc">view.config.help</span><span class="maparrow">→</span><span class="mapdst">No pressure either way <b style="color:var(--ink-3);font-weight:500">(submitter-facing)</b></span></div>
+  </div></div>
+
+  <p class="caption">
+    <b>The whole form config fits in <code>DataView.config</code></b>, which is already
+    <code>Json</code> — field order, per-form required, hidden fields, prefills, submit text. No
+    schema change beyond <code>mode = "form"</code>. Published forms are deferred: anonymous
+    writes raise <code>createdBy</code>, rate limiting and spam handling that private forms
+    simply do not have.
+  </p>
+</section>
+
+<!-- ══ 8. VIEW ACCESS + SPLIT ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Surface 08</span><h2>View access, and the split mode</h2></div>
+  <p class="sec-note">
+    Two additions from looking outside Notion. Airtable puts an access model on every view —
+    one enum column, and it replaces the localStorage preference we had planned. Split is a
+    desktop idiom neither product has.
+  </p>
+
+  <div class="frame">
+    <div class="toolrow"><span class="pillbtn">Reading now</span><span class="muted" style="font-size:12.5px">Who can change this view?</span></div>
+    <div class="acc">
+      <div class="acard on">
+        <div class="aname">Personal</div>
+        <div class="adesc">Only you adjust filters, grouping and sorts. Hidden from everyone else's rail.</div>
+      </div>
+      <div class="acard">
+        <div class="aname">Collaborative</div>
+        <div class="adesc">Anyone with access can change how this view is configured.</div>
+      </div>
+      <div class="acard">
+        <div class="aname">Locked</div>
+        <div class="adesc">Configuration is frozen. Records stay editable by everyone.</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Replaces O10.</b> A personal view becomes a nameable, keepable, later-shareable object
+    rather than a preference hidden in localStorage. Notion charges for this; Airtable made it a
+    property of the view.
+  </p>
+
+  <h3 class="subhead">Split — read through a table, not across it</h3>
+  <p class="sec-note">
+    Rows on the left, the selected row on the right. Mail clients, Obsidian. Grid is for editing
+    <em>across</em> rows; split is for going <em>through</em> them one at a time — which is what
+    a reading list or a contact table is actually for. Nearly free: both halves already ship in
+    Phase 2.
+  </p>
+
+  <div class="frame">
+    <div class="splitv">
+      <div class="splitlist">
+        <div class="slrow"><div class="st">The Design of Everyday Things</div><div class="sa">Don Norman · Finished</div></div>
+        <div class="slrow on"><div class="st">Data and Reality</div><div class="sa">William Kent · Finished</div></div>
+        <div class="slrow"><div class="st">Thinking in Systems</div><div class="sa">Donella Meadows · Reading</div></div>
+        <div class="slrow"><div class="st">A Pattern Language</div><div class="sa">C. Alexander · Finished</div></div>
+        <div class="slrow"><div class="st">Seeing Like a State</div><div class="sa">James C. Scott · Want to read</div></div>
+      </div>
+      <div class="splitdetail">
+        <h4 class="rptitle" style="font-size:22px; margin-bottom:14px">Data and Reality</h4>
+        <div class="proprail" style="padding-bottom:14px; margin-bottom:14px">
+          <div class="prop"><span class="pk"><svg><use href="#i-text"/></svg>Author</span><span class="pv">William Kent</span></div>
+          <div class="prop"><span class="pk"><svg><use href="#i-status"/></svg>Status</span><span class="pv"><span class="pill p-done">Finished</span></span></div>
+          <div class="prop"><span class="pk"><svg><use href="#i-num"/></svg>Rating</span><span class="pv"><span class="stars">★★★★</span></span></div>
+        </div>
+        <div class="rpbody"><p>Kent's argument is that the hard part was never the storage — it is that two people never quite mean the same thing by "customer".</p></div>
+      </div>
+    </div>
+  </div>
+
+  <p class="caption">
+    <b>Arrow keys move down the list and the right pane follows.</b> The detail pane is the same
+    component as Surface 02's row peek, which is why this mode costs almost nothing once list
+    mode and peek both exist.
+  </p>
+</section>
+
+<!-- ══ LEDGER ══ -->
+<section class="sec">
+  <div class="sec-head"><span class="sec-tag">Ledger</span><h2>What this preview decides</h2></div>
+  <p class="sec-note">Each row is an open decision from the plan, answered by something visible above. Disagree with any and the change is a CSS edit, not a refactor.</p>
+
+  <div class="ledger">
+    <div class="drow"><div class="did">O1</div><div><div class="dq">"Data Table" or "Database"?</div><div class="da"><em>Database</em> — used throughout above. It has views, relations and rollups; the stub's wording predates all three.</div></div></div>
+    <div class="drow"><div class="did">O2</div><div><div class="dq">Query mode before relations?</div><div class="da"><em>Yes</em> — Surface 05 reads as the same product as Surface 01, which is the whole argument. It also proves the view layer decoupled cleanly.</div></div></div>
+    <div class="drow"><div class="did">O4</div><div><div class="dq">Column type changes: coerce, or forbid?</div><div class="da"><em>Forbid</em> — the type picker in Surface 03 is display-only. Create a new column and migrate.</div></div></div>
+    <div class="drow"><div class="did">O5</div><div><div class="dq">Undo: in-session real, durable stubbed?</div><div class="da"><em>Build it.</em> Skipping does not save the work — <code>DataRow.deletedAt</code> already exists, so without undo you build a row trash-and-restore screen instead, which covers deletes but never cell edits or pasted ranges.</div></div></div>
+    <div class="drow"><div class="did">O13</div><div><div class="dq">Form view</div><div class="da"><em>In scope.</em> Private forms in Phase 2; published forms deferred behind their own pass — anonymous writes raise <code>createdBy</code>, rate limiting and spam handling.</div></div></div>
+    <div class="drow"><div class="did">O14</div><div><div class="dq">View access model</div><div class="da"><em>Adopt Airtable's</em> personal / collaborative / locked. One enum column, and it replaces O10's localStorage preference.</div></div></div>
+    <div class="drow"><div class="did">O16</div><div><div class="dq">One window node, or a separate database block?</div><div class="da"><em>Extend <code>noteWindow</code>.</em> Its <code>targetContentId</code> is already kind-agnostic, and it has solved cycle detection, depth limits, blockId hygiene, presence gating and public-render UUID safety. Gated on reading its 1,033-line node view first.</div></div></div>
+    <div class="drow"><div class="did">O8</div><div><div class="dq">Second view mode: kanban or gallery?</div><div class="da"><em>Both</em>, and list too. Board is the one that earns the phase; the other two fell out nearly free once the view layer existed.</div></div></div>
+    <div class="drow"><div class="did">O9</div><div><div class="dq">Views in the tree: virtual or real nodes?</div><div class="da"><em>Virtual</em> — the dot markers in Surface 04. Real nodes would hand views tags, links, trash and grants nobody asked for.</div></div></div>
+    <div class="drow"><div class="did">O10</div><div><div class="dq">Per-user view memory</div><div class="da"><em>localStorage</em>, not schema. Notion charges for personal views; this costs nothing and needs no migration.</div></div></div>
+    <div class="drow"><div class="did">O11</div><div><div class="dq">Tree order for promoted rows</div><div class="da"><em>Stamped once</em> from the default view at promotion, then independent. <code>sortKey</code> is per-view, so continuous sync is not even well-defined — but it does mean reordering the table will not reorder the tree.</div></div></div>
+  </div>
+</section>
+
+<footer>
+  Companion to <code>docs/notes-feature/work-tracking/DATABASE-CONTENT-TYPE-PLAN.md</code> · Phase −1 ·
+  verified against <code>origin/main</code> @ d3a92484
+</footer>
+
+</div>
+
+<script>
+(function () {
+  var frame = document.querySelector('.frame');
+  var tabs = frame.querySelectorAll('.vtab[data-v]');
+  var panes = frame.querySelectorAll('[data-view]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (t) { t.setAttribute('aria-selected', String(t === tab)); });
+      panes.forEach(function (p) { p.hidden = p.getAttribute('data-view') !== tab.dataset.v; });
+    });
+  });
+
+  var peek = document.querySelector('.peek');
+  var rows = {
+    norman:   ['The Design of Everyday Things', 'Don Norman', 'p-done', 'Finished', '★★★★★', '2026-01-14', 'nngroup.com'],
+    meadows:  ['Thinking in Systems', 'Donella Meadows', 'p-act', 'Reading', '', '', ''],
+    apl:      ['A Pattern Language', 'Christopher Alexander', 'p-done', 'Finished', '★★★★★', '2025-11-02', ''],
+    kent:     ['Data and Reality', 'William Kent', 'p-done', 'Finished', '★★★★', '2026-03-08', 'archive.org'],
+    timeless: ['The Timeless Way of Building', 'Christopher Alexander', 'p-act', 'Reading', '', '', ''],
+    hamming:  ['The Art of Doing Science and Engineering', 'Richard Hamming', 'p-hold', 'Paused', '★★★★', '', ''],
+    scott:    ['Seeing Like a State', 'James C. Scott', 'p-idle', 'Want to read', '', '', '']
+  };
+  document.querySelectorAll('.rowbtn[data-row]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var r = rows[btn.dataset.row];
+      if (!r || !peek) return;
+      peek.querySelector('h4').textContent = r[0];
+      var f = peek.querySelectorAll('.fld');
+      f[0].querySelector('.fval').textContent = r[1];
+      f[1].querySelector('.fval').innerHTML = '<span class="pill ' + r[2] + '">' + r[3] + '</span>';
+      f[2].querySelector('.fval').innerHTML = r[4] ? '<span class="stars">' + r[4] + '</span>' : '<span class="emptyval">Not rated</span>';
+      f[3].querySelector('.fval').innerHTML = r[5] ? '<span class="num">' + r[5] + '</span>' : '<span class="emptyval">Empty</span>';
+      f[4].querySelector('.fval').innerHTML = r[6] ? '<a class="linkcell" href="#s2">' + r[6] + '</a>' : '<span class="emptyval">Empty</span>';
+      peek.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+})();
+</script>

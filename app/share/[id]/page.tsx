@@ -100,7 +100,7 @@ export default async function SharePage({ params }: { params: SharePageParams })
           ? {
               mode: content.dataPayload.mode,
               source: content.dataPayload.source,
-              schema: content.dataPayload.schema,
+              rowCount: content.dataPayload.rowCount,
             }
           : null,
         visualization: content.visualizationPayload
