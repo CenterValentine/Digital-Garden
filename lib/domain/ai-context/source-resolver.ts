@@ -68,6 +68,25 @@ function finalize(
 }
 
 /**
+ * Databases resolve to a SCHEMA digest, never row content (plan B1). This
+ * case is what keeps a `data` node out of the permanently-uncovered set:
+ * without it the sweep would retry the node every cycle and never resolve.
+ * Because the digest is schema-derived, `sourceContentHash` is too — cell
+ * edits cannot dirty context, while description edits (semantic) do.
+ */
+async function resolveData(
+  node: ResolverNodeRef,
+  maxTokens: number
+): Promise<ResolvedSourceContent> {
+  const { buildDataSchemaDigest } = await import(
+    "@/lib/domain/data/server/digest"
+  );
+  const digest = await buildDataSchemaDigest(node.id);
+  if (!digest) return empty(node.id, "Database has no payload");
+  return finalize(node.id, digest, maxTokens);
+}
+
+/**
  * Build a resolver bound to the given options. Stateless otherwise, so a single
  * instance can be reused across a whole selection.
  */
@@ -93,6 +112,8 @@ export function createSourceContentResolver(
           // Folders carry no payload text; their context comes from the
           // metadata roll-up (Phase 2), not from this resolver.
           return empty(node.id, "Folder — summarized via its Context doc");
+        case "data":
+          return resolveData(node, maxTokens);
         default:
           return empty(node.id, `Unsupported source type: ${node.contentType}`);
       }

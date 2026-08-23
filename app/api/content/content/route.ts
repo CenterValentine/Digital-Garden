@@ -946,6 +946,22 @@ export async function POST(request: NextRequest) {
     // inputs. Root-level creates have no parent chain to flag (no-op).
     after(() => markContextDirty([parentId || null]));
 
+    // Databases seed AgenticMetadata at REFERENCE immediately (plan B1):
+    // covered from birth, resolved on the sweep's first pass via the schema
+    // digest, and never a member of the permanently-uncovered set. Uses the
+    // canonical upsert so the row shape stays owned by the metadata module.
+    if (content.contentType === "data") {
+      const createdId = content.id;
+      const ownerId = session.user.id;
+      after(async () => {
+        const [{ setContextMode }, { ContextMode }] = await Promise.all([
+          import("@/lib/domain/ai-context/metadata"),
+          import("@/lib/database/generated/prisma"),
+        ]);
+        await setContextMode(ownerId, createdId, ContextMode.REFERENCE);
+      });
+    }
+
     // Format response
     const response: ContentDetailResponse = {
       id: content.id,

@@ -985,7 +985,19 @@ node) is where this gets genuinely hard, and it is out of scope.
 ### Phase 4 — Relations and rollups
 
 `DataRowLink` CRUD, symmetric backlink columns, relation-cell picker, read-time rollups
-(count, sum, min, max, join). `contentLink` column type pointing at arbitrary `ContentNode`s.
+(count, sum, min, max, join). `contentLink` column type pointing at arbitrary `ContentNode`s
+— **click opens the target in a workspace tab** (owner, 2026-08-23), and the backlinks
+dual-write uses a distinct `linkType: "data-cell"` (verified safe: the tree's
+embed-ownership inference only reacts to `image-ref` / `audio-ref`).
+
+**People columns (owner, 2026-08-23).** The enum's `person` type is specced `→ User`, which
+in a mostly-single-user knowledge base points at nearly nothing. The valuable referent is the
+**people extension's Person entities** — the contact graph. Resolution requiring **no
+migration**: `person` cells keep storing an id string; `DataColumn.config.personSource:
+"user" | "person"` (default `"person"`) declares which id-space, since config is Json.
+People are already first-class in the content graph (`ContentNode.personId`,
+`person-profile` type), so the picker is the people surface, redaction runs through the same
+`resolveLinkTargets` shape, and U6 (Contacts) becomes the gating fixture for this column.
 
 ### Phase 5 — Lazy promotion and row pages
 

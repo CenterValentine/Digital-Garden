@@ -111,6 +111,23 @@ export function noteWindowAttrSpec(): Record<string, unknown> {
     targetContentId: dataAttr<string | null>("targetContentId", {
       default: null,
     }),
+    // Database targets (DATABASE-CONTENT-TYPE-PLAN B7/O16). Reserved from
+    // the first schema bump even though nothing renders them until Phase 2:
+    // a TipTap attr added later costs a second version bump plus a second
+    // Hocuspocus redeploy, and an un-redeployed collab server rewrites
+    // unknown content to unsupportedBlock. One node, four targets:
+    //   targetContentId → note        today's window (unchanged)
+    //   targetContentId → database    the table at its default view
+    //   + targetViewId                one saved view (linked-view case)
+    //   + targetRowId                 one row page, embedded
+    // PUBLIC-SAFETY: renderHTML below emits only the human-readable title,
+    // so these ids inherit the never-reach-published-HTML guarantee.
+    targetViewId: dataAttr<string | null>("targetViewId", {
+      default: null,
+    }),
+    targetRowId: dataAttr<string | null>("targetRowId", {
+      default: null,
+    }),
     targetTitle: dataAttr("targetTitle"),
     height: dataAttr<number>("height", { default: 245, parseAs: "number" }),
     showBorder: dataAttr<boolean>("showBorder", {
