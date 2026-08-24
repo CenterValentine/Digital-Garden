@@ -12,7 +12,12 @@
 import { useCallback, useState } from "react";
 import { Check, ChevronDown, Plus, Star, Trash2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
-import type { DataView, DataViewAccess } from "@/lib/domain/data";
+import type {
+  DataColumn,
+  DataView,
+  DataViewAccess,
+  DataViewMode,
+} from "@/lib/domain/data";
 import { PanelPortal } from "./PanelPortal";
 
 const ACCESS_LABEL: Record<DataViewAccess, { label: string; hint: string }> = {
@@ -30,27 +35,41 @@ const ACCESS_LABEL: Record<DataViewAccess, { label: string; hint: string }> = {
   },
 };
 
+/** Modes with a renderer. The others exist in the type, not the picker. */
+const MODE_LABEL: Partial<Record<DataViewMode, string>> = {
+  grid: "Grid",
+  board: "Board",
+};
+
 const fieldClass = cn(
   "w-full rounded-md border border-border bg-background px-2 py-1.5",
   "text-xs outline-none focus:ring-2 focus:ring-primary"
 );
 
+export interface ViewPatch {
+  name?: string;
+  access?: DataViewAccess;
+  makeDefault?: boolean;
+  mode?: DataViewMode;
+  groupByColumnId?: string | null;
+}
+
 interface DataViewBarProps {
   views: DataView[];
+  /** For the board's group-by picker — status/select columns only. */
+  columns: DataColumn[];
   activeViewId: string | null;
   defaultViewId: string | null;
   canWrite: boolean;
   onSwitch: (viewId: string) => void;
   onCreate: () => Promise<void>;
-  onUpdate: (
-    viewId: string,
-    patch: { name?: string; access?: DataViewAccess; makeDefault?: boolean }
-  ) => Promise<void>;
+  onUpdate: (viewId: string, patch: ViewPatch) => Promise<void>;
   onDelete: (viewId: string) => Promise<void>;
 }
 
 export function DataViewBar({
   views,
+  columns,
   activeViewId,
   defaultViewId,
   canWrite,
@@ -109,6 +128,7 @@ export function DataViewBar({
             {menuViewId === view.id && (
               <ViewMenu
                 view={view}
+                columns={columns}
                 isDefault={view.id === defaultViewId}
                 isOnly={views.length <= 1}
                 onUpdate={onUpdate}
@@ -138,6 +158,7 @@ export function DataViewBar({
 
 interface ViewMenuProps {
   view: DataView;
+  columns: DataColumn[];
   isDefault: boolean;
   isOnly: boolean;
   onUpdate: DataViewBarProps["onUpdate"];
@@ -147,6 +168,7 @@ interface ViewMenuProps {
 
 function ViewMenu({
   view,
+  columns,
   isDefault,
   isOnly,
   onUpdate,
@@ -188,6 +210,55 @@ function ViewMenu({
         }}
         className={cn(fieldClass, locked && "opacity-50")}
       />
+
+      <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Layout
+      </label>
+      <select
+        value={view.mode}
+        disabled={locked}
+        onChange={(e) =>
+          void run(() =>
+            onUpdate(view.id, { mode: e.target.value as DataViewMode })
+          )
+        }
+        className={fieldClass}
+      >
+        {(Object.keys(MODE_LABEL) as DataViewMode[]).map((m) => (
+          <option key={m} value={m}>
+            {MODE_LABEL[m]}
+          </option>
+        ))}
+      </select>
+
+      {view.mode === "board" && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Group by
+          </label>
+          <select
+            value={view.groupByColumnId ?? ""}
+            disabled={locked}
+            onChange={(e) =>
+              void run(() =>
+                onUpdate(view.id, {
+                  groupByColumnId: e.target.value || null,
+                })
+              )
+            }
+            className={fieldClass}
+          >
+            <option value="">Auto (first Status column)</option>
+            {columns
+              .filter((c) => c.type === "status" || c.type === "select")
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+        </>
+      )}
 
       <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         Who can change this view

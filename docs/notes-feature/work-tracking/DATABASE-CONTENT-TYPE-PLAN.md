@@ -124,6 +124,12 @@ users will search for a row they know exists and get nothing.
   rows as first-class search results would require a result type that isn't a `ContentNode`
   — deferred deliberately.
 
+**Friction (owner, 2026-08-23, B9 log):** the result card for a database shows title +
+description + date but no MATCH context — a note result shows a highlighted excerpt, the
+database result doesn't say why it matched. The v1 spec's "3 matching rows" affordance was
+never built. Fix when search returns: include the best-matching row's text as the excerpt
+(server: `rows.take(1)` on the match + count; client: the data-type result card renders it).
+
 Not solved here: `contains` + `mode: insensitive` is a sequential scan. Pre-existing across
 all payload types; this makes it no worse. Trigram indexing is a separate piece of work.
 

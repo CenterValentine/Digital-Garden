@@ -34,7 +34,6 @@ import {
   type DataRow,
   type DataTable,
   type DataView,
-  type DataViewAccess,
   type RowData,
   type UndoExecutor,
   type UndoOp,
@@ -43,7 +42,8 @@ import {
 import { DataGridRow } from "./DataGridRow";
 import { DataColumnHeader } from "./DataColumnHeader";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
-import { DataViewBar } from "./DataViewBar";
+import { DataViewBar, type ViewPatch } from "./DataViewBar";
+import { DataBoardView } from "./DataBoardView";
 
 /** Row height in px. Fixed so the windowing maths stays honest. */
 const ROW_HEIGHT = 36;
@@ -612,10 +612,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   }, [contentId, load]);
 
   const updateView = useCallback(
-    async (
-      viewId: string,
-      patch: { name?: string; access?: DataViewAccess; makeDefault?: boolean }
-    ) => {
+    async (viewId: string, patch: ViewPatch) => {
       const res = await fetch(`/api/content/data/${contentId}/views`, {
         method: "PATCH",
         credentials: "include",
@@ -649,6 +646,44 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       await load(viewId === state.view?.id ? null : (state.view?.id ?? null));
     },
     [contentId, load, state.view]
+  );
+
+  /**
+   * Board's per-column "+ New": create a row, stamp its group cell. Two
+   * requests, one undo entry for the add — the stamp rides as a second
+   * cell-edit entry, which reads correctly in the undo toast.
+   */
+  const addRowInGroup = useCallback(
+    async (optionId: string | null) => {
+      const res = await fetch(`/api/content/data/${contentId}/rows`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: 1 }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setNotice("Could not add a row");
+        return;
+      }
+      const rowIds: string[] = json.data.rowIds;
+      const op: UndoOp = { kind: "addRows", rowIds, label: "" };
+      setStack((s) =>
+        pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
+      );
+
+      const groupCol = columns.find((c) => c.id === state.view?.groupByColumnId)
+        ?? columns.find((c) => c.type === "status")
+        ?? columns.find((c) => c.type === "select");
+      if (optionId && groupCol && rowIds[0]) {
+        await sendWrites(
+          [{ rowId: rowIds[0], columnKey: groupCol.key, before: undefined, after: optionId }],
+          false
+        );
+      }
+      await load(state.view?.id ?? null);
+    },
+    [contentId, columns, state.view, sendWrites, load, clientId]
   );
 
   const toggleRow = useCallback((rowId: string) => {
@@ -721,6 +756,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
       <DataViewBar
         views={state.table.views}
+        columns={columns}
         activeViewId={state.view?.id ?? null}
         defaultViewId={state.table.defaultViewId}
         canWrite={state.canWrite}
@@ -746,6 +782,18 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         </div>
       )}
 
+      {state.view?.mode === "board" ? (
+        <div className="min-h-0 flex-1">
+          <DataBoardView
+            view={state.view}
+            columns={columns}
+            rows={state.rows}
+            editable={state.canWrite}
+            onCommitCell={commitCell}
+            onAddRowInGroup={addRowInGroup}
+          />
+        </div>
+      ) : (
       <div
         ref={scrollRef}
         onScroll={(e) => setScrollTop(e.currentTarget.scrollTop)}
@@ -827,6 +875,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }

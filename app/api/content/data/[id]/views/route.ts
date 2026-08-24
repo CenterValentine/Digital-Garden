@@ -28,6 +28,10 @@ import {
 } from "@/lib/domain/data/server/access";
 import { keyAtEnd } from "@/lib/domain/data";
 
+/** Modes with a renderer today. The enum-free VarChar means adding one
+ * later is a UI change, never a migration (plan D11). */
+const IMPLEMENTED_VIEW_MODES = ["grid", "board"] as const;
+
 const ROUTE_PATH = "/api/content/data/[id]/views";
 
 type Params = Promise<{ id: string }>;
@@ -127,6 +131,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         name?: string;
         access?: string;
         makeDefault?: boolean;
+        mode?: string;
+        groupByColumnId?: string | null;
       };
       if (!body.viewId) return badRequest("`viewId` is required");
       if (body.name !== undefined && !body.name.trim()) {
@@ -137,6 +143,33 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         !VIEW_ACCESS.includes(body.access as (typeof VIEW_ACCESS)[number])
       ) {
         return badRequest("access must be collaborative, personal, or locked");
+      }
+      if (
+        body.mode !== undefined &&
+        !IMPLEMENTED_VIEW_MODES.includes(
+          body.mode as (typeof IMPLEMENTED_VIEW_MODES)[number]
+        )
+      ) {
+        return badRequest(
+          `That view mode is not built yet. Available: ${IMPLEMENTED_VIEW_MODES.join(", ")}`
+        );
+      }
+      // A board groups by a single-value option column. Validating the
+      // TYPE here keeps the renderer's assumption ("options exist, cells
+      // hold one id") true by construction.
+      if (body.groupByColumnId != null) {
+        const column = await prisma.dataColumn.findFirst({
+          where: {
+            id: body.groupByColumnId,
+            tableId: id,
+            deletedAt: null,
+            type: { in: ["status", "select"] },
+          },
+          select: { id: true },
+        });
+        if (!column) {
+          return badRequest("Boards group by a Status or Select column");
+        }
       }
 
       const view = await prisma.dataView.findFirst({
@@ -160,6 +193,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         const accessOnly =
           body.access !== undefined &&
           body.name === undefined &&
+          body.mode === undefined &&
+          body.groupByColumnId === undefined &&
           !body.makeDefault;
         if (!accessOnly || !(isViewOwner || isTableOwner)) {
           return forbidden("This view is locked — unlock it first");
@@ -174,6 +209,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
               ? { name: body.name.trim().slice(0, 255) }
               : {}),
             ...(body.access !== undefined ? { access: body.access } : {}),
+            ...(body.mode !== undefined ? { mode: body.mode } : {}),
+            ...(body.groupByColumnId !== undefined
+              ? { groupByColumnId: body.groupByColumnId }
+              : {}),
           },
         });
         if (body.makeDefault) {
