@@ -82,7 +82,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
         });
       }
 
-      const table = await loadTable(id);
+      const table = await loadTable(id, session.user.id);
       if (!table) return notFound();
 
       const cursorSortKey = sp.get("cursorSortKey");

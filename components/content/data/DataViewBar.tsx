@@ -1,0 +1,248 @@
+"use client";
+
+/**
+ * View tabs above the grid (plan B8 surface 2, O14).
+ *
+ * One click between saved views — the Notion-parity baseline the rest of
+ * B8's navigation story (workspace tabs, the rail, wiki-links to views)
+ * builds on. Each tab's chevron opens a menu: rename, access
+ * (collaborative / personal / locked), make default, delete.
+ */
+
+import { useCallback, useState } from "react";
+import { Check, ChevronDown, Plus, Star, Trash2 } from "lucide-react";
+import { cn } from "@/lib/core/utils";
+import type { DataView, DataViewAccess } from "@/lib/domain/data";
+import { PanelPortal } from "./PanelPortal";
+
+const ACCESS_LABEL: Record<DataViewAccess, { label: string; hint: string }> = {
+  collaborative: {
+    label: "Collaborative",
+    hint: "Anyone with access can change how this view is configured.",
+  },
+  personal: {
+    label: "Personal",
+    hint: "Only you can see or adjust this view.",
+  },
+  locked: {
+    label: "Locked",
+    hint: "Configuration is frozen. Rows stay editable.",
+  },
+};
+
+const fieldClass = cn(
+  "w-full rounded-md border border-border bg-background px-2 py-1.5",
+  "text-xs outline-none focus:ring-2 focus:ring-primary"
+);
+
+interface DataViewBarProps {
+  views: DataView[];
+  activeViewId: string | null;
+  defaultViewId: string | null;
+  canWrite: boolean;
+  onSwitch: (viewId: string) => void;
+  onCreate: () => Promise<void>;
+  onUpdate: (
+    viewId: string,
+    patch: { name?: string; access?: DataViewAccess; makeDefault?: boolean }
+  ) => Promise<void>;
+  onDelete: (viewId: string) => Promise<void>;
+}
+
+export function DataViewBar({
+  views,
+  activeViewId,
+  defaultViewId,
+  canWrite,
+  onSwitch,
+  onCreate,
+  onUpdate,
+  onDelete,
+}: DataViewBarProps) {
+  const [menuViewId, setMenuViewId] = useState<string | null>(null);
+
+  return (
+    <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border px-2">
+      {views.map((view) => {
+        const active = view.id === activeViewId;
+        return (
+          <div key={view.id} className="relative flex shrink-0 items-stretch">
+            <button
+              type="button"
+              onClick={() => onSwitch(view.id)}
+              className={cn(
+                "flex items-center gap-1.5 rounded-t px-2.5 py-2 text-xs",
+                "-mb-px border-b-2",
+                active
+                  ? "border-primary font-medium text-foreground"
+                  : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+            >
+              {view.name}
+              {view.access === "personal" && (
+                <span
+                  className="text-[9px] uppercase tracking-wide text-muted-foreground"
+                  title={ACCESS_LABEL.personal.hint}
+                >
+                  personal
+                </span>
+              )}
+              {view.id === defaultViewId && (
+                <Star
+                  className="h-2.5 w-2.5 text-muted-foreground"
+                  aria-label="Default view"
+                />
+              )}
+            </button>
+            {canWrite && active && (
+              <button
+                type="button"
+                aria-label={`${view.name} view options`}
+                onClick={() =>
+                  setMenuViewId((cur) => (cur === view.id ? null : view.id))
+                }
+                className="flex items-center px-0.5 text-muted-foreground hover:text-foreground"
+              >
+                <ChevronDown className="h-3 w-3" />
+              </button>
+            )}
+            {menuViewId === view.id && (
+              <ViewMenu
+                view={view}
+                isDefault={view.id === defaultViewId}
+                isOnly={views.length <= 1}
+                onUpdate={onUpdate}
+                onDelete={onDelete}
+                onClose={() => setMenuViewId(null)}
+              />
+            )}
+          </div>
+        );
+      })}
+
+      {canWrite && (
+        <button
+          type="button"
+          onClick={() => void onCreate()}
+          title="Add view"
+          className="ml-1 flex shrink-0 items-center rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <Plus className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── Per-view menu ────────────────────────────────────────────────────────
+
+interface ViewMenuProps {
+  view: DataView;
+  isDefault: boolean;
+  isOnly: boolean;
+  onUpdate: DataViewBarProps["onUpdate"];
+  onDelete: DataViewBarProps["onDelete"];
+  onClose: () => void;
+}
+
+function ViewMenu({
+  view,
+  isDefault,
+  isOnly,
+  onUpdate,
+  onDelete,
+  onClose,
+}: ViewMenuProps) {
+  const [name, setName] = useState(view.name);
+  const [busy, setBusy] = useState(false);
+  const locked = view.access === "locked";
+
+  const run = useCallback(
+    async (fn: () => Promise<void>) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await fn();
+        onClose();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, onClose]
+  );
+
+  return (
+    <PanelPortal open onDismiss={onClose}>
+      <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Name
+      </label>
+      <input
+        autoFocus
+        value={name}
+        disabled={locked}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && name.trim() && name.trim() !== view.name) {
+            void run(() => onUpdate(view.id, { name: name.trim() }));
+          }
+        }}
+        className={cn(fieldClass, locked && "opacity-50")}
+      />
+
+      <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+        Who can change this view
+      </label>
+      <select
+        value={view.access}
+        onChange={(e) =>
+          void run(() =>
+            onUpdate(view.id, { access: e.target.value as DataViewAccess })
+          )
+        }
+        className={fieldClass}
+      >
+        {(Object.keys(ACCESS_LABEL) as DataViewAccess[]).map((a) => (
+          <option key={a} value={a}>
+            {ACCESS_LABEL[a].label}
+          </option>
+        ))}
+      </select>
+      <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+        {ACCESS_LABEL[view.access].hint}
+      </p>
+
+      <div className="mt-3 flex items-center justify-between">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            disabled={isDefault || locked}
+            onClick={() => void run(() => onUpdate(view.id, { makeDefault: true }))}
+            className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted disabled:opacity-40"
+          >
+            <Star className="h-3 w-3" />
+            {isDefault ? "Default" : "Make default"}
+          </button>
+          <button
+            type="button"
+            disabled={isOnly || locked}
+            title={isOnly ? "A database keeps at least one view" : undefined}
+            onClick={() => void run(() => onDelete(view.id))}
+            className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-destructive hover:bg-destructive/10 disabled:opacity-40"
+          >
+            <Trash2 className="h-3 w-3" />
+            Delete
+          </button>
+        </div>
+        <button
+          type="button"
+          disabled={!name.trim() || name.trim() === view.name || locked}
+          onClick={() => void run(() => onUpdate(view.id, { name: name.trim() }))}
+          className="flex items-center gap-1 rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
+        >
+          <Check className="h-3 w-3" />
+          Save
+        </button>
+      </div>
+    </PanelPortal>
+  );
+}

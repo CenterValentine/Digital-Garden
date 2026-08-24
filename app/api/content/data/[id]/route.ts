@@ -51,7 +51,7 @@ export async function GET(
       const table = await withSpan(
         { layer: "content", name: "data_table_load" },
         { attrs: { content_id: id } },
-        async () => loadTable(id)
+        async () => loadTable(id, session.user.id)
       );
 
       if (!table) {

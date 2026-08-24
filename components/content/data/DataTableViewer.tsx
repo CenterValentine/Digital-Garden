@@ -34,6 +34,7 @@ import {
   type DataRow,
   type DataTable,
   type DataView,
+  type DataViewAccess,
   type RowData,
   type UndoExecutor,
   type UndoOp,
@@ -42,6 +43,7 @@ import {
 import { DataGridRow } from "./DataGridRow";
 import { DataColumnHeader } from "./DataColumnHeader";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
+import { DataViewBar } from "./DataViewBar";
 
 /** Row height in px. Fixed so the windowing maths stays honest. */
 const ROW_HEIGHT = 36;
@@ -103,9 +105,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   // ── Load ───────────────────────────────────────────────────────────────
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (viewId: string | null = null) => {
     try {
-      const res = await fetch(`/api/content/data/${contentId}`, {
+      const q = viewId ? `?view=${encodeURIComponent(viewId)}` : "";
+      const res = await fetch(`/api/content/data/${contentId}${q}`, {
         credentials: "include",
       });
       const json = await res.json();
@@ -122,6 +125,13 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         loading: false,
         error: null,
       });
+      // ?view= addressability (plan B8 surface 1): the resolved view lands
+      // in the URL so a copied link reopens THIS view. replaceState, not the
+      // router — a view switch is not a navigation.
+      const url = new URL(window.location.href);
+      if (json.data.view?.id) url.searchParams.set("view", json.data.view.id);
+      else url.searchParams.delete("view");
+      window.history.replaceState(window.history.state, "", url.toString());
     } catch (err) {
       setState((s) => ({
         ...s,
@@ -132,7 +142,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   }, [contentId]);
 
   useEffect(() => {
-    void load();
+    const fromUrl = new URLSearchParams(window.location.search).get("view");
+    void load(fromUrl);
   }, [load]);
 
   // ── Poll ───────────────────────────────────────────────────────────────
@@ -336,7 +347,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           if (!result.ok) {
             return { status: "failed", detail: result.message ?? "write failed" };
           }
-          await load();
+          await load(state.view?.id ?? null);
           return { status: "applied" };
         }
         case "deleteRows":
@@ -349,14 +360,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             body: JSON.stringify({ rowIds: op.rowIds, restore: restoring }),
           });
           if (!res.ok) return { status: "failed", detail: "request failed" };
-          await load();
+          await load(state.view?.id ?? null);
           return { status: "applied" };
         }
         default:
           return { status: "failed", detail: "not undoable yet" };
       }
     },
-    [contentId, sendWrites, load]
+    [contentId, sendWrites, load, state.view]
   );
 
   const handleUndo = useCallback(async () => {
@@ -414,8 +425,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     setStack((s) =>
       pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
     );
-    await load();
-  }, [contentId, load, clientId]);
+    await load(state.view?.id ?? null);
+  }, [contentId, load, clientId, state.view]);
 
   const deleteSelected = useCallback(async () => {
     if (selectedRows.size === 0) return;
@@ -436,8 +447,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     );
     setSelectedRows(new Set());
     setNotice(`${describeOp(op)} deleted · ⌘Z to undo`);
-    await load();
-  }, [contentId, selectedRows, load, clientId]);
+    await load(state.view?.id ?? null);
+  }, [contentId, selectedRows, load, clientId, state.view]);
 
   // ── Column lifecycle ───────────────────────────────────────────────────
   //
@@ -458,10 +469,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         setNotice(json?.error?.message ?? "Could not update columns");
         return false;
       }
-      await load();
+      await load(state.view?.id ?? null);
       return true;
     },
-    [contentId, load]
+    [contentId, load, state.view]
   );
 
   const addColumn = useCallback(
@@ -574,6 +585,72 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [dragColumnId, columns, columnRequest]
   );
 
+  // ── View lifecycle ─────────────────────────────────────────────────────
+
+  const switchView = useCallback(
+    (viewId: string) => {
+      if (viewId === state.view?.id) return;
+      setSelectedRows(new Set());
+      void load(viewId);
+    },
+    [state.view, load]
+  );
+
+  const createView = useCallback(async () => {
+    const res = await fetch(`/api/content/data/${contentId}/views`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      setNotice(json?.error?.message ?? "Could not create a view");
+      return;
+    }
+    await load(json.data.viewId);
+  }, [contentId, load]);
+
+  const updateView = useCallback(
+    async (
+      viewId: string,
+      patch: { name?: string; access?: DataViewAccess; makeDefault?: boolean }
+    ) => {
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId, ...patch }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setNotice(json?.error?.message ?? "Could not update the view");
+        return;
+      }
+      await load(state.view?.id ?? null);
+    },
+    [contentId, load, state.view]
+  );
+
+  const deleteView = useCallback(
+    async (viewId: string) => {
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setNotice(json?.error?.message ?? "Could not delete the view");
+        return;
+      }
+      // Deleting the active view lands on the table's resolved default.
+      await load(viewId === state.view?.id ? null : (state.view?.id ?? null));
+    },
+    [contentId, load, state.view]
+  );
+
   const toggleRow = useCallback((rowId: string) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
@@ -641,6 +718,17 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           )}
         </div>
       </header>
+
+      <DataViewBar
+        views={state.table.views}
+        activeViewId={state.view?.id ?? null}
+        defaultViewId={state.table.defaultViewId}
+        canWrite={state.canWrite}
+        onSwitch={switchView}
+        onCreate={createView}
+        onUpdate={updateView}
+        onDelete={deleteView}
+      />
 
       {notice && (
         <div

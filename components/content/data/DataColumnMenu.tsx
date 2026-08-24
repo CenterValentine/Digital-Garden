@@ -17,20 +17,10 @@
  * migrate" is both cheaper to build and clearer about what happens to data.
  */
 
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react";
-import { createPortal } from "react-dom";
+import { useCallback, useState } from "react";
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
-import {
-  calculateMenuPosition,
-  type CalculatedPosition,
-} from "@/lib/core/menu-positioning";
+import { PanelPortal } from "./PanelPortal";
 import {
   IMPLEMENTED_COLUMN_TYPES,
   type DataColumn,
@@ -50,150 +40,10 @@ const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   email: "Email",
 };
 
-const panelClass = cn(
-  // Fixed + z-[120]: portaled to <body>, above the sidebars, positioned by
-  // calculateMenuPosition. Never `absolute` inside the grid — that is the
-  // clipping bug this file exists to not have.
-  "fixed z-[120] w-64 rounded-lg border border-border bg-popover p-3 shadow-lg"
-);
-
 const fieldClass = cn(
   "w-full rounded-md border border-border bg-background px-2 py-1.5",
   "text-xs outline-none focus:ring-2 focus:ring-primary"
 );
-
-// ── Portal panel plumbing ────────────────────────────────────────────────
-
-/**
- * Anchors a portaled panel to the parent element of an invisible marker.
- *
- * Two-phase per the menu-positioning contract: the panel first renders
- * invisible at the viewport origin so it can be measured, then the measured
- * size goes through `calculateMenuPosition` for flip/shift at viewport
- * edges. Repositions on scroll (capture, so the grid's own scroller counts)
- * and resize rather than closing — the header cell is sticky, so scrolling
- * with an open menu is a normal thing to do.
- */
-function usePanelPlacement(open: boolean) {
-  const markerRef = useRef<HTMLSpanElement>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<CalculatedPosition | null>(null);
-
-  const reposition = useCallback(() => {
-    const anchor = markerRef.current?.parentElement;
-    const panel = panelRef.current;
-    if (!anchor || !panel) return;
-    const a = anchor.getBoundingClientRect();
-    const p = panel.getBoundingClientRect();
-    setPos(
-      calculateMenuPosition({
-        triggerPosition: { x: a.left, y: a.bottom + 4 },
-        menuDimensions: { width: p.width, height: p.height },
-      })
-    );
-  }, []);
-
-  useLayoutEffect(() => {
-    if (!open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- audited: two-phase menu measurement, same pattern as ContextMenu
-      setPos(null);
-      return;
-    }
-    // Measuring the just-rendered panel requires a post-render setState —
-    // the sanctioned exception used by every calculateMenuPosition consumer.
-    reposition();
-  }, [open, reposition]);
-
-  useEffect(() => {
-    if (!open) return;
-    window.addEventListener("resize", reposition);
-    document.addEventListener("scroll", reposition, true);
-    return () => {
-      window.removeEventListener("resize", reposition);
-      document.removeEventListener("scroll", reposition, true);
-    };
-  }, [open, reposition]);
-
-  return { markerRef, panelRef, pos };
-}
-
-/**
- * Outside-click + Escape dismissal, portal-aware.
- *
- * The anchor cell is exempted from "outside": its own click handler toggles
- * the menu, and dismissing on mousedown first would close-then-reopen —
- * a menu that cannot be toggled shut.
- */
-function useDismiss(
-  open: boolean,
-  panelRef: React.RefObject<HTMLDivElement | null>,
-  markerRef: React.RefObject<HTMLSpanElement | null>,
-  onDismiss: () => void
-) {
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      const target = e.target as Node;
-      if (panelRef.current?.contains(target)) return;
-      if (markerRef.current?.parentElement?.contains(target)) return;
-      onDismiss();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onDismiss();
-    };
-    document.addEventListener("mousedown", onDown);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDown);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open, panelRef, markerRef, onDismiss]);
-}
-
-interface PanelPortalProps {
-  open: boolean;
-  onDismiss: () => void;
-  children: React.ReactNode;
-}
-
-function PanelPortal({ open, onDismiss, children }: PanelPortalProps) {
-  const { markerRef, panelRef, pos } = usePanelPlacement(open);
-  useDismiss(open, panelRef, markerRef, onDismiss);
-
-  return (
-    <>
-      <span ref={markerRef} className="hidden" aria-hidden="true" />
-      {open &&
-        typeof document !== "undefined" &&
-        createPortal(
-          <div
-            ref={panelRef}
-            className={panelClass}
-            style={
-              pos
-                ? {
-                    left: pos.x,
-                    top: pos.y,
-                    maxHeight: pos.maxHeight,
-                    overflowY: "auto",
-                  }
-                : // Measurement frame: mounted but invisible, so the real
-                  // position is computed from true dimensions.
-                  { left: 0, top: 0, visibility: "hidden" }
-            }
-            // React portals propagate synthetic events through the COMPONENT
-            // tree, so without this a click inside the panel bubbles to the
-            // header cell's onClick and toggles the menu shut mid-edit.
-            onClick={(e) => e.stopPropagation()}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            {children}
-          </div>,
-          document.body
-        )}
-    </>
-  );
-}
 
 // ── Add ──────────────────────────────────────────────────────────────────
 

@@ -56,7 +56,10 @@ export interface LoadedRow {
  * but NOT from storage — a cell whose column was removed keeps its value so
  * that undoing the delete restores real data (plan B4).
  */
-export async function loadTable(tableId: string): Promise<DataTable | null> {
+export async function loadTable(
+  tableId: string,
+  viewerId?: string
+): Promise<DataTable | null> {
   const payload = await prisma.dataPayload.findUnique({
     where: { contentId: tableId },
     include: {
@@ -65,7 +68,19 @@ export async function loadTable(tableId: string): Promise<DataTable | null> {
         where: { deletedAt: null },
         orderBy: { position: "asc" },
       },
-      views: { orderBy: { position: "asc" } },
+      views: {
+        // Personal views are visible ONLY to their owner (plan O14) — hidden
+        // from everyone else's bar, exactly Airtable's semantics. Omitting
+        // viewerId (internal callers like the AI digest) shows only shared
+        // views, which is the safe direction to fail in.
+        where: {
+          OR: [
+            { access: { not: "personal" } },
+            ...(viewerId ? [{ ownerId: viewerId }] : []),
+          ],
+        },
+        orderBy: { position: "asc" },
+      },
     },
   });
 
