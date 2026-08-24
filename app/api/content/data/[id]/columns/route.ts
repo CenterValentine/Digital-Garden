@@ -15,6 +15,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
+import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
 import {
@@ -108,6 +110,8 @@ export async function POST(request: NextRequest, { params }: { params: Params })
           })
       );
 
+      // Schema changed → the AI digest changed (plan B1 route discipline).
+      after(() => markContextDirty([id]));
       return NextResponse.json({ success: true, data: { columnId } });
     } catch (error) {
       logger.error({
@@ -174,6 +178,15 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         position: body.position,
       });
 
+      // Name/description/config are semantic; a position-only PATCH is a
+      // drag-reorder and deliberately does NOT dirty context (plan B1).
+      if (
+        body.name !== undefined ||
+        body.description !== undefined ||
+        body.config !== undefined
+      ) {
+        after(() => markContextDirty([id]));
+      }
       return NextResponse.json({ success: true, data: { columnId: body.columnId } });
     } catch (error) {
       logger.error({
@@ -209,12 +222,14 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       // removed, so this is a metadata flip (plan B4.5).
       if (body.restore) {
         await restoreColumn(body.columnId);
+        after(() => markContextDirty([id]));
         return NextResponse.json({ success: true, data: { restored: true } });
       }
 
       const result = await softDeleteColumn(body.columnId);
       if (!result.ok) return forbidden(result.reason ?? "Cannot delete column");
 
+      after(() => markContextDirty([id]));
       return NextResponse.json({ success: true, data: { deleted: true } });
     } catch (error) {
       logger.error({

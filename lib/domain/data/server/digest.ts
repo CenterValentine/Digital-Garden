@@ -54,7 +54,11 @@ export async function buildDataSchemaDigest(
       content: { select: { title: true } },
       columns: {
         where: { deletedAt: null },
-        orderBy: { position: "asc" },
+        // Ordered by the IMMUTABLE key, not position: drag-reordering
+        // columns is presentational, and ordering the digest by position
+        // would shift the context hash on every drag — churn with no
+        // semantic change. Same reasoning as the bucketed row count.
+        orderBy: { key: "asc" },
         select: { name: true, type: true, description: true, config: true },
       },
       views: {
