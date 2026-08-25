@@ -142,6 +142,9 @@ export async function POST(request: NextRequest, { params }: { params: Params })
 
       const table = await loadTable(id);
       if (!table) return notFound();
+      if (table.mode === "query") {
+        return badRequest("Query databases are read-only projections — create a note and it appears");
+      }
 
       const rowIds = await withSpan(
         { layer: "content", name: "data_rows_create" },
@@ -194,6 +197,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
 
       const table = await loadTable(id);
       if (!table) return notFound();
+      if (table.mode === "query") {
+        return badRequest("Query databases are read-only projections");
+      }
 
       const { ok, results } = await withSpan(
         { layer: "content", name: "data_cells_write" },

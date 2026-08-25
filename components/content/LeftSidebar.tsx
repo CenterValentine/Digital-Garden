@@ -53,6 +53,7 @@ export function LeftSidebar() {
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
+    dataMode?: "query"; // For data type — query databases (plan Phase 3)
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
 
@@ -226,6 +227,10 @@ export function LeftSidebar() {
     setCreateTrigger({ type: "data", timestamp: Date.now() });
   }, []);
 
+  const handleCreateDataQuery = useCallback(() => {
+    setCreateTrigger({ type: "data", dataMode: "query", timestamp: Date.now() });
+  }, []);
+
   // const handleCreateHope = useCallback(() => {
   //   setCreateTrigger({ type: "hope", timestamp: Date.now() });
   // }, []);
@@ -292,6 +297,7 @@ export function LeftSidebar() {
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
           onCreateData={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateData}
+          onCreateDataQuery={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateDataQuery}
           onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
           onCreateN8nWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateN8nWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}

@@ -79,6 +79,7 @@ export interface NewContentCallbacks {
   onCreateVisualizationExcalidraw?: (parentId: string | null) => void | Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => void | Promise<void>;
   onCreateData?: (parentId: string | null) => void | Promise<void>;
+  onCreateDataQuery?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
   onCreateN8nWorkflow?: (parentId: string | null) => void | Promise<void>;
@@ -407,6 +408,16 @@ export function getNewContentMenuItems(
     icon: <Table className="h-4 w-4" />,
     onClick: () => callbacks.onCreateData?.(normalizedParentId),
     disabled: !callbacks.onCreateData,
+  });
+
+  // Query database — a saved search over existing content, rendered as a
+  // table (plan Phase 3). Rows ARE the matching notes; nothing is copied.
+  items.push({
+    id: "new-data-query",
+    label: "Query Database",
+    icon: <Table className="h-4 w-4" />,
+    onClick: () => callbacks.onCreateDataQuery?.(normalizedParentId),
+    disabled: !callbacks.onCreateDataQuery,
   });
 
   // Stubs — defined but not implemented yet.

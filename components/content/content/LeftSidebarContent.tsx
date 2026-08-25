@@ -54,6 +54,7 @@ interface LeftSidebarContentProps {
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
+    dataMode?: "query"; // For data type — query databases
   } | null;
   onSelectionChange?: (hasMultipleSelections: boolean) => void;
   /** `parentId` is the folder the files were dropped into (`null` = root). */
@@ -1374,6 +1375,9 @@ export function LeftSidebarContent({
       } else if (type === "data") {
         // The server seeds the column + view; the client sends only the intent.
         requestBody.contentType = "data";
+        if (createTrigger?.dataMode) {
+          requestBody.dataMode = createTrigger.dataMode;
+        }
       } else if (type === "visualization") {
         requestBody.engine = config.payload?.engine;
         requestBody.chartConfig = config.payload?.config || {};

@@ -795,6 +795,44 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (
+      requestedContentType === "data" &&
+      (body as { dataMode?: string }).dataMode === "query"
+    ) {
+      // Query database (plan Phase 3): a saved search rendered as a table.
+      // No columns — they are synthesized node projections; no rows — the
+      // rows ARE the matching notes. Just a view and a default query.
+      contentType = "data";
+      const { buildDefaultView, DEFAULT_CONTENT_QUERY } = await import(
+        "@/lib/domain/data"
+      );
+      const queryView = buildDefaultView();
+      payloadData = {
+        dataPayload: {
+          create: {
+            mode: "query",
+            source: DEFAULT_CONTENT_QUERY as unknown as Prisma.InputJsonValue,
+            searchText: title.toLowerCase(),
+            views: {
+              create: [
+                {
+                  ownerId: session.user.id,
+                  name: "Results",
+                  mode: queryView.mode,
+                  access: queryView.access,
+                  section: queryView.section,
+                  filters: queryView.filters as unknown as Prisma.InputJsonValue,
+                  sorts: queryView.sorts as unknown as Prisma.InputJsonValue,
+                  groupByColumnId: queryView.groupByColumnId,
+                  columnPrefs: queryView.columnPrefs as unknown as Prisma.InputJsonValue,
+                  config: queryView.config as unknown as Prisma.InputJsonValue,
+                  position: queryView.position,
+                },
+              ],
+            },
+          },
+        },
+      };
     } else if (requestedContentType === "data") {
       // User-defined database (DATABASE-CONTENT-TYPE-PLAN → Phase 1a).
       //

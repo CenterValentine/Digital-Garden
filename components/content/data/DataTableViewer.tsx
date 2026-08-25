@@ -47,6 +47,8 @@ import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
 import { DataRowPeek } from "./DataRowPeek";
 import { DataFilterBar } from "./DataFilterBar";
+import { DataQueryBar } from "./DataQueryBar";
+import { useContentStore } from "@/state/content-store";
 
 /** Row height in px. Fixed so the windowing maths stays honest. */
 const ROW_HEIGHT = 36;
@@ -110,10 +112,33 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    */
   const clientId = useId();
 
+  /**
+   * The poll callback reads the CURRENT view through this ref instead of
+   * closing over state.view — keeping the poll effect's dep array at its
+   * original constant shape. (Growing it mid-session tripped React's
+   * changed-size warning under Fast Refresh; the ref also stops the poll
+   * from re-subscribing on every view switch.)
+   */
+  const viewRef = useRef<DataView | null>(null);
+  useEffect(() => {
+    viewRef.current = state.view;
+  }, [state.view]);
+
   const columns = useMemo(
     () => state.table?.columns.filter((c) => !c.deletedAt) ?? [],
     [state.table]
   );
+
+  /**
+   * Query tables are read-only projections (plan Phase 3): rows ARE
+   * ContentNodes, so nothing here may edit cells, columns, or rows — the
+   * server rejects it anyway, but the affordances should never render.
+   * View management (rename, layout, access) stays live: views are the
+   * table's OWN objects either way.
+   */
+  const isQuery = state.table?.mode === "query";
+  const canEditData = state.canWrite && !isQuery;
+  const selectNode = useContentStore((s) => s.setSelectedContentId);
 
   // ── Load ───────────────────────────────────────────────────────────────
 
@@ -205,8 +230,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         // Under view sorts the merge below would be WRONG — it re-sorts by
         // sortKey, scrambling the server's cell-value order. One reload gets
         // the truth; changes are rare enough that this costs nothing.
-        if ((state.view?.sorts?.length ?? 0) > 0) {
-          void load(state.view?.id ?? null);
+        const currentView = viewRef.current;
+        if ((currentView?.sorts?.length ?? 0) > 0) {
+          void load(currentView?.id ?? null);
           return;
         }
 
@@ -252,7 +278,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [contentId, state.serverTime, state.view, load]);
+  }, [contentId, state.serverTime, load]);
 
   // ── Viewport measurement ───────────────────────────────────────────────
 
@@ -844,10 +870,22 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedCell, columns, state.rows]);
 
-  const openRow = useCallback((rowId: string) => {
-    setPeekRowId(rowId);
-    setEditTarget(null);
-  }, []);
+  const openRow = useCallback(
+    (rowId: string) => {
+      if (isQuery) {
+        // The row IS a note/file — open the real thing, never a row page.
+        const row = state.rows.find((r) => r.id === rowId);
+        selectNode(rowId, {
+          contentType: row?.nodeContentType ?? null,
+          title: typeof row?.data.title === "string" ? row.data.title : null,
+        });
+        return;
+      }
+      setPeekRowId(rowId);
+      setEditTarget(null);
+    },
+    [isQuery, state.rows, selectNode]
+  );
 
   const navigatePeek = useCallback(
     (dir: 1 | -1) => {
@@ -947,13 +985,35 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         onDelete={deleteView}
       />
 
-      {state.view && (
+      {state.view && !isQuery && (
         <DataFilterBar
           view={state.view}
           columns={columns}
           canWrite={state.canWrite}
           onSave={(filters) => updateView(state.view!.id, { filters })}
           onSaveSorts={(sorts) => updateView(state.view!.id, { sorts })}
+        />
+      )}
+
+      {isQuery && state.table?.query && (
+        <DataQueryBar
+          query={state.table.query}
+          total={state.rows.length}
+          canEdit={state.canWrite}
+          onSave={async (query) => {
+            const res = await fetch(`/api/content/data/${contentId}`, {
+              method: "PATCH",
+              credentials: "include",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ query }),
+            });
+            const json = await res.json();
+            if (!res.ok || !json.success) {
+              setNotice(json?.error?.message ?? "Could not update the query");
+              return;
+            }
+            await load(state.view?.id ?? null);
+          }}
         />
       )}
 
@@ -979,7 +1039,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             view={state.view}
             columns={columns}
             rows={state.rows}
-            editable={state.canWrite}
+            editable={canEditData}
             onCommitCell={commitCell}
             onAddRowInGroup={addRowInGroup}
             onOpenRow={openRow}
@@ -999,7 +1059,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               <DataColumnHeader
                 key={column.id}
                 column={column}
-                editable={state.canWrite}
+                editable={canEditData}
                 menuOpen={openColumnId === column.id}
                 onToggleMenu={(columnId) =>
                   setOpenColumnId((current) =>
@@ -1025,7 +1085,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 )}
               </DataColumnHeader>
             ))}
-            {state.canWrite && <AddColumnButton onAdd={addColumn} />}
+            {canEditData && <AddColumnButton onAdd={addColumn} />}
           </div>
 
           {/* Spacer preserves true scroll height while only a slice renders. */}
@@ -1045,7 +1105,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   columns={columns}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
-                  editable={state.canWrite}
+                  editable={canEditData}
                   editColumnKey={
                     editTarget?.rowId === row.id ? editTarget.columnKey : null
                   }
@@ -1065,7 +1125,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             </div>
           </div>
 
-          {state.canWrite && (
+          {canEditData && (
             <button
               type="button"
               onClick={addRow}
@@ -1086,7 +1146,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <DataRowPeek
           row={peekRow}
           columns={columns}
-          editable={state.canWrite}
+          editable={canEditData}
           index={peekIndex}
           total={state.rows.length}
           onCommitCell={commitCell}

@@ -153,6 +153,11 @@ export interface DataRow {
   data: RowData;
   /** Non-null once the row has been promoted to a ContentNode (plan D2). */
   contentId: string | null;
+  /**
+   * Query-mode only: the underlying node's content type, so opening the
+   * "row" opens the REAL note/file rather than a row page.
+   */
+  nodeContentType?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -288,10 +293,33 @@ export interface DataView {
 
 export type DataTableMode = "inline" | "external" | "query";
 
+/**
+ * The saved query behind a `mode: "query"` table (plan Phase 3).
+ *
+ * A query table owns nothing — it is a saved search rendered as a table.
+ * Rows ARE the matching ContentNodes; nothing is copied, so tagging a new
+ * note makes it appear and deleting the table harms no note. Kept
+ * deliberately small in v1: tags are ALL-of (matching the tag-filter
+ * semantics of search), types are ANY-of.
+ */
+export interface ContentQuery {
+  /** Tag slugs the node must carry ALL of. */
+  tags: string[];
+  /** Content types to include (ANY of). Empty = notes only. */
+  contentTypes: string[];
+}
+
+export const DEFAULT_CONTENT_QUERY: ContentQuery = {
+  tags: [],
+  contentTypes: ["note"],
+};
+
 export interface DataTable {
   contentId: string;
   title: string;
   mode: DataTableMode;
+  /** Present when mode === "query" — the saved query the table renders. */
+  query?: ContentQuery;
   description: string | null;
   defaultViewId: string | null;
   rowCount: number;

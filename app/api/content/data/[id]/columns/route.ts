@@ -16,6 +16,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
+import { prisma } from "@/lib/database/client";
 import { markContextDirty } from "@/lib/domain/ai-context/context-dirty";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import { logger, withRouteTrace, withSpan } from "@/lib/core/logger";
@@ -64,6 +65,17 @@ async function authorize(id: string) {
   const level = await resolveDataTableAccess(id, session.user.id);
   if (!canRead(level)) return { error: notFound() } as const;
   if (!canAlterSchema(level)) return { error: forbidden() } as const;
+  const payload = await prisma.dataPayload.findUnique({
+    where: { contentId: id },
+    select: { mode: true },
+  });
+  // Query tables have no DataColumn rows — their "columns" are synthesized
+  // node projections (plan Phase 3), so the schema surface is sealed.
+  if (payload?.mode === "query") {
+    return {
+      error: badRequest("Query databases project note fields — they have no editable columns"),
+    } as const;
+  }
   return { session } as const;
 }
 
