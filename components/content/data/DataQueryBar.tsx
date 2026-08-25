@@ -114,9 +114,28 @@ export function DataQueryBar({ query, total, canEdit, onSave }: DataQueryBarProp
           chosen types.
         </p>
 
-        <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-          Include types
-        </label>
+        <div className="mb-1 mt-3 flex items-baseline justify-between">
+          <label className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Include types
+          </label>
+          {/* One toggle, two meanings: anything unchecked → All; all
+              checked → None. Compact, and always one click from either
+              extreme (owner, 2026-08-25). */}
+          <button
+            type="button"
+            disabled={!canEdit}
+            onClick={() =>
+              setTypesDraft(
+                types.length === QUERYABLE.length
+                  ? []
+                  : QUERYABLE.map(([value]) => value)
+              )
+            }
+            className="text-[10px] font-medium text-primary hover:underline disabled:opacity-40"
+          >
+            {types.length === QUERYABLE.length ? "None" : "All"}
+          </button>
+        </div>
         <div className="grid grid-cols-2 gap-1">
           {QUERYABLE.map(([value, label]) => (
             <label key={value} className="flex items-center gap-2 text-xs">
