@@ -120,7 +120,9 @@ export function DataFilterBar({ view, columns, canWrite, onSave, onSaveSorts }: 
     close();
   }, [draft, onSave, close]);
 
-  const filterable = columns.filter((c) => operatorsForType(c.type).length > 0);
+  const filterable = columns.filter(
+    (c) => operatorsForType(c.type).length > 0
+  );
 
   return (
     <div className="relative flex items-center gap-2 border-b border-border/60 px-3 py-1.5">

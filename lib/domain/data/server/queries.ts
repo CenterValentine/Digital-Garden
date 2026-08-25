@@ -19,10 +19,12 @@ import { prisma } from "@/lib/database/client";
 // sentinel, not a type.
 import { Prisma } from "@/lib/database/generated/prisma";
 import {
+  cellToText,
   isFilterGroup,
   resolveDateWindow,
   sortByKey,
   sortStatusOptions,
+  type CellValue,
   type DataColumn,
   type DataColumnConfig,
   type DataSort,
@@ -310,16 +312,25 @@ export interface LoadRowsOptions {
  * rule: the existence of a private row must not leak through a relation
  * someone else drew to it.
  */
+interface HydratedLinks {
+  refs: Map<string, Record<string, RelationLinkRef[]>>;
+  /** Data of displayed rows the viewer may SEE — restricted rows absent, so
+   * derived computation cannot leak values through an aggregate. */
+  targetData: Map<string, { tableId: string; data: RowData }>;
+}
+
 async function hydrateRelationLinks(
   rows: Array<{ id: string }>,
   columns: DataColumn[],
   viewerId: string | undefined
-): Promise<Map<string, Record<string, RelationLinkRef[]>>> {
+): Promise<HydratedLinks> {
   const relationColumns = columns.filter(
     (c) => c.type === "relation" && !c.deletedAt
   );
   const result = new Map<string, Record<string, RelationLinkRef[]>>();
-  if (relationColumns.length === 0 || rows.length === 0) return result;
+  const targetData = new Map<string, { tableId: string; data: RowData }>();
+  if (relationColumns.length === 0 || rows.length === 0)
+    return { refs: result, targetData };
 
   const rowIds = rows.map((r) => r.id);
   // The pair cross-references both ways, so symmetricColumnId is set on
@@ -381,7 +392,7 @@ async function hydrateRelationLinks(
       });
     }
   }
-  if (entries.length === 0) return result;
+  if (entries.length === 0) return { refs: result, targetData };
 
   const displayRows = await prisma.dataRow.findMany({
     where: { id: { in: [...new Set(entries.map((e) => e.displayRowId))] } },
@@ -420,6 +431,15 @@ async function hydrateRelationLinks(
     for (const n of nodes) visibleTables.add(n.id);
   }
 
+  for (const row of displayRows) {
+    if (!row.deletedAt && visibleTables.has(row.tableId)) {
+      targetData.set(row.id, {
+        tableId: row.tableId,
+        data: (row.data ?? {}) as RowData,
+      });
+    }
+  }
+
   for (const entry of entries) {
     const target = displayById.get(entry.displayRowId);
     if (!target || target.deletedAt) continue;
@@ -442,6 +462,117 @@ async function hydrateRelationLinks(
     const perRow = result.get(entry.attachRowId) ?? {};
     (perRow[entry.attachColumnId] ??= []).push(ref);
     result.set(entry.attachRowId, perRow);
+  }
+  return { refs: result, targetData };
+}
+
+/**
+ * Compute lookup/rollup values (plan Phase 4, D6 — derived columns store
+ * NOTHING; this happens at every read). Aggregates run over VISIBLE targets
+ * only: hydration's targetData omits rows the viewer cannot see, so a
+ * rollup can never launder a private table's values through a sum.
+ */
+async function computeDerivedValues(
+  rows: Array<{ id: string }>,
+  columns: DataColumn[],
+  hydrated: HydratedLinks
+): Promise<Map<string, Record<string, string | number>>> {
+  const result = new Map<string, Record<string, string | number>>();
+  const derivedColumns = columns.filter(
+    (c) => (c.type === "lookup" || c.type === "rollup") && !c.deletedAt
+  );
+  if (derivedColumns.length === 0 || rows.length === 0) return result;
+
+  // The target-table columns these deriveds read through.
+  const targetColumnIds = [
+    ...new Set(
+      derivedColumns
+        .map((c) => c.config.lookupColumnId ?? c.config.rollupColumnId)
+        .filter((id): id is string => !!id)
+    ),
+  ];
+  const targetColumns =
+    targetColumnIds.length > 0
+      ? await prisma.dataColumn.findMany({
+          where: { id: { in: targetColumnIds }, deletedAt: null },
+        })
+      : [];
+  const targetColumnById = new Map(
+    targetColumns.map((c) => [
+      c.id,
+      {
+        id: c.id,
+        key: c.key,
+        name: c.name,
+        type: c.type,
+        position: c.position,
+        isPrimary: c.isPrimary,
+        config: (c.config ?? {}) as unknown as DataColumnConfig,
+        description: c.description,
+        deletedAt: null,
+      } as DataColumn,
+    ])
+  );
+
+  for (const row of rows) {
+    const perColumn: Record<string, string | number> = {};
+    for (const column of derivedColumns) {
+      const relId = column.config.relationColumnId;
+      if (!relId) continue;
+      const refs = hydrated.refs.get(row.id)?.[relId] ?? [];
+      const visibleTargets = refs
+        .filter((r) => !r.restricted)
+        .map((r) => hydrated.targetData.get(r.rowId))
+        .filter((t): t is { tableId: string; data: RowData } => !!t);
+
+      if (column.type === "rollup" && column.config.rollupFn === "count") {
+        perColumn[column.id] = visibleTargets.length;
+        continue;
+      }
+
+      const throughId =
+        column.config.lookupColumnId ?? column.config.rollupColumnId;
+      const through = throughId ? targetColumnById.get(throughId) : undefined;
+      if (!through) continue;
+
+      const values = visibleTargets
+        .map((t) => t.data[through.key])
+        .filter((v): v is CellValue => v !== undefined);
+
+      if (column.type === "lookup") {
+        perColumn[column.id] = values
+          .map((v) => cellToText(through, v))
+          .filter(Boolean)
+          .join(", ");
+        continue;
+      }
+
+      switch (column.config.rollupFn) {
+        case "sum": {
+          const nums = values.filter((v): v is number => typeof v === "number");
+          perColumn[column.id] = nums.reduce((a, b) => a + b, 0);
+          break;
+        }
+        case "min":
+        case "max": {
+          const nums = values.filter((v): v is number => typeof v === "number");
+          if (nums.length > 0) {
+            perColumn[column.id] =
+              column.config.rollupFn === "min"
+                ? Math.min(...nums)
+                : Math.max(...nums);
+          }
+          break;
+        }
+        case "join":
+        default:
+          perColumn[column.id] = values
+            .map((v) => cellToText(through, v))
+            .filter(Boolean)
+            .join(", ");
+      }
+    }
+    if (Object.keys(perColumn).length > 0) result.set(row.id, perColumn);
   }
   return result;
 }
@@ -562,13 +693,15 @@ export async function loadRowPage({
       LIMIT ${limit}
     `);
     const sortedLinks = await hydrateRelationLinks(raw, columns, viewerId);
+    const sortedDerived = await computeDerivedValues(raw, columns, sortedLinks);
     return {
       rows: raw.map((r) => ({
         id: r.id,
         tableId: r.tableId,
         sortKey: r.sortKey,
         data: (r.data ?? {}) as RowData,
-        links: sortedLinks.get(r.id),
+        links: sortedLinks.refs.get(r.id),
+        derived: sortedDerived.get(r.id),
         contentId: r.contentId,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
@@ -614,6 +747,7 @@ export async function loadRowPage({
   const page = hasMore ? rows.slice(0, limit) : rows;
   const last = page[page.length - 1];
   const pageLinks = await hydrateRelationLinks(page, columns, viewerId);
+  const pageDerived = await computeDerivedValues(page, columns, pageLinks);
 
   return {
     rows: page.map((r) => ({
@@ -621,7 +755,8 @@ export async function loadRowPage({
       tableId: r.tableId,
       sortKey: r.sortKey,
       data: (r.data ?? {}) as unknown as RowData,
-      links: pageLinks.get(r.id),
+      links: pageLinks.refs.get(r.id),
+      derived: pageDerived.get(r.id),
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),

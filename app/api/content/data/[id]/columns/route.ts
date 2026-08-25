@@ -34,8 +34,10 @@ import {
 } from "@/lib/domain/data/server/mutations";
 import {
   IMPLEMENTED_COLUMN_TYPES,
+  ROLLUP_FNS,
   type DataColumnConfig,
   type DataColumnType,
+  type RollupFn,
 } from "@/lib/domain/data";
 
 const ROUTE_PATH = "/api/content/data/[id]/columns";
@@ -127,6 +129,55 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         );
         if (!canRead(targetLevel)) {
           return badRequest("Relation target database not found");
+        }
+      }
+
+      // Lookup/rollup traverse a relation on THIS table and read a column
+      // on ITS target (plan Phase 4). Validated so the computation's
+      // assumptions hold by construction rather than by hope.
+      if (body.type === "lookup" || body.type === "rollup") {
+        const relId = body.config?.relationColumnId;
+        if (!relId) {
+          return badRequest("Pick which relation this column reads through");
+        }
+        const relation = await prisma.dataColumn.findFirst({
+          where: { id: relId, tableId: id, type: "relation", deletedAt: null },
+          select: { config: true },
+        });
+        if (!relation) {
+          return badRequest("That relation column does not exist here");
+        }
+        const relTarget = (
+          relation.config as { relationTableId?: string } | null
+        )?.relationTableId;
+
+        const fn = body.config?.rollupFn;
+        if (body.type === "rollup") {
+          if (!fn || !ROLLUP_FNS.includes(fn as RollupFn)) {
+            return badRequest(
+              `Rollup needs a function: ${ROLLUP_FNS.join(", ")}`
+            );
+          }
+        }
+        const throughId =
+          body.type === "lookup"
+            ? body.config?.lookupColumnId
+            : fn === "count"
+              ? undefined
+              : body.config?.rollupColumnId;
+        if (body.type === "lookup" && !throughId) {
+          return badRequest("Pick which column to look up");
+        }
+        if (throughId) {
+          const through = await prisma.dataColumn.findFirst({
+            where: { id: throughId, tableId: relTarget ?? "", deletedAt: null },
+            select: { id: true },
+          });
+          if (!through) {
+            return badRequest(
+              "That column does not exist on the relation's database"
+            );
+          }
         }
       }
 

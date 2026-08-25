@@ -49,6 +49,12 @@ const OPERATORS_BY_TYPE: Partial<Record<DataColumn["type"], FilterOperator[]>> =
   contentLink: [...UNIVERSAL, ...SET],
   file: UNIVERSAL,
   relation: [...UNIVERSAL, ...SET],
+  // Derived columns store nothing (plan D6) — a filter over them would
+  // interrogate an empty data path and silently match everything or
+  // nothing. Empty list = excluded from the filter UI entirely.
+  formula: [],
+  rollup: [],
+  lookup: [],
 };
 
 export function operatorsForType(type: DataColumn["type"]): FilterOperator[] {

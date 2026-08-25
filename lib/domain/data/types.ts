@@ -59,6 +59,8 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
   "url",
   "email",
   "relation",
+  "lookup",
+  "rollup",
 ];
 
 /**
@@ -100,6 +102,10 @@ export interface SelectOption {
   group?: StatusGroup;
 }
 
+/** Rollup aggregations (plan Phase 4). All computed at read time (D6). */
+export const ROLLUP_FNS = ["count", "sum", "min", "max", "join"] as const;
+export type RollupFn = (typeof ROLLUP_FNS)[number];
+
 // ── Column config ────────────────────────────────────────────────────────
 
 export interface DataColumnConfig {
@@ -115,6 +121,14 @@ export interface DataColumnConfig {
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
   symmetricColumnId?: string;
+  /** `lookup` · `rollup` — which relation column on THIS table to traverse. */
+  relationColumnId?: string;
+  /** `lookup` — the column on the target table whose value shows through. */
+  lookupColumnId?: string;
+  /** `rollup` — the aggregation. `count` needs no target column. */
+  rollupFn?: RollupFn;
+  /** `rollup` — the target-table column the aggregate runs over. */
+  rollupColumnId?: string;
   /**
    * `relation` — TRUE on the mirrored half of a pair. The pair is
    * cross-referenced both ways, so symmetricColumnId alone cannot tell the
@@ -179,6 +193,12 @@ export interface DataRow {
    * a read-model attachment, not stored cell state.
    */
   links?: Record<string, RelationLinkRef[]>;
+  /**
+   * Lookup/rollup results, computed server-side at read time (plan D6 —
+   * derived columns store NOTHING) and keyed by column id. Display-ready:
+   * strings and numbers only, aggregated over targets the viewer can see.
+   */
+  derived?: Record<string, string | number>;
   /** Non-null once the row has been promoted to a ContentNode (plan D2). */
   contentId: string | null;
   /**

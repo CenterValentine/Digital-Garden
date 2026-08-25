@@ -124,6 +124,7 @@ function DataGridRowImpl({
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
+            derivedValue={row.derived?.[column.id]}
             editable={editable}
             forceEdit={forceEdit}
             cellSelected={selectedColumnKey === column.key}
@@ -149,6 +150,8 @@ interface DataCellProps {
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
   links?: RelationLinkRef[];
+  /** Server-computed lookup/rollup value, when this is a derived column. */
+  derivedValue?: string | number;
   editable: boolean;
   forceEdit: boolean;
   cellSelected: boolean;
@@ -164,6 +167,7 @@ function DataCell({
   rowId,
   value,
   links,
+  derivedValue,
   editable,
   forceEdit,
   cellSelected,
@@ -278,6 +282,26 @@ function DataCell({
             +
           </button>
         )}
+      </div>
+    );
+  }
+
+  // Derived cells show the server-computed value — nothing is stored
+  // (plan D6), nothing is editable, and the muted tone says so.
+  if (column.type === "lookup" || column.type === "rollup") {
+    const text = derivedValue === undefined ? "" : String(derivedValue);
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs text-muted-foreground",
+          column.type === "rollup" && "justify-end font-mono tabular-nums",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        onClick={() => onSelect(rowId, column.key)}
+        title={text || undefined}
+      >
+        <span className="truncate">{text}</span>
       </div>
     );
   }

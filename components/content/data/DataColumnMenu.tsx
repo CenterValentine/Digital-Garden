@@ -23,9 +23,11 @@ import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
 import {
   IMPLEMENTED_COLUMN_TYPES,
+  ROLLUP_FNS,
   type DataColumn,
   type DataColumnConfig,
   type DataColumnType,
+  type RollupFn,
 } from "@/lib/domain/data";
 
 const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
@@ -40,6 +42,16 @@ const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   url: "URL",
   email: "Email",
   relation: "Relation",
+  lookup: "Lookup",
+  rollup: "Rollup",
+};
+
+const ROLLUP_LABEL: Record<RollupFn, string> = {
+  count: "Count",
+  sum: "Sum",
+  min: "Min",
+  max: "Max",
+  join: "Join values",
 };
 
 const fieldClass = cn(
@@ -53,6 +65,8 @@ interface AddColumnButtonProps {
   /** The table this column joins — excluded from relation targets (self-
    * relations are a later decision, not an accident waiting to happen). */
   tableId: string;
+  /** Existing columns — lookup/rollup pick a relation to read through. */
+  columns: DataColumn[];
   onAdd: (input: {
     name: string;
     type: DataColumnType;
@@ -61,7 +75,7 @@ interface AddColumnButtonProps {
   }) => Promise<void>;
 }
 
-export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
+export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<DataColumnType>("text");
@@ -69,6 +83,47 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
   const [databases, setDatabases] = useState<Array<{ id: string; title: string }>>([]);
+  // Lookup/rollup wiring: the relation to traverse, the target-table column
+  // to read, and (rollup) the aggregation.
+  const [throughRelationId, setThroughRelationId] = useState("");
+  const [targetColumnId, setTargetColumnId] = useState("");
+  const [rollupFn, setRollupFn] = useState<RollupFn>("count");
+  const [targetColumns, setTargetColumns] = useState<DataColumn[] | null>(null);
+
+  const relationColumns = columns.filter(
+    (c) => c.type === "relation" && !c.deletedAt
+  );
+  const isDerived = type === "lookup" || type === "rollup";
+  const needsTargetColumn =
+    type === "lookup" || (type === "rollup" && rollupFn !== "count");
+  const throughRelation = relationColumns.find(
+    (c) => c.id === throughRelationId
+  );
+  const throughTargetTableId = throughRelation?.config.relationTableId ?? "";
+
+  // Load the chosen relation's target-table schema for the column picker.
+  useEffect(() => {
+    if (!isDerived || !throughTargetTableId) return;
+    let cancelled = false;
+    setTargetColumns(null);
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/content/data/${throughTargetTableId}`,
+          { credentials: "include" }
+        );
+        const json = await res.json();
+        if (!cancelled && json?.success) {
+          setTargetColumns(json.data.table.columns as DataColumn[]);
+        }
+      } catch {
+        if (!cancelled) setTargetColumns([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isDerived, throughTargetTableId]);
 
   // Relation targets load lazily, first time the type is picked.
   useEffect(() => {
@@ -99,26 +154,57 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
     setName("");
     setType("text");
     setTargetDbId("");
+    setThroughRelationId("");
+    setTargetColumnId("");
+    setRollupFn("count");
+    setTargetColumns(null);
   }, []);
 
   const submit = useCallback(async () => {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
     if (type === "relation" && !targetDbId) return;
+    if (isDerived && !throughRelationId) return;
+    if (needsTargetColumn && !targetColumnId) return;
     setBusy(true);
     try {
+      let config: DataColumnConfig | undefined;
+      if (type === "relation") config = { relationTableId: targetDbId };
+      else if (type === "lookup")
+        config = {
+          relationColumnId: throughRelationId,
+          lookupColumnId: targetColumnId,
+        };
+      else if (type === "rollup")
+        config = {
+          relationColumnId: throughRelationId,
+          rollupFn,
+          ...(rollupFn !== "count" ? { rollupColumnId: targetColumnId } : {}),
+        };
       await onAdd({
         name: trimmed,
         type,
-        config:
-          type === "relation" ? { relationTableId: targetDbId } : undefined,
+        config,
         createBacklink: type === "relation" ? withBacklink : undefined,
       });
       close();
     } finally {
       setBusy(false);
     }
-  }, [name, type, targetDbId, busy, onAdd, close]);
+  }, [
+    name,
+    type,
+    targetDbId,
+    withBacklink,
+    isDerived,
+    needsTargetColumn,
+    throughRelationId,
+    targetColumnId,
+    rollupFn,
+    busy,
+    onAdd,
+    close,
+  ]);
 
   return (
     <div className="shrink-0">
@@ -194,6 +280,85 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
           </>
         )}
 
+        {isDerived && (
+          <>
+            <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Through relation
+            </label>
+            {relationColumns.length === 0 ? (
+              <p className="text-[11px] text-muted-foreground">
+                Add a Relation column first — {TYPE_LABEL[type]} reads its
+                values through one.
+              </p>
+            ) : (
+              <select
+                value={throughRelationId}
+                onChange={(e) => {
+                  setThroughRelationId(e.target.value);
+                  setTargetColumnId("");
+                }}
+                className={fieldClass}
+              >
+                <option value="">Choose a relation…</option>
+                {relationColumns.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {type === "rollup" && (
+              <>
+                <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  Calculate
+                </label>
+                <select
+                  value={rollupFn}
+                  onChange={(e) => setRollupFn(e.target.value as RollupFn)}
+                  className={fieldClass}
+                >
+                  {ROLLUP_FNS.map((fn) => (
+                    <option key={fn} value={fn}>
+                      {ROLLUP_LABEL[fn]}
+                    </option>
+                  ))}
+                </select>
+              </>
+            )}
+
+            {needsTargetColumn && throughRelationId && (
+              <>
+                <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                  {type === "lookup" ? "Show column" : "Over column"}
+                </label>
+                <select
+                  value={targetColumnId}
+                  onChange={(e) => setTargetColumnId(e.target.value)}
+                  className={fieldClass}
+                >
+                  <option value="">
+                    {targetColumns === null ? "Loading…" : "Choose a column…"}
+                  </option>
+                  {(targetColumns ?? [])
+                    .filter((c) =>
+                      type === "rollup" && rollupFn !== "join"
+                        ? c.type === "number"
+                        : c.type !== "relation" &&
+                          c.type !== "lookup" &&
+                          c.type !== "rollup"
+                    )
+                    .map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                </select>
+              </>
+            )}
+          </>
+        )}
+
         <div className="mt-3 flex justify-end gap-2">
           <button
             type="button"
@@ -205,7 +370,13 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
           <button
             type="button"
             onClick={submit}
-            disabled={!name.trim() || busy || (type === "relation" && !targetDbId)}
+            disabled={
+              !name.trim() ||
+              busy ||
+              (type === "relation" && !targetDbId) ||
+              (isDerived && !throughRelationId) ||
+              (needsTargetColumn && !targetColumnId)
+            }
             className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
           >
             Add

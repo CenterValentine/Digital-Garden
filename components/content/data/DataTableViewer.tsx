@@ -1091,7 +1091,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               </DataColumnHeader>
             ))}
             {canEditData && (
-              <AddColumnButton tableId={contentId} onAdd={addColumn} />
+              <AddColumnButton
+                tableId={contentId}
+                columns={columns}
+                onAdd={addColumn}
+              />
             )}
           </div>
 

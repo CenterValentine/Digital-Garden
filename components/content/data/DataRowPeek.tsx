@@ -132,7 +132,26 @@ export function DataRowPeek({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {columns.map((column) =>
-          column.type === "relation" ? (
+          column.type === "lookup" || column.type === "rollup" ? (
+            <div
+              key={`${row.id}:${column.id}`}
+              className="border-b border-border/40 py-2.5 last:border-b-0"
+            >
+              <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+                {column.name}
+              </label>
+              <p className="text-xs text-muted-foreground">
+                {row.derived?.[column.id] !== undefined
+                  ? String(row.derived[column.id])
+                  : "—"}
+              </p>
+              {column.description && (
+                <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+                  {column.description}
+                </p>
+              )}
+            </div>
+          ) : column.type === "relation" ? (
             <RelationField
               key={`${row.id}:${column.id}`}
               tableId={tableId}
