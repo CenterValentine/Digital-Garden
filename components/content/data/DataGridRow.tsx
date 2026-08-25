@@ -57,8 +57,9 @@ interface DataGridRowProps {
   onToggleSelect: (rowId: string) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   onSelectCell: (rowId: string, columnKey: string) => void;
-  /** Open this row in the peek panel. */
-  onOpenRow: (rowId: string) => void;
+  /** Open this row in the peek panel — optionally focused on one column,
+   * which auto-opens that relation's link picker (no second click). */
+  onOpenRow: (rowId: string, focusColumnId?: string) => void;
   /** Tab/Shift+Tab out of an editing cell. */
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   /** Enter/Escape ended an edit — the parent clears any forced target. */
@@ -157,7 +158,7 @@ interface DataCellProps {
   cellSelected: boolean;
   onCommit: (rowId: string, columnKey: string, value: unknown) => void;
   onSelect: (rowId: string, columnKey: string) => void;
-  onOpenRow: (rowId: string) => void;
+  onOpenRow: (rowId: string, focusColumnId?: string) => void;
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   onEditEnd: () => void;
 }
@@ -275,7 +276,9 @@ function DataCell({
             title="Link rows"
             onClick={(e) => {
               e.stopPropagation();
-              onOpenRow(rowId);
+              // Straight into THIS relation's picker — the + used to open
+              // the peek and then demand a second + (owner, 2026-08-26).
+              onOpenRow(rowId, column.id);
             }}
             className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >

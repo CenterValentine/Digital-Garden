@@ -44,6 +44,8 @@ interface DataRowPeekProps {
   editable: boolean;
   index: number;
   total: number;
+  /** Auto-open this column's link picker on mount (the grid's relation +). */
+  focusColumnId?: string | null;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
@@ -58,6 +60,7 @@ export function DataRowPeek({
   editable,
   index,
   total,
+  focusColumnId,
   onCommitCell,
   onRefresh,
   onNavigate,
@@ -79,9 +82,8 @@ export function DataRowPeek({
   }, [onClose]);
 
   const primary = columns.find((c) => c.isPrimary) ?? columns[0] ?? null;
-  const title = primary
-    ? cellToText(primary, row.data[primary.key]) || "Untitled"
-    : "Untitled";
+  const rawTitle = primary ? cellToText(primary, row.data[primary.key]) : "";
+  const title = rawTitle || "Untitled";
 
   return (
     <aside
@@ -126,7 +128,19 @@ export function DataRowPeek({
         </div>
       </header>
 
-      <h3 className="truncate px-3 pb-1 pt-3 text-base font-semibold" title={title}>
+      {/* The heading IS the primary column's value — "Untitled" is its
+          empty state, not data (owner asked where it came from,
+          2026-08-26). Italic + muted + a tooltip make that legible. */}
+      <h3
+        className={cn(
+          "truncate px-3 pb-1 pt-3 text-base font-semibold",
+          !rawTitle && "italic text-muted-foreground"
+        )}
+        title={
+          rawTitle ||
+          `Untitled — this row is named by its ${primary?.name ?? "primary"} column`
+        }
+      >
         {title}
       </h3>
 
@@ -159,6 +173,7 @@ export function DataRowPeek({
               column={column}
               links={row.links?.[column.id] ?? []}
               editable={editable}
+              autoOpen={focusColumnId === column.id}
               onRefresh={onRefresh}
             />
           ) : (
@@ -350,6 +365,8 @@ interface RelationFieldProps {
   column: DataColumn;
   links: RelationLinkRef[];
   editable: boolean;
+  /** Open the picker immediately — the grid's + landed here on purpose. */
+  autoOpen?: boolean;
   onRefresh: () => void;
 }
 
@@ -365,9 +382,10 @@ function RelationField({
   column,
   links,
   editable,
+  autoOpen = false,
   onRefresh,
 }: RelationFieldProps) {
-  const [picking, setPicking] = useState(false);
+  const [picking, setPicking] = useState(autoOpen && editable);
   const [candidates, setCandidates] = useState<
     Array<{ id: string; title: string }> | null
   >(null);
@@ -386,34 +404,42 @@ function RelationField({
     : column.id;
   const linksEndpointTable = isBacklink ? targetTableId : tableId;
 
-  const openPicker = useCallback(async () => {
-    setPicking(true);
-    if (candidates !== null || !targetTableId) return;
-    try {
-      const res = await fetch(`/api/content/data/${targetTableId}`, {
-        credentials: "include",
-      });
-      const json = await res.json();
-      if (!json?.success) {
-        setCandidates([]);
-        return;
+  // Candidates load whenever the picker is open and empty — whether it was
+  // opened by click or by the grid's + (autoOpen), one code path.
+  useEffect(() => {
+    if (!picking || candidates !== null || !targetTableId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/content/data/${targetTableId}`, {
+          credentials: "include",
+        });
+        const json = await res.json();
+        if (cancelled) return;
+        if (!json?.success) {
+          setCandidates([]);
+          return;
+        }
+        const primary = (json.data.table.columns as DataColumn[]).find(
+          (c) => c.isPrimary
+        );
+        setCandidates(
+          (json.data.rows as DataRow[]).map((r) => ({
+            id: r.id,
+            title:
+              (primary && typeof r.data[primary.key] === "string"
+                ? (r.data[primary.key] as string)
+                : "") || "Untitled",
+          }))
+        );
+      } catch {
+        if (!cancelled) setCandidates([]);
       }
-      const primary = (json.data.table.columns as DataColumn[]).find(
-        (c) => c.isPrimary
-      );
-      setCandidates(
-        (json.data.rows as DataRow[]).map((r) => ({
-          id: r.id,
-          title:
-            (primary && typeof r.data[primary.key] === "string"
-              ? (r.data[primary.key] as string)
-              : "") || "Untitled",
-        }))
-      );
-    } catch {
-      setCandidates([]);
-    }
-  }, [candidates, targetTableId]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [picking, candidates, targetTableId]);
 
   const link = useCallback(
     async (toRowId: string) => {
@@ -502,7 +528,7 @@ function RelationField({
             type="button"
             aria-label="Link rows"
             title="Link rows"
-            onClick={() => (picking ? setPicking(false) : void openPicker())}
+            onClick={() => setPicking((p) => !p)}
             className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
             <Plus className="h-2.5 w-2.5" />

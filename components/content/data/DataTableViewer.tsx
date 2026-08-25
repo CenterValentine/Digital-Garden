@@ -98,6 +98,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     columnKey: string;
   } | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
+  const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     columnId: string;
     side: "left" | "right";
@@ -876,7 +877,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   }, [selectedCell, columns, state.rows]);
 
   const openRow = useCallback(
-    (rowId: string) => {
+    (rowId: string, focusColumnId?: string) => {
       if (isQuery) {
         // The row IS a note/file — open the real thing, never a row page.
         const row = state.rows.find((r) => r.id === rowId);
@@ -887,6 +888,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         return;
       }
       setPeekRowId(rowId);
+      setPeekFocusColumnId(focusColumnId ?? null);
       setEditTarget(null);
     },
     [isQuery, state.rows, selectNode]
@@ -1161,10 +1163,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           editable={canEditData}
           index={peekIndex}
           total={state.rows.length}
+          focusColumnId={peekFocusColumnId}
           onCommitCell={commitCell}
           onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}
-          onClose={() => setPeekRowId(null)}
+          onClose={() => {
+            setPeekRowId(null);
+            setPeekFocusColumnId(null);
+          }}
         />
       )}
     </div>
