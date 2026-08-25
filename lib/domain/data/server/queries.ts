@@ -34,6 +34,7 @@ import {
   type FilterCondition,
   type ContentRef,
   type FilterNode,
+  type PersonRef,
   type RelationLinkRef,
   type RelativeDateWindow,
   type RowData,
@@ -546,6 +547,96 @@ async function hydrateContentRefs(
 }
 
 /**
+ * Hydrate person cells (plan Phase 4). The cell stores ONE id whose space
+ * the column's `personSource` declares:
+ *  - "person" (default): the people extension's Person entities. Resolved
+ *    when owned by the VIEWER or the TABLE OWNER (a shared table shows the
+ *    author's contacts by name); anything else — or a deleted person —
+ *    renders restricted with no name (plan V1-3).
+ *  - "user": app accounts. Names resolve for any account on the instance —
+ *    collaborators' usernames are not secrets between people sharing a
+ *    table.
+ */
+async function hydratePersonRefs(
+  rows: Array<{ id: string; data: unknown }>,
+  columns: DataColumn[],
+  tableId: string,
+  viewerId: string | undefined
+): Promise<Map<string, Record<string, PersonRef>>> {
+  const result = new Map<string, Record<string, PersonRef>>();
+  const personColumns = columns.filter(
+    (c) => c.type === "person" && !c.deletedAt
+  );
+  if (personColumns.length === 0 || rows.length === 0) return result;
+
+  const personIds = new Set<string>();
+  const userIds = new Set<string>();
+  for (const row of rows) {
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    for (const column of personColumns) {
+      const cell = data[column.key];
+      if (typeof cell !== "string" || !cell) continue;
+      if ((column.config.personSource ?? "person") === "user") {
+        userIds.add(cell);
+      } else {
+        personIds.add(cell);
+      }
+    }
+  }
+  if (personIds.size === 0 && userIds.size === 0) return result;
+
+  const tableOwner = await prisma.contentNode.findUnique({
+    where: { id: tableId },
+    select: { ownerId: true },
+  });
+  const allowedOwners = [
+    ...new Set(
+      [viewerId, tableOwner?.ownerId].filter((v): v is string => !!v)
+    ),
+  ];
+
+  const [persons, users] = await Promise.all([
+    personIds.size > 0
+      ? prisma.person.findMany({
+          where: {
+            id: { in: [...personIds] },
+            deletedAt: null,
+            ownerId: { in: allowedOwners },
+          },
+          select: { id: true, displayName: true },
+        })
+      : Promise.resolve([]),
+    userIds.size > 0
+      ? prisma.user.findMany({
+          where: { id: { in: [...userIds] } },
+          select: { id: true, username: true, email: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const personById = new Map(persons.map((p) => [p.id, p.displayName]));
+  const userById = new Map(
+    users.map((u) => [u.id, u.username || u.email || "User"])
+  );
+
+  for (const row of rows) {
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    const perColumn: Record<string, PersonRef> = {};
+    for (const column of personColumns) {
+      const cell = data[column.key];
+      if (typeof cell !== "string" || !cell) continue;
+      const source = column.config.personSource ?? "person";
+      const name =
+        source === "user" ? userById.get(cell) : personById.get(cell);
+      perColumn[column.id] = name
+        ? { id: cell, name, restricted: false }
+        : { id: cell, name: "", restricted: true };
+    }
+    if (Object.keys(perColumn).length > 0) result.set(row.id, perColumn);
+  }
+  return result;
+}
+
+/**
  * Compute lookup/rollup values (plan Phase 4, D6 — derived columns store
  * NOTHING; this happens at every read). Aggregates run over VISIBLE targets
  * only: hydration's targetData omits rows the viewer cannot see, so a
@@ -774,6 +865,7 @@ export async function loadRowPage({
     const sortedLinks = await hydrateRelationLinks(raw, columns, viewerId);
     const sortedDerived = await computeDerivedValues(raw, columns, sortedLinks);
     const sortedContentRefs = await hydrateContentRefs(raw, columns, viewerId);
+    const sortedPersonRefs = await hydratePersonRefs(raw, columns, tableId, viewerId);
     return {
       rows: raw.map((r) => ({
         id: r.id,
@@ -782,6 +874,7 @@ export async function loadRowPage({
         data: (r.data ?? {}) as RowData,
         links: sortedLinks.refs.get(r.id),
         contentRefs: sortedContentRefs.get(r.id),
+        personRefs: sortedPersonRefs.get(r.id),
         derived: sortedDerived.get(r.id),
         contentId: r.contentId,
         createdAt: r.createdAt.toISOString(),
@@ -830,6 +923,7 @@ export async function loadRowPage({
   const pageLinks = await hydrateRelationLinks(page, columns, viewerId);
   const pageDerived = await computeDerivedValues(page, columns, pageLinks);
   const pageContentRefs = await hydrateContentRefs(page, columns, viewerId);
+  const pagePersonRefs = await hydratePersonRefs(page, columns, tableId, viewerId);
 
   return {
     rows: page.map((r) => ({
@@ -839,6 +933,7 @@ export async function loadRowPage({
       data: (r.data ?? {}) as unknown as RowData,
       links: pageLinks.refs.get(r.id),
       contentRefs: pageContentRefs.get(r.id),
+      personRefs: pagePersonRefs.get(r.id),
       derived: pageDerived.get(r.id),
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),

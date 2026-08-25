@@ -30,6 +30,7 @@ import {
   type ContentRef,
   type DataColumn,
   type DataRow,
+  type PersonRef,
   type RelationLinkRef,
 } from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
@@ -130,6 +131,7 @@ function DataGridRowImpl({
             value={row.data[column.key]}
             links={row.links?.[column.id]}
             contentRefs={row.contentRefs?.[column.id]}
+            personRef={row.personRefs?.[column.id]}
             derivedValue={row.derived?.[column.id]}
             editable={editable}
             forceEdit={forceEdit}
@@ -159,6 +161,8 @@ interface DataCellProps {
   links?: RelationLinkRef[];
   /** Hydrated node targets, when this is a contentLink column. */
   contentRefs?: ContentRef[];
+  /** Hydrated person, when this is a person column. */
+  personRef?: PersonRef;
   /** Server-computed lookup/rollup value, when this is a derived column. */
   derivedValue?: string | number;
   editable: boolean;
@@ -178,6 +182,7 @@ function DataCell({
   value,
   links,
   contentRefs,
+  personRef,
   derivedValue,
   editable,
   forceEdit,
@@ -343,6 +348,51 @@ function DataCell({
             type="button"
             aria-label="Link content"
             title="Link content"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenRow(rowId, column.id);
+            }}
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            +
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Person cells show the hydrated display name; editing lives in the peek
+  // (a picker over your People). Restricted = the person is not yours to
+  // see, or was deleted (plan V1-3).
+  if (column.type === "person") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-2 text-xs",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        onClick={() => onSelect(rowId, column.key)}
+        onDoubleClick={editable ? () => onOpenRow(rowId, column.id) : undefined}
+        title={editable ? "Double-click to assign" : undefined}
+      >
+        {personRef && (
+          <span
+            className={cn(
+              "truncate rounded-full px-2 py-0.5 text-[11px]",
+              personRef.restricted
+                ? "bg-muted italic text-muted-foreground"
+                : "bg-muted text-foreground"
+            )}
+          >
+            {personRef.restricted ? "Restricted" : personRef.name}
+          </span>
+        )}
+        {!personRef && editable && (
+          <button
+            type="button"
+            aria-label="Assign person"
+            title="Assign person"
             onClick={(e) => {
               e.stopPropagation();
               onOpenRow(rowId, column.id);

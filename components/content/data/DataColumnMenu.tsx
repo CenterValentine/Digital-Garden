@@ -44,6 +44,8 @@ const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   relation: "Relation",
   lookup: "Lookup",
   rollup: "Rollup",
+  contentLink: "Content link",
+  person: "Person",
 };
 
 const ROLLUP_LABEL: Record<RollupFn, string> = {
@@ -88,6 +90,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   const [throughRelationId, setThroughRelationId] = useState("");
   const [targetColumnId, setTargetColumnId] = useState("");
   const [rollupFn, setRollupFn] = useState<RollupFn>("count");
+  const [personSource, setPersonSource] = useState<"person" | "user">("person");
   const [targetColumns, setTargetColumns] = useState<DataColumn[] | null>(null);
 
   const relationColumns = columns.filter(
@@ -157,6 +160,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     setThroughRelationId("");
     setTargetColumnId("");
     setRollupFn("count");
+    setPersonSource("person");
     setTargetColumns(null);
   }, []);
 
@@ -181,6 +185,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           rollupFn,
           ...(rollupFn !== "count" ? { rollupColumnId: targetColumnId } : {}),
         };
+      else if (type === "person") config = { personSource };
       await onAdd({
         name: trimmed,
         type,
@@ -201,6 +206,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     throughRelationId,
     targetColumnId,
     rollupFn,
+    personSource,
     busy,
     onAdd,
     close,
@@ -277,6 +283,27 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
               />
               Also add the linked column over there
             </label>
+          </>
+        )}
+
+        {type === "person" && (
+          <>
+            <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Who it points at
+            </label>
+            <select
+              value={personSource}
+              onChange={(e) =>
+                setPersonSource(e.target.value as "person" | "user")
+              }
+              className={fieldClass}
+            >
+              <option value="person">People (your contacts)</option>
+              <option value="user">App users</option>
+            </select>
+            <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+              People is usually right — it draws from your People extension.
+            </p>
           </>
         )}
 

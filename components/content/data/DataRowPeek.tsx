@@ -29,6 +29,7 @@ import {
   type ContentRef,
   type DataColumn,
   type DataRow,
+  type PersonRef,
   type RelationLinkRef,
 } from "@/lib/domain/data";
 import {
@@ -154,7 +155,16 @@ export function DataRowPeek({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {columns.map((column) =>
-          column.type === "contentLink" ? (
+          column.type === "person" ? (
+            <PersonField
+              key={`${row.id}:${column.id}`}
+              column={column}
+              personRef={row.personRefs?.[column.id]}
+              editable={editable}
+              autoOpen={focusColumnId === column.id}
+              onCommit={(v) => onCommitCell(row.id, column.key, v)}
+            />
+          ) : column.type === "contentLink" ? (
             <ContentLinkField
               key={`${row.id}:${column.id}`}
               column={column}
@@ -726,6 +736,168 @@ function ContentLinkField({
         />
       )}
 
+      {column.description && (
+        <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+          {column.description}
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+// ── Person field ─────────────────────────────────────────────────────────
+
+interface PersonFieldProps {
+  column: DataColumn;
+  personRef?: PersonRef;
+  editable: boolean;
+  autoOpen?: boolean;
+  onCommit: (value: unknown) => void;
+}
+
+/**
+ * Person editor (plan Phase 4, personSource decision 2026-08-23).
+ *
+ * "person" source searches the People extension via /api/people/search —
+ * the maintained owner-scoped search, not a bespoke list. "user" source is
+ * declared-but-read-only in v1: a mostly-single-user instance has no user
+ * roster to pick from, and the plan's value lives in the contact graph.
+ */
+function PersonField({
+  column,
+  personRef,
+  editable,
+  autoOpen = false,
+  onCommit,
+}: PersonFieldProps) {
+  const source = column.config.personSource ?? "person";
+  const canPick = editable && source === "person";
+  const [picking, setPicking] = useState(autoOpen && canPick);
+  const [query, setQuery] = useState("");
+  const [options, setOptions] = useState<
+    Array<{ id: string; name: string }> | null
+  >(null);
+
+  // Owner-scoped people search; person entries only (groups are not
+  // assignable). Re-runs as the query changes while the picker is open.
+  useEffect(() => {
+    if (!picking) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/people/search?q=${encodeURIComponent(query)}&limit=25`,
+          { credentials: "include" }
+        );
+        const json = await res.json();
+        if (cancelled || !json?.success) return;
+        const people = (
+          json.data.results as Array<{
+            treeNodeKind: string;
+            personId?: string;
+            label: string;
+          }>
+        )
+          .filter((r) => r.treeNodeKind === "person" && r.personId)
+          .map((r) => ({ id: r.personId!, name: r.label }));
+        setOptions(people);
+      } catch {
+        if (!cancelled) setOptions([]);
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [picking, query]);
+
+  return (
+    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        {column.name}
+      </label>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {personRef && (
+          <span
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
+              personRef.restricted
+                ? "bg-muted italic text-muted-foreground"
+                : "bg-muted text-foreground"
+            )}
+          >
+            {personRef.restricted ? "Restricted" : personRef.name}
+            {editable && (
+              <button
+                type="button"
+                onClick={() => onCommit(undefined)}
+                aria-label="Clear person"
+                className="rounded-full hover:bg-muted-foreground/20"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </span>
+        )}
+        {canPick && !personRef && (
+          <button
+            type="button"
+            aria-label="Assign person"
+            title="Assign person"
+            onClick={() => setPicking((p) => !p)}
+            className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            <Plus className="h-2.5 w-2.5" />
+          </button>
+        )}
+        {!canPick && !personRef && (
+          <span className="text-xs text-muted-foreground">—</span>
+        )}
+      </div>
+
+      {picking && canPick && (
+        <div className="mt-2 rounded-md border border-border p-1.5">
+          <input
+            autoFocus
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search your People…"
+            className={cn(fieldClass, "mb-1")}
+          />
+          <div className="max-h-36 overflow-y-auto">
+            {options === null && (
+              <p className="px-1 py-1 text-[11px] text-muted-foreground">Loading…</p>
+            )}
+            {options !== null && options.length === 0 && (
+              <p className="px-1 py-1 text-[11px] text-muted-foreground">
+                No people found.
+              </p>
+            )}
+            {(options ?? []).map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => {
+                  setPicking(false);
+                  onCommit(p.id);
+                }}
+                className="block w-full truncate rounded px-1.5 py-1 text-left text-xs hover:bg-muted"
+              >
+                {p.name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {source === "user" && (
+        <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+          App-user assignment arrives with multi-user; this column stores
+          account ids.
+        </p>
+      )}
       {column.description && (
         <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
           {column.description}

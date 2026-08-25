@@ -62,6 +62,7 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
   "lookup",
   "rollup",
   "contentLink",
+  "person",
 ];
 
 /**
@@ -122,6 +123,13 @@ export interface DataColumnConfig {
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
   symmetricColumnId?: string;
+  /**
+   * `person` — which id-space the cell stores (plan Phase 4 decision,
+   * 2026-08-23). Default "person": the people extension's Person entities,
+   * the contact graph — in a mostly-single-user knowledge base, `User`
+   * points at nearly nothing. Config is Json, so this cost no migration.
+   */
+  personSource?: "user" | "person";
   /** `lookup` · `rollup` — which relation column on THIS table to traverse. */
   relationColumnId?: string;
   /** `lookup` — the column on the target table whose value shows through. */
@@ -196,6 +204,13 @@ export interface ContentRef {
   restricted: boolean;
 }
 
+/** One hydrated person cell — same redaction stance as every other ref. */
+export interface PersonRef {
+  id: string;
+  name: string;
+  restricted: boolean;
+}
+
 export interface DataRow {
   id: string;
   tableId: string;
@@ -212,6 +227,8 @@ export interface DataRow {
    * stays an id array (plan B8c); titles and types are read-model.
    */
   contentRefs?: Record<string, ContentRef[]>;
+  /** Person cells hydrated to display names, keyed by column id. */
+  personRefs?: Record<string, PersonRef>;
   /**
    * Lookup/rollup results, computed server-side at read time (plan D6 —
    * derived columns store NOTHING) and keyed by column id. Display-ready:
