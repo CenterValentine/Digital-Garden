@@ -996,6 +996,14 @@ node) is where this gets genuinely hard, and it is out of scope.
 dual-write uses a distinct `linkType: "data-cell"` (verified safe: the tree's
 embed-ownership inference only reacts to `image-ref` / `audio-ref`).
 
+**Relation targets are immutable (owner question → locked, 2026-08-26).**
+`config.relationTableId` is set at creation and the columns PATCH rejects any
+change — same doctrine as O4's frozen types. Retargeting would leave existing
+`DataRowLink`s pointing into the old table while new links land in the new one
+(a mixed bag no renderer or rollup can interpret), and purging on retarget
+would be mass link destruction with no undo op. New target = new column; the
+old column soft-deletes recoverably with its links intact (V1-2).
+
 **People columns (owner, 2026-08-23).** The enum's `person` type is specced `→ User`, which
 in a mostly-single-user knowledge base points at nearly nothing. The valuable referent is the
 **people extension's Person entities** — the contact graph. Resolution requiring **no

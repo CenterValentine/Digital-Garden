@@ -200,6 +200,32 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         return badRequest("Description is limited to 280 characters");
       }
 
+      // A relation's TARGET is set once (same doctrine as O4's frozen
+      // types). Retargeting would leave existing DataRowLinks pointing into
+      // the old table while new links go to the new one — a mixed bag no
+      // renderer or rollup can make sense of — and purging them instead
+      // would be mass link destruction with no undo op. New target = new
+      // column; the old one soft-deletes recoverably.
+      if (body.config !== undefined) {
+        const existing = await prisma.dataColumn.findFirst({
+          where: { id: body.columnId, tableId: id },
+          select: { type: true, config: true },
+        });
+        if (existing?.type === "relation") {
+          const currentTarget = (
+            existing.config as { relationTableId?: string } | null
+          )?.relationTableId;
+          if (
+            body.config.relationTableId !== undefined &&
+            body.config.relationTableId !== currentTarget
+          ) {
+            return badRequest(
+              "A relation's target database is set once — create a new column to relate to a different database"
+            );
+          }
+        }
+      }
+
       await updateColumn(body.columnId, {
         name: body.name?.trim(),
         description: body.description,
