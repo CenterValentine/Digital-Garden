@@ -34,6 +34,7 @@ import {
   type DataColumn,
   type DataRow,
   type DataTable,
+  type ContentRef,
   type DataView,
   type RowData,
   type UndoExecutor,
@@ -876,6 +877,18 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [selectedCell, columns, state.rows]);
 
+  /** contentLink chip → the real node, in a workspace tab (plan Phase 4). */
+  const openContent = useCallback(
+    (ref: ContentRef) => {
+      if (ref.restricted) return;
+      selectNode(ref.id, {
+        contentType: ref.contentType,
+        title: ref.title,
+      });
+    },
+    [selectNode]
+  );
+
   const openRow = useCallback(
     (rowId: string, focusColumnId?: string) => {
       if (isQuery) {
@@ -1131,6 +1144,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   onCommitCell={commitCell}
                   onSelectCell={selectCell}
                   onOpenRow={openRow}
+                  onOpenContent={openContent}
                   onAdvance={advanceEdit}
                   onEditEnd={clearEditTarget}
                 />
@@ -1164,6 +1178,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           index={peekIndex}
           total={state.rows.length}
           focusColumnId={peekFocusColumnId}
+          onOpenContent={openContent}
           onCommitCell={commitCell}
           onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}

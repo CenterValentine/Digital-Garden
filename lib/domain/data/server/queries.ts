@@ -32,6 +32,7 @@ import {
   type DataView,
   type DataViewConfig,
   type FilterCondition,
+  type ContentRef,
   type FilterNode,
   type RelationLinkRef,
   type RelativeDateWindow,
@@ -467,6 +468,84 @@ async function hydrateRelationLinks(
 }
 
 /**
+ * Hydrate contentLink cells (plan Phase 4): the cell stores ContentNode ids
+ * (plan B8c); this resolves them to titles + content types for chips, in
+ * CELL ORDER (the array is order-significant). V1-3 stance throughout: a
+ * node the viewer cannot open — no ownership, no live grant, or deleted —
+ * yields restricted with NO title; a dangling id (target hard-gone) renders
+ * the same way rather than crashing or silently vanishing (plan G12).
+ */
+async function hydrateContentRefs(
+  rows: Array<{ id: string; data: unknown }>,
+  columns: DataColumn[],
+  viewerId: string | undefined
+): Promise<Map<string, Record<string, ContentRef[]>>> {
+  const result = new Map<string, Record<string, ContentRef[]>>();
+  const linkColumns = columns.filter(
+    (c) => c.type === "contentLink" && !c.deletedAt
+  );
+  if (linkColumns.length === 0 || rows.length === 0) return result;
+
+  const allIds = new Set<string>();
+  for (const row of rows) {
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    for (const column of linkColumns) {
+      const cell = data[column.key];
+      if (Array.isArray(cell)) {
+        for (const id of cell) if (typeof id === "string") allIds.add(id);
+      }
+    }
+  }
+  if (allIds.size === 0) return result;
+
+  const visible = viewerId
+    ? await prisma.contentNode.findMany({
+        where: {
+          id: { in: [...allIds] },
+          deletedAt: null,
+          OR: [
+            { ownerId: viewerId },
+            {
+              viewGrants: {
+                some: {
+                  userId: viewerId,
+                  OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+                },
+              },
+            },
+          ],
+        },
+        select: { id: true, title: true, contentType: true },
+      })
+    : [];
+  const byId = new Map(visible.map((n) => [n.id, n]));
+
+  for (const row of rows) {
+    const data = (row.data ?? {}) as Record<string, unknown>;
+    const perColumn: Record<string, ContentRef[]> = {};
+    for (const column of linkColumns) {
+      const cell = data[column.key];
+      if (!Array.isArray(cell) || cell.length === 0) continue;
+      perColumn[column.id] = cell
+        .filter((id): id is string => typeof id === "string")
+        .map((id) => {
+          const node = byId.get(id);
+          return node
+            ? {
+                id,
+                title: node.title || "Untitled",
+                contentType: node.contentType,
+                restricted: false,
+              }
+            : { id, title: "", contentType: null, restricted: true };
+        });
+    }
+    if (Object.keys(perColumn).length > 0) result.set(row.id, perColumn);
+  }
+  return result;
+}
+
+/**
  * Compute lookup/rollup values (plan Phase 4, D6 — derived columns store
  * NOTHING; this happens at every read). Aggregates run over VISIBLE targets
  * only: hydration's targetData omits rows the viewer cannot see, so a
@@ -694,6 +773,7 @@ export async function loadRowPage({
     `);
     const sortedLinks = await hydrateRelationLinks(raw, columns, viewerId);
     const sortedDerived = await computeDerivedValues(raw, columns, sortedLinks);
+    const sortedContentRefs = await hydrateContentRefs(raw, columns, viewerId);
     return {
       rows: raw.map((r) => ({
         id: r.id,
@@ -701,6 +781,7 @@ export async function loadRowPage({
         sortKey: r.sortKey,
         data: (r.data ?? {}) as RowData,
         links: sortedLinks.refs.get(r.id),
+        contentRefs: sortedContentRefs.get(r.id),
         derived: sortedDerived.get(r.id),
         contentId: r.contentId,
         createdAt: r.createdAt.toISOString(),
@@ -748,6 +829,7 @@ export async function loadRowPage({
   const last = page[page.length - 1];
   const pageLinks = await hydrateRelationLinks(page, columns, viewerId);
   const pageDerived = await computeDerivedValues(page, columns, pageLinks);
+  const pageContentRefs = await hydrateContentRefs(page, columns, viewerId);
 
   return {
     rows: page.map((r) => ({
@@ -756,6 +838,7 @@ export async function loadRowPage({
       sortKey: r.sortKey,
       data: (r.data ?? {}) as unknown as RowData,
       links: pageLinks.refs.get(r.id),
+      contentRefs: pageContentRefs.get(r.id),
       derived: pageDerived.get(r.id),
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),

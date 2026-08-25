@@ -144,6 +144,9 @@ export async function writeCells(
 
     // Pass 2 — commit.
     const primary = columns.find((c) => c.isPrimary && !c.deletedAt);
+    const contentLinkColumns = columns.filter(
+      (c) => c.type === "contentLink" && !c.deletedAt
+    );
     for (const [rowId, data] of nextByRow) {
       const row = rows.find((r) => r.id === rowId);
       await tx.dataRow.update({
@@ -162,6 +165,73 @@ export async function writeCells(
           where: { id: row.contentId },
           data: { title: deriveRowTitle(columns, data).slice(0, 255) },
         });
+      }
+
+      // Backlinks dual-write (plan Phase 4): a contentLink cell pointing at
+      // a node makes the TABLE a backlink source for that node, via a
+      // distinct linkType the tree's embed-ownership inference ignores
+      // (only image-ref/audio-ref feed it — verified 2026-08-23). Cell is
+      // the source of truth; ContentLink rows follow it. Removal only when
+      // NO live row in the table still references the target.
+      if (contentLinkColumns.length > 0 && row) {
+        const before = rowById.get(rowId) ?? {};
+        for (const column of contentLinkColumns) {
+          const prev = new Set(
+            Array.isArray(before[column.key])
+              ? (before[column.key] as string[])
+              : []
+          );
+          const next = new Set(
+            Array.isArray(data[column.key])
+              ? (data[column.key] as string[])
+              : []
+          );
+          for (const targetId of next) {
+            if (prev.has(targetId)) continue;
+            await tx.contentLink.upsert({
+              where: {
+                sourceId_targetId_linkType: {
+                  sourceId: tableId,
+                  targetId,
+                  linkType: "data-cell",
+                },
+              },
+              create: { sourceId: tableId, targetId, linkType: "data-cell" },
+              update: {},
+            });
+          }
+          for (const targetId of prev) {
+            if (next.has(targetId)) continue;
+            // A reference may survive through ANY contentLink column —
+            // including another column of THIS row's new state — so the
+            // existence check spans all of them, not just the edited one.
+            const stillInThisRow = contentLinkColumns.some((c) => {
+              const cell = data[c.key];
+              return Array.isArray(cell) && cell.includes(targetId);
+            });
+            if (stillInThisRow) continue;
+            const stillReferenced = await tx.dataRow.count({
+              where: {
+                tableId,
+                deletedAt: null,
+                id: { not: rowId },
+                OR: contentLinkColumns.map((c) => ({
+                  data: {
+                    path: [c.key],
+                    array_contains: [
+                      targetId,
+                    ] as unknown as Prisma.InputJsonValue,
+                  },
+                })),
+              },
+            });
+            if (stillReferenced === 0) {
+              await tx.contentLink.deleteMany({
+                where: { sourceId: tableId, targetId, linkType: "data-cell" },
+              });
+            }
+          }
+        }
       }
 
       results.push({ status: "applied", rowId, data });

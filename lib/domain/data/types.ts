@@ -61,6 +61,7 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
   "relation",
   "lookup",
   "rollup",
+  "contentLink",
 ];
 
 /**
@@ -182,6 +183,19 @@ export interface RelationLinkRef {
   restricted: boolean;
 }
 
+/**
+ * One hydrated contentLink target (plan Phase 4): a real ContentNode the
+ * cell points at. Same V1-3 redaction stance as relations — a target the
+ * viewer cannot open shows restricted with NO title. `contentType` rides
+ * along so the click can open the node in a workspace tab.
+ */
+export interface ContentRef {
+  id: string;
+  title: string;
+  contentType: string | null;
+  restricted: boolean;
+}
+
 export interface DataRow {
   id: string;
   tableId: string;
@@ -193,6 +207,11 @@ export interface DataRow {
    * a read-model attachment, not stored cell state.
    */
   links?: Record<string, RelationLinkRef[]>;
+  /**
+   * contentLink cells hydrated to nodes, keyed by column id. Cell storage
+   * stays an id array (plan B8c); titles and types are read-model.
+   */
+  contentRefs?: Record<string, ContentRef[]>;
   /**
    * Lookup/rollup results, computed server-side at read time (plan D6 —
    * derived columns store NOTHING) and keyed by column id. Display-ready:

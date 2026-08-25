@@ -19,17 +19,22 @@
  * poll-clobbers-typing hazard the grid cells dodge, dodged the same way.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
   sortStatusOptions,
   type CellValue,
+  type ContentRef,
   type DataColumn,
   type DataRow,
   type RelationLinkRef,
 } from "@/lib/domain/data";
+import {
+  ContentTreePicker,
+  useWorkspaceViewOptions,
+} from "@/components/content/pickers/ContentTreePicker";
 
 const fieldClass = cn(
   "w-full rounded-md border border-border bg-background px-2 py-1.5",
@@ -46,6 +51,8 @@ interface DataRowPeekProps {
   total: number;
   /** Auto-open this column's link picker on mount (the grid's relation +). */
   focusColumnId?: string | null;
+  /** Open a linked ContentNode in a workspace tab. */
+  onOpenContent: (ref: ContentRef) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
@@ -61,6 +68,7 @@ export function DataRowPeek({
   index,
   total,
   focusColumnId,
+  onOpenContent,
   onCommitCell,
   onRefresh,
   onNavigate,
@@ -146,7 +154,18 @@ export function DataRowPeek({
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {columns.map((column) =>
-          column.type === "lookup" || column.type === "rollup" ? (
+          column.type === "contentLink" ? (
+            <ContentLinkField
+              key={`${row.id}:${column.id}`}
+              column={column}
+              refs={row.contentRefs?.[column.id] ?? []}
+              value={row.data[column.key]}
+              editable={editable}
+              autoOpen={focusColumnId === column.id}
+              onOpenContent={onOpenContent}
+              onCommit={(v) => onCommitCell(row.id, column.key, v)}
+            />
+          ) : column.type === "lookup" || column.type === "rollup" ? (
             <div
               key={`${row.id}:${column.id}`}
               className="border-b border-border/40 py-2.5 last:border-b-0"
@@ -567,6 +586,144 @@ function RelationField({
             ))}
           </div>
         </div>
+      )}
+
+      {column.description && (
+        <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+          {column.description}
+        </p>
+      )}
+    </div>
+  );
+}
+
+
+// ── Content link field ───────────────────────────────────────────────────
+
+interface ContentLinkFieldProps {
+  column: DataColumn;
+  refs: ContentRef[];
+  value: CellValue | undefined;
+  editable: boolean;
+  autoOpen?: boolean;
+  onOpenContent: (ref: ContentRef) => void;
+  onCommit: (value: unknown) => void;
+}
+
+/**
+ * contentLink editor (plan Phase 4): chips are real nodes (click opens in a
+ * tab), × removes, + opens the CANONICAL ContentTreePicker — "Reuse THIS —
+ * do not build new pickers" (owner decision 2026-08-15). The cell stores an
+ * id array; commit goes through the ordinary cell write, which also runs
+ * the ContentLink backlinks dual-write server-side.
+ */
+function ContentLinkField({
+  column,
+  refs,
+  value,
+  editable,
+  autoOpen = false,
+  onOpenContent,
+  onCommit,
+}: ContentLinkFieldProps) {
+  const [picking, setPicking] = useState(autoOpen && editable);
+  // The anchor ELEMENT lives in state, not a ref: it is read during render
+  // (the picker needs it as a prop), and the React Compiler correctly
+  // rejects ref reads in render. A callback ref keeps it current.
+  const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
+  const { views, defaultViewId } = useWorkspaceViewOptions();
+
+  const ids = useMemo(
+    () =>
+      Array.isArray(value)
+        ? value.filter((v): v is string => typeof v === "string")
+        : [],
+    [value]
+  );
+
+  const add = useCallback(
+    (target: { id: string }) => {
+      setPicking(false);
+      if (ids.includes(target.id)) return;
+      onCommit([...ids, target.id]);
+    },
+    [ids, onCommit]
+  );
+
+  const remove = useCallback(
+    (id: string) => {
+      const next = ids.filter((x) => x !== id);
+      onCommit(next.length > 0 ? next : undefined);
+    },
+    [ids, onCommit]
+  );
+
+  return (
+    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        {column.name}
+      </label>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {refs.map((ref) => (
+          <span
+            key={ref.id}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
+              ref.restricted
+                ? "bg-muted italic text-muted-foreground"
+                : "bg-primary/10 text-primary"
+            )}
+          >
+            {ref.restricted ? (
+              "Restricted"
+            ) : (
+              <button
+                type="button"
+                onClick={() => onOpenContent(ref)}
+                className="truncate hover:underline"
+                title={`Open "${ref.title}"`}
+              >
+                {ref.title}
+              </button>
+            )}
+            {editable && !ref.restricted && (
+              <button
+                type="button"
+                onClick={() => remove(ref.id)}
+                aria-label={`Remove ${ref.title}`}
+                className="rounded-full hover:bg-primary/20"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </span>
+        ))}
+        {editable && (
+          <button
+            ref={setAnchorEl}
+            type="button"
+            aria-label="Link content"
+            title="Link content"
+            onClick={() => setPicking((p) => !p)}
+            className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            <Plus className="h-2.5 w-2.5" />
+          </button>
+        )}
+      </div>
+
+      {picking && anchorEl && (
+        <ContentTreePicker
+          anchorEl={anchorEl}
+          onPick={add}
+          onClose={() => setPicking(false)}
+          disabledIds={ids}
+          disabledReason="already linked"
+          searchPlaceholder="Link notes, files, folders…"
+          views={views}
+          defaultViewId={defaultViewId}
+        />
       )}
 
       {column.description && (

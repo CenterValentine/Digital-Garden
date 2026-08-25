@@ -27,6 +27,7 @@ import { cn } from "@/lib/core/utils";
 import {
   cellToText,
   type CellValue,
+  type ContentRef,
   type DataColumn,
   type DataRow,
   type RelationLinkRef,
@@ -60,6 +61,8 @@ interface DataGridRowProps {
   /** Open this row in the peek panel — optionally focused on one column,
    * which auto-opens that relation's link picker (no second click). */
   onOpenRow: (rowId: string, focusColumnId?: string) => void;
+  /** Open a linked ContentNode in a workspace tab (owner requirement). */
+  onOpenContent: (ref: ContentRef) => void;
   /** Tab/Shift+Tab out of an editing cell. */
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   /** Enter/Escape ended an edit — the parent clears any forced target. */
@@ -78,6 +81,7 @@ function DataGridRowImpl({
   onCommitCell,
   onSelectCell,
   onOpenRow,
+  onOpenContent,
   onAdvance,
   onEditEnd,
 }: DataGridRowProps) {
@@ -125,6 +129,7 @@ function DataGridRowImpl({
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
+            contentRefs={row.contentRefs?.[column.id]}
             derivedValue={row.derived?.[column.id]}
             editable={editable}
             forceEdit={forceEdit}
@@ -132,6 +137,7 @@ function DataGridRowImpl({
             onCommit={onCommitCell}
             onSelect={onSelectCell}
             onOpenRow={onOpenRow}
+            onOpenContent={onOpenContent}
             onAdvance={onAdvance}
             onEditEnd={onEditEnd}
           />
@@ -151,6 +157,8 @@ interface DataCellProps {
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
   links?: RelationLinkRef[];
+  /** Hydrated node targets, when this is a contentLink column. */
+  contentRefs?: ContentRef[];
   /** Server-computed lookup/rollup value, when this is a derived column. */
   derivedValue?: string | number;
   editable: boolean;
@@ -159,6 +167,7 @@ interface DataCellProps {
   onCommit: (rowId: string, columnKey: string, value: unknown) => void;
   onSelect: (rowId: string, columnKey: string) => void;
   onOpenRow: (rowId: string, focusColumnId?: string) => void;
+  onOpenContent: (ref: ContentRef) => void;
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   onEditEnd: () => void;
 }
@@ -168,6 +177,7 @@ function DataCell({
   rowId,
   value,
   links,
+  contentRefs,
   derivedValue,
   editable,
   forceEdit,
@@ -175,6 +185,7 @@ function DataCell({
   onCommit,
   onSelect,
   onOpenRow,
+  onOpenContent,
   onAdvance,
   onEditEnd,
 }: DataCellProps) {
@@ -278,6 +289,62 @@ function DataCell({
               e.stopPropagation();
               // Straight into THIS relation's picker — the + used to open
               // the peek and then demand a second + (owner, 2026-08-26).
+              onOpenRow(rowId, column.id);
+            }}
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            +
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // contentLink cells: chips are the REAL nodes — clicking one opens it in
+  // a workspace tab (owner requirement, plan Phase 4); the + goes to the
+  // peek's picker. Restricted/dangling targets show a redacted pill that
+  // opens nothing (plan V1-3/G12).
+  if (column.type === "contentLink") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        onClick={() => onSelect(rowId, column.key)}
+      >
+        {(contentRefs ?? []).map((ref) =>
+          ref.restricted ? (
+            <span
+              key={ref.id}
+              className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px] italic text-muted-foreground"
+              title="Restricted"
+            >
+              Restricted
+            </span>
+          ) : (
+            <button
+              key={ref.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenContent(ref);
+              }}
+              className="truncate rounded-full bg-primary/10 px-2 py-0.5 text-[11px] text-primary hover:bg-primary/20"
+              title={`Open "${ref.title}"`}
+            >
+              {ref.title}
+            </button>
+          )
+        )}
+        {editable && (
+          <button
+            type="button"
+            aria-label="Link content"
+            title="Link content"
+            onClick={(e) => {
+              e.stopPropagation();
               onOpenRow(rowId, column.id);
             }}
             className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
