@@ -57,6 +57,7 @@ interface AddColumnButtonProps {
     name: string;
     type: DataColumnType;
     config?: DataColumnConfig;
+    createBacklink?: boolean;
   }) => Promise<void>;
 }
 
@@ -66,6 +67,7 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
   const [type, setType] = useState<DataColumnType>("text");
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
+  const [withBacklink, setWithBacklink] = useState(true);
   const [databases, setDatabases] = useState<Array<{ id: string; title: string }>>([]);
 
   // Relation targets load lazily, first time the type is picked.
@@ -110,6 +112,7 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
         type,
         config:
           type === "relation" ? { relationTableId: targetDbId } : undefined,
+        createBacklink: type === "relation" ? withBacklink : undefined,
       });
       close();
     } finally {
@@ -179,6 +182,15 @@ export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
                 </option>
               ))}
             </select>
+            <label className="mt-2 flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={withBacklink}
+                onChange={(e) => setWithBacklink(e.target.checked)}
+                className="h-3.5 w-3.5 accent-current"
+              />
+              Also add the linked column over there
+            </label>
           </>
         )}
 

@@ -376,6 +376,75 @@ export async function createColumn(
 }
 
 /**
+ * Create a forward relation column here AND its backlink on the target, as
+ * one transaction (plan Phase 4, appendix: symmetry is a property of the
+ * columns, not the storage). The backlink is a relation column whose
+ * config.symmetricColumnId names the forward column; it owns no links —
+ * hydration reads the forward column's links with the direction flipped.
+ * The pair cross-references both ways so either side can find its mirror.
+ */
+export async function createRelationPair(
+  tableId: string,
+  targetTableId: string,
+  input: { name: string; description?: string | null },
+  backlinkName: string
+): Promise<{ forwardId: string; backlinkId: string }> {
+  return prisma.$transaction(async (tx) => {
+    const makeColumn = async (
+      onTableId: string,
+      name: string,
+      config: DataColumnConfig,
+      description: string | null
+    ) => {
+      const existing = await tx.dataColumn.findMany({
+        where: { tableId: onTableId },
+        select: { key: true, position: true },
+        orderBy: { position: "desc" },
+      });
+      return tx.dataColumn.create({
+        data: {
+          tableId: onTableId,
+          key: generateUniqueColumnKey(existing.map((c) => c.key)),
+          name: name.slice(0, 255),
+          type: "relation",
+          position: keyAtEnd(existing[0]?.position ?? null),
+          isPrimary: false,
+          config: config as unknown as Prisma.InputJsonValue,
+          description,
+        },
+        select: { id: true },
+      });
+    };
+
+    const forward = await makeColumn(
+      tableId,
+      input.name,
+      { relationTableId: targetTableId },
+      input.description?.slice(0, 280) ?? null
+    );
+    const backlink = await makeColumn(
+      targetTableId,
+      backlinkName,
+      { relationTableId: tableId, symmetricColumnId: forward.id, isBacklink: true },
+      null
+    );
+    await tx.dataColumn.update({
+      where: { id: forward.id },
+      data: {
+        config: {
+          relationTableId: targetTableId,
+          symmetricColumnId: backlink.id,
+        } as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    await refreshTableSearchText(tx, tableId);
+    await refreshTableSearchText(tx, targetTableId);
+    return { forwardId: forward.id, backlinkId: backlink.id };
+  });
+}
+
+/**
  * Rename a column, or edit its description and config.
  *
  * Note what is NOT here: `type`. Changing a column's type is forbidden

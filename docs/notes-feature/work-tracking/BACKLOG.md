@@ -10,6 +10,21 @@ last_updated: 2026-08-12
 
 ---
 
+## Database content type — follow-ups (2026-08-26, branch `feat/data-content-type`; plan: DATABASE-CONTENT-TYPE-PLAN.md)
+
+- [ ] **(Parked — keep-forever is the decision) Stale column links.** Owner
+  raised a cron sweep for links of soft-deleted relation columns, then asked
+  the better question: is keeping them even bloaty? It is not — a
+  `DataRowLink` is ~100–150 bytes with indexes, hydration filters by LIVE
+  column ids so stale links are never scanned per request, and hard-deleting
+  a database cascades everything anyway. Keeping them forever costs
+  kilobytes and buys UNBOUNDED column undo (the `Restrict` FK, plan V1-2,
+  restores a column with all relationships intact at any distance). Decision
+  2026-08-26: no cron; revisit only if a real vault ever measures otherwise.
+  If one is ever built: links first (Restrict demands the order), then the
+  column, then vacuum orphaned cell keys; dry-run mode; `app/api/cron/`
+  pattern.
+
 ## Layout intent/projection — follow-ups (2026-08-16, after P1–P3 on `feat/layout-intent-projection`; spec: LAYOUT-INTENT-PROJECTION-PLAN.md)
 
 - **F2 sync affordance** — workspace-bar dropdown of per-device layout records (<30d, data already in `ContentWorkspaceResponse.layoutRecords`), radio to pick the lead layout overriding the R5 chain; expiry falls back to default.

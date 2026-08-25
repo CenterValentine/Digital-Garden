@@ -115,6 +115,14 @@ export interface DataColumnConfig {
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
   symmetricColumnId?: string;
+  /**
+   * `relation` — TRUE on the mirrored half of a pair. The pair is
+   * cross-referenced both ways, so symmetricColumnId alone cannot tell the
+   * directions apart; this flag is the discriminator. Backlinks own no
+   * links — hydration reads the forward column's links in reverse, and the
+   * links API refuses direct writes through them.
+   */
+  isBacklink?: boolean;
 }
 
 export interface DataColumn {

@@ -356,6 +356,16 @@ function RelationField({
   const [busy, setBusy] = useState(false);
 
   const targetTableId = column.config.relationTableId;
+  /**
+   * Backlink half of a pair (plan Phase 4 appendix): it owns no links, so
+   * writes go to the FORWARD column on the other table with from/to
+   * swapped. Reads were already flipped by hydration.
+   */
+  const isBacklink = column.config.isBacklink === true;
+  const forwardColumnId = isBacklink
+    ? column.config.symmetricColumnId
+    : column.id;
+  const linksEndpointTable = isBacklink ? targetTableId : tableId;
 
   const openPicker = useCallback(async () => {
     setPicking(true);
@@ -391,18 +401,22 @@ function RelationField({
       if (busy) return;
       setBusy(true);
       try {
-        await fetch(`/api/content/data/${tableId}/links`, {
+        await fetch(`/api/content/data/${linksEndpointTable}/links`, {
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ columnId: column.id, fromRowId: rowId, toRowId }),
+          body: JSON.stringify(
+            isBacklink
+              ? { columnId: forwardColumnId, fromRowId: toRowId, toRowId: rowId }
+              : { columnId: forwardColumnId, fromRowId: rowId, toRowId }
+          ),
         });
         onRefresh();
       } finally {
         setBusy(false);
       }
     },
-    [busy, tableId, column.id, rowId, onRefresh]
+    [busy, linksEndpointTable, forwardColumnId, isBacklink, rowId, onRefresh]
   );
 
   const unlink = useCallback(
@@ -410,7 +424,9 @@ function RelationField({
       if (busy) return;
       setBusy(true);
       try {
-        await fetch(`/api/content/data/${tableId}/links`, {
+        // The link's SOURCE row lives on the forward table — the DELETE
+        // scope check demands the request go there.
+        await fetch(`/api/content/data/${linksEndpointTable}/links`, {
           method: "DELETE",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
@@ -421,7 +437,7 @@ function RelationField({
         setBusy(false);
       }
     },
-    [busy, tableId, onRefresh]
+    [busy, linksEndpointTable, onRefresh]
   );
 
   const linkedIds = new Set(links.map((l) => l.rowId));

@@ -69,7 +69,9 @@ export function DataColumnHeader({
   onColumnDragEnd,
   children,
 }: DataColumnHeaderProps) {
-  const glyph = TYPE_GLYPH[column.type] ?? "·";
+  const glyph = column.config?.isBacklink
+    ? "⇠"
+    : (TYPE_GLYPH[column.type] ?? "·");
 
   return (
     <div

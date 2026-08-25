@@ -27,6 +27,7 @@ import {
 } from "@/lib/domain/data/server/access";
 import {
   createColumn,
+  createRelationPair,
   restoreColumn,
   softDeleteColumn,
   updateColumn,
@@ -93,6 +94,8 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         type?: string;
         description?: string | null;
         config?: DataColumnConfig;
+        /** Relation only: also create the mirrored column on the target. */
+        createBacklink?: boolean;
       };
 
       const name = body.name?.trim();
@@ -125,6 +128,43 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         if (!canRead(targetLevel)) {
           return badRequest("Relation target database not found");
         }
+      }
+
+      // Backlink pair (plan Phase 4, appendix): one transaction creates the
+      // forward column here and its mirror on the target — which needs
+      // SCHEMA rights over there too. Named after THIS table, the way the
+      // reverse direction reads from the other side.
+      if (body.type === "relation" && body.createBacklink) {
+        const targetId = body.config!.relationTableId!;
+        const targetLevel = await resolveDataTableAccess(
+          targetId,
+          gate.session.user.id
+        );
+        if (!canAlterSchema(targetLevel)) {
+          return forbidden(
+            "Creating a linked column on the target needs schema access there"
+          );
+        }
+        const sourceNode = await prisma.contentNode.findUnique({
+          where: { id },
+          select: { title: true },
+        });
+        const pair = await withSpan(
+          { layer: "content", name: "data_relation_pair_create" },
+          { attrs: { target: targetId } },
+          async () =>
+            createRelationPair(
+              id,
+              targetId,
+              { name, description: body.description ?? null },
+              sourceNode?.title ?? "Linked"
+            )
+        );
+        after(() => markContextDirty([id, targetId]));
+        return NextResponse.json({
+          success: true,
+          data: { columnId: pair.forwardId, backlinkId: pair.backlinkId },
+        });
       }
 
       const columnId = await withSpan(

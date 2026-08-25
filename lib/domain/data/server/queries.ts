@@ -296,11 +296,19 @@ export interface LoadRowsOptions {
  * Hydrate relation cells for a page of rows (plan Phase 4).
  *
  * Links live ONLY in DataRowLink (plan D4); this attaches a read model:
- * per row, per relation column, the linked rows' display titles. Titles
- * come from each target table's primary column. Target tables the viewer
- * cannot read yield `restricted: true` with NO title — the V1-3 rule: the
- * existence of a private row must not leak through a relation someone
- * else drew to it.
+ * per row, per relation column, the linked rows' display titles.
+ *
+ * Two directions, one storage (the appendix rule — symmetry is a property
+ * of the COLUMNS, not the storage):
+ *  - a FORWARD column owns its links: match fromRowId, display the to-row;
+ *  - a BACKLINK column (config.symmetricColumnId set) owns nothing: it
+ *    reads the forward column's links with the direction flipped — match
+ *    toRowId, display the from-row.
+ *
+ * Titles come from each displayed row's table's primary column. Tables the
+ * viewer cannot read yield `restricted: true` with NO title — the V1-3
+ * rule: the existence of a private row must not leak through a relation
+ * someone else drew to it.
  */
 async function hydrateRelationLinks(
   rows: Array<{ id: string }>,
@@ -313,35 +321,87 @@ async function hydrateRelationLinks(
   const result = new Map<string, Record<string, RelationLinkRef[]>>();
   if (relationColumns.length === 0 || rows.length === 0) return result;
 
-  const links = await prisma.dataRowLink.findMany({
-    where: {
-      fromRowId: { in: rows.map((r) => r.id) },
-      columnId: { in: relationColumns.map((c) => c.id) },
-    },
-    orderBy: { position: "asc" },
-    select: { id: true, columnId: true, fromRowId: true, toRowId: true },
-  });
-  if (links.length === 0) return result;
+  const rowIds = rows.map((r) => r.id);
+  // The pair cross-references both ways, so symmetricColumnId is set on
+  // BOTH halves — isBacklink is the discriminator.
+  const forward = relationColumns.filter((c) => !c.config.isBacklink);
+  const backward = relationColumns.filter(
+    (c) => c.config.isBacklink && c.config.symmetricColumnId
+  );
 
-  const targetRows = await prisma.dataRow.findMany({
-    where: { id: { in: [...new Set(links.map((l) => l.toRowId))] } },
+  /** attachRowId/attachColumnId = where the chip renders;
+   *  displayRowId = whose title it shows. */
+  const entries: Array<{
+    attachRowId: string;
+    attachColumnId: string;
+    displayRowId: string;
+    linkId: string;
+    position: string;
+  }> = [];
+
+  if (forward.length > 0) {
+    const links = await prisma.dataRowLink.findMany({
+      where: {
+        fromRowId: { in: rowIds },
+        columnId: { in: forward.map((c) => c.id) },
+      },
+      orderBy: { position: "asc" },
+      select: { id: true, columnId: true, fromRowId: true, toRowId: true, position: true },
+    });
+    for (const l of links) {
+      entries.push({
+        attachRowId: l.fromRowId,
+        attachColumnId: l.columnId,
+        displayRowId: l.toRowId,
+        linkId: l.id,
+        position: l.position,
+      });
+    }
+  }
+
+  if (backward.length > 0) {
+    const bySymmetric = new Map(
+      backward.map((c) => [c.config.symmetricColumnId as string, c.id])
+    );
+    const links = await prisma.dataRowLink.findMany({
+      where: {
+        toRowId: { in: rowIds },
+        columnId: { in: [...bySymmetric.keys()] },
+      },
+      orderBy: { position: "asc" },
+      select: { id: true, columnId: true, fromRowId: true, toRowId: true, position: true },
+    });
+    for (const l of links) {
+      entries.push({
+        attachRowId: l.toRowId,
+        attachColumnId: bySymmetric.get(l.columnId)!,
+        displayRowId: l.fromRowId,
+        linkId: l.id,
+        position: l.position,
+      });
+    }
+  }
+  if (entries.length === 0) return result;
+
+  const displayRows = await prisma.dataRow.findMany({
+    where: { id: { in: [...new Set(entries.map((e) => e.displayRowId))] } },
     select: { id: true, tableId: true, data: true, deletedAt: true },
   });
-  const targetById = new Map(targetRows.map((r) => [r.id, r]));
+  const displayById = new Map(displayRows.map((r) => [r.id, r]));
 
-  const targetTableIds = [...new Set(targetRows.map((r) => r.tableId))];
+  const displayTableIds = [...new Set(displayRows.map((r) => r.tableId))];
   const primaries = await prisma.dataColumn.findMany({
-    where: { tableId: { in: targetTableIds }, isPrimary: true, deletedAt: null },
+    where: { tableId: { in: displayTableIds }, isPrimary: true, deletedAt: null },
     select: { tableId: true, key: true },
   });
   const primaryKeyByTable = new Map(primaries.map((p) => [p.tableId, p.key]));
 
-  // Visibility per TARGET TABLE: its owner, or a live grant on its node.
+  // Visibility per displayed row's TABLE: its owner, or a live grant.
   const visibleTables = new Set<string>();
-  if (targetTableIds.length > 0 && viewerId) {
+  if (displayTableIds.length > 0 && viewerId) {
     const nodes = await prisma.contentNode.findMany({
       where: {
-        id: { in: targetTableIds },
+        id: { in: displayTableIds },
         deletedAt: null,
         OR: [
           { ownerId: viewerId },
@@ -360,8 +420,8 @@ async function hydrateRelationLinks(
     for (const n of nodes) visibleTables.add(n.id);
   }
 
-  for (const link of links) {
-    const target = targetById.get(link.toRowId);
+  for (const entry of entries) {
+    const target = displayById.get(entry.displayRowId);
     if (!target || target.deletedAt) continue;
     const visible = visibleTables.has(target.tableId);
     const primaryKey = primaryKeyByTable.get(target.tableId);
@@ -369,8 +429,8 @@ async function hydrateRelationLinks(
       ? (target.data as Record<string, unknown>)?.[primaryKey]
       : undefined;
     const ref: RelationLinkRef = {
-      linkId: link.id,
-      rowId: link.toRowId,
+      linkId: entry.linkId,
+      rowId: entry.displayRowId,
       title:
         visible && typeof raw === "string" && raw
           ? raw
@@ -379,9 +439,9 @@ async function hydrateRelationLinks(
             : "",
       restricted: !visible,
     };
-    const perRow = result.get(link.fromRowId) ?? {};
-    (perRow[link.columnId] ??= []).push(ref);
-    result.set(link.fromRowId, perRow);
+    const perRow = result.get(entry.attachRowId) ?? {};
+    (perRow[entry.attachColumnId] ??= []).push(ref);
+    result.set(entry.attachRowId, perRow);
   }
   return result;
 }

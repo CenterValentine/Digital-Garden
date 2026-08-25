@@ -541,6 +541,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       name: string;
       type: DataColumn["type"];
       config?: DataColumn["config"];
+      createBacklink?: boolean;
     }) => {
       await columnRequest("POST", input);
     },

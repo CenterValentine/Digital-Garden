@@ -76,9 +76,21 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         select: { config: true },
       });
       if (!column) return badRequest("Not a relation column on this database");
-      const relationTableId = (
-        column.config as { relationTableId?: string } | null
-      )?.relationTableId;
+      const config = column.config as {
+        relationTableId?: string;
+        symmetricColumnId?: string;
+        isBacklink?: boolean;
+      } | null;
+      // Backlink columns own no links — they read the forward column's rows
+      // in reverse. Writing through them would create orphan links no
+      // hydration path ever reads; the client writes to the FORWARD column
+      // on the other table instead.
+      if (config?.isBacklink) {
+        return badRequest(
+          "This column mirrors a relation on the other database — link from there"
+        );
+      }
+      const relationTableId = config?.relationTableId;
 
       // Source row belongs here; target row belongs to the CONFIGURED table.
       const [fromRow, toRow] = await Promise.all([

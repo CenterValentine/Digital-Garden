@@ -261,15 +261,22 @@ function DataCell({
           </span>
         ))}
         {/* The + rides along whether the cell is empty or populated —
-            linking more rows is as normal as linking the first one
-            (owner, 2026-08-26). */}
+            linking more rows is as normal as linking the first one, and it
+            is a real BUTTON straight into the peek, not a hint that only
+            looked like one (owner, 2026-08-26). */}
         {editable && (
-          <span
+          <button
+            type="button"
             aria-label="Link rows"
-            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+            title="Link rows"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenRow(rowId);
+            }}
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
             +
-          </span>
+          </button>
         )}
       </div>
     );
