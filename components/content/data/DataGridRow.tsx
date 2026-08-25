@@ -129,6 +129,7 @@ function DataGridRowImpl({
             cellSelected={selectedColumnKey === column.key}
             onCommit={onCommitCell}
             onSelect={onSelectCell}
+            onOpenRow={onOpenRow}
             onAdvance={onAdvance}
             onEditEnd={onEditEnd}
           />
@@ -153,6 +154,7 @@ interface DataCellProps {
   cellSelected: boolean;
   onCommit: (rowId: string, columnKey: string, value: unknown) => void;
   onSelect: (rowId: string, columnKey: string) => void;
+  onOpenRow: (rowId: string) => void;
   onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
   onEditEnd: () => void;
 }
@@ -167,6 +169,7 @@ function DataCell({
   cellSelected,
   onCommit,
   onSelect,
+  onOpenRow,
   onAdvance,
   onEditEnd,
 }: DataCellProps) {
@@ -224,19 +227,31 @@ function DataCell({
     );
   }
 
-  // Relation cells render their hydrated targets as chips — read-only in
-  // the grid, edited from the peek. A restricted target shows a redacted
-  // pill, never a title (plan V1-3).
+  // Relation cells render their hydrated targets as chips — LINKED and
+  // edited from the row peek, which double-click opens. An empty editable
+  // cell says so instead of rendering as nothing: "I linked the tables but
+  // can't see how to connect rows" was the owner hitting exactly that
+  // silence (2026-08-26). A restricted target shows a redacted pill, never
+  // a title (plan V1-3).
   if (column.type === "relation") {
+    const empty = (links ?? []).length === 0;
     return (
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          editable && "cursor-pointer"
         )}
         style={{ width: DEFAULT_COLUMN_WIDTH }}
         onClick={() => onSelect(rowId, column.key)}
+        onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
+        title={editable ? "Double-click to link rows" : undefined}
       >
+        {empty && editable && (
+          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground">
+            + Link
+          </span>
+        )}
         {(links ?? []).map((link) => (
           <span
             key={link.linkId}
