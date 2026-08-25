@@ -52,7 +52,10 @@ export function DataRailPanel() {
   const [databases, setDatabases] = useState<RailDatabase[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState("");
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // Databases default COLLAPSED (owner, 2026-08-25) — the rail is a launcher,
+  // and a wall of every view defeats the scan. Tracking the EXPANDED set
+  // makes collapsed-by-default the empty state.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const setSelectedContentId = useContentStore((s) => s.setSelectedContentId);
 
   useEffect(() => {
@@ -97,7 +100,7 @@ export function DataRailPanel() {
   );
 
   const toggle = useCallback((dbId: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(dbId)) next.delete(dbId);
       else next.add(dbId);
@@ -153,8 +156,9 @@ export function DataRailPanel() {
 
         {filtered.map((db) => {
           // While searching, matches stay visible regardless of collapse —
-          // a hit hidden inside a collapsed group reads as a miss.
-          const isCollapsed = q ? false : collapsed.has(db.id);
+          // a hit hidden inside a collapsed group reads as a miss. (Owner:
+          // search behaviour confirmed good — do not change.)
+          const isCollapsed = q ? false : !expanded.has(db.id);
           return (
             <div key={db.id} className="mb-0.5">
               <div className="group flex items-center">
