@@ -25,6 +25,7 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 import { clientLogger } from "@/lib/core/logger/client";
+import { DataRailPanel } from "./data/DataRailPanel";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
@@ -313,6 +314,8 @@ export function LeftSidebar() {
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
         {activeView === "inbox" && <InboxLeftPanel />}
+
+        {activeView === "databases" && <DataRailPanel />}
 
         {activeView === "recents" && <RecentsPanel />}
 

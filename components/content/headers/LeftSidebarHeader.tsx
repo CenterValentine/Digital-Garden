@@ -177,6 +177,29 @@ export function LeftSidebarHeader({
             )}
           </button>
 
+          {/* Databases rail — every table and its views, one click from
+              anywhere (DATABASE-CONTENT-TYPE-PLAN B8 surface 6). */}
+          <button
+            onClick={() => {
+              setActiveView("databases");
+              if (isSearchOpen) toggleSearch();
+            }}
+            className={`rounded-md p-1.5 transition-colors ${
+              activeView === "databases" ? tabActive : tabInactive
+            }`}
+            title="Databases"
+            type="button"
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M3 6c0-1.1 4-2 9-2s9 .9 9 2-4 2-9 2-9-.9-9-2zm0 0v12c0 1.1 4 2 9 2s9-.9 9-2V6m-18 6c0 1.1 4 2 9 2s9-.9 9-2"
+              />
+            </svg>
+          </button>
+
           {/* Extension-registered top-level tabs (people, calendar, etc.) */}
           {headerExtensionItems.map(({ item, ActionComponent }) => {
             if (item.type === "action") {

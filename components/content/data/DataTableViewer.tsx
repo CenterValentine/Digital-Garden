@@ -158,6 +158,21 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     void load(fromUrl);
   }, [load]);
 
+  // The rail's open-a-view seam: a fresh mount reads ?view= above; an
+  // already-mounted viewer switches live on this event (same CustomEvent
+  // pattern as dg:people-create-document).
+  useEffect(() => {
+    const onOpenView = (e: Event) => {
+      const detail = (e as CustomEvent<{ contentId: string; viewId: string }>)
+        .detail;
+      if (detail?.contentId !== contentId || !detail.viewId) return;
+      setSelectedRows(new Set());
+      void load(detail.viewId);
+    };
+    window.addEventListener("dg:data-open-view", onOpenView);
+    return () => window.removeEventListener("dg:data-open-view", onOpenView);
+  }, [contentId, load]);
+
   // ── Poll ───────────────────────────────────────────────────────────────
   //
   // Reuses the shared-poller shape `noteWindow` established rather than
