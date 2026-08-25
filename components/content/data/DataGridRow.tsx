@@ -363,7 +363,20 @@ function DataCell({
         cellSelected && "ring-1 ring-inset ring-primary"
       )}
       style={{ width: DEFAULT_COLUMN_WIDTH }}
-      onClick={() => onSelect(rowId, column.key)}
+      onClick={() => {
+        onSelect(rowId, column.key);
+        // First click on an EMPTY editable cell goes straight to editing —
+        // there is nothing to select-and-look-at, so the extra step was pure
+        // friction (owner, 2026-08-27). Populated cells keep click=select /
+        // double-click=edit, and the keyboard path is untouched BY
+        // CONSTRUCTION: Tab moves selection through the window keydown
+        // handler, which never routes through this click handler, so
+        // tabbing across blank cells still only selects (Enter edits).
+        if (canInlineEdit && !isSelectLike && value === undefined) {
+          onEditEnd();
+          beginEdit();
+        }
+      }}
       onDoubleClick={() => {
         if (canInlineEdit && !isSelectLike) {
           onEditEnd();
