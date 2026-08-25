@@ -125,7 +125,7 @@ export function DataFilterBar({ view, columns, canWrite, onSave }: DataFilterBar
         )}
       </button>
 
-      <PanelPortal open={open} onDismiss={close}>
+      <PanelPortal open={open} onDismiss={close} className="w-[22rem]">
         <div className="flex flex-col gap-2">
           {conditions.length === 0 && (
             <p className="text-xs text-muted-foreground">
@@ -200,47 +200,63 @@ function ConditionRow({ condition, columns, disabled, onChange, onRemove }: Cond
   const needsValue =
     condition.operator !== "isEmpty" && condition.operator !== "isNotEmpty";
 
+  // Two lines: selects + remove on the first, the VALUE on its own
+  // full-width second line. The first cut squeezed the value input into the
+  // leftovers of a 256px panel, which collapsed it to a sliver — typed text
+  // had nowhere to render (owner bug, 2026-08-24).
   return (
-    <div className="flex items-center gap-1.5">
-      <select
-        value={column.id}
-        disabled={disabled}
-        onChange={(e) => {
-          const next = columns.find((c) => c.id === e.target.value);
-          if (!next) return;
-          // Column change resets operator + value — operators are per-type
-          // and a stale value silently filters wrong.
-          onChange({
-            columnId: next.id,
-            operator: operatorsForType(next.type)[0],
-          });
-        }}
-        className={cn(fieldClass, "max-w-24 flex-1")}
-      >
-        {columns.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+    <div className="flex flex-col gap-1 rounded-md border border-border/60 p-1.5">
+      <div className="flex items-center gap-1.5">
+        <select
+          value={column.id}
+          disabled={disabled}
+          onChange={(e) => {
+            const next = columns.find((c) => c.id === e.target.value);
+            if (!next) return;
+            // Column change resets operator + value — operators are per-type
+            // and a stale value silently filters wrong.
+            onChange({
+              columnId: next.id,
+              operator: operatorsForType(next.type)[0],
+            });
+          }}
+          className={cn(fieldClass, "min-w-0 flex-1")}
+        >
+          {columns.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
 
-      <select
-        value={condition.operator}
-        disabled={disabled}
-        onChange={(e) =>
-          onChange({
-            columnId: column.id,
-            operator: e.target.value as FilterOperator,
-          })
-        }
-        className={cn(fieldClass, "shrink-0")}
-      >
-        {operators.map((op) => (
-          <option key={op} value={op}>
-            {OPERATOR_LABEL[op]}
-          </option>
-        ))}
-      </select>
+        <select
+          value={condition.operator}
+          disabled={disabled}
+          onChange={(e) =>
+            onChange({
+              columnId: column.id,
+              operator: e.target.value as FilterOperator,
+            })
+          }
+          className={cn(fieldClass, "min-w-0 flex-1")}
+        >
+          {operators.map((op) => (
+            <option key={op} value={op}>
+              {OPERATOR_LABEL[op]}
+            </option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={onRemove}
+          aria-label="Remove filter"
+          className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
+      </div>
 
       {needsValue && (
         <ValueInput
@@ -250,16 +266,6 @@ function ConditionRow({ condition, columns, disabled, onChange, onRemove }: Cond
           onChange={onChange}
         />
       )}
-
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onRemove}
-        aria-label="Remove filter"
-        className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
-      >
-        <Trash2 className="h-3 w-3" />
-      </button>
     </div>
   );
 }
@@ -281,7 +287,7 @@ function ValueInput({ column, condition, disabled, onChange }: ValueInputProps) 
         value={typeof condition.value === "string" ? condition.value : ""}
         disabled={disabled}
         onChange={(e) => set(e.target.value)}
-        className={cn(fieldClass, "flex-1")}
+        className={cn(fieldClass, "w-full")}
       >
         <option value="">Choose…</option>
         {DATE_WINDOWS.map(([v, label]) => (
@@ -322,7 +328,7 @@ function ValueInput({ column, condition, disabled, onChange }: ValueInputProps) 
           // option, stored as a one-element array.
           set(isSetOp ? [e.target.value] : e.target.value)
         }
-        className={cn(fieldClass, "flex-1")}
+        className={cn(fieldClass, "w-full")}
       >
         <option value="">Choose…</option>
         {options.map((o) => (
@@ -340,7 +346,7 @@ function ValueInput({ column, condition, disabled, onChange }: ValueInputProps) 
         value={condition.value === true ? "true" : condition.value === false ? "false" : ""}
         disabled={disabled}
         onChange={(e) => set(e.target.value === "true")}
-        className={cn(fieldClass, "flex-1")}
+        className={cn(fieldClass, "w-full")}
       >
         <option value="">Choose…</option>
         <option value="true">Checked</option>
@@ -364,7 +370,7 @@ function ValueInput({ column, condition, disabled, onChange }: ValueInputProps) 
         )
       }
       placeholder="Value"
-      className={cn(fieldClass, "min-w-0 flex-1")}
+      className={cn(fieldClass, "w-full")}
     />
   );
 }

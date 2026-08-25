@@ -117,10 +117,12 @@ function useDismiss(
 export interface PanelPortalProps {
   open: boolean;
   onDismiss: () => void;
+  /** Merged over the base chrome via cn/twMerge — e.g. `w-[22rem]` widens. */
+  className?: string;
   children: React.ReactNode;
 }
 
-export function PanelPortal({ open, onDismiss, children }: PanelPortalProps) {
+export function PanelPortal({ open, onDismiss, className, children }: PanelPortalProps) {
   const { markerRef, panelRef, pos } = usePanelPlacement(open);
   useDismiss(open, panelRef, markerRef, onDismiss);
 
@@ -132,7 +134,7 @@ export function PanelPortal({ open, onDismiss, children }: PanelPortalProps) {
         createPortal(
           <div
             ref={panelRef}
-            className={panelClass}
+            className={cn(panelClass, className)}
             style={
               pos
                 ? {
