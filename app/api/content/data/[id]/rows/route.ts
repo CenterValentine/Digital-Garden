@@ -101,6 +101,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
             ? { sortKey: cursorSortKey, id: cursorId }
             : null,
         limit,
+        viewerId: session.user.id,
       });
 
       return NextResponse.json({

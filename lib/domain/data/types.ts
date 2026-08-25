@@ -58,6 +58,7 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
   "status",
   "url",
   "email",
+  "relation",
 ];
 
 /**
@@ -146,11 +147,30 @@ export type CellValue = string | number | boolean | string[];
 /** A row's cells, keyed by `DataColumn.key`. Absent key = empty. */
 export type RowData = Record<string, CellValue>;
 
+/**
+ * One hydrated relation target (plan Phase 4). `restricted` is the V1-3
+ * redaction: a link whose target table the viewer cannot read shows a
+ * placeholder, NEVER the row's title — the existence of a private row must
+ * not leak through a relation someone else drew to it.
+ */
+export interface RelationLinkRef {
+  linkId: string;
+  rowId: string;
+  title: string;
+  restricted: boolean;
+}
+
 export interface DataRow {
   id: string;
   tableId: string;
   sortKey: string;
   data: RowData;
+  /**
+   * Relation cells, hydrated server-side and keyed by COLUMN ID. Links live
+   * only in DataRowLink (plan D4) — never mirrored into `data` — so this is
+   * a read-model attachment, not stored cell state.
+   */
+  links?: Record<string, RelationLinkRef[]>;
   /** Non-null once the row has been promoted to a ContentNode (plan D2). */
   contentId: string | null;
   /**

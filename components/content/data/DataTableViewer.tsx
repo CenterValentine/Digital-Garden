@@ -537,7 +537,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   const addColumn = useCallback(
-    async (input: { name: string; type: DataColumn["type"] }) => {
+    async (input: {
+      name: string;
+      type: DataColumn["type"];
+      config?: DataColumn["config"];
+    }) => {
       await columnRequest("POST", input);
     },
     [columnRequest]
@@ -1085,7 +1089,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 )}
               </DataColumnHeader>
             ))}
-            {canEditData && <AddColumnButton onAdd={addColumn} />}
+            {canEditData && (
+              <AddColumnButton tableId={contentId} onAdd={addColumn} />
+            )}
           </div>
 
           {/* Spacer preserves true scroll height while only a slice renders. */}
@@ -1144,12 +1150,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
       {peekRow && (
         <DataRowPeek
+          tableId={contentId}
           row={peekRow}
           columns={columns}
           editable={canEditData}
           index={peekIndex}
           total={state.rows.length}
           onCommitCell={commitCell}
+          onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}
           onClose={() => setPeekRowId(null)}
         />

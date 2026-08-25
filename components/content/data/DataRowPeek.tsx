@@ -19,8 +19,8 @@
  * poll-clobbers-typing hazard the grid cells dodge, dodged the same way.
  */
 
-import { useEffect } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { ChevronDown, ChevronUp, Plus, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
@@ -28,6 +28,7 @@ import {
   type CellValue,
   type DataColumn,
   type DataRow,
+  type RelationLinkRef,
 } from "@/lib/domain/data";
 
 const fieldClass = cn(
@@ -36,23 +37,29 @@ const fieldClass = cn(
 );
 
 interface DataRowPeekProps {
+  /** The table's contentId — relation link writes go through its API. */
+  tableId: string;
   row: DataRow;
   columns: DataColumn[];
   editable: boolean;
   index: number;
   total: number;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
+  /** Link/unlink happened — the parent reloads so hydration refreshes. */
+  onRefresh: () => void;
   onNavigate: (dir: 1 | -1) => void;
   onClose: () => void;
 }
 
 export function DataRowPeek({
+  tableId,
   row,
   columns,
   editable,
   index,
   total,
   onCommitCell,
+  onRefresh,
   onNavigate,
   onClose,
 }: DataRowPeekProps) {
@@ -124,15 +131,27 @@ export function DataRowPeek({
       </h3>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
-        {columns.map((column) => (
-          <PeekField
-            key={`${row.id}:${column.id}`}
-            column={column}
-            value={row.data[column.key]}
-            editable={editable}
-            onCommit={(v) => onCommitCell(row.id, column.key, v)}
-          />
-        ))}
+        {columns.map((column) =>
+          column.type === "relation" ? (
+            <RelationField
+              key={`${row.id}:${column.id}`}
+              tableId={tableId}
+              rowId={row.id}
+              column={column}
+              links={row.links?.[column.id] ?? []}
+              editable={editable}
+              onRefresh={onRefresh}
+            />
+          ) : (
+            <PeekField
+              key={`${row.id}:${column.id}`}
+              column={column}
+              value={row.data[column.key]}
+              editable={editable}
+              onCommit={(v) => onCommitCell(row.id, column.key, v)}
+            />
+          )
+        )}
 
         <p className="mt-4 rounded-md border border-dashed border-border p-2.5 text-[11px] leading-snug text-muted-foreground">
           {row.contentId
@@ -301,4 +320,198 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
         </p>
       );
   }
+}
+
+
+// ── Relation field ───────────────────────────────────────────────────────
+
+interface RelationFieldProps {
+  tableId: string;
+  rowId: string;
+  column: DataColumn;
+  links: RelationLinkRef[];
+  editable: boolean;
+  onRefresh: () => void;
+}
+
+/**
+ * The relation editor (plan Phase 4): linked rows as removable chips, plus
+ * a picker over the target table's rows. Restricted targets render a
+ * redacted pill and cannot be unlinked from here — you should not be able
+ * to edit what you cannot see (plan V1-3).
+ */
+function RelationField({
+  tableId,
+  rowId,
+  column,
+  links,
+  editable,
+  onRefresh,
+}: RelationFieldProps) {
+  const [picking, setPicking] = useState(false);
+  const [candidates, setCandidates] = useState<
+    Array<{ id: string; title: string }> | null
+  >(null);
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const targetTableId = column.config.relationTableId;
+
+  const openPicker = useCallback(async () => {
+    setPicking(true);
+    if (candidates !== null || !targetTableId) return;
+    try {
+      const res = await fetch(`/api/content/data/${targetTableId}`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (!json?.success) {
+        setCandidates([]);
+        return;
+      }
+      const primary = (json.data.table.columns as DataColumn[]).find(
+        (c) => c.isPrimary
+      );
+      setCandidates(
+        (json.data.rows as DataRow[]).map((r) => ({
+          id: r.id,
+          title:
+            (primary && typeof r.data[primary.key] === "string"
+              ? (r.data[primary.key] as string)
+              : "") || "Untitled",
+        }))
+      );
+    } catch {
+      setCandidates([]);
+    }
+  }, [candidates, targetTableId]);
+
+  const link = useCallback(
+    async (toRowId: string) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await fetch(`/api/content/data/${tableId}/links`, {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ columnId: column.id, fromRowId: rowId, toRowId }),
+        });
+        onRefresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, tableId, column.id, rowId, onRefresh]
+  );
+
+  const unlink = useCallback(
+    async (linkId: string) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await fetch(`/api/content/data/${tableId}/links`, {
+          method: "DELETE",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ linkId }),
+        });
+        onRefresh();
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, tableId, onRefresh]
+  );
+
+  const linkedIds = new Set(links.map((l) => l.rowId));
+  const shown = (candidates ?? []).filter(
+    (c) =>
+      !linkedIds.has(c.id) &&
+      (!filter.trim() ||
+        c.title.toLowerCase().includes(filter.trim().toLowerCase()))
+  );
+
+  return (
+    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
+        {column.name}
+      </label>
+
+      <div className="flex flex-wrap items-center gap-1">
+        {links.map((l) => (
+          <span
+            key={l.linkId}
+            className={cn(
+              "flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px]",
+              l.restricted
+                ? "bg-muted italic text-muted-foreground"
+                : "bg-primary/10 text-primary"
+            )}
+          >
+            {l.restricted ? "Restricted" : l.title}
+            {editable && !l.restricted && (
+              <button
+                type="button"
+                onClick={() => void unlink(l.linkId)}
+                aria-label={`Unlink ${l.title}`}
+                className="rounded-full hover:bg-primary/20"
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            )}
+          </span>
+        ))}
+        {editable && (
+          <button
+            type="button"
+            onClick={() => (picking ? setPicking(false) : void openPicker())}
+            className="flex items-center gap-0.5 rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            <Plus className="h-2.5 w-2.5" />
+            Link
+          </button>
+        )}
+      </div>
+
+      {picking && (
+        <div className="mt-2 rounded-md border border-border p-1.5">
+          <input
+            autoFocus
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Search rows…"
+            className={cn(fieldClass, "mb-1")}
+          />
+          <div className="max-h-36 overflow-y-auto">
+            {candidates === null && (
+              <p className="px-1 py-1 text-[11px] text-muted-foreground">Loading…</p>
+            )}
+            {candidates !== null && shown.length === 0 && (
+              <p className="px-1 py-1 text-[11px] text-muted-foreground">
+                Nothing to link.
+              </p>
+            )}
+            {shown.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                disabled={busy}
+                onClick={() => void link(c.id)}
+                className="block w-full truncate rounded px-1.5 py-1 text-left text-xs hover:bg-muted"
+              >
+                {c.title}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {column.description && (
+        <p className="mt-1 text-[10px] italic leading-snug text-muted-foreground">
+          {column.description}
+        </p>
+      )}
+    </div>
+  );
 }

@@ -29,6 +29,7 @@ import {
   type CellValue,
   type DataColumn,
   type DataRow,
+  type RelationLinkRef,
 } from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 
@@ -122,6 +123,7 @@ function DataGridRowImpl({
             column={column}
             rowId={row.id}
             value={row.data[column.key]}
+            links={row.links?.[column.id]}
             editable={editable}
             forceEdit={forceEdit}
             cellSelected={selectedColumnKey === column.key}
@@ -144,6 +146,8 @@ interface DataCellProps {
   column: DataColumn;
   rowId: string;
   value: CellValue | undefined;
+  /** Hydrated relation targets, when this is a relation column. */
+  links?: RelationLinkRef[];
   editable: boolean;
   forceEdit: boolean;
   cellSelected: boolean;
@@ -157,6 +161,7 @@ function DataCell({
   column,
   rowId,
   value,
+  links,
   editable,
   forceEdit,
   cellSelected,
@@ -215,6 +220,37 @@ function DataCell({
           aria-label={column.name}
           className="h-3.5 w-3.5 accent-current"
         />
+      </div>
+    );
+  }
+
+  // Relation cells render their hydrated targets as chips — read-only in
+  // the grid, edited from the peek. A restricted target shows a redacted
+  // pill, never a title (plan V1-3).
+  if (column.type === "relation") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        onClick={() => onSelect(rowId, column.key)}
+      >
+        {(links ?? []).map((link) => (
+          <span
+            key={link.linkId}
+            className={cn(
+              "truncate rounded-full px-2 py-0.5 text-[11px]",
+              link.restricted
+                ? "bg-muted italic text-muted-foreground"
+                : "bg-primary/10 text-primary"
+            )}
+            title={link.restricted ? "Restricted" : link.title}
+          >
+            {link.restricted ? "Restricted" : link.title}
+          </span>
+        ))}
       </div>
     );
   }

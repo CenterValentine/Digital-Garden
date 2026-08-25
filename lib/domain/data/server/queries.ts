@@ -31,6 +31,7 @@ import {
   type DataViewConfig,
   type FilterCondition,
   type FilterNode,
+  type RelationLinkRef,
   type RelativeDateWindow,
   type RowData,
   type RowPage,
@@ -287,6 +288,102 @@ export interface LoadRowsOptions {
   cursor?: RowPageCursor | null;
   limit?: number;
   now?: Date;
+  /** Needed to redact relation targets the viewer cannot see (plan V1-3). */
+  viewerId?: string;
+}
+
+/**
+ * Hydrate relation cells for a page of rows (plan Phase 4).
+ *
+ * Links live ONLY in DataRowLink (plan D4); this attaches a read model:
+ * per row, per relation column, the linked rows' display titles. Titles
+ * come from each target table's primary column. Target tables the viewer
+ * cannot read yield `restricted: true` with NO title — the V1-3 rule: the
+ * existence of a private row must not leak through a relation someone
+ * else drew to it.
+ */
+async function hydrateRelationLinks(
+  rows: Array<{ id: string }>,
+  columns: DataColumn[],
+  viewerId: string | undefined
+): Promise<Map<string, Record<string, RelationLinkRef[]>>> {
+  const relationColumns = columns.filter(
+    (c) => c.type === "relation" && !c.deletedAt
+  );
+  const result = new Map<string, Record<string, RelationLinkRef[]>>();
+  if (relationColumns.length === 0 || rows.length === 0) return result;
+
+  const links = await prisma.dataRowLink.findMany({
+    where: {
+      fromRowId: { in: rows.map((r) => r.id) },
+      columnId: { in: relationColumns.map((c) => c.id) },
+    },
+    orderBy: { position: "asc" },
+    select: { id: true, columnId: true, fromRowId: true, toRowId: true },
+  });
+  if (links.length === 0) return result;
+
+  const targetRows = await prisma.dataRow.findMany({
+    where: { id: { in: [...new Set(links.map((l) => l.toRowId))] } },
+    select: { id: true, tableId: true, data: true, deletedAt: true },
+  });
+  const targetById = new Map(targetRows.map((r) => [r.id, r]));
+
+  const targetTableIds = [...new Set(targetRows.map((r) => r.tableId))];
+  const primaries = await prisma.dataColumn.findMany({
+    where: { tableId: { in: targetTableIds }, isPrimary: true, deletedAt: null },
+    select: { tableId: true, key: true },
+  });
+  const primaryKeyByTable = new Map(primaries.map((p) => [p.tableId, p.key]));
+
+  // Visibility per TARGET TABLE: its owner, or a live grant on its node.
+  const visibleTables = new Set<string>();
+  if (targetTableIds.length > 0 && viewerId) {
+    const nodes = await prisma.contentNode.findMany({
+      where: {
+        id: { in: targetTableIds },
+        deletedAt: null,
+        OR: [
+          { ownerId: viewerId },
+          {
+            viewGrants: {
+              some: {
+                userId: viewerId,
+                OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              },
+            },
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    for (const n of nodes) visibleTables.add(n.id);
+  }
+
+  for (const link of links) {
+    const target = targetById.get(link.toRowId);
+    if (!target || target.deletedAt) continue;
+    const visible = visibleTables.has(target.tableId);
+    const primaryKey = primaryKeyByTable.get(target.tableId);
+    const raw = primaryKey
+      ? (target.data as Record<string, unknown>)?.[primaryKey]
+      : undefined;
+    const ref: RelationLinkRef = {
+      linkId: link.id,
+      rowId: link.toRowId,
+      title:
+        visible && typeof raw === "string" && raw
+          ? raw
+          : visible
+            ? "Untitled"
+            : "",
+      restricted: !visible,
+    };
+    const perRow = result.get(link.fromRowId) ?? {};
+    (perRow[link.columnId] ??= []).push(ref);
+    result.set(link.fromRowId, perRow);
+  }
+  return result;
 }
 
 // ── Sort → SQL ───────────────────────────────────────────────────────────
@@ -372,6 +469,7 @@ export async function loadRowPage({
   cursor = null,
   limit = DEFAULT_ROW_PAGE_SIZE,
   now = new Date(),
+  viewerId,
 }: LoadRowsOptions): Promise<RowPage> {
   const filterWhere = view ? filterToWhere(view.filters, columns, now) : null;
 
@@ -403,12 +501,14 @@ export async function loadRowPage({
       ORDER BY ${Prisma.join(orderFragments, ", ")}, "id" ASC
       LIMIT ${limit}
     `);
+    const sortedLinks = await hydrateRelationLinks(raw, columns, viewerId);
     return {
       rows: raw.map((r) => ({
         id: r.id,
         tableId: r.tableId,
         sortKey: r.sortKey,
         data: (r.data ?? {}) as RowData,
+        links: sortedLinks.get(r.id),
         contentId: r.contentId,
         createdAt: r.createdAt.toISOString(),
         updatedAt: r.updatedAt.toISOString(),
@@ -453,6 +553,7 @@ export async function loadRowPage({
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
   const last = page[page.length - 1];
+  const pageLinks = await hydrateRelationLinks(page, columns, viewerId);
 
   return {
     rows: page.map((r) => ({
@@ -460,6 +561,7 @@ export async function loadRowPage({
       tableId: r.tableId,
       sortKey: r.sortKey,
       data: (r.data ?? {}) as unknown as RowData,
+      links: pageLinks.get(r.id),
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),

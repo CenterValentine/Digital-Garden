@@ -110,6 +110,23 @@ export async function POST(request: NextRequest, { params }: { params: Params })
         );
       }
 
+      // Relation columns must point at a real database the creator can
+      // read (plan Phase 4) — validated here so the renderer's assumption
+      // ("config.relationTableId is a data table") holds by construction.
+      if (body.type === "relation") {
+        const targetId = body.config?.relationTableId;
+        if (!targetId) {
+          return badRequest("A relation column needs a target database");
+        }
+        const targetLevel = await resolveDataTableAccess(
+          targetId,
+          gate.session.user.id
+        );
+        if (!canRead(targetLevel)) {
+          return badRequest("Relation target database not found");
+        }
+      }
+
       const columnId = await withSpan(
         { layer: "content", name: "data_column_create" },
         { attrs: { column_type: body.type } },

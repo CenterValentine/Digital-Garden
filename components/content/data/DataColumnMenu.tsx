@@ -17,13 +17,14 @@
  * migrate" is both cheaper to build and clearer about what happens to data.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
 import {
   IMPLEMENTED_COLUMN_TYPES,
   type DataColumn,
+  type DataColumnConfig,
   type DataColumnType,
 } from "@/lib/domain/data";
 
@@ -38,6 +39,7 @@ const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   status: "Status",
   url: "URL",
   email: "Email",
+  relation: "Relation",
 };
 
 const fieldClass = cn(
@@ -48,32 +50,72 @@ const fieldClass = cn(
 // ── Add ──────────────────────────────────────────────────────────────────
 
 interface AddColumnButtonProps {
-  onAdd: (input: { name: string; type: DataColumnType }) => Promise<void>;
+  /** The table this column joins — excluded from relation targets (self-
+   * relations are a later decision, not an accident waiting to happen). */
+  tableId: string;
+  onAdd: (input: {
+    name: string;
+    type: DataColumnType;
+    config?: DataColumnConfig;
+  }) => Promise<void>;
 }
 
-export function AddColumnButton({ onAdd }: AddColumnButtonProps) {
+export function AddColumnButton({ tableId, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<DataColumnType>("text");
   const [busy, setBusy] = useState(false);
+  const [targetDbId, setTargetDbId] = useState("");
+  const [databases, setDatabases] = useState<Array<{ id: string; title: string }>>([]);
+
+  // Relation targets load lazily, first time the type is picked.
+  useEffect(() => {
+    if (type !== "relation" || databases.length > 0 || !open) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/content/data", { credentials: "include" });
+        const json = await res.json();
+        if (!cancelled && json?.success) {
+          setDatabases(
+            (json.data.databases as Array<{ id: string; title: string }>).filter(
+              (db) => db.id !== tableId
+            )
+          );
+        }
+      } catch {
+        // The select stays empty; submit stays disabled — recoverable.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [type, open, databases.length, tableId]);
 
   const close = useCallback(() => {
     setOpen(false);
     setName("");
     setType("text");
+    setTargetDbId("");
   }, []);
 
   const submit = useCallback(async () => {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
+    if (type === "relation" && !targetDbId) return;
     setBusy(true);
     try {
-      await onAdd({ name: trimmed, type });
+      await onAdd({
+        name: trimmed,
+        type,
+        config:
+          type === "relation" ? { relationTableId: targetDbId } : undefined,
+      });
       close();
     } finally {
       setBusy(false);
     }
-  }, [name, type, busy, onAdd, close]);
+  }, [name, type, targetDbId, busy, onAdd, close]);
 
   return (
     <div className="shrink-0">
@@ -120,6 +162,26 @@ export function AddColumnButton({ onAdd }: AddColumnButtonProps) {
           values across.
         </p>
 
+        {type === "relation" && (
+          <>
+            <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+              Links to
+            </label>
+            <select
+              value={targetDbId}
+              onChange={(e) => setTargetDbId(e.target.value)}
+              className={fieldClass}
+            >
+              <option value="">Choose a database…</option>
+              {databases.map((db) => (
+                <option key={db.id} value={db.id}>
+                  {db.title}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
+
         <div className="mt-3 flex justify-end gap-2">
           <button
             type="button"
@@ -131,7 +193,7 @@ export function AddColumnButton({ onAdd }: AddColumnButtonProps) {
           <button
             type="button"
             onClick={submit}
-            disabled={!name.trim() || busy}
+            disabled={!name.trim() || busy || (type === "relation" && !targetDbId)}
             className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
           >
             Add

@@ -110,6 +110,7 @@ export async function GET(
             tableId: id,
             view,
             columns: table.columns,
+            viewerId: session.user.id,
           });
           span.attr("rows", result.rows.length).attr("total", result.total);
           return result;
