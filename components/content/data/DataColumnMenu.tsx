@@ -282,7 +282,7 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
 
       {column.type === "relation" && (
         <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
-          This relation's database is set once. To link somewhere else, add a
+          This relation&apos;s database is set once. To link somewhere else, add a
           new column — deleting this one keeps its links and can be undone.
         </p>
       )}
