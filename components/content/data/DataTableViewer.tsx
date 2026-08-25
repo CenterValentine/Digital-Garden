@@ -202,6 +202,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           return;
         }
 
+        // Under view sorts the merge below would be WRONG — it re-sorts by
+        // sortKey, scrambling the server's cell-value order. One reload gets
+        // the truth; changes are rare enough that this costs nothing.
+        if ((state.view?.sorts?.length ?? 0) > 0) {
+          void load(state.view?.id ?? null);
+          return;
+        }
+
         setState((s) => {
           const gone = new Set(deletedIds);
           const byId = new Map(changed.map((r) => [r.id, r]));
@@ -244,7 +252,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [contentId, state.serverTime]);
+  }, [contentId, state.serverTime, state.view, load]);
 
   // ── Viewport measurement ───────────────────────────────────────────────
 
@@ -945,6 +953,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           columns={columns}
           canWrite={state.canWrite}
           onSave={(filters) => updateView(state.view!.id, { filters })}
+          onSaveSorts={(sorts) => updateView(state.view!.id, { sorts })}
         />
       )}
 

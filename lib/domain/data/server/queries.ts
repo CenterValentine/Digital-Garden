@@ -22,6 +22,7 @@ import {
   isFilterGroup,
   resolveDateWindow,
   sortByKey,
+  sortStatusOptions,
   type DataColumn,
   type DataColumnConfig,
   type DataSort,
@@ -288,6 +289,66 @@ export interface LoadRowsOptions {
   now?: Date;
 }
 
+// ── Sort → SQL ───────────────────────────────────────────────────────────
+
+/**
+ * ORDER BY fragment for one sort, typed per column (plan B8c pays off here):
+ *  - numbers/booleans get a guarded cast — text ordering would put "10"
+ *    before "9", and jsonb_typeof guards junk from throwing;
+ *  - select/status order by OPTION POSITION via a CASE over option ids —
+ *    cells store ids (plan D3), and id ordering is meaningless;
+ *  - everything else orders as text, which for ISO-8601 dates IS
+ *    chronological order — the reason dates are stored that way.
+ * NULLS LAST both directions: empty cells sink, matching every grid users
+ * know. All user-adjacent values ride as bind parameters; the direction
+ * keyword is whitelisted, never interpolated from input.
+ */
+function sortToOrderBy(
+  sorts: DataSort[],
+  columns: DataColumn[]
+): Prisma.Sql[] {
+  const fragments: Prisma.Sql[] = [];
+  for (const sort of sorts) {
+    const column = columns.find((c) => c.id === sort.columnId && !c.deletedAt);
+    if (!column) continue; // a sort on a removed column is skipped, not fatal
+    const dir =
+      sort.direction === "desc" ? Prisma.sql`DESC` : Prisma.sql`ASC`;
+
+    let expr: Prisma.Sql;
+    if (column.type === "number") {
+      expr = Prisma.sql`(CASE WHEN jsonb_typeof("data"->${column.key}) = 'number' THEN ("data"->>${column.key})::numeric END)`;
+    } else if (column.type === "checkbox") {
+      expr = Prisma.sql`(CASE WHEN jsonb_typeof("data"->${column.key}) = 'boolean' THEN ("data"->>${column.key})::boolean END)`;
+    } else if (
+      (column.type === "select" || column.type === "status") &&
+      (column.config.options?.length ?? 0) > 0
+    ) {
+      const options =
+        column.type === "status"
+          ? sortStatusOptions(column.config.options ?? [])
+          : (column.config.options ?? []);
+      const whens = options.map(
+        (o, i) => Prisma.sql`WHEN ${o.id} THEN ${i}`
+      );
+      expr = Prisma.sql`(CASE "data"->>${column.key} ${Prisma.join(whens, " ")} END)`;
+    } else {
+      expr = Prisma.sql`"data"->>${column.key}`;
+    }
+    fragments.push(Prisma.sql`${expr} ${dir} NULLS LAST`);
+  }
+  return fragments;
+}
+
+interface RawSortedRow {
+  id: string;
+  tableId: string;
+  sortKey: string;
+  data: unknown;
+  contentId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /**
  * One page of rows.
  *
@@ -295,6 +356,14 @@ export interface LoadRowsOptions {
  * skips and duplicates rows under concurrent insertion, which is exactly
  * what a shared table has (plan B8d). The id tiebreak keeps the order total
  * even if two sort keys ever collide.
+ *
+ * With VIEW SORTS active the read switches to raw SQL — Prisma cannot
+ * orderBy a JSONB path. Filters still run through the ONE Prisma compiler
+ * (filterToWhere) as an id-preselect, so the filter semantics cannot fork
+ * into a third implementation; the raw query only orders and pages the
+ * matching ids. Sorted views serve the first `limit` rows with an accurate
+ * total — deep pagination lands with the pagination UI, which no path has
+ * yet.
  */
 export async function loadRowPage({
   tableId,
@@ -311,6 +380,43 @@ export async function loadRowPage({
     deletedAt: null,
     ...(filterWhere ? { AND: [filterWhere] } : {}),
   };
+
+  const orderFragments = view?.sorts?.length
+    ? sortToOrderBy(view.sorts, columns)
+    : [];
+
+  if (orderFragments.length > 0) {
+    // Filter via Prisma (one compiler), order via SQL. Id-preselect is cheap
+    // at this feature's design scale (plan D1: ≤10k rows per table).
+    const matching = await prisma.dataRow.findMany({
+      where: baseWhere,
+      select: { id: true },
+    });
+    if (matching.length === 0) {
+      return { rows: [], nextCursor: null, total: 0 };
+    }
+    const ids = matching.map((m) => m.id);
+    const raw = await prisma.$queryRaw<RawSortedRow[]>(Prisma.sql`
+      SELECT "id", "tableId", "sortKey", "data", "contentId", "createdAt", "updatedAt"
+      FROM "DataRow"
+      WHERE "id" = ANY(${ids}::uuid[])
+      ORDER BY ${Prisma.join(orderFragments, ", ")}, "id" ASC
+      LIMIT ${limit}
+    `);
+    return {
+      rows: raw.map((r) => ({
+        id: r.id,
+        tableId: r.tableId,
+        sortKey: r.sortKey,
+        data: (r.data ?? {}) as RowData,
+        contentId: r.contentId,
+        createdAt: r.createdAt.toISOString(),
+        updatedAt: r.updatedAt.toISOString(),
+      })),
+      nextCursor: null,
+      total: ids.length,
+    };
+  }
 
   const cursorWhere: Prisma.DataRowWhereInput | null = cursor
     ? {

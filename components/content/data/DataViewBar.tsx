@@ -53,6 +53,7 @@ export interface ViewPatch {
   mode?: DataViewMode;
   groupByColumnId?: string | null;
   filters?: import("@/lib/domain/data").FilterNode;
+  sorts?: import("@/lib/domain/data").DataSort[];
 }
 
 interface DataViewBarProps {

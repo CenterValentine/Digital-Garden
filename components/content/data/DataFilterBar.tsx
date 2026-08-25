@@ -15,13 +15,14 @@
  */
 
 import { useCallback, useState } from "react";
-import { ListFilter, Plus, Trash2 } from "lucide-react";
+import { ArrowUpDown, ListFilter, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   isFilterGroup,
   operatorsForType,
   sortStatusOptions,
   type DataColumn,
+  type DataSort,
   type DataView,
   type FilterCondition,
   type FilterNode,
@@ -67,14 +68,29 @@ function toConditions(filters: FilterNode | null | undefined): FilterCondition[]
   return filters.children.filter((c): c is FilterCondition => !isFilterGroup(c));
 }
 
+/** Types a sort can order meaningfully. multiSelect and files have no single value. */
+const SORTABLE_TYPES: ReadonlySet<string> = new Set([
+  "text",
+  "longText",
+  "number",
+  "checkbox",
+  "date",
+  "select",
+  "status",
+  "url",
+  "email",
+  "phone",
+]);
+
 interface DataFilterBarProps {
   view: DataView;
   columns: DataColumn[];
   canWrite: boolean;
   onSave: (filters: FilterNode) => Promise<void>;
+  onSaveSorts: (sorts: DataSort[]) => Promise<void>;
 }
 
-export function DataFilterBar({ view, columns, canWrite, onSave }: DataFilterBarProps) {
+export function DataFilterBar({ view, columns, canWrite, onSave, onSaveSorts }: DataFilterBarProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<FilterCondition[] | null>(null);
   const active = toConditions(view.filters);
@@ -124,6 +140,13 @@ export function DataFilterBar({ view, columns, canWrite, onSave }: DataFilterBar
           <span className="font-mono text-[10px] tabular-nums">{active.length}</span>
         )}
       </button>
+
+      <SortButton
+        view={view}
+        columns={columns}
+        canWrite={canWrite}
+        onSave={onSaveSorts}
+      />
 
       <PanelPortal open={open} onDismiss={close} className="w-[22rem]">
         <div className="flex flex-col gap-2">
@@ -372,5 +395,145 @@ function ValueInput({ column, condition, disabled, onChange }: ValueInputProps) 
       placeholder="Value"
       className={cn(fieldClass, "w-full")}
     />
+  );
+}
+
+
+// ── Sorts ────────────────────────────────────────────────────────────────
+
+interface SortButtonProps {
+  view: DataView;
+  columns: DataColumn[];
+  canWrite: boolean;
+  onSave: (sorts: DataSort[]) => Promise<void>;
+}
+
+/**
+ * Per-view sort editor. Up to three (column, direction) pairs, applied in
+ * order. Sorting runs SERVER-side through the raw ORDER BY path — never a
+ * page-local shuffle — so it stays correct past the first page.
+ */
+function SortButton({ view, columns, canWrite, onSave }: SortButtonProps) {
+  const [open, setOpen] = useState(false);
+  const [draft, setDraft] = useState<DataSort[] | null>(null);
+  const active = view.sorts ?? [];
+  const locked = view.access === "locked";
+  const sorts = draft ?? active;
+  const sortable = columns.filter((c) => SORTABLE_TYPES.has(c.type));
+
+  const close = useCallback(() => {
+    setOpen(false);
+    setDraft(null);
+  }, []);
+
+  const apply = useCallback(async () => {
+    if (draft) await onSave(draft);
+    close();
+  }, [draft, onSave, close]);
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          "flex items-center gap-1.5 rounded px-2 py-1 text-xs",
+          active.length > 0
+            ? "bg-primary/10 font-medium text-primary"
+            : "text-muted-foreground hover:bg-muted"
+        )}
+      >
+        <ArrowUpDown className="h-3.5 w-3.5" />
+        Sort
+        {active.length > 0 && (
+          <span className="font-mono text-[10px] tabular-nums">{active.length}</span>
+        )}
+      </button>
+
+      <PanelPortal open={open} onDismiss={close} className="w-72">
+        <div className="flex flex-col gap-2">
+          {sorts.length === 0 && (
+            <p className="text-xs text-muted-foreground">
+              No sorts — rows keep their manual order.
+            </p>
+          )}
+          {sorts.map((sort, i) => (
+            <div key={i} className="flex items-center gap-1.5">
+              <select
+                value={sort.columnId}
+                disabled={!canWrite || locked}
+                onChange={(e) => {
+                  const list = [...sorts];
+                  list[i] = { ...sort, columnId: e.target.value };
+                  setDraft(list);
+                }}
+                className={cn(fieldClass, "min-w-0 flex-1")}
+              >
+                {sortable.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={sort.direction}
+                disabled={!canWrite || locked}
+                onChange={(e) => {
+                  const list = [...sorts];
+                  list[i] = {
+                    ...sort,
+                    direction: e.target.value as DataSort["direction"],
+                  };
+                  setDraft(list);
+                }}
+                className={cn(fieldClass, "shrink-0")}
+              >
+                <option value="asc">Ascending</option>
+                <option value="desc">Descending</option>
+              </select>
+              <button
+                type="button"
+                disabled={!canWrite || locked}
+                onClick={() => setDraft(sorts.filter((_, j) => j !== i))}
+                aria-label="Remove sort"
+                className="shrink-0 rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-40"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+
+          <div className="mt-1 flex items-center justify-between">
+            <button
+              type="button"
+              disabled={!canWrite || locked || sorts.length >= 3 || sortable.length === 0}
+              onClick={() =>
+                setDraft([
+                  ...sorts,
+                  { columnId: sortable[0].id, direction: "asc" },
+                ])
+              }
+              className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted disabled:opacity-40"
+            >
+              <Plus className="h-3 w-3" />
+              Add sort
+            </button>
+            <button
+              type="button"
+              disabled={!canWrite || locked || draft === null}
+              onClick={() => void apply()}
+              className="rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Apply
+            </button>
+          </div>
+          {locked && (
+            <p className="text-[10px] text-muted-foreground">
+              This view is locked — its sorts cannot change.
+            </p>
+          )}
+        </div>
+      </PanelPortal>
+    </>
   );
 }

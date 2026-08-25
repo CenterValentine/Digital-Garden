@@ -30,6 +30,7 @@ import {
   keyAtEnd,
   validateFilter,
   type DataColumnConfig,
+  type DataSort,
   type FilterNode,
 } from "@/lib/domain/data";
 import { Prisma } from "@/lib/database/generated/prisma";
@@ -140,6 +141,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         mode?: string;
         groupByColumnId?: string | null;
         filters?: FilterNode;
+        sorts?: DataSort[];
       };
       if (!body.viewId) return badRequest("`viewId` is required");
       if (body.name !== undefined && !body.name.trim()) {
@@ -161,6 +163,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           `That view mode is not built yet. Available: ${IMPLEMENTED_VIEW_MODES.join(", ")}`
         );
       }
+      if (body.sorts !== undefined) {
+        if (!Array.isArray(body.sorts) || body.sorts.length > 3) {
+          return badRequest("Sorts must be a list of at most 3");
+        }
+        for (const sort of body.sorts) {
+          if (sort.direction !== "asc" && sort.direction !== "desc") {
+            return badRequest("Sort direction must be asc or desc");
+          }
+          const column = await prisma.dataColumn.findFirst({
+            where: { id: sort.columnId, tableId: id, deletedAt: null },
+            select: { id: true },
+          });
+          if (!column) return badRequest("Sort references an unknown column");
+        }
+      }
+
       // The filter tree is validated against the table's live columns —
       // an ignored clause returns MORE rows than asked for, which is the
       // failure direction that leaks data (plan B8c).
@@ -224,6 +242,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           body.mode === undefined &&
           body.groupByColumnId === undefined &&
           body.filters === undefined &&
+          body.sorts === undefined &&
           !body.makeDefault;
         if (!accessOnly || !(isViewOwner || isTableOwner)) {
           return forbidden("This view is locked — unlock it first");
@@ -244,6 +263,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
               : {}),
             ...(body.filters !== undefined
               ? { filters: body.filters as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(body.sorts !== undefined
+              ? { sorts: body.sorts as unknown as Prisma.InputJsonValue }
               : {}),
           },
         });
