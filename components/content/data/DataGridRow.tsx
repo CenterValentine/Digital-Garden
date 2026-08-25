@@ -248,8 +248,11 @@ function DataCell({
         title={editable ? "Double-click to link rows" : undefined}
       >
         {empty && editable && (
-          <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-            + Link
+          <span
+            aria-label="Link rows"
+            className="rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+          >
+            +
           </span>
         )}
         {(links ?? []).map((link) => (

@@ -465,11 +465,12 @@ function RelationField({
         {editable && (
           <button
             type="button"
+            aria-label="Link rows"
+            title="Link rows"
             onClick={() => (picking ? setPicking(false) : void openPicker())}
-            className="flex items-center gap-0.5 rounded-full border border-dashed border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/50 hover:text-foreground"
+            className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
             <Plus className="h-2.5 w-2.5" />
-            Link
           </button>
         )}
       </div>
