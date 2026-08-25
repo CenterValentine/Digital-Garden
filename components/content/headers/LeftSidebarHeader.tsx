@@ -35,6 +35,7 @@ interface LeftSidebarHeaderProps {
   onCreateVisualizationDiagramsNet?: () => void;
   onCreateChat?: () => void;
   onCreateData?: () => void;
+  onCreateDataQuery?: () => void;
   onCreateWorkflow?: () => void;
   onCreateN8nWorkflow?: () => void;
   onCreateAiImage?: () => void;
@@ -60,6 +61,7 @@ export function LeftSidebarHeader({
   onCreateVisualizationDiagramsNet,
   onCreateChat,
   onCreateData,
+  onCreateDataQuery,
   onCreateWorkflow,
   onCreateN8nWorkflow,
   onCreateAiImage,
@@ -377,6 +379,7 @@ export function LeftSidebarHeader({
             onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}
             onCreateChat={onCreateChat ? () => onCreateChat() : undefined}
             onCreateData={onCreateData ? () => onCreateData() : undefined}
+            onCreateDataQuery={onCreateDataQuery ? () => onCreateDataQuery() : undefined}
             onCreateWorkflow={onCreateWorkflow ? () => onCreateWorkflow() : undefined}
             onCreateN8nWorkflow={onCreateN8nWorkflow ? () => onCreateN8nWorkflow() : undefined}
             onCreateAiImage={onCreateAiImage ? () => onCreateAiImage() : undefined}
