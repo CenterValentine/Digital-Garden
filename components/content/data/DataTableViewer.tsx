@@ -22,6 +22,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react"
 import { Plus, Trash2, Undo2, Redo2 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
+  cellToText,
   createUndoStack,
   describeOp,
   diffRow,
@@ -39,11 +40,12 @@ import {
   type UndoOp,
   type UndoStackState,
 } from "@/lib/domain/data";
-import { DataGridRow } from "./DataGridRow";
+import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
 import { DataColumnHeader } from "./DataColumnHeader";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
+import { DataRowPeek } from "./DataRowPeek";
 
 /** Row height in px. Fixed so the windowing maths stays honest. */
 const ROW_HEIGHT = 36;
@@ -84,6 +86,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const [viewportHeight, setViewportHeight] = useState(600);
   const [openColumnId, setOpenColumnId] = useState<string | null>(null);
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<{
+    rowId: string;
+    columnKey: string;
+  } | null>(null);
+  const [selectedCell, setSelectedCell] = useState<{
+    rowId: string;
+    columnKey: string;
+  } | null>(null);
+  const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     columnId: string;
     side: "left" | "right";
@@ -686,6 +697,93 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [contentId, columns, state.view, sendWrites, load, clientId]
   );
 
+  // ── Cell keyboard model (owner friction, 2026-08-24) ───────────────────
+
+  const selectCell = useCallback((rowId: string, columnKey: string) => {
+    setSelectedCell({ rowId, columnKey });
+    setEditTarget(null);
+  }, []);
+
+  const clearEditTarget = useCallback(() => setEditTarget(null), []);
+
+  /** Tab advances editing through inline-editable columns, wrapping rows. */
+  const advanceEdit = useCallback(
+    (rowId: string, columnKey: string, dir: 1 | -1) => {
+      const editableCols = columns.filter((c) =>
+        INLINE_EDITABLE_TYPES.has(c.type)
+      );
+      const ci = editableCols.findIndex((c) => c.key === columnKey);
+      const ri = state.rows.findIndex((r) => r.id === rowId);
+      if (ci === -1 || ri === -1) {
+        setEditTarget(null);
+        return;
+      }
+      let nci = ci + dir;
+      let nri = ri;
+      if (nci >= editableCols.length) {
+        nci = 0;
+        nri = ri + 1;
+      } else if (nci < 0) {
+        nci = editableCols.length - 1;
+        nri = ri - 1;
+      }
+      const nextRow = state.rows[nri];
+      if (!nextRow) {
+        setEditTarget(null);
+        return;
+      }
+      const target = { rowId: nextRow.id, columnKey: editableCols[nci].key };
+      setEditTarget(target);
+      setSelectedCell(target);
+    },
+    [columns, state.rows]
+  );
+
+  // ⌘C on a selected cell copies its display text — labels for selects,
+  // never option ids. Skipped inside inputs and when the browser has a real
+  // text selection, so ordinary copying is never hijacked.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "c") return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (window.getSelection()?.toString()) return;
+      if (!selectedCell) return;
+      const column = columns.find((c) => c.key === selectedCell.columnKey);
+      const row = state.rows.find((r) => r.id === selectedCell.rowId);
+      if (!column || !row) return;
+      e.preventDefault();
+      const text = cellToText(column, row.data[column.key]);
+      void navigator.clipboard.writeText(text);
+      setNotice(text ? `Copied "${text.slice(0, 40)}${text.length > 40 ? "…" : ""}"` : "Copied empty cell");
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCell, columns, state.rows]);
+
+  const openRow = useCallback((rowId: string) => {
+    setPeekRowId(rowId);
+    setEditTarget(null);
+  }, []);
+
+  const navigatePeek = useCallback(
+    (dir: 1 | -1) => {
+      setPeekRowId((cur) => {
+        const i = state.rows.findIndex((r) => r.id === cur);
+        const next = state.rows[i + dir];
+        return next ? next.id : cur;
+      });
+    },
+    [state.rows]
+  );
+
   const toggleRow = useCallback((rowId: string) => {
     setSelectedRows((prev) => {
       const next = new Set(prev);
@@ -715,8 +813,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
 
   const totalHeight = state.rows.length * ROW_HEIGHT;
 
+  const peekRow = peekRowId
+    ? state.rows.find((r) => r.id === peekRowId) ?? null
+    : null;
+  const peekIndex = peekRow
+    ? state.rows.findIndex((r) => r.id === peekRow.id)
+    : -1;
+
   return (
-    <div className="flex h-full flex-col">
+    <div className="relative flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
         <h2 className="text-sm font-semibold">{title}</h2>
         <span className="font-mono text-xs text-muted-foreground">
@@ -791,6 +896,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             editable={state.canWrite}
             onCommitCell={commitCell}
             onAddRowInGroup={addRowInGroup}
+            onOpenRow={openRow}
           />
         </div>
       ) : (
@@ -802,6 +908,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         <div className="min-w-max">
           <div className="sticky top-0 z-10 flex border-b border-border bg-muted/60 backdrop-blur">
             <div className="w-9 shrink-0 border-r border-border/60" />
+            <div className="w-6 shrink-0" />
             {columns.map((column) => (
               <DataColumnHeader
                 key={column.id}
@@ -853,8 +960,20 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={state.canWrite}
+                  editColumnKey={
+                    editTarget?.rowId === row.id ? editTarget.columnKey : null
+                  }
+                  selectedColumnKey={
+                    selectedCell?.rowId === row.id
+                      ? selectedCell.columnKey
+                      : null
+                  }
                   onToggleSelect={toggleRow}
                   onCommitCell={commitCell}
+                  onSelectCell={selectCell}
+                  onOpenRow={openRow}
+                  onAdvance={advanceEdit}
+                  onEditEnd={clearEditTarget}
                 />
               ))}
             </div>
@@ -875,6 +994,19 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           )}
         </div>
       </div>
+      )}
+
+      {peekRow && (
+        <DataRowPeek
+          row={peekRow}
+          columns={columns}
+          editable={state.canWrite}
+          index={peekIndex}
+          total={state.rows.length}
+          onCommitCell={commitCell}
+          onNavigate={navigatePeek}
+          onClose={() => setPeekRowId(null)}
+        />
       )}
     </div>
   );

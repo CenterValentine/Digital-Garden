@@ -6,6 +6,7 @@ import {
   Folder,
   MessageCircle,
   MessagesSquare,
+  Table,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -32,6 +33,8 @@ export function getTabIcon(contentType: string | null): LucideIcon {
       return MessageCircle;
     case "dm-thread":
       return MessagesSquare;
+    case "data":
+      return Table;
     default:
       return File;
   }

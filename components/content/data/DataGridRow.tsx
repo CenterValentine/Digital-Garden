@@ -6,12 +6,42 @@
  * Editing is commit-on-blur / commit-on-Enter rather than per-keystroke: a
  * keystroke-level write turns one edit into forty undo entries and forty
  * round trips, and Escape needs somewhere to revert *to*.
+ *
+ * Keyboard model (owner friction, 2026-08-24):
+ *  - Tab / Shift+Tab commit and advance editing to the adjacent inline-
+ *    editable cell — the parent owns the geometry, this file only reports
+ *    direction.
+ *  - Single click SELECTS a cell (ring); ⌘C on a selected cell copies its
+ *    display text. Double-click edits, as before.
+ *
+ * Forced entry into edit mode arrives as the `forceEdit` prop and is
+ * honoured via a KEYED REMOUNT in the parent (the key embeds the flag), so
+ * the draft is seeded in the useState initializer — no state-mirroring
+ * effect, which the React Compiler rejects and which cost a data-loss bug
+ * in this file's first draft.
  */
 
 import { memo, useCallback, useState } from "react";
+import { Expand } from "lucide-react";
 import { cn } from "@/lib/core/utils";
-import { cellToText, type CellValue, type DataColumn, type DataRow } from "@/lib/domain/data";
+import {
+  cellToText,
+  type CellValue,
+  type DataColumn,
+  type DataRow,
+} from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+
+/** Types whose cells open a text input in place. Everything else edits in peek. */
+export const INLINE_EDITABLE_TYPES: ReadonlySet<string> = new Set([
+  "text",
+  "longText",
+  "number",
+  "date",
+  "url",
+  "email",
+  "phone",
+]);
 
 interface DataGridRowProps {
   row: DataRow;
@@ -19,8 +49,19 @@ interface DataGridRowProps {
   height: number;
   selected: boolean;
   editable: boolean;
+  /** Column key currently forced into edit mode in THIS row, if any. */
+  editColumnKey: string | null;
+  /** Column key currently selected (ring + ⌘C source) in THIS row, if any. */
+  selectedColumnKey: string | null;
   onToggleSelect: (rowId: string) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
+  onSelectCell: (rowId: string, columnKey: string) => void;
+  /** Open this row in the peek panel. */
+  onOpenRow: (rowId: string) => void;
+  /** Tab/Shift+Tab out of an editing cell. */
+  onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
+  /** Enter/Escape ended an edit — the parent clears any forced target. */
+  onEditEnd: () => void;
 }
 
 function DataGridRowImpl({
@@ -29,13 +70,19 @@ function DataGridRowImpl({
   height,
   selected,
   editable,
+  editColumnKey,
+  selectedColumnKey,
   onToggleSelect,
   onCommitCell,
+  onSelectCell,
+  onOpenRow,
+  onAdvance,
+  onEditEnd,
 }: DataGridRowProps) {
   return (
     <div
       className={cn(
-        "flex border-b border-border/40",
+        "group flex border-b border-border/40",
         selected ? "bg-primary/5" : "hover:bg-muted/40"
       )}
       style={{ height }}
@@ -49,16 +96,42 @@ function DataGridRowImpl({
           className="h-3.5 w-3.5 accent-current"
         />
       </div>
-      {columns.map((column) => (
-        <DataCell
-          key={column.id}
-          column={column}
-          rowId={row.id}
-          value={row.data[column.key]}
-          editable={editable}
-          onCommit={onCommitCell}
-        />
-      ))}
+      {/* Peek affordance: reserved width so cells stay aligned with the
+          header's matching spacer; visible on row hover. */}
+      <div className="flex w-6 shrink-0 items-center justify-center">
+        <button
+          type="button"
+          onClick={() => onOpenRow(row.id)}
+          title="Open row"
+          aria-label="Open row"
+          className={cn(
+            "rounded p-0.5 text-muted-foreground opacity-0",
+            "hover:bg-muted focus-visible:opacity-100 group-hover:opacity-100"
+          )}
+        >
+          <Expand className="h-3 w-3" />
+        </button>
+      </div>
+      {columns.map((column) => {
+        const forceEdit = editable && editColumnKey === column.key;
+        return (
+          <DataCell
+            // The flag lives in the key so flipping it REMOUNTS the cell —
+            // the draft seeds in the initializer instead of an effect.
+            key={`${column.id}:${forceEdit ? "e" : "v"}`}
+            column={column}
+            rowId={row.id}
+            value={row.data[column.key]}
+            editable={editable}
+            forceEdit={forceEdit}
+            cellSelected={selectedColumnKey === column.key}
+            onCommit={onCommitCell}
+            onSelect={onSelectCell}
+            onAdvance={onAdvance}
+            onEditEnd={onEditEnd}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -72,20 +145,38 @@ interface DataCellProps {
   rowId: string;
   value: CellValue | undefined;
   editable: boolean;
+  forceEdit: boolean;
+  cellSelected: boolean;
   onCommit: (rowId: string, columnKey: string, value: unknown) => void;
+  onSelect: (rowId: string, columnKey: string) => void;
+  onAdvance: (rowId: string, columnKey: string, dir: 1 | -1) => void;
+  onEditEnd: () => void;
 }
 
-function DataCell({ column, rowId, value, editable, onCommit }: DataCellProps) {
+function DataCell({
+  column,
+  rowId,
+  value,
+  editable,
+  forceEdit,
+  cellSelected,
+  onCommit,
+  onSelect,
+  onAdvance,
+  onEditEnd,
+}: DataCellProps) {
+  const canInlineEdit = editable && INLINE_EDITABLE_TYPES.has(column.type);
+
   /**
-   * The draft exists ONLY while editing, and is seeded at the moment editing
-   * begins. Holding a draft mirrored from `value` would mean syncing it back
-   * whenever a poll landed — which is both a cascading-render bug the React
-   * Compiler rejects, and a real data-loss hazard: a poll arriving mid-typing
-   * would overwrite what the user was in the middle of writing.
-   *
-   * `null` = not editing. Empty string is a legitimate draft.
+   * The draft exists ONLY while editing; `null` = view mode. Seeded from
+   * `forceEdit` in the initializer — the keyed remount above makes that
+   * sound. Holding a draft mirrored from `value` would need a sync effect,
+   * which is both a compiler error and a real data-loss hazard when a poll
+   * lands mid-typing.
    */
-  const [draft, setDraft] = useState<string | null>(null);
+  const [draft, setDraft] = useState<string | null>(() =>
+    forceEdit && canInlineEdit ? (value === undefined ? "" : String(value)) : null
+  );
   const editing = draft !== null;
 
   const asText = value === undefined ? "" : String(value);
@@ -104,12 +195,17 @@ function DataCell({ column, rowId, value, editable, onCommit }: DataCellProps) {
 
   const cancel = useCallback(() => setDraft(null), []);
 
-  // Checkboxes have no edit mode — a click IS the commit.
+  // Checkboxes have no edit mode — a click IS the commit. The wrapper click
+  // still selects, so ⌘C works on them too.
   if (column.type === "checkbox") {
     return (
       <div
-        className="flex shrink-0 items-center border-r border-border/40 px-3"
+        className={cn(
+          "flex shrink-0 items-center border-r border-border/40 px-3",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
         style={{ width: DEFAULT_COLUMN_WIDTH }}
+        onClick={() => onSelect(rowId, column.key)}
       >
         <input
           type="checkbox"
@@ -128,7 +224,7 @@ function DataCell({ column, rowId, value, editable, onCommit }: DataCellProps) {
     column.type === "status" ||
     column.type === "multiSelect";
 
-  if (editing && editable && !isSelectLike) {
+  if (editing && canInlineEdit) {
     return (
       <div
         className="shrink-0 border-r border-border/40"
@@ -143,9 +239,17 @@ function DataCell({ column, rowId, value, editable, onCommit }: DataCellProps) {
             if (e.key === "Enter") {
               e.preventDefault();
               commit();
+              onEditEnd();
             } else if (e.key === "Escape") {
               e.preventDefault();
               cancel();
+              onEditEnd();
+            } else if (e.key === "Tab") {
+              // Commit, then hand the direction up — the parent knows the
+              // column geometry and picks the adjacent editable cell.
+              e.preventDefault();
+              commit();
+              onAdvance(rowId, column.key, e.shiftKey ? -1 : 1);
             }
           }}
           className={cn(
@@ -164,12 +268,17 @@ function DataCell({ column, rowId, value, editable, onCommit }: DataCellProps) {
     <div
       className={cn(
         "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs",
-        editable && "cursor-text",
-        column.type === "number" && "justify-end font-mono tabular-nums"
+        canInlineEdit && "cursor-text",
+        column.type === "number" && "justify-end font-mono tabular-nums",
+        cellSelected && "ring-1 ring-inset ring-primary"
       )}
       style={{ width: DEFAULT_COLUMN_WIDTH }}
+      onClick={() => onSelect(rowId, column.key)}
       onDoubleClick={() => {
-        if (editable && !isSelectLike) beginEdit();
+        if (canInlineEdit && !isSelectLike) {
+          onEditEnd();
+          beginEdit();
+        }
       }}
       title={display || undefined}
     >

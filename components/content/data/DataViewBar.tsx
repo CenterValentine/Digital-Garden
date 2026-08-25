@@ -79,19 +79,62 @@ export function DataViewBar({
   onDelete,
 }: DataViewBarProps) {
   const [menuViewId, setMenuViewId] = useState<string | null>(null);
+  const [renamingViewId, setRenamingViewId] = useState<string | null>(null);
+
+  const commitRename = useCallback(
+    (viewId: string, raw: string, original: string) => {
+      setRenamingViewId(null);
+      const name = raw.trim();
+      if (!name || name === original) return;
+      void onUpdate(viewId, { name });
+    },
+    [onUpdate]
+  );
 
   return (
     <div className="flex items-center gap-0.5 overflow-x-auto border-b border-border px-2">
       {views.map((view) => {
         const active = view.id === activeViewId;
+        if (renamingViewId === view.id) {
+          return (
+            <input
+              key={view.id}
+              autoFocus
+              defaultValue={view.name}
+              onFocus={(e) => e.target.select()}
+              onBlur={(e) => commitRename(view.id, e.target.value, view.name)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  commitRename(view.id, e.currentTarget.value, view.name);
+                } else if (e.key === "Escape") {
+                  setRenamingViewId(null);
+                }
+              }}
+              className={cn(
+                "w-28 shrink-0 rounded border border-primary bg-background",
+                "px-2 py-1.5 text-xs outline-none"
+              )}
+            />
+          );
+        }
         return (
           <div key={view.id} className="relative flex shrink-0 items-stretch">
             <button
               type="button"
               onClick={() => onSwitch(view.id)}
+              onDoubleClick={() => {
+                // Double-click renames in place (owner, 2026-08-24). Locked
+                // views skip straight past — the server would refuse anyway.
+                if (canWrite && view.access !== "locked") {
+                  setRenamingViewId(view.id);
+                }
+              }}
               className={cn(
                 "flex items-center gap-1.5 rounded-t px-2.5 py-2 text-xs",
-                "-mb-px border-b-2",
+                "-mb-px border-b-2 select-none",
+                // Own the focus style: the browser's default ring collides
+                // with the active underline and reads as broken chrome.
+                "outline-none focus-visible:bg-muted/60",
                 active
                   ? "border-primary font-medium text-foreground"
                   : "border-transparent text-muted-foreground hover:bg-muted/50 hover:text-foreground"

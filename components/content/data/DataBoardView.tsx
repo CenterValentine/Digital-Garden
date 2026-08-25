@@ -41,6 +41,7 @@ interface DataBoardViewProps {
   editable: boolean;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   onAddRowInGroup: (optionId: string | null) => Promise<void>;
+  onOpenRow: (rowId: string) => void;
 }
 
 export function DataBoardView({
@@ -50,6 +51,7 @@ export function DataBoardView({
   editable,
   onCommitCell,
   onAddRowInGroup,
+  onOpenRow,
 }: DataBoardViewProps) {
   const [dragRowId, setDragRowId] = useState<string | null>(null);
   const [dropGroup, setDropGroup] = useState<string | null>(null);
@@ -187,6 +189,7 @@ export function DataBoardView({
                 cardColumns={cardColumns}
                 editable={editable}
                 dragging={dragRowId === row.id}
+                onOpen={() => onOpenRow(row.id)}
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = "move";
                   e.dataTransfer.setData("text/plain", row.id);
@@ -226,6 +229,7 @@ interface BoardCardProps {
   cardColumns: DataColumn[];
   editable: boolean;
   dragging: boolean;
+  onOpen: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
 }
@@ -236,6 +240,7 @@ function BoardCard({
   cardColumns,
   editable,
   dragging,
+  onOpen,
   onDragStart,
   onDragEnd,
 }: BoardCardProps) {
@@ -253,9 +258,11 @@ function BoardCard({
       draggable={editable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
+      onClick={onOpen}
       className={cn(
         "rounded-md border border-border bg-background p-2 shadow-sm",
-        editable && "cursor-grab active:cursor-grabbing",
+        "cursor-pointer",
+        editable && "active:cursor-grabbing",
         dragging && "opacity-40"
       )}
     >
