@@ -234,7 +234,6 @@ function DataCell({
   // silence (2026-08-26). A restricted target shows a redacted pill, never
   // a title (plan V1-3).
   if (column.type === "relation") {
-    const empty = (links ?? []).length === 0;
     return (
       <div
         className={cn(
@@ -247,14 +246,6 @@ function DataCell({
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
       >
-        {empty && editable && (
-          <span
-            aria-label="Link rows"
-            className="rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
-          >
-            +
-          </span>
-        )}
         {(links ?? []).map((link) => (
           <span
             key={link.linkId}
@@ -269,6 +260,17 @@ function DataCell({
             {link.restricted ? "Restricted" : link.title}
           </span>
         ))}
+        {/* The + rides along whether the cell is empty or populated —
+            linking more rows is as normal as linking the first one
+            (owner, 2026-08-26). */}
+        {editable && (
+          <span
+            aria-label="Link rows"
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground"
+          >
+            +
+          </span>
+        )}
       </div>
     );
   }
