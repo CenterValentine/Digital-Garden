@@ -424,6 +424,13 @@ export async function GET(
         ownedByNote: content.ownedByNote
           ? { id: content.ownedByNote.id, title: content.ownedByNote.title }
           : null,
+        promotedFromRow: content.promotedFromRow
+          ? {
+              rowId: content.promotedFromRow.id,
+              tableId: content.promotedFromRow.tableId,
+              tableTitle: content.promotedFromRow.table.content.title,
+            }
+          : null,
       };
 
       // Include full payload data

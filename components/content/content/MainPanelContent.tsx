@@ -129,6 +129,12 @@ interface ContentResponse {
     updatedAt?: string;
     // Path A: populated when this visualization is owned by a note.
     ownedByNoteId?: string | null;
+    /** Set when this node is a database row's page (plan Phase 5). */
+    promotedFromRow?: {
+      rowId: string;
+      tableId: string;
+      tableTitle: string;
+    } | null;
     ownedByNote?: { id: string; title: string } | null;
     note?: {
       tiptapJson: JSONContent | null; // Persisted from Prisma Json field
@@ -315,6 +321,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
   const [contentData, setContentData] = useState<any>(null);
+  // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when the open
+  // node is a database row's page, the breadcrumb below keeps it from
+  // reading as an orphan note with a strange title.
+  const [promotedFromRow, setPromotedFromRow] = useState<{
+    rowId: string;
+    tableId: string;
+    tableTitle: string;
+  } | null>(null);
   // Path A: when this ContentNode is a visualization owned by a note, the
   // standalone viewer is read-only. Non-null means "this is an embedded
   // drawing; edits happen in the owning note."
@@ -620,6 +634,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           contentType: result.data.contentType,
           isTemporary: false,
         });
+
+        setPromotedFromRow(result.data.promotedFromRow ?? null);
 
         // Store payload data for Phase 2 content types
         switch (result.data.contentType) {
@@ -2414,6 +2430,36 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onPersonMentionClick={handlePersonMentionClick}
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
+            )}
+            {promotedFromRow && (
+              <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
+                <span>Row of</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedContentId(promotedFromRow.tableId, {
+                      contentType: "data",
+                      title: promotedFromRow.tableTitle,
+                    })
+                  }
+                  className="font-medium text-foreground hover:underline"
+                >
+                  {promotedFromRow.tableTitle}
+                </button>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedContentId(promotedFromRow.tableId, {
+                      contentType: "data",
+                      title: promotedFromRow.tableTitle,
+                    })
+                  }
+                  className="hover:underline"
+                >
+                  Open in table
+                </button>
+              </div>
             )}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (

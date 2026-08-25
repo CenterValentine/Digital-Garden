@@ -129,6 +129,18 @@ export const CONTENT_WITH_PAYLOADS = {
   dataPayload: true,
   hopePayload: true,
   workflowPayload: true,
+
+  // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when this
+  // node IS a database row's page, carry enough to render the breadcrumb —
+  // without it, a promoted row reached from search or a backlink reads as
+  // an orphan note with a strange title.
+  promotedFromRow: {
+    select: {
+      id: true,
+      tableId: true,
+      table: { select: { content: { select: { title: true } } } },
+    },
+  },
 } as const;
 
 /**

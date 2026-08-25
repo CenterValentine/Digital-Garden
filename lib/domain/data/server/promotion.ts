@@ -1,0 +1,106 @@
+/**
+ * Row promotion (plan Phase 5, D2): a DataRow earns a real ContentNode.
+ *
+ * Lazy by design — a ContentNode here is expensive (tags, links,
+ * publishing, trash, history, grants), so only rows someone deliberately
+ * elevates ever pay for one. The promoted node:
+ *
+ *  - contentType "note": a NotePayload body for free
+ *  - parentId + ownedByNoteId = the table node (the ContentOwnedByNote
+ *    ownership edge the rest of the app already honours)
+ *  - `role` set by the TRIGGER, never a constant (plan Phase 5): `primary`
+ *    for deliberate promotion (opened as a page) — visible in the file
+ *    tree under the database; `referenced` for incidental (a wiki-link or
+ *    mention landing on the row) — hidden until the existing toggle
+ *  - title from the primary column, and the title-sync in writeCells keeps
+ *    it current from then on
+ *
+ * Deletion already cascades correctly: softDeleteRows keys off DataRow
+ * (never ownedByNoteId), so a row page filed elsewhere in the tree still
+ * dies — and restores — with its row.
+ *
+ * Idempotent: promoting a promoted row returns the existing node.
+ *
+ * SERVER-ONLY (Prisma).
+ */
+
+import { prisma } from "@/lib/database/client";
+import type { Prisma } from "@/lib/database/generated/prisma";
+import { generateUniqueSlug } from "@/lib/domain/content/slug";
+import { deriveRowTitle, type DataColumn } from "@/lib/domain/data";
+
+const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
+
+export type PromotionRole = "primary" | "referenced";
+
+export interface PromotionResult {
+  contentId: string;
+  /** False when the row was already promoted — the node is the existing one. */
+  created: boolean;
+}
+
+export async function promoteRow(
+  tableId: string,
+  rowId: string,
+  columns: DataColumn[],
+  role: PromotionRole
+): Promise<PromotionResult | { error: string }> {
+  const row = await prisma.dataRow.findFirst({
+    where: { id: rowId, tableId, deletedAt: null },
+    select: { id: true, contentId: true, data: true },
+  });
+  if (!row) return { error: "Row not found" };
+
+  if (row.contentId) {
+    // Already a page. One upgrade is legal: an incidentally-promoted
+    // (referenced) row being opened DELIBERATELY becomes primary — it
+    // graduates into the tree. Never the reverse.
+    if (role === "primary") {
+      await prisma.contentNode.updateMany({
+        where: { id: row.contentId, role: "referenced" },
+        data: { role: "primary" },
+      });
+    }
+    return { contentId: row.contentId, created: false };
+  }
+
+  const table = await prisma.contentNode.findFirst({
+    where: { id: tableId, contentType: "data", deletedAt: null },
+    select: { id: true, ownerId: true },
+  });
+  if (!table) return { error: "Database not found" };
+
+  const title = deriveRowTitle(
+    columns,
+    (row.data ?? {}) as Record<string, never>
+  ).slice(0, 255);
+  const slug = await generateUniqueSlug(title, table.ownerId);
+
+  const contentId = await prisma.$transaction(async (tx) => {
+    const node = await tx.contentNode.create({
+      data: {
+        ownerId: table.ownerId,
+        title,
+        slug,
+        contentType: "note",
+        role,
+        parentId: tableId,
+        ownedByNoteId: tableId,
+        notePayload: {
+          create: {
+            tiptapJson: EMPTY_DOC as unknown as Prisma.InputJsonValue,
+            searchText: "",
+          },
+        },
+      },
+      select: { id: true },
+    });
+    await tx.dataRow.update({
+      where: { id: rowId },
+      data: { contentId: node.id },
+    });
+    return node.id;
+  });
+
+  return { contentId, created: true };
+}

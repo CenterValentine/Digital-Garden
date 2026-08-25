@@ -889,6 +889,38 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [selectNode]
   );
 
+  /**
+   * Deliberate promotion (plan Phase 5): the row becomes a real note —
+   * role "primary", visible in the tree under the database — and opens in
+   * a workspace tab. Idempotent server-side; an already-promoted row just
+   * opens.
+   */
+  const openAsPage = useCallback(
+    async (rowId: string) => {
+      const row = state.rows.find((r) => r.id === rowId);
+      if (row?.contentId) {
+        selectNode(row.contentId, { contentType: "note" });
+        return;
+      }
+      const res = await fetch(`/api/content/data/${contentId}/promote`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rowId, role: "primary" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        setNotice(json?.error?.message ?? "Could not open the row as a page");
+        return;
+      }
+      setPeekRowId(null);
+      selectNode(json.data.contentId, { contentType: "note" });
+      // Refresh so the row carries its contentId (the peek badge flips).
+      void load(state.view?.id ?? null);
+    },
+    [contentId, state.rows, state.view, selectNode, load]
+  );
+
   const openRow = useCallback(
     (rowId: string, focusColumnId?: string) => {
       if (isQuery) {
@@ -1179,6 +1211,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           total={state.rows.length}
           focusColumnId={peekFocusColumnId}
           onOpenContent={openContent}
+          onOpenAsPage={openAsPage}
           onCommitCell={commitCell}
           onRefresh={() => void load(state.view?.id ?? null)}
           onNavigate={navigatePeek}

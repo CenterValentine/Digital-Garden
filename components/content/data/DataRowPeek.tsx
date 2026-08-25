@@ -54,6 +54,8 @@ interface DataRowPeekProps {
   focusColumnId?: string | null;
   /** Open a linked ContentNode in a workspace tab. */
   onOpenContent: (ref: ContentRef) => void;
+  /** Promote this row to a page and open it (plan Phase 5). */
+  onOpenAsPage: (rowId: string) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
@@ -70,6 +72,7 @@ export function DataRowPeek({
   total,
   focusColumnId,
   onOpenContent,
+  onOpenAsPage,
   onCommitCell,
   onRefresh,
   onNavigate,
@@ -216,11 +219,22 @@ export function DataRowPeek({
           )
         )}
 
-        <p className="mt-4 rounded-md border border-dashed border-border p-2.5 text-[11px] leading-snug text-muted-foreground">
-          {row.contentId
-            ? "This row has its own page."
-            : "This row is not a page yet — opening rows as full pages with a note body arrives with promotion (Phase 5)."}
-        </p>
+        <div className="mt-4 rounded-md border border-dashed border-border p-2.5">
+          <p className="text-[11px] leading-snug text-muted-foreground">
+            {row.contentId
+              ? "This row has its own page — a real note with a body, tags, and backlinks."
+              : "Open this row as a page to give it a note body, tags, and backlinks. It stays a row of this database either way."}
+          </p>
+          {editable && (
+            <button
+              type="button"
+              onClick={() => onOpenAsPage(row.id)}
+              className="mt-2 rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground"
+            >
+              {row.contentId ? "Open page" : "Open as page"}
+            </button>
+          )}
+        </div>
       </div>
     </aside>
   );

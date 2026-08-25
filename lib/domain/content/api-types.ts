@@ -85,6 +85,11 @@ export interface ContentListItem {
 }
 
 export interface ContentDetailResponse {
+  /**
+   * Set when this node is a database row's page (plan Phase 5) — feeds the
+   * breadcrumb so the page never reads as an orphan note.
+   */
+  promotedFromRow?: { rowId: string; tableId: string; tableTitle: string } | null;
   id: string;
   ownerId: string;
   title: string;
