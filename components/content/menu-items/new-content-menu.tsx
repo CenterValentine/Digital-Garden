@@ -401,23 +401,31 @@ export function getNewContentMenuItems(
     disabled: !callbacks.onAddPeopleTarget,
   });
 
-  // Database — user-defined tables (DATABASE-CONTENT-TYPE-PLAN).
+  // Database — one entry, two flavors in a submenu (owner, 2026-08-27),
+  // same pattern as Workflow. "Blank Database" owns its rows; "Query
+  // Database" is a saved search over existing content (plan Phase 3) —
+  // rows ARE the matching notes, nothing is copied.
   items.push({
-    id: "new-data",
+    id: "new-database",
     label: "Database",
     icon: <Table className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateData?.(normalizedParentId),
-    disabled: !callbacks.onCreateData,
-  });
-
-  // Query database — a saved search over existing content, rendered as a
-  // table (plan Phase 3). Rows ARE the matching notes; nothing is copied.
-  items.push({
-    id: "new-data-query",
-    label: "Query Database",
-    icon: <Table className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateDataQuery?.(normalizedParentId),
-    disabled: !callbacks.onCreateDataQuery,
+    disabled: !callbacks.onCreateData && !callbacks.onCreateDataQuery,
+    submenu: [
+      {
+        id: "new-data",
+        label: "Blank Database",
+        icon: <Table className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateData?.(normalizedParentId),
+        disabled: !callbacks.onCreateData,
+      },
+      {
+        id: "new-data-query",
+        label: "Query Database",
+        icon: <Table className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateDataQuery?.(normalizedParentId),
+        disabled: !callbacks.onCreateDataQuery,
+      },
+    ],
   });
 
   // Stubs — defined but not implemented yet.
