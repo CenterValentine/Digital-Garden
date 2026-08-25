@@ -55,6 +55,8 @@ export function DataBoardView({
 }: DataBoardViewProps) {
   const [dragRowId, setDragRowId] = useState<string | null>(null);
   const [dropGroup, setDropGroup] = useState<string | null>(null);
+  /** Click selects (a card should FEEL selectable); double-click opens. */
+  const [selectedRowId, setSelectedRowId] = useState<string | null>(null);
 
   const groupColumn = useMemo(
     () =>
@@ -189,6 +191,8 @@ export function DataBoardView({
                 cardColumns={cardColumns}
                 editable={editable}
                 dragging={dragRowId === row.id}
+                selected={selectedRowId === row.id}
+                onSelect={() => setSelectedRowId(row.id)}
                 onOpen={() => onOpenRow(row.id)}
                 onDragStart={(e) => {
                   e.dataTransfer.effectAllowed = "move";
@@ -229,6 +233,8 @@ interface BoardCardProps {
   cardColumns: DataColumn[];
   editable: boolean;
   dragging: boolean;
+  selected: boolean;
+  onSelect: () => void;
   onOpen: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onDragEnd: () => void;
@@ -240,6 +246,8 @@ function BoardCard({
   cardColumns,
   editable,
   dragging,
+  selected,
+  onSelect,
   onOpen,
   onDragStart,
   onDragEnd,
@@ -258,10 +266,18 @@ function BoardCard({
       draggable={editable}
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
-      onClick={onOpen}
+      // Click = select, double-click = open (owner, 2026-08-24). The open
+      // affordance moving to dblclick is what makes single-click selection
+      // feel safe to use.
+      onClick={onSelect}
+      onDoubleClick={onOpen}
       className={cn(
-        "rounded-md border border-border bg-background p-2 shadow-sm",
-        "cursor-pointer",
+        "rounded-md border bg-background p-2 shadow-sm",
+        "cursor-pointer transition-all duration-100",
+        "hover:-translate-y-px hover:border-primary/40 hover:shadow-md",
+        selected
+          ? "border-primary ring-1 ring-primary"
+          : "border-border",
         editable && "active:cursor-grabbing",
         dragging && "opacity-40"
       )}

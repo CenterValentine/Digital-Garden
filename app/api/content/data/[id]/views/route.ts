@@ -26,7 +26,13 @@ import {
   canWrite,
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
-import { keyAtEnd } from "@/lib/domain/data";
+import {
+  keyAtEnd,
+  validateFilter,
+  type DataColumnConfig,
+  type FilterNode,
+} from "@/lib/domain/data";
+import { Prisma } from "@/lib/database/generated/prisma";
 
 /** Modes with a renderer today. The enum-free VarChar means adding one
  * later is a UI change, never a migration (plan D11). */
@@ -133,6 +139,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         makeDefault?: boolean;
         mode?: string;
         groupByColumnId?: string | null;
+        filters?: FilterNode;
       };
       if (!body.viewId) return badRequest("`viewId` is required");
       if (body.name !== undefined && !body.name.trim()) {
@@ -154,6 +161,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           `That view mode is not built yet. Available: ${IMPLEMENTED_VIEW_MODES.join(", ")}`
         );
       }
+      // The filter tree is validated against the table's live columns —
+      // an ignored clause returns MORE rows than asked for, which is the
+      // failure direction that leaks data (plan B8c).
+      if (body.filters !== undefined) {
+        const cols = await prisma.dataColumn.findMany({
+          where: { tableId: id, deletedAt: null },
+          select: { id: true, key: true, name: true, type: true, position: true, isPrimary: true, config: true, description: true },
+        });
+        const errors = validateFilter(
+          body.filters,
+          cols.map((c) => ({
+            ...c,
+            config: (c.config ?? {}) as unknown as DataColumnConfig,
+            deletedAt: null,
+          }))
+        );
+        if (errors.length > 0) {
+          return badRequest(`Invalid filter: ${errors[0].message}`);
+        }
+      }
+
       // A board groups by a single-value option column. Validating the
       // TYPE here keeps the renderer's assumption ("options exist, cells
       // hold one id") true by construction.
@@ -195,6 +223,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           body.name === undefined &&
           body.mode === undefined &&
           body.groupByColumnId === undefined &&
+          body.filters === undefined &&
           !body.makeDefault;
         if (!accessOnly || !(isViewOwner || isTableOwner)) {
           return forbidden("This view is locked — unlock it first");
@@ -212,6 +241,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
             ...(body.mode !== undefined ? { mode: body.mode } : {}),
             ...(body.groupByColumnId !== undefined
               ? { groupByColumnId: body.groupByColumnId }
+              : {}),
+            ...(body.filters !== undefined
+              ? { filters: body.filters as unknown as Prisma.InputJsonValue }
               : {}),
           },
         });

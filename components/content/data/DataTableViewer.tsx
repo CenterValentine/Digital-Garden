@@ -46,6 +46,7 @@ import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
 import { DataRowPeek } from "./DataRowPeek";
+import { DataFilterBar } from "./DataFilterBar";
 
 /** Row height in px. Fixed so the windowing maths stays honest. */
 const ROW_HEIGHT = 36;
@@ -739,6 +740,58 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [columns, state.rows]
   );
 
+  // Tab walks SELECTION through every column, row by row, until exhausted
+  // (owner, 2026-08-24) — distinct from Tab-while-editing, which advances
+  // the editor through inline-editable columns only. Enter on a selected
+  // editable cell opens its editor; Escape clears selection.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!selectedCell || editTarget) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const dir = e.shiftKey ? -1 : 1;
+        const ci = columns.findIndex((c) => c.key === selectedCell.columnKey);
+        const ri = state.rows.findIndex((r) => r.id === selectedCell.rowId);
+        if (ci === -1 || ri === -1) return;
+        let nci = ci + dir;
+        let nri = ri;
+        if (nci >= columns.length) {
+          nci = 0;
+          nri = ri + 1;
+        } else if (nci < 0) {
+          nci = columns.length - 1;
+          nri = ri - 1;
+        }
+        const nextRow = state.rows[nri];
+        // Exhausted means STOP — the selection holds at the last cell
+        // rather than wrapping to the top, so repeated Tab is bounded.
+        if (!nextRow) return;
+        setSelectedCell({ rowId: nextRow.id, columnKey: columns[nci].key });
+      } else if (e.key === "Enter") {
+        const column = columns.find((c) => c.key === selectedCell.columnKey);
+        if (column && INLINE_EDITABLE_TYPES.has(column.type)) {
+          e.preventDefault();
+          setEditTarget(selectedCell);
+        }
+      } else if (e.key === "Escape") {
+        setSelectedCell(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedCell, editTarget, columns, state.rows]);
+
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real
   // text selection, so ordinary copying is never hijacked.
@@ -870,6 +923,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         onUpdate={updateView}
         onDelete={deleteView}
       />
+
+      {state.view && (
+        <DataFilterBar
+          view={state.view}
+          columns={columns}
+          canWrite={state.canWrite}
+          onSave={(filters) => updateView(state.view!.id, { filters })}
+        />
+      )}
 
       {notice && (
         <div
