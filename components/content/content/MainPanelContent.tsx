@@ -67,6 +67,7 @@ import { ExternalViewer } from "../viewer/ExternalViewer";
 import { ChatViewer } from "../viewer/ChatViewer";
 import { VisualizationViewer } from "../viewer/VisualizationViewer";
 import { DataTableViewer } from "../data/DataTableViewer";
+import { DataRowPropertyHeader } from "@/components/content/data/DataRowPropertyHeader";
 import { DataViewer } from "../viewer/DataViewer";
 import { HopeViewer } from "../viewer/HopeViewer";
 import { WorkflowViewer } from "../viewer/WorkflowViewer";
@@ -2571,6 +2572,12 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                   </>
                 )}
               </div>
+            )}
+            {promotedFromRow && (
+              <DataRowPropertyHeader
+                tableId={promotedFromRow.tableId}
+                rowId={promotedFromRow.rowId}
+              />
             )}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (

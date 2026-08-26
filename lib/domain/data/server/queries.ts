@@ -1048,6 +1048,50 @@ export async function loadRowChanges(
   };
 }
 
+/**
+ * Specific rows by id, fully hydrated — the property header's fetch
+ * (Phase 6a) and the AI tools' row-detail path. Also the missing piece
+ * behind ?row= deep links beyond page 1.
+ */
+export async function loadRowsByIds(
+  tableId: string,
+  rowIds: string[],
+  columns: DataColumn[],
+  viewerId?: string
+): Promise<DataRow[]> {
+  if (rowIds.length === 0) return [];
+  const raw = await prisma.dataRow.findMany({
+    where: { tableId, id: { in: rowIds.slice(0, 100) }, deletedAt: null },
+    select: {
+      id: true,
+      tableId: true,
+      sortKey: true,
+      data: true,
+      contentId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (raw.length === 0) return [];
+  const links = await hydrateRelationLinks(raw, columns, viewerId);
+  const derived = await computeDerivedValues(raw, columns, links);
+  const contentRefs = await hydrateContentRefs(raw, columns, viewerId);
+  const personRefs = await hydratePersonRefs(raw, columns, tableId, viewerId);
+  return raw.map((r) => ({
+    id: r.id,
+    tableId: r.tableId,
+    sortKey: r.sortKey,
+    data: (r.data ?? {}) as RowData,
+    links: links.refs.get(r.id),
+    contentRefs: contentRefs.get(r.id),
+    personRefs: personRefs.get(r.id),
+    derived: derived.get(r.id),
+    contentId: r.contentId,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
+}
+
 /** Rows in view order, for exports and the AI query tool. */
 export function orderRows(rows: LoadedRow[]): LoadedRow[] {
   return sortByKey(rows);
