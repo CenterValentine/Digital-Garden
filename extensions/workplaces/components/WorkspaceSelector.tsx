@@ -1550,7 +1550,11 @@ export function WorkspaceSelector() {
           }}
           className="min-w-72 border-white/10 bg-white/95 text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
         >
-          <DropdownMenuLabel className="text-xs uppercase tracking-[0.18em] text-gray-500">
+          {/* Half-step toward the WORKBENCHES header's compaction, not all
+              the way: py-1.5 -> py-1 and leading-tight rather than
+              leading-none. This is the menu's primary heading, so it keeps a
+              little more air than a nested submenu's label. */}
+          <DropdownMenuLabel className="py-1 text-xs uppercase leading-tight tracking-[0.18em] text-gray-500">
             Workspaces
           </DropdownMenuLabel>
 
