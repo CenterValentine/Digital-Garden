@@ -645,10 +645,25 @@ export function WorkspaceSelector() {
     workspace: ContentWorkspaceResponse,
     rect: DOMRect,
   ) => {
+    // Anchor the FIRST FOLDER ROW to the arrow, not the panel's top edge.
+    // Hanging the panel from rect.top put the "Workbenches" label level with
+    // the row and pushed the first real item a row-height below the arrow that
+    // summoned it, so the eye had to travel down to find the list. Lifting the
+    // panel by its own chrome (p-1 + the label block) puts the first folder
+    // beside the arrow and lets the label sit above it, where a heading
+    // belongs. Sits 2px off the row so it reads as attached to the arrow.
+    const PANEL_PADDING = 4; // panel p-1
+    const LABEL_BLOCK = 16; // pt-1 + 10px leading-none label + pb-0.5
     setWorkbenchMenu({
       workspaceId: workspace.id,
-      x: Math.min(rect.right + 6, window.innerWidth - 252),
-      y: Math.max(8, Math.min(rect.top - 4, window.innerHeight - 340)),
+      x: Math.min(rect.right + 2, window.innerWidth - 252),
+      y: Math.max(
+        8,
+        Math.min(
+          rect.top - PANEL_PADDING - LABEL_BLOCK,
+          window.innerHeight - 340,
+        ),
+      ),
       folders: null,
     });
     // First-level subfolders of the view root. The scoped tree route already
