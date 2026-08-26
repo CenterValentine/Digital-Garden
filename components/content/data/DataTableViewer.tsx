@@ -200,6 +200,39 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     return () => window.removeEventListener("dg:data-open-view", onOpenView);
   }, [contentId, load]);
 
+  // ?row= addressability (plan Phase 5): a copied link reopens this row.
+  // Promoted rows resolve to their NODE — once a page exists it is the
+  // canonical surface (it carries the breadcrumb back here), so the link
+  // follows the row's graduation instead of reopening the lesser peek.
+  // Un-promoted rows open as the peek. The first data pass consumes the
+  // inbound param BEFORE the mirror below may rewrite it; afterwards the
+  // param simply follows peek state (replaceState — not a navigation).
+  // A row beyond the loaded page or filtered out opens nothing (v1: no
+  // row-by-id fetch path exists yet).
+  const rowUrlInitRef = useRef(false);
+  useEffect(() => {
+    if (!rowUrlInitRef.current) {
+      if (state.loading || !state.table) return;
+      rowUrlInitRef.current = true;
+      const fromUrl = new URLSearchParams(window.location.search).get("row");
+      if (fromUrl) {
+        const row = state.rows.find((r) => r.id === fromUrl);
+        if (row?.contentId) {
+          selectNode(row.contentId, { contentType: "note" });
+          return;
+        }
+        if (row) {
+          setPeekRowId(row.id);
+          return;
+        }
+      }
+    }
+    const url = new URL(window.location.href);
+    if (peekRowId) url.searchParams.set("row", peekRowId);
+    else url.searchParams.delete("row");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, [state.loading, state.table, state.rows, peekRowId, selectNode]);
+
   // ── Poll ───────────────────────────────────────────────────────────────
   //
   // Reuses the shared-poller shape `noteWindow` established rather than
