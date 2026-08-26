@@ -501,8 +501,12 @@ function ToolConfigRow({
           onCheckedChange={(checked) =>
             onChange({
               ...config,
-              // Default-on, so only persist when off.
-              enabled: checked ? undefined : false,
+              // ALWAYS explicit (owner report, 2026-08-28): the settings
+              // PATCH deep-merges, and a merge cannot delete a key — the
+              // old "undefined = back to default" convention made
+              // re-enabling impossible (stripped client-side, the stored
+              // `false` survived every save).
+              enabled: checked,
             })
           }
           className="shrink-0"

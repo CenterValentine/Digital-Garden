@@ -1624,6 +1624,32 @@ export async function POST(request: Request) {
         // note search for an id it could never find (owner report,
         // 2026-08-27).
         try {
+          // Advertise ONLY what the settings filter will actually serve
+          // (owner report, 2026-08-28: the grounding named all four tools
+          // while three were disabled in settings — actively instructing
+          // the model to call tools the route had filtered out, which the
+          // SDK surfaces as an unavailable-tool error). Disabled tools are
+          // named as disabled so the model can tell the USER why.
+          const DATA_TOOL_SET = [
+            "query_database",
+            "describe_database",
+            "insert_rows",
+            "update_row",
+          ];
+          const enabledDataTools = DATA_TOOL_SET.filter(
+            (tid) => toolConfig[tid]?.enabled !== false
+          );
+          const disabledDataTools = DATA_TOOL_SET.filter(
+            (tid) => toolConfig[tid]?.enabled === false
+          );
+          const availabilityLine =
+            enabledDataTools.length === 0
+              ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}.${
+                  disabledDataTools.length > 0
+                    ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
+                    : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
+                }`;
           const boundData = await prisma.contentNode.findFirst({
             where: {
               id: contentId,
@@ -1643,7 +1669,7 @@ export async function POST(request: Request) {
               // thread can carry the model's own earlier claims that these
               // tools failed or don't exist — grounding is per-request, so
               // state the current truth explicitly.
-              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}\n\nThe database tools (query_database, update_row, insert_rows, describe_database) ARE available in this turn — disregard any earlier statements in this conversation that they were unavailable or that a change already succeeded; verify current values with query_database instead of trusting prior turns.`;
+              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}\n\n${availabilityLine}`;
             }
           } else {
             // A chat bound to a promoted row's PAGE is bound to the row
@@ -1674,9 +1700,7 @@ export async function POST(request: Request) {
               parts.push(
                 "When a request could mean either the note BODY or the row's CELLS and the outcome differs, ask the user which they mean — name both options briefly instead of guessing."
               );
-              parts.push(
-                "The database tools (query_database, update_row, insert_rows, describe_database) ARE available in this turn — disregard any earlier statements in this conversation that they were unavailable or that a change already succeeded; verify current values with query_database instead of trusting prior turns."
-              );
+              parts.push(availabilityLine);
               mentionedContext += `\n\n${parts.join("\n\n")}`;
             }
           }
