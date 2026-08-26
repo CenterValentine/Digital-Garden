@@ -1639,6 +1639,37 @@ export async function POST(request: Request) {
             if (digest) {
               mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}`;
             }
+          } else {
+            // A chat bound to a promoted row's PAGE is bound to the row
+            // (owner report, 2026-08-28: the model read the note, renamed
+            // it, and declared the database unreachable — it never knew
+            // the open note IS a row of it). Ground with the linkage, the
+            // row's cells, and the table's capsule so the tools are
+            // addressable without a search.
+            const boundRow = await prisma.dataRow.findFirst({
+              where: { contentId, deletedAt: null },
+              select: {
+                tableId: true,
+                table: { select: { content: { select: { title: true } } } },
+              },
+            });
+            if (boundRow) {
+              const { buildDataSchemaDigest, buildRowPropertiesBlock } =
+                await import("@/lib/domain/data/server/digest");
+              const [props, digest] = await Promise.all([
+                buildRowPropertiesBlock(contentId),
+                buildDataSchemaDigest(boundRow.tableId),
+              ]);
+              const parts = [
+                `This chat is open on a row PAGE of the database "${boundRow.table.content.title}" — the open note and the database row are the SAME record (title sync is two-way: renaming either renames both).`,
+              ];
+              if (props) parts.push(props);
+              if (digest) parts.push(digest);
+              parts.push(
+                "When a request could mean either the note BODY or the row's CELLS and the outcome differs, ask the user which they mean — name both options briefly instead of guessing."
+              );
+              mentionedContext += `\n\n${parts.join("\n\n")}`;
+            }
           }
         } catch (dataGroundingError) {
           logger.warn({

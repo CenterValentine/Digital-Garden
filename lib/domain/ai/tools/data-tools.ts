@@ -57,6 +57,32 @@ const INSERT_CAP = 25;
 const CONFIRM_THRESHOLD = 10;
 
 /**
+ * The database this chat is implicitly bound to, if any: the bound
+ * content is the data node itself, OR a promoted row's page — a chat
+ * open on a row page is open on the row (owner report, 2026-08-28).
+ */
+async function boundTableIdFor(
+  ctx: ToolExecuteContext
+): Promise<string | null> {
+  if (!ctx.contentId) return null;
+  const data = await prisma.contentNode.findFirst({
+    where: {
+      id: ctx.contentId,
+      ownerId: ctx.userId,
+      contentType: "data",
+      deletedAt: null,
+    },
+    select: { id: true },
+  });
+  if (data) return data.id;
+  const row = await prisma.dataRow.findFirst({
+    where: { contentId: ctx.contentId, deletedAt: null },
+    select: { tableId: true },
+  });
+  return row?.tableId ?? null;
+}
+
+/**
  * Structural jurisdiction: the database must be associated with THIS
  * conversation, and the user must be able to read it. Returns the loaded
  * table or a model-facing refusal string.
@@ -68,10 +94,12 @@ async function resolveJurisdiction(
   | { table: DataTable; level: Awaited<ReturnType<typeof resolveDataTableAccess>> }
   | { refusal: string }
 > {
-  // The chat being OPEN ON this database is the strongest association
-  // there is — sidechat binding (plan Phase 6) needs no
-  // ConversationAssociation row to prove what ctx.contentId already states.
-  const boundHere = ctx.contentId === databaseId;
+  // The chat being OPEN ON this database — the node itself, or one of
+  // its row pages — is the strongest association there is; sidechat
+  // binding (plan Phase 6) needs no ConversationAssociation row.
+  const boundHere =
+    ctx.contentId === databaseId ||
+    (await boundTableIdFor(ctx)) === databaseId;
   if (!boundHere) {
     if (!ctx.conversationId) {
       return {
@@ -114,18 +142,8 @@ async function resolveDatabaseRef(
   const trimmed = ref?.trim();
   if (trimmed && UUID_RE.test(trimmed)) return { id: trimmed };
   if (!trimmed) {
-    if (ctx.contentId) {
-      const bound = await prisma.contentNode.findFirst({
-        where: {
-          id: ctx.contentId,
-          ownerId: ctx.userId,
-          contentType: "data",
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      if (bound) return { id: bound.id };
-    }
+    const bound = await boundTableIdFor(ctx);
+    if (bound) return { id: bound };
     return {
       refusal:
         "No database given and this chat isn't open on one — pass databaseId (the id from the mention capsule) or the database's exact name.",
