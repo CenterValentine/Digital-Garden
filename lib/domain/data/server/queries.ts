@@ -27,6 +27,7 @@ import {
   type CellValue,
   type DataColumn,
   type DataColumnConfig,
+  type DataRow,
   type DataSort,
   type DataTable,
   type DataView,
@@ -950,12 +951,23 @@ export async function loadRowPage({
  * Returns deletions separately, because a row that vanished from a filtered
  * view and a row that was actually deleted need different client handling:
  * one is a re-filter, the other removes it from every view at once.
+ *
+ * Changed rows carry the SAME hydrated read-model as the page paths (links,
+ * contentRefs, personRefs, derived). The client merge replaces rows
+ * wholesale, so a leaner payload here would STRIP hydration from any row the
+ * poller touches — a person pill would vanish within one poll interval of
+ * being assigned (owner report, 2026-08-26).
  */
 export async function loadRowChanges(
   tableId: string,
-  since: Date
-): Promise<{ changed: LoadedRow[]; deletedIds: string[] }> {
-  const [changed, deleted] = await Promise.all([
+  since: Date,
+  viewerId?: string
+): Promise<{ changed: DataRow[]; deletedIds: string[] }> {
+  const [rawColumns, changed, deleted] = await Promise.all([
+    prisma.dataColumn.findMany({
+      where: { tableId, deletedAt: null },
+      orderBy: { position: "asc" },
+    }),
     prisma.dataRow.findMany({
       where: { tableId, deletedAt: null, updatedAt: { gt: since } },
       orderBy: [{ sortKey: "asc" }, { id: "asc" }],
@@ -977,12 +989,33 @@ export async function loadRowChanges(
     }),
   ]);
 
+  const columns: DataColumn[] = rawColumns.map((c) => ({
+    id: c.id,
+    key: c.key,
+    name: c.name,
+    type: c.type,
+    position: c.position,
+    isPrimary: c.isPrimary,
+    config: (c.config ?? {}) as unknown as DataColumnConfig,
+    description: c.description,
+    deletedAt: null,
+  }));
+
+  const links = await hydrateRelationLinks(changed, columns, viewerId);
+  const derived = await computeDerivedValues(changed, columns, links);
+  const contentRefs = await hydrateContentRefs(changed, columns, viewerId);
+  const personRefs = await hydratePersonRefs(changed, columns, tableId, viewerId);
+
   return {
     changed: changed.map((r) => ({
       id: r.id,
       tableId: r.tableId,
       sortKey: r.sortKey,
       data: (r.data ?? {}) as unknown as RowData,
+      links: links.refs.get(r.id),
+      contentRefs: contentRefs.get(r.id),
+      personRefs: personRefs.get(r.id),
+      derived: derived.get(r.id),
       contentId: r.contentId,
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),

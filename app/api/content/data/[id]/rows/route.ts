@@ -75,7 +75,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
       if (since) {
         const at = new Date(since);
         if (Number.isNaN(at.getTime())) return badRequest("Invalid `since` timestamp");
-        const changes = await loadRowChanges(id, at);
+        const changes = await loadRowChanges(id, at, session.user.id);
         return NextResponse.json({
           success: true,
           data: { ...changes, serverTime: new Date().toISOString() },

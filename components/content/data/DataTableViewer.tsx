@@ -393,8 +393,18 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           Date.now()
         )
       );
+
+      // Person and content-link cells store ids but DISPLAY server-hydrated
+      // read-model (names, titles) — the optimistic merge above can only
+      // show the raw id, which these renderers ignore. One reload fetches
+      // the refs; without it the picker's choice looks like it never landed
+      // (owner report, 2026-08-26).
+      const column = state.table?.columns.find((c) => c.key === columnKey);
+      if (column && (column.type === "person" || column.type === "contentLink")) {
+        void load(viewRef.current?.id ?? null);
+      }
     },
-    [state.rows, sendWrites, clientId]
+    [state.rows, state.table, sendWrites, clientId, load]
   );
 
   // ── Undo ───────────────────────────────────────────────────────────────
