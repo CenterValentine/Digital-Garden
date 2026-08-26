@@ -142,7 +142,22 @@ async function resolveNote(
   }
   if (!text.trim()) text = payload.searchText;
 
-  return finalize(node.id, `# ${node.title}\n\n${text}`, maxTokens);
+  // Promoted database rows (Phase 6b): the page's cells ride its note
+  // context — otherwise a row-page mention injects an empty body and the
+  // model never sees the data the page IS. One indexed lookup; null for
+  // every ordinary note.
+  let properties = "";
+  try {
+    const { buildRowPropertiesBlock } = await import(
+      "@/lib/domain/data/server/digest"
+    );
+    const block = await buildRowPropertiesBlock(node.id);
+    if (block) properties = `${block}\n\n`;
+  } catch {
+    // Properties are additive context — a failure must not sink the note.
+  }
+
+  return finalize(node.id, `# ${node.title}\n\n${properties}${text}`, maxTokens);
 }
 
 async function resolveFile(
