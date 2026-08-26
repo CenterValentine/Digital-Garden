@@ -22,12 +22,15 @@ import { Check, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
 import {
+  generateColumnKey,
   IMPLEMENTED_COLUMN_TYPES,
   ROLLUP_FNS,
   type DataColumn,
   type DataColumnConfig,
   type DataColumnType,
   type RollupFn,
+  type SelectOption,
+  type StatusGroup,
 } from "@/lib/domain/data";
 
 const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
@@ -418,7 +421,11 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
 
 interface ColumnMenuProps {
   column: DataColumn;
-  onSave: (patch: { name: string; description: string | null }) => Promise<void>;
+  onSave: (patch: {
+    name: string;
+    description: string | null;
+    config?: DataColumnConfig;
+  }) => Promise<void>;
   onDelete: () => Promise<void>;
   onClose: () => void;
 }
@@ -428,20 +435,60 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
   const [description, setDescription] = useState(column.description ?? "");
   const [busy, setBusy] = useState(false);
 
+  // Options editor (select / multiSelect / status). Cells store option IDS
+  // (plan D3), so editing a label here renames it everywhere at once, and
+  // removing an option orphans its id in cells — values are kept, display
+  // goes blank — which is what makes re-adding or undoing non-destructive.
+  const isSelectLike =
+    column.type === "select" ||
+    column.type === "multiSelect" ||
+    column.type === "status";
+  const [options, setOptions] = useState<SelectOption[]>(
+    () => column.config.options ?? []
+  );
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+
+  const addBulk = useCallback(() => {
+    // One label per line; commas work too. Dedupe case-insensitively
+    // against existing options AND within the pasted list itself.
+    const seen = new Set(options.map((o) => o.label.trim().toLowerCase()));
+    const fresh: SelectOption[] = [];
+    for (const raw of bulkText.split(/[\n,]/)) {
+      const label = raw.trim();
+      if (!label || seen.has(label.toLowerCase())) continue;
+      seen.add(label.toLowerCase());
+      fresh.push({
+        id: generateColumnKey(),
+        label,
+        ...(column.type === "status" ? { group: "todo" as StatusGroup } : {}),
+      });
+    }
+    if (fresh.length > 0) setOptions((o) => [...o, ...fresh]);
+    setBulkText("");
+    setBulkOpen(false);
+  }, [bulkText, options, column.type]);
+
   const save = useCallback(async () => {
     const trimmed = name.trim();
     if (!trimmed || busy) return;
     setBusy(true);
     try {
+      const cleaned = options
+        .map((o) => ({ ...o, label: o.label.trim() }))
+        .filter((o) => o.label);
       await onSave({
         name: trimmed,
         description: description.trim() || null,
+        ...(isSelectLike
+          ? { config: { ...column.config, options: cleaned } }
+          : {}),
       });
       onClose();
     } finally {
       setBusy(false);
     }
-  }, [name, description, busy, onSave, onClose]);
+  }, [name, description, options, isSelectLike, column.config, busy, onSave, onClose]);
 
   return (
     <PanelPortal open onDismiss={onClose}>
@@ -495,6 +542,131 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
           This relation&apos;s database is set once. To link somewhere else, add a
           new column — deleting this one keeps its links and can be undone.
         </p>
+      )}
+
+      {isSelectLike && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Options
+          </label>
+          <div className="flex max-h-44 flex-col gap-1 overflow-y-auto">
+            {options.map((o, i) => (
+              <div key={o.id} className="flex items-center gap-1">
+                <input
+                  value={o.label}
+                  onChange={(e) =>
+                    setOptions((cur) =>
+                      cur.map((x, j) =>
+                        j === i ? { ...x, label: e.target.value } : x
+                      )
+                    )
+                  }
+                  placeholder="Option label"
+                  className={fieldClass}
+                />
+                {column.type === "status" && (
+                  <select
+                    value={o.group ?? "todo"}
+                    onChange={(e) =>
+                      setOptions((cur) =>
+                        cur.map((x, j) =>
+                          j === i
+                            ? { ...x, group: e.target.value as StatusGroup }
+                            : x
+                        )
+                      )
+                    }
+                    title="Board group"
+                    className={cn(fieldClass, "w-24 shrink-0")}
+                  >
+                    <option value="todo">To do</option>
+                    <option value="active">Active</option>
+                    <option value="done">Done</option>
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOptions((cur) => cur.filter((_, j) => j !== i))
+                  }
+                  aria-label={`Remove option ${o.label || i + 1}`}
+                  className="shrink-0 rounded p-1 text-muted-foreground hover:bg-muted hover:text-destructive"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+            {options.length === 0 && (
+              <p className="text-[10px] italic text-muted-foreground">
+                No options yet — cells stay empty until some exist.
+              </p>
+            )}
+          </div>
+          <div className="mt-1.5 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() =>
+                setOptions((cur) => [
+                  ...cur,
+                  {
+                    id: generateColumnKey(),
+                    label: "",
+                    ...(column.type === "status"
+                      ? { group: "todo" as StatusGroup }
+                      : {}),
+                  },
+                ])
+              }
+              className="flex items-center gap-1 rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <Plus className="h-3 w-3" />
+              Add option
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkOpen((b) => !b)}
+              className="rounded px-1.5 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              Bulk add…
+            </button>
+          </div>
+          {bulkOpen && (
+            <div className="mt-1.5">
+              <textarea
+                autoFocus
+                value={bulkText}
+                onChange={(e) => setBulkText(e.target.value)}
+                rows={4}
+                placeholder={"One option per line (commas work too)"}
+                className={cn(fieldClass, "resize-none")}
+              />
+              <div className="mt-1 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBulkText("");
+                    setBulkOpen(false);
+                  }}
+                  className="rounded px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={addBulk}
+                  disabled={!bulkText.trim()}
+                  className="rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  Add all
+                </button>
+              </div>
+            </div>
+          )}
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            Remember to Save. Renaming an option renames it everywhere;
+            removing one blanks it in cells without erasing their data.
+          </p>
+        </>
       )}
 
       <div className="mt-3 flex items-center justify-between">

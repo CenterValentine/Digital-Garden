@@ -320,7 +320,7 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
       const chosen = new Set(Array.isArray(value) ? value : []);
       const options = column.config.options ?? [];
       if (options.length === 0) {
-        return <p className="text-xs text-muted-foreground">No options yet</p>;
+        return <p className="text-xs text-muted-foreground">No options yet — add them from the column&apos;s header menu.</p>;
       }
       return (
         <div className="flex flex-col gap-1">

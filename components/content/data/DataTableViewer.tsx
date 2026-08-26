@@ -33,6 +33,7 @@ import {
   undo as undoStack,
   type CellEdit,
   type DataColumn,
+  type DataColumnConfig,
   type DataRow,
   type DataTable,
   type ContentRef,
@@ -643,7 +644,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   const saveColumn = useCallback(
-    async (columnId: string, patch: { name: string; description: string | null }) => {
+    async (
+      columnId: string,
+      patch: {
+        name: string;
+        description: string | null;
+        config?: DataColumnConfig;
+      }
+    ) => {
       await columnRequest("PATCH", { columnId, ...patch });
     },
     [columnRequest]
