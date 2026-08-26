@@ -52,14 +52,32 @@ export async function promoteRow(
   if (!row) return { error: "Row not found" };
 
   if (row.contentId) {
-    // Already a page. One upgrade is legal: an incidentally-promoted
-    // (referenced) row being opened DELIBERATELY becomes primary — it
-    // graduates into the tree. Never the reverse.
-    if (role === "primary") {
-      await prisma.contentNode.updateMany({
-        where: { id: row.contentId, role: "referenced" },
-        data: { role: "primary" },
-      });
+    // Already a page — possibly in the trash: deleting the PAGE leaves the
+    // row alive (the row is data; the node is merely its note form), so
+    // re-opening REVIVES the same node with its body and tags intact,
+    // rather than failing on a dead pointer or minting a duplicate
+    // (owner report, 2026-08-26). One upgrade is legal alongside: an
+    // incidentally-promoted (referenced) row opened DELIBERATELY becomes
+    // primary — it graduates into the tree. Never the reverse.
+    const node = await prisma.contentNode.findUnique({
+      where: { id: row.contentId },
+      select: { role: true, deletedAt: true },
+    });
+    if (node) {
+      const patch: { deletedAt?: null; deletedBy?: null; role?: "primary" } = {};
+      if (node.deletedAt) {
+        patch.deletedAt = null;
+        patch.deletedBy = null;
+      }
+      if (role === "primary" && node.role === "referenced") {
+        patch.role = "primary";
+      }
+      if (Object.keys(patch).length > 0) {
+        await prisma.contentNode.update({
+          where: { id: row.contentId },
+          data: patch,
+        });
+      }
     }
     return { contentId: row.contentId, created: false };
   }

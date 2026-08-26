@@ -222,7 +222,7 @@ export function DataRowPeek({
         <div className="mt-4 rounded-md border border-dashed border-border p-2.5">
           <p className="text-[11px] leading-snug text-muted-foreground">
             {row.contentId
-              ? "This row has its own page — a real note with a body, tags, and backlinks."
+              ? "This row is a note nested under this database — its body, tags, and backlinks live there."
               : "Open this row as a page to give it a note body, tags, and backlinks. It stays a row of this database either way."}
           </p>
           {editable && (

@@ -50,7 +50,10 @@ export async function searchRowSuggestions(
   const rows = await prisma.dataRow.findMany({
     where: {
       deletedAt: null,
-      contentId: null,
+      // Un-promoted rows — AND rows whose page sits in the trash: the row
+      // is still live data, so it must stay linkable, and selecting it
+      // revives its node (promoteRow) instead of dead-linking.
+      OR: [{ contentId: null }, { content: { deletedAt: { not: null } } }],
       searchText: { contains: q, mode: "insensitive" },
       table: {
         // Query-table rows project nodes that exist already — nothing to

@@ -956,12 +956,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    */
   const openAsPage = useCallback(
     async (rowId: string) => {
-      const row = state.rows.find((r) => r.id === rowId);
-      if (row?.contentId) {
-        clearRowParam();
-        selectNode(row.contentId, { contentType: "note" });
-        return;
-      }
+      // Always through the promote endpoint — no contentId short-circuit.
+      // It is idempotent and cheap, and it is also the recovery path: a
+      // page deleted from the tree leaves row.contentId pointing at a
+      // TRASHED node, which the server revives (body and tags intact)
+      // where a client-side jump would open a dead page (owner report,
+      // 2026-08-26).
       const res = await fetch(`/api/content/data/${contentId}/promote`, {
         method: "POST",
         credentials: "include",
@@ -979,7 +979,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       // Refresh so the row carries its contentId (the peek badge flips).
       void load(state.view?.id ?? null);
     },
-    [contentId, state.rows, state.view, selectNode, load, clearRowParam]
+    [contentId, state.view, selectNode, load, clearRowParam]
   );
 
   const openRow = useCallback(
