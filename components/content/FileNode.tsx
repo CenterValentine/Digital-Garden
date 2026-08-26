@@ -98,7 +98,7 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (
     parentId: string | null,
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
   ) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
@@ -598,6 +598,12 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         } : undefined,
         onCreateExternal: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           await onCreate(parentId, "external");
+        } : undefined,
+        // JSON was silently unreachable from the context menu: the shared
+        // menu hides items whose callback is absent, and only the header
+        // ever supplied this one (audit, 2026-08-27).
+        onCreateJson: onCreate && !isPeopleNode ? async (parentId: string | null) => {
+          await onCreate(parentId, "json");
         } : undefined,
         onCreateChat: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           await onCreate(parentId, "chat");
