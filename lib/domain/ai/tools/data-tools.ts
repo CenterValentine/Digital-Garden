@@ -68,21 +68,27 @@ async function resolveJurisdiction(
   | { table: DataTable; level: Awaited<ReturnType<typeof resolveDataTableAccess>> }
   | { refusal: string }
 > {
-  if (!ctx.conversationId) {
-    return {
-      refusal:
-        "This chat has no bound conversation, so database tools are unavailable. Ask the user to mention the database in a saved conversation.",
-    };
-  }
-  const assoc = await prisma.conversationAssociation.findFirst({
-    where: { conversationId: ctx.conversationId, contentNodeId: databaseId },
-    select: { conversationId: true },
-  });
-  if (!assoc) {
-    return {
-      refusal:
-        "That database is not associated with this conversation — tools reach only associated databases by design. Ask the user to @-mention it (or open the chat from the database) first.",
-    };
+  // The chat being OPEN ON this database is the strongest association
+  // there is — sidechat binding (plan Phase 6) needs no
+  // ConversationAssociation row to prove what ctx.contentId already states.
+  const boundHere = ctx.contentId === databaseId;
+  if (!boundHere) {
+    if (!ctx.conversationId) {
+      return {
+        refusal:
+          "This chat has no bound conversation, so database tools are unavailable. Ask the user to mention the database in a saved conversation.",
+      };
+    }
+    const assoc = await prisma.conversationAssociation.findFirst({
+      where: { conversationId: ctx.conversationId, contentNodeId: databaseId },
+      select: { conversationId: true },
+    });
+    if (!assoc) {
+      return {
+        refusal:
+          "That database is not associated with this conversation — tools reach only associated databases by design. Ask the user to @-mention it (or open the chat from the database) first.",
+      };
+    }
   }
   const level = await resolveDataTableAccess(databaseId, ctx.userId);
   if (!canRead(level)) return { refusal: "Database not found." };

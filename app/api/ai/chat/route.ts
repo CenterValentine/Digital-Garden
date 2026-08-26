@@ -1614,6 +1614,40 @@ export async function POST(request: Request) {
             error: groundingError,
           });
         }
+
+        // Database sidechat grounding (plan Phase 6): a conversation bound
+        // to a data node gets its schema capsule exactly like a mention —
+        // without this, "insert a row in this file" left the model blind
+        // to the very database the chat was opened on, hunting through
+        // note search for an id it could never find (owner report,
+        // 2026-08-27).
+        try {
+          const boundData = await prisma.contentNode.findFirst({
+            where: {
+              id: contentId,
+              ownerId: session.user.id,
+              contentType: "data",
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (boundData) {
+            const { buildDataSchemaDigest } = await import(
+              "@/lib/domain/data/server/digest"
+            );
+            const digest = await buildDataSchemaDigest(contentId);
+            if (digest) {
+              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}`;
+            }
+          }
+        } catch (dataGroundingError) {
+          logger.warn({
+            layer: "ai",
+            event: "data:chat:grounding_failed",
+            summary: "database grounding failed — continuing without it",
+            error: dataGroundingError,
+          });
+        }
       }
 
       // Playbook progressive disclosure (AI v3.2 T3): inject standing rules

@@ -35,7 +35,12 @@ import { Wrench } from "lucide-react";
 import AIConnectionsPage from "@/components/settings/AIConnectionsPage";
 import { SearchConnectionsCard } from "@/components/settings/SearchConnectionsCard";
 import AIFeatureRoutingPage from "@/components/settings/AIFeatureRoutingPage";
-import { Checkbox } from "@/components/client/ui/checkbox";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/client/ui/tabs";
 import { Input } from "@/components/client/ui/input";
 import {
   Select,
@@ -370,17 +375,25 @@ export default function AISettingsPage() {
           </span>
         }
       >
-        <div className="space-y-4">
+        {/* Tabbed by group with control-panel switches (owner, 2026-08-27):
+            the flat five-section list outgrew the page. */}
+        <Tabs defaultValue={TOOL_GROUPS[0].label}>
+          <TabsList className="flex w-full flex-wrap justify-start">
+            {TOOL_GROUPS.map((group) => (
+              <TabsTrigger key={group.label} value={group.label}>
+                {group.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
           {TOOL_GROUPS.map((group) => (
-            <div key={group.label} className="space-y-2">
-              <div className="flex items-baseline gap-2 border-b border-black/10 pb-1 dark:border-white/10">
-                <h4 className="text-[11px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                  {group.label}
-                </h4>
-                <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                  {group.description}
-                </span>
-              </div>
+            <TabsContent
+              key={group.label}
+              value={group.label}
+              className="mt-3 space-y-2"
+            >
+              <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                {group.description}
+              </p>
               {group.ids.map((toolId) => (
                 <ToolConfigRow
                   key={toolId}
@@ -396,9 +409,9 @@ export default function AISettingsPage() {
                   onChange={(next) => handleToolConfigChange(toolId, next)}
                 />
               ))}
-            </div>
+            </TabsContent>
           ))}
-        </div>
+        </Tabs>
       </SettingSection>
     </SettingsPage>
   );
@@ -455,30 +468,18 @@ function ToolConfigRow({
       )?.id ?? NO_OVERRIDE
     : NO_OVERRIDE;
 
-  const checkboxId = `ai-tool-${toolId}`;
+  const switchId = `ai-tool-${toolId}`;
 
   return (
     <div
       className={
         enabled
-          ? "rounded-lg border border-black/10 bg-black/[0.02] p-3 transition-colors dark:border-white/10 dark:bg-white/[0.02]"
-          : "rounded-lg border border-black/5 bg-black/[0.04] p-3 transition-colors dark:border-white/5 dark:bg-black/10"
+          ? "rounded-lg border border-black/10 bg-black/[0.02] px-3 py-2 transition-colors dark:border-white/10 dark:bg-white/[0.02]"
+          : "rounded-lg border border-black/5 bg-black/[0.04] px-3 py-2 transition-colors dark:border-white/5 dark:bg-black/10"
       }
     >
-      <div className="flex items-start gap-3">
-        <Checkbox
-          id={checkboxId}
-          checked={enabled}
-          onCheckedChange={(checked) =>
-            onChange({
-              ...config,
-              // Default-on, so only persist when off.
-              enabled: checked === true ? undefined : false,
-            })
-          }
-          className="mt-1"
-        />
-        <label htmlFor={checkboxId} className="min-w-0 flex-1 cursor-pointer">
+      <div className="flex items-center gap-3">
+        <label htmlFor={switchId} className="min-w-0 flex-1 cursor-pointer">
           <span className="flex items-center gap-2">
             <span className="text-sm font-medium">{meta.name}</span>
             <code className="rounded bg-black/10 px-1 py-px text-[10px] text-muted-foreground dark:bg-black/20">
@@ -494,6 +495,18 @@ function ToolConfigRow({
             {meta.description}
           </p>
         </label>
+        <Switch
+          id={switchId}
+          checked={enabled}
+          onCheckedChange={(checked) =>
+            onChange({
+              ...config,
+              // Default-on, so only persist when off.
+              enabled: checked ? undefined : false,
+            })
+          }
+          className="shrink-0"
+        />
       </div>
 
       {callsAi && enabled && (
