@@ -1285,10 +1285,26 @@ Sidechat auto-associates. Playbooks name their target database via mention/attac
    factory in the drift map, route spread — `ai:drift:check` green (58 tools). End-to-end
    co-browse smoke is the owner's.
 
-### Phase 7 — Remaining stub seams
+### Phase 7 — Remaining stub seams — BUILT 2026-08-27
 
 B6's import and export reservations. (Publishing needs no exclusion work — see B6 — and the
 block seam landed in Phase 1b per B7.)
+
+**Done:**
+- **Export — O6 taken, real CSV** (`lib/domain/data/server/export.ts`, branch in
+  `bulk-export.ts`): the default view's rows as CSV + a `.meta.json` sidecar
+  (`dg-database-meta@1`: full column configs, relation targets, display-lossy list).
+  Hydration makes "lossy" columns better than empty — relations/person/contentLink/file
+  export display titles, lookup/rollup their computed values — recorded as display-lossy so
+  re-import rebuilds from configs, never from CSV cells. Query tables export their
+  projection. Requested format is ignored for data nodes: CSV is the honest tabular format.
+- **Import — shape only** (`lib/domain/data/import.ts`): `DataImportProvenance` (the
+  `DataPayload.source` record), `InferredColumn`, and `inferColumnsFromSamples` returning
+  NOT_IMPLEMENTED — the seam exists, nothing half-built behind it.
+- **Publishing — B7 item 4 VERIFIED:** `ServerNoteWindow.renderHTML` constructs its emitted
+  attributes literally (`class` + `data-block-type` only) and never spreads HTMLAttributes,
+  so `targetViewId`/`targetRowId` structurally cannot reach published HTML. No new
+  publishing work, as designed.
 
 ---
 
