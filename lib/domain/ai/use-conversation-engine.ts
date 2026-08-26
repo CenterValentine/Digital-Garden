@@ -524,6 +524,12 @@ export interface UseConversationEngineResult {
   mentionResults: SuggestionItem[];
   handleMentionSearch: (query: string) => void;
   /**
+   * Resolve a database-row mention to a real node by promoting it at role
+   * "referenced" (plan Phase 5) — same endpoint the wiki-link path hits.
+   * Returns the item rewritten with the node id, or null on failure.
+   */
+  handleResolveMention: (item: SuggestionItem) => Promise<SuggestionItem | null>;
+  /**
    * Pre-flight gate for folder mentions (plan Phase 4 / sweep B5): fires on
    * pill insert so context refreshes while the user is still typing. Chip
    * states keyed by folderId; snapshots ride the sent message as durable
@@ -1342,6 +1348,18 @@ export function useConversationEngine({
     if (mentionTimerRef.current) clearTimeout(mentionTimerRef.current);
     mentionTimerRef.current = setTimeout(async () => {
       try {
+        // Un-promoted database rows ride beside the node search (plan
+        // Phase 5) — best-effort, so a row-search failure cannot take the
+        // node results with it.
+        const rowsPromise = query.trim()
+          ? fetch(
+              `/api/content/data/suggest?q=${encodeURIComponent(query)}&limit=5`,
+              { credentials: "include" },
+            )
+              .then((r) => (r.ok ? r.json() : null))
+              .catch(() => null)
+          : Promise.resolve(null);
+
         const res = await fetch(
           `/api/content/content?search=${encodeURIComponent(query)}&limit=8`,
           { credentials: "include" },
@@ -1356,12 +1374,61 @@ export function useConversationEngine({
             description: item.contentType,
           }),
         );
+
+        const rowData = await rowsPromise;
+        if (rowData?.success) {
+          type RowItem = { rowId: string; tableId: string; tableTitle: string; title: string };
+          for (const row of (rowData.data?.items ?? []) as RowItem[]) {
+            items.push({
+              // Sentinel — never inserted: selection promotes the row and
+              // the pill takes the returned node id (handleResolveMention).
+              id: `row:${row.rowId}`,
+              label: row.title,
+              contentType: "data-row",
+              description: `Row of ${row.tableTitle}`,
+              row: { rowId: row.rowId, tableId: row.tableId },
+            });
+          }
+        }
+
         setMentionResults(items);
       } catch {
         /* silently fail — search is best-effort */
       }
     }, 150);
   }, []);
+
+  // Promote-on-selection for row mentions (plan Phase 5): the row becomes a
+  // real node at role "referenced" — hidden from the tree, exactly like a
+  // wiki-link to the same row — and the mention machinery downstream
+  // (associations, capsules) sees an ordinary note id.
+  const handleResolveMention = useCallback(
+    async (item: SuggestionItem): Promise<SuggestionItem | null> => {
+      if (!item.row) return item;
+      try {
+        const res = await fetch(
+          `/api/content/data/${item.row.tableId}/promote`,
+          {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ rowId: item.row.rowId, role: "referenced" }),
+          },
+        );
+        const json = await res.json();
+        if (!res.ok || !json?.success) return null;
+        return {
+          ...item,
+          id: json.data.contentId as string,
+          contentType: "note",
+          row: undefined,
+        };
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
 
   // ── playbooks (AI v3.2 T3) ──
   // Fetched once per mount for the /playbook command entry. A handful of
@@ -3020,6 +3087,7 @@ export function useConversationEngine({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    handleResolveMention,
     notifyMentionInserted,
     folderGates,
     commandItems,
