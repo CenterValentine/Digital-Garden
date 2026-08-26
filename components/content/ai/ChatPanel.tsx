@@ -959,8 +959,11 @@ export function ChatPanel({
       {/* Header — shows active provider/model. Save button removed:
           chats auto-save to the bound Conversation. Delete is protected
           by a two-step confirm. */}
-      <div className="flex shrink-0 items-center justify-between border-b border-black/10 dark:border-white/10 px-3 py-2">
-        <div className="flex min-w-0 items-center gap-2">
+      {/* flex-wrap: in a narrow sidechat the target chips overlapped the
+          window controls into an unreadable pile (owner report,
+          2026-08-28) — they now break onto a second row instead. */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-y-1 border-b border-black/10 dark:border-white/10 px-3 py-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-2 gap-y-1">
           <HeaderTitle providerId={providerId} modelId={modelId} />
           <TargetFolderChip
             target={targetFolder}
@@ -979,7 +982,7 @@ export function ChatPanel({
             hasOrigin={Boolean(contentId)}
           />
         </div>
-        <div className="flex items-center gap-1">
+        <div className="ml-auto flex items-center gap-1">
           {conversationId && (
             <button
               onClick={() => void handleOpenInPage()}

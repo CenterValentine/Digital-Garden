@@ -134,6 +134,50 @@ function translateOptionValue(
   return value;
 }
 
+/**
+ * Normalization safety (owner-requested, 2026-08-28): the strict encoder
+ * REJECTS type violations by design (plan B8c — never coerce), but a model
+ * legitimately produces unambiguous near-misses. Normalize exactly those,
+ * nothing else, BEFORE the encoder:
+ *  - strings trimmed;
+ *  - number columns: a purely numeric string becomes a number;
+ *  - checkbox columns: "true"/"yes"/"false"/"no" strings become booleans;
+ *  - date columns: M/D/YYYY becomes ISO YYYY-MM-DD (ISO passes through).
+ * Anything still ambiguous falls to the encoder and fails loudly — a
+ * normalization that guesses is worse than a rejection that teaches.
+ */
+function normalizeCellInput(column: DataColumn, raw: unknown): unknown {
+  let value = raw;
+  if (typeof value === "string") value = value.trim();
+  if (column.type === "number" && typeof value === "string" && value !== "") {
+    const n = Number(value);
+    if (Number.isFinite(n)) value = n;
+  }
+  if (column.type === "checkbox" && typeof value === "string") {
+    const v = value.toLowerCase();
+    if (v === "true" || v === "yes") value = true;
+    else if (v === "false" || v === "no") value = false;
+  }
+  if (column.type === "date" && typeof value === "string") {
+    const us = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (us) {
+      value = `${us[3]}-${us[1].padStart(2, "0")}-${us[2].padStart(2, "0")}`;
+    }
+  }
+  return translateOptionValue(column, value);
+}
+
+/** Cells no write tool may target, with the reason the model needs. */
+function writeBlockReason(column: DataColumn): string | null {
+  if (column.type === "relation") {
+    return `${column.name} is a relation — links change through the table UI, not cell writes (not supported by this tool yet).`;
+  }
+  if (column.type === "lookup" || column.type === "rollup") {
+    return `${column.name} is computed from a relation — it has no stored value to write.`;
+  }
+  return null;
+}
+
 export function createDataTools(ctx: ToolExecuteContext) {
   return {
     describe_database: tool({
@@ -395,7 +439,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
                 errors.push(`Row ${i + 1}: no column named "${ref}".`);
                 continue;
               }
-              cells[column.key] = translateOptionValue(column, raw);
+              const blocked = writeBlockReason(column);
+              if (blocked) {
+                errors.push(`Row ${i + 1}: ${blocked}`);
+                continue;
+              }
+              cells[column.key] = normalizeCellInput(column, raw);
             }
             if (dedupeColumn) {
               const v = cells[dedupeColumn.key];
@@ -460,6 +509,129 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Inserting rows failed with an internal error — nothing may have been written; tell the user.";
+        }
+      },
+    }),
+
+    update_row: tool({
+      description:
+        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows.",
+      inputSchema: z.object({
+        databaseId: z.string().describe("The database's content id"),
+        rowId: z
+          .string()
+          .describe("The row to update — from a query_database result line"),
+        cells: z
+          .record(z.string(), z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.null(),
+          ]))
+          .describe(
+            "ONLY the columns to change: {columnName: newValue}. null clears the cell (user-requested blanks only). Option labels ok for select-likes; dates ISO (M/D/YYYY tolerated)."
+          ),
+        expect: z
+          .record(z.string(), z.union([
+            z.string(),
+            z.number(),
+            z.boolean(),
+            z.array(z.string()),
+            z.null(),
+          ]))
+          .optional()
+          .describe(
+            "Current values you last read, per column you're changing (null = you believe it's empty). Strongly recommended: protects the user's concurrent edits."
+          ),
+      }),
+      execute: async (input) => {
+        try {
+          const gate = await resolveJurisdiction(ctx, input.databaseId);
+          if ("refusal" in gate) return gate.refusal;
+          const { table, level } = gate;
+          if (!canWrite(level)) {
+            return "You have read access here but not write — tell the user.";
+          }
+          if (table.mode === "query") {
+            return "Query databases project existing notes — edit the note itself, not rows.";
+          }
+          const live = table.columns.filter((c) => !c.deletedAt);
+
+          const entries = Object.entries(input.cells);
+          if (entries.length === 0) return "No cells given — nothing to change.";
+          if (entries.length > 10) {
+            return "At most 10 cells per update — split it, or reconsider whether this is really one edit.";
+          }
+
+          const writes: CellWrite[] = [];
+          const errors: string[] = [];
+          for (const [ref, raw] of entries) {
+            const column = findColumn(live, ref);
+            if (!column) {
+              errors.push(`No column named "${ref}".`);
+              continue;
+            }
+            const blocked = writeBlockReason(column);
+            if (blocked) {
+              errors.push(blocked);
+              continue;
+            }
+            // null / "" = clear (empty-is-absent, plan B8c): the key is
+            // deleted, exactly what the grid does.
+            const value =
+              raw === null || raw === ""
+                ? undefined
+                : normalizeCellInput(column, raw);
+            const write: CellWrite = {
+              rowId: input.rowId,
+              columnKey: column.key,
+              value,
+            };
+            if (input.expect && ref in input.expect) {
+              const rawExpect = input.expect[ref];
+              write.expect = (
+                rawExpect === null || rawExpect === ""
+                  ? undefined
+                  : normalizeCellInput(column, rawExpect)
+              ) as CellWrite["expect"];
+              write.hasExpectation = true;
+            }
+            writes.push(write);
+          }
+          if (errors.length > 0) {
+            return `Nothing updated — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
+          }
+
+          const result = await writeCells(input.databaseId, live, writes);
+          const stale = result.results.filter((r) => r.status === "stale");
+          if (stale.length > 0) {
+            const details = stale
+              .map((s) => {
+                const col = live.find((c) => c.key === s.columnKey);
+                const current = col
+                  ? cellToText(col, s.current) || "(empty)"
+                  : String(s.current ?? "(empty)");
+                return `${col?.name ?? s.columnKey} is now: ${current}`;
+              })
+              .join("; ");
+            return `Not updated — the row changed since you read it (${details}). Re-query and retry with fresh expect values, or ask the user which value should win.`;
+          }
+          const failed = result.results.filter((r) => r.status === "error");
+          if (failed.length > 0) {
+            return `Not updated — validation rejected: ${failed
+              .map((f) => f.message)
+              .join("; ")}. Nothing changed (all-or-nothing).`;
+          }
+          return `Updated ${writes.length} cell${writes.length === 1 ? "" : "s"} on the row. The user sees the change in the grid and can undo it there.`;
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:update_caught",
+            summary: "update_row failed",
+            error,
+          });
+          return "Updating the row failed with an internal error — nothing may have been written; tell the user.";
         }
       },
     }),

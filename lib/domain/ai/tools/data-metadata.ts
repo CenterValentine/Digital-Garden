@@ -10,6 +10,7 @@ export const DATA_TOOL_IDS = [
   "query_database",
   "describe_database",
   "insert_rows",
+  "update_row",
 ] as const;
 
 export type DataToolId = (typeof DATA_TOOL_IDS)[number];
@@ -32,5 +33,10 @@ export const DATA_TOOL_METADATA: Record<
     name: "Insert Database Rows",
     description:
       "Append new rows to an associated database (append-only — cannot modify or delete existing rows; ≤25 per call, optional dedupe column, batches over 10 require your confirmation)",
+  },
+  update_row: {
+    name: "Update Database Row",
+    description:
+      "Change cells in ONE existing row — only the columns the user named, all-or-nothing, with compare-and-set protection against overwriting concurrent edits; cannot create or delete rows",
   },
 };
