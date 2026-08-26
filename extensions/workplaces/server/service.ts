@@ -28,6 +28,7 @@ import type {
 import {
   applyWorkbenchFolderOrder,
   normalizeWorkbenchSettings,
+  resolveFolderOrder,
 } from "./types";
 
 const MAIN_WORKSPACE_NAME = "Main Workspace";
@@ -1110,10 +1111,43 @@ export async function removeContentFromWorkspaces(
 }
 
 /**
+ * How many parent hops separate a live folder from an ancestor, or null when
+ * the ancestor isn't reached within `maxHops` (folder moved out, trashed, or
+ * simply deeper than the nesting budget allows). 1 = first-level child.
+ *
+ * A hop-bounded upward walk rather than a subtree query: depth budgets are
+ * 1-3, so this is at most three point reads, each also asserting the
+ * intermediate folder is alive — a folder inside a trashed parent must not
+ * count as attached.
+ */
+async function folderHopsToAncestor(
+  ownerId: string,
+  folderId: string,
+  ancestorId: string,
+  maxHops: number,
+): Promise<number | null> {
+  let currentId = folderId;
+  for (let hops = 1; hops <= maxHops; hops++) {
+    const node = await prisma.contentNode.findFirst({
+      where: { id: currentId, ownerId, deletedAt: null },
+      select: { parentId: true },
+    });
+    if (!node?.parentId) return null;
+    if (node.parentId === ancestorId) return hops;
+    currentId = node.parentId;
+  }
+  return null;
+}
+
+/**
  * First-level subfolders of a view workspace's root, joined to any workbench
  * rows that already exist for them. One query per side; the join is done here
  * rather than in the client so "does this folder have a workbench?" has a
  * single answer.
+ *
+ * Root layer only: nested layers are derived client-side from the scoped
+ * tree the submenu already fetches, so serving them here would be a second
+ * source of truth for the same data.
  */
 export async function listWorkbenchFolders(
   ownerId: string,
@@ -1152,19 +1186,45 @@ export async function listWorkbenchFolders(
       .map((row) => [row.viewRootContentId as string, row.id]),
   );
 
+  // canNest = the depth budget allows another layer AND the folder actually
+  // has subfolders. One grouped count for the whole row set.
+  const nestable = new Set<string>();
+  if (settings.maxDepth > 1 && folders.length > 0) {
+    const childCounts = await prisma.contentNode.groupBy({
+      by: ["parentId"],
+      where: {
+        ownerId,
+        parentId: { in: folders.map((folder) => folder.id) },
+        contentType: "folder",
+        deletedAt: null,
+      },
+      _count: { _all: true },
+    });
+    for (const row of childCounts) {
+      if (row.parentId) nestable.add(row.parentId);
+    }
+  }
+
   return applyWorkbenchFolderOrder(
     folders.map((folder) => ({
       folderId: folder.id,
       title: folder.title,
       workbenchId: workbenchByFolder.get(folder.id) ?? null,
       hidden: hidden.has(folder.id),
+      canNest: nestable.has(folder.id),
     })),
-    settings.folderOrder,
+    resolveFolderOrder(settings, parent.viewRootContentId, true),
   );
 }
 
 /**
- * Materialize-or-reuse the workbench for one first-level subfolder.
+ * Materialize-or-reuse the workbench for a folder within the view's nesting
+ * budget (1-3 layers below the view root; the parent's `maxDepth` decides).
+ *
+ * Workbench rows stay FLAT regardless of the folder's depth — parent is
+ * always the top workspace, never another workbench. Nesting is a property of
+ * the MENU, not the data: keying benches off parent benches would force
+ * materializing every ancestor just to browse a layer.
  *
  * Reuse covers three cases, in order: an active row (return it untouched, so
  * pane layouts survive), an ARCHIVED row (reactivate — a folder rescued from
@@ -1191,24 +1251,31 @@ export async function createWorkbench(
   // A workbench only exists under a VIEW workspace, and never under another
   // workbench: the submenu is one level deep by design.
   if (!parent?.viewRootContentId || parent.isMain) return null;
-  if (!normalizeWorkbenchSettings(normalizeSettings(parent.settings)).enabled) {
-    return null;
-  }
+  const workbenchSettings = normalizeWorkbenchSettings(
+    normalizeSettings(parent.settings),
+  );
+  if (!workbenchSettings.enabled) return null;
 
-  // The folder must still be a FIRST-LEVEL child of the parent's view root.
-  // Re-checked server-side because the submenu the click came from may be
-  // seconds stale — the folder can have moved or been trashed meanwhile.
+  // The folder must still sit within the view's nesting budget. Re-checked
+  // server-side because the submenu the click came from may be seconds stale
+  // — the folder can have moved or been trashed meanwhile.
   const folder = await prisma.contentNode.findFirst({
     where: {
       id: folderContentId,
       ownerId,
-      parentId: parent.viewRootContentId,
       contentType: "folder",
       deletedAt: null,
     },
     select: { id: true, title: true },
   });
   if (!folder) return null;
+  const hops = await folderHopsToAncestor(
+    ownerId,
+    folderContentId,
+    parent.viewRootContentId,
+    workbenchSettings.maxDepth,
+  );
+  if (hops === null) return null;
 
   const existing = await prisma.contentWorkspace.findFirst({
     where: { ownerId, parentWorkspaceId, viewRootContentId: folderContentId },
@@ -1321,17 +1388,24 @@ export async function sweepDormantWorkbenches(now: Date): Promise<{
   for (const workbench of workbenches) {
     const parent = workbench.parentWorkspace;
     let attached = false;
-    if (parent?.viewRootContentId && workbench.viewRootContentId) {
-      const folder = await prisma.contentNode.findFirst({
-        where: {
-          id: workbench.viewRootContentId,
-          ownerId: workbench.ownerId,
-          parentId: parent.viewRootContentId,
-          deletedAt: null,
-        },
-        select: { id: true },
-      });
-      attached = folder !== null && parent.status === "active";
+    if (
+      parent?.viewRootContentId &&
+      workbench.viewRootContentId &&
+      parent.status === "active"
+    ) {
+      // Same walk createWorkbench uses: attached means reachable within the
+      // parent's CURRENT depth budget, so lowering maxDepth from 3 to 1
+      // makes deeper benches dormant rather than leaving them stranded live.
+      const maxDepth = normalizeWorkbenchSettings(
+        normalizeSettings(parent.settings),
+      ).maxDepth;
+      const hops = await folderHopsToAncestor(
+        workbench.ownerId,
+        workbench.viewRootContentId,
+        parent.viewRootContentId,
+        maxDepth,
+      );
+      attached = hops !== null;
     }
 
     if (attached) {

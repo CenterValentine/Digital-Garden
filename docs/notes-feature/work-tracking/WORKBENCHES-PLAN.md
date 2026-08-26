@@ -171,6 +171,14 @@ the database checklist.
    delete row, move/retarget → dormant (2026-08-24).
 4. Submenu hide: per-folder "Hide from workbenches" + blanket "unhide all" footer only
    (2026-08-24).
+8. Nesting (2026-08-26): the submenu may descend up to **3 folder layers**
+   (`settings.workbenches.maxDepth`, default **1** — opt-in). Workbench rows
+   stay FLAT (parent = the top workspace at any depth; nesting is a property
+   of the MENU, not the data), hide/reorder work per layer (orders keyed by
+   parent folder in `folderOrders`), nested panels carry no header, and the
+   nested dwell is 400ms vs the root's 250ms. `createWorkbench` and the
+   dormant sweep validate by hop-bounded ancestor walk within the parent's
+   current depth budget — lowering the budget makes deeper benches dormant.
 5. Workbenches are **not renameable** — renaming happens only by renaming the folder
    (2026-08-24).
 6. Submenu opens on dwell only; **a click always selects the workspace itself** — no
