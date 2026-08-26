@@ -32,7 +32,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
-import { normalizeWorkbenchSettings } from "@/extensions/workplaces/server/types";
+import {
+  applyWorkbenchFolderOrder,
+  normalizeWorkbenchSettings,
+} from "@/extensions/workplaces/server/types";
 import { useContentStore } from "@/state/content-store";
 import { formatRelativeTime } from "@/lib/core/format-relative-time";
 import {
@@ -484,6 +487,10 @@ export function WorkspaceSelector() {
     /** null = loading; [] = no subfolders. */
     folders: Array<{ id: string; title: string }> | null;
   } | null>(null);
+  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(
+    null,
+  );
   const workbenchDwellTimerRef = useRef<number | null>(null);
   const workbenchCloseTimerRef = useRef<number | null>(null);
 
@@ -838,6 +845,62 @@ export function WorkspaceSelector() {
       console.error("[WorkspaceSelector] Failed to hide folder:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to hide folder",
+      );
+    }
+  };
+
+  const persistWorkbenchSettings = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    patch: Partial<ReturnType<typeof normalizeWorkbenchSettings>>,
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    await updateWorkspace(parentWorkspace.id, {
+      settings: {
+        ...parentWorkspace.settings,
+        workbenches: { ...current, ...patch },
+      },
+    });
+  };
+
+  /**
+   * Persist a moved row. The saved order lists EVERY folder currently known,
+   * not just the moved pair — a sparse list would leave the unlisted folders
+   * ranked equal and their relative order at the mercy of whatever the tree
+   * returned that day.
+   */
+  const handleReorderWorkbenchFolder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    orderedFolderIds: string[],
+    draggedId: string,
+    targetId: string,
+  ) => {
+    const next = [...orderedFolderIds];
+    const from = next.indexOf(draggedId);
+    const to = next.indexOf(targetId);
+    if (from === -1 || to === -1 || from === to) return;
+    next.splice(from, 1);
+    next.splice(to, 0, draggedId);
+    try {
+      await persistWorkbenchSettings(parentWorkspace, { folderOrder: next });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to reorder workbenches:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save workbench order",
+      );
+    }
+  };
+
+  const handleResetWorkbenchOrder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+  ) => {
+    try {
+      await persistWorkbenchSettings(parentWorkspace, { folderOrder: [] });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to reset order:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to reset order",
       );
     }
   };
@@ -2097,7 +2160,17 @@ export function WorkspaceSelector() {
               parentWorkspace.settings,
             );
             const hiddenIds = new Set(workbenchSettings.hiddenFolderIds);
-            const allFolders = workbenchMenu.folders ?? [];
+            const allFolders = applyWorkbenchFolderOrder(
+              (workbenchMenu.folders ?? []).map((folder) => ({
+                ...folder,
+                folderId: folder.id,
+              })),
+              workbenchSettings.folderOrder,
+            );
+            // Drag math runs over EVERY folder, hidden ones included: dropping
+            // across a hidden neighbour must not silently reshuffle it.
+            const orderedFolderIds = allFolders.map((folder) => folder.id);
+            const hasCustomOrder = workbenchSettings.folderOrder.length > 0;
             const visibleFolders = allFolders.filter(
               (folder) => !hiddenIds.has(folder.id),
             );
@@ -2144,9 +2217,43 @@ export function WorkspaceSelector() {
                       <button
                         key={folder.id}
                         type="button"
+                        draggable
+                        onDragStart={(event) => {
+                          event.dataTransfer.effectAllowed = "move";
+                          event.dataTransfer.setData("text/plain", folder.id);
+                          setDraggedFolderId(folder.id);
+                        }}
+                        onDragOver={(event) => {
+                          if (!draggedFolderId) return;
+                          event.preventDefault();
+                          event.dataTransfer.dropEffect = "move";
+                          setFolderDropTargetId(folder.id);
+                        }}
+                        onDragLeave={() => {
+                          setFolderDropTargetId((current) =>
+                            current === folder.id ? null : current,
+                          );
+                        }}
+                        onDrop={(event) => {
+                          event.preventDefault();
+                          const dragged = draggedFolderId;
+                          setDraggedFolderId(null);
+                          setFolderDropTargetId(null);
+                          if (!dragged) return;
+                          void handleReorderWorkbenchFolder(
+                            parentWorkspace,
+                            orderedFolderIds,
+                            dragged,
+                            folder.id,
+                          );
+                        }}
+                        onDragEnd={() => {
+                          setDraggedFolderId(null);
+                          setFolderDropTargetId(null);
+                        }}
                         disabled={switchingWorkspaceId !== null}
                         title={[
-                          "Open workbench · right-click to hide",
+                          "Open workbench · drag to reorder · right-click to hide",
                           existing ? lastOpenedLine(existing) : "",
                         ]
                           .filter(Boolean)
@@ -2166,6 +2273,11 @@ export function WorkspaceSelector() {
                           isActiveBench
                             ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] hover:bg-gold-dark/60 dark:text-white"
                             : "hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                        } ${draggedFolderId === folder.id ? "opacity-40" : ""} ${
+                          folderDropTargetId === folder.id &&
+                          draggedFolderId !== folder.id
+                            ? "ring-1 ring-gold-primary/50"
+                            : ""
                         }`}
                       >
                         <Folder className={`${density.icon} shrink-0`} />
@@ -2210,16 +2322,37 @@ export function WorkspaceSelector() {
                     );
                   })
                 )}
-                {hiddenCount > 0 ? (
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void handleUnhideAllWorkbenchFolders(parentWorkspace)
-                    }
-                    className={`mt-1 flex w-full items-center gap-1 rounded-lg border-t border-black/10 px-1.5 text-left text-[10px] text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:border-white/10 dark:hover:text-white ${density.row}`}
-                  >
-                    {hiddenCount} hidden · unhide all
-                  </button>
+                {hiddenCount > 0 || hasCustomOrder ? (
+                  // One footer slot, shared: it appears only once something has
+                  // been customised, and each affordance undoes exactly the
+                  // customisation that summoned it.
+                  <div className="mt-1 flex items-center gap-1 border-t border-black/10 pt-1 text-[10px] dark:border-white/10">
+                    {hiddenCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          void handleUnhideAllWorkbenchFolders(parentWorkspace)
+                        }
+                        className="flex-1 truncate rounded-lg px-1.5 py-0.5 text-left text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                      >
+                        {hiddenCount} hidden · unhide all
+                      </button>
+                    ) : null}
+                    {hasCustomOrder ? (
+                      <button
+                        type="button"
+                        title="Restore the folders' own order"
+                        onClick={() =>
+                          void handleResetWorkbenchOrder(parentWorkspace)
+                        }
+                        className={`truncate rounded-lg px-1.5 py-0.5 text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white ${
+                          hiddenCount > 0 ? "shrink-0" : "flex-1 text-left"
+                        }`}
+                      >
+                        reset order
+                      </button>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             );

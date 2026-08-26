@@ -85,6 +85,13 @@ export interface WorkspaceWorkbenchSettings {
   enabled: boolean;
   hiddenFolderIds: string[];
   dormantClearoutDays: number;
+  /**
+   * User's custom submenu order, as folder ids. Empty = follow the folders'
+   * own tree order. Ids are kept even when a folder is hidden or disappears:
+   * a stale id costs one map lookup, whereas pruning would silently forget
+   * the position of a folder that comes back.
+   */
+  folderOrder: string[];
 }
 
 /**
@@ -112,7 +119,32 @@ export function normalizeWorkbenchSettings(
     Number.isFinite(obj.dormantClearoutDays)
       ? Math.min(365, Math.max(1, Math.round(obj.dormantClearoutDays)))
       : 30;
-  return { enabled, hiddenFolderIds, dormantClearoutDays };
+  const folderOrder = Array.isArray(obj.folderOrder)
+    ? obj.folderOrder.filter((value): value is string => typeof value === "string")
+    : [];
+  return { enabled, hiddenFolderIds, dormantClearoutDays, folderOrder };
+}
+
+/**
+ * Apply a saved folder order to a list keyed by folder id.
+ *
+ * Unlisted ids sort last and keep their incoming (tree) order — `sort` is
+ * stable — so a folder created after the last reorder appears at the end
+ * rather than jumping to the top.
+ *
+ * Shared by the server list route and the submenu so both agree on order.
+ */
+export function applyWorkbenchFolderOrder<T extends { folderId: string }>(
+  items: T[],
+  folderOrder: string[],
+): T[] {
+  if (folderOrder.length === 0) return items;
+  const rank = new Map(folderOrder.map((id, index) => [id, index]));
+  return [...items].sort(
+    (a, b) =>
+      (rank.get(a.folderId) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(b.folderId) ?? Number.MAX_SAFE_INTEGER),
+  );
 }
 
 /** One row of GET /api/content/workspaces/[id]/workbenches. */

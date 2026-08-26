@@ -25,7 +25,10 @@ import type {
 } from "./types";
 // Value import (not `import type`): the same normalizer the client uses, so
 // server and submenu can't disagree about what "workbenches enabled" means.
-import { normalizeWorkbenchSettings } from "./types";
+import {
+  applyWorkbenchFolderOrder,
+  normalizeWorkbenchSettings,
+} from "./types";
 
 const MAIN_WORKSPACE_NAME = "Main Workspace";
 const MAIN_WORKSPACE_SLUG = "main";
@@ -1149,12 +1152,15 @@ export async function listWorkbenchFolders(
       .map((row) => [row.viewRootContentId as string, row.id]),
   );
 
-  return folders.map((folder) => ({
-    folderId: folder.id,
-    title: folder.title,
-    workbenchId: workbenchByFolder.get(folder.id) ?? null,
-    hidden: hidden.has(folder.id),
-  }));
+  return applyWorkbenchFolderOrder(
+    folders.map((folder) => ({
+      folderId: folder.id,
+      title: folder.title,
+      workbenchId: workbenchByFolder.get(folder.id) ?? null,
+      hidden: hidden.has(folder.id),
+    })),
+    settings.folderOrder,
+  );
 }
 
 /**
