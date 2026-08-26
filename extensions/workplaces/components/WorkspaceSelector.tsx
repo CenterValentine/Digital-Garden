@@ -33,6 +33,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
 import { normalizeWorkbenchSettings } from "@/extensions/workplaces/server/types";
+import { useContentStore } from "@/state/content-store";
 import {
   Dialog,
   DialogContent,
@@ -194,6 +195,28 @@ function markExpirationWarningSeen(workspaceId: string, expiresAt: string) {
   );
 }
 
+/**
+ * How many distinct tabs a workspace holds.
+ *
+ * Unions the legacy pane snapshot with membership (R1 truth): surfaces that
+ * don't write the blob — the extension panel — land only in membership, while
+ * a workspace last saved by an older client may have only the blob. Counting
+ * either alone under-reports depending on which surface touched it last.
+ *
+ * De-duped by id, since a tab open in two panes is one piece of content.
+ */
+function getWorkspaceTabCount(workspace: ContentWorkspaceResponse): number {
+  const ids = new Set<string>();
+  for (const pane of Object.values(workspace.paneState.paneTabContentIds)) {
+    for (const id of pane?.contentIds ?? []) ids.add(id);
+  }
+  for (const id of workspace.membershipContentIds ?? []) ids.add(id);
+  return ids.size;
+}
+
+const TAB_COUNT_CHIP_CLASS =
+  "shrink-0 rounded-full px-1 text-[9px] leading-[1.4] tabular-nums";
+
 const MENU_HEADING_CLASS =
   "px-1.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-gray-500";
 
@@ -332,6 +355,10 @@ export function WorkspaceSelector() {
   );
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
   const openWorkbench = useWorkspaceStore((state) => state.openWorkbench);
+  // The ACTIVE workspace's stored snapshot lags by the persist debounce, so
+  // its own count comes from the live content store — otherwise a tab you
+  // just opened isn't counted until the write lands.
+  const liveTabCount = useContentStore((state) => state.openContentIds.length);
   const reorderWorkspaces = useWorkspaceStore(
     (state) => state.reorderWorkspaces,
   );
@@ -1793,6 +1820,27 @@ export function WorkspaceSelector() {
                     </span>
 
                     {renderWorkspaceName(workspace, "min-w-0 flex-1 truncate")}
+                    {(() => {
+                      const count =
+                        workspace.id === activeWorkspace?.id
+                          ? liveTabCount
+                          : getWorkspaceTabCount(workspace);
+                      // A workspace with nothing open shows nothing: "0" is
+                      // noise on a freshly created or reset workspace.
+                      if (count === 0) return null;
+                      return (
+                        <span
+                          title={`${count} open ${count === 1 ? "tab" : "tabs"}`}
+                          className={`${TAB_COUNT_CHIP_CLASS} ${
+                            isActive
+                              ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
+                              : "bg-black/[0.06] text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      );
+                    })()}
                     {workspace.isView ? (
                       <Eye
                         className={`h-3 w-3 shrink-0 ${
@@ -2064,12 +2112,35 @@ export function WorkspaceSelector() {
                         <span className="min-w-0 flex-1 truncate">
                           {folder.title}
                         </span>
-                        {existing ? (
-                          <span
-                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-primary/70"
-                            title="Workbench exists"
-                          />
-                        ) : null}
+                        {(() => {
+                          if (!existing) return null;
+                          const count = isActiveBench
+                            ? liveTabCount
+                            : getWorkspaceTabCount(existing);
+                          // The dot already says "this workbench exists"; the
+                          // count replaces it when there is something in it,
+                          // so the row never carries both markers.
+                          if (count === 0) {
+                            return (
+                              <span
+                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-primary/70"
+                                title="Workbench exists"
+                              />
+                            );
+                          }
+                          return (
+                            <span
+                              title={`${count} open ${count === 1 ? "tab" : "tabs"}`}
+                              className={`${TAB_COUNT_CHIP_CLASS} ${
+                                isActiveBench
+                                  ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
+                                  : "bg-black/[0.06] text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          );
+                        })()}
                       </button>
                     );
                   })
