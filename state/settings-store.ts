@@ -20,7 +20,15 @@ interface SettingsStore extends UserSettings {
 
   // Actions
   fetchFromBackend: () => Promise<void>;
-  saveToBackend: () => Promise<void>;
+  /**
+   * Push settings to the server. With `patch`, ONLY that partial is sent
+   * (the PATCH route deep-merges server-side); without, the legacy
+   * whole-snapshot is sent. Prefer scoped patches: the store is
+   * localStorage-persisted per tab, so a whole-snapshot save from a stale
+   * tab silently resurrects old values — the mechanism that kept
+   * re-disabling the database tools (owner report, 2026-08-28).
+   */
+  saveToBackend: (patch?: Partial<UserSettings>) => Promise<void>;
   reset: () => Promise<void>;
 
   // Section updaters (auto-save to backend)
@@ -86,24 +94,26 @@ export const useSettingsStore = create<SettingsStore>()(
       },
 
       // Save to backend
-      saveToBackend: async () => {
+      saveToBackend: async (patch?: Partial<UserSettings>) => {
         const current = get();
-        const settings: UserSettings = {
-          version: current.version,
-          ui: current.ui,
-          files: current.files,
-          fileTree: current.fileTree,
-          external: current.external,
-          search: current.search,
-          editor: current.editor,
-          ai: current.ai,
-          exportBackup: current.exportBackup,
-          calendar: current.calendar,
-          periodicNotes: current.periodicNotes,
-          flashcards: current.flashcards,
-          notifications: current.notifications,
-          studio: current.studio,
-        };
+        const settings: Partial<UserSettings> = patch
+          ? { version: current.version, ...patch }
+          : {
+              version: current.version,
+              ui: current.ui,
+              files: current.files,
+              fileTree: current.fileTree,
+              external: current.external,
+              search: current.search,
+              editor: current.editor,
+              ai: current.ai,
+              exportBackup: current.exportBackup,
+              calendar: current.calendar,
+              periodicNotes: current.periodicNotes,
+              flashcards: current.flashcards,
+              notifications: current.notifications,
+              studio: current.studio,
+            };
 
         set({ isSyncing: true, error: null });
         try {
@@ -212,7 +222,9 @@ export const useSettingsStore = create<SettingsStore>()(
           ai: { ...state.ai, ...ai },
           hasPendingChanges: true,
         }));
-        await get().saveToBackend();
+        // Scoped: send ONLY the delta. A whole-snapshot here let any stale
+        // tab's incidental save clobber ai.toolConfig server-side.
+        await get().saveToBackend({ ai } as Partial<UserSettings>);
       },
 
       setCalendarSettings: async (calendar) => {
