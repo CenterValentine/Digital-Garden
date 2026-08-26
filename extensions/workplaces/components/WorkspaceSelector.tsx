@@ -1486,7 +1486,13 @@ export function WorkspaceSelector() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
+            // Same fill as the ACTIVE row in the menu below (gold-dark/50):
+            // the trigger and the row it stands for now read as one object, so
+            // the current workspace stays present in the user's mind instead
+            // of being a neutral chip they have to open a menu to recall. Ink
+            // follows the same light/dark split the fill forces — near-black
+            // on the light tan, white on the dark-mode bronze.
+            className="inline-flex items-center gap-1.5 rounded-md border border-gold-dark/55 bg-gold-dark/50 px-2.5 py-1 text-xs font-medium text-gray-900 transition-colors hover:bg-gold-dark/60 dark:text-white"
             title={
               getWorkspaceDescription(activeWorkspace) || "Choose workspace"
             }
