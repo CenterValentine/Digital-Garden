@@ -16,7 +16,6 @@ import {
   Copy,
   Eye,
   Folder,
-  GripVertical,
   Loader2,
   Lock,
   Plus,
@@ -488,6 +487,7 @@ export function WorkspaceSelector() {
     folders: Array<{ id: string; title: string }> | null;
   } | null>(null);
   const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const draggingFolderRef = useRef(false);
   const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(
     null,
   );
@@ -717,9 +717,13 @@ export function WorkspaceSelector() {
   };
   // Grace period so a pointer travelling row → submenu doesn't lose the menu.
   const scheduleWorkbenchClose = () => {
+    if (draggingFolderRef.current) return;
     cancelWorkbenchClose();
     workbenchCloseTimerRef.current = window.setTimeout(() => {
       workbenchCloseTimerRef.current = null;
+      // Re-checked at fire time as well: a drag can begin between scheduling
+      // and firing, and that timer would otherwise still close the panel.
+      if (draggingFolderRef.current) return;
       setWorkbenchMenu(null);
     }, 200);
   };
@@ -932,6 +936,7 @@ export function WorkspaceSelector() {
   // Closing the root dropdown always dismisses the workbench submenu.
   useEffect(() => {
     if (menuOpen) return;
+    draggingFolderRef.current = false;
     if (workbenchDwellTimerRef.current !== null) {
       window.clearTimeout(workbenchDwellTimerRef.current);
       workbenchDwellTimerRef.current = null;
@@ -1018,6 +1023,10 @@ export function WorkspaceSelector() {
     if (description) lines.push(description);
     const lastOpened = lastOpenedLine(workspace);
     if (lastOpened) lines.push(lastOpened);
+    // Main Workspace is pinned first — the one row this doesn't apply to.
+    // Promising a drag that silently does nothing is worse than saying
+    // nothing at all.
+    if (!workspace.isMain) lines.push("Drag to reorder");
     return lines.join("\n");
   };
 
@@ -1878,6 +1887,8 @@ export function WorkspaceSelector() {
                   startInlineRename(workspace);
                 }}
                 className={`group gap-1 pr-1 ${density.row} ${density.text} ${
+                  workspace.isMain ? "" : "cursor-grab active:cursor-grabbing"
+                } ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-dark" : "border-gold-primary/35"}`
                     : "pl-1.5"
@@ -2022,24 +2033,12 @@ export function WorkspaceSelector() {
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
-                        <GripVertical
-                          className={`h-3.5 w-3.5 shrink-0 cursor-grab ${
-                            isActive
-                              ? "text-gray-600/80 dark:text-white/70"
-                              : "text-gray-400"
-                          } active:cursor-grabbing`}
-                        />
                       </>
                     ) : (
-                      // Main Workspace can't be deleted or reordered. Stand in
-                      // for both controls at their exact widths (delete button
-                      // = 14px glyph + p-0.5; grip = 16px + ml-0.5) so its gear
-                      // lines up with everyone else's instead of drifting to
-                      // the right edge.
-                      <>
-                        <span aria-hidden className="h-[18px] w-[18px] shrink-0" />
-                        <span aria-hidden className="h-3.5 w-3.5 shrink-0" />
-                      </>
+                      // Main Workspace can't be deleted, so stand in for the
+                      // delete button at its exact width (14px glyph + p-0.5)
+                      // to keep its gear aligned with everyone else's.
+                      <span aria-hidden className="h-[18px] w-[18px] shrink-0" />
                     )}
 
                     {/* Trailing workbench slot — the row's last element.
@@ -2184,6 +2183,18 @@ export function WorkspaceSelector() {
                 style={{ left: workbenchMenu.x, top: workbenchMenu.y }}
                 onPointerEnter={() => cancelWorkbenchClose()}
                 onPointerLeave={() => scheduleWorkbenchClose()}
+                onDragOver={(event) => {
+                  // Without a preventDefault here, releasing between two rows
+                  // counts as a drop on a non-target and the browser plays the
+                  // snap-back animation instead of ending the drag quietly.
+                  if (draggingFolderRef.current) event.preventDefault();
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  draggingFolderRef.current = false;
+                  setDraggedFolderId(null);
+                  setFolderDropTargetId(null);
+                }}
                 onClick={(event) => event.stopPropagation()}
                 onContextMenu={(event) => event.preventDefault()}
               >
@@ -2221,6 +2232,9 @@ export function WorkspaceSelector() {
                         onDragStart={(event) => {
                           event.dataTransfer.effectAllowed = "move";
                           event.dataTransfer.setData("text/plain", folder.id);
+                          draggingFolderRef.current = true;
+                          cancelWorkbenchClose();
+                          cancelWorkbenchDwell();
                           setDraggedFolderId(folder.id);
                         }}
                         onDragOver={(event) => {
@@ -2237,6 +2251,7 @@ export function WorkspaceSelector() {
                         onDrop={(event) => {
                           event.preventDefault();
                           const dragged = draggedFolderId;
+                          draggingFolderRef.current = false;
                           setDraggedFolderId(null);
                           setFolderDropTargetId(null);
                           if (!dragged) return;
@@ -2248,6 +2263,11 @@ export function WorkspaceSelector() {
                           );
                         }}
                         onDragEnd={() => {
+                          // Fires for cancelled drags too (Esc, drop outside),
+                          // so this is the reliable place to release the
+                          // close-guard.
+                          draggingFolderRef.current = false;
+                          cancelWorkbenchClose();
                           setDraggedFolderId(null);
                           setFolderDropTargetId(null);
                         }}
