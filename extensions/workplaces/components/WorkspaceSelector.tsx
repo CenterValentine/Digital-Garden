@@ -238,6 +238,51 @@ function getLastActiveAt(workspace: ContentWorkspaceResponse): number {
 const TAB_COUNT_CHIP_CLASS =
   "shrink-0 rounded-full px-1 text-[9px] leading-[1.4] tabular-nums";
 
+/** Which edge of the hovered row the dragged item would land on. */
+type DropEdge = "before" | "after";
+
+/**
+ * Pointer position within a row, as an edge. Half-height split — the same
+ * read the file tree's drop cursor uses, and the reason a drop feels
+ * predictable: the line appears where the item will actually go.
+ */
+function edgeFromPointer(
+  event: { clientY: number },
+  element: HTMLElement,
+): DropEdge {
+  const rect = element.getBoundingClientRect();
+  return event.clientY - rect.top < rect.height / 2 ? "before" : "after";
+}
+
+/**
+ * Drop-cursor line, drawn as an outset box-shadow on the hovered row so it
+ * reads as sitting BETWEEN rows rather than decorating one.
+ *
+ * Returned as a single class because `shadow-*` utilities collide under
+ * tailwind-merge — an active row's inset ring and a drop line can't both be
+ * expressed, so the transient one wins while a drag is over it.
+ */
+function dropCursorClass(edge: DropEdge): string {
+  return edge === "before"
+    ? "shadow-[0_-2px_0_0_var(--gold-primary)]"
+    : "shadow-[0_2px_0_0_var(--gold-primary)]";
+}
+
+/** Move `draggedId` to the chosen edge of `targetId`, returning a new order. */
+function reorderByEdge(
+  order: string[],
+  draggedId: string,
+  targetId: string,
+  edge: DropEdge,
+): string[] | null {
+  if (draggedId === targetId) return null;
+  const next = order.filter((id) => id !== draggedId);
+  const targetIndex = next.indexOf(targetId);
+  if (targetIndex === -1 || !order.includes(draggedId)) return null;
+  next.splice(edge === "before" ? targetIndex : targetIndex + 1, 0, draggedId);
+  return next;
+}
+
 const MENU_HEADING_CLASS =
   "px-1.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-gray-500";
 
@@ -469,6 +514,7 @@ export function WorkspaceSelector() {
   const [draggedWorkspaceId, setDraggedWorkspaceId] = useState<string | null>(
     null,
   );
+  const [workspaceDropEdge, setWorkspaceDropEdge] = useState<DropEdge>("before");
   const [dropTargetWorkspaceId, setDropTargetWorkspaceId] = useState<
     string | null
   >(null);
@@ -491,6 +537,7 @@ export function WorkspaceSelector() {
   const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(
     null,
   );
+  const [folderDropEdge, setFolderDropEdge] = useState<DropEdge>("before");
   const workbenchDwellTimerRef = useRef<number | null>(null);
   const workbenchCloseTimerRef = useRef<number | null>(null);
 
@@ -877,13 +924,10 @@ export function WorkspaceSelector() {
     orderedFolderIds: string[],
     draggedId: string,
     targetId: string,
+    edge: DropEdge,
   ) => {
-    const next = [...orderedFolderIds];
-    const from = next.indexOf(draggedId);
-    const to = next.indexOf(targetId);
-    if (from === -1 || to === -1 || from === to) return;
-    next.splice(from, 1);
-    next.splice(to, 0, draggedId);
+    const next = reorderByEdge(orderedFolderIds, draggedId, targetId, edge);
+    if (!next) return;
     try {
       await persistWorkbenchSettings(parentWorkspace, { folderOrder: next });
     } catch (error) {
@@ -1509,22 +1553,25 @@ export function WorkspaceSelector() {
     }
   };
 
-  const handleWorkspaceDrop = (targetWorkspaceId: string) => {
+  const handleWorkspaceDrop = (
+    targetWorkspaceId: string,
+    edge: DropEdge,
+  ) => {
     if (!draggedWorkspaceId || draggedWorkspaceId === targetWorkspaceId) {
       setDraggedWorkspaceId(null);
       setDropTargetWorkspaceId(null);
       return;
     }
 
-    const nextOrder = [...orderedWorkspaceIds];
-    const fromIndex = nextOrder.indexOf(draggedWorkspaceId);
-    const toIndex = nextOrder.indexOf(targetWorkspaceId);
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    const [movedWorkspaceId] = nextOrder.splice(fromIndex, 1);
-    nextOrder.splice(toIndex, 0, movedWorkspaceId);
+    const nextOrder = reorderByEdge(
+      orderedWorkspaceIds,
+      draggedWorkspaceId,
+      targetWorkspaceId,
+      edge,
+    );
     setDraggedWorkspaceId(null);
     setDropTargetWorkspaceId(null);
+    if (!nextOrder) return;
 
     void reorderWorkspaces(nextOrder).catch((error) => {
       console.error("[WorkspaceSelector] Failed to reorder workspaces:", error);
@@ -1808,6 +1855,9 @@ export function WorkspaceSelector() {
                   event.preventDefault();
                   event.dataTransfer.dropEffect = "move";
                   setDropTargetWorkspaceId(workspace.id);
+                  setWorkspaceDropEdge(
+                    edgeFromPointer(event, event.currentTarget),
+                  );
                 }}
                 onDragLeave={() => {
                   if (dropTargetWorkspaceId === workspace.id) {
@@ -1817,7 +1867,10 @@ export function WorkspaceSelector() {
                 onDrop={(event) => {
                   event.preventDefault();
                   if (!workspace.isMain) {
-                    handleWorkspaceDrop(workspace.id);
+                    handleWorkspaceDrop(
+                      workspace.id,
+                      edgeFromPointer(event, event.currentTarget),
+                    );
                   }
                 }}
                 onDragEnd={() => {
@@ -1897,7 +1950,9 @@ export function WorkspaceSelector() {
                     ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] focus:bg-gold-dark/60 focus:text-gray-900 dark:text-white dark:focus:text-white"
                     : "focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white"
                 } ${isDragged ? "opacity-40" : ""} ${
-                  isDropTarget ? "ring-1 ring-gold-primary/40" : ""
+                  isDropTarget && !isDragged
+                    ? dropCursorClass(workspaceDropEdge)
+                    : ""
                 }`}
               >
                 {isEditing ? (
@@ -2242,6 +2297,9 @@ export function WorkspaceSelector() {
                           event.preventDefault();
                           event.dataTransfer.dropEffect = "move";
                           setFolderDropTargetId(folder.id);
+                          setFolderDropEdge(
+                            edgeFromPointer(event, event.currentTarget),
+                          );
                         }}
                         onDragLeave={() => {
                           setFolderDropTargetId((current) =>
@@ -2260,6 +2318,7 @@ export function WorkspaceSelector() {
                             orderedFolderIds,
                             dragged,
                             folder.id,
+                            edgeFromPointer(event, event.currentTarget),
                           );
                         }}
                         onDragEnd={() => {
@@ -2296,7 +2355,7 @@ export function WorkspaceSelector() {
                         } ${draggedFolderId === folder.id ? "opacity-40" : ""} ${
                           folderDropTargetId === folder.id &&
                           draggedFolderId !== folder.id
-                            ? "ring-1 ring-gold-primary/50"
+                            ? dropCursorClass(folderDropEdge)
                             : ""
                         }`}
                       >
