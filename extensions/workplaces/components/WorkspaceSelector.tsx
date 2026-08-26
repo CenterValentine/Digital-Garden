@@ -663,9 +663,18 @@ export function WorkspaceSelector() {
         if (!response.ok || !result.success || !result.data) {
           throw new Error(result.error?.message ?? "Failed to load folders");
         }
+        // The tree API tags EVERY node: real content is `treeNodeKind:
+        // "content"`, and only the synthetic People rows carry
+        // "person"/"peopleGroup". Testing for an ABSENT kind therefore
+        // discarded every genuine folder and made this submenu report "No
+        // subfolders in this view yet" for every view. Match the convention
+        // used by ContentTreePicker: default the kind, then exclude the
+        // synthetic rows (which are not real content parents).
         return result.data.tree
           .filter(
-            (node) => node.contentType === "folder" && !node.treeNodeKind,
+            (node) =>
+              node.contentType === "folder" &&
+              (node.treeNodeKind ?? "content") === "content",
           )
           .map((node) => ({ id: node.id, title: node.title }));
       })
@@ -1681,7 +1690,7 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-2 pr-1.5 ${
+                className={`group gap-2 pr-1 ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
                     : "pl-1.5"
@@ -1815,17 +1824,23 @@ export function WorkspaceSelector() {
                           normalizeWorkbenchSettings(workspace.settings).enabled
                         )
                       }
-                      className="-ml-1 flex h-3 w-3 shrink-0 items-center justify-center"
+                      className="-ml-1.5 flex h-3 w-3 shrink-0 items-center justify-center"
                     >
                       {workspace.isView &&
                       workspace.viewRootContentId &&
                       normalizeWorkbenchSettings(workspace.settings).enabled ? (
                         <ChevronRight
-                          strokeWidth={1.5}
+                          strokeWidth={2}
                           className={`h-3 w-3 transition-colors ${
-                            workbenchMenu?.workspaceId === workspace.id
-                              ? "text-gold-primary"
-                              : "text-gray-400/80"
+                            isActive
+                              ? // On the gold active fill the gold accent
+                                // disappears — read the arrow against the
+                                // fill instead, same as the row's delete
+                                // button does.
+                                "text-gray-800 dark:text-white"
+                              : workbenchMenu?.workspaceId === workspace.id
+                                ? "text-gold-primary"
+                                : "text-gray-500 dark:text-gray-400"
                           }`}
                           aria-label="Has workbenches"
                         />
