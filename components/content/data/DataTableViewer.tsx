@@ -24,6 +24,7 @@ import { cn } from "@/lib/core/utils";
 import {
   cellToText,
   createUndoStack,
+  deriveRowTitle,
   describeOp,
   diffRow,
   keyForMove,
@@ -149,6 +150,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   // breadcrumb flash to the database and bounce (owner report,
   // 2026-08-26). The content-store URL sync preserves foreign params, so
   // nothing else will clean it up.
+  // Node-affecting database mutations announce themselves the way every
+  // other surface does (owner report, 2026-08-26): `content-updated`
+  // patches a title in place; `dg:tree-refresh` refetches after promotion
+  // creates/revives a node or a delete takes one with it. Without these
+  // the tree and open tabs go stale until a manual refresh.
+  const refreshTree = useCallback(() => {
+    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+  }, []);
+
   const clearRowParam = useCallback(() => {
     const url = new URL(window.location.href);
     if (!url.searchParams.has("row")) return;
@@ -451,6 +461,22 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (column && (column.type === "person" || column.type === "contentLink")) {
         void load(viewRef.current?.id ?? null);
       }
+
+      // Title sync, client half: the server renames the promoted node in
+      // writeCells; the tree label and any open tab hear it through the
+      // same event every other rename travels on.
+      if (column?.isPrimary && row.contentId && state.table) {
+        window.dispatchEvent(
+          new CustomEvent("content-updated", {
+            detail: {
+              contentId: row.contentId,
+              updates: {
+                title: deriveRowTitle(state.table.columns, optimistic),
+              },
+            },
+          })
+        );
+      }
     },
     [state.rows, state.table, sendWrites, clientId, load]
   );
@@ -481,6 +507,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             body: JSON.stringify({ rowIds: op.rowIds, restore: restoring }),
           });
           if (!res.ok) return { status: "failed", detail: "request failed" };
+          // Deletes cascade to promoted pages and restores revive them —
+          // either way the tree changed. (Unconditional: restored rows are
+          // not in client state to check for contentId.)
+          refreshTree();
           await load(state.view?.id ?? null);
           return { status: "applied" };
         }
@@ -488,7 +518,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           return { status: "failed", detail: "not undoable yet" };
       }
     },
-    [contentId, sendWrites, load, state.view]
+    [contentId, sendWrites, load, state.view, refreshTree]
   );
 
   const handleUndo = useCallback(async () => {
@@ -566,10 +596,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     setStack((s) =>
       pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
     );
+    // The cascade just took any promoted pages with it.
+    if (rowIds.some((id) => state.rows.find((r) => r.id === id)?.contentId)) {
+      refreshTree();
+    }
     setSelectedRows(new Set());
     setNotice(`${describeOp(op)} deleted · ⌘Z to undo`);
     await load(state.view?.id ?? null);
-  }, [contentId, selectedRows, load, clientId, state.view]);
+  }, [contentId, selectedRows, load, clientId, state.view, state.rows, refreshTree]);
 
   // ── Column lifecycle ───────────────────────────────────────────────────
   //
@@ -975,11 +1009,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       setPeekRowId(null);
       clearRowParam();
+      refreshTree();
       selectNode(json.data.contentId, { contentType: "note" });
       // Refresh so the row carries its contentId (the peek badge flips).
       void load(state.view?.id ?? null);
     },
-    [contentId, state.view, selectNode, load, clearRowParam]
+    [contentId, state.view, selectNode, load, clearRowParam, refreshTree]
   );
 
   const openRow = useCallback(

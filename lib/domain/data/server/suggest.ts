@@ -58,7 +58,11 @@ export async function searchRowSuggestions(
       table: {
         // Query-table rows project nodes that exist already — nothing to
         // promote, and their nodes are found by the note search directly.
-        mode: "table",
+        // NOT-query rather than a positive literal: real tables are mode
+        // "inline" (the default) or "external" — a "table" literal here
+        // matched nothing and silenced every row suggestion (owner report,
+        // 2026-08-26).
+        mode: { not: "query" },
         content: { ownerId: viewerId, deletedAt: null },
       },
     },

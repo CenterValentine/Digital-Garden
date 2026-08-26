@@ -1500,6 +1500,9 @@ export function useConversationEngine({
         );
         const json = await res.json();
         if (!res.ok || !json?.success) return null;
+        // The referenced node just appeared behind its database's reference
+        // chip — the tree hears about it like any other creation.
+        window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
         return {
           ...item,
           id: json.data.contentId as string,

@@ -1434,6 +1434,9 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         });
         return null;
       }
+      // The referenced node just appeared behind its database's reference
+      // chip — the tree hears about it like any other creation.
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
       return { contentId: result.data.contentId as string };
     },
     []
