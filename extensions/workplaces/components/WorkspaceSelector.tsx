@@ -1690,7 +1690,7 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-2 pr-1 ${
+                className={`group gap-1.5 pr-1 ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
                     : "pl-1.5"
@@ -1793,7 +1793,7 @@ export function WorkspaceSelector() {
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
-                        <GripVertical className="ml-0.5 h-4 w-4 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" />
+                        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" />
                       </>
                     ) : (
                       // Main Workspace can't be deleted or reordered. Stand in
@@ -1803,7 +1803,7 @@ export function WorkspaceSelector() {
                       // the right edge.
                       <>
                         <span aria-hidden className="h-[18px] w-[18px] shrink-0" />
-                        <span aria-hidden className="ml-0.5 h-4 w-4 shrink-0" />
+                        <span aria-hidden className="h-3.5 w-3.5 shrink-0" />
                       </>
                     )}
 
@@ -1824,7 +1824,7 @@ export function WorkspaceSelector() {
                           normalizeWorkbenchSettings(workspace.settings).enabled
                         )
                       }
-                      className="-ml-1.5 flex h-3 w-3 shrink-0 items-center justify-center"
+                      className="-ml-0.5 flex h-3 w-3 shrink-0 items-center justify-center"
                     >
                       {workspace.isView &&
                       workspace.viewRootContentId &&
@@ -1833,14 +1833,8 @@ export function WorkspaceSelector() {
                           strokeWidth={2}
                           className={`h-3 w-3 transition-colors ${
                             isActive
-                              ? // On the gold active fill the gold accent
-                                // disappears — read the arrow against the
-                                // fill instead, same as the row's delete
-                                // button does.
-                                "text-gray-800 dark:text-white"
-                              : workbenchMenu?.workspaceId === workspace.id
-                                ? "text-gold-primary"
-                                : "text-gray-500 dark:text-gray-400"
+                              ? "text-gray-700 group-hover:text-gray-900 dark:text-white/90 dark:group-hover:text-white"
+                              : "text-gray-400 group-hover:text-gray-700 dark:text-gray-500 dark:group-hover:text-gray-200"
                           }`}
                           aria-label="Has workbenches"
                         />
