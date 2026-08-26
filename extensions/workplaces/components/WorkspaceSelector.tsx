@@ -1692,11 +1692,11 @@ export function WorkspaceSelector() {
                 }}
                 className={`group gap-1 pr-1 ${
                   workspace.isView
-                    ? `border-l-2 pl-1 ${isActive ? "border-white/50" : "border-gold-primary/35"}`
+                    ? `border-l-2 pl-1 ${isActive ? "border-gold-dark" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
                   isActive
-                    ? "bg-gold-dark text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22)] focus:bg-gold-dark focus:text-white"
+                    ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] focus:bg-gold-dark/60 focus:text-gray-900 dark:text-white dark:focus:text-white"
                     : "focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white"
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
@@ -1743,14 +1743,18 @@ export function WorkspaceSelector() {
                     {workspace.isView ? (
                       <Eye
                         className={`h-3 w-3 shrink-0 ${
-                          isActive ? "text-white" : "text-gold-primary/70"
+                          isActive
+                            ? "text-gray-800 dark:text-white"
+                            : "text-gold-primary/70"
                         }`}
                       />
                     ) : null}
                     {workspace.isLocked ? (
                       <Lock
                         className={`h-3 w-3 shrink-0 ${
-                          isActive ? "text-white/85" : "text-gray-400/80"
+                          isActive
+                            ? "text-gray-700/80 dark:text-white/80"
+                            : "text-gray-400/80"
                         }`}
                       />
                     ) : null}
@@ -1771,7 +1775,7 @@ export function WorkspaceSelector() {
                       }}
                       className={`rounded p-0.5 transition-colors ${
                         isActive
-                          ? "text-white/85 hover:bg-white/20 hover:text-white"
+                          ? "text-gray-700 hover:bg-black/10 hover:text-gray-900 dark:text-white/85 dark:hover:bg-white/20 dark:hover:text-white"
                           : "text-gray-400/80 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
                       }`}
                       aria-label={`Open ${workspace.name} settings`}
@@ -1798,7 +1802,7 @@ export function WorkspaceSelector() {
                           }}
                           className={`rounded p-0.5 opacity-0 transition-colors group-hover:opacity-100 group-focus:opacity-100 ${
                             isActive
-                              ? "text-white hover:bg-white/20 hover:text-white"
+                              ? "text-gray-700 hover:bg-red-500/15 hover:text-red-700 dark:text-white dark:hover:bg-white/20 dark:hover:text-white"
                               : "text-gray-500 hover:bg-red-500/10 hover:text-red-600"
                           }`}
                           aria-label={`Delete ${workspace.name}`}
@@ -1807,7 +1811,9 @@ export function WorkspaceSelector() {
                         </button>
                         <GripVertical
                           className={`h-3.5 w-3.5 shrink-0 cursor-grab ${
-                            isActive ? "text-white/80" : "text-gray-400"
+                            isActive
+                              ? "text-gray-600/80 dark:text-white/70"
+                              : "text-gray-400"
                           } active:cursor-grabbing`}
                         />
                       </>
@@ -1849,7 +1855,7 @@ export function WorkspaceSelector() {
                           strokeWidth={2}
                           className={`h-3 w-3 transition-colors ${
                             isActive
-                              ? "text-white"
+                              ? "text-gray-800 dark:text-white"
                               : "text-gray-400 dark:text-gray-500"
                           }`}
                           aria-label="Has workbenches"
