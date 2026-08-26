@@ -140,7 +140,23 @@ export async function POST(request: NextRequest) {
           const isReferenceToNote =
             content.role === "referenced" &&
             targetParent.contentType === "note";
-          if (!isReferenceToNote) {
+          // A promoted row page may return to ITS database (plan Phase 5:
+          // rows are freely movable in both directions — promotion nested
+          // it here server-side, so the tree must be able to put it back).
+          // Only a row of exactly this table qualifies; other content gets
+          // the same refusal as any non-folder target.
+          const isRowReturningHome =
+            !isReferenceToNote &&
+            targetParent.contentType === "data" &&
+            !!(await prisma.dataRow.findFirst({
+              where: {
+                contentId,
+                tableId: targetParent.id,
+                deletedAt: null,
+              },
+              select: { id: true },
+            }));
+          if (!isReferenceToNote && !isRowReturningHome) {
             return NextResponse.json(
               {
                 success: false,
@@ -152,11 +168,18 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          // Re-home the reference under this note; its storage home is the
-          // note's folder so parentId invariants (paths, cascades, folder
-          // scans) stay intact.
-          ownerNoteUpdate = targetParent.id;
-          storageTargetParentId = targetParent.parentId;
+          if (isRowReturningHome) {
+            // Restore promotion's canonical ownership (ownedByNoteId = the
+            // table) so a referenced row page partitions back behind the
+            // database's reference chip instead of dangling.
+            ownerNoteUpdate = targetParent.id;
+          } else {
+            // Re-home the reference under this note; its storage home is the
+            // note's folder so parentId invariants (paths, cascades, folder
+            // scans) stay intact.
+            ownerNoteUpdate = targetParent.id;
+            storageTargetParentId = targetParent.parentId;
+          }
         } else if (content.role === "referenced") {
           // Explicit drop into a folder detaches the reference from its
           // note — it becomes folder-level referenced content, adjacent to

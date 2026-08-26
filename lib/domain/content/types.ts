@@ -63,6 +63,12 @@ export interface TreeNode {
   /** Position within the reference block, for rounding the block's corners. */
   referenceEdge?: "first" | "last" | "only" | "middle";
   /**
+   * The database this node is a promoted row of (plan Phase 5). Grants the
+   * one non-folder drop the tree allows besides reference-onto-note: a row
+   * page may be dropped back into ITS OWN database.
+   */
+  promotedFromTableId?: string | null;
+  /**
    * Status-dot state. "none" renders nothing — the overwhelming majority of
    * nodes, which have never been published and need no status.
    */

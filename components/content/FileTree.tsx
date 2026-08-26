@@ -341,7 +341,17 @@ export function FileTree({
       const allReferences =
         dragNodes.length > 0 &&
         dragNodes.every((dragNode) => dragNode.data.role === "referenced");
-      if (!(parentNode.data.contentType === "note" && allReferences)) {
+      // A database accepts exactly its own promoted rows back (plan Phase 5:
+      // rows are freely movable — that has to include the way home). Nothing
+      // else may nest under a data node.
+      const allRowsOfThisTable =
+        dragNodes.length > 0 &&
+        dragNodes.every(
+          (dragNode) => dragNode.data.promotedFromTableId === parentNode.data.id
+        );
+      const noteOk = parentNode.data.contentType === "note" && allReferences;
+      const dataOk = parentNode.data.contentType === "data" && allRowsOfThisTable;
+      if (!noteOk && !dataOk) {
         return false;
       }
     }
