@@ -355,7 +355,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   // strip. Defined once, rendered in BOTH content branches — a promoted
   // row's page is a note, but files/etc. can in principle be promoted
   // targets too.
-  const promotedRowChrome = promotedFromRow ? (
+  const promotedRowBanner = promotedFromRow ? (
     <>
       <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
         <span>Row of</span>
@@ -418,11 +418,25 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           </>
         )}
       </div>
-      <DataRowPropertyHeader
-        tableId={promotedFromRow.tableId}
-        rowId={promotedFromRow.rowId}
-      />
     </>
+  ) : null;
+
+  // Two mounts, one live slot: the strip renders only where its persisted
+  // per-database position says (Reference Drawer precedent — the arrow in
+  // the strip flips it above/below the note).
+  const propsStripAbove = promotedFromRow ? (
+    <DataRowPropertyHeader
+      tableId={promotedFromRow.tableId}
+      rowId={promotedFromRow.rowId}
+      slot="above"
+    />
+  ) : null;
+  const propsStripBelow = promotedFromRow ? (
+    <DataRowPropertyHeader
+      tableId={promotedFromRow.tableId}
+      rowId={promotedFromRow.rowId}
+      slot="below"
+    />
   ) : null;
   const collaborationCapability = useMemo(
     () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
@@ -2577,8 +2591,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            {promotedRowChrome}
+            {promotedRowBanner}
+            {propsStripAbove}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
+            {propsStripBelow}
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
                 contentId={selectedContentId}
@@ -2596,15 +2612,17 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               />
             )}
           </div>
-        ) : promotedRowChrome ? (
+        ) : promotedRowBanner ? (
           // A promoted row's page is a NOTE, so it renders here — the
           // provenance banner and Properties strip were originally mounted
           // only in the non-note branch above, which is why neither ever
           // appeared on a row page (owner report, 2026-08-27). The inner
           // wrapper stays overflow-free: the editor manages its own scroll.
           <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
-            {promotedRowChrome}
+            {promotedRowBanner}
+            {propsStripAbove}
             <div className="min-h-0 flex-1 overflow-auto">{contentElement}</div>
+            {propsStripBelow}
           </div>
         ) : (
           contentElement

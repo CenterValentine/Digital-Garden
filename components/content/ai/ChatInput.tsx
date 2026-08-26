@@ -851,7 +851,9 @@ function makeMentionPill(label: string, id: string): HTMLElement {
   // Opened via ⌘/Ctrl+click (see handleEditorClick) — advertise it on hover.
   span.title = `${label} — ${OPEN_MODIFIER_LABEL}+click to open`;
   span.className =
-    "inline-flex items-center align-baseline rounded-md border border-blue-500/30 bg-blue-500/15 px-1.5 py-0.5 text-blue-200 text-xs font-medium leading-tight mx-0.5 transition-colors hover:bg-blue-500/25";
+    // text-blue-200 on the light composer was near-invisible (owner
+    // report, 2026-08-27) — the pill now carries both themes.
+    "inline-flex items-center align-baseline rounded-md border border-blue-500/40 bg-blue-500/15 px-1.5 py-0.5 text-blue-700 dark:border-blue-500/30 dark:text-blue-200 text-xs font-medium leading-tight mx-0.5 transition-colors hover:bg-blue-500/25";
   span.textContent = `@${label}`;
   return span;
 }

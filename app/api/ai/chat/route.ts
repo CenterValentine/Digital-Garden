@@ -1535,12 +1535,49 @@ export async function POST(request: Request) {
             });
           }
 
+          // Database mentions inject the schema capsule (plan Phase 6b) —
+          // the generic branch below reads notePayload, which a data node
+          // does not have, so without this a mentioned database injected
+          // literally "(no text content available)" and the model never
+          // learned the id its tools take (owner report, 2026-08-27).
+          // Promoted row pages likewise append their cells.
+          const dataSections = new Map<string, string>();
+          const rowPropSections = new Map<string, string>();
+          try {
+            const { buildDataSchemaDigest, buildRowPropertiesBlock } =
+              await import("@/lib/domain/data/server/digest");
+            await Promise.all([
+              ...mentionedNodes
+                .filter((node) => node.contentType === "data")
+                .map(async (node) => {
+                  const digest = await buildDataSchemaDigest(node.id);
+                  if (digest) dataSections.set(node.id, digest);
+                }),
+              ...mentionedNodes
+                .filter((node) => node.contentType === "note")
+                .map(async (node) => {
+                  const block = await buildRowPropertiesBlock(node.id);
+                  if (block) rowPropSections.set(node.id, block);
+                }),
+            ]);
+          } catch (dataError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:data_mention_caught",
+              summary: "data mention capsule failed — name-only fallback",
+              error: dataError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
             if (folderSection) return folderSection;
+            const dataSection = dataSections.get(node.id);
+            if (dataSection) return dataSection;
             const text =
               node.notePayload?.searchText || "(no text content available)";
-            return `### ${node.title}\n${text.slice(0, 2000)}`;
+            const props = rowPropSections.get(node.id);
+            return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
           sections.push(...linkedFolderSections);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
