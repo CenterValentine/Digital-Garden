@@ -1265,17 +1265,25 @@ with zero new machinery.
 associated tables — a chat scoped to Job Leads is structurally unable to write to Contacts.
 Sidechat auto-associates. Playbooks name their target database via mention/attachment.
 
-#### Build order
+#### Build order — BUILT 2026-08-27, owner smoke pending
 
-1. **6a** Property header on row pages (P5 fold-in; its data path feeds the row capsule).
-2. **6b** DataCapsule (schema, LIVE/CACHED split) + row-page capsule (cells as properties).
-3. **6c** `query_database` + `describe_database` — budgets, projection, cursor, association
-   jurisdiction.
-4. **6d** `insert_rows` — append-only, dedupeBy, per-row results, receipts/undo, approval
-   threshold.
-5. **6e** B5 classification (all three user-configurable) + ai:drift green + end-to-end
-   smoke: co-browse a listings page → rows appear deduped → batch-iterate into the vetted
-   table → attach a deliverable resume to a row.
+1. **6a ✅** Property header on row pages (DataRowFields extraction — one field-editor set
+   serving peek, split pane, and header; rows `?ids=` hydrated fetch).
+2. **6b ✅** DataCapsule = the upgraded B1 digest (option vocab capped at 50, token contract
+   stated in-capsule, node id in the header as the tools' address) + row-page cells riding
+   the note resolver.
+3. **6c ✅** `query_database` + `describe_database` — one filter compiler, page-unit caps,
+   4KB serialization budget with truncation reporting, cursor paging, association
+   jurisdiction checked in-tool.
+4. **6d ✅** `insert_rows` — append-only, whole-batch pre-validation, label→id translation,
+   dedupeBy skip-and-report, per-row strict-encode errors. **One deviation from this
+   replan:** the >10-row gate is a `confirmedByUser` input the model may set only after
+   explicit user approval in conversation — NOT a real approval card (that UI is the
+   flashcard proposal flow, extension-specific today). Honest stand-in; a proper proposal
+   card is follow-up work if inserts prove common.
+5. **6e ✅** B5: all three classified user-configurable ("Databases" settings group), Data
+   factory in the drift map, route spread — `ai:drift:check` green (58 tools). End-to-end
+   co-browse smoke is the owner's.
 
 ### Phase 7 — Remaining stub seams
 
