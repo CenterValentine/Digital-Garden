@@ -97,6 +97,61 @@ async function resolveJurisdiction(
   return { table, level };
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Model ergonomics for the database reference (owner failure report,
+ * 2026-08-28): weak models pass the database's NAME, or omit the id in a
+ * sidechat that is literally open on the table. Accept all three — a
+ * UUID, nothing (→ the bound data node), or a title (case-insensitive,
+ * unique among the user's databases).
+ */
+async function resolveDatabaseRef(
+  ctx: ToolExecuteContext,
+  ref: string | undefined
+): Promise<{ id: string } | { refusal: string }> {
+  const trimmed = ref?.trim();
+  if (trimmed && UUID_RE.test(trimmed)) return { id: trimmed };
+  if (!trimmed) {
+    if (ctx.contentId) {
+      const bound = await prisma.contentNode.findFirst({
+        where: {
+          id: ctx.contentId,
+          ownerId: ctx.userId,
+          contentType: "data",
+          deletedAt: null,
+        },
+        select: { id: true },
+      });
+      if (bound) return { id: bound.id };
+    }
+    return {
+      refusal:
+        "No database given and this chat isn't open on one — pass databaseId (the id from the mention capsule) or the database's exact name.",
+    };
+  }
+  const matches = await prisma.contentNode.findMany({
+    where: {
+      ownerId: ctx.userId,
+      contentType: "data",
+      deletedAt: null,
+      title: { equals: trimmed, mode: "insensitive" },
+    },
+    select: { id: true, title: true },
+    take: 2,
+  });
+  if (matches.length === 1) return { id: matches[0].id };
+  if (matches.length > 1) {
+    return {
+      refusal: `More than one database is named "${trimmed}" — use the id from the mention capsule instead.`,
+    };
+  }
+  return {
+    refusal: `No database named "${trimmed}". Use the id (or exact name) from the mention capsule, or ask the user which database they mean.`,
+  };
+}
+
 /** Column lookup by name (case-insensitive), key, or id. */
 function findColumn(
   columns: DataColumn[],
@@ -186,13 +241,18 @@ export function createDataTools(ctx: ToolExecuteContext) {
       inputSchema: z.object({
         databaseId: z
           .string()
-          .describe("The database's content id (shown in its mention capsule)"),
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
       }),
       execute: async ({ databaseId }) => {
         try {
-          const gate = await resolveJurisdiction(ctx, databaseId);
+          const dbRef = await resolveDatabaseRef(ctx, databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
           if ("refusal" in gate) return gate.refusal;
-          const digest = await buildDataSchemaDigest(databaseId);
+          const digest = await buildDataSchemaDigest(dbRef.id);
           return digest ?? "This database has no schema yet.";
         } catch (error) {
           logger.warn({
@@ -209,33 +269,33 @@ export function createDataTools(ctx: ToolExecuteContext) {
     query_database: tool({
       description:
         "Read rows from an associated database, filtered and sorted SERVER-SIDE — never page through everything to find three rows. Returns at most one page (default 20, max 100) of compact text rows plus the total match count; narrow your filters if truncated. Sorted queries return only the top rows (no cursor); unsorted queries return a cursor for deliberate paging. Filter ops by type: text-likes take is/isNot/contains/notContains/startsWith; numbers and dates take is/gt/gte/lt/lte; select/status take is/isNot (option label or id); multiSelect/relation-likes take hasAny/hasAll/hasNone; every column takes isEmpty/isNotEmpty.",
+      // Deliberately LENIENT schema (owner failure report, 2026-08-28): a
+      // strict shape fails the whole call before execute with an opaque
+      // validation error the model can't learn from. Validation lives in
+      // execute, where every miss returns a teaching message instead.
       inputSchema: z.object({
-        databaseId: z.string().describe("The database's content id"),
-        filters: z
-          .array(
-            z.object({
-              column: z.string().describe("Column name (case-insensitive) or id"),
-              op: z.string().describe("Filter operator (see tool description)"),
-              value: z
-                .union([
-                  z.string(),
-                  z.number(),
-                  z.boolean(),
-                  z.array(z.string()),
-                ])
-                .optional()
-                .describe("Omit for isEmpty/isNotEmpty; option label(s) ok for select-likes"),
-            })
-          )
+        databaseId: z
+          .string()
           .optional()
-          .describe("ANDed conditions"),
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        filters: z
+          .array(z.record(z.string(), z.unknown()))
+          .optional()
+          .describe(
+            'ANDed conditions: [{column, op, value?}] — value omitted for isEmpty/isNotEmpty; option labels ok for select-likes'
+          ),
         sortBy: z.string().optional().describe("Column name to sort by"),
-        sortDirection: z.enum(["asc", "desc"]).optional(),
+        sortDirection: z.string().optional().describe("asc or desc"),
         columns: z
           .array(z.string())
           .optional()
           .describe("Column names to return; default primary + first 3"),
-        limit: z.number().optional().describe("Rows per page, default 20, max 100"),
+        limit: z
+          .union([z.number(), z.string()])
+          .optional()
+          .describe("Rows per page, default 20, max 100"),
         cursorSortKey: z.string().optional(),
         cursorId: z
           .string()
@@ -244,27 +304,43 @@ export function createDataTools(ctx: ToolExecuteContext) {
       }),
       execute: async (input) => {
         try {
-          const gate = await resolveJurisdiction(ctx, input.databaseId);
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
           if ("refusal" in gate) return gate.refusal;
+          const databaseId = dbRef.id;
           const { table } = gate;
           const live = table.columns.filter((c) => !c.deletedAt);
 
           // Compile the model's flat conditions through the ONE filter
-          // compiler (plan Phase 2) — no third implementation.
+          // compiler (plan Phase 2) — no third implementation. Key aliases
+          // tolerated (column/field/name, op/operator) — weak models mix
+          // them, and a naming slip shouldn't cost a turn.
           const conditions: FilterCondition[] = [];
-          for (const f of input.filters ?? []) {
-            const column = findColumn(live, f.column);
+          for (const raw of input.filters ?? []) {
+            const f = raw as Record<string, unknown>;
+            const columnRef = [f.column, f.field, f.name].find(
+              (v): v is string => typeof v === "string"
+            );
+            const opRef = [f.op, f.operator].find(
+              (v): v is string => typeof v === "string"
+            );
+            if (!columnRef || !opRef) {
+              return 'Each filter needs {column, op} (value optional). Example: {"column": "Status", "op": "is", "value": "Done"}.';
+            }
+            const value = f.value === null ? undefined : f.value;
+            const column = findColumn(live, columnRef);
             if (!column) {
-              return `No column named "${f.column}" here. Columns: ${live.map((c) => c.name).join(", ")}.`;
+              return `No column named "${columnRef}" here. Columns: ${live.map((c) => c.name).join(", ")}.`;
             }
             const allowed = operatorsForType(column.type);
-            if (!allowed.includes(f.op as FilterOperator)) {
-              return `Operator "${f.op}" does not apply to ${column.name} (${column.type}). Allowed: ${allowed.join(", ")}.`;
+            if (!allowed.includes(opRef as FilterOperator)) {
+              return `Operator "${opRef}" does not apply to ${column.name} (${column.type}). Allowed: ${allowed.join(", ")}.`;
             }
             conditions.push({
               columnId: column.id,
-              operator: f.op as FilterOperator,
-              value: translateOptionValue(column, f.value) as CellValue,
+              operator: opRef as FilterOperator,
+              value: translateOptionValue(column, value) as CellValue,
             });
           }
 
@@ -275,7 +351,9 @@ export function createDataTools(ctx: ToolExecuteContext) {
             sorts = [
               {
                 columnId: column.id,
-                direction: input.sortDirection ?? "asc",
+                direction: input.sortDirection?.toLowerCase().startsWith("desc")
+                  ? "desc"
+                  : "asc",
               },
             ];
           }
@@ -286,12 +364,19 @@ export function createDataTools(ctx: ToolExecuteContext) {
             sorts,
           } as unknown as DataView;
 
+          const requestedLimit =
+            typeof input.limit === "string" ? Number(input.limit) : input.limit;
           const limit = Math.min(
-            Math.max(input.limit ?? DEFAULT_LIMIT, 1),
+            Math.max(
+              Number.isFinite(requestedLimit ?? NaN)
+                ? (requestedLimit as number)
+                : DEFAULT_LIMIT,
+              1
+            ),
             MAX_LIMIT
           );
           const page = await loadRowPage({
-            tableId: input.databaseId,
+            tableId: databaseId,
             view,
             columns: live,
             cursor:
@@ -365,7 +450,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
       description:
         "Append new rows to an associated database. APPEND-ONLY: cannot modify or delete existing rows. Each row is {columnName: value}; select/status/multiSelect accept option labels; dates are ISO strings; file/contentLink cells take arrays of content ids. Max 25 rows per call; batches over 10 require confirmedByUser: true, which you may set ONLY after the user explicitly approved the batch in conversation. Use dedupeBy with a url column when collecting from the web so re-runs never duplicate rows.",
       inputSchema: z.object({
-        databaseId: z.string().describe("The database's content id"),
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
         rows: z
           .array(z.record(z.string(), z.unknown()))
           .describe("Rows to append: [{columnName: value, …}]"),
@@ -382,8 +472,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
       }),
       execute: async (input) => {
         try {
-          const gate = await resolveJurisdiction(ctx, input.databaseId);
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
           if ("refusal" in gate) return gate.refusal;
+          const databaseId = dbRef.id;
           const { table, level } = gate;
           if (!canWrite(level)) {
             return "You have read access here but not write — tell the user.";
@@ -414,7 +507,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               return `No column named "${input.dedupeBy}" to dedupe by.`;
             }
             const existing = await prisma.dataRow.findMany({
-              where: { tableId: input.databaseId, deletedAt: null },
+              where: { tableId: databaseId, deletedAt: null },
               select: { data: true },
             });
             for (const r of existing) {
@@ -469,7 +562,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
           }
 
           const rowIds = await createRows(
-            input.databaseId,
+            databaseId,
             live,
             prepared.length,
             ctx.userId
@@ -480,7 +573,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
               writes.push({ rowId, columnKey: key, value });
             }
           });
-          const result = await writeCells(input.databaseId, live, writes);
+          const result = await writeCells(databaseId, live, writes);
           const failed = result.results.filter((r) => r.status === "error");
 
           const parts = [
@@ -517,7 +610,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
       description:
         "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows.",
       inputSchema: z.object({
-        databaseId: z.string().describe("The database's content id"),
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
         rowId: z
           .string()
           .describe("The row to update — from a query_database result line"),
@@ -547,8 +645,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
       }),
       execute: async (input) => {
         try {
-          const gate = await resolveJurisdiction(ctx, input.databaseId);
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
           if ("refusal" in gate) return gate.refusal;
+          const databaseId = dbRef.id;
           const { table, level } = gate;
           if (!canWrite(level)) {
             return "You have read access here but not write — tell the user.";
@@ -603,7 +704,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
             return `Nothing updated — fix these first:\n${errors.join("\n")}\nColumns here: ${live.map((c) => c.name).join(", ")}.`;
           }
 
-          const result = await writeCells(input.databaseId, live, writes);
+          const result = await writeCells(databaseId, live, writes);
           const stale = result.results.filter((r) => r.status === "stale");
           if (stale.length > 0) {
             const details = stale
