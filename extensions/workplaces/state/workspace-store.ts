@@ -21,6 +21,7 @@ import type {
   WorkspaceLayoutRecordSummary,
   WorkspaceOpenConflict,
   WorkspaceOpenIntentResponse,
+  WorkspaceStatePayload,
   WorkspaceStateSavePayload,
 } from "@/extensions/workplaces/server";
 import type {

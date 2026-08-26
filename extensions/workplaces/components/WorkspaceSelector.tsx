@@ -12,6 +12,7 @@ import * as LucideIcons from "lucide-react";
 import {
   Briefcase,
   ChevronDown,
+  ChevronRight,
   Copy,
   Eye,
   Folder,
@@ -1580,7 +1581,7 @@ export function WorkspaceSelector() {
                   workbenchDwellTimerRef.current = window.setTimeout(() => {
                     workbenchDwellTimerRef.current = null;
                     openWorkbenchMenuFor(workspace, rect);
-                  }, 1000);
+                  }, 500);
                 }}
                 onPointerMove={(event) => {
                   // Radix focuses menu items as the pointer moves over them.
@@ -1735,6 +1736,18 @@ export function WorkspaceSelector() {
                     ) : null}
                     {workspace.isLocked ? (
                       <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
+                    ) : null}
+                    {workspace.isView &&
+                    workspace.viewRootContentId &&
+                    normalizeWorkbenchSettings(workspace.settings).enabled ? (
+                      <ChevronRight
+                        className={`h-3.5 w-3.5 shrink-0 transition-colors ${
+                          workbenchMenu?.workspaceId === workspace.id
+                            ? "text-gold-primary"
+                            : "text-gray-400/80"
+                        }`}
+                        aria-label="Has workbenches"
+                      />
                     ) : null}
                     <button
                       type="button"
