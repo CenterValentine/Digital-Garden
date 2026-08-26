@@ -60,6 +60,8 @@ interface DataRowPeekProps {
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
   onNavigate: (dir: 1 | -1) => void;
+  /** "overlay" (default) floats over the grid; "inline" fills a split pane. */
+  variant?: "overlay" | "inline";
   onClose: () => void;
 }
 
@@ -76,6 +78,7 @@ export function DataRowPeek({
   onCommitCell,
   onRefresh,
   onNavigate,
+  variant = "overlay",
   onClose,
 }: DataRowPeekProps) {
   useEffect(() => {
@@ -100,8 +103,10 @@ export function DataRowPeek({
   return (
     <aside
       className={cn(
-        "absolute inset-y-0 right-0 z-20 flex w-80 flex-col",
-        "border-l border-border bg-background shadow-xl"
+        "flex flex-col bg-background",
+        variant === "overlay"
+          ? "absolute inset-y-0 right-0 z-20 w-80 border-l border-border shadow-xl"
+          : "h-full min-h-0 w-full"
       )}
       aria-label={`Row: ${title}`}
     >
@@ -167,7 +172,7 @@ export function DataRowPeek({
               autoOpen={focusColumnId === column.id}
               onCommit={(v) => onCommitCell(row.id, column.key, v)}
             />
-          ) : column.type === "contentLink" ? (
+          ) : column.type === "contentLink" || column.type === "file" ? (
             <ContentLinkField
               key={`${row.id}:${column.id}`}
               column={column}

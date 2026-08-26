@@ -30,6 +30,7 @@ import {
   keyAtEnd,
   validateFilter,
   type DataColumnConfig,
+  type DataViewConfig,
   type DataSort,
   type FilterNode,
 } from "@/lib/domain/data";
@@ -37,7 +38,7 @@ import { Prisma } from "@/lib/database/generated/prisma";
 
 /** Modes with a renderer today. The enum-free VarChar means adding one
  * later is a UI change, never a migration (plan D11). */
-const IMPLEMENTED_VIEW_MODES = ["grid", "board", "list", "form"] as const;
+const IMPLEMENTED_VIEW_MODES = ["grid", "board", "list", "form", "gallery", "split"] as const;
 
 const ROUTE_PATH = "/api/content/data/[id]/views";
 
@@ -140,6 +141,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         makeDefault?: boolean;
         mode?: string;
         groupByColumnId?: string | null;
+        config?: DataViewConfig;
         filters?: FilterNode;
         sorts?: DataSort[];
       };
@@ -243,6 +245,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           body.groupByColumnId === undefined &&
           body.filters === undefined &&
           body.sorts === undefined &&
+          body.config === undefined &&
           !body.makeDefault;
         if (!accessOnly || !(isViewOwner || isTableOwner)) {
           return forbidden("This view is locked — unlock it first");
@@ -266,6 +269,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
               : {}),
             ...(body.sorts !== undefined
               ? { sorts: body.sorts as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(body.config !== undefined
+              ? { config: body.config as unknown as Prisma.InputJsonValue }
               : {}),
           },
         });

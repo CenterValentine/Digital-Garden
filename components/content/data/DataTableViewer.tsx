@@ -50,6 +50,7 @@ import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
 import { DataFormView } from "./DataFormView";
+import { DataGalleryView } from "./DataGalleryView";
 import { DataRowPeek } from "./DataRowPeek";
 import { DataFilterBar } from "./DataFilterBar";
 import { DataQueryBar } from "./DataQueryBar";
@@ -1262,6 +1263,49 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             onSubmit={submitFormRow}
           />
         </div>
+      ) : state.view?.mode === "gallery" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <DataGalleryView
+            rows={state.rows}
+            columns={columns}
+            view={state.view}
+            onOpenRow={openRow}
+          />
+        </div>
+      ) : state.view?.mode === "split" ? (
+        <div className="flex min-h-0 flex-1">
+          <div className="w-72 shrink-0 overflow-y-auto border-r border-border">
+            <DataListView
+              rows={state.rows}
+              columns={columns}
+              onOpenRow={openRow}
+            />
+          </div>
+          <div className="min-w-0 flex-1 overflow-y-auto">
+            {peekRow ? (
+              <DataRowPeek
+                variant="inline"
+                tableId={contentId}
+                row={peekRow}
+                columns={columns}
+                editable={canEditData}
+                index={peekIndex}
+                total={state.rows.length}
+                focusColumnId={peekFocusColumnId}
+                onOpenContent={openContent}
+                onOpenAsPage={openAsPage}
+                onCommitCell={commitCell}
+                onRefresh={() => load(viewRef.current?.id ?? null)}
+                onNavigate={navigatePeek}
+                onClose={() => setPeekRowId(null)}
+              />
+            ) : (
+              <p className="px-6 py-8 text-xs text-muted-foreground">
+                Select a row on the left.
+              </p>
+            )}
+          </div>
+        </div>
       ) : (
       <div
         ref={scrollRef}
@@ -1366,7 +1410,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       </div>
       )}
 
-      {peekRow && (
+      {peekRow && state.view?.mode !== "split" && (
         <DataRowPeek
           tableId={contentId}
           row={peekRow}

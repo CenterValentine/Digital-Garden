@@ -49,6 +49,7 @@ const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   rollup: "Rollup",
   contentLink: "Content link",
   person: "Person",
+  file: "File",
 };
 
 const ROLLUP_LABEL: Record<RollupFn, string> = {

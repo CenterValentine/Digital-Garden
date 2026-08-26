@@ -483,8 +483,10 @@ async function hydrateContentRefs(
   viewerId: string | undefined
 ): Promise<Map<string, Record<string, ContentRef[]>>> {
   const result = new Map<string, Record<string, ContentRef[]>>();
+  // `file` cells share the contentLink shape (id-arrays of nodes, plan
+  // B8b) — one hydrator serves both, so redaction cannot fork.
   const linkColumns = columns.filter(
-    (c) => c.type === "contentLink" && !c.deletedAt
+    (c) => (c.type === "contentLink" || c.type === "file") && !c.deletedAt
   );
   if (linkColumns.length === 0 || rows.length === 0) return result;
 
@@ -517,7 +519,20 @@ async function hydrateContentRefs(
             },
           ],
         },
-        select: { id: true, title: true, contentType: true },
+        select: {
+          id: true,
+          title: true,
+          contentType: true,
+          filePayload: {
+            select: {
+              thumbnailUrl: true,
+              width: true,
+              height: true,
+              blurDataUrl: true,
+              mimeType: true,
+            },
+          },
+        },
       })
     : [];
   const byId = new Map(visible.map((n) => [n.id, n]));
@@ -538,6 +553,15 @@ async function hydrateContentRefs(
                 title: node.title || "Untitled",
                 contentType: node.contentType,
                 restricted: false,
+                file: node.filePayload
+                  ? {
+                      thumbnailUrl: node.filePayload.thumbnailUrl,
+                      width: node.filePayload.width,
+                      height: node.filePayload.height,
+                      blurDataUrl: node.filePayload.blurDataUrl,
+                      mimeType: node.filePayload.mimeType,
+                    }
+                  : null,
               }
             : { id, title: "", contentType: null, restricted: true };
         });
