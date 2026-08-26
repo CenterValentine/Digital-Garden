@@ -135,6 +135,7 @@ interface ContentResponse {
       tableId: string;
       tableTitle: string;
     } | null;
+    role?: "primary" | "referenced";
     ownedByNote?: { id: string; title: string } | null;
     note?: {
       tiptapJson: JSONContent | null; // Persisted from Prisma Json field
@@ -328,6 +329,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
     rowId: string;
     tableId: string;
     tableTitle: string;
+    /** "referenced" pages offer graduation into the tree from the banner. */
+    role: "primary" | "referenced";
   } | null>(null);
   // Path A: when this ContentNode is a visualization owned by a note, the
   // standalone viewer is read-only. Non-null means "this is an embedded
@@ -635,7 +638,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           isTemporary: false,
         });
 
-        setPromotedFromRow(result.data.promotedFromRow ?? null);
+        setPromotedFromRow(
+          result.data.promotedFromRow
+            ? {
+                ...result.data.promotedFromRow,
+                role: result.data.role ?? "primary",
+              }
+            : null
+        );
 
         // Store payload data for Phase 2 content types
         switch (result.data.contentType) {
@@ -2520,6 +2530,46 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 >
                   Open in table
                 </button>
+                {promotedFromRow.role === "referenced" && (
+                  <>
+                    <span aria-hidden="true">·</span>
+                    {/* Graduation from the page itself (plan Phase 5 "Add
+                        to tree" trigger, owner-requested 2026-08-27): a
+                        link-promoted page can join the tree without a
+                        detour through the table's peek. Same one-way
+                        referenced→primary rule as every other trigger. */}
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await tracedFetch(
+                          `/api/content/data/${promotedFromRow.tableId}/promote`,
+                          {
+                            method: "POST",
+                            credentials: "include",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              rowId: promotedFromRow.rowId,
+                              role: "primary",
+                            }),
+                          }
+                        );
+                        const json = await res.json();
+                        if (res.ok && json?.success) {
+                          window.dispatchEvent(
+                            new CustomEvent("dg:tree-refresh")
+                          );
+                          setPromotedFromRow({
+                            ...promotedFromRow,
+                            role: "primary",
+                          });
+                        }
+                      }}
+                      className="hover:underline"
+                    >
+                      Add to file tree
+                    </button>
+                  </>
+                )}
               </div>
             )}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>

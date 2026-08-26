@@ -37,7 +37,7 @@ import { Prisma } from "@/lib/database/generated/prisma";
 
 /** Modes with a renderer today. The enum-free VarChar means adding one
  * later is a UI change, never a migration (plan D11). */
-const IMPLEMENTED_VIEW_MODES = ["grid", "board"] as const;
+const IMPLEMENTED_VIEW_MODES = ["grid", "board", "list", "form"] as const;
 
 const ROUTE_PATH = "/api/content/data/[id]/views";
 

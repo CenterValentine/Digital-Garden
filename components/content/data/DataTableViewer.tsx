@@ -48,6 +48,8 @@ import { DataColumnHeader } from "./DataColumnHeader";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
+import { DataListView } from "./DataListView";
+import { DataFormView } from "./DataFormView";
 import { DataRowPeek } from "./DataRowPeek";
 import { DataFilterBar } from "./DataFilterBar";
 import { DataQueryBar } from "./DataQueryBar";
@@ -605,6 +607,47 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     setNotice(`${describeOp(op)} deleted · ⌘Z to undo`);
     await load(state.view?.id ?? null);
   }, [contentId, selectedRows, load, clientId, state.view, state.rows, refreshTree]);
+
+  // Form view submission (plan O13): one fresh row, its cells written in a
+  // single unconditional batch (no CAS — nothing existed before), then a
+  // reload so the new row appears when the user switches back to the grid.
+  const submitFormRow = useCallback(
+    async (cells: Record<string, unknown>): Promise<boolean> => {
+      const res = await fetch(`/api/content/data/${contentId}/rows`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ count: 1 }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success || !json.data.rowIds?.[0]) {
+        setNotice("Could not add the row");
+        return false;
+      }
+      const rowId: string = json.data.rowIds[0];
+      const edits: CellEdit[] = Object.entries(cells).map(
+        ([columnKey, value]) => ({
+          rowId,
+          columnKey,
+          after: value as CellEdit["after"],
+          before: undefined,
+        })
+      );
+      if (edits.length > 0) {
+        const write = await sendWrites(edits, false);
+        if (!write.ok) {
+          setNotice(`Row added, but some fields failed — ${write.message}`);
+        }
+      }
+      const op: UndoOp = { kind: "addRows", rowIds: [rowId], label: "" };
+      setStack((s) =>
+        pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
+      );
+      void load(viewRef.current?.id ?? null);
+      return true;
+    },
+    [contentId, sendWrites, clientId, load]
+  );
 
   // ── Column lifecycle ───────────────────────────────────────────────────
   //
@@ -1200,6 +1243,23 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
             onCommitCell={commitCell}
             onAddRowInGroup={addRowInGroup}
             onOpenRow={openRow}
+          />
+        </div>
+      ) : state.view?.mode === "list" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <DataListView
+            rows={state.rows}
+            columns={columns}
+            onOpenRow={openRow}
+          />
+        </div>
+      ) : state.view?.mode === "form" ? (
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <DataFormView
+            columns={columns}
+            view={state.view}
+            canWrite={canEditData}
+            onSubmit={submitFormRow}
           />
         </div>
       ) : (

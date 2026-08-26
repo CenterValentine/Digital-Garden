@@ -424,6 +424,12 @@ export async function GET(
         ownedByNote: content.ownedByNote
           ? { id: content.ownedByNote.id, title: content.ownedByNote.title }
           : null,
+        // ContentRole also holds "system"; the banner cares only about the
+        // primary/referenced pair, so anything else is simply not sent.
+        role:
+          content.role === "primary" || content.role === "referenced"
+            ? content.role
+            : undefined,
         promotedFromRow: content.promotedFromRow
           ? {
               rowId: content.promotedFromRow.id,

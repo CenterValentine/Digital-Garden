@@ -39,6 +39,8 @@ const ACCESS_LABEL: Record<DataViewAccess, { label: string; hint: string }> = {
 const MODE_LABEL: Partial<Record<DataViewMode, string>> = {
   grid: "Grid",
   board: "Board",
+  list: "List",
+  form: "Form",
 };
 
 const fieldClass = cn(
