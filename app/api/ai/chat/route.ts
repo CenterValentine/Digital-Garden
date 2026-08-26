@@ -1637,7 +1637,11 @@ export async function POST(request: Request) {
             );
             const digest = await buildDataSchemaDigest(contentId);
             if (digest) {
-              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}`;
+              // Stale-history armor (owner report, 2026-08-28): a long
+              // thread can carry the model's own earlier claims that these
+              // tools failed or don't exist — grounding is per-request, so
+              // state the current truth explicitly.
+              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}\n\nThe database tools (query_database, update_row, insert_rows, describe_database) ARE available in this turn — disregard any earlier statements in this conversation that they were unavailable or that a change already succeeded; verify current values with query_database instead of trusting prior turns.`;
             }
           } else {
             // A chat bound to a promoted row's PAGE is bound to the row
@@ -1667,6 +1671,9 @@ export async function POST(request: Request) {
               if (digest) parts.push(digest);
               parts.push(
                 "When a request could mean either the note BODY or the row's CELLS and the outcome differs, ask the user which they mean — name both options briefly instead of guessing."
+              );
+              parts.push(
+                "The database tools (query_database, update_row, insert_rows, describe_database) ARE available in this turn — disregard any earlier statements in this conversation that they were unavailable or that a change already succeeded; verify current values with query_database instead of trusting prior turns."
               );
               mentionedContext += `\n\n${parts.join("\n\n")}`;
             }
