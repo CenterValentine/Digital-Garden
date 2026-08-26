@@ -39,7 +39,21 @@ export interface WikiLinkSuggestionItem {
   slug: string;
   /** "note" (default) or "folder" — folders link to their capsule-backed view. */
   contentType?: string;
+  /**
+   * Present on UN-promoted database rows (plan Phase 5): `id` is then a
+   * `row:` sentinel, not a ContentNode id, and selecting the item promotes
+   * the row (role "referenced") before the link is inserted. The command
+   * refuses to insert the sentinel — a row item without a promote callback
+   * degrades to plain text, never to a dead link.
+   */
+  row?: { rowId: string; tableId: string; tableTitle: string };
 }
+
+/** Resolves a row suggestion to a real node — injected beside `fetchNotes`. */
+export type WikiLinkRowPromoter = (row: {
+  rowId: string;
+  tableId: string;
+}) => Promise<{ contentId: string } | null>;
 
 type WikiLinkSearchStatus = "loading" | "ready" | "error";
 
@@ -157,11 +171,15 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
             ) : (
               <span className="flex items-center justify-between gap-2">
                 <span className="truncate">{item.title}</span>
-                {item.contentType === "folder" && (
+                {item.row ? (
+                  <span className="max-w-[10rem] shrink-0 truncate rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
+                    {item.row.tableTitle}
+                  </span>
+                ) : item.contentType === "folder" ? (
                   <span className="shrink-0 rounded border border-white/15 px-1 py-px text-[9px] uppercase tracking-wide text-gray-400">
                     folder
                   </span>
-                )}
+                ) : null}
               </span>
             )}
           </button>
@@ -174,7 +192,8 @@ export const WikiLinkList = forwardRef<WikiLinkListRef, WikiLinkListProps>((prop
 WikiLinkList.displayName = "WikiLinkList";
 
 export function createWikiLinkSuggestion(
-  fetchNotes: (query: string) => Promise<WikiLinkSuggestionItem[]>
+  fetchNotes: (query: string) => Promise<WikiLinkSuggestionItem[]>,
+  promoteRow?: WikiLinkRowPromoter
 ): Omit<SuggestionOptions, "editor"> {
   // Only the newest request may set the settled status — a slow stale
   // response must not overwrite what the latest query reported.
@@ -344,6 +363,45 @@ export function createWikiLinkSuggestion(
             },
           })
           .run();
+        return;
+      }
+
+      // Un-promoted database row (plan Phase 5): there is no node to point
+      // at until promotion (role "referenced") returns one. The trigger text
+      // is consumed SYNCHRONOUSLY, then the link inserts at the current
+      // selection when promotion resolves — selection-anchored rather than
+      // range-anchored, because the captured range positions are dead
+      // numbers a concurrent collab step would shift, while the selection
+      // maps through remote steps correctly. On failure the row's title
+      // lands as plain text: the user's intent stays visible, never a
+      // sentinel-id link that resolves to nothing.
+      if (item.row) {
+        chain.run();
+        const rowMeta = item.row;
+        void (async () => {
+          if (promoteRow) {
+            try {
+              const promoted = await promoteRow(rowMeta);
+              if (promoted) {
+                editor
+                  .chain()
+                  .focus()
+                  .insertContent({
+                    type: "wikiLink",
+                    attrs: {
+                      targetId: promoted.contentId,
+                      targetTitle: item.title,
+                    },
+                  })
+                  .run();
+                return;
+              }
+            } catch {
+              // fall through to the plain-text fallback
+            }
+          }
+          editor.chain().focus().insertContent(item.title).run();
+        })();
         return;
       }
 

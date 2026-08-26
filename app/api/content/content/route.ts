@@ -795,6 +795,102 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (
+      requestedContentType === "data" &&
+      (body as { dataMode?: string }).dataMode === "query"
+    ) {
+      // Query database (plan Phase 3): a saved search rendered as a table.
+      // No columns — they are synthesized node projections; no rows — the
+      // rows ARE the matching notes. Just a view and a default query.
+      contentType = "data";
+      const { buildDefaultView, DEFAULT_CONTENT_QUERY } = await import(
+        "@/lib/domain/data"
+      );
+      const queryView = buildDefaultView();
+      payloadData = {
+        dataPayload: {
+          create: {
+            mode: "query",
+            source: DEFAULT_CONTENT_QUERY as unknown as Prisma.InputJsonValue,
+            searchText: title.toLowerCase(),
+            views: {
+              create: [
+                {
+                  ownerId: session.user.id,
+                  name: "Results",
+                  mode: queryView.mode,
+                  access: queryView.access,
+                  section: queryView.section,
+                  filters: queryView.filters as unknown as Prisma.InputJsonValue,
+                  sorts: queryView.sorts as unknown as Prisma.InputJsonValue,
+                  groupByColumnId: queryView.groupByColumnId,
+                  columnPrefs: queryView.columnPrefs as unknown as Prisma.InputJsonValue,
+                  config: queryView.config as unknown as Prisma.InputJsonValue,
+                  position: queryView.position,
+                },
+              ],
+            },
+          },
+        },
+      };
+    } else if (requestedContentType === "data") {
+      // User-defined database (DATABASE-CONTENT-TYPE-PLAN → Phase 1a).
+      //
+      // Seeded with ONE text column named "Name" and one grid view —
+      // deliberately not Notion's Name/Tags/Date. Columns a user did not ask
+      // for are noise they must delete before they can start, and the primary
+      // column has to exist because titles and promotion depend on it.
+      contentType = "data";
+      const { buildDefaultColumns, buildDefaultView, deriveTableSearchText } =
+        await import("@/lib/domain/data");
+
+      const seedColumns = buildDefaultColumns();
+      const seedView = buildDefaultView();
+
+      payloadData = {
+        dataPayload: {
+          create: {
+            mode: "inline",
+            source: {} as unknown as Prisma.InputJsonValue,
+            searchText: deriveTableSearchText(
+              title,
+              seedColumns.map((c) => ({
+                ...c,
+                id: "",
+                deletedAt: null,
+              }))
+            ),
+            columns: {
+              create: seedColumns.map((c) => ({
+                key: c.key,
+                name: c.name,
+                type: c.type,
+                position: c.position,
+                isPrimary: c.isPrimary,
+                config: c.config as unknown as Prisma.InputJsonValue,
+                description: c.description,
+              })),
+            },
+            views: {
+              create: [
+                {
+                  ownerId: session.user.id,
+                  name: seedView.name,
+                  mode: seedView.mode,
+                  access: seedView.access,
+                  section: seedView.section,
+                  filters: seedView.filters as unknown as Prisma.InputJsonValue,
+                  sorts: seedView.sorts as unknown as Prisma.InputJsonValue,
+                  groupByColumnId: seedView.groupByColumnId,
+                  columnPrefs: seedView.columnPrefs as unknown as Prisma.InputJsonValue,
+                  config: seedView.config as unknown as Prisma.InputJsonValue,
+                  position: seedView.position,
+                },
+              ],
+            },
+          },
+        },
+      };
     } else if (requestedContentType === "workflow") {
       // User-authored workflow — seeded with the job-application starter
       // graph; edited in the builder (workflows extension content viewer).
@@ -887,6 +983,22 @@ export async function POST(request: NextRequest) {
     // Folder Studio auto-context: a new child changes the parent's roll-up
     // inputs. Root-level creates have no parent chain to flag (no-op).
     after(() => markContextDirty([parentId || null]));
+
+    // Databases seed AgenticMetadata at REFERENCE immediately (plan B1):
+    // covered from birth, resolved on the sweep's first pass via the schema
+    // digest, and never a member of the permanently-uncovered set. Uses the
+    // canonical upsert so the row shape stays owned by the metadata module.
+    if (content.contentType === "data") {
+      const createdId = content.id;
+      const ownerId = session.user.id;
+      after(async () => {
+        const [{ setContextMode }, { ContextMode }] = await Promise.all([
+          import("@/lib/domain/ai-context/metadata"),
+          import("@/lib/database/generated/prisma"),
+        ]);
+        await setContextMode(ownerId, createdId, ContextMode.REFERENCE);
+      });
+    }
 
     // Format response
     const response: ContentDetailResponse = {

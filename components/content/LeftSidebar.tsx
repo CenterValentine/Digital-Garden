@@ -25,6 +25,7 @@ import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
 import { clientLogger } from "@/lib/core/logger/client";
+import { DataRailPanel } from "./data/DataRailPanel";
 
 export function LeftSidebar() {
   const { mode } = useLeftPanelCollapseStore();
@@ -52,6 +53,7 @@ export function LeftSidebar() {
     type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
+    dataMode?: "query"; // For data type — query databases (plan Phase 3)
   } | null>(null);
   const [isCreateDisabled, setIsCreateDisabled] = useState(false);
 
@@ -221,9 +223,13 @@ export function LeftSidebar() {
     }));
   }, []);
 
-  // const handleCreateData = useCallback(() => {
-  //   setCreateTrigger({ type: "data", timestamp: Date.now() });
-  // }, []);
+  const handleCreateData = useCallback(() => {
+    setCreateTrigger({ type: "data", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateDataQuery = useCallback(() => {
+    setCreateTrigger({ type: "data", dataMode: "query", timestamp: Date.now() });
+  }, []);
 
   // const handleCreateHope = useCallback(() => {
   //   setCreateTrigger({ type: "hope", timestamp: Date.now() });
@@ -290,6 +296,8 @@ export function LeftSidebar() {
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
           onCreateChat={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateChat}
+          onCreateData={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateData}
+          onCreateDataQuery={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateDataQuery}
           onCreateWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateWorkflow}
           onCreateN8nWorkflow={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateN8nWorkflow}
           onCreateAiImage={activeView === PEOPLE_VIEW_KEY ? undefined : () => handleCreateAiImage(null)}
@@ -312,6 +320,8 @@ export function LeftSidebar() {
         {activeView === "extensions" && <LeftSidebarExtensions />}
 
         {activeView === "inbox" && <InboxLeftPanel />}
+
+        {activeView === "databases" && <DataRailPanel />}
 
         {activeView === "recents" && <RecentsPanel />}
 

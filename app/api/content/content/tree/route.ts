@@ -79,6 +79,8 @@ type ContentTreeNode = {
   contentType: string;
   treeNodeKind: "content" | "peopleGroup" | "person";
   role: string;
+  /** The database this node is a promoted row of, if any (plan Phase 5). */
+  promotedFromTableId?: string | null;
   children: ContentTreeNode[];
   /**
    * Referenced children, partitioned OUT of `children` so the tree renders
@@ -215,6 +217,10 @@ export async function GET(request: NextRequest) {
               customIcon: true,
               iconColor: true,
               isPublished: true,
+              // Promoted database rows (plan Phase 5): lets the tree know a
+              // node may be dropped BACK into its database — the only
+              // non-folder, non-note drop target that exists.
+              promotedFromRow: { select: { tableId: true } },
               createdAt: true,
               updatedAt: true,
               deletedAt: true,
@@ -401,6 +407,7 @@ export async function GET(request: NextRequest) {
           contentType: item.contentType,
           treeNodeKind: "content",
           role: item.role,
+          promotedFromTableId: item.promotedFromRow?.tableId ?? null,
           children: [],
           references: [],
           publishState: derivePublishState(item.isPublished, item.publicItems),

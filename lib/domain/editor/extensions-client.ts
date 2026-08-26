@@ -100,7 +100,13 @@ export interface EditorExtensionsOptions {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string; row?: { rowId: string; tableId: string; tableTitle: string } }>>;
+  /**
+   * Promote an un-promoted database-row suggestion to a real node (plan
+   * Phase 5, role "referenced"). Without it, row items degrade to plain
+   * text on selection.
+   */
+  promoteRowForWikiLink?: (row: { rowId: string; tableId: string }) => Promise<{ contentId: string } | null>;
   /** Callback when a tag is clicked */
   onTagClick?: (tagId: string, tagName: string) => void;
   /** Fetch tags for tag autocomplete */
@@ -282,7 +288,10 @@ export function getEditorExtensions(options?: EditorExtensionsOptions): Extensio
     WikiLink.configure({
       onClickLink: options?.onWikiLinkClick || (() => {}),
       suggestion: options?.fetchNotesForWikiLink
-        ? createWikiLinkSuggestion(options.fetchNotesForWikiLink)
+        ? createWikiLinkSuggestion(
+            options.fetchNotesForWikiLink,
+            options.promoteRowForWikiLink
+          )
         : undefined,
     }),
 

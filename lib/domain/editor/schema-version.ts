@@ -81,7 +81,7 @@
  * See: docs/notes-feature/TIPTAP-SCHEMA-EVOLUTION-GUIDE.md
  */
 
-export const TIPTAP_SCHEMA_VERSION = "1.15.0";
+export const TIPTAP_SCHEMA_VERSION = "1.16.0";
 
 export interface SchemaVersion {
   version: string;
@@ -109,6 +109,22 @@ export interface SchemaChange {
  * 4. Run tests: pnpm test lib/domain/export
  */
 export const SCHEMA_HISTORY: SchemaVersion[] = [
+  {
+    version: "1.16.0",
+    date: "2026-08-23",
+    changes: [
+      {
+        type: "modify",
+        target: "node",
+        name: "noteWindow",
+        description:
+          "Reserved database targets (DATABASE-CONTENT-TYPE-PLAN B7/O16): nullable targetViewId + targetRowId attrs, defaulting null. Nothing renders them until Phase 2 — reserved now because a TipTap attr added later costs another version bump plus another Hocuspocus redeploy, and an un-redeployed collab server rewrites unknown content to unsupportedBlock. One node, four targets: note window (unchanged), whole database, one saved view, one embedded row page. renderHTML unchanged — ids never reach published HTML. ⚠ Hocuspocus redeploy required after merge.",
+        breaking: false,
+        migrationsAvailable: [],
+      },
+    ],
+    migrationsRequired: false,
+  },
   {
     version: "1.15.0",
     date: "2026-08-14",

@@ -250,6 +250,7 @@ function ChatViewerInner({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    handleResolveMention,
     notifyMentionInserted,
     folderGates,
     commandItems,
@@ -928,6 +929,7 @@ function ChatViewerInner({
         disabled={loadingInitial}
         placeholder="Continue the conversation..."
         onMentionSearch={handleMentionSearch}
+        onResolveMention={handleResolveMention}
         onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}

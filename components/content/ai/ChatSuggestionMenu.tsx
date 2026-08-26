@@ -9,7 +9,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { FileText, Folder, MessageCircle, File, Wrench, GitBranch } from "lucide-react";
+import { FileText, Folder, MessageCircle, File, Wrench, GitBranch, Table } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 
 export interface SuggestionItem {
@@ -19,6 +19,12 @@ export interface SuggestionItem {
   contentType?: string;
   /** For commands: text to insert when selected */
   insertText?: string;
+  /**
+   * Present on UN-promoted database rows (plan Phase 5): `id` is a `row:`
+   * sentinel until selection promotes the row (role "referenced") and the
+   * mention pill takes the returned node id instead.
+   */
+  row?: { rowId: string; tableId: string };
 }
 
 interface ChatSuggestionMenuProps {
@@ -42,6 +48,8 @@ function getItemIcon(item: SuggestionItem, mode: "mention" | "command") {
       return <Folder className={cn(cls, "text-yellow-400")} />;
     case "chat":
       return <MessageCircle className={cn(cls, "text-green-400")} />;
+    case "data-row":
+      return <Table className={cn(cls, "text-teal-400")} />;
     default:
       return <File className={cn(cls, "text-gray-600 dark:text-gray-400")} />;
   }

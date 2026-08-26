@@ -63,6 +63,12 @@ export interface TreeNode {
   /** Position within the reference block, for rounding the block's corners. */
   referenceEdge?: "first" | "last" | "only" | "middle";
   /**
+   * The database this node is a promoted row of (plan Phase 5). Grants the
+   * one non-folder drop the tree allows besides reference-onto-note: a row
+   * page may be dropped back into ITS OWN database.
+   */
+  promotedFromTableId?: string | null;
+  /**
    * Status-dot state. "none" renders nothing — the overwhelming majority of
    * nodes, which have never been published and need no status.
    */
@@ -149,6 +155,18 @@ export const CONTENT_WITH_PAYLOADS = {
   dataPayload: true,
   hopePayload: true,
   workflowPayload: true,
+
+  // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when this
+  // node IS a database row's page, carry enough to render the breadcrumb —
+  // without it, a promoted row reached from search or a backlink reads as
+  // an orphan note with a strange title.
+  promotedFromRow: {
+    select: {
+      id: true,
+      tableId: true,
+      table: { select: { content: { select: { title: true } } } },
+    },
+  },
 } as const;
 
 /**

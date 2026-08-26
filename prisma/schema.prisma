@@ -146,6 +146,7 @@ model ContentNode {
   chatPayload          ChatPayload?
   visualizationPayload VisualizationPayload?
   dataPayload          DataPayload?
+  promotedFromRow      DataRow?              @relation("PromotedDataRow")
   hopePayload          HopePayload?
   workflowPayload      WorkflowPayload?
 
@@ -535,6 +536,7 @@ model User {
   tags                    Tag[]
   trashedContent          TrashBin[]
   viewGrants              ViewGrant[]
+  dataViews               DataView[]                @relation("DataViewOwner")
   peopleGroups            PeopleGroup[]
   peopleDefaultGroups     PeopleGroup[]            @relation("DefaultPeopleGroup")
   people                  Person[]
@@ -1460,17 +1462,183 @@ model VisualizationPayload {
   @@index([engine])
 }
 
+enum DataColumnType {
+  text
+  longText
+  number
+  checkbox
+  date
+  select
+  multiSelect
+  status // grouped select (todo/active/done) — drives kanban; NOT `select`
+  person // → User
+  relation // → DataRow, via DataRowLink. Cell stores NOTHING.
+  contentLink // → ContentNode (incl. query-mode rows)
+  file // → array of `file` ContentNode ids
+  url
+  email
+  phone // declared, unimplemented
+  autoNumber // declared, unimplemented
+  formula // computed on read, stores nothing
+  rollup // computed on read, stores nothing
+  lookup // computed on read, stores nothing (pulls a value; ≠ rollup)
+  createdAt // system, read from the row
+  updatedAt // system, read from the row
+  createdBy // declared, unimplemented
+  updatedBy // declared, unimplemented
+}
+
+/// The database node itself. Keyed by ContentNode.id, like every payload.
 model DataPayload {
-  contentId String   @id @db.Uuid
-  mode      String   @db.VarChar(20) // "inline" | "external" | "query"
-  source    Json     @default("{}") // Table data or external source config
-  schema    Json     @default("{}") // Column definitions
+  contentId     String  @id @db.Uuid
+  mode          String  @default("inline") @db.VarChar(20) // "inline" | "external" | "query"
+  /// external-source config, or the saved ContentNode query for mode:"query"
+  source        Json    @default("{}")
+  /// Opened with no ?view= → this one. Deliberately NOT an FK: deleting a
+  /// view must not cascade the table away; the read path falls back to
+  /// first-by-position.
+  defaultViewId String? @db.Uuid
+  /// Denormalized for grid headers. Maintained transactionally with row writes.
+  rowCount      Int     @default(0)
+  /// User-authored, ≤280 chars. Feeds the AI schema digest (plan B1/D9).
+  description   String? @db.VarChar(280)
+  /// Table title + column names, so a table is findable by its schema (B2).
+  searchText    String  @default("")
+
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
-  content ContentNode @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  content ContentNode  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  columns DataColumn[]
+  rows    DataRow[]
+  views   DataView[]
 
   @@index([mode])
+}
+
+/// One column. `key` is the opaque JSONB key and NEVER the display name, so
+/// renaming is metadata-only and touches zero rows (plan D3).
+model DataColumn {
+  id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableId     String         @db.Uuid
+  /// Short opaque nanoid — the key inside DataRow.data. Immutable for life.
+  key         String         @db.VarChar(16)
+  name        String         @db.VarChar(255)
+  type        DataColumnType
+  /// Fractional index (lib/domain/data/ordering.ts).
+  position    String         @db.VarChar(64)
+  /// The title column. Exactly one per table; syncs to ContentNode.title on
+  /// promotion.
+  isPrimary   Boolean        @default(false)
+  /// Select options, number precision, relation target, formula source, etc.
+  config      Json           @default("{}")
+  /// User-authored, ≤280 chars. AI-facing (plan D9); form help overrides it
+  /// per view, because a submitter and a model are different audiences.
+  description String?        @db.VarChar(280)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  /// Soft: an accidental column delete must be a metadata flip to undo, not a
+  /// data restoration (plan B4).
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  table    DataPayload   @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
+  outgoing DataRowLink[] @relation("DataLinkColumn")
+
+  @@unique([tableId, key])
+  @@index([tableId, position])
+}
+
+/// One row. Cells are JSON-native in `data`; empty means the key is ABSENT
+/// rather than null (plan B8c). `contentId` stays null until the row earns a
+/// page — lazy promotion, plan D2.
+model DataRow {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableId    String  @db.Uuid
+  /// Fractional index. Per-view ordering; the tree stamps its own copy once.
+  sortKey    String  @db.VarChar(64)
+  data       Json    @default("{}")
+  /// Set on promotion. Unique: one node per row, never shared.
+  contentId  String? @unique @db.Uuid
+  /// Text-ish cell values, so search can find a row (plan B2).
+  searchText String  @default("")
+
+  createdBy String?   @db.Uuid
+  createdAt DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @db.Timestamptz(6)
+  deletedAt DateTime? @db.Timestamptz(6)
+
+  table    DataPayload  @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
+  content  ContentNode? @relation("PromotedDataRow", fields: [contentId], references: [id], onDelete: SetNull)
+  linksOut DataRowLink[] @relation("DataLinkFrom")
+  linksIn  DataRowLink[] @relation("DataLinkTo")
+
+  @@index([tableId, sortKey])
+  @@index([tableId, deletedAt])
+  @@index([data(ops: JsonbPathOps)], type: Gin)
+}
+
+/// Relation cells. The ONLY home for links (plan D4) — never mirrored into
+/// DataRow.data, so there is one source of truth and both directions index.
+/// Symmetry is a property of the COLUMNS, not of this row: a two-way relation
+/// is two columns reading the same links; one-way simply omits the reverse.
+model DataRowLink {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  columnId  String   @db.Uuid
+  fromRowId String   @db.Uuid
+  toRowId   String   @db.Uuid
+  position  String   @db.VarChar(64)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  /// Restrict, NOT Cascade (plan V1-2): DataColumn soft-deletes, so cascading
+  /// here would hard-delete every link the moment a relation column is
+  /// soft-deleted — and undo would then restore a column with all of its
+  /// relationships gone. Links die only when the column is truly removed.
+  column DataColumn @relation("DataLinkColumn", fields: [columnId], references: [id], onDelete: Restrict)
+  from   DataRow    @relation("DataLinkFrom", fields: [fromRowId], references: [id], onDelete: Cascade)
+  to     DataRow    @relation("DataLinkTo", fields: [toRowId], references: [id], onDelete: Cascade)
+
+  @@unique([columnId, fromRowId, toRowId])
+  @@index([toRowId])
+}
+
+/// A saved projection. Views are the unit of navigation (plan B8): URL-
+/// addressable, pinnable as tabs, and present in the tree and the rail.
+model DataView {
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tableId String  @db.Uuid
+  /// Required by `access: personal` — a personal view needs an owner.
+  ownerId String  @db.Uuid
+  name    String  @db.VarChar(255)
+  /// "grid" | "board" | "gallery" | "list" | "split" | "form". VarChar, not an
+  /// enum (plan D11), so calendar/timeline/chart are never a migration.
+  mode    String  @default("grid") @db.VarChar(20)
+  /// "collaborative" | "personal" | "locked" (plan O14).
+  access  String  @default("collaborative") @db.VarChar(20)
+  /// Collapsible grouping in the rail. A nullable label, not a model — a model
+  /// would be a migration and this is not.
+  section String? @db.VarChar(80)
+
+  /// Recursive AND/OR tree; leaves reference DataColumn.id (plan B8c).
+  filters         Json    @default("{}")
+  sorts           Json    @default("[]")
+  groupByColumnId String? @db.Uuid
+  /// Per-column visibility, width, order overrides.
+  columnPrefs     Json    @default("{}")
+  /// Mode-specific: card size, gallery cover source, form field config.
+  config          Json    @default("{}")
+  position        String  @db.VarChar(64)
+  /// Reserved for published views (plan B6). Nothing reads it yet.
+  publicConfig    Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  table DataPayload @relation(fields: [tableId], references: [contentId], onDelete: Cascade)
+  owner User        @relation("DataViewOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([tableId, position])
+  @@index([ownerId])
 }
 
 model HopePayload {

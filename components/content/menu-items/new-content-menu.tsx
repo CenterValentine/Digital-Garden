@@ -79,6 +79,7 @@ export interface NewContentCallbacks {
   onCreateVisualizationExcalidraw?: (parentId: string | null) => void | Promise<void>;
   onCreateVisualizationDiagramsNet?: (parentId: string | null) => void | Promise<void>;
   onCreateData?: (parentId: string | null) => void | Promise<void>;
+  onCreateDataQuery?: (parentId: string | null) => void | Promise<void>;
   onCreateHope?: (parentId: string | null) => void | Promise<void>;
   onCreateWorkflow?: (parentId: string | null) => void | Promise<void>;
   onCreateN8nWorkflow?: (parentId: string | null) => void | Promise<void>;
@@ -400,15 +401,34 @@ export function getNewContentMenuItems(
     disabled: !callbacks.onAddPeopleTarget,
   });
 
-  // Stubs — defined but not implemented yet.
-
+  // Database — one entry, two flavors in a submenu (owner, 2026-08-27),
+  // same pattern as Workflow. "Blank Database" owns its rows; "Query
+  // Database" is a saved search over existing content (plan Phase 3) —
+  // rows ARE the matching notes, nothing is copied.
   items.push({
-    id: "new-data",
-    label: "Data Table",
+    id: "new-database",
+    label: "Database",
     icon: <Table className="h-4 w-4" />,
-    onClick: () => callbacks.onCreateData?.(normalizedParentId),
-    disabled: true,
+    disabled: !callbacks.onCreateData && !callbacks.onCreateDataQuery,
+    submenu: [
+      {
+        id: "new-data",
+        label: "Blank Database",
+        icon: <Table className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateData?.(normalizedParentId),
+        disabled: !callbacks.onCreateData,
+      },
+      {
+        id: "new-data-query",
+        label: "Query Database",
+        icon: <Table className="h-4 w-4" />,
+        onClick: () => callbacks.onCreateDataQuery?.(normalizedParentId),
+        disabled: !callbacks.onCreateDataQuery,
+      },
+    ],
   });
+
+  // Stubs — defined but not implemented yet.
 
   items.push({
     id: "new-hope",

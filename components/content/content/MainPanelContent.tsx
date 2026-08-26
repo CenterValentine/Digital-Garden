@@ -66,6 +66,7 @@ import { FolderViewer } from "../viewer/FolderViewer";
 import { ExternalViewer } from "../viewer/ExternalViewer";
 import { ChatViewer } from "../viewer/ChatViewer";
 import { VisualizationViewer } from "../viewer/VisualizationViewer";
+import { DataTableViewer } from "../data/DataTableViewer";
 import { DataViewer } from "../viewer/DataViewer";
 import { HopeViewer } from "../viewer/HopeViewer";
 import { WorkflowViewer } from "../viewer/WorkflowViewer";
@@ -128,6 +129,12 @@ interface ContentResponse {
     updatedAt?: string;
     // Path A: populated when this visualization is owned by a note.
     ownedByNoteId?: string | null;
+    /** Set when this node is a database row's page (plan Phase 5). */
+    promotedFromRow?: {
+      rowId: string;
+      tableId: string;
+      tableTitle: string;
+    } | null;
     ownedByNote?: { id: string; title: string } | null;
     note?: {
       tiptapJson: JSONContent | null; // Persisted from Prisma Json field
@@ -314,6 +321,14 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const [contentIsPublished, setContentIsPublished] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TODO(any-epic-phase-3d): payload is a discriminated union (folder/note/external/chat/viz/data/hope/workflow) — model as `ContentPayload` union in api-types.ts and switch each viewer branch to a narrowed value
   const [contentData, setContentData] = useState<any>(null);
+  // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when the open
+  // node is a database row's page, the breadcrumb below keeps it from
+  // reading as an orphan note with a strange title.
+  const [promotedFromRow, setPromotedFromRow] = useState<{
+    rowId: string;
+    tableId: string;
+    tableTitle: string;
+  } | null>(null);
   // Path A: when this ContentNode is a visualization owned by a note, the
   // standalone viewer is read-only. Non-null means "this is an embedded
   // drawing; edits happen in the owning note."
@@ -619,6 +634,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           contentType: result.data.contentType,
           isTemporary: false,
         });
+
+        setPromotedFromRow(result.data.promotedFromRow ?? null);
 
         // Store payload data for Phase 2 content types
         switch (result.data.contentType) {
@@ -1341,7 +1358,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
       // wiki-link navigates to the folder and, in playbooks/chat, injects
       // its context capsule like a chat mention.
-      return ((result.data?.items as NoteItem[] | undefined) || [])
+      const notes = ((result.data?.items as NoteItem[] | undefined) || [])
         .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
         .map((item) => ({
           id: item.id,
@@ -1349,6 +1366,78 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           slug: item.slug,
           contentType: item.contentType,
         }));
+
+      // Un-promoted database rows (plan Phase 5): a second suggestion
+      // source after notes, promoted to role "referenced" on selection.
+      // Best-effort — a failure here must not take the note search with it.
+      let rowItems: Array<{
+        id: string;
+        title: string;
+        slug: string;
+        row: { rowId: string; tableId: string; tableTitle: string };
+      }> = [];
+      if (query.trim()) {
+        try {
+          const rowRes = await tracedFetch(
+            `/api/content/data/suggest?q=${encodeURIComponent(query)}`,
+            { credentials: "include" }
+          );
+          const rowJson = await rowRes.json();
+          if (rowRes.ok && rowJson?.success) {
+            type RowItem = { rowId: string; tableId: string; tableTitle: string; title: string };
+            rowItems = ((rowJson.data?.items as RowItem[] | undefined) || []).map(
+              (item) => ({
+                // Sentinel, never inserted: the suggestion command promotes
+                // first and links the returned ContentNode id instead.
+                id: `row:${item.rowId}`,
+                title: item.title,
+                slug: "",
+                row: {
+                  rowId: item.rowId,
+                  tableId: item.tableId,
+                  tableTitle: item.tableTitle,
+                },
+              })
+            );
+          }
+        } catch {
+          // Rows are a bonus source; the notes above still render.
+        }
+      }
+
+      return [...notes, ...rowItems];
+    },
+    []
+  );
+
+  // Promote a row suggestion at role "referenced" — the incidental path
+  // (plan Phase 5): linking a row from prose should not surface it in the
+  // file tree the way the deliberate open-as-page action does.
+  const promoteRowForWikiLink = useCallback(
+    async (row: { rowId: string; tableId: string }) => {
+      const response = await tracedFetch(
+        `/api/content/data/${row.tableId}/promote`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowId: row.rowId, role: "referenced" }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        clientLogger.error({
+          layer: "fetch",
+          event: "wiki_link_row_promote:failed",
+          summary: "failed to promote row for wiki-link",
+          attrs: { rowId: row.rowId, status: response.status },
+        });
+        return null;
+      }
+      // The referenced node just appeared behind its database's reference
+      // chip — the tree hears about it like any other creation.
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      return { contentId: result.data.contentId as string };
     },
     []
   );
@@ -2122,6 +2211,10 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         metadata={contentData?.metadata}
       />
     );
+  } else if (contentType === "data" && selectedContentId) {
+    contentElement = (
+      <DataTableViewer contentId={selectedContentId} title={noteTitle} />
+    );
   } else if (contentType === "visualization") {
     contentElement = (
       <VisualizationViewer
@@ -2302,6 +2395,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               onOutlineChange={handleOutlineChange}
               onWikiLinkClick={handleWikiLinkClick}
               fetchNotesForWikiLink={fetchNotesForWikiLink}
+              promoteRowForWikiLink={promoteRowForWikiLink}
               fetchTags={fetchTags}
               createTag={createTag}
               fetchPeopleMentions={fetchPeopleMentions}
@@ -2390,12 +2484,43 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSave={handleSave}
                 onWikiLinkClick={handleWikiLinkClick}
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
+                promoteRowForWikiLink={promoteRowForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
                 fetchPeopleMentions={fetchPeopleMentions}
                 onPersonMentionClick={handlePersonMentionClick}
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
+            )}
+            {promotedFromRow && (
+              <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
+                <span>Row of</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedContentId(promotedFromRow.tableId, {
+                      contentType: "data",
+                      title: promotedFromRow.tableTitle,
+                    })
+                  }
+                  className="font-medium text-foreground hover:underline"
+                >
+                  {promotedFromRow.tableTitle}
+                </button>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectedContentId(promotedFromRow.tableId, {
+                      contentType: "data",
+                      title: promotedFromRow.tableTitle,
+                    })
+                  }
+                  className="hover:underline"
+                >
+                  Open in table
+                </button>
+              </div>
             )}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (
@@ -2406,6 +2531,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSave={handleSave}
                 onWikiLinkClick={handleWikiLinkClick}
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
+                promoteRowForWikiLink={promoteRowForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
                 fetchPeopleMentions={fetchPeopleMentions}

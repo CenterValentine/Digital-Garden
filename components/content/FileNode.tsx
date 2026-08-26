@@ -41,6 +41,7 @@ import {
   Pencil,
   GitBranch,
   BarChart3,
+  Table,
   MessageCircle,
   User,
   Users,
@@ -351,6 +352,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         return <ExternalLink className={`${iconSize} ${iconColor}`} />;
       case "chat":
         return <MessageCircle className={`${iconSize} ${iconColor}`} />;
+      case "data":
+        return <Table className={`${iconSize} ${iconColor}`} />;
       case "visualization":
         // Show engine-specific icon
         const engine = data.visualization?.engine;

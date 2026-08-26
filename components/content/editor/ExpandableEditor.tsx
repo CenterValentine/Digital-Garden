@@ -47,7 +47,8 @@ interface ExpandableEditorProps {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string; row?: { rowId: string; tableId: string; tableTitle: string } }>>;
+  promoteRowForWikiLink?: (row: { rowId: string; tableId: string }) => Promise<{ contentId: string } | null>;
   /** Fetch tags for tag autocomplete */
   fetchTags?: (query: string) => Promise<Array<{ id: string; name: string; slug: string; color: string | null; usageCount: number }>>;
   fetchPeopleMentions?: (query: string) => Promise<Array<{ id: string; personId: string; label: string; slug: string; email: string | null; phone: string | null; avatarUrl: string | null }>>;
@@ -92,6 +93,7 @@ export function ExpandableEditor({
   readOnly = false,
   onWikiLinkClick,
   fetchNotesForWikiLink,
+  promoteRowForWikiLink,
   fetchTags,
   fetchPeopleMentions,
   onPersonMentionClick,
@@ -205,6 +207,7 @@ export function ExpandableEditor({
             placeholder={`Add notes about this ${contentType}...`}
             onWikiLinkClick={onWikiLinkClick}
             fetchNotesForWikiLink={fetchNotesForWikiLink}
+            promoteRowForWikiLink={promoteRowForWikiLink}
             fetchTags={fetchTags}
             fetchPeopleMentions={fetchPeopleMentions}
             onPersonMentionClick={onPersonMentionClick}

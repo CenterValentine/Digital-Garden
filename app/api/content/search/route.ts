@@ -133,6 +133,35 @@ export async function GET(request: NextRequest) {
               },
             ],
           },
+          // Databases (plan B2): match on the table's own searchText (title +
+          // column names — findable by its schema) OR on any live row's
+          // derived text. Rolled up to the TABLE node: rows are not
+          // ContentNodes, so surfacing them individually would need a result
+          // type this endpoint does not have. Deliberate v1 presentation.
+          {
+            AND: [
+              { dataPayload: { isNot: null } },
+              {
+                OR: [
+                  {
+                    dataPayload: {
+                      searchText: { contains: query, mode: searchMode },
+                    },
+                  },
+                  {
+                    dataPayload: {
+                      rows: {
+                        some: {
+                          deletedAt: null,
+                          searchText: { contains: query, mode: searchMode },
+                        },
+                      },
+                    },
+                  },
+                ],
+              },
+            ],
+          },
         ];
       }
 
