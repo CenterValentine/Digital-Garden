@@ -1715,7 +1715,7 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-1 pr-1 ${
+                className={`group gap-1 py-1 pr-1 ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-dark" : "border-gold-primary/35"}`
                     : "pl-1.5"
