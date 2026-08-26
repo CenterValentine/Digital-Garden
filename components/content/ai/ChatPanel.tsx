@@ -216,6 +216,7 @@ export function ChatPanel({
     setModelPinned,
     mentionResults,
     handleMentionSearch,
+    handleResolveMention,
     notifyMentionInserted,
     folderGates,
     commandItems,
@@ -1101,6 +1102,7 @@ export function ChatPanel({
         status={status}
         disabled={loadingInitial}
         onMentionSearch={handleMentionSearch}
+        onResolveMention={handleResolveMention}
         onMentionInserted={notifyMentionInserted}
         mentionResults={mentionResults}
         commandItems={commandItems}

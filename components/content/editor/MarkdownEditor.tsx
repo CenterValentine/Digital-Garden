@@ -175,7 +175,9 @@ export interface MarkdownEditorProps {
   /** Callback when a wiki-link is clicked */
   onWikiLinkClick?: (target: WikiLinkClickTarget) => void;
   /** Fetch notes for wiki-link autocomplete */
-  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string }>>;
+  fetchNotesForWikiLink?: (query: string) => Promise<Array<{ id: string; title: string; slug: string; contentType?: string; row?: { rowId: string; tableId: string; tableTitle: string } }>>;
+  /** Promote an un-promoted database-row suggestion to a node (plan Phase 5) */
+  promoteRowForWikiLink?: (row: { rowId: string; tableId: string }) => Promise<{ contentId: string } | null>;
   /** Callback when a tag is clicked */
   onTagClick?: (tagId: string, tagName: string) => void;
   /** Fetch tags for tag autocomplete */
@@ -230,6 +232,7 @@ export function MarkdownEditor({
   onOutlineChange,
   onWikiLinkClick,
   fetchNotesForWikiLink,
+  promoteRowForWikiLink,
   onTagClick,
   fetchTags,
   createTag,
@@ -529,6 +532,7 @@ export function MarkdownEditor({
         : undefined,
       onWikiLinkClick,
       fetchNotesForWikiLink,
+      promoteRowForWikiLink,
       onTagClick,
       fetchTags,
       createTag,

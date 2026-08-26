@@ -1358,7 +1358,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
       // Notes AND folders (FOLDER-CONTEXT-CAPSULE follow-up): a folder
       // wiki-link navigates to the folder and, in playbooks/chat, injects
       // its context capsule like a chat mention.
-      return ((result.data?.items as NoteItem[] | undefined) || [])
+      const notes = ((result.data?.items as NoteItem[] | undefined) || [])
         .filter((item) => item.contentType === 'note' || item.contentType === 'folder')
         .map((item) => ({
           id: item.id,
@@ -1366,6 +1366,75 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           slug: item.slug,
           contentType: item.contentType,
         }));
+
+      // Un-promoted database rows (plan Phase 5): a second suggestion
+      // source after notes, promoted to role "referenced" on selection.
+      // Best-effort — a failure here must not take the note search with it.
+      let rowItems: Array<{
+        id: string;
+        title: string;
+        slug: string;
+        row: { rowId: string; tableId: string; tableTitle: string };
+      }> = [];
+      if (query.trim()) {
+        try {
+          const rowRes = await tracedFetch(
+            `/api/content/data/suggest?q=${encodeURIComponent(query)}`,
+            { credentials: "include" }
+          );
+          const rowJson = await rowRes.json();
+          if (rowRes.ok && rowJson?.success) {
+            type RowItem = { rowId: string; tableId: string; tableTitle: string; title: string };
+            rowItems = ((rowJson.data?.items as RowItem[] | undefined) || []).map(
+              (item) => ({
+                // Sentinel, never inserted: the suggestion command promotes
+                // first and links the returned ContentNode id instead.
+                id: `row:${item.rowId}`,
+                title: item.title,
+                slug: "",
+                row: {
+                  rowId: item.rowId,
+                  tableId: item.tableId,
+                  tableTitle: item.tableTitle,
+                },
+              })
+            );
+          }
+        } catch {
+          // Rows are a bonus source; the notes above still render.
+        }
+      }
+
+      return [...notes, ...rowItems];
+    },
+    []
+  );
+
+  // Promote a row suggestion at role "referenced" — the incidental path
+  // (plan Phase 5): linking a row from prose should not surface it in the
+  // file tree the way the deliberate open-as-page action does.
+  const promoteRowForWikiLink = useCallback(
+    async (row: { rowId: string; tableId: string }) => {
+      const response = await tracedFetch(
+        `/api/content/data/${row.tableId}/promote`,
+        {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ rowId: row.rowId, role: "referenced" }),
+        }
+      );
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        clientLogger.error({
+          layer: "fetch",
+          event: "wiki_link_row_promote:failed",
+          summary: "failed to promote row for wiki-link",
+          attrs: { rowId: row.rowId, status: response.status },
+        });
+        return null;
+      }
+      return { contentId: result.data.contentId as string };
     },
     []
   );
@@ -2337,6 +2406,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
               onOutlineChange={handleOutlineChange}
               onWikiLinkClick={handleWikiLinkClick}
               fetchNotesForWikiLink={fetchNotesForWikiLink}
+              promoteRowForWikiLink={promoteRowForWikiLink}
               fetchTags={fetchTags}
               createTag={createTag}
               fetchPeopleMentions={fetchPeopleMentions}
@@ -2424,6 +2494,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSave={handleSave}
                 onWikiLinkClick={handleWikiLinkClick}
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
+                promoteRowForWikiLink={promoteRowForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
                 fetchPeopleMentions={fetchPeopleMentions}
@@ -2470,6 +2541,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSave={handleSave}
                 onWikiLinkClick={handleWikiLinkClick}
                 fetchNotesForWikiLink={fetchNotesForWikiLink}
+                promoteRowForWikiLink={promoteRowForWikiLink}
                 fetchTags={fetchTags}
                 createTag={createTag}
                 fetchPeopleMentions={fetchPeopleMentions}

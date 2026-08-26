@@ -81,6 +81,12 @@ interface ChatInputProps {
    * user is still typing.
    */
   onMentionInserted?: (item: SuggestionItem) => void;
+  /**
+   * Resolve a mention that is not yet a node — database rows (plan Phase 5)
+   * promote on selection. Returns the item rewritten with a real id, or
+   * null on failure. Without it, row items degrade to plain text.
+   */
+  onResolveMention?: (item: SuggestionItem) => Promise<SuggestionItem | null>;
   /** The playbook currently attached to this conversation, if any. */
   activePlaybook?: ActivePlaybook | null;
   /** Detach the active playbook (dismiss the chip). */
@@ -111,6 +117,7 @@ export function ChatInput({
   commandItems = [],
   onAttachPlaybook,
   onMentionInserted,
+  onResolveMention,
   activePlaybook = null,
   onDetachPlaybook,
   footerLeading,
@@ -330,14 +337,46 @@ export function ChatInput({
       replaceRange.deleteContents();
 
       if (suggestionMode === "mention") {
-        const pill = makeMentionPill(item.label, item.id);
-        replaceRange.insertNode(pill);
-        // Trailing space after the pill so the next keystroke isn't
-        // glued to the chip.
-        const space = document.createTextNode(" ");
-        pill.after(space);
-        placeCaretAfter(space);
-        onMentionInserted?.(item);
+        const finishMention = (resolved: SuggestionItem) => {
+          const pill = makeMentionPill(resolved.label, resolved.id);
+          replaceRange.insertNode(pill);
+          // Trailing space after the pill so the next keystroke isn't
+          // glued to the chip.
+          const space = document.createTextNode(" ");
+          pill.after(space);
+          placeCaretAfter(space);
+          onMentionInserted?.(resolved);
+        };
+
+        if (item.row) {
+          // Un-promoted database row (plan Phase 5): no node exists until
+          // promotion returns one. The trigger text is already deleted
+          // above (synchronously); the pill lands when the resolve settles
+          // — `replaceRange` is a live DOM Range, so it maps through any
+          // edits made in the gap. Failure inserts the row's title as
+          // plain text: intent stays visible, and a sentinel id can never
+          // reach the association machinery downstream.
+          void (async () => {
+            const resolved = onResolveMention
+              ? await onResolveMention(item)
+              : null;
+            if (resolved && !resolved.row) {
+              finishMention(resolved);
+            } else {
+              const text = document.createTextNode(item.label);
+              replaceRange.insertNode(text);
+              placeCaretAfter(text);
+            }
+            emit();
+            root.focus();
+          })();
+          closeSuggestions();
+          emit();
+          root.focus();
+          return;
+        }
+
+        finishMention(item);
       } else if (item.contentType === "playbook") {
         // Attach, don't insert text — the trigger text was already deleted
         // above. The composer chip (below) shows what's attached.
@@ -352,7 +391,7 @@ export function ChatInput({
       emit();
       root.focus();
     },
-    [closeSuggestions, emit, onAttachPlaybook, onMentionInserted, suggestionMode],
+    [closeSuggestions, emit, onAttachPlaybook, onMentionInserted, onResolveMention, suggestionMode],
   );
 
   // ── submit / keyboard ──
