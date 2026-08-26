@@ -12,10 +12,10 @@ import * as LucideIcons from "lucide-react";
 import {
   Briefcase,
   ChevronDown,
+  ChevronRight,
   Copy,
   Eye,
   Folder,
-  GripVertical,
   Loader2,
   Lock,
   Plus,
@@ -31,6 +31,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
+import {
+  applyWorkbenchFolderOrder,
+  normalizeWorkbenchSettings,
+  resolveFolderOrder,
+} from "@/extensions/workplaces/server/types";
+import { useContentStore } from "@/state/content-store";
+import { formatRelativeTime } from "@/lib/core/format-relative-time";
 import {
   Dialog,
   DialogContent,
@@ -192,6 +199,162 @@ function markExpirationWarningSeen(workspaceId: string, expiresAt: string) {
   );
 }
 
+/**
+ * How many distinct tabs a workspace holds.
+ *
+ * Unions the legacy pane snapshot with membership (R1 truth): surfaces that
+ * don't write the blob — the extension panel — land only in membership, while
+ * a workspace last saved by an older client may have only the blob. Counting
+ * either alone under-reports depending on which surface touched it last.
+ *
+ * De-duped by id, since a tab open in two panes is one piece of content.
+ */
+function getWorkspaceTabCount(workspace: ContentWorkspaceResponse): number {
+  const ids = new Set<string>();
+  for (const pane of Object.values(workspace.paneState.paneTabContentIds)) {
+    for (const id of pane?.contentIds ?? []) ids.add(id);
+  }
+  for (const id of workspace.membershipContentIds ?? []) ids.add(id);
+  return ids.size;
+}
+
+/**
+ * Best available "last opened" signal, absent a dedicated column.
+ *
+ * `updatedAt` moves whenever the workspace's state is persisted — opening or
+ * closing a tab, rearranging panes — so it tracks use, not just edits. Layout
+ * records carry their own per-device stamps, and a surface that writes only a
+ * record (the extension panel) leaves `updatedAt` untouched, so the newest of
+ * the two is the honest answer.
+ */
+function getLastActiveAt(workspace: ContentWorkspaceResponse): number {
+  let newest = Date.parse(workspace.updatedAt);
+  for (const record of workspace.layoutRecords ?? []) {
+    const stamp = Date.parse(record.updatedAt);
+    if (Number.isFinite(stamp) && stamp > newest) newest = stamp;
+  }
+  return newest;
+}
+
+const TAB_COUNT_CHIP_CLASS =
+  "shrink-0 rounded-full px-1 text-[9px] leading-[1.4] tabular-nums";
+
+/** Which edge of the hovered row the dragged item would land on. */
+type DropEdge = "before" | "after";
+
+/**
+ * Pointer position within a row, as an edge. Half-height split — the same
+ * read the file tree's drop cursor uses, and the reason a drop feels
+ * predictable: the line appears where the item will actually go.
+ */
+function edgeFromPointer(
+  event: { clientY: number },
+  element: HTMLElement,
+): DropEdge {
+  const rect = element.getBoundingClientRect();
+  return event.clientY - rect.top < rect.height / 2 ? "before" : "after";
+}
+
+/**
+ * Drop-cursor line, drawn as an outset box-shadow on the hovered row so it
+ * reads as sitting BETWEEN rows rather than decorating one.
+ *
+ * Returned as a single class because `shadow-*` utilities collide under
+ * tailwind-merge — an active row's inset ring and a drop line can't both be
+ * expressed, so the transient one wins while a drag is over it.
+ */
+function dropCursorClass(edge: DropEdge): string {
+  return edge === "before"
+    ? "shadow-[0_-2px_0_0_var(--gold-primary)]"
+    : "shadow-[0_2px_0_0_var(--gold-primary)]";
+}
+
+/** Move `draggedId` to the chosen edge of `targetId`, returning a new order. */
+function reorderByEdge(
+  order: string[],
+  draggedId: string,
+  targetId: string,
+  edge: DropEdge,
+): string[] | null {
+  if (draggedId === targetId) return null;
+  const next = order.filter((id) => id !== draggedId);
+  const targetIndex = next.indexOf(targetId);
+  if (targetIndex === -1 || !order.includes(draggedId)) return null;
+  next.splice(edge === "before" ? targetIndex : targetIndex + 1, 0, draggedId);
+  return next;
+}
+
+/** Dwell before the ROOT workbench panel opens off a workspace row. */
+const WORKBENCH_ROOT_DWELL_MS = 250;
+/**
+ * Dwell before a NESTED layer opens off a folder row — deliberately longer
+ * (owner: between a quarter and a half second): the pointer crosses folder
+ * rows constantly while scanning a panel, where a workspace row is hovered
+ * with more intent.
+ */
+const WORKBENCH_NESTED_DWELL_MS = 400;
+
+function clampWorkbenchDepth(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 1;
+  return Math.min(3, Math.max(1, parsed));
+}
+
+/**
+ * The folder rows a panel lists: subfolders of `listRootId`, or the tree's
+ * top level for the root panel (the scoped tree route already returns the
+ * view root's children as top level). Reference-role rows nested deeper stay
+ * behind their drawer chips — only real child folders nest.
+ */
+function panelFoldersFromTree(
+  tree: TreeNode[],
+  listRootId: string | null,
+): Array<{ id: string; title: string; hasSubfolders: boolean }> {
+  const isRealFolder = (node: TreeNode) =>
+    node.contentType === "folder" &&
+    (node.treeNodeKind ?? "content") === "content";
+  const findNode = (nodes: TreeNode[]): TreeNode | null => {
+    for (const node of nodes) {
+      if (node.id === listRootId) return node;
+      const found = node.children ? findNode(node.children) : null;
+      if (found) return found;
+    }
+    return null;
+  };
+  const children =
+    listRootId === null ? tree : (findNode(tree)?.children ?? []);
+  return children.filter(isRealFolder).map((node) => ({
+    id: node.id,
+    title: node.title,
+    hasSubfolders: (node.children ?? []).some(isRealFolder),
+  }));
+}
+
+/**
+ * Per-layer panel surface. Depth 0 stays the neutral popover; each deeper
+ * layer warms toward the gold tokens by a step small enough to read as
+ * "same panel family" but large enough that two OVERLAPPING panels separate
+ * at a glance — the borders and everything else stay identical on purpose.
+ *
+ * Light: white mixed with --gold-primary (#C9A86C) at 8% / 16%.
+ * Dark: gray-950 mixed with --gold-dark (#B8965A) at 10% / 20% — near-black
+ * swallows low-alpha warmth, so dark needs the bigger steps to stay visible.
+ */
+const PANEL_DEPTH_CLASS = [
+  "bg-white/95 dark:bg-gray-950/95",
+  "bg-[#FBF8F3]/95 dark:bg-[#17171B]/95",
+  "bg-[#F6F1E7]/95 dark:bg-[#2A2724]/95",
+];
+
+const MENU_HEADING_CLASS =
+  "px-1.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-gray-500";
+
+function clampDormantDays(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 30;
+  return Math.min(365, Math.max(1, parsed));
+}
+
 function collectFolderOptions(nodes: TreeNode[], parentPath = "") {
   const folders: FolderOption[] = [];
   const nodesById: Record<string, FolderOption> = {};
@@ -320,6 +483,16 @@ export function WorkspaceSelector() {
     (state) => state.duplicateWorkspace,
   );
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
+  const openWorkbench = useWorkspaceStore((state) => state.openWorkbench);
+  // The ACTIVE workspace's stored snapshot lags by the persist debounce, so
+  // its own count comes from the live content store — otherwise a tab you
+  // just opened isn't counted until the write lands.
+  const liveTabCount = useContentStore((state) => state.openContentIds.length);
+  // Clock for relative timestamps. Held in state and refreshed when the menu
+  // opens rather than read during render: Date.now() in render is impure and
+  // the React Compiler rejects it, and a stamp taken at open time is as fresh
+  // as a tooltip needs to be.
+  const [nowMs, setNowMs] = useState(0);
   const reorderWorkspaces = useWorkspaceStore(
     (state) => state.reorderWorkspaces,
   );
@@ -337,6 +510,40 @@ export function WorkspaceSelector() {
       workspaces.find((workspace) => workspace.isMain) ??
       null,
     [activeWorkspaceId, workspaces],
+  );
+
+  /**
+   * Row density scales with how many workspaces the user keeps: a handful get
+   * comfortable rows, a long list tightens so the menu stays scannable
+   * without scrolling. Counts TOP-LEVEL workspaces only — workbenches live in
+   * their own submenu and shouldn't drag the main list denser.
+   *
+   * Tiers step rather than interpolate: a continuous formula would reflow the
+   * whole menu by a pixel every time a workspace is added, and rows that
+   * change height on unrelated actions read as jitter.
+   */
+  const density = useMemo(() => {
+    const count = workspaces.filter(
+      (workspace) => !workspace.parentWorkspaceId,
+    ).length;
+    if (count <= 6) return { row: "py-1", text: "text-sm", icon: "h-4 w-4" };
+    if (count <= 10)
+      return { row: "py-0.5", text: "text-sm", icon: "h-4 w-4" };
+    if (count <= 16)
+      return { row: "py-0.5", text: "text-xs", icon: "h-3.5 w-3.5" };
+    return { row: "py-0", text: "text-xs", icon: "h-3.5 w-3.5" };
+  }, [workspaces]);
+
+  // Parent of the ACTIVE workspace when the active one is a workbench —
+  // drives the "Parent · Workbench" trigger label and parent-row highlight.
+  const activeParentWorkspace = useMemo(
+    () =>
+      activeWorkspace?.parentWorkspaceId
+        ? (workspaces.find(
+            (workspace) => workspace.id === activeWorkspace.parentWorkspaceId,
+          ) ?? null)
+        : null,
+    [workspaces, activeWorkspace],
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -360,6 +567,9 @@ export function WorkspaceSelector() {
   >(null);
   const [viewRootFolderQuery, setViewRootFolderQuery] = useState("");
   const [draftExpiresAt, setDraftExpiresAt] = useState("");
+  const [draftWorkbenchesEnabled, setDraftWorkbenchesEnabled] = useState(true);
+  const [draftDormantClearoutDays, setDraftDormantClearoutDays] = useState("30");
+  const [draftWorkbenchDepth, setDraftWorkbenchDepth] = useState("1");
   const [folderOptions, setFolderOptions] = useState<FolderOption[]>([]);
   const [nodesById, setNodesById] = useState<Record<string, FolderOption>>({});
   const [selectedFolderId, setSelectedFolderId] = useState("");
@@ -368,6 +578,7 @@ export function WorkspaceSelector() {
   const [draggedWorkspaceId, setDraggedWorkspaceId] = useState<string | null>(
     null,
   );
+  const [workspaceDropEdge, setWorkspaceDropEdge] = useState<DropEdge>("before");
   const [dropTargetWorkspaceId, setDropTargetWorkspaceId] = useState<
     string | null
   >(null);
@@ -375,6 +586,26 @@ export function WorkspaceSelector() {
     useState<ContentWorkspaceResponse | null>(null);
   const [duplicateWorkspaceTarget, setDuplicateWorkspaceTarget] =
     useState<ContentWorkspaceResponse | null>(null);
+  // Workbench submenu STACK. Opens only via dwell on a view-workspace row —
+  // never on click: a click always targets the workspace itself; workbenches
+  // are the more acute layer behind the dwell. panels[0] lists the view
+  // root's children and carries the WORKBENCHES header; each deeper panel
+  // lists one folder's children, up to settings.workbenches.maxDepth (1-3).
+  const [workbenchMenu, setWorkbenchMenu] = useState<{
+    workspaceId: string;
+    /** Full scoped tree, fetched ONCE per open; null = loading. */
+    tree: TreeNode[] | null;
+    panels: Array<{ listRootId: string | null; x: number; y: number }>;
+  } | null>(null);
+  const [draggedFolderId, setDraggedFolderId] = useState<string | null>(null);
+  const draggingFolderRef = useRef(false);
+  const [folderDropTargetId, setFolderDropTargetId] = useState<string | null>(
+    null,
+  );
+  const [folderDropEdge, setFolderDropEdge] = useState<DropEdge>("before");
+  const workbenchDwellTimerRef = useRef<number | null>(null);
+  const workbenchCloseTimerRef = useRef<number | null>(null);
+
   const [workspaceContextMenu, setWorkspaceContextMenu] = useState<{
     workspace: ContentWorkspaceResponse;
     x: number;
@@ -522,6 +753,12 @@ export function WorkspaceSelector() {
     setDraftViewRootContentId(settingsWorkspace.viewRootContentId);
     setViewRootFolderQuery("");
     setDraftExpiresAt(toDatetimeLocalValue(settingsWorkspace.expiresAt));
+    const workbenchSettings = normalizeWorkbenchSettings(
+      settingsWorkspace.settings,
+    );
+    setDraftWorkbenchesEnabled(workbenchSettings.enabled);
+    setDraftDormantClearoutDays(String(workbenchSettings.dormantClearoutDays));
+    setDraftWorkbenchDepth(String(workbenchSettings.maxDepth));
   }, [settingsOpen, settingsWorkspace]);
 
   useEffect(() => {
@@ -578,6 +815,277 @@ export function WorkspaceSelector() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [workspaceContextMenu]);
+
+  const cancelWorkbenchDwell = () => {
+    if (workbenchDwellTimerRef.current !== null) {
+      window.clearTimeout(workbenchDwellTimerRef.current);
+      workbenchDwellTimerRef.current = null;
+    }
+  };
+  const cancelWorkbenchClose = () => {
+    if (workbenchCloseTimerRef.current !== null) {
+      window.clearTimeout(workbenchCloseTimerRef.current);
+      workbenchCloseTimerRef.current = null;
+    }
+  };
+  // Grace period so a pointer travelling row → submenu doesn't lose the menu.
+  const scheduleWorkbenchClose = () => {
+    if (draggingFolderRef.current) return;
+    cancelWorkbenchClose();
+    workbenchCloseTimerRef.current = window.setTimeout(() => {
+      workbenchCloseTimerRef.current = null;
+      // Re-checked at fire time as well: a drag can begin between scheduling
+      // and firing, and that timer would otherwise still close the panel.
+      if (draggingFolderRef.current) return;
+      setWorkbenchMenu(null);
+    }, 200);
+  };
+
+  const openWorkbenchMenuFor = (
+    workspace: ContentWorkspaceResponse,
+    rect: DOMRect,
+  ) => {
+    // Anchor the FIRST FOLDER ROW to the arrow, not the panel's top edge:
+    // lift the panel by its own chrome (p-1 + the label block) so the first
+    // folder lands beside the arrow and the heading sits above it.
+    const PANEL_PADDING = 4; // panel p-1
+    // Height of the MENU_HEADING_CLASS block: pt-1 (4) + a 9px leading-none
+    // label + pb-0.5 (2). Retune alongside that constant, or the first folder
+    // row drifts off the arrow it is anchored to.
+    const LABEL_BLOCK = 15;
+    setWorkbenchMenu({
+      workspaceId: workspace.id,
+      tree: null,
+      panels: [
+        {
+          listRootId: null,
+          x: Math.min(rect.right + 2, window.innerWidth - 252),
+          y: Math.max(
+            8,
+            Math.min(
+              rect.top - PANEL_PADDING - LABEL_BLOCK,
+              window.innerHeight - 340,
+            ),
+          ),
+        },
+      ],
+    });
+    // ONE scoped-tree fetch serves EVERY layer: the route returns the view
+    // root's children at top level with the whole subtree beneath them, so
+    // nested panels derive locally instead of fetching per layer.
+    void fetch(
+      `/api/content/content/tree?viewRootContentId=${workspace.viewRootContentId}`,
+      { credentials: "include" },
+    )
+      .then(async (response) => {
+        const result = (await response.json()) as TreeApiResponse;
+        if (!response.ok || !result.success || !result.data) {
+          throw new Error(result.error?.message ?? "Failed to load folders");
+        }
+        return result.data.tree;
+      })
+      .then((tree) => {
+        setWorkbenchMenu((current) =>
+          current && current.workspaceId === workspace.id
+            ? { ...current, tree }
+            : current,
+        );
+      })
+      .catch(() => {
+        setWorkbenchMenu((current) =>
+          current && current.workspaceId === workspace.id
+            ? { ...current, tree: [] }
+            : current,
+        );
+      });
+  };
+
+  /**
+   * Open (or swap) the panel one layer below `depth`, listing `folderId`'s
+   * children. Slicing first means hovering a different nestable sibling
+   * replaces the whole descendant chain rather than stacking beside it.
+   */
+  const openNestedWorkbenchPanel = (
+    depth: number,
+    folderId: string,
+    rect: DOMRect,
+  ) => {
+    setWorkbenchMenu((current) => {
+      if (!current) return current;
+      if (current.panels[depth + 1]?.listRootId === folderId) return current;
+      return {
+        ...current,
+        panels: [
+          ...current.panels.slice(0, depth + 1),
+          {
+            listRootId: folderId,
+            x: Math.min(rect.right + 2, window.innerWidth - 252),
+            y: Math.max(8, Math.min(rect.top - 4, window.innerHeight - 340)),
+          },
+        ],
+      };
+    });
+  };
+
+  const handleOpenWorkbench = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    folder: { id: string; title: string },
+  ) => {
+    setWorkbenchMenu(null);
+    setMenuOpen(false);
+    setSwitchingWorkspaceId(folder.id);
+    try {
+      await openWorkbench(parentWorkspace.id, folder.id);
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to open workbench:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to open workbench",
+      );
+    } finally {
+      setSwitchingWorkspaceId((current) =>
+        current === folder.id ? null : current,
+      );
+    }
+  };
+
+  const handleHideWorkbenchFolder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    folder: { id: string; title: string },
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    if (current.hiddenFolderIds.includes(folder.id)) return;
+    // Hiding the ACTIVE workbench's folder falls back to the parent first.
+    if (
+      activeWorkspace &&
+      activeWorkspace.parentWorkspaceId === parentWorkspace.id &&
+      activeWorkspace.viewRootContentId === folder.id
+    ) {
+      await activateWorkspace(parentWorkspace.id).catch(() => undefined);
+    }
+    try {
+      await updateWorkspace(parentWorkspace.id, {
+        settings: {
+          ...parentWorkspace.settings,
+          workbenches: {
+            ...current,
+            hiddenFolderIds: [...current.hiddenFolderIds, folder.id],
+          },
+        },
+      });
+      toast.success(`Hid "${folder.title}" from workbenches`);
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to hide folder:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to hide folder",
+      );
+    }
+  };
+
+  const persistWorkbenchSettings = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    patch: Partial<ReturnType<typeof normalizeWorkbenchSettings>>,
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    await updateWorkspace(parentWorkspace.id, {
+      settings: {
+        ...parentWorkspace.settings,
+        workbenches: { ...current, ...patch },
+      },
+    });
+  };
+
+  /**
+   * Persist a moved row. The saved order lists EVERY folder currently known,
+   * not just the moved pair — a sparse list would leave the unlisted folders
+   * ranked equal and their relative order at the mercy of whatever the tree
+   * returned that day.
+   */
+  const handleReorderWorkbenchFolder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    orderListKey: string,
+    orderedFolderIds: string[],
+    draggedId: string,
+    targetId: string,
+    edge: DropEdge,
+  ) => {
+    const next = reorderByEdge(orderedFolderIds, draggedId, targetId, edge);
+    if (!next) return;
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    try {
+      await persistWorkbenchSettings(parentWorkspace, {
+        folderOrders: { ...current.folderOrders, [orderListKey]: next },
+      });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to reorder workbenches:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to save workbench order",
+      );
+    }
+  };
+
+  const handleResetWorkbenchOrder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    orderListKey: string,
+    isRootPanel: boolean,
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    const nextOrders = { ...current.folderOrders };
+    delete nextOrders[orderListKey];
+    try {
+      await persistWorkbenchSettings(parentWorkspace, {
+        folderOrders: nextOrders,
+        // The legacy flat order shadows only the ROOT key; clear it there so
+        // a root reset actually resets, without touching nested panels.
+        ...(isRootPanel ? { folderOrder: [] } : {}),
+      });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to reset order:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to reset order",
+      );
+    }
+  };
+
+  const handleUnhideAllWorkbenchFolders = async (
+    parentWorkspace: ContentWorkspaceResponse,
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    try {
+      await updateWorkspace(parentWorkspace.id, {
+        settings: {
+          ...parentWorkspace.settings,
+          workbenches: { ...current, hiddenFolderIds: [] },
+        },
+      });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to unhide folders:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to unhide folders",
+      );
+    }
+  };
+
+  // Refresh the tooltip clock on mount and on every menu open.
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, [menuOpen]);
+
+  // Closing the root dropdown always dismisses the workbench submenu.
+  useEffect(() => {
+    if (menuOpen) return;
+    draggingFolderRef.current = false;
+    if (workbenchDwellTimerRef.current !== null) {
+      window.clearTimeout(workbenchDwellTimerRef.current);
+      workbenchDwellTimerRef.current = null;
+    }
+    if (workbenchCloseTimerRef.current !== null) {
+      window.clearTimeout(workbenchCloseTimerRef.current);
+      workbenchCloseTimerRef.current = null;
+    }
+    setWorkbenchMenu(null);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!settingsOpen || folderOptions.length > 0) return;
@@ -640,9 +1148,25 @@ export function WorkspaceSelector() {
     }, 0);
   };
 
+  /** "Last opened <relative>" — empty until the clock effect has run. */
+  const lastOpenedLine = (workspace: ContentWorkspaceResponse) => {
+    if (!nowMs) return "";
+    const stamp = getLastActiveAt(workspace);
+    if (!Number.isFinite(stamp)) return "";
+    return `Last opened ${formatRelativeTime(stamp, nowMs)}`;
+  };
+
   const buildWorkspaceTitle = (workspace: ContentWorkspaceResponse) => {
+    const lines = [workspace.name];
     const description = getWorkspaceDescription(workspace);
-    return description ? `${workspace.name}\n${description}` : workspace.name;
+    if (description) lines.push(description);
+    const lastOpened = lastOpenedLine(workspace);
+    if (lastOpened) lines.push(lastOpened);
+    // Main Workspace is pinned first — the one row this doesn't apply to.
+    // Promising a drag that silently does nothing is worse than saying
+    // nothing at all.
+    if (!workspace.isMain) lines.push("Drag to reorder");
+    return lines.join("\n");
   };
 
   const renderWorkspaceName = (
@@ -1124,22 +1648,25 @@ export function WorkspaceSelector() {
     }
   };
 
-  const handleWorkspaceDrop = (targetWorkspaceId: string) => {
+  const handleWorkspaceDrop = (
+    targetWorkspaceId: string,
+    edge: DropEdge,
+  ) => {
     if (!draggedWorkspaceId || draggedWorkspaceId === targetWorkspaceId) {
       setDraggedWorkspaceId(null);
       setDropTargetWorkspaceId(null);
       return;
     }
 
-    const nextOrder = [...orderedWorkspaceIds];
-    const fromIndex = nextOrder.indexOf(draggedWorkspaceId);
-    const toIndex = nextOrder.indexOf(targetWorkspaceId);
-    if (fromIndex === -1 || toIndex === -1) return;
-
-    const [movedWorkspaceId] = nextOrder.splice(fromIndex, 1);
-    nextOrder.splice(toIndex, 0, movedWorkspaceId);
+    const nextOrder = reorderByEdge(
+      orderedWorkspaceIds,
+      draggedWorkspaceId,
+      targetWorkspaceId,
+      edge,
+    );
     setDraggedWorkspaceId(null);
     setDropTargetWorkspaceId(null);
+    if (!nextOrder) return;
 
     void reorderWorkspaces(nextOrder).catch((error) => {
       console.error("[WorkspaceSelector] Failed to reorder workspaces:", error);
@@ -1167,6 +1694,12 @@ export function WorkspaceSelector() {
           ...settingsWorkspace.settings,
           workspaceDescription: draftDescription.trim() || null,
           workspaceIcon: draftWorkspaceIcon,
+          workbenches: {
+            ...normalizeWorkbenchSettings(settingsWorkspace.settings),
+            enabled: draftWorkbenchesEnabled,
+            dormantClearoutDays: clampDormantDays(draftDormantClearoutDays),
+            maxDepth: clampWorkbenchDepth(draftWorkbenchDepth),
+          },
         },
       });
       setSettingsOpen(false);
@@ -1268,7 +1801,9 @@ export function WorkspaceSelector() {
             // user actually names it.
             const pendingName = workspaces.find(
               (workspace) =>
-                !workspace.isMain && isWorkspaceNamePending(workspace),
+                !workspace.isMain &&
+                !workspace.parentWorkspaceId &&
+                isWorkspaceNamePending(workspace),
             );
             if (pendingName) startInlineRename(pendingName);
           }
@@ -1277,20 +1812,41 @@ export function WorkspaceSelector() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 rounded-md border border-black/10 dark:border-white/10 px-2.5 py-1 text-xs font-medium text-gray-600 transition-colors hover:bg-black/5 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white"
-            title={
-              getWorkspaceDescription(activeWorkspace) || "Choose workspace"
-            }
+            // Same fill as the ACTIVE row in the menu below (gold-dark/50):
+            // the trigger and the row it stands for now read as one object, so
+            // the current workspace stays present in the user's mind instead
+            // of being a neutral chip they have to open a menu to recall. Ink
+            // follows the same light/dark split the fill forces — near-black
+            // on the light tan, white on the dark-mode bronze.
+            className="inline-flex items-center gap-1.5 rounded-md border border-gold-dark/55 bg-gold-dark/50 px-2.5 py-1 text-xs font-medium text-gray-900 transition-colors hover:bg-gold-dark/60 dark:text-white"
+            title={[
+              getWorkspaceDescription(activeWorkspace) || "Choose workspace",
+              activeWorkspace ? lastOpenedLine(activeWorkspace) : "",
+            ]
+              .filter(Boolean)
+              .join("\n")}
           >
             {switchingWorkspaceId ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               renderWorkspaceIcon(
-                getWorkspaceIconValue(activeWorkspace),
+                getWorkspaceIconValue(activeParentWorkspace ?? activeWorkspace),
                 "h-3.5 w-3.5",
               )
             )}
-            {renderWorkspaceName(activeWorkspace, "max-w-36 truncate")}
+            {activeParentWorkspace ? (
+              <span className="inline-flex min-w-0 max-w-44 items-center gap-1">
+                <span className="truncate">
+                  {getWorkspaceDisplayName(activeParentWorkspace)}
+                </span>
+                <span className="shrink-0 text-gray-400">·</span>
+                <span className="truncate">
+                  {getWorkspaceDisplayName(activeWorkspace)}
+                </span>
+              </span>
+            ) : (
+              renderWorkspaceName(activeWorkspace, "max-w-36 truncate")
+            )}
             {activeWorkspace?.isLocked ? <Lock className="h-3 w-3" /> : null}
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
@@ -1303,8 +1859,19 @@ export function WorkspaceSelector() {
             // anywhere else) must not dismiss the menu — the user should see
             // the row icon change the moment they pick one.
             if (quickIconTarget) event.preventDefault();
+            // Same for the portaled workbench submenu (non-modal dropdown:
+            // clicks land there but count as "outside").
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.('[data-workbench-submenu="true"]')) {
+              event.preventDefault();
+            }
           }}
           onEscapeKeyDown={(event) => {
+            if (workbenchMenu) {
+              event.preventDefault();
+              setWorkbenchMenu(null);
+              return;
+            }
             if (quickIconTarget) {
               event.preventDefault();
               setQuickIconTarget(null);
@@ -1312,12 +1879,20 @@ export function WorkspaceSelector() {
           }}
           className="min-w-72 border-white/10 bg-white/95 text-gray-900 shadow-lg backdrop-blur-sm dark:bg-gray-900/95 dark:text-gray-100"
         >
-          <DropdownMenuLabel className="text-xs uppercase tracking-[0.18em] text-gray-500">
+          {/* Half-step toward the WORKBENCHES header's compaction, not all
+              the way: py-1.5 -> py-1 and leading-tight rather than
+              leading-none. This is the menu's primary heading, so it keeps a
+              little more air than a nested submenu's label. */}
+          <DropdownMenuLabel className={MENU_HEADING_CLASS}>
             Workspaces
           </DropdownMenuLabel>
 
-          {workspaces.map((workspace) => {
-            const isActive = workspace.id === activeWorkspace?.id;
+          {workspaces
+            .filter((workspace) => !workspace.parentWorkspaceId)
+            .map((workspace) => {
+            const isActive =
+              workspace.id === activeWorkspace?.id ||
+              workspace.id === activeWorkspace?.parentWorkspaceId;
             const isEditing = workspace.id === editingWorkspaceId;
             const isDragged = workspace.id === draggedWorkspaceId;
             const isDropTarget = workspace.id === dropTargetWorkspaceId;
@@ -1337,6 +1912,25 @@ export function WorkspaceSelector() {
                   event.dataTransfer.setData("text/plain", workspace.id);
                   setDraggedWorkspaceId(workspace.id);
                 }}
+                onPointerEnter={(event) => {
+                  cancelWorkbenchClose();
+                  cancelWorkbenchDwell();
+                  if (
+                    workbenchMenu &&
+                    workbenchMenu.workspaceId !== workspace.id
+                  ) {
+                    scheduleWorkbenchClose();
+                  }
+                  if (editingWorkspaceId) return;
+                  if (!workspace.isView || !workspace.viewRootContentId) return;
+                  if (!normalizeWorkbenchSettings(workspace.settings).enabled)
+                    return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  workbenchDwellTimerRef.current = window.setTimeout(() => {
+                    workbenchDwellTimerRef.current = null;
+                    openWorkbenchMenuFor(workspace, rect);
+                  }, WORKBENCH_ROOT_DWELL_MS);
+                }}
                 onPointerMove={(event) => {
                   // Radix focuses menu items as the pointer moves over them.
                   // While the inline rename input is open that roving focus
@@ -1349,12 +1943,17 @@ export function WorkspaceSelector() {
                   // Same guard for the leave side: Radix refocuses the menu
                   // content when the pointer exits an item.
                   if (editingWorkspaceId) event.preventDefault();
+                  cancelWorkbenchDwell();
+                  if (workbenchMenu) scheduleWorkbenchClose();
                 }}
                 onDragOver={(event) => {
                   if (workspace.isMain || !draggedWorkspaceId) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = "move";
                   setDropTargetWorkspaceId(workspace.id);
+                  setWorkspaceDropEdge(
+                    edgeFromPointer(event, event.currentTarget),
+                  );
                 }}
                 onDragLeave={() => {
                   if (dropTargetWorkspaceId === workspace.id) {
@@ -1364,7 +1963,10 @@ export function WorkspaceSelector() {
                 onDrop={(event) => {
                   event.preventDefault();
                   if (!workspace.isMain) {
-                    handleWorkspaceDrop(workspace.id);
+                    handleWorkspaceDrop(
+                      workspace.id,
+                      edgeFromPointer(event, event.currentTarget),
+                    );
                   }
                 }}
                 onDragEnd={() => {
@@ -1383,6 +1985,8 @@ export function WorkspaceSelector() {
                 }}
                 onSelect={(event) => {
                   event.preventDefault();
+                  cancelWorkbenchDwell();
+                  setWorkbenchMenu(null);
                   if (iconHoldFiredRef.current === workspace.id) {
                     // This press already long-pressed into the icon picker;
                     // don't also treat the release as a workspace switch.
@@ -1431,16 +2035,20 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-2 pr-2 ${
+                className={`group gap-1 pr-1 ${density.row} ${density.text} ${
+                  workspace.isMain ? "" : "cursor-grab active:cursor-grabbing"
+                } ${
                   workspace.isView
-                    ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
+                    ? `border-l-2 pl-1 ${isActive ? "border-gold-dark" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
                   isActive
-                    ? "bg-gold-primary/16 text-gold-primary shadow-[inset_0_0_0_1px_rgba(212,167,85,0.24)]"
-                    : ""
+                    ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] focus:bg-gold-dark/60 focus:text-gray-900 dark:text-white dark:focus:text-white"
+                    : "focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white"
                 } ${isDragged ? "opacity-40" : ""} ${
-                  isDropTarget ? "ring-1 ring-gold-primary/40" : ""
+                  isDropTarget && !isDragged
+                    ? dropCursorClass(workspaceDropEdge)
+                    : ""
                 }`}
               >
                 {isEditing ? (
@@ -1466,7 +2074,7 @@ export function WorkspaceSelector() {
                 ) : (
                   <>
                     <span
-                      className="inline-flex h-4 w-4 items-center justify-center"
+                      className={`inline-flex ${density.icon} items-center justify-center`}
                       onPointerDown={(event) =>
                         startIconHold(workspace, event.currentTarget)
                       }
@@ -1476,16 +2084,54 @@ export function WorkspaceSelector() {
                     >
                       {renderWorkspaceIcon(
                         getWorkspaceIconValue(workspace),
-                        "h-4 w-4",
+                        density.icon,
                       )}
                     </span>
 
                     {renderWorkspaceName(workspace, "min-w-0 flex-1 truncate")}
+                    {(() => {
+                      const count =
+                        workspace.id === activeWorkspace?.id
+                          ? liveTabCount
+                          : getWorkspaceTabCount(workspace);
+                      // A workspace with nothing open shows nothing: "0" is
+                      // noise on a freshly created or reset workspace.
+                      if (count === 0) return null;
+                      return (
+                        <span
+                          title={[
+                            `${count} open ${count === 1 ? "tab" : "tabs"}`,
+                            lastOpenedLine(workspace),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
+                          className={`${TAB_COUNT_CHIP_CLASS} ${
+                            isActive
+                              ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
+                              : "bg-black/[0.06] text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      );
+                    })()}
                     {workspace.isView ? (
-                      <Eye className="h-3 w-3 shrink-0 text-gold-primary/70" />
+                      <Eye
+                        className={`h-3 w-3 shrink-0 ${
+                          isActive
+                            ? "text-gray-800 dark:text-white"
+                            : "text-gold-primary/70"
+                        }`}
+                      />
                     ) : null}
                     {workspace.isLocked ? (
-                      <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
+                      <Lock
+                        className={`h-3 w-3 shrink-0 ${
+                          isActive
+                            ? "text-gray-700/80 dark:text-white/80"
+                            : "text-gray-400/80"
+                        }`}
+                      />
                     ) : null}
                     <button
                       type="button"
@@ -1502,7 +2148,11 @@ export function WorkspaceSelector() {
                         event.preventDefault();
                         event.stopPropagation();
                       }}
-                      className="rounded p-0.5 text-gray-400/80 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                      className={`rounded p-0.5 transition-colors ${
+                        isActive
+                          ? "text-gray-700 hover:bg-black/10 hover:text-gray-900 dark:text-white/85 dark:hover:bg-white/20 dark:hover:text-white"
+                          : "text-gray-400/80 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                      }`}
                       aria-label={`Open ${workspace.name} settings`}
                     >
                       <Settings className="h-3.5 w-3.5" />
@@ -1527,16 +2177,54 @@ export function WorkspaceSelector() {
                           }}
                           className={`rounded p-0.5 opacity-0 transition-colors group-hover:opacity-100 group-focus:opacity-100 ${
                             isActive
-                              ? "text-gray-600 dark:text-white hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                              ? "text-gray-700 hover:bg-red-500/15 hover:text-red-700 dark:text-white dark:hover:bg-white/20 dark:hover:text-white"
                               : "text-gray-500 hover:bg-red-500/10 hover:text-red-600"
                           }`}
                           aria-label={`Delete ${workspace.name}`}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
-                        <GripVertical className="ml-0.5 h-4 w-4 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" />
                       </>
-                    ) : null}
+                    ) : (
+                      // Main Workspace can't be deleted, so stand in for the
+                      // delete button at its exact width (14px glyph + p-0.5)
+                      // to keep its gear aligned with everyone else's.
+                      <span aria-hidden className="h-[18px] w-[18px] shrink-0" />
+                    )}
+
+                    {/* Trailing workbench slot — the row's last element.
+                        Reserved on EVERY row (empty when the workspace has no
+                        workbench submenu) so the right edge stays uniform: a
+                        chevron only some rows render would otherwise shift
+                        those rows' controls out of alignment. Deliberately
+                        lean — a thin 12px glyph pulled to a 4px gap (-ml-1
+                        against the row's gap-2), because it is an edge marker
+                        hinting at hover, not another control competing with
+                        the buttons beside it. */}
+                    <span
+                      aria-hidden={
+                        !(
+                          workspace.isView &&
+                          workspace.viewRootContentId &&
+                          normalizeWorkbenchSettings(workspace.settings).enabled
+                        )
+                      }
+                      className="-ml-1 flex h-3 w-3 shrink-0 items-center justify-center"
+                    >
+                      {workspace.isView &&
+                      workspace.viewRootContentId &&
+                      normalizeWorkbenchSettings(workspace.settings).enabled ? (
+                        <ChevronRight
+                          strokeWidth={2}
+                          className={`h-3 w-3 transition-colors ${
+                            isActive
+                              ? "text-gray-800 dark:text-white"
+                              : "text-gray-400 dark:text-gray-500"
+                          }`}
+                          aria-label="Has workbenches"
+                        />
+                      ) : null}
+                    </span>
                   </>
                 )}
               </DropdownMenuItem>
@@ -1546,6 +2234,8 @@ export function WorkspaceSelector() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
+            title="Create a new workspace"
+            className={`group gap-1 pl-1.5 pr-1 ${density.row} ${density.text} focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white`}
             onPointerMove={(event) => {
               // Mirror of the row guard: the pointer usually still hovers this
               // item right after clicking it, and Radix's hover-focus would
@@ -1560,8 +2250,12 @@ export function WorkspaceSelector() {
               requestCreateWorkspace();
             }}
           >
-            <Plus className="h-4 w-4" />
-            <span>New workspace</span>
+            <span
+              className={`inline-flex ${density.icon} items-center justify-center`}
+            >
+              <Plus className={density.icon} />
+            </span>
+            <span className="min-w-0 flex-1 truncate">New workspace</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -1604,6 +2298,320 @@ export function WorkspaceSelector() {
           </button>
         </div>
       ) : null}
+
+      {workbenchMenu
+        ? (() => {
+            const parentWorkspace =
+              workspaces.find(
+                (candidate) => candidate.id === workbenchMenu.workspaceId,
+              ) ?? null;
+            if (!parentWorkspace) return null;
+            const workbenchSettings = normalizeWorkbenchSettings(
+              parentWorkspace.settings,
+            );
+            const hiddenIds = new Set(workbenchSettings.hiddenFolderIds);
+            const viewRootId = parentWorkspace.viewRootContentId;
+            return workbenchMenu.panels.map((panel, depth) => {
+              const isRootPanel = depth === 0;
+              const orderListKey = panel.listRootId ?? viewRootId ?? "root";
+              const allFolders =
+                workbenchMenu.tree === null
+                  ? null
+                  : applyWorkbenchFolderOrder(
+                      panelFoldersFromTree(
+                        workbenchMenu.tree,
+                        panel.listRootId,
+                      ).map((folder) => ({ ...folder, folderId: folder.id })),
+                      resolveFolderOrder(
+                        workbenchSettings,
+                        orderListKey,
+                        isRootPanel,
+                      ),
+                    );
+              const orderedFolderIds = (allFolders ?? []).map(
+                (folder) => folder.id,
+              );
+              const hasCustomOrder =
+                (workbenchSettings.folderOrders[orderListKey]?.length ?? 0) >
+                  0 ||
+                (isRootPanel && workbenchSettings.folderOrder.length > 0);
+              const visibleFolders = (allFolders ?? []).filter(
+                (folder) => !hiddenIds.has(folder.id),
+              );
+              const hiddenCount = (allFolders ?? []).filter((folder) =>
+                hiddenIds.has(folder.id),
+              ).length;
+              const canNestDeeper = depth + 1 < workbenchSettings.maxDepth;
+              return (
+                <div
+                  key={`${depth}:${orderListKey}`}
+                  data-workbench-submenu="true"
+                  className={`fixed z-[70] max-h-80 w-60 overflow-y-auto rounded-xl border border-white/10 p-1 text-sm text-gray-900 shadow-2xl backdrop-blur-sm dark:text-white ${
+                    PANEL_DEPTH_CLASS[
+                      Math.min(depth, PANEL_DEPTH_CLASS.length - 1)
+                    ]
+                  }`}
+                  style={{ left: panel.x, top: panel.y }}
+                  onPointerEnter={() => cancelWorkbenchClose()}
+                  onPointerLeave={() => scheduleWorkbenchClose()}
+                  onDragOver={(event) => {
+                    // Without a preventDefault here, releasing between two
+                    // rows counts as a drop on a non-target and the browser
+                    // plays the snap-back animation instead of ending quietly.
+                    if (draggingFolderRef.current) event.preventDefault();
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    draggingFolderRef.current = false;
+                    setDraggedFolderId(null);
+                    setFolderDropTargetId(null);
+                  }}
+                  onClick={(event) => event.stopPropagation()}
+                  onContextMenu={(event) => event.preventDefault()}
+                >
+                  {isRootPanel ? (
+                    // Deeper panels skip the heading: the chain itself says
+                    // where you are, and repeating the label per layer reads
+                    // as three menus rather than one unfolding.
+                    <div className={MENU_HEADING_CLASS}>Workbenches</div>
+                  ) : null}
+                  {allFolders === null ? (
+                    <div className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      Loading folders…
+                    </div>
+                  ) : visibleFolders.length === 0 ? (
+                    <div className="px-1.5 py-1 text-xs text-gray-500">
+                      {allFolders.length === 0
+                        ? isRootPanel
+                          ? "No subfolders in this view yet"
+                          : "No subfolders here"
+                        : "All subfolders are hidden"}
+                    </div>
+                  ) : (
+                    visibleFolders.map((folder) => {
+                      const existing =
+                        workspaces.find(
+                          (candidate) =>
+                            candidate.parentWorkspaceId ===
+                              parentWorkspace.id &&
+                            candidate.viewRootContentId === folder.id &&
+                            candidate.status === "active",
+                        ) ?? null;
+                      const isActiveBench =
+                        existing !== null &&
+                        existing.id === activeWorkspace?.id;
+                      const nestable = folder.hasSubfolders && canNestDeeper;
+                      const isOpenBranch =
+                        workbenchMenu.panels[depth + 1]?.listRootId ===
+                        folder.id;
+                      return (
+                        <button
+                          key={folder.id}
+                          type="button"
+                          draggable
+                          onPointerEnter={(event) => {
+                            cancelWorkbenchClose();
+                            cancelWorkbenchDwell();
+                            const rect =
+                              event.currentTarget.getBoundingClientRect();
+                            workbenchDwellTimerRef.current =
+                              window.setTimeout(() => {
+                                workbenchDwellTimerRef.current = null;
+                                if (nestable) {
+                                  openNestedWorkbenchPanel(
+                                    depth,
+                                    folder.id,
+                                    rect,
+                                  );
+                                } else {
+                                  // Dwelling on a non-nestable sibling
+                                  // retires any deeper chain.
+                                  setWorkbenchMenu((current) =>
+                                    current
+                                      ? {
+                                          ...current,
+                                          panels: current.panels.slice(
+                                            0,
+                                            depth + 1,
+                                          ),
+                                        }
+                                      : current,
+                                  );
+                                }
+                              }, WORKBENCH_NESTED_DWELL_MS);
+                          }}
+                          onPointerLeave={() => cancelWorkbenchDwell()}
+                          onDragStart={(event) => {
+                            event.dataTransfer.effectAllowed = "move";
+                            event.dataTransfer.setData(
+                              "text/plain",
+                              folder.id,
+                            );
+                            draggingFolderRef.current = true;
+                            cancelWorkbenchClose();
+                            cancelWorkbenchDwell();
+                            setDraggedFolderId(folder.id);
+                          }}
+                          onDragOver={(event) => {
+                            if (!draggedFolderId) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "move";
+                            setFolderDropTargetId(folder.id);
+                            setFolderDropEdge(
+                              edgeFromPointer(event, event.currentTarget),
+                            );
+                          }}
+                          onDragLeave={() => {
+                            setFolderDropTargetId((current) =>
+                              current === folder.id ? null : current,
+                            );
+                          }}
+                          onDrop={(event) => {
+                            event.preventDefault();
+                            const dragged = draggedFolderId;
+                            draggingFolderRef.current = false;
+                            setDraggedFolderId(null);
+                            setFolderDropTargetId(null);
+                            if (!dragged) return;
+                            void handleReorderWorkbenchFolder(
+                              parentWorkspace,
+                              orderListKey,
+                              orderedFolderIds,
+                              dragged,
+                              folder.id,
+                              edgeFromPointer(event, event.currentTarget),
+                            );
+                          }}
+                          onDragEnd={() => {
+                            draggingFolderRef.current = false;
+                            cancelWorkbenchClose();
+                            setDraggedFolderId(null);
+                            setFolderDropTargetId(null);
+                          }}
+                          disabled={switchingWorkspaceId !== null}
+                          title={[
+                            "Open workbench · drag to reorder · right-click to hide",
+                            existing ? lastOpenedLine(existing) : "",
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
+                          onClick={() =>
+                            void handleOpenWorkbench(parentWorkspace, folder)
+                          }
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            void handleHideWorkbenchFolder(
+                              parentWorkspace,
+                              folder,
+                            );
+                          }}
+                          className={`flex w-full items-center gap-1 rounded-lg px-1.5 text-left transition-colors ${density.row} ${density.text} ${
+                            isActiveBench
+                              ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] hover:bg-gold-dark/60 dark:text-white"
+                              : "hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                          } ${
+                            draggedFolderId === folder.id ? "opacity-40" : ""
+                          } ${
+                            folderDropTargetId === folder.id &&
+                            draggedFolderId !== folder.id
+                              ? dropCursorClass(folderDropEdge)
+                              : ""
+                          }`}
+                        >
+                          <Folder
+                            className={`${density.icon} shrink-0`}
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {folder.title}
+                          </span>
+                          {(() => {
+                            if (!existing) return null;
+                            const count = isActiveBench
+                              ? liveTabCount
+                              : getWorkspaceTabCount(existing);
+                            if (count === 0) {
+                              return (
+                                <span
+                                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-primary/70"
+                                  title="Workbench exists"
+                                />
+                              );
+                            }
+                            return (
+                              <span
+                                title={[
+                                  `${count} open ${count === 1 ? "tab" : "tabs"}`,
+                                  lastOpenedLine(existing),
+                                ]
+                                  .filter(Boolean)
+                                  .join("\n")}
+                                className={`${TAB_COUNT_CHIP_CLASS} ${
+                                  isActiveBench
+                                    ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
+                                    : "bg-black/[0.06] text-gray-500 dark:bg-white/10 dark:text-gray-400"
+                                }`}
+                              >
+                                {count}
+                              </span>
+                            );
+                          })()}
+                          {nestable ? (
+                            <ChevronRight
+                              strokeWidth={2}
+                              className={`h-3 w-3 shrink-0 ${
+                                isOpenBranch
+                                  ? "text-gold-primary"
+                                  : "text-gray-400 dark:text-gray-500"
+                              }`}
+                              aria-label="Has subfolders"
+                            />
+                          ) : null}
+                        </button>
+                      );
+                    })
+                  )}
+                  {hiddenCount > 0 || hasCustomOrder ? (
+                    <div className="mt-1 flex items-center gap-1 border-t border-black/10 pt-1 text-[10px] dark:border-white/10">
+                      {hiddenCount > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void handleUnhideAllWorkbenchFolders(
+                              parentWorkspace,
+                            )
+                          }
+                          className="flex-1 truncate rounded-lg px-1.5 py-0.5 text-left text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                        >
+                          {hiddenCount} hidden · unhide all
+                        </button>
+                      ) : null}
+                      {hasCustomOrder ? (
+                        <button
+                          type="button"
+                          title="Restore the folders' own order"
+                          onClick={() =>
+                            void handleResetWorkbenchOrder(
+                              parentWorkspace,
+                              orderListKey,
+                              isRootPanel,
+                            )
+                          }
+                          className={`truncate rounded-lg px-1.5 py-0.5 text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white ${
+                            hiddenCount > 0 ? "shrink-0" : "flex-1 text-left"
+                          }`}
+                        >
+                          reset order
+                        </button>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            });
+          })()
+        : null}
 
       <Dialog
         open={settingsOpen}
@@ -1963,6 +2971,73 @@ export function WorkspaceSelector() {
                                 ))
                               )}
                             </div>
+                          </div>
+
+                          <div className="space-y-3 border-t border-black/10 p-3 dark:border-white/10">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="font-medium">Workbenches</div>
+                                <div className="text-xs text-gray-500">
+                                  Hovering this workspace (~1s) lists the view
+                                  root&apos;s subfolders; each opens as its own
+                                  lightweight workspace. Names mirror the
+                                  folders and cannot be edited directly.
+                                </div>
+                              </div>
+                              <Switch
+                                checked={draftWorkbenchesEnabled}
+                                disabled={isSavingSettings}
+                                onCheckedChange={(checked) =>
+                                  setDraftWorkbenchesEnabled(Boolean(checked))
+                                }
+                              />
+                            </div>
+                            {draftWorkbenchesEnabled && (
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Clear dormant workbenches after (days)
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={365}
+                                  value={draftDormantClearoutDays}
+                                  disabled={isSavingSettings}
+                                  onChange={(event) =>
+                                    setDraftDormantClearoutDays(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                                />
+                                <span className="mt-1 block font-normal text-gray-500">
+                                  Workbenches whose folder left this view are
+                                  removed after this many days (1–365, default
+                                  30). Layouts survive until then.
+                                </span>
+                              </label>
+                            )}
+                            {draftWorkbenchesEnabled && (
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Folder depth
+                                <select
+                                  value={draftWorkbenchDepth}
+                                  disabled={isSavingSettings}
+                                  onChange={(event) =>
+                                    setDraftWorkbenchDepth(event.target.value)
+                                  }
+                                  className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                                >
+                                  <option value="1">1 — subfolders only</option>
+                                  <option value="2">2 — one layer deeper</option>
+                                  <option value="3">3 — two layers deeper</option>
+                                </select>
+                                <span className="mt-1 block font-normal text-gray-500">
+                                  How many folder layers the workbench menu can
+                                  unfold, one hover-panel per layer. Deeper
+                                  folders can be hidden and reordered the same
+                                  as the first layer.
+                                </span>
+                              </label>
+                            )}
                           </div>
                         </>
                       )}

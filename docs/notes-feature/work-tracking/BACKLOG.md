@@ -10,6 +10,17 @@ last_updated: 2026-08-18
 
 ---
 
+## Workspace Workbenches — follow-ups (2026-08-26, branch `feat/workbenches`; plan: WORKBENCHES-PLAN.md)
+
+Built and committed: workbench rows (`parentWorkspaceId` + `dormantAt`), dwell submenu nestable to 3 layers, hide/reorder per layer, lifecycle hooks (archive on delete, purge on hard delete, dormant-clearout cron), tab counts, tri-state tree scope, and the redundant view-root row fix. Remaining:
+
+- [ ] **`vercel.json` cron entry for `/api/cron/dormant-workbenches`** — the route exists and is CRON_SECRET-guarded, but nothing invokes it in production yet, so dormant benches accumulate silently. Daily is the intended cadence (matches `purge-trash`).
+- [ ] **Claims: inherit vs independent** (the plan's one open question). Workbenches currently claim content independently, like any workspace — zero special cases, but two benches under one parent can each borrow the same note and conflict with each other. Revisit only if that actually bites; the alternative (inheriting the parent's claims) makes open-intent resolution depth-aware.
+- [ ] **Server list endpoint is root-only.** `listWorkbenchFolders` serves layer 1; nested layers derive client-side from the one scoped-tree fetch. Fine while the submenu is the only consumer — if a second surface (mobile, extension panel) ever needs workbenches, it needs a depth parameter rather than a second tree walk.
+- [ ] **Dormant sweep is per-row.** `sweepDormantWorkbenches` does a hop-walk per workbench (≤3 point reads each). Correct and cheap at personal-vault scale; if a tenant ever holds hundreds of benches, batch the ancestor resolution.
+- [ ] **`membershipContentIds` union for tab counts** is computed client-side per row. If the count ever needs to appear somewhere without the full workspace payload, push it into `ContentWorkspaceResponse` as a scalar.
+
+## Co-browse bind-first + navigation awareness — follow-ups (2026-08-18, after the co-browse performance PR)
 ## Database content type — follow-ups (2026-08-26, branch `feat/data-content-type`; plan: DATABASE-CONTENT-TYPE-PLAN.md)
 
 - [ ] **AI decision-survey card (owner-requested 2026-08-28).** When a chat
@@ -66,7 +77,6 @@ Surfaced while building bind-first topology / `documentChanged` / primary-scroll
 - **P6 settings split** — device / universal / universal-with-override buckets (spec §7).
 - **Legacy cleanup (expand-contract "contract")** — once all clients write records: stop applying/writing `layoutMode`/`activePaneId`/`paneState` blob, then drop the columns with a migration.
 - **Right-sidebar <960px auto-collapse** — fold into projection when next touched (lowest priority; writes only device-local state).
-
 ## Nested-editor event-routing examination (2026-08-14, after Note Window; owner-requested)
 
 Systematic study of focus/selection/drag/keyboard/IME routing through **stacked ProseMirror editors** at depth ≥2: the `stopEvent` allowlist in `node-view-factory.ts`, `.block-note-window-mount` boundaries, BubbleMenu/suggestion-plugin scoping (which editor's slash menu / wiki-link autocomplete fires when nested?), and the `noteWindowDepth`/`noteWindowAncestorTargetIds` plumbing. **Plus the window-CustomEvent addressing audit**: the 2026-08-15 mermaid-multiplication regression proved window-level events with no editor addressing fan out to every mounted MarkdownEditor. `create-diagram-block`, `embed-diagram-create`, and `block-attrs-change` are fixed (editor in detail + listener guard); still unaddressed and needing the same treatment or an explicit single-instance argument: `editor-image-upload`, `editor-open-ai-image`, `insert-ai-image`, `insert-ai-audio`, `scroll-to-heading`. Goal: a safe plan for reducing bugs when editors get nested. **Prerequisite before ever relaxing the Note Window depth cap (currently: depth 1-2 collapsed→snapshot, depth ≥3 chip) or making nested windows editable.** Context: the Note Window v1 deliberately keeps nested windows read-only/never-runtime-acquiring precisely because two-editors-deep event routing is where embedded-editor bugs breed.
@@ -348,10 +358,16 @@ Phases 0–7 of `FOLDER-STUDIO-PLAN.md` shipped; deferred by design during the b
 
 ## References-as-children Followups (2026-07-16)
 
-- [ ] **Folder main-panel views still list note-owned references** — ListView/Grid/Kanban query by parentId + `includeReferencedContent`, so a reference shown under its note in the TREE also appears in the folder view listing. Decide: filter note-owned references out of folder views (they're reachable via the note) or keep as a flat inventory.
+- [ ] **Folder main-panel views still list note-owned references** — ~~ListView/Grid/Kanban query by parentId + `includeReferencedContent`~~ **CORRECTED 2026-08-18:** they do NOT query by that flag, and never did. `buildContentListUrl` (folder-views/content-query.ts) emits only `parentId`/`personId`/`peopleGroupId`/`type`, and `GET /api/content/content` has no `role` key in its where-clause, so folder views list referenced content unconditionally. The symptom is real; the cause is the *absence* of a role filter. Fix = add a `role` param to `buildContentListUrl` + a matching where-clause key. Note the tree no longer shares this problem (see Reference Drawer below).
+- [ ] **Drop `FolderPayload.includeReferencedContent`** (2026-08-18) — verified inert: threaded through 6 components + 9 API handlers, nothing filters on it. Gallery/Kanban/Dashboard/Canvas never destructure it; ListView uses it only as a `useEffect` dep. Only writer of `true` is `flashcards/media-folder.ts:61`, whose comment describes unimplemented behaviour. Removal is 2 commits: (1) API field reads/writes + types, (2) schema `DROP COLUMN` **atomically** with all 7 create-time defaults, or `prisma generate` breaks. Needs an owner-run forward migration.
 - [ ] **Drag-attached references don't parentId-cascade with the note** — the move route's reference cascade follows the ContentLink embed graph; a reference attached by drag (not embedded) keeps its old storage parentId when the note moves folders. Display is correct (ownedByNoteId), but storage home drifts. Extend the cascade to also cover `ownedByNoteId`-children.
 - [ ] **Reference ordering under a note** — displayOrder is folder-scoped, so sibling references under a note sort by their folder order; fine for small counts, revisit if per-note ordering matters.
-- [ ] **Referenced-content visual treatment under notes** — consider a subtle badge/dimming for reference rows now that they nest (they read like normal children today).
+- [x] ~~**Referenced-content visual treatment under notes**~~ — SHIPPED 2026-08-18 as the **Reference Drawer**: the tree API partitions referenced children out of `children` into `references`, and a count chip on the parent row reveals them in a washed, rail-marked block indented a half-step. Replaced BOTH visibility toggles (tree-wide `showReferencedContent` store + per-folder menu entry) and the "N referenced items hidden" hint. Chip state keys off `refs:<parentId>` in `expandedIds`, so it inherits localStorage persistence + workspace snapshots. Design record: `Reference Drawer` artifact.
+- [ ] **Reference Drawer: pinned references** — pin an individual attachment so it renders as a normal sibling even while the block is collapsed. This is the real answer to "keep important referenced content on hand"; the block handles the rest.
+- [ ] **Reference Drawer: cross-device expansion** — chip state persists to localStorage only. If "remembered universally" should mean across devices, it needs to ride the workspace record the way layout intent does.
+- [ ] **Reference Drawer: root-level references** — a reference with no resolvable owner AND no parent has no row to host a chip, so it still renders as an ordinary root row. Deliberate (hiding it would orphan it); revisit if it shows up in practice.
+- [ ] **Reference Drawer: drop index inside an open block** — references are appended to `children` when expanded, so a drop at the end of a folder computes an index past them. No corruption, but ordering can surprise. Consider clamping drop indices to the primary-children range.
+- [ ] **Status dot: `scheduled` state** — the new three-state dot covers live / withdrawn / silent. `PublishState.scheduled` has a good claim to its own dot and is a one-line addition on the same `publicItems` select.
 - [ ] **Auto-context banner on Studio tab** — v1 surfaces the once-per-session unconfigured banner via the Context tab GET only; the Studio tab's compose/runs 409 toasts cover explicit actions. Consider a shared status probe if users miss it.
 - [ ] **Audio overview TTS voice override** — Studio inherits the global AI speech voice by design (inherit-with-override pattern); add the per-studio override field only if requested.
 - [ ] **Two-host audio + video overview** — postponed per plan Non-goals (Gemini multi-speaker TTS is the gap-filler candidate); video tile ships as a stub.

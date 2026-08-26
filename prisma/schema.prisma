@@ -611,17 +611,25 @@ model ContentWorkspace {
   viewRootContentId String?                @db.Uuid
   createdAt         DateTime               @default(now()) @db.Timestamptz(6)
   updatedAt         DateTime               @updatedAt @db.Timestamptz(6)
+  parentWorkspaceId String?                @db.Uuid
+  dormantAt         DateTime?              @db.Timestamptz(6)
 
   owner         User                           @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   viewRoot      ContentNode?                   @relation("WorkspaceViewRoot", fields: [viewRootContentId], references: [id], onDelete: SetNull)
   items         ContentWorkspaceItem[]
   tabs          ContentWorkspaceTab[]
   layoutRecords ContentWorkspaceLayoutRecord[]
+  parentWorkspace ContentWorkspace?  @relation("WorkspaceWorkbenches", fields: [parentWorkspaceId], references: [id], onDelete: Cascade)
+  workbenches     ContentWorkspace[] @relation("WorkspaceWorkbenches")
+
 
   @@unique([ownerId, slug])
+  @@unique([parentWorkspaceId, viewRootContentId])
   @@index([ownerId, status])
   @@index([ownerId, isMain])
   @@index([expiresAt])
+  @@index([parentWorkspaceId])
+
 }
 
 model ContentWorkspaceItem {

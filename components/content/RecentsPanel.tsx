@@ -16,6 +16,7 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
+import { formatRelativeTime } from "@/lib/core/format-relative-time";
 import { useNavigationHistoryStore } from "@/state/navigation-history-store";
 import { useContentStore } from "@/state/content-store";
 import {
@@ -70,24 +71,6 @@ const DEFAULT_ICON =
 const GLOBE_ICON =
   "M21 12a9 9 0 11-18 0 9 9 0 0118 0zM3.6 9h16.8M3.6 15h16.8M12 3a15 15 0 010 18M12 3a15 15 0 000 18";
 
-function formatRelativeTime(timestamp: number): string {
-  const deltaSeconds = Math.round((timestamp - Date.now()) / 1000);
-  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
-  const table: Array<[Intl.RelativeTimeFormatUnit, number]> = [
-    ["year", 60 * 60 * 24 * 365],
-    ["month", 60 * 60 * 24 * 30],
-    ["week", 60 * 60 * 24 * 7],
-    ["day", 60 * 60 * 24],
-    ["hour", 60 * 60],
-    ["minute", 60],
-  ];
-  for (const [unit, seconds] of table) {
-    if (Math.abs(deltaSeconds) >= seconds) {
-      return rtf.format(Math.round(deltaSeconds / seconds), unit);
-    }
-  }
-  return "just now";
-}
 
 function hostnameOf(url: string): string {
   try {

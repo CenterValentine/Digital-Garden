@@ -31,6 +31,29 @@ export interface WorkspaceStatePayload {
   paneTabContentIds: WorkspacePaneStatePayload;
 }
 
+/**
+ * PATCH /api/content/workspaces/[id]/state request body: the pane snapshot plus
+ * the `updatedAt` the sender derived it from. The server rejects the write with
+ * 409 if the row has moved on, so a surface holding a stale snapshot (the
+ * extension panel iframe, the tree overlay, a second window) can't silently
+ * resurrect tabs another surface closed. `baseUpdatedAt` is never persisted —
+ * `normalizeWorkspaceStatePayload` rebuilds `paneState` from known fields only.
+ */
+export interface WorkspaceStateSavePayload extends WorkspaceStatePayload {
+  baseUpdatedAt?: string | null;
+  /**
+   * False when the sender cannot render the workspace's full pane geometry —
+   * the one-pane extension panel iframe today, a mobile client later. Its
+   * `layoutMode` and pane distribution then describe a viewport, not the
+   * workspace, so the server keeps the STORED geometry and folds in only this
+   * surface's tab membership. Without it a narrow surface silently flattens a
+   * split for every other surface on the same workspace.
+   *
+   * Defaults to true: an omitted flag means an authoritative full-shell client.
+   */
+  layoutAuthority?: boolean;
+}
+
 export interface WorkspaceContentSummary {
   id: string;
   title: string;
@@ -53,6 +76,153 @@ export interface WorkspaceViewRoot {
   title: string;
 }
 
+/**
+ * Parent-workspace `settings.workbenches` — normalized shape. Absent key =
+ * enabled with defaults. `dormantClearoutDays` is clamped to 1–365 server-side
+ * (default 30) and drives the dormant-clearout cron.
+ */
+export interface WorkspaceWorkbenchSettings {
+  enabled: boolean;
+  /**
+   * Hidden folders, flat across every layer. A folder id identifies a folder
+   * uniquely whatever its depth, so one set covers all of them.
+   */
+  hiddenFolderIds: string[];
+  dormantClearoutDays: number;
+  /**
+   * How many folder layers the submenu may descend, 1-3. Default 1 — nesting
+   * is opt-in, because most views are flat and a menu that keeps unfolding is
+   * a menu that's hard to leave.
+   */
+  maxDepth: number;
+  /**
+   * Custom order per panel, keyed by the folder whose CHILDREN that panel
+   * lists (the view root for layer 1). Keyed by parent folder rather than by
+   * depth so a folder keeps its order however you reach it, and so no layer
+   * has to exist as a workbench for its children to be ordered.
+   *
+   * Missing key = follow tree order. Ids are kept even when a folder is
+   * hidden or vanishes: a stale id costs one map lookup, while pruning would
+   * forget the position of a folder that comes back.
+   */
+  folderOrders: Record<string, string[]>;
+  /**
+   * Pre-nesting flat order for layer 1. Read-only compatibility: the client
+   * falls back to it when `folderOrders` has no entry for the view root, and
+   * the next reorder supersedes it. Never written.
+   */
+  folderOrder: string[];
+}
+
+/** Nesting depth is user-configurable within these bounds. */
+export const WORKBENCH_MIN_DEPTH = 1;
+export const WORKBENCH_MAX_DEPTH = 3;
+
+/**
+ * Normalize a workspace's raw `settings.workbenches` value. Shared by the
+ * server (service, cron) and the client (selector submenu) so the two can't
+ * drift: absent/malformed keys resolve to enabled, no hidden folders, 30-day
+ * clearout; `dormantClearoutDays` is clamped to 1–365.
+ */
+export function normalizeWorkbenchSettings(
+  settings: Record<string, unknown> | null | undefined,
+): WorkspaceWorkbenchSettings {
+  const raw = settings?.["workbenches"];
+  const obj =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const enabled = typeof obj.enabled === "boolean" ? obj.enabled : true;
+  const hiddenFolderIds = Array.isArray(obj.hiddenFolderIds)
+    ? obj.hiddenFolderIds.filter(
+        (value): value is string => typeof value === "string",
+      )
+    : [];
+  const dormantClearoutDays =
+    typeof obj.dormantClearoutDays === "number" &&
+    Number.isFinite(obj.dormantClearoutDays)
+      ? Math.min(365, Math.max(1, Math.round(obj.dormantClearoutDays)))
+      : 30;
+  const folderOrder = Array.isArray(obj.folderOrder)
+    ? obj.folderOrder.filter((value): value is string => typeof value === "string")
+    : [];
+  const maxDepth =
+    typeof obj.maxDepth === "number" && Number.isFinite(obj.maxDepth)
+      ? Math.min(
+          WORKBENCH_MAX_DEPTH,
+          Math.max(WORKBENCH_MIN_DEPTH, Math.round(obj.maxDepth)),
+        )
+      : WORKBENCH_MIN_DEPTH;
+  const folderOrders: Record<string, string[]> = {};
+  const rawOrders = obj.folderOrders;
+  if (rawOrders && typeof rawOrders === "object" && !Array.isArray(rawOrders)) {
+    for (const [key, value] of Object.entries(
+      rawOrders as Record<string, unknown>,
+    )) {
+      if (!Array.isArray(value)) continue;
+      folderOrders[key] = value.filter(
+        (entry): entry is string => typeof entry === "string",
+      );
+    }
+  }
+  return {
+    enabled,
+    hiddenFolderIds,
+    dormantClearoutDays,
+    maxDepth,
+    folderOrders,
+    folderOrder,
+  };
+}
+
+/**
+ * Apply a saved folder order to a list keyed by folder id.
+ *
+ * Unlisted ids sort last and keep their incoming (tree) order — `sort` is
+ * stable — so a folder created after the last reorder appears at the end
+ * rather than jumping to the top.
+ *
+ * Shared by the server list route and the submenu so both agree on order.
+ */
+export function applyWorkbenchFolderOrder<T extends { folderId: string }>(
+  items: T[],
+  folderOrder: string[],
+): T[] {
+  if (folderOrder.length === 0) return items;
+  const rank = new Map(folderOrder.map((id, index) => [id, index]));
+  return [...items].sort(
+    (a, b) =>
+      (rank.get(a.folderId) ?? Number.MAX_SAFE_INTEGER) -
+      (rank.get(b.folderId) ?? Number.MAX_SAFE_INTEGER),
+  );
+}
+
+/**
+ * The order a given panel should use: its own keyed entry, else the legacy
+ * flat order when this is the root panel, else tree order.
+ */
+export function resolveFolderOrder(
+  settings: WorkspaceWorkbenchSettings,
+  listRootId: string,
+  isRootPanel: boolean,
+): string[] {
+  const keyed = settings.folderOrders[listRootId];
+  if (keyed && keyed.length > 0) return keyed;
+  return isRootPanel ? settings.folderOrder : [];
+}
+
+/** One row of GET /api/content/workspaces/[id]/workbenches. */
+export interface WorkbenchFolderOption {
+  folderId: string;
+  title: string;
+  /** Existing workbench workspace id for this folder, if materialized. */
+  workbenchId: string | null;
+  /** True when the folder is in the parent's hiddenFolderIds list. */
+  hidden: boolean;
+  /** Whether this folder's own children may still be browsed (depth budget). */
+  canNest: boolean;
+}
+
 export interface ContentWorkspaceResponse {
   id: string;
   name: string;
@@ -62,6 +232,14 @@ export interface ContentWorkspaceResponse {
   isView: boolean;
   viewRootContentId: string | null;
   viewRoot: WorkspaceViewRoot | null;
+  /**
+   * Non-null marks this row as a WORKBENCH — a folder-derived sub-workspace of
+   * that parent workspace (`viewRootContentId` = the backing folder). Workbench
+   * rows are excluded from the top-level workspace list and surfaced through
+   * the parent's dwell submenu instead. They are not renameable (the name
+   * mirrors the folder) and carry no settings of their own.
+   */
+  parentWorkspaceId: string | null;
   status: "active" | "archived";
   expiresAt: string | null;
   archivedAt: string | null;

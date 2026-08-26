@@ -5,18 +5,30 @@ import {
   type ContentWorkspace,
   type ContentWorkspaceItem,
   type ContentNode,
-  type Prisma,
+  // Value import: createWorkbench needs the runtime
+  // Prisma.PrismaClientKnownRequestError to recognise a P2002 unique
+  // violation (the concurrent-click race) and reuse the winner's row.
+  Prisma,
 } from "@/lib/database/generated/prisma";
 import { generateSlug } from "@/lib/domain/content";
+import { logger } from "@/lib/core/logger";
 import { reconcileMembershipFromSnapshot } from "./membership";
 import { LAYOUT_RECORD_MAX_AGE_DAYS } from "./layout-records";
 import type {
   ContentWorkspaceResponse,
+  WorkbenchFolderOption,
   WorkspaceOpenIntentResponse,
   WorkspacePaneId,
   WorkspacePaneSnapshot,
   WorkspaceStatePayload,
   WorkspacePaneStatePayload,
+} from "./types";
+// Value import (not `import type`): the same normalizer the client uses, so
+// server and submenu can't disagree about what "workbenches enabled" means.
+import {
+  applyWorkbenchFolderOrder,
+  normalizeWorkbenchSettings,
+  resolveFolderOrder,
 } from "./types";
 
 const MAIN_WORKSPACE_NAME = "Main Workspace";
@@ -272,9 +284,17 @@ export function formatWorkspace(
       contentMeta[id] = { title, contentType };
     }
   }
+  const parentWorkspaceId = workspace.parentWorkspaceId ?? null;
+  // A workbench's name mirrors its backing folder — renaming the folder renames
+  // the workbench on the next read; the stored name is only a fallback for a
+  // dead row (folder hard-deleted, FK set null).
+  const name =
+    parentWorkspaceId && workspace.viewRoot
+      ? workspace.viewRoot.title
+      : workspace.name;
   return {
     id: workspace.id,
-    name: workspace.name,
+    name,
     slug: workspace.slug,
     isMain: workspace.isMain,
     isLocked: workspace.isLocked,
@@ -283,6 +303,7 @@ export function formatWorkspace(
     viewRoot: workspace.viewRoot
       ? { id: workspace.viewRoot.id, title: workspace.viewRoot.title }
       : null,
+    parentWorkspaceId,
     status: workspace.status,
     expiresAt: workspace.expiresAt?.toISOString() ?? null,
     archivedAt: workspace.archivedAt?.toISOString() ?? null,
@@ -818,18 +839,120 @@ function getStateContentIds(state: WorkspaceStatePayload) {
   return [...contentIds];
 }
 
+/**
+ * Fold a non-authoritative surface's tab membership into the stored geometry.
+ *
+ * A one-pane surface (extension panel, mobile) sends every tab in one pane
+ * because that's all it can show. Taken literally that write flattens a split
+ * for everyone. So its payload is read for MEMBERSHIP only — which content is
+ * open — while layoutMode, activePaneId and each tab's pane assignment come
+ * from what's already stored.
+ *
+ * Closes still propagate (anything the sender dropped is dropped here too), and
+ * opens land in the stored active pane, the only placement a projecting surface
+ * can meaningfully imply.
+ */
+function mergeMembershipIntoStoredLayout(
+  stored: WorkspaceStatePayload,
+  incoming: WorkspaceStatePayload,
+): WorkspaceStatePayload {
+  const incomingIds = new Set(getStateContentIds(incoming));
+  const storedIds = new Set(getStateContentIds(stored));
+
+  const paneTabContentIds: WorkspacePaneStatePayload = {};
+  for (const paneId of WORKSPACE_PANE_IDS) {
+    const pane = stored.paneTabContentIds[paneId];
+    const contentIds = (pane?.contentIds ?? []).filter((contentId) =>
+      incomingIds.has(contentId),
+    );
+    paneTabContentIds[paneId] = {
+      contentIds,
+      activeContentId:
+        pane?.activeContentId && contentIds.includes(pane.activeContentId)
+          ? pane.activeContentId
+          : (contentIds[0] ?? null),
+    };
+  }
+
+  const additions = [...incomingIds].filter(
+    (contentId) => !storedIds.has(contentId),
+  );
+  if (additions.length > 0) {
+    const targetPaneId = normalizePaneId(stored.activePaneId);
+    const target = paneTabContentIds[targetPaneId];
+    if (target) {
+      target.contentIds = [...target.contentIds, ...additions];
+      target.activeContentId = target.activeContentId ?? additions[0];
+    }
+  }
+
+  const survivingIds = new Set(
+    WORKSPACE_PANE_IDS.flatMap(
+      (paneId) => paneTabContentIds[paneId]?.contentIds ?? [],
+    ),
+  );
+
+  // Keep the stored active tab if it's still open. A projecting surface should
+  // not be able to yank what someone else is looking at — same principle as
+  // `preferActiveContentId` on the client's background reconcile.
+  const activeContentId =
+    stored.activeContentId && survivingIds.has(stored.activeContentId)
+      ? stored.activeContentId
+      : incoming.activeContentId && survivingIds.has(incoming.activeContentId)
+        ? incoming.activeContentId
+        : ([...survivingIds][0] ?? null);
+
+  return {
+    layoutMode: stored.layoutMode,
+    activePaneId: stored.activePaneId,
+    activeContentId,
+    paneTabContentIds,
+  };
+}
+
+export type SaveWorkspaceStateResult =
+  | { status: "ok"; workspace: ContentWorkspaceResponse }
+  | { status: "not-found" }
+  | { status: "conflict"; workspace: ContentWorkspaceResponse };
+
+/**
+ * Persist a workspace's pane snapshot, optionally guarded by the `updatedAt`
+ * the caller derived that snapshot from.
+ *
+ * WHY THE GUARD: every surface rendering MainPanelWorkspace — the app window,
+ * the browser extension's panel iframe, the tree overlay — mounts
+ * WorkplacesShellController, which PATCHes the ENTIRE pane snapshot 600ms after
+ * any local change. Unguarded that is last-writer-wins over a whole document,
+ * and the one operation it cannot express is a CLOSE: a peer still holding a
+ * pre-close snapshot re-asserts the closed tab on its next write, and the
+ * closing surface faithfully restores it on the next poll. (Same class of bug
+ * as the one `removeContentFromWorkspaces` fixes for deleted content — there
+ * the resurrection source is stored state, here it's a stale peer.)
+ *
+ * A mismatch is reported as `conflict` alongside the CURRENT row, so the caller
+ * can reconcile against real state without a second round trip. Omitting
+ * `expectedUpdatedAt` preserves the old blind overwrite for callers that have
+ * no base to offer.
+ */
 export async function saveWorkspaceState(
   ownerId: string,
   workspaceId: string,
   state: unknown,
-) {
+  expectedUpdatedAt?: string | null,
+  layoutAuthority = true,
+): Promise<SaveWorkspaceStateResult> {
   const workspace = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
   });
 
-  if (!workspace) return null;
+  if (!workspace) return { status: "not-found" };
 
-  const normalizedState = normalizeWorkspaceStatePayload(state);
+  const normalizedState = layoutAuthority
+    ? normalizeWorkspaceStatePayload(state)
+    : mergeMembershipIntoStoredLayout(
+        normalizeWorkspaceStatePayload(workspace.paneState),
+        normalizeWorkspaceStatePayload(state),
+      );
   const requestedContentIds = getStateContentIds(normalizedState);
   const ownedContentIds = requestedContentIds.length
     ? await prisma.contentNode.findMany({
@@ -857,35 +980,74 @@ export async function saveWorkspaceState(
   );
   await reconcileMembershipFromSnapshot(workspaceId, paneContentIds);
 
-  const updatedWorkspace = await prisma.contentWorkspace.update({
-    where: { id: workspaceId },
-    data: {
-      layoutMode: filteredState.layoutMode,
-      activePaneId: filteredState.activePaneId,
-      paneState: filteredState as unknown as Prisma.InputJsonValue,
-    },
-    include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
+  const stateInclude = {
+    items: {
+      where: {
+        content: { ownerId, deletedAt: null },
+      },
+      include: {
+        content: {
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+            parentId: true,
           },
         },
-        orderBy: { updatedAt: "desc" },
       },
-      viewRoot: { select: { id: true, title: true } },
+      orderBy: { updatedAt: "desc" },
     },
+    viewRoot: { select: { id: true, title: true } },
+  } satisfies Prisma.ContentWorkspaceInclude;
+
+  const data = {
+    layoutMode: filteredState.layoutMode,
+    activePaneId: filteredState.activePaneId,
+    paneState: filteredState as unknown as Prisma.InputJsonValue,
+  };
+
+  if (expectedUpdatedAt) {
+    const base = new Date(expectedUpdatedAt);
+    if (Number.isNaN(base.getTime())) {
+      return { status: "conflict", workspace: await readFormatted() };
+    }
+
+    // Millisecond WINDOW, not equality: the column is TIMESTAMPTZ(6) but the
+    // Prisma client reads it into a JS Date (ms) and we hand the client that
+    // truncated ISO string. Comparing it back for exact equality would 409
+    // forever on any row whose stored value carries sub-millisecond digits.
+    // Two writes inside the same millisecond aren't a realistic conflict given
+    // the 600ms client debounce.
+    const { count } = await prisma.contentWorkspace.updateMany({
+      where: {
+        id: workspaceId,
+        ownerId,
+        status: "active",
+        updatedAt: { gte: base, lt: new Date(base.getTime() + 1) },
+      },
+      data,
+    });
+
+    return count === 0
+      ? { status: "conflict", workspace: await readFormatted() }
+      : { status: "ok", workspace: await readFormatted() };
+  }
+
+  const updatedWorkspace = await prisma.contentWorkspace.update({
+    where: { id: workspaceId },
+    data,
+    include: stateInclude,
   });
 
-  return formatWorkspace(updatedWorkspace);
+  return { status: "ok", workspace: formatWorkspace(updatedWorkspace) };
+
+  async function readFormatted() {
+    const current = await prisma.contentWorkspace.findFirstOrThrow({
+      where: { id: workspaceId, ownerId },
+      include: stateInclude,
+    });
+    return formatWorkspace(current);
+  }
 }
 
 /**
@@ -901,6 +1063,31 @@ export async function removeContentFromWorkspaces(
   await prisma.contentWorkspaceItem.deleteMany({
     where: { contentId, workspace: { ownerId } },
   });
+
+  // Workbenches backed by this node — or by anything beneath it — go dormant
+  // with it. Deleting an ancestor folder must archive workbenches further
+  // down the subtree, so walk descendants rather than matching the id alone.
+  // Best-effort: this runs inside the delete cascade and must never fail it.
+  try {
+    const subtree = [contentId];
+    let frontier = [contentId];
+    while (frontier.length > 0) {
+      const children = await prisma.contentNode.findMany({
+        where: { ownerId, parentId: { in: frontier } },
+        select: { id: true },
+      });
+      frontier = children.map((child) => child.id);
+      subtree.push(...frontier);
+    }
+    await archiveWorkbenchesForContent(ownerId, subtree);
+  } catch (error) {
+    logger.warn({
+      layer: "content",
+      event: "workbench_archive:failed",
+      summary: `workbench archive skipped for ${contentId}`,
+      error,
+    });
+  }
 
   const workspaces = await prisma.contentWorkspace.findMany({
     where: { ownerId },
@@ -921,6 +1108,339 @@ export async function removeContentFromWorkspaces(
       },
     });
   }
+}
+
+/**
+ * How many parent hops separate a live folder from an ancestor, or null when
+ * the ancestor isn't reached within `maxHops` (folder moved out, trashed, or
+ * simply deeper than the nesting budget allows). 1 = first-level child.
+ *
+ * A hop-bounded upward walk rather than a subtree query: depth budgets are
+ * 1-3, so this is at most three point reads, each also asserting the
+ * intermediate folder is alive — a folder inside a trashed parent must not
+ * count as attached.
+ */
+async function folderHopsToAncestor(
+  ownerId: string,
+  folderId: string,
+  ancestorId: string,
+  maxHops: number,
+): Promise<number | null> {
+  let currentId = folderId;
+  for (let hops = 1; hops <= maxHops; hops++) {
+    const node = await prisma.contentNode.findFirst({
+      where: { id: currentId, ownerId, deletedAt: null },
+      select: { parentId: true },
+    });
+    if (!node?.parentId) return null;
+    if (node.parentId === ancestorId) return hops;
+    currentId = node.parentId;
+  }
+  return null;
+}
+
+/**
+ * First-level subfolders of a view workspace's root, joined to any workbench
+ * rows that already exist for them. One query per side; the join is done here
+ * rather than in the client so "does this folder have a workbench?" has a
+ * single answer.
+ *
+ * Root layer only: nested layers are derived client-side from the scoped
+ * tree the submenu already fetches, so serving them here would be a second
+ * source of truth for the same data.
+ */
+export async function listWorkbenchFolders(
+  ownerId: string,
+  parentWorkspaceId: string,
+): Promise<WorkbenchFolderOption[] | null> {
+  const parent = await prisma.contentWorkspace.findFirst({
+    where: { id: parentWorkspaceId, ownerId, status: "active" },
+    select: { id: true, viewRootContentId: true, settings: true },
+  });
+  if (!parent?.viewRootContentId) return null;
+
+  const settings = normalizeWorkbenchSettings(normalizeSettings(parent.settings));
+  if (!settings.enabled) return [];
+  const hidden = new Set(settings.hiddenFolderIds);
+
+  const [folders, existing] = await Promise.all([
+    prisma.contentNode.findMany({
+      where: {
+        ownerId,
+        parentId: parent.viewRootContentId,
+        contentType: "folder",
+        deletedAt: null,
+      },
+      select: { id: true, title: true },
+      orderBy: [{ displayOrder: "asc" }, { title: "asc" }],
+    }),
+    prisma.contentWorkspace.findMany({
+      where: { ownerId, parentWorkspaceId, status: "active" },
+      select: { id: true, viewRootContentId: true },
+    }),
+  ]);
+
+  const workbenchByFolder = new Map(
+    existing
+      .filter((row) => row.viewRootContentId)
+      .map((row) => [row.viewRootContentId as string, row.id]),
+  );
+
+  // canNest = the depth budget allows another layer AND the folder actually
+  // has subfolders. One grouped count for the whole row set.
+  const nestable = new Set<string>();
+  if (settings.maxDepth > 1 && folders.length > 0) {
+    const childCounts = await prisma.contentNode.groupBy({
+      by: ["parentId"],
+      where: {
+        ownerId,
+        parentId: { in: folders.map((folder) => folder.id) },
+        contentType: "folder",
+        deletedAt: null,
+      },
+      _count: { _all: true },
+    });
+    for (const row of childCounts) {
+      if (row.parentId) nestable.add(row.parentId);
+    }
+  }
+
+  return applyWorkbenchFolderOrder(
+    folders.map((folder) => ({
+      folderId: folder.id,
+      title: folder.title,
+      workbenchId: workbenchByFolder.get(folder.id) ?? null,
+      hidden: hidden.has(folder.id),
+      canNest: nestable.has(folder.id),
+    })),
+    resolveFolderOrder(settings, parent.viewRootContentId, true),
+  );
+}
+
+/**
+ * Materialize-or-reuse the workbench for a folder within the view's nesting
+ * budget (1-3 layers below the view root; the parent's `maxDepth` decides).
+ *
+ * Workbench rows stay FLAT regardless of the folder's depth — parent is
+ * always the top workspace, never another workbench. Nesting is a property of
+ * the MENU, not the data: keying benches off parent benches would force
+ * materializing every ancestor just to browse a layer.
+ *
+ * Reuse covers three cases, in order: an active row (return it untouched, so
+ * pane layouts survive), an ARCHIVED row (reactivate — a folder rescued from
+ * trash gets its layout back), and the unique-constraint race (two clicks
+ * before either commits; the loser re-reads the winner's row instead of
+ * failing the user's click).
+ */
+export async function createWorkbench(
+  ownerId: string,
+  parentWorkspaceId: string,
+  folderContentId: string,
+): Promise<ContentWorkspaceResponse | null> {
+  const parent = await prisma.contentWorkspace.findFirst({
+    where: { id: parentWorkspaceId, ownerId, status: "active" },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      isMain: true,
+      viewRootContentId: true,
+      settings: true,
+    },
+  });
+  // A workbench only exists under a VIEW workspace, and never under another
+  // workbench: the submenu is one level deep by design.
+  if (!parent?.viewRootContentId || parent.isMain) return null;
+  const workbenchSettings = normalizeWorkbenchSettings(
+    normalizeSettings(parent.settings),
+  );
+  if (!workbenchSettings.enabled) return null;
+
+  // The folder must still sit within the view's nesting budget. Re-checked
+  // server-side because the submenu the click came from may be seconds stale
+  // — the folder can have moved or been trashed meanwhile.
+  const folder = await prisma.contentNode.findFirst({
+    where: {
+      id: folderContentId,
+      ownerId,
+      contentType: "folder",
+      deletedAt: null,
+    },
+    select: { id: true, title: true },
+  });
+  if (!folder) return null;
+  const hops = await folderHopsToAncestor(
+    ownerId,
+    folderContentId,
+    parent.viewRootContentId,
+    workbenchSettings.maxDepth,
+  );
+  if (hops === null) return null;
+
+  const existing = await prisma.contentWorkspace.findFirst({
+    where: { ownerId, parentWorkspaceId, viewRootContentId: folderContentId },
+    select: { id: true, status: true },
+  });
+  if (existing) {
+    if (existing.status !== "active") {
+      await prisma.contentWorkspace.update({
+        where: { id: existing.id },
+        data: { status: "active", archivedAt: null, dormantAt: null },
+      });
+    }
+    return getWorkspace(ownerId, existing.id);
+  }
+
+  const slug = await uniqueWorkspaceSlug(
+    ownerId,
+    `${parent.slug}-${folder.title}`,
+  );
+
+  try {
+    const created = await prisma.contentWorkspace.create({
+      data: {
+        ownerId,
+        // Stored only as a fallback for a dead row: formatWorkspace mirrors
+        // the folder's live title, so renaming the folder renames the bench.
+        name: folder.title,
+        slug,
+        isMain: false,
+        parentWorkspaceId,
+        viewRootContentId: folderContentId,
+        layoutMode: DEFAULT_LAYOUT_MODE,
+        activePaneId: DEFAULT_PANE_ID,
+        paneState: {},
+        settings: {},
+      },
+      select: { id: true },
+    });
+    return getWorkspace(ownerId, created.id);
+  } catch (error) {
+    // Unique violation = a concurrent click won. Hand back their row.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      const winner = await prisma.contentWorkspace.findFirst({
+        where: { ownerId, parentWorkspaceId, viewRootContentId: folderContentId },
+        select: { id: true },
+      });
+      if (winner) return getWorkspace(ownerId, winner.id);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Archive every workbench whose backing folder sits inside a deleted subtree.
+ *
+ * Archive, not delete: a folder rescued from trash should bring its workbench
+ * back with pane layouts intact (createWorkbench reactivates on reuse). The
+ * hard delete belongs to the purge path, once the content itself is gone.
+ *
+ * Called from the content delete cascade, so it must never throw into it.
+ */
+export async function archiveWorkbenchesForContent(
+  ownerId: string,
+  contentIds: string[],
+): Promise<number> {
+  if (contentIds.length === 0) return 0;
+  const { count } = await prisma.contentWorkspace.updateMany({
+    where: {
+      ownerId,
+      parentWorkspaceId: { not: null },
+      status: "active",
+      viewRootContentId: { in: contentIds },
+    },
+    data: { status: "archived", archivedAt: new Date() },
+  });
+  return count;
+}
+
+/**
+ * Dormant-clearout sweep. Self-healing by design: dormancy is DERIVED here
+ * each run (is the folder still a first-level child of the parent's view
+ * root?) rather than stamped by write paths, so a missed hook delays a stamp
+ * by a day instead of leaking a row forever.
+ */
+export async function sweepDormantWorkbenches(now: Date): Promise<{
+  stamped: number;
+  cleared: number;
+  deleted: number;
+}> {
+  const workbenches = await prisma.contentWorkspace.findMany({
+    where: { parentWorkspaceId: { not: null } },
+    select: {
+      id: true,
+      ownerId: true,
+      dormantAt: true,
+      viewRootContentId: true,
+      parentWorkspace: {
+        select: { id: true, status: true, viewRootContentId: true, settings: true },
+      },
+    },
+  });
+
+  let stamped = 0;
+  let cleared = 0;
+  let deleted = 0;
+
+  for (const workbench of workbenches) {
+    const parent = workbench.parentWorkspace;
+    let attached = false;
+    if (
+      parent?.viewRootContentId &&
+      workbench.viewRootContentId &&
+      parent.status === "active"
+    ) {
+      // Same walk createWorkbench uses: attached means reachable within the
+      // parent's CURRENT depth budget, so lowering maxDepth from 3 to 1
+      // makes deeper benches dormant rather than leaving them stranded live.
+      const maxDepth = normalizeWorkbenchSettings(
+        normalizeSettings(parent.settings),
+      ).maxDepth;
+      const hops = await folderHopsToAncestor(
+        workbench.ownerId,
+        workbench.viewRootContentId,
+        parent.viewRootContentId,
+        maxDepth,
+      );
+      attached = hops !== null;
+    }
+
+    if (attached) {
+      if (workbench.dormantAt) {
+        await prisma.contentWorkspace.update({
+          where: { id: workbench.id },
+          data: { dormantAt: null },
+        });
+        cleared += 1;
+      }
+      continue;
+    }
+
+    if (!workbench.dormantAt) {
+      await prisma.contentWorkspace.update({
+        where: { id: workbench.id },
+        data: { dormantAt: now },
+      });
+      stamped += 1;
+      continue;
+    }
+
+    const days = normalizeWorkbenchSettings(
+      normalizeSettings(parent?.settings ?? {}),
+    ).dormantClearoutDays;
+    const expiresAt = new Date(
+      workbench.dormantAt.getTime() + days * 24 * 60 * 60 * 1000,
+    );
+    if (now >= expiresAt) {
+      await prisma.contentWorkspace.delete({ where: { id: workbench.id } });
+      deleted += 1;
+    }
+  }
+
+  return { stamped, cleared, deleted };
 }
 
 async function getAncestorIds(ownerId: string, contentId: string) {

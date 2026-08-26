@@ -50,6 +50,13 @@ interface FileTreeWithDropZoneProps {
    * how the destination is resolved.
    */
   onFileDrop?: (files: File[], parentId: string | null) => void;
+  /**
+   * Destination for drops that resolve to "top of the tree". Defaults to the
+   * vault root; a view-scoped sidebar passes the view root here so files
+   * dropped on empty space land inside the view instead of silently outside
+   * it (the scoped tree no longer contains the view root as a row).
+   */
+  rootDropTarget?: UploadDropTarget;
 }
 
 /** Id of the tree row under the pointer, if the event landed on one. */
@@ -67,32 +74,36 @@ function getPointerNodeId(event: React.DragEvent<HTMLDivElement>): string | null
  * implied by the tree selection or by the content open in the main panel.
  * Only a drop with none of those signals falls back to the vault root.
  */
-function FileTreeDropZoneInner({ onFileDrop, ...treeProps }: FileTreeWithDropZoneProps) {
+function FileTreeDropZoneInner({ onFileDrop, rootDropTarget, ...treeProps }: FileTreeWithDropZoneProps) {
   const dndManager = useDragDropManager();
   const dragDepthRef = useRef(0);
   const [isDragActive, setIsDragActive] = useState(false);
-  const [dropTarget, setDropTarget] = useState<UploadDropTarget>(ROOT_DROP_TARGET);
+  const effectiveRootTarget = rootDropTarget ?? ROOT_DROP_TARGET;
+  const [dropTarget, setDropTarget] = useState<UploadDropTarget>(effectiveRootTarget);
   const setExternalDropTargetId = useTreeDragStore((state) => state.setExternalDropTargetId);
   const treeData = treeProps.data;
 
   const resolveTarget = useCallback(
     (event: React.DragEvent<HTMLDivElement>): UploadDropTarget => {
-      return resolveUploadDropTarget({
+      const resolved = resolveUploadDropTarget({
         treeData,
         pointerNodeId: getPointerNodeId(event),
         selectedIds: useTreeStateStore.getState().selectedIds,
         activeContentId: useContentStore.getState().selectedContentId,
       });
+      // `source: "root"` marks the fallback — swap in the caller's top-level
+      // destination (the view root on a scoped tree).
+      return resolved.source === "root" ? effectiveRootTarget : resolved;
     },
-    [treeData],
+    [treeData, effectiveRootTarget],
   );
 
   const clearDragState = useCallback(() => {
     dragDepthRef.current = 0;
     setIsDragActive(false);
-    setDropTarget(ROOT_DROP_TARGET);
+    setDropTarget(effectiveRootTarget);
     setExternalDropTargetId(null);
-  }, [setExternalDropTargetId]);
+  }, [setExternalDropTargetId, effectiveRootTarget]);
 
   // A drag that ends outside the panel (Esc, drop on another surface) never
   // fires our drop handler — clear the row highlight on the window events.

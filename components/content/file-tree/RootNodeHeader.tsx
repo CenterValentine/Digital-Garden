@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Check, ChevronDown, Eye, Home, RefreshCw } from "lucide-react";
+import { Check, ChevronDown, Eye, Hammer, Home, RefreshCw } from "lucide-react";
 
 interface RootNodeHeaderProps {
   workspaceName?: string;
@@ -17,14 +17,24 @@ interface RootNodeHeaderProps {
    * the resting state, refresh is hidden behind it.
    */
   onRefresh?: () => void;
-  /** True while the view filter is transiently bypassed (whole tree shown). */
-  viewBypassed?: boolean;
   /**
-   * Toggle the transient view-filter bypass. When provided on a view-workspace,
-   * the view affordance (icon + title) becomes a dropdown: pick the view (filter)
-   * or "root" (whole tree). Ephemeral — the caller resets it per workspace.
+   * Scope choices for the filter dropdown, most-specific first. On a plain
+   * view-workspace this is [view, root]; on a workbench it is
+   * [workbench, parent view, root] — the "more acute layer" keeps escape
+   * hatches to both broader scopes. When provided (length > 1) the affordance
+   * becomes a dropdown; the selection is ephemeral and the caller resets it
+   * per workspace change.
    */
-  onToggleViewBypass?: (bypass: boolean) => void;
+  scopeOptions?: RootScopeOption[];
+  /** Key of the currently applied scope option. */
+  activeScopeKey?: string;
+  onSelectScope?: (key: string) => void;
+}
+
+export interface RootScopeOption {
+  key: string;
+  label: string;
+  kind: "workbench" | "view" | "root";
 }
 
 export function RootNodeHeader({
@@ -35,8 +45,9 @@ export function RootNodeHeader({
   isView = false,
   viewRootTitle,
   onRefresh,
-  viewBypassed = false,
-  onToggleViewBypass,
+  scopeOptions,
+  activeScopeKey,
+  onSelectScope,
 }: RootNodeHeaderProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [menuPos, setMenuPos] = useState<{ left: number; top: number } | null>(null);
@@ -66,9 +77,22 @@ export function RootNodeHeader({
     };
   }, [menuOpen]);
 
-  // The view affordance is a bypass dropdown only on a view-workspace with a
-  // toggle wired in.
-  const viewDropdown = isView && !!onToggleViewBypass;
+  // The view affordance is a scope dropdown only when the caller wired in
+  // more than one scope to choose between.
+  const viewDropdown =
+    !!scopeOptions && scopeOptions.length > 1 && !!onSelectScope;
+  const activeScope =
+    scopeOptions?.find((option) => option.key === activeScopeKey) ??
+    scopeOptions?.[0] ??
+    null;
+  const scopeIcon = (kind: RootScopeOption["kind"], className: string) =>
+    kind === "root" ? (
+      <Home className={className} />
+    ) : kind === "workbench" ? (
+      <Hammer className={className} />
+    ) : (
+      <Eye className={className} />
+    );
 
   const openMenu = () => {
     const r = triggerRef.current?.getBoundingClientRect();
@@ -76,8 +100,8 @@ export function RootNodeHeader({
     setMenuOpen((o) => !o);
   };
 
-  const selectBypass = (bypass: boolean) => {
-    onToggleViewBypass?.(bypass);
+  const selectScope = (key: string) => {
+    onSelectScope?.(key);
     setMenuOpen(false);
   };
 
@@ -108,16 +132,19 @@ export function RootNodeHeader({
             e.stopPropagation();
             openMenu();
           }}
-          title={viewBypassed ? "Showing all — click to re-apply the view" : "Filtered view — click to show all"}
+          title="Choose what the file tree shows"
           className="group/view -ml-1 flex min-w-0 items-center gap-2 rounded px-1 py-0.5 hover:bg-black/[0.05] dark:hover:bg-white/10"
         >
-          {viewBypassed ? (
-            <Home className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" />
+          {activeScope ? (
+            scopeIcon(
+              activeScope.kind,
+              `h-4 w-4 shrink-0 ${activeScope.kind === "root" ? "text-gray-600 dark:text-gray-400" : "text-gold-primary"}`,
+            )
           ) : (
             <Eye className="h-4 w-4 shrink-0 text-gold-primary" />
           )}
           <span className={`truncate text-sm font-medium ${isSelected ? "text-gold-primary" : "text-gray-900 dark:text-white"}`}>
-            {viewBypassed ? "root" : titleText}
+            {activeScope?.kind === "root" ? "root" : (activeScope?.label ?? titleText)}
           </span>
           <ChevronDown className="h-3 w-3 shrink-0 text-gray-500 opacity-70" />
         </button>
@@ -175,24 +202,23 @@ export function RootNodeHeader({
             style={{ position: "fixed", left: menuPos.left, top: menuPos.top, zIndex: 200 }}
             className="min-w-[200px] overflow-hidden rounded-md border border-black/10 dark:border-white/10 bg-white dark:bg-gray-900 py-1 shadow-lg"
           >
-            <button
-              type="button"
-              onClick={() => selectBypass(false)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-black/[0.05] dark:hover:bg-white/10"
-            >
-              <Eye className="h-4 w-4 shrink-0 text-gold-primary" />
-              <span className="truncate">{viewRootTitle ?? "View"}</span>
-              {!viewBypassed && <Check className="ml-auto h-4 w-4 shrink-0 text-gold-primary" />}
-            </button>
-            <button
-              type="button"
-              onClick={() => selectBypass(true)}
-              className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-black/[0.05] dark:hover:bg-white/10"
-            >
-              <Home className="h-4 w-4 shrink-0 text-gray-600 dark:text-gray-400" />
-              <span className="truncate">root — show all files</span>
-              {viewBypassed && <Check className="ml-auto h-4 w-4 shrink-0 text-gold-primary" />}
-            </button>
+            {(scopeOptions ?? []).map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                onClick={() => selectScope(option.key)}
+                className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-gray-800 dark:text-gray-100 hover:bg-black/[0.05] dark:hover:bg-white/10"
+              >
+                {scopeIcon(
+                  option.kind,
+                  `h-4 w-4 shrink-0 ${option.kind === "root" ? "text-gray-600 dark:text-gray-400" : "text-gold-primary"}`,
+                )}
+                <span className="truncate">{option.label}</span>
+                {activeScope?.key === option.key && (
+                  <Check className="ml-auto h-4 w-4 shrink-0 text-gold-primary" />
+                )}
+              </button>
+            ))}
           </div>,
           document.body,
         )}

@@ -32,7 +32,11 @@ import {
   type CaptureSettings,
 } from "@/lib/domain/browser-extension/panel-bridge";
 import { shouldCapturePage } from "@/lib/domain/browser-extension/capture-policy";
-import { useContentStore, TOP_LEFT_PANE_ID } from "@/state/content-store";
+import {
+  useContentStore,
+  constrainSurfaceLayout,
+  TOP_LEFT_PANE_ID,
+} from "@/state/content-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import {
@@ -149,6 +153,17 @@ const baseCompactSections: ContextMenuActionProvider = (ctx) => {
 };
 const COLOR_SCHEME_QUERY = "(prefers-color-scheme: dark)";
 
+// This surface is one pane wide, so it PROJECTS the workspace's geometry rather
+// than owning it: restoreWorkspace folds every pane's tabs into the single pane
+// locally, and this shell's writes are marked non-authoritative so the server
+// keeps the stored layout. The app window can sit in vertical split while the
+// panel shows the same workspace in one pane — that divergence is intended.
+//
+// Module scope, not an effect: effects run child-first, so a declaration inside
+// the component would land AFTER the workspace restore mounted within it.
+// Widening the panel later is a matter of changing this one argument.
+constrainSurfaceLayout("single");
+
 function subscribeToColorScheme(onChange: () => void) {
   const query = window.matchMedia(COLOR_SCHEME_QUERY);
   query.addEventListener("change", onChange);
@@ -252,8 +267,6 @@ export function PanelShellClient({
   // lives in the composer (PanelPageContextBar) and drives capture itself.
   // This shell only relays the host's responses in via getState() (below),
   // so the listener effect needs no store deps.
-  const layoutMode = useContentStore((s) => s.layoutMode);
-  const setLayoutMode = useContentStore((s) => s.setLayoutMode);
   const selectedContentId = useContentStore((s) => s.selectedContentId);
   // Panel-OWNED collapse state (not the shared right-panel-collapse store, which
   // is the app's and defaults collapsed). Own key, defaults open, persisted. The
@@ -389,12 +402,13 @@ export function PanelShellClient({
     return useSettingsStore.subscribe(enforce);
   }, [isDark]);
 
-  // Single-pane by necessity at panel width. Enforced silently through the
-  // store's own setLayoutMode (which reflows tabs into one pane), so nothing
-  // app-side is overridden — the panel context just never leaves "single".
-  useEffect(() => {
-    if (layoutMode !== "single") setLayoutMode("single");
-  }, [layoutMode, setLayoutMode]);
+  // Layout constraint is DECLARED at module scope (see constrainSurfaceLayout
+  // above the component). It used to be enforced here by calling
+  // setLayoutMode("single") whenever the restored layout wasn't single — the
+  // comment claimed "nothing app-side is overridden", which stopped being true
+  // once pane state became workspace-shared: setLayoutMode is a persisted
+  // mutation, so this panel was writing "single" over a workspace the app
+  // window had in vertical split, flattening it there too.
 
   // C2-hardened message listener: exact-origin validation, versioned envelope.
   useEffect(() => {

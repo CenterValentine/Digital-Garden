@@ -634,8 +634,17 @@ export async function GET(request: NextRequest) {
         for (const id of [...nodeMap.keys()]) {
           if (!included.has(id)) nodeMap.delete(id);
         }
-        const viewRoot = nodeMap.get(viewRootContentId);
-        if (viewRoot) viewRoot.parentId = null;
+        // Drop the view root itself: the sidebar's RootNodeHeader already
+        // names the view, so a root row was pure redundancy (one folder row
+        // under a header showing the same title). Its children keep their
+        // REAL parentId — the hierarchy pass below promotes nodes whose
+        // parent is absent to the top level, and sibling placement math
+        // (paste-after, create-beside, ContentTreePicker's
+        // `scopeRootParentId`) depends on top-level rows carrying the view
+        // root as parent. Reference-role children land at the top level too,
+        // where `partitionReferences` deliberately leaves parentless
+        // references inline as ordinary rows rather than hiding them.
+        nodeMap.delete(viewRootContentId);
       }
 
       // Second pass: Build hierarchy

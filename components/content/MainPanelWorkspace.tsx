@@ -10,6 +10,7 @@ import {
   TOP_RIGHT_PANE_ID,
   getVisiblePaneIds,
   useContentStore,
+  markLocalOpenIntents,
   type WorkspaceLayoutMode,
   type WorkspacePaneId,
 } from "@/state/content-store";
@@ -542,6 +543,16 @@ export function MainPanelWorkspace({
       (tabsFromUrl && tabsFromUrl.length > 0) ||
       (secondaryTabsFromUrl && secondaryTabsFromUrl.length > 0)
     ) {
+      // Deep-linked tabs are a LOCAL open that hasn't been published yet. Mark
+      // the intent so a background reconcile arriving before the debounced
+      // write can't erase them (see markLocalOpenIntents).
+      markLocalOpenIntents([
+        contentIdFromUrl,
+        ...Object.values(paneTabContentIds).flatMap((ids) => ids ?? []),
+        ...(tabsFromUrl ?? []),
+        ...(secondaryTabsFromUrl ?? []),
+      ]);
+
       restoreWorkspace({
         activeContentId: contentIdFromUrl,
         paneTabContentIds: hasPaneTabs ? paneTabContentIds : undefined,

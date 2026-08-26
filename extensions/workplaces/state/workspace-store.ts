@@ -4,6 +4,9 @@ import { create } from "zustand";
 import { toast } from "sonner";
 import {
   useContentStore,
+  clearPendingWorkspaceIntents,
+  confirmWorkspaceWrite,
+  isSurfaceLayoutAuthoritative,
   type ContentSelectionOptions,
   type WorkspaceLayoutMode,
   type WorkspacePaneId,
@@ -19,6 +22,7 @@ import type {
   WorkspaceOpenConflict,
   WorkspaceOpenIntentResponse,
   WorkspaceStatePayload,
+  WorkspaceStateSavePayload,
 } from "@/extensions/workplaces/server";
 import type {
   ContentWorkspaceItemAssignmentType,
@@ -61,6 +65,16 @@ interface WorkspaceState {
   createWorkspace: (name: string) => Promise<ContentWorkspaceResponse>;
   duplicateWorkspace: (
     workspaceId: string,
+  ) => Promise<ContentWorkspaceResponse>;
+  /**
+   * Materialize-or-reuse the workbench for a first-level subfolder of a view
+   * workspace, then activate it. Creation is lazy — a workbench row only
+   * exists once it has been opened at least once; reopening reuses (and
+   * reactivates) the existing row so pane layouts survive.
+   */
+  openWorkbench: (
+    parentWorkspaceId: string,
+    folderContentId: string,
   ) => Promise<ContentWorkspaceResponse>;
   updateWorkspace: (
     workspaceId: string,
@@ -425,6 +439,13 @@ function restoreContentWorkspace(
   // When set and still an open tab in the snapshot, this wins as the active
   // selection, so a poll/visibility refresh can't revert a fresh tab click.
   preferActiveContentId?: string | null,
+  // The `?content=` fallback below is a COLD-LOAD tiebreaker and nothing more.
+  // On a background reconcile it becomes a resurrection bug: if this window has
+  // X active, its URL says `content=X`, and another window closes X, the
+  // fallback re-elects X as active — and restoreWorkspace re-adds an
+  // activeContentId that belongs to no pane, putting the tab back and
+  // persisting it. Callers reacting to a REMOTE change pass false.
+  allowUrlActiveFallback = true,
   // Layout-intent P2b (R3): background reconciles sync the open-tab SET only.
   // "reconcile" preserves this session's layoutMode + activePaneId — another
   // surface persisting its layout must never re-arrange the one you're
@@ -464,7 +485,7 @@ function restoreContentWorkspace(
   // on workspace membership avoids regressing the manual workspace
   // switch path, where `syncWorkspaceUrl` leaves a stale `content=`
   // in the URL from the previous workspace.
-  const contentIdFromUrl = readContentIdFromUrl();
+  const contentIdFromUrl = allowUrlActiveFallback ? readContentIdFromUrl() : null;
   const urlContentBelongsToWorkspace =
     contentIdFromUrl !== null &&
     workspace.items.some((item) => item.contentId === contentIdFromUrl);
@@ -704,7 +725,7 @@ async function fetchWorkspaceMutation(
 
 async function persistWorkspaceStateById(
   workspaceId: string,
-  snapshot: WorkspaceStatePayload,
+  snapshot: WorkspaceStateSavePayload,
 ) {
   const response = await fetchWorkspaceMutation(
     `/api/content/workspaces/${workspaceId}/state`,
@@ -716,10 +737,103 @@ async function persistWorkspaceStateById(
     },
   );
 
+  // Switch-away write: the snapshot was captured before the switch, so if
+  // another surface has since written this workspace we YIELD rather than
+  // retry — retrying would re-derive from local state that no longer belongs
+  // to this workspace. The server hands back the current row, which is what
+  // the caller merges into the list.
+  //
+  // Deliberately does NOT confirm close tombstones the way writeWorkspaceState
+  // does: this payload belongs to the OUTGOING workspace, so it says nothing
+  // about whether a close in the incoming one is durable. (The switch clears
+  // tombstones wholesale anyway — see the subscription at the bottom of this
+  // file.)
+  if (response.status === 409) {
+    const body = (await response.json()) as ApiResponse<ContentWorkspaceResponse>;
+    if (body.data) return body.data;
+  }
+
   return parseResponse<ContentWorkspaceResponse>(
     response,
     "Failed to save workspace state",
   );
+}
+
+const MAX_STATE_WRITE_ATTEMPTS = 2;
+
+/**
+ * PATCH the local pane snapshot under optimistic concurrency.
+ *
+ * `baseUpdatedAt` is the workspace revision this client's snapshot was derived
+ * from. On 409 the server hands back the CURRENT row: adopt it, then re-derive
+ * and retry. Locally closed tabs survive that adoption because
+ * `content-store.restoreWorkspace` subtracts close tombstones — so the retry
+ * writes the close rather than re-adopting a tab a stale peer resurrected.
+ *
+ * If the retry budget runs out we return the remote state we last adopted. The
+ * adoption changed the local snapshot, so WorkplacesShellController's debounced
+ * effect re-arms and tries again on its own — no busy loop here.
+ */
+async function writeWorkspaceState(
+  workspaceId: string,
+): Promise<ContentWorkspaceResponse> {
+  let adoptedRemote: ContentWorkspaceResponse | null = null;
+
+  for (let attempt = 0; attempt < MAX_STATE_WRITE_ATTEMPTS; attempt += 1) {
+    const snapshot = useContentStore.getState().getWorkspaceStateSnapshot();
+    const response = await fetch(
+      `/api/content/workspaces/${workspaceId}/state`,
+      {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...snapshot,
+          baseUpdatedAt: lastAppliedUpdatedAt[workspaceId] ?? null,
+          // A one-pane surface describes a viewport, not the workspace — the
+          // server keeps stored geometry and folds in membership only.
+          layoutAuthority: isSurfaceLayoutAuthoritative(),
+        } satisfies WorkspaceStateSavePayload),
+      },
+    );
+
+    if (response.status !== 409) {
+      const saved = await parseResponse<ContentWorkspaceResponse>(
+        response,
+        "Failed to save workspace state",
+      );
+      // The server now holds this surface's view, so every local open/close it
+      // expresses is durable: a stale peer contradicting it will 409 and
+      // reconcile toward this state. Retire the intents it settles. Keyed on
+      // THIS payload, not merely "a write succeeded" — a request already in
+      // flight when the user acted still carries the pre-change snapshot.
+      confirmWorkspaceWrite([
+        ...Object.values(snapshot.paneTabContentIds).flatMap(
+          (pane) => pane?.contentIds ?? [],
+        ),
+        // activeContentId counts as "written" even though it's normally already
+        // in a pane list: restoreWorkspace RE-ADDS an activeContentId that
+        // belongs to no pane, so an id surviving there is not a closed id.
+        ...(snapshot.activeContentId ? [snapshot.activeContentId] : []),
+      ]);
+      return saved;
+    }
+
+    const body = (await response.json()) as ApiResponse<ContentWorkspaceResponse>;
+    if (!body.data) {
+      throw new Error(body.error?.message ?? "Failed to save workspace state");
+    }
+
+    adoptedRemote = body.data;
+    lastAppliedUpdatedAt[body.data.id] = body.data.updatedAt;
+    restoreContentWorkspace(
+      body.data,
+      useContentStore.getState().selectedContentId,
+      false, // remote state, not a cold load — no URL tiebreaker
+    );
+  }
+
+  return adoptedRemote as ContentWorkspaceResponse;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
@@ -846,10 +960,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       hasWorkspace(currentWorkspaces, previousActiveWorkspaceId) &&
       previousActiveWorkspaceId !== workspace.id
     ) {
-      void persistWorkspaceStateById(
-        previousActiveWorkspaceId,
-        previousSnapshot,
-      )
+      void persistWorkspaceStateById(previousActiveWorkspaceId, {
+        ...previousSnapshot,
+        baseUpdatedAt: lastAppliedUpdatedAt[previousActiveWorkspaceId] ?? null,
+        layoutAuthority: isSurfaceLayoutAuthoritative(),
+      })
         .then((persistedWorkspace) => {
           set((state) => ({
             workspaces: state.workspaces.map((candidate) =>
@@ -880,6 +995,47 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
           }));
         });
     }
+  },
+
+  openWorkbench: async (parentWorkspaceId, folderContentId) => {
+    // Reuse an already-known active workbench row without a round-trip.
+    const existing = get().workspaces.find(
+      (candidate) =>
+        candidate.parentWorkspaceId === parentWorkspaceId &&
+        candidate.viewRootContentId === folderContentId &&
+        candidate.status === "active",
+    );
+    if (existing) {
+      await get().activateWorkspace(existing.id);
+      return existing;
+    }
+    const response = await fetchWorkspaceMutation(
+      `/api/content/workspaces/${parentWorkspaceId}/workbenches`,
+      {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderContentId }),
+      },
+    );
+    const workspace = await parseResponse<ContentWorkspaceResponse>(
+      response,
+      "Failed to open workbench",
+    );
+    set((state) => ({
+      workspaces: applyWorkspaceOrder([
+        workspace,
+        ...state.workspaces.filter(
+          (candidate) => candidate.id !== workspace.id,
+        ),
+      ]),
+    }));
+    notifyMutation();
+    await get().activateWorkspace(workspace.id);
+    return (
+      get().workspaces.find((candidate) => candidate.id === workspace.id) ??
+      workspace
+    );
   },
 
   createWorkspace: async (name) => {
@@ -1151,19 +1307,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     let workspace: ContentWorkspaceResponse;
     try {
-      const response = await fetch(
-        `/api/content/workspaces/${activeWorkspaceId}/state`,
-        {
-          method: "PATCH",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(snapshot satisfies WorkspaceStatePayload),
-        },
-      );
-      workspace = await parseResponse<ContentWorkspaceResponse>(
-        response,
-        "Failed to save workspace state",
-      );
+      workspace = await writeWorkspaceState(activeWorkspaceId);
     } catch (error) {
       if (isOfflineLikePersistenceError(error)) return;
       if (!isWorkspaceNotFoundError(error)) throw error;
@@ -1437,9 +1581,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
         lastAppliedUpdatedAt[incomingActive.id] = incomingActive.updatedAt;
         // Preserve the local active tab: a background refresh syncs the open-tab
         // set, but must not revert what the user is currently viewing (e.g. a
-        // tab they just clicked after reload).
+        // tab they just clicked after reload). That preference is correctly
+        // conditional on the tab still being open remotely — so when another
+        // window CLOSES the tab this window is viewing, the close must win.
         const localActive = useContentStore.getState().selectedContentId;
-        restoreContentWorkspace(incomingActive, localActive, "reconcile");
+        restoreContentWorkspace(incomingActive, localActive, false, "reconcile");
       }
     }
 
@@ -1470,7 +1616,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
 }));
 
-// Keep the tab-filter store scoped to the active workspace. A subscription
+// Keep per-workspace local state scoped to the active workspace. A subscription
 // (rather than edits at each set() site) covers every path that changes the
 // active workspace: initial load, activate, archive fallback, background sync.
 if (typeof window !== "undefined") {
@@ -1482,6 +1628,14 @@ if (typeof window !== "undefined") {
       useWorkspaceTabFilterStore
         .getState()
         .setActiveWorkspace(state.activeWorkspaceId);
+      // Pending intents are keyed by content id but only ever meant something
+      // for the workspace they were created in. Carried across a switch they'd
+      // edit the INCOMING workspace's layout — dropping a tab it never closed,
+      // or injecting one it never opened — and this surface would then persist
+      // that edit. Zustand fires subscribers synchronously inside set(), and
+      // every switch path calls set() before restoreContentWorkspace(), so this
+      // always lands before the new workspace's tabs are applied.
+      clearPendingWorkspaceIntents();
     }
   });
 }
