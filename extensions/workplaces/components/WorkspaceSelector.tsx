@@ -1690,13 +1690,13 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-1.5 pr-1 ${
+                className={`group gap-1 pr-1 focus:text-white ${
                   workspace.isView
-                    ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
+                    ? `border-l-2 pl-1 ${isActive ? "border-white/50" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
                   isActive
-                    ? "bg-gold-primary/16 text-gold-primary shadow-[inset_0_0_0_1px_rgba(212,167,85,0.24)]"
+                    ? "bg-gold-primary text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]"
                     : ""
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
@@ -1741,10 +1741,18 @@ export function WorkspaceSelector() {
 
                     {renderWorkspaceName(workspace, "min-w-0 flex-1 truncate")}
                     {workspace.isView ? (
-                      <Eye className="h-3 w-3 shrink-0 text-gold-primary/70" />
+                      <Eye
+                        className={`h-3 w-3 shrink-0 ${
+                          isActive ? "text-white" : "text-gold-primary/70"
+                        } group-focus:text-white`}
+                      />
                     ) : null}
                     {workspace.isLocked ? (
-                      <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
+                      <Lock
+                        className={`h-3 w-3 shrink-0 ${
+                          isActive ? "text-white/85" : "text-gray-400/80"
+                        } group-focus:text-white/85`}
+                      />
                     ) : null}
                     <button
                       type="button"
@@ -1761,7 +1769,11 @@ export function WorkspaceSelector() {
                         event.preventDefault();
                         event.stopPropagation();
                       }}
-                      className="rounded p-0.5 text-gray-400/80 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                      className={`rounded p-0.5 transition-colors ${
+                        isActive
+                          ? "text-white/85 hover:bg-white/20 hover:text-white"
+                          : "text-gray-400/80 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                      } group-focus:text-white/85 group-focus:hover:bg-white/20 group-focus:hover:text-white`}
                       aria-label={`Open ${workspace.name} settings`}
                     >
                       <Settings className="h-3.5 w-3.5" />
@@ -1786,14 +1798,18 @@ export function WorkspaceSelector() {
                           }}
                           className={`rounded p-0.5 opacity-0 transition-colors group-hover:opacity-100 group-focus:opacity-100 ${
                             isActive
-                              ? "text-gray-600 dark:text-white hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
+                              ? "text-white hover:bg-white/20 hover:text-white"
                               : "text-gray-500 hover:bg-red-500/10 hover:text-red-600"
-                          }`}
+                          } group-focus:text-white group-focus:hover:bg-white/25`}
                           aria-label={`Delete ${workspace.name}`}
                         >
                           <X className="h-3.5 w-3.5" />
                         </button>
-                        <GripVertical className="h-3.5 w-3.5 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" />
+                        <GripVertical
+                          className={`h-3.5 w-3.5 shrink-0 cursor-grab ${
+                            isActive ? "text-white/80" : "text-gray-400"
+                          } group-focus:text-white/80 active:cursor-grabbing`}
+                        />
                       </>
                     ) : (
                       // Main Workspace can't be deleted or reordered. Stand in
@@ -1824,7 +1840,7 @@ export function WorkspaceSelector() {
                           normalizeWorkbenchSettings(workspace.settings).enabled
                         )
                       }
-                      className="-ml-0.5 flex h-3 w-3 shrink-0 items-center justify-center"
+                      className="-ml-1 flex h-3 w-3 shrink-0 items-center justify-center"
                     >
                       {workspace.isView &&
                       workspace.viewRootContentId &&
@@ -1833,9 +1849,9 @@ export function WorkspaceSelector() {
                           strokeWidth={2}
                           className={`h-3 w-3 transition-colors ${
                             isActive
-                              ? "text-gray-700 group-hover:text-gray-900 dark:text-white/90 dark:group-hover:text-white"
-                              : "text-gray-400 group-hover:text-gray-700 dark:text-gray-500 dark:group-hover:text-gray-200"
-                          }`}
+                              ? "text-white"
+                              : "text-gray-400 dark:text-gray-500"
+                          } group-focus:text-white`}
                           aria-label="Has workbenches"
                         />
                       ) : null}
