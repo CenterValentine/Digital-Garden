@@ -27,7 +27,12 @@
 import { prisma } from "@/lib/database/client";
 import { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
-import { deriveRowTitle, type DataColumn } from "@/lib/domain/data";
+import {
+  deriveRowTitle,
+  type DataColumn,
+  type DataColumnConfig,
+} from "@/lib/domain/data";
+import { writeCells } from "@/lib/domain/data/server/mutations";
 
 const EMPTY_DOC = { type: "doc", content: [{ type: "paragraph" }] };
 
@@ -155,4 +160,61 @@ export async function promoteRow(
   }
 
   return { contentId, created: true };
+}
+
+/**
+ * REVERSE title sync (owner report, 2026-08-28): renaming a promoted
+ * row's PAGE — tree rename, tab rename, or the AI's rename tool — flows
+ * back into the row's primary cell, mirroring the cell→node sync
+ * writeCells performs. Without this the grid shows the old title while
+ * the page shows the new, and the two never reconverge.
+ *
+ * Idempotent by construction: writeCells' own title-sync re-derives the
+ * node title from the cell we just wrote — the same string — so the
+ * second hop is a no-op, never a loop.
+ *
+ * Returns false when the node is not a promoted row, or its primary
+ * column is not text-shaped (cannot hold an arbitrary title).
+ */
+export async function syncNodeTitleToRow(
+  nodeId: string,
+  title: string
+): Promise<boolean> {
+  const row = await prisma.dataRow.findFirst({
+    where: { contentId: nodeId, deletedAt: null },
+    select: {
+      id: true,
+      tableId: true,
+      table: {
+        select: {
+          columns: {
+            where: { deletedAt: null },
+            orderBy: { position: "asc" },
+          },
+        },
+      },
+    },
+  });
+  if (!row) return false;
+
+  const columns: DataColumn[] = row.table.columns.map((c) => ({
+    id: c.id,
+    key: c.key,
+    name: c.name,
+    type: c.type,
+    position: c.position,
+    isPrimary: c.isPrimary,
+    config: (c.config ?? {}) as unknown as DataColumnConfig,
+    description: c.description,
+    deletedAt: null,
+  }));
+  const primary = columns.find((c) => c.isPrimary) ?? columns[0];
+  if (!primary || (primary.type !== "text" && primary.type !== "longText")) {
+    return false;
+  }
+
+  await writeCells(row.tableId, columns, [
+    { rowId: row.id, columnKey: primary.key, value: title },
+  ]);
+  return true;
 }
