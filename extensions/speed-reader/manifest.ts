@@ -24,7 +24,7 @@ export const speedReaderExtensionManifest: ExtensionManifest = {
   toolDefinitions: [
     {
       id: SPEED_READER_TOOL_ID,
-      label: "Speed Read",
+      label: "Speed Read Note",
       iconName: "Zap",
       surfaces: ["toolbar"],
       contentTypes: ["note", "file", "external"],

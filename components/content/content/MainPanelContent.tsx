@@ -1782,12 +1782,22 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
         toast.error("Export produced an empty file");
         return;
       }
-      triggerBlobDownload(blob, `${noteTitle || "export"}.md`);
-      toast.success("Exported as Markdown");
+      // The route names the file (databases come back as CSV whatever
+      // format was asked for) — honor its Content-Disposition and only
+      // fall back to the local guess.
+      const disposition = response.headers.get("Content-Disposition");
+      const serverName = disposition?.match(/filename="([^"]+)"/)?.[1];
+      const isData = contentType === "data";
+      triggerBlobDownload(
+        blob,
+        serverName ??
+          `${noteTitle || (isData ? "database" : "export")}.${isData ? "csv" : "md"}`
+      );
+      toast.success(isData ? "Exported as CSV" : "Exported as Markdown");
     } catch {
       toast.error("Export failed");
     }
-  }, [selectedContentId, noteTitle]);
+  }, [selectedContentId, noteTitle, contentType]);
 
   const handleCopyLink = useCallback(() => {
     const url = window.location.href;
