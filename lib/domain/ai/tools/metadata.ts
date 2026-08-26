@@ -21,6 +21,11 @@ import {
   WORKFLOW_TOOL_METADATA as _WORKFLOW_TOOL_METADATA,
   type WorkflowToolId as _WorkflowToolId,
 } from "./workflow-metadata";
+import {
+  DATA_TOOL_IDS as _DATA_TOOL_IDS,
+  DATA_TOOL_METADATA as _DATA_TOOL_METADATA,
+  type DataToolId as _DataToolId,
+} from "./data-metadata";
 
 /** Tool IDs for the base tools */
 export const BASE_TOOL_IDS = [
@@ -151,12 +156,18 @@ export const WORKFLOW_TOOL_IDS = _WORKFLOW_TOOL_IDS;
 export const WORKFLOW_TOOL_METADATA = _WORKFLOW_TOOL_METADATA;
 export type WorkflowToolId = _WorkflowToolId;
 
+// Re-export database tool metadata (plan Phase 6 / B5)
+export const DATA_TOOL_IDS = _DATA_TOOL_IDS;
+export const DATA_TOOL_METADATA = _DATA_TOOL_METADATA;
+export type DataToolId = _DataToolId;
+
 /** All tool IDs (base + editor + flashcards + workflows) for settings UI */
 export const ALL_TOOL_IDS = [
   ...BASE_TOOL_IDS,
   ..._EDITOR_TOOL_IDS,
   ..._FLASHCARD_TOOL_IDS,
   ..._WORKFLOW_TOOL_IDS,
+  ..._DATA_TOOL_IDS,
 ] as const;
 
 /**
@@ -203,6 +214,7 @@ export const ALL_TOOL_METADATA: Record<
   ..._EDITOR_TOOL_METADATA,
   ..._FLASHCARD_TOOL_METADATA,
   ..._WORKFLOW_TOOL_METADATA,
+  ..._DATA_TOOL_METADATA,
 };
 
 /**
@@ -234,5 +246,11 @@ export const TOOL_GROUPS: ReadonlyArray<{
     label: "Workflows",
     description: "Contributed by the Workflows extension.",
     ids: _WORKFLOW_TOOL_IDS,
+  },
+  {
+    label: "Databases",
+    description:
+      "Reading and appending rows in databases mentioned in the chat. Read is paged and bounded; writes are append-only.",
+    ids: _DATA_TOOL_IDS,
   },
 ];

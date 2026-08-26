@@ -12,6 +12,7 @@ export { createBaseTools } from "./registry";
 export { createEditorTools } from "./editor-tools";
 export { createFlashcardTools } from "./flashcard-tools";
 export { createWorkflowTools } from "./workflow-tools";
+export { createDataTools } from "./data-tools";
 export { BASE_TOOL_IDS, BASE_TOOL_METADATA, ALL_TOOL_IDS, ALL_TOOL_METADATA } from "./metadata";
 export { EDITOR_TOOL_IDS, EDITOR_TOOL_METADATA } from "./editor-metadata";
 export { FLASHCARD_TOOL_IDS, FLASHCARD_TOOL_METADATA } from "./flashcard-metadata";

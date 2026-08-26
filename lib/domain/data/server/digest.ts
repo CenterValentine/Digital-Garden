@@ -75,7 +75,9 @@ export async function buildDataSchemaDigest(
   if (!payload) return null;
 
   const lines: string[] = [
-    `# ${payload.content.title} (database, ${payload.mode})`,
+    // The id is the address query_database/insert_rows take — without it
+    // a mention capsule names a database the tools cannot reach.
+    `# ${payload.content.title} (database, ${payload.mode}) [id: ${nodeId}]`,
   ];
   if (payload.description) lines.push(payload.description);
   lines.push(`Size: ${bucketRowCount(payload.rowCount)}`);

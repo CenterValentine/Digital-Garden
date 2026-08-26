@@ -185,6 +185,7 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { createWorkflowTools } from "@/lib/domain/ai/tools";
+import { createDataTools } from "@/lib/domain/ai/tools";
 import {
   readPageInBrowserTool,
   openTabAndReadTool,
@@ -1230,6 +1231,9 @@ export async function POST(request: Request) {
         ...createFlashcardTools(toolCtx),
         // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
         ...createWorkflowTools(toolCtx),
+        // Databases (plan Phase 6): read paged + bounded, write append-only;
+        // jurisdiction is the conversation's associations, checked in-tool.
+        ...createDataTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
         // Agentic Browsing Phase 0: a CLIENT-executed read tool (no server
         // `execute`) — registered only when the client reports the browser
