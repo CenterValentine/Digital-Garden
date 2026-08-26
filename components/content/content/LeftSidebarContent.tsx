@@ -188,7 +188,9 @@ export function LeftSidebarContent({
     initialName: string;
     initialUrl: string;
     editingId: string | null; // ID of external link being edited (null for create)
-  }>({ open: false, mode: "create", initialName: "", initialUrl: "https://", editingId: null });
+    /** Create destination. null = derive from tree selection at save time. */
+    parentId: string | null;
+  }>({ open: false, mode: "create", initialName: "", initialUrl: "https://", editingId: null, parentId: null });
 
   // Ref to temporarily store visualization engine when creating from context menu
   const pendingVisualizationEngine = useRef<"diagrams-net" | "excalidraw" | "mermaid" | null>(null);
@@ -417,6 +419,7 @@ export function LeftSidebarContent({
           initialName: "",
           initialUrl: "https://",
           editingId: null,
+          parentId: null,
         });
       } else if (createTrigger.type === "n8n-workflow") {
         void createN8nFlow();
@@ -491,6 +494,7 @@ export function LeftSidebarContent({
           initialName: externalData.title,
           initialUrl: externalData.external?.url || "https://",
           editingId: id,
+          parentId: null,
         });
       } catch (err) {
         clientLogger.error({
@@ -1099,11 +1103,12 @@ export function LeftSidebarContent({
         }));
       } else {
         // Create new external link
-        // Determine parentId based on current selection
-        let parentId: string | null = null;
+        // Context-menu creates carry an explicit destination; header
+        // creates (parentId null) derive it from the tree selection.
+        let parentId: string | null = externalLinkDialog.parentId;
         const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
 
-        if (treeData && treeSelectedIds.length === 1) {
+        if (parentId === null && treeData && treeSelectedIds.length === 1) {
           const findNode = (nodes: TreeNode[]): TreeNode | null => {
             for (const node of nodes) {
               if (node.id === treeSelectedIds[0]) return node;
@@ -2272,6 +2277,24 @@ export function LeftSidebarContent({
     // File upload requires special two-phase flow - open upload dialog
     if (type === "file") {
       setUploadDialog({ open: true, parentId: requestedParentId });
+      return;
+    }
+
+    // External links need a URL, so they get the dialog, never the inline
+    // temp-node flow — whose body map has no "external" entry, which is why
+    // the context menu's Add → External Link threw "Failed to create"
+    // (owner report, 2026-08-27; the header + menu always rerouted, this
+    // path never did). null parentId keeps the dialog's derive-from-
+    // selection behavior for the header trigger.
+    if (type === "external") {
+      setExternalLinkDialog({
+        open: true,
+        mode: "create",
+        initialName: "",
+        initialUrl: "https://",
+        editingId: null,
+        parentId: requestedParentId,
+      });
       return;
     }
 
