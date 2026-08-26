@@ -348,6 +348,28 @@ export function WorkspaceSelector() {
     [activeWorkspaceId, workspaces],
   );
 
+  /**
+   * Row density scales with how many workspaces the user keeps: a handful get
+   * comfortable rows, a long list tightens so the menu stays scannable
+   * without scrolling. Counts TOP-LEVEL workspaces only — workbenches live in
+   * their own submenu and shouldn't drag the main list denser.
+   *
+   * Tiers step rather than interpolate: a continuous formula would reflow the
+   * whole menu by a pixel every time a workspace is added, and rows that
+   * change height on unrelated actions read as jitter.
+   */
+  const density = useMemo(() => {
+    const count = workspaces.filter(
+      (workspace) => !workspace.parentWorkspaceId,
+    ).length;
+    if (count <= 6) return { row: "py-1", text: "text-sm", icon: "h-4 w-4" };
+    if (count <= 10)
+      return { row: "py-0.5", text: "text-sm", icon: "h-4 w-4" };
+    if (count <= 16)
+      return { row: "py-0.5", text: "text-xs", icon: "h-3.5 w-3.5" };
+    return { row: "py-0", text: "text-xs", icon: "h-3.5 w-3.5" };
+  }, [workspaces]);
+
   // Parent of the ACTIVE workspace when the active one is a workbench —
   // drives the "Parent · Workbench" trigger label and parent-row highlight.
   const activeParentWorkspace = useMemo(
@@ -1715,7 +1737,7 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-1 py-1 pr-1 ${
+                className={`group gap-1 pr-1 ${density.row} ${density.text} ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-dark" : "border-gold-primary/35"}`
                     : "pl-1.5"
@@ -1750,7 +1772,7 @@ export function WorkspaceSelector() {
                 ) : (
                   <>
                     <span
-                      className="inline-flex h-4 w-4 items-center justify-center"
+                      className={`inline-flex ${density.icon} items-center justify-center`}
                       onPointerDown={(event) =>
                         startIconHold(workspace, event.currentTarget)
                       }
@@ -1760,7 +1782,7 @@ export function WorkspaceSelector() {
                     >
                       {renderWorkspaceIcon(
                         getWorkspaceIconValue(workspace),
-                        "h-4 w-4",
+                        density.icon,
                       )}
                     </span>
 
@@ -1990,12 +2012,12 @@ export function WorkspaceSelector() {
                   Workbenches
                 </div>
                 {workbenchMenu.folders === null ? (
-                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
+                  <div className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     Loading folders…
                   </div>
                 ) : visibleFolders.length === 0 ? (
-                  <div className="px-3 py-2 text-xs text-gray-500">
+                  <div className="px-1.5 py-1 text-xs text-gray-500">
                     {allFolders.length === 0
                       ? "No subfolders in this view yet"
                       : "All subfolders are hidden"}
@@ -2028,13 +2050,13 @@ export function WorkspaceSelector() {
                             folder,
                           );
                         }}
-                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
+                        className={`flex w-full items-center gap-1 rounded-lg px-1.5 text-left transition-colors ${density.row} ${density.text} ${
                           isActiveBench
                             ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] hover:bg-gold-dark/60 dark:text-white"
                             : "hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
                         }`}
                       >
-                        <Folder className="h-3.5 w-3.5 shrink-0" />
+                        <Folder className={`${density.icon} shrink-0`} />
                         <span className="min-w-0 flex-1 truncate">
                           {folder.title}
                         </span>
@@ -2054,7 +2076,7 @@ export function WorkspaceSelector() {
                     onClick={() =>
                       void handleUnhideAllWorkbenchFolders(parentWorkspace)
                     }
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-black/10 px-3 py-2 text-left text-xs text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:border-white/10 dark:hover:text-white"
+                    className={`mt-1 flex w-full items-center gap-1 rounded-lg border-t border-black/10 px-1.5 text-left text-[10px] text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:border-white/10 dark:hover:text-white ${density.row}`}
                   >
                     {hiddenCount} hidden · unhide all
                   </button>
