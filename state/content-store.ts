@@ -349,6 +349,209 @@ function getVisibleOpenContentIds(
     .filter((contentId, index, allIds) => allIds.indexOf(contentId) === index);
 }
 
+// ── surface layout capability ─────────────────────────────────────────────
+// Pane geometry (layoutMode + which pane each tab sits in) is workspace-shared
+// state, but not every surface can RENDER it. The extension panel iframe is one
+// pane wide; a mobile client will be too. Such a surface has to show the
+// workspace's tabs WITHOUT asserting that the workspace is single-pane —
+// otherwise its projection gets persisted and flattens the split everywhere.
+//
+// This is a different failure class from the stale-peer one the tombstones and
+// the `baseUpdatedAt` guard address, and neither of those can help with it: a
+// constrained surface's write is perfectly ordered and perfectly fresh. It's
+// just describing a viewport, not the workspace. Ordered last-writer-wins still
+// converges on whoever wrote last.
+//
+// Declaring a constraint does two symmetric things:
+//   READ  — restoreWorkspace clamps incoming geometry to this surface, folding
+//           hidden panes' tabs into the ones it has, rather than adopting a
+//           layout it will immediately override (an override that is itself a
+//           persisted mutation — that was the actual bug).
+//   WRITE — the sync layer marks this surface's payloads non-authoritative and
+//           the server folds in membership only, keeping stored geometry.
+//
+// Divergence between surfaces on the same workspace is the intended outcome
+// here, not a bug to reconcile.
+let surfaceLayoutMode: WorkspaceLayoutMode | null = null;
+
+/**
+ * Pin this surface to one layout and stop it from owning workspace geometry.
+ * Pass null to restore full authority (the default for the app shell).
+ *
+ * Call at module scope, not in an effect: children's effects run before their
+ * parents', so a shell that declared this in `useEffect` would lose the race
+ * against the workspace restore mounted inside it.
+ */
+export function constrainSurfaceLayout(mode: WorkspaceLayoutMode | null) {
+  surfaceLayoutMode = mode;
+}
+
+/** False when this surface projects workspace geometry rather than owning it. */
+export function isSurfaceLayoutAuthoritative() {
+  return surfaceLayoutMode === null;
+}
+
+/**
+ * Fold a pane→contentIds map from one layout into another, preserving order and
+ * dropping duplicates. Used when a constrained surface adopts a wider layout's
+ * tab set: every tab stays reachable, just in fewer panes.
+ */
+function collapsePaneContentIdsForLayout(
+  sourceLayoutMode: WorkspaceLayoutMode,
+  targetLayoutMode: WorkspaceLayoutMode,
+  paneTabContentIds: Partial<Record<WorkspacePaneId, string[]>>
+): Partial<Record<WorkspacePaneId, string[]>> {
+  const collapsed: Partial<Record<WorkspacePaneId, string[]>> = {};
+
+  getVisiblePaneIds(sourceLayoutMode).forEach((sourcePaneId) => {
+    const targetPaneId = collapsePaneIdForLayout(targetLayoutMode, sourcePaneId);
+    const existing = collapsed[targetPaneId] ?? [];
+    collapsed[targetPaneId] = [
+      ...existing,
+      ...(paneTabContentIds[sourcePaneId] ?? []).filter(
+        (contentId) => !existing.includes(contentId)
+      ),
+    ];
+  });
+
+  return collapsed;
+}
+
+// ── pending workspace intents ─────────────────────────────────────────────
+// Opening and closing a tab are the two operations a snapshot-replication model
+// can't express on its own. Every surface rendering MainPanelWorkspace (app
+// window, extension panel iframe, tree overlay) persists the WHOLE pane
+// snapshot, and `restoreWorkspace` replaces the visible tab set wholesale
+// rather than merging — so any remote snapshot that predates a local change
+// silently undoes it:
+//
+//   close → a peer that hasn't seen it re-asserts the tab, and the restore
+//           faithfully puts it back.
+//   open  → the server's set doesn't contain the tab yet, and the restore
+//           erases it. This is the sub-second window between opening content
+//           and the debounced write landing; with a second window active, any
+//           write from it triggers a reconcile that lands inside that window.
+//
+// Optimistic concurrency (workspace-store.writeWorkspaceState) stops a STALE
+// peer's write from landing, but can't help either case: a fresh reconcile is
+// not stale, it just predates a change this surface hasn't published yet.
+//
+// So local changes record an INTENT, and `restoreWorkspace` reconciles incoming
+// snapshots against it — subtracting unconfirmed closes, re-adding unconfirmed
+// opens. The two are opposites over the same key, so one entry per content id.
+//
+// LIFETIME — an intent covers exactly the gap between "I changed it" and "the
+// server agrees", and is dropped the moment any of these is true:
+//
+//  1. The write landed (`confirmWorkspaceWrite`). Once the server holds a
+//     snapshot expressing the change, every stale peer's write 409s and
+//     reconciles toward it, so the intent has no job left. This is the normal
+//     exit, and it's why an intent can't outlive its purpose: a peer that
+//     LEGITIMATELY reverses the change a second later is obeyed, not ignored.
+//  2. The opposite intent was recorded locally — an explicit override.
+//  3. The active workspace changed (`clearPendingWorkspaceIntents`). Intents
+//     are keyed by content id, but workspaces are separate documents; an intent
+//     only ever defended against THIS workspace's peers. Carried across a
+//     switch it would edit the incoming workspace's layout — and that surface
+//     would then persist the edit, corrupting a workspace that never made it.
+//
+// The elapsed-time check is a BACKSTOP for case 1 never happening — offline, a
+// suspended tab, a server erroring. It is deliberately generous because the
+// normal path never reaches it, and an immortal intent is the worst outcome
+// available here: a tab this surface silently refuses to display, or refuses to
+// let go of.
+//
+// Local-only and deliberately so: the server-side truth is the guarded write.
+type PendingWorkspaceIntent = { kind: "open" | "close"; at: number };
+const pendingWorkspaceIntents = new Map<string, PendingWorkspaceIntent>();
+
+// Standalone default. The workplaces extension overrides this off its real poll
+// interval via configurePendingIntentBackstop() — see workspace-sync.ts — so
+// the two can't drift apart if that interval is ever retuned.
+let pendingIntentBackstopMs = 300_000;
+
+/**
+ * Set the backstop lifetime for pending intents. Called by the sync layer that
+ * owns the actual peer-convergence interval; the content store has no business
+ * knowing that number (and deliberately imports nothing from extensions).
+ */
+export function configurePendingIntentBackstop(ms: number) {
+  if (Number.isFinite(ms) && ms > 0) pendingIntentBackstopMs = ms;
+}
+
+function rememberIntent(
+  contentId: string | null | undefined,
+  kind: PendingWorkspaceIntent["kind"]
+) {
+  if (!contentId) return;
+  // Recording the opposite intent replaces the previous one (case 2 above):
+  // re-opening what you just closed is an explicit override, and vice versa.
+  pendingWorkspaceIntents.set(contentId, { kind, at: Date.now() });
+}
+
+/**
+ * A pane snapshot was accepted by the server. An intent is durable truth once
+ * the accepted payload agrees with it — present for an open, absent for a
+ * close — so those intents retire.
+ *
+ * Keyed on the accepted payload rather than "some write succeeded" on purpose:
+ * a write already in flight when the user acts carries the pre-change snapshot.
+ * Retiring on its ack would drop the intent on the strength of a write that
+ * never expressed the change.
+ */
+export function confirmWorkspaceWrite(writtenContentIds: Iterable<string>) {
+  const written = new Set(writtenContentIds);
+  for (const [contentId, intent] of [...pendingWorkspaceIntents]) {
+    const durable =
+      intent.kind === "open" ? written.has(contentId) : !written.has(contentId);
+    if (durable) pendingWorkspaceIntents.delete(contentId);
+  }
+}
+
+/** Drop every intent — see case 3 above (active workspace changed). */
+export function clearPendingWorkspaceIntents() {
+  pendingWorkspaceIntents.clear();
+}
+
+/**
+ * Record open intents for content a surface is about to restore locally.
+ *
+ * Needed by the `?content=` / `tabs_*` URL path in MainPanelWorkspace, which
+ * calls `restoreWorkspace` directly and so never passes through
+ * `setSelectedContentId` (nor the workspace open guard). Without this, a
+ * deep-linked tab is unprotected for the ~700ms before its first write lands,
+ * and a reconcile in that window erases it — the "flashes then disappears"
+ * report, which needs a second window to make the reconcile happen at all.
+ */
+export function markLocalOpenIntents(
+  contentIds: Iterable<string | null | undefined>
+) {
+  for (const contentId of contentIds) rememberIntent(contentId, "open");
+}
+
+/**
+ * This surface's unpublished intent for `contentId`, or null when the server is
+ * already in agreement (or the backstop has expired).
+ */
+function pendingIntentFor(
+  contentId: string
+): PendingWorkspaceIntent["kind"] | null {
+  const intent = pendingWorkspaceIntents.get(contentId);
+  if (!intent) return null;
+  if (Date.now() - intent.at > pendingIntentBackstopMs) {
+    pendingWorkspaceIntents.delete(contentId);
+    return null;
+  }
+  return intent.kind;
+}
+
+/** Content this surface has opened but not yet published. */
+function getPendingOpenContentIds(): string[] {
+  return [...pendingWorkspaceIntents.keys()].filter(
+    (contentId) => pendingIntentFor(contentId) === "open"
+  );
+}
+
 function createWorkspaceStateSnapshot(
   state: Pick<
     ContentState,
@@ -1025,6 +1228,9 @@ export const useContentStore = create<ContentState>((set, get) => ({
   setLayoutMode: (mode) => {
     commitWorkspace(set, (state) => {
       if (state.layoutMode === mode) return {};
+      // A constrained surface can't leave its pinned layout — and must not try,
+      // since every layout change here is a persisted workspace mutation.
+      if (surfaceLayoutMode && mode !== surfaceLayoutMode) return {};
 
       const nextSnapshots = saveLayoutSnapshot(state);
       const nextPanes = getTargetPanesForLayout(
@@ -1101,6 +1307,13 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
   setSelectedContentId: (id, options = {}) => {
     if (id && !shouldAllowWorkspaceOpen(id, options)) return;
+
+    // Every user-initiated open funnels through here (openContentInPane
+    // delegates to it), so this is where an open intent is recorded — it both
+    // overrides a pending close and protects the new tab from a reconcile that
+    // lands before the debounced write does. restoreWorkspace deliberately
+    // records nothing: that's the remote path intents exist to filter.
+    rememberIntent(id, "open");
 
     commitWorkspace(set, (state) => {
       if (!id) {
@@ -1513,6 +1726,8 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const tab = state.tabs[tabId];
       if (!tab) return {};
 
+      rememberIntent(tab.contentId, "close");
+
       const nextTabs = { ...state.tabs };
       delete nextTabs[tabId];
 
@@ -1606,6 +1821,9 @@ export const useContentStore = create<ContentState>((set, get) => ({
 
   clearAllWorkspaceTabs: () => {
     commitWorkspace(set, (state) => {
+      Object.values(state.tabs).forEach((tab) =>
+        rememberIntent(tab.contentId, "close")
+      );
       const activePaneId = isPaneVisible(state.layoutMode, state.activePaneId)
         ? state.activePaneId
         : TOP_LEFT_PANE_ID;
@@ -1631,7 +1849,20 @@ export const useContentStore = create<ContentState>((set, get) => ({
   restoreWorkspace: (workspace) => {
     commitWorkspace(set, (state) => {
       const normalizedWorkspace = normalizeLegacyRestorePanes(workspace);
-      const requestedLayoutMode = normalizedWorkspace.layoutMode ?? "single";
+      const incomingLayoutMode = normalizedWorkspace.layoutMode ?? "single";
+      // A constrained surface adopts the workspace's TABS but keeps its own
+      // geometry: without this it would render the incoming layout, then flip
+      // back via setLayoutMode — and that flip is a persisted mutation, so the
+      // narrow surface would broadcast its shape to every other surface.
+      const requestedLayoutMode = surfaceLayoutMode ?? incomingLayoutMode;
+      if (requestedLayoutMode !== incomingLayoutMode) {
+        normalizedWorkspace.layoutMode = requestedLayoutMode;
+        normalizedWorkspace.paneTabContentIds = collapsePaneContentIdsForLayout(
+          incomingLayoutMode,
+          requestedLayoutMode,
+          normalizedWorkspace.paneTabContentIds ?? {}
+        );
+      }
       const requestedPaneIds = getVisiblePaneIds(requestedLayoutMode);
       const storedTabPreferences = loadStoredTabPreferences();
       // Synchronous first-frame title fallback (spec §3.8): when this restore
@@ -1640,6 +1871,59 @@ export const useContentStore = create<ContentState>((set, get) => ({
       const storedTabTitles = loadStoredTabTitles();
       const nextTabs = { ...state.tabs };
       const nextPanes = createEmptyLayoutPanes();
+
+      // Reconcile against this surface's UNPUBLISHED intents BEFORE rebuilding
+      // panes. This path replaces the visible tab set wholesale rather than
+      // merging, so a snapshot predating a local change silently undoes it —
+      // in both directions. Mutating normalizedWorkspace (not just the loop
+      // below) keeps the activeContentId re-add further down consistent.
+      const intentPaneId =
+        normalizedWorkspace.activePaneId &&
+        requestedPaneIds.includes(normalizedWorkspace.activePaneId)
+          ? normalizedWorkspace.activePaneId
+          : requestedPaneIds[0];
+
+      const reconciledPaneContentIds = Object.fromEntries(
+        Object.entries(normalizedWorkspace.paneTabContentIds ?? {}).map(
+          ([paneId, contentIds]) => [
+            paneId,
+            (contentIds ?? []).filter(
+              (contentId) => pendingIntentFor(contentId) !== "close"
+            ),
+          ]
+        )
+      ) as Partial<Record<WorkspacePaneId, string[]>>;
+
+      const alreadyPresent = new Set(
+        Object.values(reconciledPaneContentIds).flatMap((ids) => ids ?? [])
+      );
+      const pendingOpens = getPendingOpenContentIds().filter(
+        (contentId) => !alreadyPresent.has(contentId)
+      );
+      if (pendingOpens.length > 0) {
+        reconciledPaneContentIds[intentPaneId] = [
+          ...(reconciledPaneContentIds[intentPaneId] ?? []),
+          ...pendingOpens,
+        ];
+      }
+      normalizedWorkspace.paneTabContentIds = reconciledPaneContentIds;
+
+      if (
+        normalizedWorkspace.activeContentId &&
+        pendingIntentFor(normalizedWorkspace.activeContentId) === "close"
+      ) {
+        normalizedWorkspace.activeContentId = null;
+      }
+      // A tab re-added here was almost certainly what the user was just looking
+      // at. `restoreContentWorkspace`'s preferActiveContentId can't protect it
+      // — that guard requires the local active tab to exist in the INCOMING
+      // snapshot, which by definition it doesn't yet.
+      if (
+        state.selectedContentId &&
+        pendingOpens.includes(state.selectedContentId)
+      ) {
+        normalizedWorkspace.activeContentId = state.selectedContentId;
+      }
 
       requestedPaneIds.forEach((paneId) => {
         const contentIds = normalizedWorkspace.paneTabContentIds?.[paneId] ?? [];
