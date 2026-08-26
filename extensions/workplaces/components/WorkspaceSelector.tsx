@@ -194,6 +194,9 @@ function markExpirationWarningSeen(workspaceId: string, expiresAt: string) {
   );
 }
 
+const MENU_HEADING_CLASS =
+  "px-1.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-gray-500";
+
 function clampDormantDays(value: string): number {
   const parsed = Number.parseInt(value, 10);
   if (!Number.isFinite(parsed)) return 30;
@@ -675,7 +678,10 @@ export function WorkspaceSelector() {
     // beside the arrow and lets the label sit above it, where a heading
     // belongs. Sits 2px off the row so it reads as attached to the arrow.
     const PANEL_PADDING = 4; // panel p-1
-    const LABEL_BLOCK = 16; // pt-1 + 10px leading-none label + pb-0.5
+    // Height of the MENU_HEADING_CLASS block: pt-1 (4) + a 9px leading-none
+    // label + pb-0.5 (2). Retune alongside that constant, or the first folder
+    // row drifts off the arrow it is anchored to.
+    const LABEL_BLOCK = 15;
     setWorkbenchMenu({
       workspaceId: workspace.id,
       x: Math.min(rect.right + 2, window.innerWidth - 252),
@@ -1591,7 +1597,7 @@ export function WorkspaceSelector() {
               the way: py-1.5 -> py-1 and leading-tight rather than
               leading-none. This is the menu's primary heading, so it keeps a
               little more air than a nested submenu's label. */}
-          <DropdownMenuLabel className="py-1 text-[9px] uppercase leading-tight tracking-[0.18em] text-gray-500">
+          <DropdownMenuLabel className={MENU_HEADING_CLASS}>
             Workspaces
           </DropdownMenuLabel>
 
@@ -2008,9 +2014,7 @@ export function WorkspaceSelector() {
                 {/* leading-none matters as much as the padding here: a 10px
                     label still reserves a ~15px line box by default, which was
                     most of the space above and below the text. */}
-                <div className="px-3 pb-0.5 pt-1 text-[10px] uppercase leading-none tracking-[0.18em] text-gray-500">
-                  Workbenches
-                </div>
+                <div className={MENU_HEADING_CLASS}>Workbenches</div>
                 {workbenchMenu.folders === null ? (
                   <div className="flex items-center gap-1 px-1.5 py-1 text-xs text-gray-500">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
