@@ -634,13 +634,15 @@ async function hydratePersonRefs(
     userIds.size > 0
       ? prisma.user.findMany({
           where: { id: { in: [...userIds] } },
-          select: { id: true, username: true, email: true },
+          // No email: it must never reach other readers of the table
+          // (privacy review, 2026-08-27) — username or a generic label.
+          select: { id: true, username: true },
         })
       : Promise.resolve([]),
   ]);
   const personById = new Map(persons.map((p) => [p.id, p.displayName]));
   const userById = new Map(
-    users.map((u) => [u.id, u.username || u.email || "User"])
+    users.map((u) => [u.id, u.username || "User"])
   );
 
   for (const row of rows) {

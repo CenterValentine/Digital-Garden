@@ -25,7 +25,7 @@
  */
 
 import { prisma } from "@/lib/database/client";
-import type { Prisma } from "@/lib/database/generated/prisma";
+import { Prisma } from "@/lib/database/generated/prisma";
 import { generateUniqueSlug } from "@/lib/domain/content/slug";
 import { deriveRowTitle, type DataColumn } from "@/lib/domain/data";
 
@@ -39,11 +39,16 @@ export interface PromotionResult {
   created: boolean;
 }
 
+/** Thrown inside the claim transaction when a concurrent promotion won. */
+class PromotionRaceLost extends Error {}
+
 export async function promoteRow(
   tableId: string,
   rowId: string,
   columns: DataColumn[],
-  role: PromotionRole
+  role: PromotionRole,
+  /** Internal retry guard — a lost race retries ONCE into the idempotent branch. */
+  _attempt = 0
 ): Promise<PromotionResult | { error: string }> {
   const row = await prisma.dataRow.findFirst({
     where: { id: rowId, tableId, deletedAt: null },
@@ -122,12 +127,32 @@ export async function promoteRow(
       },
       select: { id: true },
     });
-    await tx.dataRow.update({
-      where: { id: rowId },
+    // Atomic claim: only the row that is STILL un-promoted takes this
+    // node. Two concurrent promotions both pass the read above (it runs
+    // outside this transaction); without the condition the loser would
+    // silently overwrite the winner's contentId and orphan its node
+    // (review finding, 2026-08-27). Losing aborts the transaction, so
+    // the loser's node rolls back with it.
+    const claimed = await tx.dataRow.updateMany({
+      where: { id: rowId, contentId: null },
       data: { contentId: node.id },
     });
+    if (claimed.count === 0) throw new PromotionRaceLost();
     return node.id;
+  }).catch((e: unknown) => {
+    // A concurrent winner can also surface as P2002 (two transactions
+    // minting the same unique slug). Either way the correct answer is
+    // the winner's node — retry once into the already-promoted branch.
+    const isRace =
+      e instanceof PromotionRaceLost ||
+      (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002");
+    if (isRace && _attempt === 0) return null;
+    throw e;
   });
+
+  if (contentId === null) {
+    return promoteRow(tableId, rowId, columns, role, 1);
+  }
 
   return { contentId, created: true };
 }
