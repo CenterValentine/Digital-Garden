@@ -1964,7 +1964,10 @@ export function WorkspaceSelector() {
                 onClick={(event) => event.stopPropagation()}
                 onContextMenu={(event) => event.preventDefault()}
               >
-                <div className="px-3 pb-1 pt-0.5 text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                {/* leading-none matters as much as the padding here: a 10px
+                    label still reserves a ~15px line box by default, which was
+                    most of the space above and below the text. */}
+                <div className="px-3 pb-0.5 pt-0 text-[10px] uppercase leading-none tracking-[0.18em] text-gray-500">
                   Workbenches
                 </div>
                 {workbenchMenu.folders === null ? (
