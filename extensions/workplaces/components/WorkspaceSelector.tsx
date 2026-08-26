@@ -1681,7 +1681,7 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-2 pr-2 ${
+                className={`group gap-2 pr-1.5 ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-gold-primary" : "border-gold-primary/35"}`
                     : "pl-1.5"
@@ -1737,18 +1737,6 @@ export function WorkspaceSelector() {
                     {workspace.isLocked ? (
                       <Lock className="h-3 w-3 shrink-0 text-gray-400/80" />
                     ) : null}
-                    {workspace.isView &&
-                    workspace.viewRootContentId &&
-                    normalizeWorkbenchSettings(workspace.settings).enabled ? (
-                      <ChevronRight
-                        className={`h-3.5 w-3.5 shrink-0 transition-colors ${
-                          workbenchMenu?.workspaceId === workspace.id
-                            ? "text-gold-primary"
-                            : "text-gray-400/80"
-                        }`}
-                        aria-label="Has workbenches"
-                      />
-                    ) : null}
                     <button
                       type="button"
                       data-workspace-settings="true"
@@ -1798,7 +1786,51 @@ export function WorkspaceSelector() {
                         </button>
                         <GripVertical className="ml-0.5 h-4 w-4 shrink-0 cursor-grab text-gray-400 active:cursor-grabbing" />
                       </>
-                    ) : null}
+                    ) : (
+                      // Main Workspace can't be deleted or reordered. Stand in
+                      // for both controls at their exact widths (delete button
+                      // = 14px glyph + p-0.5; grip = 16px + ml-0.5) so its gear
+                      // lines up with everyone else's instead of drifting to
+                      // the right edge.
+                      <>
+                        <span aria-hidden className="h-[18px] w-[18px] shrink-0" />
+                        <span aria-hidden className="ml-0.5 h-4 w-4 shrink-0" />
+                      </>
+                    )}
+
+                    {/* Trailing workbench slot — the row's last element.
+                        Reserved on EVERY row (empty when the workspace has no
+                        workbench submenu) so the right edge stays uniform: a
+                        chevron only some rows render would otherwise shift
+                        those rows' controls out of alignment. Deliberately
+                        lean — a thin 12px glyph pulled to a 4px gap (-ml-1
+                        against the row's gap-2), because it is an edge marker
+                        hinting at hover, not another control competing with
+                        the buttons beside it. */}
+                    <span
+                      aria-hidden={
+                        !(
+                          workspace.isView &&
+                          workspace.viewRootContentId &&
+                          normalizeWorkbenchSettings(workspace.settings).enabled
+                        )
+                      }
+                      className="-ml-1 flex h-3 w-3 shrink-0 items-center justify-center"
+                    >
+                      {workspace.isView &&
+                      workspace.viewRootContentId &&
+                      normalizeWorkbenchSettings(workspace.settings).enabled ? (
+                        <ChevronRight
+                          strokeWidth={1.5}
+                          className={`h-3 w-3 transition-colors ${
+                            workbenchMenu?.workspaceId === workspace.id
+                              ? "text-gold-primary"
+                              : "text-gray-400/80"
+                          }`}
+                          aria-label="Has workbenches"
+                        />
+                      ) : null}
+                    </span>
                   </>
                 )}
               </DropdownMenuItem>
