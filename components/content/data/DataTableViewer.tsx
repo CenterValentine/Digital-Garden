@@ -142,6 +142,20 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const canEditData = state.canWrite && !isQuery;
   const selectNode = useContentStore((s) => s.setSelectedContentId);
 
+  // ?row= is meaningful only while THIS viewer owns the URL. Every
+  // departure to a node must strip it, or the param outlives the table:
+  // the next mount consumes the stale value and — for a promoted row —
+  // "canonically" redirects right back to the note, making the page's
+  // breadcrumb flash to the database and bounce (owner report,
+  // 2026-08-26). The content-store URL sync preserves foreign params, so
+  // nothing else will clean it up.
+  const clearRowParam = useCallback(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has("row")) return;
+    url.searchParams.delete("row");
+    window.history.replaceState(window.history.state, "", url.toString());
+  }, []);
+
   // ── Load ───────────────────────────────────────────────────────────────
 
   const load = useCallback(async (viewId: string | null = null) => {
@@ -218,6 +232,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (fromUrl) {
         const row = state.rows.find((r) => r.id === fromUrl);
         if (row?.contentId) {
+          clearRowParam();
           selectNode(row.contentId, { contentType: "note" });
           return;
         }
@@ -231,7 +246,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     if (peekRowId) url.searchParams.set("row", peekRowId);
     else url.searchParams.delete("row");
     window.history.replaceState(window.history.state, "", url.toString());
-  }, [state.loading, state.table, state.rows, peekRowId, selectNode]);
+  }, [state.loading, state.table, state.rows, peekRowId, selectNode, clearRowParam]);
 
   // ── Poll ───────────────────────────────────────────────────────────────
   //
@@ -924,12 +939,13 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const openContent = useCallback(
     (ref: ContentRef) => {
       if (ref.restricted) return;
+      clearRowParam();
       selectNode(ref.id, {
         contentType: ref.contentType,
         title: ref.title,
       });
     },
-    [selectNode]
+    [selectNode, clearRowParam]
   );
 
   /**
@@ -942,6 +958,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     async (rowId: string) => {
       const row = state.rows.find((r) => r.id === rowId);
       if (row?.contentId) {
+        clearRowParam();
         selectNode(row.contentId, { contentType: "note" });
         return;
       }
@@ -957,11 +974,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         return;
       }
       setPeekRowId(null);
+      clearRowParam();
       selectNode(json.data.contentId, { contentType: "note" });
       // Refresh so the row carries its contentId (the peek badge flips).
       void load(state.view?.id ?? null);
     },
-    [contentId, state.rows, state.view, selectNode, load]
+    [contentId, state.rows, state.view, selectNode, load, clearRowParam]
   );
 
   const openRow = useCallback(
@@ -969,6 +987,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       if (isQuery) {
         // The row IS a note/file — open the real thing, never a row page.
         const row = state.rows.find((r) => r.id === rowId);
+        clearRowParam();
         selectNode(rowId, {
           contentType: row?.nodeContentType ?? null,
           title: typeof row?.data.title === "string" ? row.data.title : null,
@@ -979,7 +998,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       setPeekFocusColumnId(focusColumnId ?? null);
       setEditTarget(null);
     },
-    [isQuery, state.rows, selectNode]
+    [isQuery, state.rows, selectNode, clearRowParam]
   );
 
   const navigatePeek = useCallback(
