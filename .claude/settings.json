@@ -13,7 +13,7 @@
       "Bash(npx prisma *)",
       "Bash(yarn prisma *)",
       "Bash(pnpm prisma *)",
-      "Bash(psql *)",
+
       "Bash(mysql *)",
       "Bash(sqlite3 *)",
       "Bash(mongosh *)",

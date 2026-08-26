@@ -7,7 +7,8 @@ End-to-end regression coverage for the Digital Garden app. Authored during the d
 | Layer | State | What runs |
 |---|---|---|
 | **`dark-mode/`** | ✅ Operational | Screenshot diffs across light + dark themes for signed-out routes (home, sign-in, sign-up, embed/blank) |
-| **`auth/`** `editor/` `file-tree/` `content/` `search/` `extensions/` | ⚠️ Stubs (`test.skip`) | Placeholders documenting what should be covered; not executed |
+| **`publishing/`** | ✅ Operational (hard CI gate) | Per-block snapshot suite against the synthetic fixture route (`_fixtures/publishing/`), run by `publishing-visual.yml` |
+| **`auth/`** `editor/` `file-tree/` `content/` `search/` `extensions/` `inbox/` | ⚠️ Stubs (`test.skip`) | Placeholders documenting what should be covered; not executed |
 
 The Playwright runner reports both passed and skipped tests on every run — `n passed, m skipped` is the signal of "how much we have left to fill in."
 
@@ -76,6 +77,28 @@ To activate a stub:
 2. Implement the test body.
 3. Update the file's top-level docstring with new scope.
 4. Run the test and commit the resulting snapshot (if visual).
+
+### Adding a new operational test
+
+1. Decide if the surface needs auth. **Without auth** → put it in `dark-mode/`. **With auth** → it stays stubbed in `dark-mode/authenticated-routes.spec.ts` until the auth fixture lands (see below).
+2. Import `test`/`expect` from `../_fixtures/theme` and navigate with `themedGoto` (not raw `page.goto`) so the theme is applied on first paint.
+3. Wait for a stable element before snapshotting (avoids flake from font/hydration timing): `await expect(page.getByRole("...")).toBeVisible();`
+4. Run `pnpm test:e2e:update` to capture baselines, then `pnpm test:e2e` to verify.
+5. Commit both the spec and the generated PNG(s).
+
+### When NOT to add a Playwright test
+
+- Pure type/logic changes — `pnpm typecheck` is the right gate.
+- API contract changes — verify the route handler directly (a `scripts/validate-*.ts` contract check or a fixture-driven script), not a screenshot.
+- Animation timing — Playwright disables animations by default; capture the end state, not the motion.
+
+## Known gaps
+
+- **Auth fixture** (`_fixtures/auth.ts`, see below) — unblocks the stubbed authenticated dark-mode tests.
+- **Hocuspocus fixture** for `editor/collaboration.spec.ts` — needs a local Hocuspocus server or mock provider.
+- **Seeded fixture content** for tests that depend on specific note state.
+
+Tracked as follow-ups in `docs/notes-feature/work-tracking/BACKLOG.md`.
 
 ## Authentication
 

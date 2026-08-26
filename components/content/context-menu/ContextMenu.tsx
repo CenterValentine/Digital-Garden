@@ -69,6 +69,20 @@ function MenuAction({
     if (opensChild && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       onSubmenuOpen(action.id, rect);
+      return;
+    }
+    // Hovering a sibling that opens nothing means the pointer left the row
+    // owning the open child WITHOUT entering the child itself — so dismiss it.
+    // Previously only another child-opening row could displace a submenu, which
+    // left e.g. "Add" expanded while the user hovered "Import Skill…".
+    //
+    // Level-scoped by construction: `onSubmenuClose` is the handler for THIS
+    // menu level (the root passes its own, each SubMenu passes its nested one),
+    // so hovering a leaf inside "Add" closes only what "Add" opened — it can't
+    // reach up and collapse "Add" itself. That's what keeps Add > Note > Blank
+    // Note intact.
+    if (openSubmenuId) {
+      onSubmenuClose();
     }
   };
 
@@ -174,7 +188,10 @@ function MenuAction({
   return (
     <>
     {sectionLabelEl}
-    <div className="relative group/action">
+    {/* Hover lives on the ROW, not the button: disabled rows ("Paste",
+        "Toggle Star") don't fire mouse events on the <button> itself, and
+        sweeping across one still has to dismiss an open sibling submenu. */}
+    <div className="relative group/action" onMouseEnter={handleMouseEnter}>
       <div className="flex items-center">
         <button
           ref={buttonRef}
@@ -194,7 +211,6 @@ function MenuAction({
               onClose();
             }
           }}
-          onMouseEnter={handleMouseEnter}
           disabled={action.disabled && !opensChild}
           className={`
             flex flex-1 min-w-0 items-center justify-between gap-3 px-2.5 py-1 text-left text-sm transition-colors
@@ -543,6 +559,14 @@ export function ContextMenu({ actionProviders }: ContextMenuProps) {
   if (sections.length === 0) return null;
 
   const handleSubmenuOpen = (actionId: string, buttonRect: DOMRect) => {
+    // Cancel any pending close (mirrors handleNestedSubmenuOpen). Leaf-row
+    // hovers now schedule a close, so without this a leaf → submenu-row sweep
+    // would open the submenu and then let the stale timer shut it 200ms later.
+    if (submenuCloseTimeoutRef.current) {
+      clearTimeout(submenuCloseTimeoutRef.current);
+      submenuCloseTimeoutRef.current = null;
+    }
+
     // Get parent menu container's position
     const menuRect = menuRef.current?.getBoundingClientRect();
     if (!menuRect) return;

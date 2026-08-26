@@ -114,6 +114,10 @@ The Next.js app and the Hocuspocus server are separate deployments. Vercel auto-
 
 **Rule:** After any block addition merges to main, trigger a Cloud Build run (`cloudbuild.hocuspocus.yaml`).
 
+### No manual collaboration-schema registration — but the CI check still applies
+
+Unlike editor-level TipTap extensions (which need a hand-added entry in `lib/domain/collaboration/extensions.ts`), publishing blocks flow into `getCollaborationServerExtensions()` automatically: `getExtensionServerEditorExtensions()` → `publishingExtensionServerRuntime` → every `Server*` variant registered in `server-runtime.ts`. So Step 2 above *is* the collab registration. `pnpm collab:schema:check` will still fail if you forgot the `Server*` export — that's the signal, not a missing manual step.
+
 ### `renderHTML` in the server extension reads kebab keys, not camel
 
 In `addAttributes()`, you define `ctaText: dataAttr("ctaText")`. In `renderHTML`, TipTap passes this back as `HTMLAttributes["data-cta-text"]` (auto-kebab'd). Read it as `HTMLAttributes["data-cta-text"]`, not `HTMLAttributes["data-ctaText"]` or `HTMLAttributes["ctaText"]`.
