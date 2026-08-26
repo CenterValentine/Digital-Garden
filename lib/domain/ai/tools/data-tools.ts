@@ -281,7 +281,11 @@ export function createDataTools(ctx: ToolExecuteContext) {
             "The database's id or exact name; omit in a chat open on the database"
           ),
         filters: z
-          .array(z.record(z.string(), z.unknown()))
+          .union([
+            z.array(z.record(z.string(), z.unknown())),
+            // A single condition object (weak models skip the array).
+            z.record(z.string(), z.unknown()),
+          ])
           .optional()
           .describe(
             'ANDed conditions: [{column, op, value?}] — value omitted for isEmpty/isNotEmpty; option labels ok for select-likes'
@@ -317,7 +321,12 @@ export function createDataTools(ctx: ToolExecuteContext) {
           // tolerated (column/field/name, op/operator) — weak models mix
           // them, and a naming slip shouldn't cost a turn.
           const conditions: FilterCondition[] = [];
-          for (const raw of input.filters ?? []) {
+          const filterList = Array.isArray(input.filters)
+            ? input.filters
+            : input.filters
+              ? [input.filters]
+              : [];
+          for (const raw of filterList) {
             const f = raw as Record<string, unknown>;
             const columnRef = [f.column, f.field, f.name].find(
               (v): v is string => typeof v === "string"
