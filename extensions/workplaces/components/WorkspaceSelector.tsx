@@ -34,6 +34,7 @@ import {
 } from "@/components/client/ui/dropdown-menu";
 import { normalizeWorkbenchSettings } from "@/extensions/workplaces/server/types";
 import { useContentStore } from "@/state/content-store";
+import { formatRelativeTime } from "@/lib/core/format-relative-time";
 import {
   Dialog,
   DialogContent,
@@ -214,6 +215,24 @@ function getWorkspaceTabCount(workspace: ContentWorkspaceResponse): number {
   return ids.size;
 }
 
+/**
+ * Best available "last opened" signal, absent a dedicated column.
+ *
+ * `updatedAt` moves whenever the workspace's state is persisted — opening or
+ * closing a tab, rearranging panes — so it tracks use, not just edits. Layout
+ * records carry their own per-device stamps, and a surface that writes only a
+ * record (the extension panel) leaves `updatedAt` untouched, so the newest of
+ * the two is the honest answer.
+ */
+function getLastActiveAt(workspace: ContentWorkspaceResponse): number {
+  let newest = Date.parse(workspace.updatedAt);
+  for (const record of workspace.layoutRecords ?? []) {
+    const stamp = Date.parse(record.updatedAt);
+    if (Number.isFinite(stamp) && stamp > newest) newest = stamp;
+  }
+  return newest;
+}
+
 const TAB_COUNT_CHIP_CLASS =
   "shrink-0 rounded-full px-1 text-[9px] leading-[1.4] tabular-nums";
 
@@ -359,6 +378,11 @@ export function WorkspaceSelector() {
   // its own count comes from the live content store — otherwise a tab you
   // just opened isn't counted until the write lands.
   const liveTabCount = useContentStore((state) => state.openContentIds.length);
+  // Clock for relative timestamps. Held in state and refreshed when the menu
+  // opens rather than read during render: Date.now() in render is impure and
+  // the React Compiler rejects it, and a stamp taken at open time is as fresh
+  // as a tooltip needs to be.
+  const [nowMs, setNowMs] = useState(0);
   const reorderWorkspaces = useWorkspaceStore(
     (state) => state.reorderWorkspaces,
   );
@@ -837,6 +861,11 @@ export function WorkspaceSelector() {
     }
   };
 
+  // Refresh the tooltip clock on mount and on every menu open.
+  useEffect(() => {
+    setNowMs(Date.now());
+  }, [menuOpen]);
+
   // Closing the root dropdown always dismisses the workbench submenu.
   useEffect(() => {
     if (menuOpen) return;
@@ -912,9 +941,21 @@ export function WorkspaceSelector() {
     }, 0);
   };
 
+  /** "Last opened <relative>" — empty until the clock effect has run. */
+  const lastOpenedLine = (workspace: ContentWorkspaceResponse) => {
+    if (!nowMs) return "";
+    const stamp = getLastActiveAt(workspace);
+    if (!Number.isFinite(stamp)) return "";
+    return `Last opened ${formatRelativeTime(stamp, nowMs)}`;
+  };
+
   const buildWorkspaceTitle = (workspace: ContentWorkspaceResponse) => {
+    const lines = [workspace.name];
     const description = getWorkspaceDescription(workspace);
-    return description ? `${workspace.name}\n${description}` : workspace.name;
+    if (description) lines.push(description);
+    const lastOpened = lastOpenedLine(workspace);
+    if (lastOpened) lines.push(lastOpened);
+    return lines.join("\n");
   };
 
   const renderWorkspaceName = (
@@ -1563,9 +1604,12 @@ export function WorkspaceSelector() {
             // follows the same light/dark split the fill forces — near-black
             // on the light tan, white on the dark-mode bronze.
             className="inline-flex items-center gap-1.5 rounded-md border border-gold-dark/55 bg-gold-dark/50 px-2.5 py-1 text-xs font-medium text-gray-900 transition-colors hover:bg-gold-dark/60 dark:text-white"
-            title={
-              getWorkspaceDescription(activeWorkspace) || "Choose workspace"
-            }
+            title={[
+              getWorkspaceDescription(activeWorkspace) || "Choose workspace",
+              activeWorkspace ? lastOpenedLine(activeWorkspace) : "",
+            ]
+              .filter(Boolean)
+              .join("\n")}
           >
             {switchingWorkspaceId ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -1830,7 +1874,12 @@ export function WorkspaceSelector() {
                       if (count === 0) return null;
                       return (
                         <span
-                          title={`${count} open ${count === 1 ? "tab" : "tabs"}`}
+                          title={[
+                            `${count} open ${count === 1 ? "tab" : "tabs"}`,
+                            lastOpenedLine(workspace),
+                          ]
+                            .filter(Boolean)
+                            .join("\n")}
                           className={`${TAB_COUNT_CHIP_CLASS} ${
                             isActive
                               ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
@@ -1972,6 +2021,8 @@ export function WorkspaceSelector() {
           <DropdownMenuSeparator />
 
           <DropdownMenuItem
+            title="Create a new workspace"
+            className={`group gap-1 pl-1.5 pr-1 ${density.row} ${density.text} focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white`}
             onPointerMove={(event) => {
               // Mirror of the row guard: the pointer usually still hovers this
               // item right after clicking it, and Radix's hover-focus would
@@ -1986,8 +2037,12 @@ export function WorkspaceSelector() {
               requestCreateWorkspace();
             }}
           >
-            <Plus className="h-4 w-4" />
-            <span>New workspace</span>
+            <span
+              className={`inline-flex ${density.icon} items-center justify-center`}
+            >
+              <Plus className={density.icon} />
+            </span>
+            <span className="min-w-0 flex-1 truncate">New workspace</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -2090,7 +2145,12 @@ export function WorkspaceSelector() {
                         key={folder.id}
                         type="button"
                         disabled={switchingWorkspaceId !== null}
-                        title="Open workbench · right-click to hide"
+                        title={[
+                          "Open workbench · right-click to hide",
+                          existing ? lastOpenedLine(existing) : "",
+                        ]
+                          .filter(Boolean)
+                          .join("\n")}
                         onClick={() =>
                           void handleOpenWorkbench(parentWorkspace, folder)
                         }
@@ -2130,7 +2190,12 @@ export function WorkspaceSelector() {
                           }
                           return (
                             <span
-                              title={`${count} open ${count === 1 ? "tab" : "tabs"}`}
+                              title={[
+                                `${count} open ${count === 1 ? "tab" : "tabs"}`,
+                                lastOpenedLine(existing),
+                              ]
+                                .filter(Boolean)
+                                .join("\n")}
                               className={`${TAB_COUNT_CHIP_CLASS} ${
                                 isActiveBench
                                   ? "bg-black/10 text-gray-800 dark:bg-white/20 dark:text-white"
