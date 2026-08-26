@@ -75,6 +75,7 @@ import { JSONDebugView } from "../viewer/debug/JSONDebugView";
 import { TreeDebugView } from "../viewer/debug/TreeDebugView";
 import { MarkdownDebugView } from "../viewer/debug/MarkdownDebugView";
 import { MetadataDebugView } from "../viewer/debug/MetadataDebugView";
+import { InputTraceDebugView } from "../viewer/debug/InputTraceDebugView";
 import type { JSONContent } from "@tiptap/core";
 import type { EditorStats } from "../editor/MarkdownEditor";
 import type { OutlineHeading } from "@/lib/domain/content/outline-extractor";
@@ -2260,6 +2261,8 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
           return <MarkdownDebugView content={noteContent} title={noteTitle} />;
         case "metadata":
           return <MetadataDebugView content={noteContent} title={noteTitle} />;
+        case "input":
+          return <InputTraceDebugView content={noteContent} title={noteTitle} />;
         default:
           return <JSONDebugView content={noteContent} title={noteTitle} />;
       }

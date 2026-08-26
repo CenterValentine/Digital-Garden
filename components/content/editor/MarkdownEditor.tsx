@@ -41,6 +41,7 @@ import { clientLogger } from "@/lib/core/logger/client";
 import { uploadImage } from "@/lib/domain/editor/hooks/use-image-upload";
 import { isImageUrl } from "@/lib/domain/editor/utils/image-url";
 import { useEditorInstanceStore } from "@/state/editor-instance-store";
+import { inputTraceRecorder } from "@/lib/domain/editor/debug";
 import { useSettingsStore } from "@/state/settings-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useTemplateStore } from "@/state/template-store";
@@ -1039,6 +1040,15 @@ export function MarkdownEditor({
         useEditorInstanceStore.getState().clearEditor(contentId);
       }
     };
+  }, [contentId, editor]);
+
+  // Dev-only: feed the Input Trace debug view (Cmd+Shift+D → "Input").
+  // Observers are capture-phase and passive, so they cannot change editor
+  // behaviour, and the recorder is inert outside `next dev`.
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    if (!editor) return;
+    return inputTraceRecorder.attach(editor, contentId ?? "unbound");
   }, [contentId, editor]);
 
   // Handle Cmd+K / Ctrl+K keyboard shortcut for link dialog

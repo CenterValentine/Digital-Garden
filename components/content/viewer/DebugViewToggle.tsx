@@ -11,6 +11,7 @@ import { useState, useRef, useEffect } from "react";
 import { Bug, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { useDebugViewStore, type DebugViewMode } from "@/state/debug-view-store";
+import { useInputTraceStore } from "@/state/input-trace-store";
 import { useContentStore } from "@/state/content-store";
 import { getSurfaceStyles } from "@/lib/design/system";
 
@@ -19,6 +20,7 @@ const VIEW_MODES: Array<{ value: DebugViewMode; label: string; description: stri
   { value: "tree", label: "Tree", description: "ProseMirror-like hierarchy" },
   { value: "markdown", label: "Markdown", description: "Export preview" },
   { value: "metadata", label: "Metadata", description: "Stats and extracted content" },
+  { value: "input", label: "Input", description: "Keystroke → transaction trace" },
 ];
 
 export function DebugViewToggle() {
@@ -29,6 +31,7 @@ export function DebugViewToggle() {
   const isDevelopment = process.env.NODE_ENV === "development";
 
   const { isDebugPanelVisible, toggleDebugPanel, viewMode, setViewMode } = useDebugViewStore();
+  const isTracing = useInputTraceStore((state) => state.isRecording);
 
   // Close menu when clicking outside
   useEffect(() => {
@@ -85,9 +88,13 @@ export function DebugViewToggle() {
           <span className="text-xs font-medium">{currentMode.label}</span>
           <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} />
 
-          {/* Active indicator */}
-          {isDebugPanelVisible && (
-            <span className="absolute -top-1 -right-1 h-2 w-2 bg-green-500 rounded-full border border-black/50" />
+          {/* Active indicator — red + pulsing while an input trace records */}
+          {(isDebugPanelVisible || isTracing) && (
+            <span
+              className={`absolute -top-1 -right-1 h-2 w-2 rounded-full border border-black/50 ${
+                isTracing ? "bg-red-500 animate-pulse" : "bg-green-500"
+              }`}
+            />
           )}
         </Button>
 

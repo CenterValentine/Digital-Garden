@@ -298,6 +298,8 @@ All stores in `state/`. Pattern: `create<T>()(persist((set, get) => ({...}), { n
 
 **Lossless markdown system** (source-view toggle + paste-as-markdown): `tiptap → markdown → tiptap` is guaranteed lossless by **per-block self-verification** — a block is emitted as pretty markdown / HTML only if it re-parses deep-equal, else it falls to a verbatim base64 `dg-block` fence. To make a custom block render as pretty markdown (e.g. callout → `> [!note]`), add a codec in `lib/domain/content/markdown-block-codecs.ts` (needs BOTH a `toMarkdown` and a parse-side `reTag`), and fix the extension's `renderHTML`↔`parseHTML` symmetry first if `generateJSON(generateHTML(node))` ≠ node. `pnpm markdown:blocks:check` is the CI gate. **Full guide + safe-extension recipe: [docs/notes-feature/guides/editor/LOSSLESS-MARKDOWN-SYSTEM.md](docs/notes-feature/guides/editor/LOSSLESS-MARKDOWN-SYSTEM.md)** — read before challenging a foundation here.
 
+**Debugging formatting quirks:** the dev-only debug panel (Cmd+Shift+D) has an **Input** view that records keystrokes correlated with the ProseMirror transactions they produce — node path, stored vs. resolved marks, every step, and the `beforeinput` intent. Export to the clipboard or to `.local/input-trace/` for an assistant to read. Guide: [docs/notes-feature/guides/editor/INPUT-TRACE-DEBUG-TOOL.md](docs/notes-feature/guides/editor/INPUT-TRACE-DEBUG-TOOL.md)
+
 **Auto-save:** 2-second debounce with visual indicator (yellow → green).
 
 ### Collaboration Architecture

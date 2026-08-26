@@ -8,7 +8,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-export type DebugViewMode = "json" | "tree" | "markdown" | "metadata";
+export type DebugViewMode = "json" | "tree" | "markdown" | "metadata" | "input";
 
 interface DebugViewStore {
   // State
