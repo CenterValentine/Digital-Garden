@@ -46,6 +46,7 @@ import {
   Globe,
   FileCode,
   File as FileIcon,
+  Link as LinkIcon,
   Plus,
   History,
   ChevronRight,
@@ -83,6 +84,12 @@ interface TreeNodeLite {
   treeNodeKind?: string;
   note?: unknown;
   children?: TreeNodeLite[];
+  /**
+   * Referenced children, partitioned out of `children` by the tree API. They
+   * have to be walked separately or attachments are invisible to browse —
+   * which is what kept referenced content reachable by search only.
+   */
+  references?: TreeNodeLite[];
 }
 
 export interface PickerTarget {
@@ -136,6 +143,14 @@ interface FlatRow {
   siblingIndex: number;
   /** True when this row has renderable nested content (expand affordance). */
   hasChildren: boolean;
+  /**
+   * Row came from a parent's `references` array — an attachment or generated
+   * deliverable rather than authored content. Marked so it can carry the same
+   * link badge the file tree uses, and so the "insert after" gap is
+   * suppressed: references occupy a separate index space from primary
+   * children, so `siblingIndex + 1` would not mean what it means elsewhere.
+   */
+  isReference: boolean;
 }
 
 function flattenEligible(
@@ -144,6 +159,7 @@ function flattenEligible(
   parentId: string | null,
   depth = 0,
   out: FlatRow[] = [],
+  asReference = false,
 ): FlatRow[] {
   let siblingIndex = 0;
   for (const node of nodes) {
@@ -163,11 +179,27 @@ function flattenEligible(
         parentId,
         siblingIndex,
         hasChildren: false,
+        isReference: asReference,
       };
       out.push(row);
-      if (RECURSE_TYPES.has(node.contentType) && node.children?.length) {
+      if (RECURSE_TYPES.has(node.contentType)) {
         const before = out.length;
-        flattenEligible(node.children, eligibleTypes, node.id, depth + 1, out);
+        if (node.children?.length) {
+          flattenEligible(node.children, eligibleTypes, node.id, depth + 1, out);
+        }
+        // Second pass for the parent's reference block. Listed after primary
+        // children, matching the file tree's default placement, and flagged so
+        // the rows read as attachments rather than authored content.
+        if (node.references?.length) {
+          flattenEligible(
+            node.references,
+            eligibleTypes,
+            node.id,
+            depth + 1,
+            out,
+            true,
+          );
+        }
         row.hasChildren = out.length > before;
       }
     }
@@ -569,6 +601,9 @@ export function ContentTreePicker({
                   parentId: null,
                   siblingIndex: 0,
                   hasChildren: false,
+                  // Search hits come back as PickerTarget (id/title/type) with
+                  // no role, so they render unbadged even when referenced.
+                  isReference: false,
                 }}
                 disabled={disabledSet.has(item.id)}
                 disabledReason={disabledReason}
@@ -597,6 +632,7 @@ export function ContentTreePicker({
                       parentId: null,
                       siblingIndex: 0,
                       hasChildren: false,
+                      isReference: false,
                     }}
                     disabled={disabledSet.has(r.id)}
                     disabledReason={disabledReason}
@@ -685,8 +721,13 @@ export function ContentTreePicker({
                 // visible row is its child, and a note created "after"
                 // the container would land below the whole subtree —
                 // visually elsewhere than the gap. Skip those.
+                // Reference rows are excluded: they occupy a separate index
+                // space from primary children, so "create after this one"
+                // would splice at a slot that means something else.
                 const gapEligible =
-                  Boolean(quickCreate) && (!next || next.depth <= row.depth);
+                  Boolean(quickCreate) &&
+                  !row.isReference &&
+                  (!next || next.depth <= row.depth);
                 // A LEADING gap marks the top slot of a sibling group:
                 // above the first top-level row, and between an expanded
                 // container and its first child ("beginning of folder").
@@ -906,19 +947,40 @@ function PickRow({
           // Keeps leaf labels aligned with expandable siblings.
           <span className="w-3 shrink-0" aria-hidden />
         )}
-        {row.contentType === "folder" ? (
-          isExpanded ? (
-            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
+        {/* Reference rows carry the same corner badge the file tree uses, so
+            an attachment reads as one here too rather than as a plain child. */}
+        <span
+          className={cn("relative inline-flex shrink-0", row.isReference && "mr-0.5")}
+        >
+          {row.contentType === "folder" ? (
+            isExpanded ? (
+              <FolderOpen className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
+            ) : (
+              <Folder className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
+            )
           ) : (
-            <Folder className="h-3.5 w-3.5 shrink-0 text-yellow-500/80" />
-          )
-        ) : (
-          <TypeIcon
-            contentType={row.contentType}
-            className="h-3.5 w-3.5 shrink-0 text-gray-400"
-          />
-        )}
-        <span className="truncate text-gray-700 dark:text-gray-300">
+            <TypeIcon
+              contentType={row.contentType}
+              className="h-3.5 w-3.5 shrink-0 text-gray-400"
+            />
+          )}
+          {row.isReference ? (
+            <span
+              aria-hidden
+              className="absolute -bottom-1 -right-1 flex h-2.5 w-2.5 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-black/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15"
+            >
+              <LinkIcon className="h-1.5 w-1.5" />
+            </span>
+          ) : null}
+        </span>
+        <span
+          className={cn(
+            "truncate",
+            row.isReference
+              ? "text-gray-500 dark:text-gray-400"
+              : "text-gray-700 dark:text-gray-300",
+          )}
+        >
           {row.title}
         </span>
         {disabled && disabledReason ? (

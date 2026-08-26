@@ -102,6 +102,18 @@ export async function handleWebToNativeMessage(
  * │ it to your auth flow — that's the 5–10 lines worth your judgement.      │
  * └─────────────────────────────────────────────────────────────────────────┘
  */
+/**
+ * Off-origin hosts that must STAY in the WebView: OAuth round-trips.
+ *
+ * The session cookie lands in whichever browser finishes the redirect
+ * chain. Externalizing accounts.google.com sent the whole OAuth flow to the
+ * SFSafariViewController sheet — sign-in completed *there*, its cookie jar
+ * got the session, and the WebView came back still logged out (observed in
+ * the P0 simulator smoke, 2026-08-14). Keeping the chain in-WebView puts
+ * the callback — and the cookie — in the shell's own jar.
+ */
+const IN_WEBVIEW_HOSTS: ReadonlySet<string> = new Set(["accounts.google.com"]);
+
 export function shouldOpenExternally(
   targetUrl: string,
   appOrigin: string = getAppOrigin()
@@ -114,6 +126,14 @@ export function shouldOpenExternally(
   // Only http(s) past this point; let unknown schemes stay in-WebView so the
   // page can decide what to do with them.
   if (scheme !== "http:" && scheme !== "https:") return false;
+
+  // OAuth allowlist: these hosts round-trip back to our origin and must
+  // complete inside the WebView (see IN_WEBVIEW_HOSTS above).
+  try {
+    if (IN_WEBVIEW_HOSTS.has(new URL(targetUrl).hostname)) return false;
+  } catch {
+    // Unparseable URL — fall through to the origin comparison.
+  }
 
   // Same app origin → in-app navigation. Different origin → external.
   return !sameOrigin(targetUrl, appOrigin);

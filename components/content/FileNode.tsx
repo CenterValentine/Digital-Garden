@@ -51,7 +51,9 @@ import { format } from "date-fns";
 import { useLongPress } from "@/components/common/useLongPress";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { useContentStore } from "@/state/content-store";
+import { useTreeStateStore } from "@/state/tree-state-store";
 import { useTreeDragStore } from "@/state/tree-drag-store";
+import { referenceGroupKey } from "@/lib/features/content/reference-group";
 import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
 import type { TreeNode } from "@/lib/domain/content/types";
@@ -104,8 +106,6 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onChangeIcon?: (id: string) => void;
   /** Phase 2: Folder view mode switching */
   onSetFolderView?: (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => Promise<void>;
-  /** Phase 2: Toggle referenced content visibility for folder */
-  onToggleReferencedContent?: (id: string, currentValue: boolean) => Promise<void>;
   /** Visualization engine-specific creators */
   onCreateVisualizationMermaid?: (parentId: string | null) => Promise<void>;
   onCreateVisualizationExcalidraw?: (parentId: string | null) => Promise<void>;
@@ -122,11 +122,43 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onSelectionOnly?: () => void;
 }
 
-export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onToggleReferencedContent, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget, onSelectionOnly }: FileNodeProps) {
+export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete, onDuplicate, onDownload, onChangeIcon, onSetFolderView, onCreateVisualizationMermaid, onCreateVisualizationExcalidraw, onCreateVisualizationDiagramsNet, onCreateAiImage, onAddPeopleTarget, onSelectionOnly }: FileNodeProps) {
   const { data } = node;
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
   const isOpen = node.isOpen;
+
+  // Reference block membership. `isNestedReference` is set by FileTree's
+  // expandReferences transform, never by the API — a referenced node rendered
+  // outside a block (e.g. at tree root, where there's no parent to host a chip)
+  // deliberately renders as an ordinary row.
+  const isNestedReference = data.isNestedReference === true;
+  const referenceCount = data.references?.length ?? 0;
+  const referencesExpanded = useTreeStateStore((state) =>
+    state.expandedIds.has(referenceGroupKey(data.id)),
+  );
+  const referencesAtStart = useTreeStateStore((state) =>
+    state.referencesAtStartIds.has(data.id),
+  );
+  /**
+   * Whether this row has any content of its own to order the reference block
+   * against. Reads the post-transform children: when the block is open its
+   * rows are tagged `isNestedReference`, so filtering them leaves exactly the
+   * primary children in both the open and closed states.
+   *
+   * A row whose ONLY children are references has nothing to reorder — the
+   * block is the whole list, so it sits at the top either way. Showing a
+   * placement control there offers a swap that visibly does nothing, which
+   * reads as broken rather than as a no-op.
+   */
+  const hasPrimaryChildren = (data.children ?? []).some(
+    (child) => !child.isNestedReference,
+  );
+  const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
+  const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
+  const toggleReferencePosition = useTreeStateStore(
+    (state) => state.toggleReferencePosition,
+  );
 
   const { openMenu } = useContextMenuStore();
   const selectedContentId = useContentStore((state) => state.selectedContentId);
@@ -493,7 +525,16 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           isFolder,
           treeNodeKind: data.treeNodeKind,
           parentId: data.parentId, // Add parentId for sibling creation logic
-          includeReferencedContent: data.folder?.includeReferencedContent || false, // Phase 2: Folder setting
+          referenceCount,
+          // Reports whether the block is actually ON SCREEN, not merely
+          // flagged on — a row collapsed by its chevron hides an "expanded"
+          // block, and the menu label has to say "Show" there because that is
+          // what clicking will do.
+          referencesExpanded: referencesExpanded && isOpen,
+          referencesAtStart,
+          // Gates the placement entry the same way the chip's arrow is gated,
+          // so the menu never offers a reorder the row can't show.
+          hasPrimaryChildren,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
           isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
@@ -591,9 +632,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onSetFolderView: onSetFolderView ? async (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => {
           await onSetFolderView(id, viewMode);
         } : undefined,
-        onToggleReferencedContent: onToggleReferencedContent ? async (id: string, currentValue: boolean) => {
-          await onToggleReferencedContent(id, currentValue);
-        } : undefined,
+        onToggleReferences: (_id: string) => {
+          // Same one-click reveal as the chip — the menu entry mirrors it
+          // rather than reimplementing a half-open state. The id is always
+          // this row's, which toggleReferenceBlock already closes over.
+          toggleReferenceBlock();
+        },
+        onToggleReferencePosition: (id: string) => {
+          toggleReferencePosition(id);
+        },
         onEditExternal: async (id: string) => {
           // Dispatched to LeftSidebarContent via window event so the edit
           // dialog stays owned by the panel that hosts it.
@@ -616,6 +663,62 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         },
       }
     );
+  };
+
+  /**
+   * Open the reference block AND the row that holds it, in one click.
+   *
+   * The block is spliced into this row's `children`, so flipping the block on
+   * while the row itself is closed reveals nothing — it only makes the row's
+   * chevron appear, leaving the user to click a second time to see anything.
+   * Opening the row alongside it collapses those two steps into the one the
+   * chip already promises.
+   *
+   * Collapsing is deliberately NOT symmetric: closing the row too would also
+   * hide the primary children, which the user never asked to hide. A row whose
+   * only children were references simply loses its chevron again.
+   */
+  const toggleReferenceBlock = () => {
+    // react-arborist's tree.open() has no leaf/children guard, so opening is
+    // safe even though the reference rows only land in `children` on the next
+    // render. It also fires onToggle, which persists the row's own expansion;
+    // setNodeExpanded is belt-and-braces and idempotent.
+    const openRow = () => {
+      if (node.isOpen) return;
+      node.open();
+      setNodeExpanded(data.id, true);
+    };
+
+    // Block already on, but the row was collapsed by its chevron: the chip
+    // reads as active while showing nothing. Treat the click as "reveal"
+    // rather than toggling references off — the chip always means "show me
+    // these" whenever they aren't actually on screen.
+    if (referencesExpanded && !node.isOpen) {
+      openRow();
+      return;
+    }
+
+    const willExpand = !referencesExpanded;
+    toggleReferences(referenceGroupKey(data.id));
+    if (willExpand) openRow();
+  };
+
+  // Reference-block chrome. Separation here is deliberately VISUAL, not
+  // structural: these are ordinary tree nodes (same selection, drag and
+  // context menu), drawn on a wash with a rail so system-generated
+  // attachments read apart from content the user authored.
+  const referenceBlockClasses = () => {
+    if (!isNestedReference) return "";
+    const edge = data.referenceEdge;
+    const corners =
+      edge === "only"
+        ? "rounded-md"
+        : edge === "first"
+          ? "rounded-t-md"
+          : edge === "last"
+            ? "rounded-b-md"
+            : "";
+    return `bg-black/[0.035] dark:bg-white/[0.045] ${corners}`;
   };
 
   // Three-state visual styling
@@ -657,6 +760,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         touch-callout-none
         flex items-center gap-2 px-2 py-1 cursor-pointer
         transition-colors duration-150
+        ${referenceBlockClasses()}
         ${getBackgroundStyle()}
         ${node.state.isDragging ? "opacity-50" : ""}
       `}
@@ -706,6 +810,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       }}
     >
       <div className="flex items-center gap-1">
+        {/* Rail + half-step indent for reference-block rows. A half step (8px
+            against the tree's 15px) separates the block without implying a
+            parent row that doesn't exist. */}
+        {isNestedReference && (
+          <span aria-hidden className="flex h-full w-2 flex-none justify-center">
+            <span className="w-px self-stretch bg-black/10 dark:bg-white/15" />
+          </span>
+        )}
         {getChevron()}
         {/* Corner badges use the OS-alias idiom: a small glyph on the icon's
             corner. Playbook takes precedence over the referenced marker — a
@@ -773,6 +885,74 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         )}
       </span>
 
+      {/* Reference count chip — the affordance that opens this row's
+          reference block. Allowed to compete for the trailing edge because it
+          carries more than the draft dot it displaced. Right-click reaches the
+          row's own menu, which grows reference-group actions when count > 0. */}
+      {referenceCount > 0 && (
+        <span
+          className={`
+            flex flex-none items-center rounded-full border
+            text-[10px] leading-none tabular-nums transition-colors
+            ${
+              referencesExpanded
+                ? "border-gold-primary/40 bg-gold-primary/15 text-gold-primary"
+                : "border-black/10 bg-black/[0.04] text-gray-500 dark:border-white/10 dark:bg-white/[0.06] dark:text-gray-400"
+            }
+          `}
+        >
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation(); // never select or open the content itself
+              toggleReferenceBlock();
+            }}
+            onDoubleClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+            aria-expanded={referencesExpanded}
+            aria-label={
+              referencesExpanded
+                ? `Hide ${referenceCount} referenced items`
+                : `Show ${referenceCount} referenced items`
+            }
+            title={`${referenceCount} referenced item${referenceCount === 1 ? "" : "s"}`}
+            className="flex items-center gap-1 rounded-full px-1.5 py-px transition-colors hover:text-gray-800 dark:hover:text-gray-200"
+          >
+            <LucideIcons.Link className="h-2 w-2" />
+            {referenceCount}
+          </button>
+
+          {/* Placement toggle. Rendered only while the block is open AND this
+              row has primary children to order it against — on a collapsed
+              block, or a row that holds nothing but references, the control
+              offers a swap with no visible outcome. */}
+          {referencesExpanded && hasPrimaryChildren && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleReferencePosition(data.id);
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+              tabIndex={-1}
+              aria-label={
+                referencesAtStart
+                  ? "Move referenced items below content"
+                  : "Move referenced items above content"
+              }
+              title={
+                referencesAtStart
+                  ? "Referenced items first — click to move below"
+                  : "Referenced items last — click to move above"
+              }
+              className="flex items-center rounded-full border-l border-gold-primary/30 px-1 py-px transition-opacity hover:opacity-100 opacity-70"
+            >
+              <LucideIcons.ArrowUpDown className="h-2.5 w-2.5" />
+            </button>
+          )}
+        </span>
+      )}
+
       {/* Upload status indicator for files */}
       {data.file && data.file.uploadStatus === "uploading" && (
         <div className="h-2 w-2 rounded-full bg-yellow-500 animate-pulse" />
@@ -781,11 +961,20 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         <div className="h-2 w-2 rounded-full bg-red-500" title="Upload failed" />
       )}
 
-      {/* Published indicator */}
-      {!data.isPublished && (
+      {/* Publish status. Silent for the "never published" majority — the old
+          dot fired on `!isPublished`, a legacy share-link boolean the
+          publishing extension never writes, so it appeared on nearly every row
+          and meant nothing. Only live and withdrawn earn a pixel now. */}
+      {data.publishState === "live" && (
         <div
-          className="h-2 w-2 rounded-full bg-gray-500"
-          title="Draft (not published)"
+          className="h-2 w-2 flex-none rounded-full bg-emerald-500"
+          title="Published"
+        />
+      )}
+      {data.publishState === "withdrawn" && (
+        <div
+          className="h-2 w-2 flex-none rounded-full bg-amber-500"
+          title="Unpublished — this was live"
         />
       )}
     </div>

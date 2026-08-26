@@ -40,6 +40,7 @@ import type {
 } from "@/lib/domain/ai/use-conversation-engine";
 import { useTreeDragStore } from "@/state/tree-drag-store";
 import { useImagePreviewStore } from "@/state/image-preview-store";
+import { useContentStore } from "@/state/content-store";
 import { PanelPageContextBar } from "./PanelPageContextBar";
 import { isPanelEmbedSurface } from "@/lib/domain/browser-extension/panel-bridge";
 
@@ -57,6 +58,12 @@ interface ArboristDragItem {
 
 /** Mention syntax: `@[Title](id)`. Used in serializer + parser + send-side. */
 const MENTION_RE = /@\[([^\]]+)\]\(([^)]+)\)/g;
+
+/** Platform-appropriate modifier name for the mention-pill open hint. */
+const OPEN_MODIFIER_LABEL =
+  typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform)
+    ? "⌘"
+    : "Ctrl";
 
 interface ChatInputProps {
   /** Canonical value: text + `@[Title](id)` tokens. */
@@ -465,6 +472,26 @@ export function ChatInput({
 
   // ── paste: strip formatting, keep plain text ──
 
+  // ⌘/Ctrl+click on a mention pill opens the mentioned content (same as the
+  // pills in sent messages, which open on plain click). Plain click keeps
+  // its editing meaning — caret placement beside the pill — so a modifier
+  // is required here, mirroring the editor's link convention.
+  const handleEditorClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      const target = e.target as HTMLElement | null;
+      const pill = target?.closest?.("[data-mention]") as HTMLElement | null;
+      if (!pill || !editorRef.current?.contains(pill)) return;
+      const id = pill.dataset.id;
+      if (!id) return;
+      e.preventDefault();
+      useContentStore
+        .getState()
+        .setSelectedContentId(id, { title: pill.dataset.label ?? null });
+    },
+    [],
+  );
+
   const handlePaste = useCallback(
     (e: React.ClipboardEvent<HTMLDivElement>) => {
       // OS-file paste → attachment intake.
@@ -670,6 +697,7 @@ export function ChatInput({
           onInput={handleInput}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          onClick={handleEditorClick}
           data-placeholder={placeholder}
           className={cn(
             "scrollbar-hide block w-full max-h-[160px] min-h-[36px] overflow-y-auto whitespace-pre-wrap break-words",
@@ -820,8 +848,10 @@ function makeMentionPill(label: string, id: string): HTMLElement {
   span.dataset.id = id;
   span.dataset.label = label;
   span.contentEditable = "false";
+  // Opened via ⌘/Ctrl+click (see handleEditorClick) — advertise it on hover.
+  span.title = `${label} — ${OPEN_MODIFIER_LABEL}+click to open`;
   span.className =
-    "inline-flex items-center align-baseline rounded-md border border-blue-500/30 bg-blue-500/15 px-1.5 py-0.5 text-blue-200 text-xs font-medium leading-tight mx-0.5";
+    "inline-flex items-center align-baseline rounded-md border border-blue-500/30 bg-blue-500/15 px-1.5 py-0.5 text-blue-200 text-xs font-medium leading-tight mx-0.5 transition-colors hover:bg-blue-500/25";
   span.textContent = `@${label}`;
   return span;
 }

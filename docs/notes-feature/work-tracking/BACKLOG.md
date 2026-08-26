@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-12
+last_updated: 2026-08-18
 ---
 
 # Sprint Backlog
@@ -40,6 +40,15 @@ last_updated: 2026-08-12
   If one is ever built: links first (Restrict demands the order), then the
   column, then vacuum orphaned cell keys; dry-run mode; `app/api/cron/`
   pattern.
+
+## Co-browse bind-first + navigation awareness — follow-ups (2026-08-18, after `feat/cobrowse-bind-first`)
+
+Surfaced while building bind-first topology / `documentChanged` / primary-scroller enumeration; not blocking:
+- **Same-site vs same-page bind heuristic.** `startSession` binds the user's tab for any same-site url (host modulo `www.`). If smoke shows the model passing a same-site url for a genuinely different task ("now search X" while the user sits on an unrelated page of the same site), consider a `bindPolicy` hint or a path-distance rule — but only with evidence; the current rule deliberately favors the user's page state.
+- **Scroll a NAMED container.** `scroll`/`collect` pick the primary scroller heuristically (window vs dominant inner pane). A `role`/`name` target on `scroll` ("scroll the container holding this element", via `DOM.scrollIntoViewIfNeeded` on the last collected item) would make virtualized side-lists that don't dominate the viewport enumerable too. Add when a real page needs it.
+- **Harness-enforced item itinerary.** Per-item runs now freeze the enumerated list by observed `href` at the prompt level; the ledger already tiers url > label. If drift persists, have `propose_item_iteration` reject/flag "next" items whose keys aren't in the approved set (code guarantee over prompt).
+- **`documentChanged` for OOPIF-hosted lists.** `docId` is the TOP frame's loaderId; a results list living inside an embedded ATS iframe (Greenhouse/Lever) navigates the child frame only. Extend `currentDocId` to include child-session loaderIds when Slice-4 targets show it matters.
+- **Pre-existing:** the engine had been dropping `scroll`'s `atBottom` (lived in `res.data`); now forwarded. Audit other act ops for the same `res.data`-vs-`res` shape assumption.
 
 ## Layout intent/projection — follow-ups (2026-08-16, after P1–P3 on `feat/layout-intent-projection`; spec: LAYOUT-INTENT-PROJECTION-PLAN.md)
 
@@ -130,9 +139,9 @@ Surfaced during the reliability sweep; not blocking the PR:
 
 The `insert_block` tool (Phases 0–2, branch `feat/ai-block-authoring`) lets the AI **create** rich editor/publishing blocks — leaf blocks plus containers (columns/tabs/accordion/cardPanel/listContainer) with nested content. Surfaced during smoke-testing; pick up **after** the current AI-blocks work ships:
 
-- [ ] **AI block EDITING (`update_block` tool).** Today the AI can only insert blocks — it has no way to modify an existing block's attributes. Asked to "rename these feature titles", it falls back to `apply_diff` (text edits), which can't touch block attrs, so it fails. Needs a tool that targets an existing block by `blockId` and patches its attrs (validated against the block schema, same as insert) — likely a `__editPayload` variant applied by the orchestrator via `updateAttributes` at the block's position. This is the "memory-edit-like" functionality; the natural Phase 3 of the feature. Owner-requested docket (2026-08-03).
-- [ ] **List-item sub-shape hints (fixes "undefined" item titles).** JSON-string list attrs (`featureList.items`, `pricingCard.features`, gallery images…) hold arrays of objects with a specific shape (`{title, description, icon?}`). The array→JSON-string coercion makes them parse, but the model guesses the object KEYS, so a wrong key (`name` vs `title`) renders as "undefined". Surface each list attr's item shape — via a `get_block_schema` tool (progressive disclosure) and/or documenting the shape in the attr's Zod `.describe()`.
-- [ ] **Phase 2b container richness.** Allow prose children (paragraph/heading with text) inside containers — currently only registered blocks can be children, so "a card with a paragraph of prose" isn't expressible. Plus custom tab labels (tabs auto-label "Tab 1/2" today).
+- [x] **AI block EDITING (`update_block`) — SHIPPED (Phase 3, branch `feat/ai-block-editing`, 2026-08-04).** The AI can now list a note's blocks (`list_document_blocks`), edit an existing block's attrs in place (`update_block(blockId, attrs)`, applied via the orchestrator's `setNodeMarkup` at the block's position), and insert between blocks (`afterBlockId`). Remaining edge: `update_block` patches **attributes** only — it can't add/remove a container's children or rename a non-registered `tabPanel` wrapper.
+- [~] **List-item sub-shape hints — PARTIALLY addressed (Phase 3).** `insert_block`/`update_block` now surface each attr's Zod `.describe()` inline (including item shapes like `featureList.items {icon,title,description}`), which fixed the "undefined" titles for the common blocks. Remaining: an on-demand `get_block_schema` tool for deeper shape disclosure on more exotic/nested blocks.
+- [ ] **Phase 2b — prose children in containers.** Allow paragraph/heading (with text) as container children — currently only registered blocks can be children, so "a card with a paragraph of prose" isn't expressible. (Custom tab labels — **DONE in Phase 3**: tab children take a `label`.)
 
 ---
 

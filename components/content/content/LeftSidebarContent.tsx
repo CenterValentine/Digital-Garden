@@ -24,7 +24,6 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
-import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -40,7 +39,6 @@ interface TreeApiResponse {
       maxDepth: number;
       byType: Record<string, number>;
     };
-    hiddenReferencedCount?: number;
   };
   error?: {
     code: string;
@@ -166,14 +164,6 @@ export function LeftSidebarContent({
   onCreateAiImage,
 }: LeftSidebarContentProps) {
   const [treeData, setTreeData] = useState<TreeNode[] | null>(null);
-  // Referenced-content visibility + the hidden-count hint (Session 5b).
-  const showReferencedContent = useFileTreeFilterStore(
-    (s) => s.showReferencedContent,
-  );
-  const setShowReferencedContent = useFileTreeFilterStore(
-    (s) => s.setShowReferencedContent,
-  );
-  const [hiddenReferencedCount, setHiddenReferencedCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
@@ -292,10 +282,6 @@ export function LeftSidebarContent({
       if (activeWorkspaceIsView && activeViewRootContentId && !viewBypassed) {
         url.searchParams.set("viewRootContentId", activeViewRootContentId);
       }
-      if (showReferencedContent) {
-        url.searchParams.set("showReferencedContent", "true");
-      }
-
       const response = await fetch(url.toString(), {
         credentials: "include",
       });
@@ -320,7 +306,6 @@ export function LeftSidebarContent({
       }
 
       setTreeData(result.data.tree);
-      setHiddenReferencedCount(result.data.hiddenReferencedCount ?? 0);
     } catch (err) {
       clientLogger.error({
         layer: "ui",
@@ -333,7 +318,7 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed, showReferencedContent]);
+  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -660,22 +645,31 @@ export function LeftSidebarContent({
     let originalParentId: string | null = null;
     let originalIndex: number = -1;
 
+    // Both arrays have to be walked. Referenced children are partitioned out
+    // of `children` into `references` by the tree API, so a node dragged out
+    // of a reference block is only findable there — searching `children`
+    // alone left `movedNode` null and silently no-op'd the whole optimistic
+    // update, leaving the drop invisible until a reload.
     const removeNode = (nodes: TreeNode[], parentId: string | null = null): TreeNode[] => {
       return nodes
-        .map((node, index) => {
+        .map((node, index): TreeNode | null => {
           if (node.id === nodeId) {
             movedNode = node;
             originalParentId = parentId;
             originalIndex = index;
             return null; // Remove this node
           }
-          if (node.children && node.children.length > 0) {
-            return {
-              ...node,
-              children: removeNode(node.children, node.id),
-            };
-          }
-          return node;
+          return {
+            ...node,
+            children:
+              node.children && node.children.length > 0
+                ? removeNode(node.children, node.id)
+                : (node.children ?? []),
+            references:
+              node.references && node.references.length > 0
+                ? removeNode(node.references, node.id)
+                : node.references,
+          };
         })
         .filter((node): node is TreeNode => node !== null);
     };
@@ -696,33 +690,66 @@ export function LeftSidebarContent({
     }
 
 
+    // Mirror the server's partition: a referenced node lands in the target's
+    // `references`, not its `children`. Inserting into `children` rendered the
+    // drop as an ordinary row and left the parent's count chip stale until a
+    // reload re-fetched the partitioned tree.
+    //
+    // Root is the exception on purpose — the API never partitions the root
+    // array, because there is no row there to host a block. A reference
+    // dropped at root is meant to sit ungrouped, which is the "unassigned"
+    // state the root drop deliberately produces.
+    const relocated = movedNode as TreeNode;
+    const landsInReferences =
+      newParentId !== null && relocated.role === "referenced";
+
     // Insert the node at its new location
     const insertNode = (nodes: TreeNode[]): TreeNode[] => {
       // If this is the target parent (or root if newParentId is null)
       if (newParentId === null) {
         // Insert at root level
         const newNodes = [...nodes];
-        newNodes.splice(adjustedIndex, 0, movedNode!);
+        newNodes.splice(adjustedIndex, 0, relocated);
         return newNodes;
       }
 
       return nodes.map((node) => {
         if (node.id === newParentId) {
+          const landing = { ...relocated, parentId: newParentId };
+          if (landsInReferences) {
+            const newReferences = [...(node.references ?? [])];
+            // react-arborist's index counts rendered rows (primary children
+            // plus any spliced-in references), so it can overshoot this
+            // array. Clamp rather than relying on splice's silent append —
+            // the server re-sorts by displayOrder on the next fetch anyway.
+            newReferences.splice(
+              Math.min(adjustedIndex, newReferences.length),
+              0,
+              landing,
+            );
+            return { ...node, references: newReferences };
+          }
           // Found the target parent, insert into its children
           const newChildren = [...(node.children || [])];
-          newChildren.splice(adjustedIndex, 0, { ...movedNode!, parentId: newParentId });
+          newChildren.splice(adjustedIndex, 0, landing);
           return {
             ...node,
             children: newChildren,
           };
         }
-        if (node.children && node.children.length > 0) {
-          return {
-            ...node,
-            children: insertNode(node.children),
-          };
-        }
-        return node;
+        // Recurse through both arrays — the target may itself be a reference
+        // (a side chat inside a block that owns its own deliverables).
+        return {
+          ...node,
+          children:
+            node.children && node.children.length > 0
+              ? insertNode(node.children)
+              : (node.children ?? []),
+          references:
+            node.references && node.references.length > 0
+              ? insertNode(node.references)
+              : node.references,
+        };
       });
     };
 
@@ -2117,48 +2144,6 @@ export function LeftSidebarContent({
     }
   };
 
-  /** Phase 2: Handler for toggling referenced content visibility for folder */
-  const handleToggleReferencedContent = async (id: string, currentValue: boolean) => {
-    try {
-      const newValue = !currentValue;
-
-      // Call API to persist setting
-      const response = await fetch(`/api/content/folder/${id}/view`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ includeReferencedContent: newValue }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error?.message || "Failed to update folder setting");
-      }
-
-      await response.json();
-
-      // Show success toast
-      toast.success(newValue ? "Showing referenced content" : "Hiding referenced content", {
-        description: "Folder setting has been saved",
-      });
-
-      // Refresh tree to reflect changes in main panel
-      await fetchTree();
-    } catch (err) {
-      clientLogger.error({
-        layer: "ui",
-        event: "folder_referenced_toggle:caught",
-        summary: "toggle referenced content handler caught",
-        attrs: { content_id: id },
-        error: err,
-      });
-      toast.error("Failed to update folder setting", {
-        description: err instanceof Error ? err.message : "An unexpected error occurred. Please try again.",
-      });
-    }
-  };
-
   // Handler: Change icon for content
   const handleChangeIcon = (id: string) => {
     // Find node to get current icon
@@ -2517,7 +2502,6 @@ export function LeftSidebarContent({
             onDownload={handleDownload}
             onChangeIcon={handleChangeIcon}
             onSetFolderView={handleSetFolderView}
-            onToggleReferencedContent={handleToggleReferencedContent}
             onCreateVisualizationMermaid={handleCreateVisualizationMermaid}
             onCreateVisualizationExcalidraw={handleCreateVisualizationExcalidraw}
             onCreateVisualizationDiagramsNet={handleCreateVisualizationDiagramsNet}
@@ -2533,23 +2517,9 @@ export function LeftSidebarContent({
           />
         </div>
 
-        {/* Referenced-content hint — surfaces when hidden referenced
-            content exists, so the user can reveal it (also toggleable via
-            the file-tree right-click menu). */}
-        {!showReferencedContent && hiddenReferencedCount > 0 && (
-          <button
-            type="button"
-            onClick={() => setShowReferencedContent(true)}
-            className="flex w-full items-center gap-1.5 border-t border-black/5 dark:border-white/5 px-3 py-1.5 text-[11px] text-gray-500 hover:text-gray-300 hover:bg-white/5 transition-colors"
-            title="Show referenced content (attachments, linked files)"
-          >
-            <span className="opacity-70">
-              {hiddenReferencedCount} referenced item
-              {hiddenReferencedCount === 1 ? "" : "s"} hidden
-            </span>
-            <span className="ml-auto font-medium">Show</span>
-          </button>
-        )}
+        {/* The "N referenced items hidden · Show" hint lived here. It's gone
+            with the global filter: nothing is hidden tree-wide any more, and
+            each parent reports its own references on its count chip. */}
 
         {/* Status bar */}
         {/* <LeftSidebarStatusBar

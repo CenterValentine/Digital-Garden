@@ -198,6 +198,16 @@ single writer, so the condition shouldn't arise; and by fact 9 a throwing guard 
 the existing guard's throw skips **both** the `ydocState` and payload writes — i.e. it would
 discard live user edits invisibly. If ever built: skip the payload write only, never the Y state.
 
+> **Post-incident update (2026-08-18, PR #168):** the "single writer, shouldn't arise" premise
+> held for *server* writers but not for the client's **offline / `localOnly` REST fallback** — a
+> solo editor that opened a note while Hocuspocus was cold stayed detached for hours and its
+> edits landed in the payload while the Y.Doc froze (note `db80c857`, 63 vs 167 blocks). The
+> guard was still correctly NOT built on the store side (the reasoning above stands). It was built
+> on the **load** side instead — `payloadIsNewerThanCollaborativeCopy` in
+> `loadCollaborationYDocState` — where *choosing* the fresher representation at bootstrap is safe
+> because nothing live is discarded. Companion fix: solo `localOnly` sessions now re-promote on
+> typing when online with dirty state. Contract + rationale: `CONTENT-LOAD-CASCADE.md §9.4`.
+
 ---
 
 ## §7a — Existing surface this plan must reconcile with (found in regression review)

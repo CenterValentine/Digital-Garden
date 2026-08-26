@@ -434,6 +434,34 @@ enforced ledger, not from being content.
 
 ## Co-browsing presence — session-owned tabs
 
+- **Tab topology — amended 2026-08-17 (owner): BIND-FIRST.** The page the user
+  is on is the default target; a fresh agent-owned tab is the exception. Decided
+  in CODE from real tab facts (`session.js startSession`), not by prompt:
+  no url, or a url on the **same site** as the user's active tab → bind that tab
+  in place (no reload — their filters/personalized list/signed-in state survive);
+  an existing session's tab is kept when it's the same-site match (a mid-run
+  re-open or a post-eviction recovery must never spawn a sibling tab); a new tab
+  only for a **different site** (obvious mismatch) or an explicit `newTab: true`
+  (user asked for one). "The user's active tab" is scoped to the **panel's own
+  window** (`panelWindowId` stamped by the panel host — `tabs.query({active})`
+  alone returns one tab per window). Binding **replaces** a session on another
+  tab (session-manager policy) while the executor's single-session invariant
+  stays strict. Why: the earlier default ("new tab unless the model omits `url`")
+  made every fallback path — a mis-resolved bind, a `NO_SESSION` recovery, plain
+  prompt bias toward passing the URL it can see — end in a duplicate tab.
+- **Document identity, not URL text.** Every act reports `documentChanged` from
+  the top frame's CDP `loaderId` (`snapshot.js currentDocId`): true = a real
+  navigation (`back` returns), false = the same document updated in place even if
+  its query string changed (results pages load details beside the list; `back`
+  there is wrong, and `history.back()` after a real navigation reloads a list that
+  may re-rank). Site-agnostic; URL-path comparison is only the fallback.
+- **Primary-scroller scrolling.** `scroll`/`collect` drive the page's PRIMARY
+  scroller — the window when it has real travel, else the dominant visible inner
+  `overflow:auto` container (≥25 % of the viewport; a sidebar/code block never
+  wins) — so two-pane results layouts, mail clients and dashboards enumerate
+  fully instead of `atBottom` on an unmoving window (`actions.js SCROLLER_JS`;
+  reports `scroller`). Per-item runs iterate a **frozen** enumerated list by
+  observed `href` (never re-derive "next" from a re-read list).
 - **Teleport** (above). **Two modes:** *immersive* (watch the synthetic agent
   cursor — overlay, not the OS pointer) vs *ambient* (wander; agent runs
   read/navigate, pauses at every critical checkpoint, OS-notifies, you return to
@@ -796,6 +824,20 @@ even a background tab can't load (aggressive bot-detection / device blocks).
   "agent is driving" signal, paired with our own in-app co-browsing indicator +
   one-click Stop (detach + dismiss). Attach only during an active co-browse
   session; detach the instant it ends.
+  **Amended 2026-08-17 — scope + on-page banner.** The infobar is a *global*
+  Chromium infobar: it appears in every tab of every window of the profile,
+  standalone-PWA windows included, and there is no extension-side way to scope
+  it to the driven tab. The only suppressions are browser-side and all-or-nothing:
+  the `--silent-debugger-extension-api` launch flag (local/dev remedy), or
+  installing the extension via the `ExtensionInstallForcelist` policy (policy-
+  installed extensions never raise the infobar — the eventual distribution-time
+  fix; needs a packed CRX + hosted `update.xml` + a managed-preferences plist for
+  Vivaldi/Chrome). We therefore stopped relying on the infobar as the per-page
+  signal: the extension now paints its own **on-page banner** into the driven tab
+  (`agentic/cdp/banner.js`) — `chrome.scripting`-injected (not CDP) so it can be
+  removed after an out-of-band detach and re-painted on every navigation from
+  `tabs.onUpdated`, and passive (`pointer-events:none`, `aria-hidden`) so it never
+  occludes the hit-test gate or enters the a11y snapshot. Stop remains in the panel.
 
 ## Explicitly out of scope (recorded)
 

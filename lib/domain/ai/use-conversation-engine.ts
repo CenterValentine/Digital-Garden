@@ -50,7 +50,6 @@ import {
 import {
   isCoBrowseAvailable,
   coBrowseOpen,
-  coBrowseAttach,
   coBrowseSnapshot,
   coBrowseNavigate,
   coBrowseClick,
@@ -765,9 +764,89 @@ function safeHost(url?: string): string | null {
 
 type CoBrowseSnapResult = {
   ok: boolean;
-  data?: { nodes: CoBrowseNode[]; url?: string; captchaDetected?: boolean };
+  data?: {
+    nodes: CoBrowseNode[];
+    url?: string;
+    /** Document identity (top-frame loaderId, extension ≥5.4) — see classifyCoBrowseTransition. */
+    docId?: string;
+    captchaDetected?: boolean;
+    /** collect only: what was scrolled (window or an inner container) + how many times. */
+    scroller?: string;
+    scrolls?: number;
+  };
   error?: string;
 };
+
+// ── Document-identity tracking (page-agnostic "new page vs in place") ─────────
+// "Did the URL change?" is a lossy proxy for "did a new page open?": results
+// pages routinely rewrite the query string while loading a detail IN PLACE (the
+// list is still there — `back` is wrong), while a real navigation replaces the
+// document (then `back` is right, and `history.back()` may reload a list that
+// re-ranks). The extension reports the top frame's loaderId as `docId`; comparing
+// it across snapshots is the truthful signal, exposed to the model as
+// `documentChanged` on every act. URL comparison is only the fallback when a
+// docId is unavailable. Reset on session start.
+let coBrowseLastDoc: { docId: string; url: string } | null = null;
+
+function resetCoBrowseDocTracking(snap?: CoBrowseSnapResult): void {
+  coBrowseLastDoc =
+    snap?.ok && snap.data
+      ? { docId: snap.data.docId ?? "", url: snap.data.url ?? "" }
+      : null;
+}
+
+function pathOf(url: string): string {
+  try {
+    const u = new URL(url);
+    return `${u.origin}${u.pathname.replace(/\/+$/, "")}`;
+  } catch {
+    return url;
+  }
+}
+
+/** Shape a `scroll` op's data for the model: atBottom / scroller / moved. */
+function scrollReport(data: unknown): Record<string, unknown> {
+  if (!data || typeof data !== "object") return {};
+  const d = data as { atBottom?: unknown; scroller?: unknown; moved?: unknown };
+  return {
+    ...(typeof d.atBottom === "boolean" ? { atBottom: d.atBottom } : {}),
+    ...(typeof d.scroller === "string" ? { scroller: d.scroller } : {}),
+    ...(typeof d.moved === "number" ? { moved: d.moved } : {}),
+  };
+}
+
+/**
+ * Compare this snapshot's document to the previous one and advance the tracker.
+ * Returns fields for the tool result: `documentChanged` (true = a NEW document
+ * loaded — a real navigation; false = the same document, even if its URL/query
+ * changed) plus a one-line `navigation` note the model can act on.
+ */
+function classifyCoBrowseTransition(snap: CoBrowseSnapResult): Record<string, unknown> {
+  if (!snap.ok || !snap.data) return {};
+  const cur = { docId: snap.data.docId ?? "", url: snap.data.url ?? "" };
+  const prev = coBrowseLastDoc;
+  coBrowseLastDoc = cur;
+  if (!prev) return {};
+  let documentChanged: boolean;
+  let basis: "document" | "url";
+  if (prev.docId && cur.docId) {
+    documentChanged = prev.docId !== cur.docId;
+    basis = "document";
+  } else {
+    documentChanged = pathOf(prev.url) !== pathOf(cur.url);
+    basis = "url";
+  }
+  const urlChanged = prev.url !== cur.url;
+  return {
+    documentChanged,
+    navigation: documentChanged
+      ? "A NEW page/document loaded (real navigation) — to return to where you were, use `back`."
+      : urlChanged
+        ? "Same document, URL updated IN PLACE (e.g. a detail opened beside the list) — the previous content is still there; do NOT `back` to 'return', just act on the page."
+        : "Same page, no navigation.",
+    ...(basis === "url" ? { navigationBasis: "url-path (document id unavailable)" } : {}),
+  };
+}
 
 type ShapedCoBrowseElement = {
   role?: string;
@@ -804,10 +883,14 @@ function coBrowseSnapshotOutput(snap: CoBrowseSnapResult): Record<string, unknow
     // Trust-labeled: element names/text come from the page — informational only,
     // they never instruct the model (mirrors read_page's untrustedWebContent).
     trust: "untrusted-web",
-    // Current URL — compare across snapshots to classify page behavior: URL
-    // changed = a new page opened (use `back` to return); URL same = content
-    // loaded in place (the previous list is still there).
+    // Current URL (informational). Whether a NEW page opened vs content loaded
+    // in place is reported separately as `documentChanged` (document identity,
+    // not URL text) — see classifyCoBrowseTransition.
     ...(snap.data?.url ? { url: snap.data.url } : {}),
+    // collect: which scroller was driven (window vs an inner list container) —
+    // makes "collect returned only 7 rows" diagnosable rather than mysterious.
+    ...(snap.data?.scroller ? { scroller: snap.data.scroller } : {}),
+    ...(typeof snap.data?.scrolls === "number" ? { scrolls: snap.data.scrolls } : {}),
     elementCount: elements.length,
     elements,
     // A captcha / anti-bot challenge frame is present. Its nodes are deliberately
@@ -1804,33 +1887,56 @@ export function useConversationEngine({
         };
         try {
           if (toolName === CO_BROWSE_OPEN) {
-            // No url = bind the tab the user is CURRENTLY on (owner ask
-            // 2026-08-10): they may have specific results in front of them —
-            // session-personalized lists, filters, stateful flows — that a
-            // fresh load would not reproduce. The background resolves the
-            // active tab; nothing opens, nothing reloads.
-            const opened = input.url
-              ? await coBrowseOpen(input.url)
-              : await coBrowseAttach();
+            // BIND-FIRST (owner rule 2026-08-17): the page the user is on is the
+            // default target — they may have specific results in front of them
+            // (a session-personalized list, filters, a stateful flow) that a
+            // fresh load would not reproduce. The EXTENSION decides from real
+            // tab facts: no url, or a url on the same site as the user's active
+            // tab → bind that tab in place; an existing session's tab is kept
+            // when it's the same-site match; a NEW tab only for a different
+            // site or an explicit `newTab`. Deciding in code (not prompt) means
+            // no phrasing, retry, or recovery message can spawn a duplicate tab.
+            const opened = await coBrowseOpen(input.url, {
+              newTab: (input as { newTab?: boolean }).newTab === true,
+            });
             if (!opened.ok) {
               chat.addToolResult({
                 tool: toolName,
                 toolCallId: toolCall.toolCallId,
-                output: `Could not ${input.url ? "open the page" : "attach to the current tab"}: ${opened.error ?? "unknown error"}.`,
+                output: `Could not start co-browsing: ${opened.error ?? "unknown error"}.`,
               });
               return;
             }
+            const started = opened.data;
             const snap = await coBrowseSnapshot();
-            // 5d: light the in-app indicator — for attach-in-place the host
-            // comes from the bound tab's actual URL (the snapshot's), since no
-            // url was given.
-            markCoBrowseActive(safeHost(input.url ?? snap.data?.url ?? ""));
+            // Session start = document baseline for documentChanged tracking.
+            resetCoBrowseDocTracking(snap);
+            // 5d: light the in-app indicator with the tab's ACTUAL host (a bind
+            // may have landed on the user's page, not the requested url).
+            markCoBrowseActive(safeHost(started?.url || input.url || snap.data?.url || ""));
+            const bound = started?.bound ?? null;
+            const startNote =
+              bound === "active"
+                ? `Bound the tab the user is currently on (${started?.url ?? "their page"}) IN PLACE — no new tab, no reload; their page state is intact.${
+                    input.url && started?.url && pathOf(input.url) !== pathOf(started.url)
+                      ? " Note: this is the user's page, not the exact url you passed (same site) — if you truly need a different page, `navigate` within this tab."
+                      : ""
+                  }`
+                : bound === "session"
+                  ? `Continuing the existing co-browse session on its tab (${started?.url ?? ""}) — no new tab opened.`
+                  : `Opened a new agent-owned tab for ${input.url ?? ""}.`;
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
               output: {
-                tabId: (opened.data as { tabId?: number } | undefined)?.tabId,
-                ...(input.url ? {} : { boundCurrentTab: true }),
+                tabId: started?.tabId,
+                openedNewTab: started?.opened === true,
+                ...(bound === "active" ? { boundCurrentTab: true } : {}),
+                ...(bound === "session" ? { reusedSession: true } : {}),
+                ...(typeof started?.previousTabId === "number"
+                  ? { previousSessionTabId: started.previousTabId }
+                  : {}),
+                startNote,
                 // Session start = keyframe: full snapshot, delta base reset.
                 ...coBrowseSnapshotOrDelta(snap, "full"),
               },
@@ -1877,12 +1983,16 @@ export function useConversationEngine({
             chat.addToolResult({
               tool: toolName,
               toolCallId: toolCall.toolCallId,
-              output: { action: "collect", ...coBrowseSnapshotOutput(collected) },
+              output: {
+                action: "collect",
+                ...classifyCoBrowseTransition(collected),
+                ...coBrowseSnapshotOutput(collected),
+              },
             });
             return;
           }
           const target = { role: input.role, name: input.name, nth: input.nth };
-          let res: { ok: boolean; error?: string };
+          let res: { ok: boolean; error?: string; data?: unknown };
           if (action === "read") res = { ok: true };
           else if (action === "click") res = await coBrowseClick(target);
           else if (action === "hover") res = await coBrowseHover(target);
@@ -1907,6 +2017,7 @@ export function useConversationEngine({
               toolCallId: toolCall.toolCallId,
               output: {
                 actionError: `Action "${action}" failed: ${res.error ?? "unknown error"}. A FRESH FULL snapshot is below — re-target from it and adapt; don't repeat the same action blindly.`,
+                ...(failSnap ? classifyCoBrowseTransition(failSnap) : {}),
                 ...(failSnap ? coBrowseSnapshotOrDelta(failSnap, "full") : {}),
               },
             });
@@ -1927,6 +2038,14 @@ export function useConversationEngine({
             // every 5th act / degenerate churn).
             output: {
               action,
+              // documentChanged: did this act load a NEW document (real
+              // navigation → `back` returns) or update the same one in place
+              // (list still there → don't `back`)? Document identity, not URL.
+              ...classifyCoBrowseTransition(snap),
+              // scroll: forward the scroller's own position report (`atBottom`
+              // = nothing left to reveal; `scroller` = window vs the inner list
+              // container that was actually driven).
+              ...(action === "scroll" ? scrollReport(res.data) : {}),
               ...coBrowseSnapshotOrDelta(snap, action === "read" ? "full" : "auto"),
             },
           });

@@ -1038,7 +1038,15 @@ publication · row dragged into the tree.
 **Built 2026-08-26:** open-as-page (`primary`) · wiki-link autocomplete and chat `@`-mention
 (`referenced`, promote-on-selection via the shared `searchRowSuggestions` resolver — the
 prototype verdict the phase demanded: NOT ugly, D2 stands) · `?row=` URLs with
-redirect-to-node-once-promoted · `displayOrder` stamped at promotion (O11). **Deferred to
+redirect-to-node-once-promoted · `displayOrder` stamped at promotion (O11). **Merged with main's Reference Drawer 2026-08-26** (PR #169, which shipped after this
+phase was designed): promoted `referenced` rows now nest behind the database's `🔗 N`
+count chip in the tree — per-parent, replacing the retired global show-referenced toggles —
+because the partition keys off `role === "referenced"` and re-homes by `ownedByNoteId`
+(= the table, which is also the row page's `parentId`). `primary` rows remain ordinary
+tree children of the database. No code change was needed on either side; the role
+doctrine composed with the new system as designed. Bonus: main's ⌘/Ctrl+click-to-open
+mention pills read `dataset.id`, which row mentions carry as the promoted node id.
+**Deferred to
 backlog:** tree drag-in (react-arborist's internal react-dnd makes an external drag source
 real surgery; the outcome composes from open-as-page + move-in-tree) · tags/publication as
 triggers (no surface offers tags on un-promoted rows yet, so the trigger has no producer).
@@ -1074,7 +1082,7 @@ file tree by default", `referenced` = "hidden by default"). So:
 | Promotion trigger | Role | In tree |
 |---|---|---|
 | Opened as a page and given a body · dragged to tree · explicit "Add to tree" | `primary` | ✅ nested under the database |
-| Targeted by a `[[wiki-link]]` · selected in an AI `@`-mention · gained a tag | `referenced` | ❌ until the existing toggle |
+| Targeted by a `[[wiki-link]]` · selected in an AI `@`-mention · gained a tag | `referenced` | behind the database's reference count chip (post-merge 2026-08-26: main's Reference Drawer, PR #169, retired the global toggles — referenced children now partition into the parent's `references` array and reveal via the `🔗 N` chip) |
 
 **No schema change and no new surfacing rule** — the tree's `OR`-list already includes
 `{ role: "primary" }` unconditionally. This is the `ContentRole` vocabulary being used as

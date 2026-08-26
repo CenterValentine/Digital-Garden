@@ -7,7 +7,7 @@
  * Returns null when no toolbar tools are available.
  */
 
-import { BookmarkPlus, Download, Layers, Link2, Share2, Upload, Zap } from "lucide-react";
+import { BookmarkPlus, Code2, Download, Layers, Link2, Share2, Upload, Zap } from "lucide-react";
 import { useToolSurface } from "@/lib/domain/tools";
 import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
@@ -41,8 +41,11 @@ import { useRightSidebarStateStore } from "@/state/right-sidebar-state-store";
 const READ_ALOUD_CONTENT_TYPES = new Set(["note", "file", "html", "code"]);
 
 /** Map iconName strings to lucide-react components */
+// An iconName with no entry here renders a button with no icon at all — silent
+// and easy to miss. Keep in sync with TOOL_REGISTRY's iconName values.
 const ICON_MAP: Record<string, ComponentType<{ className?: string }>> = {
   BookmarkPlus,
+  Code2,
   Download,
   Layers,
   Link2,
@@ -214,19 +217,32 @@ export function ContentToolbar({ contentId: contentIdProp }: ContentToolbarProps
       {tools.filter((t) => t.definition.order < 70).map((tool) => {
         const Icon = ICON_MAP[tool.definition.iconName];
         const isIconOnly = tool.definition.iconOnly ?? false;
+        // A toggle's pressed styling is its only affordance in an icon-only
+        // toolbar, so it also gets aria-pressed and a label describing what the
+        // next press does (activeLabel) rather than a static noun.
+        const isToggle = tool.definition.isToggle ?? false;
+        const label =
+          isToggle && tool.isActive
+            ? tool.definition.activeLabel ?? tool.definition.label
+            : tool.definition.label;
         return (
           <button
             key={tool.definition.id}
             onClick={tool.execute}
             disabled={tool.isDisabled}
+            aria-pressed={isToggle ? tool.isActive : undefined}
             className={`flex shrink-0 items-center gap-1.5 rounded-md ${
               isIconOnly ? "px-1.5 py-1.5" : "px-2.5 py-1.5"
-            } text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50`}
-            title={tool.definition.label}
+            } text-sm font-medium transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+              isToggle && tool.isActive
+                ? "bg-muted text-foreground"
+                : "text-muted-foreground"
+            }`}
+            title={label}
             type="button"
           >
             {Icon && <Icon className="h-4 w-4" />}
-            {!isIconOnly && <span className="whitespace-nowrap">{tool.definition.label}</span>}
+            {!isIconOnly && <span className="whitespace-nowrap">{label}</span>}
           </button>
         );
       })}

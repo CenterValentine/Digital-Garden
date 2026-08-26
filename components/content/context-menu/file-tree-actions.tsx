@@ -27,6 +27,7 @@ import {
   Columns3,
   LayoutDashboard,
   Network,
+  ArrowUpDown,
   Eye,
   EyeOff,
   ExternalLink,
@@ -61,7 +62,6 @@ import {
   type WorkspacePaneId,
 } from "@/state/content-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
-import { useFileTreeFilterStore } from "@/state/file-tree-filter-store";
 import { useSettingsStore } from "@/state/settings-store";
 import { useExtensionActivationStore } from "@/state/extension-activation-store";
 
@@ -81,7 +81,17 @@ export interface FileTreeContext {
     isFolder: boolean;
     treeNodeKind?: "content" | "peopleGroup" | "person";
     parentId?: string | null;
-    includeReferencedContent?: boolean; // Phase 2: Folder setting
+    /** Count of referenced children, for the reference-block actions. */
+    referenceCount?: number;
+    /** Whether this row's reference block is currently expanded. */
+    referencesExpanded?: boolean;
+    /** Whether this row's reference block sits before its primary children. */
+    referencesAtStart?: boolean;
+    /**
+     * Whether the row has content of its own to order references against. A
+     * row holding nothing but references has nothing to reorder.
+     */
+    hasPrimaryChildren?: boolean;
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
     isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
@@ -101,8 +111,10 @@ export interface FileTreeContext {
   onRefresh?: () => Promise<void>;
   /** Phase 2: Folder view mode switching */
   onSetFolderView?: (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => Promise<void>;
-  /** Phase 2: Toggle referenced content visibility for folder */
-  onToggleReferencedContent?: (id: string, currentValue: boolean) => Promise<void>;
+  /** Expand/collapse this row's reference block (the count chip's action). */
+  onToggleReferences?: (id: string) => void;
+  /** Flip this row's reference block between start and end of its children. */
+  onToggleReferencePosition?: (id: string) => void;
   /** Phase 2: Edit external link */
   onEditExternal?: (id: string) => Promise<void>;
   /** Phase 2: Copy external link URL */
@@ -156,7 +168,8 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     onDownload,
     onRefresh,
     onSetFolderView,
-    onToggleReferencedContent,
+    onToggleReferences,
+    onToggleReferencePosition,
     onEditExternal,
     onCopyExternalUrl,
     onCreateNote,
@@ -393,6 +406,46 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     }
   }
 
+  // Section 2a: Reference block. Any row that owns referenced children gets
+  // this — folders AND notes alike. It's the keyboard/right-click route to the
+  // same thing the count chip does, so the chip isn't the only way in.
+  if (
+    isSingleSelection &&
+    clickedId &&
+    onToggleReferences &&
+    (clickedNode?.referenceCount ?? 0) > 0
+  ) {
+    const referenceCount = clickedNode?.referenceCount ?? 0;
+    sections.push({
+      actions: [
+        {
+          id: "toggle-references",
+          label: clickedNode?.referencesExpanded
+            ? `Hide ${referenceCount} referenced item${referenceCount === 1 ? "" : "s"}`
+            : `Show ${referenceCount} referenced item${referenceCount === 1 ? "" : "s"}`,
+          icon: clickedNode?.referencesExpanded ? (
+            <EyeOff className="h-4 w-4" />
+          ) : (
+            <Eye className="h-4 w-4" />
+          ),
+          onClick: () => onToggleReferences(clickedId),
+        },
+        ...(onToggleReferencePosition && clickedNode?.hasPrimaryChildren
+          ? [
+              {
+                id: "toggle-reference-position",
+                label: clickedNode?.referencesAtStart
+                  ? "Move referenced items below content"
+                  : "Move referenced items above content",
+                icon: <ArrowUpDown className="h-4 w-4" />,
+                onClick: () => onToggleReferencePosition(clickedId),
+              },
+            ]
+          : []),
+      ],
+    });
+  }
+
   // Section 2: Folder view mode (folder only, single selection)
   if (isSingleSelection && clickedId && isFolder && onSetFolderView) {
     sections.push({
@@ -435,22 +488,6 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
             },
           ],
           divider: true,
-        },
-        {
-          id: "toggle-referenced",
-          // Scoped to THIS folder. Distinct from the tree-wide toggle in
-          // Section 8 ("Show all referenced content"). The labels used to
-          // collide as "Show Referenced Content" in both places.
-          label: clickedNode?.includeReferencedContent
-            ? "Hide referenced content in this folder"
-            : "Show referenced content in this folder",
-          icon: clickedNode?.includeReferencedContent ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />,
-          onClick: async () => {
-            if (onToggleReferencedContent) {
-              await onToggleReferencedContent(clickedId, clickedNode?.includeReferencedContent || false);
-            }
-          },
-          disabled: !onToggleReferencedContent,
         },
       ],
     });
@@ -792,25 +829,14 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   }
 
   // Section 8: View options + Refresh (always available)
+  //
+  // Both "show/hide referenced content" entries used to live here and in
+  // Section 2's Set View submenu. They're gone: references are no longer
+  // filtered at all, just nested behind each parent's count chip, so there is
+  // nothing global left to toggle.
   {
-    const { showReferencedContent, toggleShowReferencedContent } =
-      useFileTreeFilterStore.getState();
     sections.push({
       actions: [
-        {
-          id: "toggle-referenced-content",
-          // Tree-wide filter. Section 2 has a per-folder variant labeled
-          // "Show referenced content in this folder" — distinct scope.
-          label: showReferencedContent
-            ? "Hide all referenced content"
-            : "Show all referenced content",
-          icon: showReferencedContent ? (
-            <EyeOff className="h-4 w-4" />
-          ) : (
-            <Eye className="h-4 w-4" />
-          ),
-          onClick: () => toggleShowReferencedContent(),
-        },
         {
           id: "refresh",
           label: "Refresh Tree",

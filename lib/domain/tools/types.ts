@@ -46,6 +46,12 @@ export interface ToolDefinition {
   shortcut?: string;
   /** Whether this tool has an active/inactive toggle state */
   isToggle?: boolean;
+  /**
+   * Label/tooltip to use while the tool is active. Lets a toggle describe what
+   * the next press will DO rather than what it is — "Apply markdown and return
+   * to rich text" instead of a static noun. Ignored unless `isToggle`.
+   */
+  activeLabel?: string;
   /** Show icon only, hide label (for toolbar space optimization) */
   iconOnly?: boolean;
   /** For sidebar-tab surface: the tab key used by RightSidebar */
