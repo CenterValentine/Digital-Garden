@@ -1202,6 +1202,8 @@ export async function POST(request: Request) {
         // themselves). editableContentId is deliberately undefined when a
         // workflow is open, so thread the raw contentId through for it.
         contentId: editableContentId ?? (openWorkflowTitle ? contentId : undefined),
+        // The raw binding, un-scoped — database tools' implicit jurisdiction.
+        boundContentId: contentId,
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the

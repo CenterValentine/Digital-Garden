@@ -64,10 +64,14 @@ const CONFIRM_THRESHOLD = 10;
 async function boundTableIdFor(
   ctx: ToolExecuteContext
 ): Promise<string | null> {
-  if (!ctx.contentId) return null;
+  // boundContentId is the raw chat binding; contentId is editor-scoped
+  // (undefined for database-bound chats — the hole that made every
+  // "bound here" check silently false, owner report 2026-08-28).
+  const bound = ctx.boundContentId ?? ctx.contentId;
+  if (!bound) return null;
   const data = await prisma.contentNode.findFirst({
     where: {
-      id: ctx.contentId,
+      id: bound,
       ownerId: ctx.userId,
       contentType: "data",
       deletedAt: null,
@@ -76,7 +80,7 @@ async function boundTableIdFor(
   });
   if (data) return data.id;
   const row = await prisma.dataRow.findFirst({
-    where: { contentId: ctx.contentId, deletedAt: null },
+    where: { contentId: bound, deletedAt: null },
     select: { tableId: true },
   });
   return row?.tableId ?? null;
@@ -98,6 +102,7 @@ async function resolveJurisdiction(
   // its row pages — is the strongest association there is; sidechat
   // binding (plan Phase 6) needs no ConversationAssociation row.
   const boundHere =
+    ctx.boundContentId === databaseId ||
     ctx.contentId === databaseId ||
     (await boundTableIdFor(ctx)) === databaseId;
   if (!boundHere) {
