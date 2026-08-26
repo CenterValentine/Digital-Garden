@@ -350,6 +350,80 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
   const refreshPageTemplates = usePageTemplateStore((state) => state.fetchTemplates);
   const collaborationEnabled = process.env.NEXT_PUBLIC_COLLABORATION_ENABLED === "true";
   const visualizationEngine = contentType === "visualization" ? (contentData?.engine as string | null | undefined) ?? null : null;
+
+  // Row-page chrome (plan Phase 5/6a): provenance banner + Properties
+  // strip. Defined once, rendered in BOTH content branches — a promoted
+  // row's page is a note, but files/etc. can in principle be promoted
+  // targets too.
+  const promotedRowChrome = promotedFromRow ? (
+    <>
+      <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
+        <span>Row of</span>
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedContentId(promotedFromRow.tableId, {
+              contentType: "data",
+              title: promotedFromRow.tableTitle,
+            })
+          }
+          className="font-medium text-foreground hover:underline"
+        >
+          {promotedFromRow.tableTitle}
+        </button>
+        <span aria-hidden="true">·</span>
+        <button
+          type="button"
+          onClick={() =>
+            setSelectedContentId(promotedFromRow.tableId, {
+              contentType: "data",
+              title: promotedFromRow.tableTitle,
+            })
+          }
+          className="hover:underline"
+        >
+          Open in table
+        </button>
+        {promotedFromRow.role === "referenced" && (
+          <>
+            <span aria-hidden="true">·</span>
+            {/* Graduation from the page itself (plan Phase 5 "Add to
+                tree" trigger): one-way referenced→primary, same as every
+                other trigger. */}
+            <button
+              type="button"
+              onClick={async () => {
+                const res = await tracedFetch(
+                  `/api/content/data/${promotedFromRow.tableId}/promote`,
+                  {
+                    method: "POST",
+                    credentials: "include",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      rowId: promotedFromRow.rowId,
+                      role: "primary",
+                    }),
+                  }
+                );
+                const json = await res.json();
+                if (res.ok && json?.success) {
+                  window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+                  setPromotedFromRow({ ...promotedFromRow, role: "primary" });
+                }
+              }}
+              className="hover:underline"
+            >
+              Add to file tree
+            </button>
+          </>
+        )}
+      </div>
+      <DataRowPropertyHeader
+        tableId={promotedFromRow.tableId}
+        rowId={promotedFromRow.rowId}
+      />
+    </>
+  ) : null;
   const collaborationCapability = useMemo(
     () => (collaborationEnabled ? getContentCollaborationCapability(contentType) : null),
     [collaborationEnabled, contentType]
@@ -2503,82 +2577,7 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
-            {promotedFromRow && (
-              <div className="flex items-center gap-2 border-b border-border/60 bg-muted/30 px-4 py-1.5 text-xs text-muted-foreground">
-                <span>Row of</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedContentId(promotedFromRow.tableId, {
-                      contentType: "data",
-                      title: promotedFromRow.tableTitle,
-                    })
-                  }
-                  className="font-medium text-foreground hover:underline"
-                >
-                  {promotedFromRow.tableTitle}
-                </button>
-                <span aria-hidden="true">·</span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSelectedContentId(promotedFromRow.tableId, {
-                      contentType: "data",
-                      title: promotedFromRow.tableTitle,
-                    })
-                  }
-                  className="hover:underline"
-                >
-                  Open in table
-                </button>
-                {promotedFromRow.role === "referenced" && (
-                  <>
-                    <span aria-hidden="true">·</span>
-                    {/* Graduation from the page itself (plan Phase 5 "Add
-                        to tree" trigger, owner-requested 2026-08-27): a
-                        link-promoted page can join the tree without a
-                        detour through the table's peek. Same one-way
-                        referenced→primary rule as every other trigger. */}
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const res = await tracedFetch(
-                          `/api/content/data/${promotedFromRow.tableId}/promote`,
-                          {
-                            method: "POST",
-                            credentials: "include",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              rowId: promotedFromRow.rowId,
-                              role: "primary",
-                            }),
-                          }
-                        );
-                        const json = await res.json();
-                        if (res.ok && json?.success) {
-                          window.dispatchEvent(
-                            new CustomEvent("dg:tree-refresh")
-                          );
-                          setPromotedFromRow({
-                            ...promotedFromRow,
-                            role: "primary",
-                          });
-                        }
-                      }}
-                      className="hover:underline"
-                    >
-                      Add to file tree
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-            {promotedFromRow && (
-              <DataRowPropertyHeader
-                tableId={promotedFromRow.tableId}
-                rowId={promotedFromRow.rowId}
-              />
-            )}
+            {promotedRowChrome}
             <div className="flex-1 min-h-[150px] overflow-auto">{contentElement}</div>
             {notesPanelPosition !== "above" && (
               <ExpandableEditor
@@ -2596,6 +2595,16 @@ export function MainPanelContent({ paneId, initialContent = null }: MainPanelCon
                 onSaveAsPageTemplate={handleSaveAsTemplate}
               />
             )}
+          </div>
+        ) : promotedRowChrome ? (
+          // A promoted row's page is a NOTE, so it renders here — the
+          // provenance banner and Properties strip were originally mounted
+          // only in the non-note branch above, which is why neither ever
+          // appeared on a row page (owner report, 2026-08-27). The inner
+          // wrapper stays overflow-free: the editor manages its own scroll.
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+            {promotedRowChrome}
+            <div className="min-h-0 flex-1 overflow-auto">{contentElement}</div>
           </div>
         ) : (
           contentElement
