@@ -1,7 +1,7 @@
 ---
 last_updated: 2026-08-26
 current_epoch: 18
-current_sprint: 58
+current_sprint: 63
 sprint_status: in-progress
 ---
 
@@ -52,6 +52,16 @@ before planning and executing. There may be additions or modifications.
 Durable offline editing for the **plain/REST save path** (continuous localStorage draft + reconnect replay), tab-content preload, and clearer collaboration-degraded UX. Continuation of the May-17 anti-overwrite ("Phase I") guards and the 2026-06-11 canonical-`bodyHash` hotfix (#56). Today the conflict resolver only protects the **online plain path**; the collab path relies on Y.js IndexedDB + CRDT, and plain-path offline edits are **not** durably persisted (in-memory; reload can lose them).
 
 ## Recent Completions (Last 30 Days)
+
+**August 26, 2026**: **Workspace Workbenches — folder-derived sub-workspaces, nestable 3 layers deep** (branch `feat/workbenches`, PR pending; typecheck/lint/build green; ⚠ **migration `20260826120000_workbenches` must `migrate deploy` before any non-local env**; ⚠ **`vercel.json` cron entry needed for `/api/cron/dormant-workbenches`**; owner smoke pending)
+
+Hovering a view-workspace in the workspaces dropdown (250ms) unfolds its view root's subfolders; clicking one lazily materializes a **workbench** — a `ContentWorkspace` row (`parentWorkspaceId`, `dormantAt`) that inherits every existing sync behaviour (pane 409s, `layoutAuthority`, claims, tree snapshots) for free. Folders are the vocabulary; there are no custom workbenches. Nesting is opt-in to **3 folder layers** (`settings.workbenches.maxDepth`, default 1), and the key decision is that workbench rows stay **flat** — parent is always the top workspace whatever the folder's depth, because keying benches off parent benches would force materializing every ancestor just to browse a layer. Hide (right-click), per-panel reorder (drag, keyed by parent folder in `folderOrders`), tab counts, and last-opened tooltips work identically at every layer; nested panels drop the header and carry a per-layer tint so overlapping panels stay distinguishable. **One** scoped-tree fetch serves all three layers.
+
+**Lifecycle mirrors the folders.** Rename mirrors (the workbench name is derived, never stored authoritatively); soft delete **archives** so a trash round-trip restores pane layouts; purge deletes rows the `SetNull` FK orphaned; the folder-delete dialog names affected benches and flags the open one; `createWorkbench` and the daily `dormant-workbenches` cron both validate by a hop-bounded ancestor walk within the parent's *current* depth budget, so lowering `maxDepth` makes deeper benches dormant rather than stranding them. Dormancy is **derived per sweep**, not stamped by write paths — a missed hook delays a stamp by a day instead of leaking a row.
+
+**Bundled fix — the redundant view-root row.** A view-scoped tree rendered the view root as a folder row directly under a header already naming it. The route now drops that node from the map and lets the existing orphan fallback promote its children, **preserving their real `parentId`** — which is what kept sibling-paste, create-beside and `ContentTreePicker`'s placement math correct. `LeftSidebarContent` gained `scopedRootParentId`, remapping tree-space "top level" to the view root on every write path (move, create, create-document, external link, upload, file drop), and the header's boolean bypass became a **tri-state** scope picker (workbench / parent view / root).
+
+**Selector polish.** Grip handles retired (the whole row was always draggable; a tooltip says so), drop-cursor **lines** replacing the target ring in both menus — with the drop finally honouring the pointer's half-height edge — row density that steps with workspace count, one shared class for both menu headings, and a contrast pass that fixed gold-on-gold in three places, including the dropdown primitive's `--accent-foreground` (#3D5A5B) painting dark teal on its own gold hover fill.
 
 **August 26, 2026** *(updated Aug 27: Phase 2 completed — file column/gallery/split/form/list views + options editor; Phase 6 built — property header, DataCapsule, query_database/describe_database/append-only insert_rows with enforced token contract and association jurisdiction, B5-classified; creation-path audit fixed external-link + JSON context-menu gaps)*: **Database content type — Phases 1–6 built** (branch `feat/data-content-type`; per-slice eslint + scoped-tsc green throughout, owner smoke-testing phase-by-phase on Mac; plan: `work-tracking/DATABASE-CONTENT-TYPE-PLAN.md`; ⚠ **rebase onto main + owner regression pass pending**, ⚠ **migration `20260817172426_data_content_type` must `migrate deploy` before any non-local env**, ⚠ **Hocuspocus redeploy required at merge** — noteWindow attrs, TipTap schema 1.16.0)
 

@@ -10,6 +10,17 @@ last_updated: 2026-08-18
 
 ---
 
+## Workspace Workbenches — follow-ups (2026-08-26, branch `feat/workbenches`; plan: WORKBENCHES-PLAN.md)
+
+Built and committed: workbench rows (`parentWorkspaceId` + `dormantAt`), dwell submenu nestable to 3 layers, hide/reorder per layer, lifecycle hooks (archive on delete, purge on hard delete, dormant-clearout cron), tab counts, tri-state tree scope, and the redundant view-root row fix. Remaining:
+
+- [ ] **`vercel.json` cron entry for `/api/cron/dormant-workbenches`** — the route exists and is CRON_SECRET-guarded, but nothing invokes it in production yet, so dormant benches accumulate silently. Daily is the intended cadence (matches `purge-trash`).
+- [ ] **Claims: inherit vs independent** (the plan's one open question). Workbenches currently claim content independently, like any workspace — zero special cases, but two benches under one parent can each borrow the same note and conflict with each other. Revisit only if that actually bites; the alternative (inheriting the parent's claims) makes open-intent resolution depth-aware.
+- [ ] **Server list endpoint is root-only.** `listWorkbenchFolders` serves layer 1; nested layers derive client-side from the one scoped-tree fetch. Fine while the submenu is the only consumer — if a second surface (mobile, extension panel) ever needs workbenches, it needs a depth parameter rather than a second tree walk.
+- [ ] **Dormant sweep is per-row.** `sweepDormantWorkbenches` does a hop-walk per workbench (≤3 point reads each). Correct and cheap at personal-vault scale; if a tenant ever holds hundreds of benches, batch the ancestor resolution.
+- [ ] **`membershipContentIds` union for tab counts** is computed client-side per row. If the count ever needs to appear somewhere without the full workspace payload, push it into `ContentWorkspaceResponse` as a scalar.
+
+## Co-browse bind-first + navigation awareness — follow-ups (2026-08-18, after the co-browse performance PR)
 ## Database content type — follow-ups (2026-08-26, branch `feat/data-content-type`; plan: DATABASE-CONTENT-TYPE-PLAN.md)
 
 - [ ] **AI decision-survey card (owner-requested 2026-08-28).** When a chat
@@ -48,10 +59,6 @@ last_updated: 2026-08-18
   If one is ever built: links first (Restrict demands the order), then the
   column, then vacuum orphaned cell keys; dry-run mode; `app/api/cron/`
   pattern.
-
-## Workspace Workbenches — folder-derived sub-workspaces (2026-08-24, plan: WORKBENCHES-PLAN.md)
-
-Hovering a view-workspace in the workspaces dropdown (~1 s) reveals its view root's first-level subfolders; clicking one lazily materializes a **workbench** — a child `ContentWorkspace` row (`parentWorkspaceId` migration, `viewRootContentId` = subfolder) that inherits ALL existing sync machinery (pane 409s, layoutAuthority, claims) for free. No custom workbenches — folders are the vocabulary. Toggle rides `settings.workbenches` next to "Enable as View" (default on). Retarget: **dormant + restorable** (dormancy is a submenu filter by `viewRootContentId`, not state). Folder lifecycle stays mirrored — rename mirrors, soft delete archives (trash-restorable), purge deletes the row, active-workbench fallback to parent — plus per-folder "Hide from workbenches" with a blanket "unhide all" footer (`settings.workbenches.hiddenFolderIds`). Workbenches are NOT renameable (folder rename is the only rename); submenu opens on dwell only — a click always selects the workspace itself; folder-delete confirmation warns when the folder backs a workbench. **Cron:** daily dormant-clearout sweep (`dormantAt` stamping, self-healing — no write-path hooks), default **30 days**, per-workspace override ≤ **365** (`settings.workbenches.dormantClearoutDays`); purge-side row deletion rides the existing `app/api/cron/purge-trash` path. P0 (scoped tree drops the redundant view-root row + `scopedRootParentId` write remap) shipped on `feat/file-tree-reference-drawer`; P1 schema/server → P2 selector submenu → P3 tri-state root/view/workbench scope filter in RootNodeHeader → P4 lifecycle (retarget warning, orphan guards). Decision points + full design in the plan doc.
 
 ## Co-browse bind-first + navigation awareness — follow-ups (2026-08-18, after `feat/cobrowse-bind-first`)
 
