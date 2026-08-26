@@ -241,11 +241,36 @@ export async function purgeExpiredTrash(): Promise<{
     where: { deletedAt: { lt: cutoff } },
   });
 
+  // Workbenches (folder-derived sub-workspaces) whose backing folder was just
+  // hard-deleted. The FK is SetNull, so those rows survive the cascade with a
+  // null viewRootContentId — and a workbench without a folder is dead by
+  // definition, since createWorkbench always sets one. Soft delete only
+  // ARCHIVES them, so a trash restore can bring the layout back; this is the
+  // point of no return, where the content itself is gone.
+  let purgedWorkbenches = 0;
+  try {
+    const { count } = await prisma.contentWorkspace.deleteMany({
+      where: { parentWorkspaceId: { not: null }, viewRootContentId: null },
+    });
+    purgedWorkbenches = count;
+  } catch (error) {
+    logger.warn({
+      layer: "route",
+      event: "trash.purge.workbench_failed",
+      summary: "failed to purge orphaned workbenches",
+      error,
+    });
+  }
+
   logger.info({
     layer: "ai",
     event: "trash.purge.expired",
-    summary: `purged ${expiredChats.length} chats + ${expiredContent.count} content nodes`,
-    attrs: { chats: expiredChats.length, content: expiredContent.count },
+    summary: `purged ${expiredChats.length} chats + ${expiredContent.count} content nodes + ${purgedWorkbenches} workbenches`,
+    attrs: {
+      chats: expiredChats.length,
+      content: expiredContent.count,
+      workbenches: purgedWorkbenches,
+    },
   });
 
   return { chats: expiredChats.length, content: expiredContent.count };

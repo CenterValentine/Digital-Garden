@@ -9,7 +9,9 @@ import { withRouteTrace } from "@/lib/core/logger/route-trace";
 import {
   archiveWorkspace,
   assignContentToWorkspace,
+  createWorkbench,
   createWorkspace,
+  listWorkbenchFolders,
   duplicateWorkspace,
   getWorkspace,
   listWorkspaces,
@@ -78,6 +80,110 @@ export async function handleCreateWorkplace(request: NextRequest) {
       return errorResponse(error, "Failed to create workspace");
     }
   });
+}
+
+export async function handleListWorkbenches(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(
+    request,
+    { route: "/api/content/workspaces/[id]/workbenches" },
+    async () => {
+      try {
+        const session = await requireAuth();
+        const { id } = await params;
+        const data = await listWorkbenchFolders(session.user.id, id);
+        if (data === null) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "NOT_A_VIEW",
+                message: "Workspace not found or is not a view",
+              },
+            },
+            { status: 404 }
+          );
+        }
+        return NextResponse.json(
+          { success: true, data },
+          { headers: { "Cache-Control": "no-store" } }
+        );
+      } catch (error) {
+        logger.error({
+          layer: "content",
+          event: "workbenches_list:caught",
+          summary: "GET caught",
+          error,
+        });
+        return errorResponse(error, "Failed to list workbenches");
+      }
+    }
+  );
+}
+
+export async function handleCreateWorkbench(
+  request: NextRequest,
+  { params }: { params: WorkspaceParams }
+) {
+  return withRouteTrace(
+    request,
+    { route: "/api/content/workspaces/[id]/workbenches" },
+    async () => {
+      try {
+        const session = await requireAuth();
+        const { id } = await params;
+        const body = await request.json().catch(() => ({}));
+        const folderContentId =
+          typeof body.folderContentId === "string" ? body.folderContentId : null;
+        if (!folderContentId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "INVALID_REQUEST",
+                message: "folderContentId is required",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
+        const data = await createWorkbench(
+          session.user.id,
+          id,
+          folderContentId
+        );
+        // One 409 for every "the world moved on" case — folder trashed, moved
+        // out of the view, parent retargeted, workbenches switched off. The
+        // client's remedy is identical in all of them: refresh the submenu.
+        if (!data) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "WORKBENCH_UNAVAILABLE",
+                message:
+                  "That folder is no longer a subfolder of this workspace's view",
+              },
+            },
+            { status: 409 }
+          );
+        }
+
+        return NextResponse.json({ success: true, data }, { status: 201 });
+      } catch (error) {
+        logger.error({
+          layer: "content",
+          event: "workbench_create:caught",
+          summary: "POST caught",
+          error,
+        });
+        return errorResponse(error, "Failed to open workbench");
+      }
+    }
+  );
 }
 
 export async function handleResetWorkplaces(request: NextRequest) {
