@@ -1590,7 +1590,7 @@ export function WorkspaceSelector() {
                   workbenchDwellTimerRef.current = window.setTimeout(() => {
                     workbenchDwellTimerRef.current = null;
                     openWorkbenchMenuFor(workspace, rect);
-                  }, 500);
+                  }, 250);
                 }}
                 onPointerMove={(event) => {
                   // Radix focuses menu items as the pointer moves over them.
@@ -1690,14 +1690,14 @@ export function WorkspaceSelector() {
                   event.stopPropagation();
                   startInlineRename(workspace);
                 }}
-                className={`group gap-1 pr-1 focus:text-white ${
+                className={`group gap-1 pr-1 ${
                   workspace.isView
                     ? `border-l-2 pl-1 ${isActive ? "border-white/50" : "border-gold-primary/35"}`
                     : "pl-1.5"
                 } ${
                   isActive
-                    ? "bg-gold-primary text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.28)]"
-                    : ""
+                    ? "bg-gold-dark text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.22)] focus:bg-gold-dark focus:text-white"
+                    : "focus:bg-gold-primary/15 focus:text-gray-900 dark:focus:text-white"
                 } ${isDragged ? "opacity-40" : ""} ${
                   isDropTarget ? "ring-1 ring-gold-primary/40" : ""
                 }`}
@@ -1744,14 +1744,14 @@ export function WorkspaceSelector() {
                       <Eye
                         className={`h-3 w-3 shrink-0 ${
                           isActive ? "text-white" : "text-gold-primary/70"
-                        } group-focus:text-white`}
+                        }`}
                       />
                     ) : null}
                     {workspace.isLocked ? (
                       <Lock
                         className={`h-3 w-3 shrink-0 ${
                           isActive ? "text-white/85" : "text-gray-400/80"
-                        } group-focus:text-white/85`}
+                        }`}
                       />
                     ) : null}
                     <button
@@ -1773,7 +1773,7 @@ export function WorkspaceSelector() {
                         isActive
                           ? "text-white/85 hover:bg-white/20 hover:text-white"
                           : "text-gray-400/80 hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
-                      } group-focus:text-white/85 group-focus:hover:bg-white/20 group-focus:hover:text-white`}
+                      }`}
                       aria-label={`Open ${workspace.name} settings`}
                     >
                       <Settings className="h-3.5 w-3.5" />
@@ -1800,7 +1800,7 @@ export function WorkspaceSelector() {
                             isActive
                               ? "text-white hover:bg-white/20 hover:text-white"
                               : "text-gray-500 hover:bg-red-500/10 hover:text-red-600"
-                          } group-focus:text-white group-focus:hover:bg-white/25`}
+                          }`}
                           aria-label={`Delete ${workspace.name}`}
                         >
                           <X className="h-3.5 w-3.5" />
@@ -1808,7 +1808,7 @@ export function WorkspaceSelector() {
                         <GripVertical
                           className={`h-3.5 w-3.5 shrink-0 cursor-grab ${
                             isActive ? "text-white/80" : "text-gray-400"
-                          } group-focus:text-white/80 active:cursor-grabbing`}
+                          } active:cursor-grabbing`}
                         />
                       </>
                     ) : (
@@ -1851,7 +1851,7 @@ export function WorkspaceSelector() {
                             isActive
                               ? "text-white"
                               : "text-gray-400 dark:text-gray-500"
-                          } group-focus:text-white`}
+                          }`}
                           aria-label="Has workbenches"
                         />
                       ) : null}
