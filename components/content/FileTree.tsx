@@ -136,11 +136,17 @@ export function FileTree({
 
     // Build a set of all valid IDs in current tree data
     const allIds = new Set<string>();
+    // Walks `references` as well as `children`: this set decides which
+    // persisted selections survive, and a row inside a reference block would
+    // otherwise be judged stale and silently deselected.
     const collectIds = (nodes: TreeNode[]) => {
       nodes.forEach(node => {
         allIds.add(node.id);
         if (node.children) {
           collectIds(node.children);
+        }
+        if (node.references) {
+          collectIds(node.references);
         }
       });
     };
