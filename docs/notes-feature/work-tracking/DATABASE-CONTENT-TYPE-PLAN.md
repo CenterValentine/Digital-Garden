@@ -147,10 +147,19 @@ grants are **additive only, never subtractive**.
   then unions any row-level grant. **No route may touch `DataRow` without going through it.**
 - Publishing guard: a promoted row cannot be `isPublished` unless its table is. Cheap to add
   now, a leak if added later.
-- **Verification task (not yet confirmed):** whether `ViewGrant` is hierarchical — i.e.
-  whether a grant on a folder implies access to descendants. If it is, promoted rows as
-  `role: referenced` children need an explicit exclusion so a folder grant can't independently
-  reach rows of a table that grant doesn't cover. Confirm before Phase 5.
+- **Verification task — CONFIRMED 2026-08-26 (Phase 5): `ViewGrant` is flat, not
+  hierarchical.** Every resolver checks exactly the target node's own grants and nothing
+  else: `resolveContentAccessFromNode` ([collaboration/access.ts](../../../lib/domain/collaboration/access.ts))
+  is a single `findUnique` on `(contentId, userId)`; `resolveDataTableAccess` and
+  `resolveDataRowAccess` ([data/server/access.ts](../../../lib/domain/data/server/access.ts))
+  read only the table node's / row node's grant lists. No code path implies descendant
+  access from a folder grant, so the feared leak (folder grant reaching promoted rows the
+  table grant doesn't cover) **cannot occur** and no exclusion is needed. One asymmetry
+  recorded, fails-closed so backlog-grade, not a blocker: a TABLE grant does not extend to
+  a promoted row's *node* surface (`/api/content/content/[id]` resolves per-node), so a
+  grantee can read the row's cells through the table routes but not its promoted page.
+  A multi-user future should reconcile by teaching the content route the
+  `promotedFromRow → resolveDataRowAccess` fallback, mirroring the additive-only union.
 
 ### B4 — Undo
 
@@ -1025,6 +1034,14 @@ Three levels of "open a row"; **this pass scopes to levels 1–2.**
 
 Promotion triggers: open row as page · wiki-link targets the row · row gains tags, a body, or
 publication · row dragged into the tree.
+
+**Built 2026-08-26:** open-as-page (`primary`) · wiki-link autocomplete and chat `@`-mention
+(`referenced`, promote-on-selection via the shared `searchRowSuggestions` resolver — the
+prototype verdict the phase demanded: NOT ugly, D2 stands) · `?row=` URLs with
+redirect-to-node-once-promoted · `displayOrder` stamped at promotion (O11). **Deferred to
+backlog:** tree drag-in (react-arborist's internal react-dnd makes an external drag source
+real surgery; the outcome composes from open-as-page + move-in-tree) · tags/publication as
+triggers (no surface offers tags on un-promoted rows yet, so the trigger has no producer).
 
 **Where a promoted row is reachable from.** Promotion makes a row a real `ContentNode`, so it
 inherits every content access surface at once — *except* the file tree, and that exception is

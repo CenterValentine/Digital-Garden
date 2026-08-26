@@ -47,7 +47,7 @@ export async function promoteRow(
 ): Promise<PromotionResult | { error: string }> {
   const row = await prisma.dataRow.findFirst({
     where: { id: rowId, tableId, deletedAt: null },
-    select: { id: true, contentId: true, data: true },
+    select: { id: true, contentId: true, data: true, sortKey: true },
   });
   if (!row) return { error: "Row not found" };
 
@@ -77,6 +77,14 @@ export async function promoteRow(
   const slug = await generateUniqueSlug(title, table.ownerId);
 
   const contentId = await prisma.$transaction(async (tx) => {
+    // Tree position, stamped ONCE from the default view's order (plan O11):
+    // the row's ordinal among live rows by sortKey. After this the two
+    // orders are independent — reordering the table never reorders the
+    // tree, and sortKey is per-view fractional text the tree could not
+    // track anyway.
+    const displayOrder = await tx.dataRow.count({
+      where: { tableId, deletedAt: null, sortKey: { lt: row.sortKey } },
+    });
     const node = await tx.contentNode.create({
       data: {
         ownerId: table.ownerId,
@@ -86,6 +94,7 @@ export async function promoteRow(
         role,
         parentId: tableId,
         ownedByNoteId: tableId,
+        displayOrder,
         notePayload: {
           create: {
             tiptapJson: EMPTY_DOC as unknown as Prisma.InputJsonValue,

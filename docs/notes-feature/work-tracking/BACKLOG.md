@@ -12,6 +12,22 @@ last_updated: 2026-08-12
 
 ## Database content type — follow-ups (2026-08-26, branch `feat/data-content-type`; plan: DATABASE-CONTENT-TYPE-PLAN.md)
 
+- [ ] **Drag-a-row-into-the-tree promotion trigger (Phase 5 deferral).** The
+  plan lists tree drag-in among the deliberate promotion triggers (role
+  "primary", parentId = drop target). Deferred from the Phase 5 pass: the
+  file tree is react-arborist, whose drag-and-drop is internal react-dnd —
+  accepting an external HTML5 drag from the data grid means bridging the
+  grid into arborist's DnD context, real surgery on a shared surface. The
+  same outcome already composes from two working primitives (Open as page →
+  move the node in the tree; rows are freely movable, plan O11 resolution),
+  so the trigger is sugar. Build when the tree next gets DnD attention.
+- [ ] **Table-grant → promoted-row-page access fallback (multi-user).** B3
+  verification (2026-08-26) confirmed ViewGrant is flat, so no folder-grant
+  leak exists — but a TABLE grantee can read a row's cells via the data
+  routes while its promoted page 404s (per-node resolution, fails closed).
+  When multi-user matters: teach `/api/content/content/[id]` the
+  `promotedFromRow → resolveDataRowAccess` fallback (additive-only union).
+
 - [ ] **(Parked — keep-forever is the decision) Stale column links.** Owner
   raised a cron sweep for links of soft-deleted relation columns, then asked
   the better question: is keeping them even bloaty? It is not — a
