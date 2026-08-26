@@ -90,6 +90,8 @@ export interface ContentDetailResponse {
    * breadcrumb so the page never reads as an orphan note.
    */
   promotedFromRow?: { rowId: string; tableId: string; tableTitle: string } | null;
+  /** Tree visibility role — lets the row-page banner offer graduation. */
+  role?: "primary" | "referenced";
   id: string;
   ownerId: string;
   title: string;

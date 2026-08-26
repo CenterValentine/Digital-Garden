@@ -424,6 +424,12 @@ export async function GET(
         ownedByNote: content.ownedByNote
           ? { id: content.ownedByNote.id, title: content.ownedByNote.title }
           : null,
+        // ContentRole also holds "system"; the banner cares only about the
+        // primary/referenced pair, so anything else is simply not sent.
+        role:
+          content.role === "primary" || content.role === "referenced"
+            ? content.role
+            : undefined,
         promotedFromRow: content.promotedFromRow
           ? {
               rowId: content.promotedFromRow.id,
@@ -1288,6 +1294,29 @@ export async function PATCH(
       // it really changed, then publish `conversation.updated` so any open
       // ChatViewer instance refreshes via SSE. Best-effort: a sync failure
       // does not undo the successful content update.
+      // Two-way title sync for promoted rows (owner report, 2026-08-28):
+      // a page rename from ANY surface — tree, tab, the AI's rename tool —
+      // flows back into the row's primary cell, mirroring the cell→node
+      // direction writeCells already handles. Best-effort, same stance as
+      // the Conversation mirror below; the grid's poller picks the cell
+      // change up within one tick.
+      if (title !== undefined && title !== existing.title) {
+        try {
+          const { syncNodeTitleToRow } = await import(
+            "@/lib/domain/data/server/promotion"
+          );
+          await syncNodeTitleToRow(id, updated.title);
+        } catch (error) {
+          logger.warn({
+            layer: "route",
+            event: "content.rename.row_sync_failed",
+            summary: `failed to mirror title into promoted row cell for ${id}`,
+            attrs: { content_id: id },
+            error,
+          });
+        }
+      }
+
       if (
         title !== undefined &&
         title !== existing.title &&

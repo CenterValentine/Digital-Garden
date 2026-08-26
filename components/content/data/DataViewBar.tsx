@@ -39,6 +39,10 @@ const ACCESS_LABEL: Record<DataViewAccess, { label: string; hint: string }> = {
 const MODE_LABEL: Partial<Record<DataViewMode, string>> = {
   grid: "Grid",
   board: "Board",
+  list: "List",
+  form: "Form",
+  gallery: "Gallery",
+  split: "Split",
 };
 
 const fieldClass = cn(
@@ -52,6 +56,7 @@ export interface ViewPatch {
   makeDefault?: boolean;
   mode?: DataViewMode;
   groupByColumnId?: string | null;
+  config?: import("@/lib/domain/data").DataViewConfig;
   filters?: import("@/lib/domain/data").FilterNode;
   sorts?: import("@/lib/domain/data").DataSort[];
 }
@@ -275,6 +280,60 @@ function ViewMenu({
           </option>
         ))}
       </select>
+
+      {view.mode === "gallery" && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Cover
+          </label>
+          <select
+            value={view.config.coverColumnId ?? ""}
+            disabled={locked}
+            onChange={(e) =>
+              void run(() =>
+                onUpdate(view.id, {
+                  config: {
+                    ...view.config,
+                    coverColumnId: e.target.value || undefined,
+                  },
+                })
+              )
+            }
+            className={fieldClass}
+          >
+            <option value="">Auto (first File, then image URL)</option>
+            {columns
+              .filter((c) => c.type === "file" || c.type === "url")
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+          </select>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Card size
+          </label>
+          <select
+            value={view.config.cardSize ?? "medium"}
+            disabled={locked}
+            onChange={(e) =>
+              void run(() =>
+                onUpdate(view.id, {
+                  config: {
+                    ...view.config,
+                    cardSize: e.target.value as "small" | "medium" | "large",
+                  },
+                })
+              )
+            }
+            className={fieldClass}
+          >
+            <option value="small">Small</option>
+            <option value="medium">Medium</option>
+            <option value="large">Large</option>
+          </select>
+        </>
+      )}
 
       {view.mode === "board" && (
         <>

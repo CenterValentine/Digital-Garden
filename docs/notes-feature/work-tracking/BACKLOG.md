@@ -12,6 +12,14 @@ last_updated: 2026-08-18
 
 ## Database content type — follow-ups (2026-08-26, branch `feat/data-content-type`; plan: DATABASE-CONTENT-TYPE-PLAN.md)
 
+- [ ] **AI decision-survey card (owner-requested 2026-08-28).** When a chat
+  request is ambiguous between surfaces (note body vs row cells; which of
+  two databases; rename vs duplicate), the model should present a
+  Claude-style choice card the user clicks, not free-text guessing. Today
+  the row-page grounding carries prompt-level "ask, name both options"
+  guidance; the real affordance is a small tool (`ask_user_choice`) +
+  chat-card UI + harness handling of the selection as the next user turn.
+  Generalizes the flashcard proposal-card and update_row confirm patterns.
 - [ ] **Drag-a-row-into-the-tree promotion trigger (Phase 5 deferral).** The
   plan lists tree drag-in among the deliberate promotion triggers (role
   "primary", parentId = drop target). Deferred from the Phase 5 pass: the

@@ -309,7 +309,7 @@ function DataCell({
   // a workspace tab (owner requirement, plan Phase 4); the + goes to the
   // peek's picker. Restricted/dangling targets show a redacted pill that
   // opens nothing (plan V1-3/G12).
-  if (column.type === "contentLink") {
+  if (column.type === "contentLink" || column.type === "file") {
     return (
       <div
         className={cn(

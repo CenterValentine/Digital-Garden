@@ -26,6 +26,7 @@ import {
   ChevronDown,
   ChevronRight,
   Kanban,
+  Plus,
   Search,
   Star,
   Table,
@@ -99,6 +100,46 @@ export function DataRailPanel() {
     [setSelectedContentId]
   );
 
+  // Rail quick-add (plan Phase 2 leftover, built 2026-08-27): the rail is
+  // where databases live, so creating one shouldn't require the tree's +
+  // menu. Server seeds the Name column and default view; we open it ready
+  // to rename.
+  const createDatabase = useCallback(async () => {
+    try {
+      const res = await fetch("/api/content/content", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: "Untitled database",
+          parentId: null,
+          contentType: "data",
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json?.success) return;
+      const created = json.data as { id: string; title: string };
+      setDatabases((prev) => [
+        {
+          id: created.id,
+          title: created.title,
+          rowCount: 0,
+          defaultViewId: null,
+          views: [],
+        },
+        ...prev,
+      ]);
+      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+      setSelectedContentId(created.id, {
+        contentType: "data",
+        title: created.title,
+      });
+    } catch {
+      // Quick-add failing silently is wrong — but the + menu path still
+      // works, and the rail has no toast surface; log-free no-op for v1.
+    }
+  }, [setSelectedContentId]);
+
   const toggle = useCallback((dbId: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -128,14 +169,25 @@ export function DataRailPanel() {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-border/60 p-2">
-        <div className="flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
-          <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search databases and views"
-            className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
-          />
+        <div className="flex items-center gap-1.5">
+          <div className="flex min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-2 py-1.5">
+            <Search className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search databases and views"
+              className="min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() => void createDatabase()}
+            title="New database"
+            aria-label="New database"
+            className="shrink-0 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
 

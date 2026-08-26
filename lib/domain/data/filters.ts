@@ -47,7 +47,7 @@ const OPERATORS_BY_TYPE: Partial<Record<DataColumn["type"], FilterOperator[]>> =
   multiSelect: [...UNIVERSAL, ...SET],
   person: [...UNIVERSAL, ...EQUALITY],
   contentLink: [...UNIVERSAL, ...SET],
-  file: UNIVERSAL,
+  file: [...UNIVERSAL, ...SET],
   relation: [...UNIVERSAL, ...SET],
   // Derived columns store nothing (plan D6) — a filter over them would
   // interrogate an empty data path and silently match everything or

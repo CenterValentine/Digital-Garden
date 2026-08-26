@@ -22,6 +22,7 @@ import {
 } from "@/lib/domain/data/server/access";
 import {
   loadRowChanges,
+  loadRowsByIds,
   loadRowPage,
   loadTable,
   resolveView,
@@ -84,6 +85,26 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
 
       const table = await loadTable(id, session.user.id);
       if (!table) return notFound();
+
+      // Specific rows, hydrated — the property header and deep links.
+      const ids = sp.get("ids");
+      if (ids) {
+        const rows = await loadRowsByIds(
+          id,
+          ids.split(",").filter(Boolean),
+          table.columns,
+          session.user.id
+        );
+        return NextResponse.json({
+          success: true,
+          data: {
+            rows,
+            columns: table.columns,
+            accessLevel: level,
+            serverTime: new Date().toISOString(),
+          },
+        });
+      }
 
       const cursorSortKey = sp.get("cursorSortKey");
       const cursorId = sp.get("cursorId");

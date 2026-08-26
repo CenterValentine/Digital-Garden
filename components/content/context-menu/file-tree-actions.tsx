@@ -126,6 +126,7 @@ export interface FileTreeContext {
   onCreateHtml?: (parentId: string | null) => Promise<void>;
   onCreateDocument?: (parentId: string | null) => Promise<void>;
   onCreateSpreadsheet?: (parentId: string | null) => Promise<void>;
+  onCreateJson?: (parentId: string | null) => Promise<void>;
   /** Phase 2: New content type creators */
   onCreateExternal?: (parentId: string | null) => Promise<void>;
   onCreateChat?: (parentId: string | null) => Promise<void>;
@@ -180,6 +181,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     onCreateDocument,
     onCreateSpreadsheet,
     onCreateExternal,
+    onCreateJson,
     onCreateChat,
     onCreateAiImage,
     onAddPeopleTarget,
@@ -230,6 +232,7 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
       onCreateDocument: isPeopleMount ? undefined : onCreateDocument,
       onCreateSpreadsheet: isPeopleMount ? undefined : onCreateSpreadsheet,
       onCreateExternal: isPeopleMount ? undefined : onCreateExternal,
+      onCreateJson: isPeopleMount ? undefined : onCreateJson,
       onCreateChat: isPeopleMount ? undefined : onCreateChat,
       onCreateAiImage: isPeopleMount ? undefined : onCreateAiImage,
       onAddPeopleTarget: isPeopleMount ? undefined : onAddPeopleTarget,

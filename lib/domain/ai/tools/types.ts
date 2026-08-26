@@ -15,6 +15,15 @@ export interface ToolExecuteContext {
   /** The content node being edited — required for editor tools */
   contentId?: string;
   /**
+   * The chat's bound content node, whatever its type. Unlike `contentId`
+   * (editor-scoped: only set for editable notes / open workflows), this is
+   * the raw binding — database tools resolve implicit jurisdiction through
+   * it (a chat open on a data node or a promoted row page is bound to that
+   * table; owner failure report 2026-08-28: the editor-scoped field left
+   * database-bound chats with no binding at all).
+   */
+  boundContentId?: string;
+  /**
    * Set by the chat route AFTER playbook resolution (attached or rooted
    * execution) when a playbook's full body is already injected into the
    * system prompt. getCurrentNote returns a short pointer for this id

@@ -144,8 +144,10 @@ export async function writeCells(
 
     // Pass 2 — commit.
     const primary = columns.find((c) => c.isPrimary && !c.deletedAt);
+    // `file` cells are contentLink-shaped (plan B8b) and want the same
+    // backlink dual-write: an attachment IS a reference to that node.
     const contentLinkColumns = columns.filter(
-      (c) => c.type === "contentLink" && !c.deletedAt
+      (c) => (c.type === "contentLink" || c.type === "file") && !c.deletedAt
     );
     for (const [rowId, data] of nextByRow) {
       const row = rows.find((r) => r.id === rowId);

@@ -200,6 +200,44 @@ export async function exportSingleDocument(
     throw new Error("Content not found or access denied");
   }
 
+  // Databases export as CSV of the default view + a .meta.json sidecar
+  // reserving the round-trip shape (plan Phase 7 / B6, O6 taken). The
+  // requested format is deliberately ignored for data nodes — CSV is the
+  // one honest tabular format the converters have.
+  if (content.contentType === "data") {
+    const { exportDatabaseCsv } = await import(
+      "@/lib/domain/data/server/export"
+    );
+    const db = await exportDatabaseCsv(contentId, content.ownerId, userId);
+    if (!db) throw new Error("Content not found or access denied");
+    const base = (content.slug || content.title || "database").replace(
+      /[^a-zA-Z0-9-_]+/g,
+      "-"
+    );
+    const metaJson = JSON.stringify(db.meta, null, 2);
+    return {
+      success: true,
+      files: [
+        {
+          name: `${base}.csv`,
+          content: db.csv,
+          mimeType: "text/csv",
+          size: Buffer.byteLength(db.csv, "utf-8"),
+        },
+        {
+          name: `${base}.meta.json`,
+          content: metaJson,
+          mimeType: "application/json",
+          size: Buffer.byteLength(metaJson, "utf-8"),
+        },
+      ],
+      metadata: {
+        warnings: [],
+        rowCount: db.rowCount,
+      } as unknown as Record<string, unknown>,
+    } as unknown as Awaited<ReturnType<typeof convertDocument>>;
+  }
+
   if (!content.notePayload) {
     throw new Error("Content is not a note");
   }

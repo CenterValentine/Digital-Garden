@@ -185,6 +185,7 @@ import { createBaseTools } from "@/lib/domain/ai/tools";
 import { createEditorTools } from "@/lib/domain/ai/tools";
 import { createFlashcardTools } from "@/lib/domain/ai/tools";
 import { createWorkflowTools } from "@/lib/domain/ai/tools";
+import { createDataTools } from "@/lib/domain/ai/tools";
 import {
   readPageInBrowserTool,
   openTabAndReadTool,
@@ -1201,6 +1202,8 @@ export async function POST(request: Request) {
         // themselves). editableContentId is deliberately undefined when a
         // workflow is open, so thread the raw contentId through for it.
         contentId: editableContentId ?? (openWorkflowTitle ? contentId : undefined),
+        // The raw binding, un-scoped — database tools' implicit jurisdiction.
+        boundContentId: contentId,
         conversationId: conversationIdForAssoc ?? undefined,
         targetFolderId,
         // When the user is viewing this conversation in full-page mode the
@@ -1230,6 +1233,9 @@ export async function POST(request: Request) {
         ...createFlashcardTools(toolCtx),
         // Trellis workflow mastery (AI v3 core S6, umbrella B1/B2).
         ...createWorkflowTools(toolCtx),
+        // Databases (plan Phase 6): read paged + bounded, write append-only;
+        // jurisdiction is the conversation's associations, checked in-tool.
+        ...createDataTools(toolCtx),
         ...(editableContentId ? createEditorTools(toolCtx) : {}),
         // Agentic Browsing Phase 0: a CLIENT-executed read tool (no server
         // `execute`) — registered only when the client reports the browser
@@ -1531,12 +1537,49 @@ export async function POST(request: Request) {
             });
           }
 
+          // Database mentions inject the schema capsule (plan Phase 6b) —
+          // the generic branch below reads notePayload, which a data node
+          // does not have, so without this a mentioned database injected
+          // literally "(no text content available)" and the model never
+          // learned the id its tools take (owner report, 2026-08-27).
+          // Promoted row pages likewise append their cells.
+          const dataSections = new Map<string, string>();
+          const rowPropSections = new Map<string, string>();
+          try {
+            const { buildDataSchemaDigest, buildRowPropertiesBlock } =
+              await import("@/lib/domain/data/server/digest");
+            await Promise.all([
+              ...mentionedNodes
+                .filter((node) => node.contentType === "data")
+                .map(async (node) => {
+                  const digest = await buildDataSchemaDigest(node.id);
+                  if (digest) dataSections.set(node.id, digest);
+                }),
+              ...mentionedNodes
+                .filter((node) => node.contentType === "note")
+                .map(async (node) => {
+                  const block = await buildRowPropertiesBlock(node.id);
+                  if (block) rowPropSections.set(node.id, block);
+                }),
+            ]);
+          } catch (dataError) {
+            logger.warn({
+              layer: "ai",
+              event: "ai_context:data_mention_caught",
+              summary: "data mention capsule failed — name-only fallback",
+              error: dataError,
+            });
+          }
+
           const sections = mentionedNodes.map((node) => {
             const folderSection = folderSections.get(node.id);
             if (folderSection) return folderSection;
+            const dataSection = dataSections.get(node.id);
+            if (dataSection) return dataSection;
             const text =
               node.notePayload?.searchText || "(no text content available)";
-            return `### ${node.title}\n${text.slice(0, 2000)}`;
+            const props = rowPropSections.get(node.id);
+            return `### ${node.title}\n${props ? `${props}\n\n` : ""}${text.slice(0, 2000)}`;
           });
           sections.push(...linkedFolderSections);
           mentionedContext = `\n\nThe user has referenced the following content:\n\n${sections.join("\n\n")}`;
@@ -1571,6 +1614,102 @@ export async function POST(request: Request) {
             event: "studio:chat:grounding_failed",
             summary: "folder grounding failed — continuing without it",
             error: groundingError,
+          });
+        }
+
+        // Database sidechat grounding (plan Phase 6): a conversation bound
+        // to a data node gets its schema capsule exactly like a mention —
+        // without this, "insert a row in this file" left the model blind
+        // to the very database the chat was opened on, hunting through
+        // note search for an id it could never find (owner report,
+        // 2026-08-27).
+        try {
+          // Advertise ONLY what the settings filter will actually serve
+          // (owner report, 2026-08-28: the grounding named all four tools
+          // while three were disabled in settings — actively instructing
+          // the model to call tools the route had filtered out, which the
+          // SDK surfaces as an unavailable-tool error). Disabled tools are
+          // named as disabled so the model can tell the USER why.
+          const DATA_TOOL_SET = [
+            "query_database",
+            "describe_database",
+            "insert_rows",
+            "update_row",
+          ];
+          const enabledDataTools = DATA_TOOL_SET.filter(
+            (tid) => toolConfig[tid]?.enabled !== false
+          );
+          const disabledDataTools = DATA_TOOL_SET.filter(
+            (tid) => toolConfig[tid]?.enabled === false
+          );
+          const availabilityLine =
+            enabledDataTools.length === 0
+              ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never searchNotes/getCurrentNote, which see only notes and will mislead you about row data.${
+                  disabledDataTools.length > 0
+                    ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
+                    : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
+                }`;
+          const boundData = await prisma.contentNode.findFirst({
+            where: {
+              id: contentId,
+              ownerId: session.user.id,
+              contentType: "data",
+              deletedAt: null,
+            },
+            select: { id: true },
+          });
+          if (boundData) {
+            const { buildDataSchemaDigest } = await import(
+              "@/lib/domain/data/server/digest"
+            );
+            const digest = await buildDataSchemaDigest(contentId);
+            if (digest) {
+              // Stale-history armor (owner report, 2026-08-28): a long
+              // thread can carry the model's own earlier claims that these
+              // tools failed or don't exist — grounding is per-request, so
+              // state the current truth explicitly.
+              mentionedContext += `\n\nThis chat is open on the following database:\n\n${digest}\n\n${availabilityLine}`;
+            }
+          } else {
+            // A chat bound to a promoted row's PAGE is bound to the row
+            // (owner report, 2026-08-28: the model read the note, renamed
+            // it, and declared the database unreachable — it never knew
+            // the open note IS a row of it). Ground with the linkage, the
+            // row's cells, and the table's capsule so the tools are
+            // addressable without a search.
+            const boundRow = await prisma.dataRow.findFirst({
+              where: { contentId, deletedAt: null },
+              select: {
+                tableId: true,
+                table: { select: { content: { select: { title: true } } } },
+              },
+            });
+            if (boundRow) {
+              const { buildDataSchemaDigest, buildRowPropertiesBlock } =
+                await import("@/lib/domain/data/server/digest");
+              const [props, digest] = await Promise.all([
+                buildRowPropertiesBlock(contentId),
+                buildDataSchemaDigest(boundRow.tableId),
+              ]);
+              const parts = [
+                `This chat is open on a row PAGE of the database "${boundRow.table.content.title}" — the open note and the database row are the SAME record (title sync is two-way: renaming either renames both).`,
+              ];
+              if (props) parts.push(props);
+              if (digest) parts.push(digest);
+              parts.push(
+                "When a request could mean either the note BODY or the row's CELLS and the outcome differs, ask the user which they mean — name both options briefly instead of guessing."
+              );
+              parts.push(availabilityLine);
+              mentionedContext += `\n\n${parts.join("\n\n")}`;
+            }
+          }
+        } catch (dataGroundingError) {
+          logger.warn({
+            layer: "ai",
+            event: "data:chat:grounding_failed",
+            summary: "database grounding failed — continuing without it",
+            error: dataGroundingError,
           });
         }
       }

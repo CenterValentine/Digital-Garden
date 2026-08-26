@@ -70,7 +70,9 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     label: "Export",
     iconName: "Download",
     surfaces: ["toolbar"],
-    contentTypes: ["note"],
+    // Databases export too (plan Phase 7): the route returns CSV for data
+    // nodes regardless of requested format.
+    contentTypes: ["note", "data"],
     order: 85,
     group: "export",
     iconOnly: true,

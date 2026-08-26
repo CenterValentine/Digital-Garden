@@ -75,7 +75,11 @@ export function useReasoningDisclosure(
   const pref = useReasoningPrefStore((s) => s.pref);
   const setPref = useReasoningPrefStore((s) => s.setPref);
   const headerRef = useRef<HTMLButtonElement | null>(null);
-  const open = pref ?? Boolean(streaming);
+  // Default COLLAPSED even while streaming (owner, 2026-08-28): verbose
+  // thinkers emit a block per step, and auto-opening each one turns the
+  // transcript into scrolling noise. The header's live timer already says
+  // a think is alive; expanding is one click and sticky for the session.
+  const open = pref ?? false;
 
   const toggle = useCallback(() => {
     const el = headerRef.current;

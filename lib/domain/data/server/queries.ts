@@ -483,8 +483,10 @@ async function hydrateContentRefs(
   viewerId: string | undefined
 ): Promise<Map<string, Record<string, ContentRef[]>>> {
   const result = new Map<string, Record<string, ContentRef[]>>();
+  // `file` cells share the contentLink shape (id-arrays of nodes, plan
+  // B8b) — one hydrator serves both, so redaction cannot fork.
   const linkColumns = columns.filter(
-    (c) => c.type === "contentLink" && !c.deletedAt
+    (c) => (c.type === "contentLink" || c.type === "file") && !c.deletedAt
   );
   if (linkColumns.length === 0 || rows.length === 0) return result;
 
@@ -517,7 +519,20 @@ async function hydrateContentRefs(
             },
           ],
         },
-        select: { id: true, title: true, contentType: true },
+        select: {
+          id: true,
+          title: true,
+          contentType: true,
+          filePayload: {
+            select: {
+              thumbnailUrl: true,
+              width: true,
+              height: true,
+              blurDataUrl: true,
+              mimeType: true,
+            },
+          },
+        },
       })
     : [];
   const byId = new Map(visible.map((n) => [n.id, n]));
@@ -538,6 +553,15 @@ async function hydrateContentRefs(
                 title: node.title || "Untitled",
                 contentType: node.contentType,
                 restricted: false,
+                file: node.filePayload
+                  ? {
+                      thumbnailUrl: node.filePayload.thumbnailUrl,
+                      width: node.filePayload.width,
+                      height: node.filePayload.height,
+                      blurDataUrl: node.filePayload.blurDataUrl,
+                      mimeType: node.filePayload.mimeType,
+                    }
+                  : null,
               }
             : { id, title: "", contentType: null, restricted: true };
         });
@@ -610,13 +634,15 @@ async function hydratePersonRefs(
     userIds.size > 0
       ? prisma.user.findMany({
           where: { id: { in: [...userIds] } },
-          select: { id: true, username: true, email: true },
+          // No email: it must never reach other readers of the table
+          // (privacy review, 2026-08-27) — username or a generic label.
+          select: { id: true, username: true },
         })
       : Promise.resolve([]),
   ]);
   const personById = new Map(persons.map((p) => [p.id, p.displayName]));
   const userById = new Map(
-    users.map((u) => [u.id, u.username || u.email || "User"])
+    users.map((u) => [u.id, u.username || "User"])
   );
 
   for (const row of rows) {
@@ -1022,6 +1048,50 @@ export async function loadRowChanges(
     })),
     deletedIds: deleted.map((d) => d.id),
   };
+}
+
+/**
+ * Specific rows by id, fully hydrated — the property header's fetch
+ * (Phase 6a) and the AI tools' row-detail path. Also the missing piece
+ * behind ?row= deep links beyond page 1.
+ */
+export async function loadRowsByIds(
+  tableId: string,
+  rowIds: string[],
+  columns: DataColumn[],
+  viewerId?: string
+): Promise<DataRow[]> {
+  if (rowIds.length === 0) return [];
+  const raw = await prisma.dataRow.findMany({
+    where: { tableId, id: { in: rowIds.slice(0, 100) }, deletedAt: null },
+    select: {
+      id: true,
+      tableId: true,
+      sortKey: true,
+      data: true,
+      contentId: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (raw.length === 0) return [];
+  const links = await hydrateRelationLinks(raw, columns, viewerId);
+  const derived = await computeDerivedValues(raw, columns, links);
+  const contentRefs = await hydrateContentRefs(raw, columns, viewerId);
+  const personRefs = await hydratePersonRefs(raw, columns, tableId, viewerId);
+  return raw.map((r) => ({
+    id: r.id,
+    tableId: r.tableId,
+    sortKey: r.sortKey,
+    data: (r.data ?? {}) as RowData,
+    links: links.refs.get(r.id),
+    contentRefs: contentRefs.get(r.id),
+    personRefs: personRefs.get(r.id),
+    derived: derived.get(r.id),
+    contentId: r.contentId,
+    createdAt: r.createdAt.toISOString(),
+    updatedAt: r.updatedAt.toISOString(),
+  }));
 }
 
 /** Rows in view order, for exports and the AI query tool. */

@@ -322,6 +322,7 @@ const FACTORY_FILES: Record<string, string> = {
   Editor: "lib/domain/ai/tools/editor-tools.ts",
   Flashcard: "lib/domain/ai/tools/flashcard-tools.ts",
   Workflow: "lib/domain/ai/tools/workflow-tools.ts",
+  Data: "lib/domain/ai/tools/data-tools.ts",
 };
 
 const serverToolDefs = Object.values(FACTORY_FILES).flatMap((file) =>

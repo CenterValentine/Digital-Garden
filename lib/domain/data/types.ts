@@ -63,6 +63,7 @@ export const IMPLEMENTED_COLUMN_TYPES: readonly DataColumnType[] = [
   "rollup",
   "contentLink",
   "person",
+  "file",
 ];
 
 /**
@@ -202,6 +203,18 @@ export interface ContentRef {
   title: string;
   contentType: string | null;
   restricted: boolean;
+  /**
+   * `file` cells only (plan B8b): the display quartet FilePayload already
+   * carries — aspect ratio known before the image loads, blur while it
+   * does. null for non-file nodes and unprocessed files.
+   */
+  file?: {
+    thumbnailUrl: string | null;
+    width: number | null;
+    height: number | null;
+    blurDataUrl: string | null;
+    mimeType: string | null;
+  } | null;
 }
 
 /** One hydrated person cell — same redaction stance as every other ref. */

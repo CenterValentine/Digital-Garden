@@ -30,10 +30,15 @@ function bucketRowCount(n: number): string {
   return "thousands of rows";
 }
 
+/** Option vocab, capped (Phase 6 token contract): 50 labels, then a count. */
+const OPTION_CAP = 50;
+
 function describeOptions(options: SelectOption[] | undefined): string {
   if (!options || options.length === 0) return "";
-  const labels = options.map((o) => o.label).join(", ");
-  return ` — options: ${labels}`;
+  const shown = options.slice(0, OPTION_CAP).map((o) => o.label).join(", ");
+  const more =
+    options.length > OPTION_CAP ? ` (+${options.length - OPTION_CAP} more)` : "";
+  return ` — options: ${shown}${more}`;
 }
 
 /**
@@ -70,7 +75,9 @@ export async function buildDataSchemaDigest(
   if (!payload) return null;
 
   const lines: string[] = [
-    `# ${payload.content.title} (database, ${payload.mode})`,
+    // The id is the address query_database/insert_rows take — without it
+    // a mention capsule names a database the tools cannot reach.
+    `# ${payload.content.title} (database, ${payload.mode}) [id: ${nodeId}]`,
   ];
   if (payload.description) lines.push(payload.description);
   lines.push(`Size: ${bucketRowCount(payload.rowCount)}`);
@@ -91,5 +98,71 @@ export async function buildDataSchemaDigest(
     );
   }
 
+  // The Phase 6 token contract, stated where the model reads it: schema
+  // rides the capsule, rows arrive ONLY through tools, paged and bounded.
+  lines.push(
+    "",
+    "Rows are never included in context. Use query_database (filtered, paged) to read rows and describe_database for the full schema."
+  );
+
   return lines.join("\n");
+}
+
+/**
+ * Row properties block for a PROMOTED row's note (Phase 6b): the page's
+ * cells, serialized compactly, appended to the note's own context so a
+ * row-page mention carries its data instead of an empty body. Bounded by
+ * construction — one row, cellToText strings, empties skipped.
+ */
+export async function buildRowPropertiesBlock(
+  contentId: string
+): Promise<string | null> {
+  const row = await prisma.dataRow.findFirst({
+    where: { contentId, deletedAt: null },
+    select: {
+      data: true,
+      table: {
+        select: {
+          content: { select: { title: true } },
+          columns: {
+            where: { deletedAt: null },
+            orderBy: { position: "asc" },
+            select: {
+              id: true,
+              key: true,
+              name: true,
+              type: true,
+              position: true,
+              isPrimary: true,
+              config: true,
+              description: true,
+            },
+          },
+        },
+      },
+    },
+  });
+  if (!row) return null;
+
+  const { cellToText } = await import("@/lib/domain/data");
+  const data = (row.data ?? {}) as Record<string, unknown>;
+  const lines: string[] = [
+    `Row of database "${row.table.content.title}" — properties:`,
+  ];
+  for (const c of row.table.columns) {
+    const column = {
+      id: c.id,
+      key: c.key,
+      name: c.name,
+      type: c.type,
+      position: c.position,
+      isPrimary: c.isPrimary,
+      config: (c.config ?? {}) as unknown as DataColumnConfig,
+      description: c.description,
+      deletedAt: null,
+    };
+    const text = cellToText(column, data[c.key] as never);
+    if (text) lines.push(`- ${c.name}: ${text}`);
+  }
+  return lines.length > 1 ? lines.join("\n") : null;
 }

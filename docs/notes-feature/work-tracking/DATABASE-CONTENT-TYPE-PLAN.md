@@ -1191,10 +1191,120 @@ scoped to Books should be structurally unable to write to Contacts.
 **v1 scope: read-only.** `query_database` alone is most of the value and none of the risk
 (open decision O3).
 
-### Phase 7 — Remaining stub seams
+---
+
+### Phase 6 — REPLANNED 2026-08-27 (owner-directed: token safety + co-browse)
+
+Two owner requirements reshaped this phase before building began:
+
+1. **"Not without some kind of safety"** — the worry that a whole database dumps into a
+   chat's context. The capsule's never-inject-rows rule was already the design; this replan
+   turns it into an enforced contract with named ceilings and user controls.
+2. **Co-browse is a first-class consumer.** The driving use case: job hunting. A playbook
+   browses listings, adds qualifying jobs as rows; later passes iterate that table in
+   batches to build a second, vetted database whose rows carry attached resumes (file
+   column, B8b). This REQUIRES a row-insert tool — O3's read-only scope is amended, not
+   abandoned: the write we admit is the *safest possible* write.
+
+#### The token contract (enforced, not aspirational)
+
+| Ceiling | Value | Enforced where |
+|---|---|---|
+| Capsule | schema only, under the existing `maxTokensPerNode` budget (`truncateToTokens`); option vocabularies capped (first 50 + "N more") | capsule assembly |
+| `query_database` rows per call | default 20, hard max 100 (one page unit, = `DEFAULT_ROW_PAGE_SIZE`) | tool handler, server-side |
+| `query_database` result bytes | rows serialize via `cellToText` (compact strings, never raw JSONB) into a ~4KB budget; overflow returns `truncated: true` + `totalMatching` so the model narrows instead of re-querying bigger | tool handler |
+| Column projection | tool takes `columns?: string[]`; default = primary + first few visible | tool handler |
+| Paging | cursor continuation only — each page is a separate, user-visible tool call | existing step budget bounds the loop |
+| Worst case per turn | hard-max rows × compact cells × step budget = bounded and computable; no single call can exceed one page | arithmetic, not policy |
+
+**User controls (the opt-out the owner asked for):** the existing Stop button halts a turn
+mid-tool-loop; every page/insert is a visible tool call as it happens (never a silent bulk
+dump); both tools are B5-classified **user-configurable** — disableable per-user in the
+existing tool settings; inserts above the approval threshold raise an approval card
+(precedent: the note-tool shrink gate).
+
+#### Write tier — O3 amended: `insert_rows` joins v1, append-only
+
+The one write the job flow needs, with rails that make its worst case boring:
+
+- **Append-only.** Cannot touch existing rows. Worst case = junk rows: visible in the grid,
+  batch-deletable, fully undoable.
+- **≤25 rows per call**, each cell through `encodeCell` (strict — violations reject per-row
+  with per-row results, mirroring the CAS write results shape; never coerced).
+- **`dedupeBy: columnKey`** (optional): rows whose value already exists in that column are
+  skipped and reported. This is what makes co-browse itineraries **idempotent** — re-running
+  a playbook over the same job board cannot duplicate rows. Cheap at design scale via the
+  existing GIN index.
+- **Receipts + undo:** insert receipts carry created rowIds; the Undo chip is
+  `softDeleteRows` — the inverse already exists (B4).
+- **Approval card** above 10 rows in one call.
+- `update_rows` / `delete_rows` stay deferred; `add_column` / `alter_column` (schema tier)
+  stay out entirely.
+
+#### Co-browse marriage (respecting its stated objectives)
+
+No co-browse code changes needed — its chat surface shares the conversation engine, so the
+tools and jurisdiction arrive for free. The objectives that must keep holding, and how the
+database flow leans on rather than fights them:
+
+| Co-browse objective | Database interaction |
+|---|---|
+| Bind-first (never steal the user's tab) | untouched — tools are chat-side |
+| Frozen itineraries, keyed by observed href | maps 1:1 to rows with a `url` column; `dedupeBy: url` makes the itinerary idempotent across sessions |
+| documentChanged awareness | collection still per-item; `insert_rows` batches per enumeration round, one visible call per batch |
+| Ledger tiers url > label | the url column IS the durable key; labels land in text columns |
+
+**The job-hunting loop, end to end:** enumerate listing → per-item collect (title, company,
+location, url, notes) → `insert_rows` with `dedupeBy: url` → owner vets in grid/board
+(status column) → second pass: `query_database` filter `status = apply`, batches of ≤20,
+feeding the resume phase → tailored resumes are WS3 chat deliverables (real ContentNodes) —
+their ids drop straight into the row's **file column**. Deliverables + file cells compose
+with zero new machinery.
+
+**Jurisdiction unchanged:** `ConversationAssociation` (`source: explicit`) binds tools to
+associated tables — a chat scoped to Job Leads is structurally unable to write to Contacts.
+Sidechat auto-associates. Playbooks name their target database via mention/attachment.
+
+#### Build order — BUILT 2026-08-27, owner smoke pending
+
+1. **6a ✅** Property header on row pages (DataRowFields extraction — one field-editor set
+   serving peek, split pane, and header; rows `?ids=` hydrated fetch).
+2. **6b ✅** DataCapsule = the upgraded B1 digest (option vocab capped at 50, token contract
+   stated in-capsule, node id in the header as the tools' address) + row-page cells riding
+   the note resolver.
+3. **6c ✅** `query_database` + `describe_database` — one filter compiler, page-unit caps,
+   4KB serialization budget with truncation reporting, cursor paging, association
+   jurisdiction checked in-tool.
+4. **6d ✅** `insert_rows` — append-only, whole-batch pre-validation, label→id translation,
+   dedupeBy skip-and-report, per-row strict-encode errors. **One deviation from this
+   replan:** the >10-row gate is a `confirmedByUser` input the model may set only after
+   explicit user approval in conversation — NOT a real approval card (that UI is the
+   flashcard proposal flow, extension-specific today). Honest stand-in; a proper proposal
+   card is follow-up work if inserts prove common.
+5. **6e ✅** B5: all three classified user-configurable ("Databases" settings group), Data
+   factory in the drift map, route spread — `ai:drift:check` green (58 tools). End-to-end
+   co-browse smoke is the owner's.
+
+### Phase 7 — Remaining stub seams — BUILT 2026-08-27
 
 B6's import and export reservations. (Publishing needs no exclusion work — see B6 — and the
 block seam landed in Phase 1b per B7.)
+
+**Done:**
+- **Export — O6 taken, real CSV** (`lib/domain/data/server/export.ts`, branch in
+  `bulk-export.ts`): the default view's rows as CSV + a `.meta.json` sidecar
+  (`dg-database-meta@1`: full column configs, relation targets, display-lossy list).
+  Hydration makes "lossy" columns better than empty — relations/person/contentLink/file
+  export display titles, lookup/rollup their computed values — recorded as display-lossy so
+  re-import rebuilds from configs, never from CSV cells. Query tables export their
+  projection. Requested format is ignored for data nodes: CSV is the honest tabular format.
+- **Import — shape only** (`lib/domain/data/import.ts`): `DataImportProvenance` (the
+  `DataPayload.source` record), `InferredColumn`, and `inferColumnsFromSamples` returning
+  NOT_IMPLEMENTED — the seam exists, nothing half-built behind it.
+- **Publishing — B7 item 4 VERIFIED:** `ServerNoteWindow.renderHTML` constructs its emitted
+  attributes literally (`class` + `data-block-type` only) and never spreads HTMLAttributes,
+  so `targetViewId`/`targetRowId` structurally cannot reach published HTML. No new
+  publishing work, as designed.
 
 ---
 
@@ -1204,7 +1314,7 @@ block seam landed in Phase 1b per B7.)
 |---|---|---|
 | O1 | Menu label "Data Table" vs "Database" | **Database** — it will have views, relations, and rollups, and it's what users will search for. The stub's wording may have been deliberate. |
 | O2 | Phase 3 (`mode: "query"`) before Phase 4 (relations)? | **Yes** — differentiator, and it validates the Phase 2 decoupling while it's fresh. |
-| O3 | Chat write-tools in v1? | **No** — read-only first. |
+| O3 | Chat write-tools in v1? | ~~No — read-only first~~ **Amended 2026-08-27:** append-only `insert_rows` joins v1 with rails (≤25/call, dedupeBy, per-row strict encode, receipts+undo, approval >10) — the co-browse job-hunting flow requires it, and an append is the safest write. update/delete/schema tools stay out. |
 | O4 | Column type changes: coerce-with-preview, or forbid and require a new column? | **Forbid** — much cheaper and arguably more honest. |
 | ~~O5~~ | ~~B4's undo split~~ | **Resolved 2026-08-17 — build in-session undo, stub durable/collaborative.** Skipping it does not save the work, it relocates it into a row trash-and-restore UI that covers less. |
 | O6 | Real CSV export in v1 instead of the B6 stub? | Cheap (~1h) and high value; planned as stub per instruction. |
