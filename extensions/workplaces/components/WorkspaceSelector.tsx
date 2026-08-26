@@ -1569,7 +1569,7 @@ export function WorkspaceSelector() {
               the way: py-1.5 -> py-1 and leading-tight rather than
               leading-none. This is the menu's primary heading, so it keeps a
               little more air than a nested submenu's label. */}
-          <DropdownMenuLabel className="py-1 text-xs uppercase leading-tight tracking-[0.18em] text-gray-500">
+          <DropdownMenuLabel className="py-1 text-[9px] uppercase leading-tight tracking-[0.18em] text-gray-500">
             Workspaces
           </DropdownMenuLabel>
 
