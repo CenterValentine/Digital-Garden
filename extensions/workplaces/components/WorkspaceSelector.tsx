@@ -2028,10 +2028,10 @@ export function WorkspaceSelector() {
                             folder,
                           );
                         }}
-                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10 ${
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors ${
                           isActiveBench
-                            ? "bg-gold-primary/16 text-gold-primary"
-                            : ""
+                            ? "bg-gold-dark/50 text-gray-900 shadow-[inset_0_0_0_1px_rgba(184,150,90,0.55)] hover:bg-gold-dark/60 dark:text-white"
+                            : "hover:bg-gold-primary/15 hover:text-gray-900 dark:hover:text-white"
                         }`}
                       >
                         <Folder className="h-3.5 w-3.5 shrink-0" />
@@ -2054,7 +2054,7 @@ export function WorkspaceSelector() {
                     onClick={() =>
                       void handleUnhideAllWorkbenchFolders(parentWorkspace)
                     }
-                    className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-black/10 px-3 py-2 text-left text-xs text-gray-500 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-black/10 px-3 py-2 text-left text-xs text-gray-500 transition-colors hover:bg-gold-primary/15 hover:text-gray-900 dark:border-white/10 dark:hover:text-white"
                   >
                     {hiddenCount} hidden · unhide all
                   </button>
