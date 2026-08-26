@@ -7,7 +7,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { FileTreeWithDropZone } from "../FileTreeWithDropZone";
 import { FileTreeSkeleton } from "../skeletons/FileTreeSkeleton";
@@ -17,7 +17,7 @@ import { ExternalLinkDialog } from "../external/ExternalLinkDialog";
 import { FileUploadDialog } from "../dialogs/FileUploadDialog";
 import { IconSelector } from "../IconSelector";
 import { LeftSidebarStatusBar } from "../LeftSidebarStatusBar";
-import { RootNodeHeader } from "../file-tree/RootNodeHeader";
+import { RootNodeHeader, type RootScopeOption } from "../file-tree/RootNodeHeader";
 import { useContentStore } from "@/state/content-store";
 import { useSearchStore } from "@/state/search-store";
 import { useTreeStateStore } from "@/state/tree-state-store";
@@ -100,13 +100,20 @@ function patchTreeNodeTitle(
       return { ...node, title: newTitle };
     }
 
-    if (!node.children?.length) {
+    // Both arrays — a rename of content sitting in a parent's reference block
+    // has to patch there too, or the optimistic title never updates for it.
+    if (!node.children?.length && !node.references?.length) {
       return node;
     }
 
     return {
       ...node,
-      children: patchTreeNodeTitle(node.children, contentId, newTitle),
+      children: node.children?.length
+        ? patchTreeNodeTitle(node.children, contentId, newTitle)
+        : (node.children ?? []),
+      references: node.references?.length
+        ? patchTreeNodeTitle(node.references, contentId, newTitle)
+        : node.references,
     };
   });
 }
@@ -263,16 +270,99 @@ export function LeftSidebarContent({
     const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
     return ws?.isView ? (ws.viewRoot?.title ?? null) : null;
   });
+  // Workbench support: when the active workspace is a workbench (child of a
+  // view workspace), its PARENT's view is offered as a middle scope between
+  // the workbench folder and the whole tree.
+  const activeWorkspaceIsWorkbench = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    return Boolean(ws?.parentWorkspaceId);
+  });
+  const activeParentViewRootContentId = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    if (!ws?.parentWorkspaceId) return null;
+    const parent = state.workspaces.find((w) => w.id === ws.parentWorkspaceId);
+    return parent?.viewRootContentId ?? null;
+  });
+  const activeParentViewRootTitle = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    if (!ws?.parentWorkspaceId) return null;
+    const parent = state.workspaces.find((w) => w.id === ws.parentWorkspaceId);
+    return parent?.viewRoot?.title ?? parent?.name ?? null;
+  });
 
-  // Transient "escape the view filter": on a view-workspace the user can bypass
-  // the view root to see the whole tree. Deliberately EPHEMERAL — it never
-  // persists and resets on ANY workspace change (including leaving and coming
-  // back), so a workspace's view always re-applies fresh.
-  const [viewBypassed, setViewBypassed] = useState(false);
-  // Reset the transient bypass whenever the workspace changes.
+  // Transient scope override for the view filter. `null` = the workspace's own
+  // scope (view root, or the workbench's folder); "parentView" (workbench only)
+  // = the parent workspace's view; "root" = the whole tree. Deliberately
+  // EPHEMERAL — it never persists and resets on ANY workspace change
+  // (including leaving and coming back), so a workspace's scope always
+  // re-applies fresh.
+  const [scopeOverride, setScopeOverride] = useState<
+    "parentView" | "root" | null
+  >(null);
   useEffect(() => {
-    setViewBypassed(false);
+    setScopeOverride(null);
   }, [activeWorkspaceId]);
+
+  // The folder the tree is actually scoped to right now (null = whole tree).
+  const effectiveViewRootContentId =
+    !activeWorkspaceIsView || scopeOverride === "root"
+      ? null
+      : scopeOverride === "parentView"
+        ? activeParentViewRootContentId
+        : activeViewRootContentId;
+  const scopedRootTitle =
+    scopeOverride === "parentView"
+      ? activeParentViewRootTitle
+      : activeViewRootTitle;
+
+  // In a view-scoped tree the view root's own row is gone — its children ARE
+  // the top level — so tree-space "null parent" (top level) must be remapped
+  // to the view root for every server write. Without this, creates/moves/
+  // drops aimed at the top of a filtered tree land at the real vault root,
+  // invisibly outside the view the user is looking at.
+  const scopedRootParentId = effectiveViewRootContentId;
+  const rootDropTarget = useMemo(
+    () =>
+      scopedRootParentId
+        ? {
+            parentId: scopedRootParentId,
+            label: scopedRootTitle ?? "view",
+            source: "root" as const,
+          }
+        : undefined,
+    [scopedRootParentId, scopedRootTitle],
+  );
+
+  // Scope options for the RootNodeHeader dropdown: [own scope, (parent view),
+  // root]. Absent (undefined) on non-view workspaces — no dropdown.
+  const scopeOptions = useMemo<RootScopeOption[] | undefined>(() => {
+    if (!activeWorkspaceIsView) return undefined;
+    const options: RootScopeOption[] = [
+      {
+        key: "default",
+        label: activeViewRootTitle ?? "view",
+        kind: activeWorkspaceIsWorkbench ? "workbench" : "view",
+      },
+    ];
+    if (activeWorkspaceIsWorkbench && activeParentViewRootContentId) {
+      options.push({
+        key: "parentView",
+        label: activeParentViewRootTitle ?? "view",
+        kind: "view",
+      });
+    }
+    options.push({ key: "root", label: "root — show all files", kind: "root" });
+    return options;
+  }, [
+    activeWorkspaceIsView,
+    activeWorkspaceIsWorkbench,
+    activeViewRootTitle,
+    activeParentViewRootContentId,
+    activeParentViewRootTitle,
+  ]);
+  const handleSelectScope = (key: string) => {
+    setScopeOverride(key === "parentView" || key === "root" ? key : null);
+  };
 
   // Fetch tree data
   const fetchTree = useCallback(async () => {
@@ -281,8 +371,8 @@ export function LeftSidebarContent({
       setError(null);
 
       const url = new URL("/api/content/content/tree", window.location.origin);
-      if (activeWorkspaceIsView && activeViewRootContentId && !viewBypassed) {
-        url.searchParams.set("viewRootContentId", activeViewRootContentId);
+      if (effectiveViewRootContentId) {
+        url.searchParams.set("viewRootContentId", effectiveViewRootContentId);
       }
       const response = await fetch(url.toString(), {
         credentials: "include",
@@ -320,7 +410,7 @@ export function LeftSidebarContent({
     } finally {
       setIsLoading(false);
     }
-  }, [activeWorkspaceId, activeWorkspaceIsView, activeViewRootContentId, viewBypassed]);
+  }, [activeWorkspaceId, effectiveViewRootContentId]);
 
   // Initial load and refresh when trigger or active workspace changes.
   // Gated on `workspaceStoreReady` so we don't double-fetch (once for
@@ -782,6 +872,11 @@ export function LeftSidebarContent({
       string,
       { currentParentId: string | null; currentIndex: number }
     >();
+    // Walks both arrays: a row inside a parent's reference block is a
+    // perfectly ordinary drag source, and skipping `references` left it
+    // without a recorded position. The index it yields is within whichever
+    // array held it — only consulted for same-parent reordering, where the
+    // server re-sorts by displayOrder anyway.
     const findPositions = (nodes: TreeNode[], parent: string | null = null) => {
       for (let i = 0; i < nodes.length; i++) {
         if (dragIds.includes(nodes[i].id)) {
@@ -789,6 +884,9 @@ export function LeftSidebarContent({
         }
         if (nodes[i].children && nodes[i].children.length > 0) {
           findPositions(nodes[i].children, nodes[i].id);
+        }
+        if (nodes[i].references && nodes[i].references.length > 0) {
+          findPositions(nodes[i].references, nodes[i].id);
         }
       }
     };
@@ -890,7 +988,7 @@ export function LeftSidebarContent({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 target: toPeopleMountTarget(node),
-                contentParentId: parentId,
+                contentParentId: parentId ?? scopedRootParentId,
                 displayOrder: apiIndex,
                 allowRemount: true,
               }),
@@ -901,7 +999,7 @@ export function LeftSidebarContent({
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 contentId: id,
-                targetParentId: parentId,
+                targetParentId: parentId ?? scopedRootParentId,
                 newDisplayOrder: apiIndex,
               }),
             });
@@ -1104,8 +1202,11 @@ export function LeftSidebarContent({
       } else {
         // Create new external link
         // Context-menu creates carry an explicit destination; header
-        // creates (parentId null) derive it from the tree selection.
-        let parentId: string | null = externalLinkDialog.parentId;
+        // creates (parentId null) derive it from the tree selection, and
+        // in a view-scoped tree an unselected create belongs to the view
+        // root rather than the vault root.
+        let parentId: string | null =
+          externalLinkDialog.parentId ?? scopedRootParentId;
         const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
 
         if (parentId === null && treeData && treeSelectedIds.length === 1) {
@@ -1199,6 +1300,14 @@ export function LeftSidebarContent({
     // "invalid input syntax for type uuid" error (server now translates
     // it to PARENT_NOT_READY, but skipping the round-trip is friendlier).
     // The user can retry in a moment once the parent's real UUID lands.
+    // View-scope remap: with the view root's row gone, a top-level create in
+    // a scoped tree belongs to the view root, not the vault root. People
+    // virtual parents keep their null requestParentId — the people ids carry
+    // the placement.
+    const requestParentId =
+      createTarget.peopleGroupId || createTarget.personId
+        ? createTarget.requestParentId
+        : (createTarget.requestParentId ?? scopedRootParentId);
     const reqParent = createTarget.requestParentId;
     if (typeof reqParent === "string" && reqParent.startsWith("temp-")) {
       setErrorDialog({
@@ -1315,7 +1424,7 @@ export function LeftSidebarContent({
       // Build request body — keys vary per content type (payload spread later)
       const requestBody: Record<string, unknown> = {
         title: config.title,
-        parentId: createTarget.requestParentId,
+        parentId: requestParentId,
       };
       if (createTarget.peopleGroupId) {
         requestBody.peopleGroupId = createTarget.peopleGroupId;
@@ -1334,7 +1443,7 @@ export function LeftSidebarContent({
           body: JSON.stringify({
             fileName: config.title,
             fileType: config.fileType,
-            parentId: createTarget.requestParentId,
+            parentId: requestParentId,
           }),
         });
 
@@ -1798,6 +1907,43 @@ export function LeftSidebarContent({
         .join("\n");
       const remaining = nodesToDelete.length - 3;
       confirmMessage = `${examples}\n• ...and ${remaining} more`;
+    }
+
+    // Workbench warning (owner requirement): deleting a folder that backs a
+    // workbench — directly or anywhere in the deleted subtree — also archives
+    // that workbench. Say exactly which, and flag the currently-open one.
+    const collectDeletedIds = (node: TreeNode, into: Set<string>) => {
+      into.add(node.id);
+      for (const child of node.children ?? []) collectDeletedIds(child, into);
+      for (const child of node.references ?? []) collectDeletedIds(child, into);
+    };
+    const deletedSubtreeIds = new Set<string>();
+    for (const node of nodesToDelete) collectDeletedIds(node, deletedSubtreeIds);
+    const workspaceState = useWorkspaceStore.getState();
+    const affectedWorkbenches = workspaceState.workspaces.filter(
+      (workspace) =>
+        workspace.parentWorkspaceId !== null &&
+        workspace.status === "active" &&
+        workspace.viewRootContentId !== null &&
+        deletedSubtreeIds.has(workspace.viewRootContentId),
+    );
+    if (affectedWorkbenches.length > 0) {
+      const names = affectedWorkbenches
+        .map((workspace) =>
+          workspace.id === workspaceState.activeWorkspaceId
+            ? `"${workspace.name}" (currently open)`
+            : `"${workspace.name}"`,
+        )
+        .join(", ");
+      const workbenchWarning =
+        affectedWorkbenches.length === 1
+          ? `Also archives the workbench ${names}.`
+          : `Also archives ${affectedWorkbenches.length} workbenches: ${names}.`;
+      confirmMessage = confirmMessage
+        ? `${confirmMessage}
+
+${workbenchWarning}`
+        : workbenchWarning;
     }
 
     // Check if any items have children
@@ -2276,7 +2422,8 @@ export function LeftSidebarContent({
   ) => {
     // File upload requires special two-phase flow - open upload dialog
     if (type === "file") {
-      setUploadDialog({ open: true, parentId: requestedParentId });
+      // Scoped views default the upload destination to the view root.
+      setUploadDialog({ open: true, parentId: requestedParentId ?? scopedRootParentId });
       return;
     }
 
@@ -2480,8 +2627,40 @@ export function LeftSidebarContent({
     );
   }
 
-  // Empty state
+  // Empty state. A view-scoped workspace keeps its RootNodeHeader even when
+  // the view root has no children: the header carries the view-filter
+  // dropdown ("root — show all files"), without which an empty view would
+  // strand the user with no way back to the full tree.
   if (!treeData || treeData.length === 0) {
+    if (treeData && effectiveViewRootContentId) {
+      return (
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          <RootNodeHeader
+            workspaceName="root"
+            totalFiles={0}
+            isSelected={!selectedContentId}
+            isView={activeWorkspaceIsView}
+            viewRootTitle={scopedRootTitle}
+            scopeOptions={scopeOptions}
+            activeScopeKey={scopeOverride ?? "default"}
+            onSelectScope={handleSelectScope}
+            onRefresh={() => {
+              void fetchTree();
+            }}
+            onClick={() => {
+              setSelectedContentId(null);
+              setSelectedIds([]);
+            }}
+          />
+          <div className="flex flex-1 flex-col items-center justify-center p-4 text-center">
+            <div className="text-sm text-gray-400 mb-2">This view is empty</div>
+            <div className="text-xs text-gray-500">
+              Create something here, or switch to root to see all files
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex h-full flex-col items-center justify-center p-4 text-center">
         <div className="text-sm text-gray-400 mb-2">No files yet</div>
@@ -2503,9 +2682,10 @@ export function LeftSidebarContent({
             totalFiles={countTotalNodes(treeData)}
             isSelected={!selectedContentId}
             isView={activeWorkspaceIsView}
-            viewRootTitle={activeViewRootTitle}
-            viewBypassed={viewBypassed}
-            onToggleViewBypass={setViewBypassed}
+            viewRootTitle={scopedRootTitle}
+            scopeOptions={scopeOptions}
+            activeScopeKey={scopeOverride ?? "default"}
+            onSelectScope={handleSelectScope}
             onRefresh={() => {
               void fetchTree();
             }}
@@ -2516,6 +2696,7 @@ export function LeftSidebarContent({
           />
           <FileTreeWithDropZone
             data={treeData}
+            rootDropTarget={rootDropTarget}
             onMove={handleMove}
             onSelect={handleSelect}
             onRename={handleRename}

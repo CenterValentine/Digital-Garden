@@ -31,6 +31,29 @@ export interface WorkspaceStatePayload {
   paneTabContentIds: WorkspacePaneStatePayload;
 }
 
+/**
+ * PATCH /api/content/workspaces/[id]/state request body: the pane snapshot plus
+ * the `updatedAt` the sender derived it from. The server rejects the write with
+ * 409 if the row has moved on, so a surface holding a stale snapshot (the
+ * extension panel iframe, the tree overlay, a second window) can't silently
+ * resurrect tabs another surface closed. `baseUpdatedAt` is never persisted —
+ * `normalizeWorkspaceStatePayload` rebuilds `paneState` from known fields only.
+ */
+export interface WorkspaceStateSavePayload extends WorkspaceStatePayload {
+  baseUpdatedAt?: string | null;
+  /**
+   * False when the sender cannot render the workspace's full pane geometry —
+   * the one-pane extension panel iframe today, a mobile client later. Its
+   * `layoutMode` and pane distribution then describe a viewport, not the
+   * workspace, so the server keeps the STORED geometry and folds in only this
+   * surface's tab membership. Without it a narrow surface silently flattens a
+   * split for every other surface on the same workspace.
+   *
+   * Defaults to true: an omitted flag means an authoritative full-shell client.
+   */
+  layoutAuthority?: boolean;
+}
+
 export interface WorkspaceContentSummary {
   id: string;
   title: string;
@@ -53,6 +76,55 @@ export interface WorkspaceViewRoot {
   title: string;
 }
 
+/**
+ * Parent-workspace `settings.workbenches` — normalized shape. Absent key =
+ * enabled with defaults. `dormantClearoutDays` is clamped to 1–365 server-side
+ * (default 30) and drives the dormant-clearout cron.
+ */
+export interface WorkspaceWorkbenchSettings {
+  enabled: boolean;
+  hiddenFolderIds: string[];
+  dormantClearoutDays: number;
+}
+
+/**
+ * Normalize a workspace's raw `settings.workbenches` value. Shared by the
+ * server (service, cron) and the client (selector submenu) so the two can't
+ * drift: absent/malformed keys resolve to enabled, no hidden folders, 30-day
+ * clearout; `dormantClearoutDays` is clamped to 1–365.
+ */
+export function normalizeWorkbenchSettings(
+  settings: Record<string, unknown> | null | undefined,
+): WorkspaceWorkbenchSettings {
+  const raw = settings?.["workbenches"];
+  const obj =
+    raw && typeof raw === "object" && !Array.isArray(raw)
+      ? (raw as Record<string, unknown>)
+      : {};
+  const enabled = typeof obj.enabled === "boolean" ? obj.enabled : true;
+  const hiddenFolderIds = Array.isArray(obj.hiddenFolderIds)
+    ? obj.hiddenFolderIds.filter(
+        (value): value is string => typeof value === "string",
+      )
+    : [];
+  const dormantClearoutDays =
+    typeof obj.dormantClearoutDays === "number" &&
+    Number.isFinite(obj.dormantClearoutDays)
+      ? Math.min(365, Math.max(1, Math.round(obj.dormantClearoutDays)))
+      : 30;
+  return { enabled, hiddenFolderIds, dormantClearoutDays };
+}
+
+/** One row of GET /api/content/workspaces/[id]/workbenches. */
+export interface WorkbenchFolderOption {
+  folderId: string;
+  title: string;
+  /** Existing workbench workspace id for this folder, if materialized. */
+  workbenchId: string | null;
+  /** True when the folder is in the parent's hiddenFolderIds list. */
+  hidden: boolean;
+}
+
 export interface ContentWorkspaceResponse {
   id: string;
   name: string;
@@ -62,6 +134,14 @@ export interface ContentWorkspaceResponse {
   isView: boolean;
   viewRootContentId: string | null;
   viewRoot: WorkspaceViewRoot | null;
+  /**
+   * Non-null marks this row as a WORKBENCH — a folder-derived sub-workspace of
+   * that parent workspace (`viewRootContentId` = the backing folder). Workbench
+   * rows are excluded from the top-level workspace list and surfaced through
+   * the parent's dwell submenu instead. They are not renameable (the name
+   * mirrors the folder) and carry no settings of their own.
+   */
+  parentWorkspaceId: string | null;
   status: "active" | "archived";
   expiresAt: string | null;
   archivedAt: string | null;

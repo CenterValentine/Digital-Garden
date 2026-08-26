@@ -1,5 +1,6 @@
 import type { ContentWorkspaceResponse } from "@/extensions/workplaces/server";
 import { useWorkspaceStore, registerMutationBroadcast } from "./workspace-store";
+import { configurePendingIntentBackstop } from "@/state/content-store";
 import { warmContentSummaryCache } from "@/lib/domain/content/content-summary-cache";
 
 const SYNC_CHANNEL_NAME = "dg-workspace-sync";
@@ -40,6 +41,15 @@ export function installWorkspaceSync(): () => void {
   if (typeof window === "undefined") return () => undefined;
   if (installed) return () => undefined;
   installed = true;
+
+  // Pending open/close intents normally retire the moment a write is
+  // acknowledged; this is only the backstop for an ack that never arrives
+  // (offline, suspended tab, erroring server). Derived from the poll interval
+  // rather than hard-coded in the content store so retuning POLL_INTERVAL_MS
+  // can't silently leave a stale assumption behind — and generous, because the
+  // normal path never reaches it and an immortal intent means a tab this
+  // surface refuses to display, or refuses to let go of.
+  configurePendingIntentBackstop(POLL_INTERVAL_MS * 20);
 
   if (typeof BroadcastChannel !== "undefined") {
     channel = new BroadcastChannel(SYNC_CHANNEL_NAME);

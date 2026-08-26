@@ -263,8 +263,15 @@ export async function handleSaveWorkplaceState(
       const session = await requireAuth();
       const { id } = await params;
       const body = await request.json();
-      const data = await saveWorkspaceState(session.user.id, id, body);
-      if (!data) {
+      const result = await saveWorkspaceState(
+        session.user.id,
+        id,
+        body,
+        typeof body?.baseUpdatedAt === "string" ? body.baseUpdatedAt : null,
+        // Absent flag = authoritative full-shell client (the app window).
+        body?.layoutAuthority !== false
+      );
+      if (result.status === "not-found") {
         return NextResponse.json(
           {
             success: false,
@@ -273,7 +280,25 @@ export async function handleSaveWorkplaceState(
           { status: 404 }
         );
       }
-      return NextResponse.json({ success: true, data });
+      if (result.status === "conflict") {
+        // Someone else (another window, the extension panel iframe, the tree
+        // overlay) wrote this workspace after the caller read it. The caller's
+        // whole-snapshot write is dropped and the CURRENT state ships back so
+        // it can reconcile — critical for closes, which a stale peer's
+        // snapshot would otherwise resurrect.
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "WORKSPACE_STATE_CONFLICT",
+              message: "Workspace state changed since it was loaded",
+            },
+            data: result.workspace,
+          },
+          { status: 409 }
+        );
+      }
+      return NextResponse.json({ success: true, data: result.workspace });
     } catch (error) {
       logger.error({ layer: "content", event: "workspaces_state_save:caught", summary: "PATCH caught", error });
       return errorResponse(error, "Failed to save workspace state");

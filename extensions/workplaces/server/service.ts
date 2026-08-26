@@ -272,9 +272,24 @@ export function formatWorkspace(
       contentMeta[id] = { title, contentType };
     }
   }
+  // Workbench parent pointer. Read structurally rather than as a typed column
+  // so this compiles both before and after the `workbenches` migration lands
+  // (prisma/ is owner-applied; the generated client gains the field only after
+  // `prisma generate` against the migrated schema). Becomes a direct
+  // `workspace.parentWorkspaceId` read once the migration ships.
+  const parentWorkspaceId =
+    (workspace as { parentWorkspaceId?: string | null }).parentWorkspaceId ??
+    null;
+  // A workbench's name mirrors its backing folder — renaming the folder renames
+  // the workbench on the next read; the stored name is only a fallback for a
+  // dead row (folder hard-deleted, FK set null).
+  const name =
+    parentWorkspaceId && workspace.viewRoot
+      ? workspace.viewRoot.title
+      : workspace.name;
   return {
     id: workspace.id,
-    name: workspace.name,
+    name,
     slug: workspace.slug,
     isMain: workspace.isMain,
     isLocked: workspace.isLocked,
@@ -283,6 +298,7 @@ export function formatWorkspace(
     viewRoot: workspace.viewRoot
       ? { id: workspace.viewRoot.id, title: workspace.viewRoot.title }
       : null,
+    parentWorkspaceId,
     status: workspace.status,
     expiresAt: workspace.expiresAt?.toISOString() ?? null,
     archivedAt: workspace.archivedAt?.toISOString() ?? null,
@@ -818,18 +834,120 @@ function getStateContentIds(state: WorkspaceStatePayload) {
   return [...contentIds];
 }
 
+/**
+ * Fold a non-authoritative surface's tab membership into the stored geometry.
+ *
+ * A one-pane surface (extension panel, mobile) sends every tab in one pane
+ * because that's all it can show. Taken literally that write flattens a split
+ * for everyone. So its payload is read for MEMBERSHIP only — which content is
+ * open — while layoutMode, activePaneId and each tab's pane assignment come
+ * from what's already stored.
+ *
+ * Closes still propagate (anything the sender dropped is dropped here too), and
+ * opens land in the stored active pane, the only placement a projecting surface
+ * can meaningfully imply.
+ */
+function mergeMembershipIntoStoredLayout(
+  stored: WorkspaceStatePayload,
+  incoming: WorkspaceStatePayload,
+): WorkspaceStatePayload {
+  const incomingIds = new Set(getStateContentIds(incoming));
+  const storedIds = new Set(getStateContentIds(stored));
+
+  const paneTabContentIds: WorkspacePaneStatePayload = {};
+  for (const paneId of WORKSPACE_PANE_IDS) {
+    const pane = stored.paneTabContentIds[paneId];
+    const contentIds = (pane?.contentIds ?? []).filter((contentId) =>
+      incomingIds.has(contentId),
+    );
+    paneTabContentIds[paneId] = {
+      contentIds,
+      activeContentId:
+        pane?.activeContentId && contentIds.includes(pane.activeContentId)
+          ? pane.activeContentId
+          : (contentIds[0] ?? null),
+    };
+  }
+
+  const additions = [...incomingIds].filter(
+    (contentId) => !storedIds.has(contentId),
+  );
+  if (additions.length > 0) {
+    const targetPaneId = normalizePaneId(stored.activePaneId);
+    const target = paneTabContentIds[targetPaneId];
+    if (target) {
+      target.contentIds = [...target.contentIds, ...additions];
+      target.activeContentId = target.activeContentId ?? additions[0];
+    }
+  }
+
+  const survivingIds = new Set(
+    WORKSPACE_PANE_IDS.flatMap(
+      (paneId) => paneTabContentIds[paneId]?.contentIds ?? [],
+    ),
+  );
+
+  // Keep the stored active tab if it's still open. A projecting surface should
+  // not be able to yank what someone else is looking at — same principle as
+  // `preferActiveContentId` on the client's background reconcile.
+  const activeContentId =
+    stored.activeContentId && survivingIds.has(stored.activeContentId)
+      ? stored.activeContentId
+      : incoming.activeContentId && survivingIds.has(incoming.activeContentId)
+        ? incoming.activeContentId
+        : ([...survivingIds][0] ?? null);
+
+  return {
+    layoutMode: stored.layoutMode,
+    activePaneId: stored.activePaneId,
+    activeContentId,
+    paneTabContentIds,
+  };
+}
+
+export type SaveWorkspaceStateResult =
+  | { status: "ok"; workspace: ContentWorkspaceResponse }
+  | { status: "not-found" }
+  | { status: "conflict"; workspace: ContentWorkspaceResponse };
+
+/**
+ * Persist a workspace's pane snapshot, optionally guarded by the `updatedAt`
+ * the caller derived that snapshot from.
+ *
+ * WHY THE GUARD: every surface rendering MainPanelWorkspace — the app window,
+ * the browser extension's panel iframe, the tree overlay — mounts
+ * WorkplacesShellController, which PATCHes the ENTIRE pane snapshot 600ms after
+ * any local change. Unguarded that is last-writer-wins over a whole document,
+ * and the one operation it cannot express is a CLOSE: a peer still holding a
+ * pre-close snapshot re-asserts the closed tab on its next write, and the
+ * closing surface faithfully restores it on the next poll. (Same class of bug
+ * as the one `removeContentFromWorkspaces` fixes for deleted content — there
+ * the resurrection source is stored state, here it's a stale peer.)
+ *
+ * A mismatch is reported as `conflict` alongside the CURRENT row, so the caller
+ * can reconcile against real state without a second round trip. Omitting
+ * `expectedUpdatedAt` preserves the old blind overwrite for callers that have
+ * no base to offer.
+ */
 export async function saveWorkspaceState(
   ownerId: string,
   workspaceId: string,
   state: unknown,
-) {
+  expectedUpdatedAt?: string | null,
+  layoutAuthority = true,
+): Promise<SaveWorkspaceStateResult> {
   const workspace = await prisma.contentWorkspace.findFirst({
     where: { id: workspaceId, ownerId, status: "active" },
   });
 
-  if (!workspace) return null;
+  if (!workspace) return { status: "not-found" };
 
-  const normalizedState = normalizeWorkspaceStatePayload(state);
+  const normalizedState = layoutAuthority
+    ? normalizeWorkspaceStatePayload(state)
+    : mergeMembershipIntoStoredLayout(
+        normalizeWorkspaceStatePayload(workspace.paneState),
+        normalizeWorkspaceStatePayload(state),
+      );
   const requestedContentIds = getStateContentIds(normalizedState);
   const ownedContentIds = requestedContentIds.length
     ? await prisma.contentNode.findMany({
@@ -857,35 +975,74 @@ export async function saveWorkspaceState(
   );
   await reconcileMembershipFromSnapshot(workspaceId, paneContentIds);
 
-  const updatedWorkspace = await prisma.contentWorkspace.update({
-    where: { id: workspaceId },
-    data: {
-      layoutMode: filteredState.layoutMode,
-      activePaneId: filteredState.activePaneId,
-      paneState: filteredState as unknown as Prisma.InputJsonValue,
-    },
-    include: {
-      items: {
-        where: {
-          content: { ownerId, deletedAt: null },
-        },
-        include: {
-          content: {
-            select: {
-              id: true,
-              title: true,
-              contentType: true,
-              parentId: true,
-            },
+  const stateInclude = {
+    items: {
+      where: {
+        content: { ownerId, deletedAt: null },
+      },
+      include: {
+        content: {
+          select: {
+            id: true,
+            title: true,
+            contentType: true,
+            parentId: true,
           },
         },
-        orderBy: { updatedAt: "desc" },
       },
-      viewRoot: { select: { id: true, title: true } },
+      orderBy: { updatedAt: "desc" },
     },
+    viewRoot: { select: { id: true, title: true } },
+  } satisfies Prisma.ContentWorkspaceInclude;
+
+  const data = {
+    layoutMode: filteredState.layoutMode,
+    activePaneId: filteredState.activePaneId,
+    paneState: filteredState as unknown as Prisma.InputJsonValue,
+  };
+
+  if (expectedUpdatedAt) {
+    const base = new Date(expectedUpdatedAt);
+    if (Number.isNaN(base.getTime())) {
+      return { status: "conflict", workspace: await readFormatted() };
+    }
+
+    // Millisecond WINDOW, not equality: the column is TIMESTAMPTZ(6) but the
+    // Prisma client reads it into a JS Date (ms) and we hand the client that
+    // truncated ISO string. Comparing it back for exact equality would 409
+    // forever on any row whose stored value carries sub-millisecond digits.
+    // Two writes inside the same millisecond aren't a realistic conflict given
+    // the 600ms client debounce.
+    const { count } = await prisma.contentWorkspace.updateMany({
+      where: {
+        id: workspaceId,
+        ownerId,
+        status: "active",
+        updatedAt: { gte: base, lt: new Date(base.getTime() + 1) },
+      },
+      data,
+    });
+
+    return count === 0
+      ? { status: "conflict", workspace: await readFormatted() }
+      : { status: "ok", workspace: await readFormatted() };
+  }
+
+  const updatedWorkspace = await prisma.contentWorkspace.update({
+    where: { id: workspaceId },
+    data,
+    include: stateInclude,
   });
 
-  return formatWorkspace(updatedWorkspace);
+  return { status: "ok", workspace: formatWorkspace(updatedWorkspace) };
+
+  async function readFormatted() {
+    const current = await prisma.contentWorkspace.findFirstOrThrow({
+      where: { id: workspaceId, ownerId },
+      include: stateInclude,
+    });
+    return formatWorkspace(current);
+  }
 }
 
 /**

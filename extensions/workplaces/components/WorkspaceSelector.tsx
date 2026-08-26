@@ -31,6 +31,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/client/ui/dropdown-menu";
+import { normalizeWorkbenchSettings } from "@/extensions/workplaces/server/types";
 import {
   Dialog,
   DialogContent,
@@ -192,6 +193,12 @@ function markExpirationWarningSeen(workspaceId: string, expiresAt: string) {
   );
 }
 
+function clampDormantDays(value: string): number {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed)) return 30;
+  return Math.min(365, Math.max(1, parsed));
+}
+
 function collectFolderOptions(nodes: TreeNode[], parentPath = "") {
   const folders: FolderOption[] = [];
   const nodesById: Record<string, FolderOption> = {};
@@ -320,6 +327,7 @@ export function WorkspaceSelector() {
     (state) => state.duplicateWorkspace,
   );
   const updateWorkspace = useWorkspaceStore((state) => state.updateWorkspace);
+  const openWorkbench = useWorkspaceStore((state) => state.openWorkbench);
   const reorderWorkspaces = useWorkspaceStore(
     (state) => state.reorderWorkspaces,
   );
@@ -337,6 +345,18 @@ export function WorkspaceSelector() {
       workspaces.find((workspace) => workspace.isMain) ??
       null,
     [activeWorkspaceId, workspaces],
+  );
+
+  // Parent of the ACTIVE workspace when the active one is a workbench —
+  // drives the "Parent · Workbench" trigger label and parent-row highlight.
+  const activeParentWorkspace = useMemo(
+    () =>
+      activeWorkspace?.parentWorkspaceId
+        ? (workspaces.find(
+            (workspace) => workspace.id === activeWorkspace.parentWorkspaceId,
+          ) ?? null)
+        : null,
+    [workspaces, activeWorkspace],
   );
 
   const [menuOpen, setMenuOpen] = useState(false);
@@ -360,6 +380,8 @@ export function WorkspaceSelector() {
   >(null);
   const [viewRootFolderQuery, setViewRootFolderQuery] = useState("");
   const [draftExpiresAt, setDraftExpiresAt] = useState("");
+  const [draftWorkbenchesEnabled, setDraftWorkbenchesEnabled] = useState(true);
+  const [draftDormantClearoutDays, setDraftDormantClearoutDays] = useState("30");
   const [folderOptions, setFolderOptions] = useState<FolderOption[]>([]);
   const [nodesById, setNodesById] = useState<Record<string, FolderOption>>({});
   const [selectedFolderId, setSelectedFolderId] = useState("");
@@ -375,6 +397,19 @@ export function WorkspaceSelector() {
     useState<ContentWorkspaceResponse | null>(null);
   const [duplicateWorkspaceTarget, setDuplicateWorkspaceTarget] =
     useState<ContentWorkspaceResponse | null>(null);
+  // Workbench dwell submenu. Opens ONLY via ~1s hover on a view-workspace row
+  // — never on click: a click always targets the workspace itself; workbenches
+  // are the more acute layer behind the dwell.
+  const [workbenchMenu, setWorkbenchMenu] = useState<{
+    workspaceId: string;
+    x: number;
+    y: number;
+    /** null = loading; [] = no subfolders. */
+    folders: Array<{ id: string; title: string }> | null;
+  } | null>(null);
+  const workbenchDwellTimerRef = useRef<number | null>(null);
+  const workbenchCloseTimerRef = useRef<number | null>(null);
+
   const [workspaceContextMenu, setWorkspaceContextMenu] = useState<{
     workspace: ContentWorkspaceResponse;
     x: number;
@@ -522,6 +557,11 @@ export function WorkspaceSelector() {
     setDraftViewRootContentId(settingsWorkspace.viewRootContentId);
     setViewRootFolderQuery("");
     setDraftExpiresAt(toDatetimeLocalValue(settingsWorkspace.expiresAt));
+    const workbenchSettings = normalizeWorkbenchSettings(
+      settingsWorkspace.settings,
+    );
+    setDraftWorkbenchesEnabled(workbenchSettings.enabled);
+    setDraftDormantClearoutDays(String(workbenchSettings.dormantClearoutDays));
   }, [settingsOpen, settingsWorkspace]);
 
   useEffect(() => {
@@ -578,6 +618,158 @@ export function WorkspaceSelector() {
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [workspaceContextMenu]);
+
+  const cancelWorkbenchDwell = () => {
+    if (workbenchDwellTimerRef.current !== null) {
+      window.clearTimeout(workbenchDwellTimerRef.current);
+      workbenchDwellTimerRef.current = null;
+    }
+  };
+  const cancelWorkbenchClose = () => {
+    if (workbenchCloseTimerRef.current !== null) {
+      window.clearTimeout(workbenchCloseTimerRef.current);
+      workbenchCloseTimerRef.current = null;
+    }
+  };
+  // Grace period so a pointer travelling row → submenu doesn't lose the menu.
+  const scheduleWorkbenchClose = () => {
+    cancelWorkbenchClose();
+    workbenchCloseTimerRef.current = window.setTimeout(() => {
+      workbenchCloseTimerRef.current = null;
+      setWorkbenchMenu(null);
+    }, 200);
+  };
+
+  const openWorkbenchMenuFor = (
+    workspace: ContentWorkspaceResponse,
+    rect: DOMRect,
+  ) => {
+    setWorkbenchMenu({
+      workspaceId: workspace.id,
+      x: Math.min(rect.right + 6, window.innerWidth - 252),
+      y: Math.max(8, Math.min(rect.top - 4, window.innerHeight - 340)),
+      folders: null,
+    });
+    // First-level subfolders of the view root. The scoped tree route already
+    // returns the root's CHILDREN as top level, so the top-level folder rows
+    // are exactly the workbench candidates.
+    void fetch(
+      `/api/content/content/tree?viewRootContentId=${workspace.viewRootContentId}`,
+      { credentials: "include" },
+    )
+      .then(async (response) => {
+        const result = (await response.json()) as TreeApiResponse;
+        if (!response.ok || !result.success || !result.data) {
+          throw new Error(result.error?.message ?? "Failed to load folders");
+        }
+        return result.data.tree
+          .filter(
+            (node) => node.contentType === "folder" && !node.treeNodeKind,
+          )
+          .map((node) => ({ id: node.id, title: node.title }));
+      })
+      .then((folders) => {
+        setWorkbenchMenu((current) =>
+          current && current.workspaceId === workspace.id
+            ? { ...current, folders }
+            : current,
+        );
+      })
+      .catch(() => {
+        setWorkbenchMenu((current) =>
+          current && current.workspaceId === workspace.id
+            ? { ...current, folders: [] }
+            : current,
+        );
+      });
+  };
+
+  const handleOpenWorkbench = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    folder: { id: string; title: string },
+  ) => {
+    setWorkbenchMenu(null);
+    setMenuOpen(false);
+    setSwitchingWorkspaceId(folder.id);
+    try {
+      await openWorkbench(parentWorkspace.id, folder.id);
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to open workbench:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to open workbench",
+      );
+    } finally {
+      setSwitchingWorkspaceId((current) =>
+        current === folder.id ? null : current,
+      );
+    }
+  };
+
+  const handleHideWorkbenchFolder = async (
+    parentWorkspace: ContentWorkspaceResponse,
+    folder: { id: string; title: string },
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    if (current.hiddenFolderIds.includes(folder.id)) return;
+    // Hiding the ACTIVE workbench's folder falls back to the parent first.
+    if (
+      activeWorkspace &&
+      activeWorkspace.parentWorkspaceId === parentWorkspace.id &&
+      activeWorkspace.viewRootContentId === folder.id
+    ) {
+      await activateWorkspace(parentWorkspace.id).catch(() => undefined);
+    }
+    try {
+      await updateWorkspace(parentWorkspace.id, {
+        settings: {
+          ...parentWorkspace.settings,
+          workbenches: {
+            ...current,
+            hiddenFolderIds: [...current.hiddenFolderIds, folder.id],
+          },
+        },
+      });
+      toast.success(`Hid "${folder.title}" from workbenches`);
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to hide folder:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to hide folder",
+      );
+    }
+  };
+
+  const handleUnhideAllWorkbenchFolders = async (
+    parentWorkspace: ContentWorkspaceResponse,
+  ) => {
+    const current = normalizeWorkbenchSettings(parentWorkspace.settings);
+    try {
+      await updateWorkspace(parentWorkspace.id, {
+        settings: {
+          ...parentWorkspace.settings,
+          workbenches: { ...current, hiddenFolderIds: [] },
+        },
+      });
+    } catch (error) {
+      console.error("[WorkspaceSelector] Failed to unhide folders:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to unhide folders",
+      );
+    }
+  };
+
+  // Closing the root dropdown always dismisses the workbench submenu.
+  useEffect(() => {
+    if (menuOpen) return;
+    if (workbenchDwellTimerRef.current !== null) {
+      window.clearTimeout(workbenchDwellTimerRef.current);
+      workbenchDwellTimerRef.current = null;
+    }
+    if (workbenchCloseTimerRef.current !== null) {
+      window.clearTimeout(workbenchCloseTimerRef.current);
+      workbenchCloseTimerRef.current = null;
+    }
+    setWorkbenchMenu(null);
+  }, [menuOpen]);
 
   useEffect(() => {
     if (!settingsOpen || folderOptions.length > 0) return;
@@ -1167,6 +1359,11 @@ export function WorkspaceSelector() {
           ...settingsWorkspace.settings,
           workspaceDescription: draftDescription.trim() || null,
           workspaceIcon: draftWorkspaceIcon,
+          workbenches: {
+            ...normalizeWorkbenchSettings(settingsWorkspace.settings),
+            enabled: draftWorkbenchesEnabled,
+            dormantClearoutDays: clampDormantDays(draftDormantClearoutDays),
+          },
         },
       });
       setSettingsOpen(false);
@@ -1268,7 +1465,9 @@ export function WorkspaceSelector() {
             // user actually names it.
             const pendingName = workspaces.find(
               (workspace) =>
-                !workspace.isMain && isWorkspaceNamePending(workspace),
+                !workspace.isMain &&
+                !workspace.parentWorkspaceId &&
+                isWorkspaceNamePending(workspace),
             );
             if (pendingName) startInlineRename(pendingName);
           }
@@ -1286,11 +1485,23 @@ export function WorkspaceSelector() {
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
             ) : (
               renderWorkspaceIcon(
-                getWorkspaceIconValue(activeWorkspace),
+                getWorkspaceIconValue(activeParentWorkspace ?? activeWorkspace),
                 "h-3.5 w-3.5",
               )
             )}
-            {renderWorkspaceName(activeWorkspace, "max-w-36 truncate")}
+            {activeParentWorkspace ? (
+              <span className="inline-flex min-w-0 max-w-44 items-center gap-1">
+                <span className="truncate">
+                  {getWorkspaceDisplayName(activeParentWorkspace)}
+                </span>
+                <span className="shrink-0 text-gray-400">·</span>
+                <span className="truncate">
+                  {getWorkspaceDisplayName(activeWorkspace)}
+                </span>
+              </span>
+            ) : (
+              renderWorkspaceName(activeWorkspace, "max-w-36 truncate")
+            )}
             {activeWorkspace?.isLocked ? <Lock className="h-3 w-3" /> : null}
             <ChevronDown className="h-3.5 w-3.5" />
           </button>
@@ -1303,8 +1514,19 @@ export function WorkspaceSelector() {
             // anywhere else) must not dismiss the menu — the user should see
             // the row icon change the moment they pick one.
             if (quickIconTarget) event.preventDefault();
+            // Same for the portaled workbench submenu (non-modal dropdown:
+            // clicks land there but count as "outside").
+            const target = event.target as HTMLElement | null;
+            if (target?.closest?.('[data-workbench-submenu="true"]')) {
+              event.preventDefault();
+            }
           }}
           onEscapeKeyDown={(event) => {
+            if (workbenchMenu) {
+              event.preventDefault();
+              setWorkbenchMenu(null);
+              return;
+            }
             if (quickIconTarget) {
               event.preventDefault();
               setQuickIconTarget(null);
@@ -1316,8 +1538,12 @@ export function WorkspaceSelector() {
             Workspaces
           </DropdownMenuLabel>
 
-          {workspaces.map((workspace) => {
-            const isActive = workspace.id === activeWorkspace?.id;
+          {workspaces
+            .filter((workspace) => !workspace.parentWorkspaceId)
+            .map((workspace) => {
+            const isActive =
+              workspace.id === activeWorkspace?.id ||
+              workspace.id === activeWorkspace?.parentWorkspaceId;
             const isEditing = workspace.id === editingWorkspaceId;
             const isDragged = workspace.id === draggedWorkspaceId;
             const isDropTarget = workspace.id === dropTargetWorkspaceId;
@@ -1337,6 +1563,25 @@ export function WorkspaceSelector() {
                   event.dataTransfer.setData("text/plain", workspace.id);
                   setDraggedWorkspaceId(workspace.id);
                 }}
+                onPointerEnter={(event) => {
+                  cancelWorkbenchClose();
+                  cancelWorkbenchDwell();
+                  if (
+                    workbenchMenu &&
+                    workbenchMenu.workspaceId !== workspace.id
+                  ) {
+                    scheduleWorkbenchClose();
+                  }
+                  if (editingWorkspaceId) return;
+                  if (!workspace.isView || !workspace.viewRootContentId) return;
+                  if (!normalizeWorkbenchSettings(workspace.settings).enabled)
+                    return;
+                  const rect = event.currentTarget.getBoundingClientRect();
+                  workbenchDwellTimerRef.current = window.setTimeout(() => {
+                    workbenchDwellTimerRef.current = null;
+                    openWorkbenchMenuFor(workspace, rect);
+                  }, 1000);
+                }}
                 onPointerMove={(event) => {
                   // Radix focuses menu items as the pointer moves over them.
                   // While the inline rename input is open that roving focus
@@ -1349,6 +1594,8 @@ export function WorkspaceSelector() {
                   // Same guard for the leave side: Radix refocuses the menu
                   // content when the pointer exits an item.
                   if (editingWorkspaceId) event.preventDefault();
+                  cancelWorkbenchDwell();
+                  if (workbenchMenu) scheduleWorkbenchClose();
                 }}
                 onDragOver={(event) => {
                   if (workspace.isMain || !draggedWorkspaceId) return;
@@ -1383,6 +1630,8 @@ export function WorkspaceSelector() {
                 }}
                 onSelect={(event) => {
                   event.preventDefault();
+                  cancelWorkbenchDwell();
+                  setWorkbenchMenu(null);
                   if (iconHoldFiredRef.current === workspace.id) {
                     // This press already long-pressed into the icon picker;
                     // don't also treat the release as a workspace switch.
@@ -1604,6 +1853,112 @@ export function WorkspaceSelector() {
           </button>
         </div>
       ) : null}
+
+      {workbenchMenu
+        ? (() => {
+            const parentWorkspace =
+              workspaces.find(
+                (candidate) => candidate.id === workbenchMenu.workspaceId,
+              ) ?? null;
+            if (!parentWorkspace) return null;
+            const workbenchSettings = normalizeWorkbenchSettings(
+              parentWorkspace.settings,
+            );
+            const hiddenIds = new Set(workbenchSettings.hiddenFolderIds);
+            const allFolders = workbenchMenu.folders ?? [];
+            const visibleFolders = allFolders.filter(
+              (folder) => !hiddenIds.has(folder.id),
+            );
+            const hiddenCount = allFolders.filter((folder) =>
+              hiddenIds.has(folder.id),
+            ).length;
+            return (
+              <div
+                data-workbench-submenu="true"
+                className="fixed z-[70] max-h-80 w-60 overflow-y-auto rounded-xl border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-2xl backdrop-blur-sm dark:bg-gray-950/95 dark:text-white"
+                style={{ left: workbenchMenu.x, top: workbenchMenu.y }}
+                onPointerEnter={() => cancelWorkbenchClose()}
+                onPointerLeave={() => scheduleWorkbenchClose()}
+                onClick={(event) => event.stopPropagation()}
+                onContextMenu={(event) => event.preventDefault()}
+              >
+                <div className="px-3 py-1.5 text-[10px] uppercase tracking-[0.18em] text-gray-500">
+                  Workbenches
+                </div>
+                {workbenchMenu.folders === null ? (
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-gray-500">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Loading folders…
+                  </div>
+                ) : visibleFolders.length === 0 ? (
+                  <div className="px-3 py-2 text-xs text-gray-500">
+                    {allFolders.length === 0
+                      ? "No subfolders in this view yet"
+                      : "All subfolders are hidden"}
+                  </div>
+                ) : (
+                  visibleFolders.map((folder) => {
+                    const existing =
+                      workspaces.find(
+                        (candidate) =>
+                          candidate.parentWorkspaceId === parentWorkspace.id &&
+                          candidate.viewRootContentId === folder.id &&
+                          candidate.status === "active",
+                      ) ?? null;
+                    const isActiveBench =
+                      existing !== null && existing.id === activeWorkspace?.id;
+                    return (
+                      <button
+                        key={folder.id}
+                        type="button"
+                        disabled={switchingWorkspaceId !== null}
+                        title="Open workbench · right-click to hide"
+                        onClick={() =>
+                          void handleOpenWorkbench(parentWorkspace, folder)
+                        }
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          event.stopPropagation();
+                          void handleHideWorkbenchFolder(
+                            parentWorkspace,
+                            folder,
+                          );
+                        }}
+                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-colors hover:bg-black/5 dark:hover:bg-white/10 ${
+                          isActiveBench
+                            ? "bg-gold-primary/16 text-gold-primary"
+                            : ""
+                        }`}
+                      >
+                        <Folder className="h-3.5 w-3.5 shrink-0" />
+                        <span className="min-w-0 flex-1 truncate">
+                          {folder.title}
+                        </span>
+                        {existing ? (
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-gold-primary/70"
+                            title="Workbench exists"
+                          />
+                        ) : null}
+                      </button>
+                    );
+                  })
+                )}
+                {hiddenCount > 0 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleUnhideAllWorkbenchFolders(parentWorkspace)
+                    }
+                    className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-black/10 px-3 py-2 text-left text-xs text-gray-500 transition-colors hover:bg-black/5 dark:border-white/10 dark:hover:bg-white/10"
+                  >
+                    {hiddenCount} hidden · unhide all
+                  </button>
+                ) : null}
+              </div>
+            );
+          })()
+        : null}
 
       <Dialog
         open={settingsOpen}
@@ -1963,6 +2318,50 @@ export function WorkspaceSelector() {
                                 ))
                               )}
                             </div>
+                          </div>
+
+                          <div className="space-y-3 border-t border-black/10 p-3 dark:border-white/10">
+                            <div className="flex items-start justify-between gap-4">
+                              <div>
+                                <div className="font-medium">Workbenches</div>
+                                <div className="text-xs text-gray-500">
+                                  Hovering this workspace (~1s) lists the view
+                                  root&apos;s subfolders; each opens as its own
+                                  lightweight workspace. Names mirror the
+                                  folders and cannot be edited directly.
+                                </div>
+                              </div>
+                              <Switch
+                                checked={draftWorkbenchesEnabled}
+                                disabled={isSavingSettings}
+                                onCheckedChange={(checked) =>
+                                  setDraftWorkbenchesEnabled(Boolean(checked))
+                                }
+                              />
+                            </div>
+                            {draftWorkbenchesEnabled && (
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400">
+                                Clear dormant workbenches after (days)
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={365}
+                                  value={draftDormantClearoutDays}
+                                  disabled={isSavingSettings}
+                                  onChange={(event) =>
+                                    setDraftDormantClearoutDays(
+                                      event.target.value,
+                                    )
+                                  }
+                                  className="mt-1 w-full rounded-md border border-black/10 bg-white/70 px-3 py-2 text-sm outline-none focus:border-gold-primary disabled:opacity-50 dark:border-white/10 dark:bg-white/5"
+                                />
+                                <span className="mt-1 block font-normal text-gray-500">
+                                  Workbenches whose folder left this view are
+                                  removed after this many days (1–365, default
+                                  30). Layouts survive until then.
+                                </span>
+                              </label>
+                            )}
                           </div>
                         </>
                       )}
