@@ -330,6 +330,22 @@ function panelFoldersFromTree(
   }));
 }
 
+/**
+ * Per-layer panel surface. Depth 0 stays the neutral popover; each deeper
+ * layer warms toward the gold tokens by a step small enough to read as
+ * "same panel family" but large enough that two OVERLAPPING panels separate
+ * at a glance — the borders and everything else stay identical on purpose.
+ *
+ * Light: white mixed with --gold-primary (#C9A86C) at 8% / 16%.
+ * Dark: gray-950 mixed with --gold-dark (#B8965A) at 10% / 20% — near-black
+ * swallows low-alpha warmth, so dark needs the bigger steps to stay visible.
+ */
+const PANEL_DEPTH_CLASS = [
+  "bg-white/95 dark:bg-gray-950/95",
+  "bg-[#FBF8F3]/95 dark:bg-[#17171B]/95",
+  "bg-[#F6F1E7]/95 dark:bg-[#2A2724]/95",
+];
+
 const MENU_HEADING_CLASS =
   "px-1.5 pb-0.5 pt-1 text-[9px] font-semibold uppercase leading-none tracking-[0.18em] text-gray-500";
 
@@ -2330,7 +2346,11 @@ export function WorkspaceSelector() {
                 <div
                   key={`${depth}:${orderListKey}`}
                   data-workbench-submenu="true"
-                  className="fixed z-[70] max-h-80 w-60 overflow-y-auto rounded-xl border border-white/10 bg-white/95 p-1 text-sm text-gray-900 shadow-2xl backdrop-blur-sm dark:bg-gray-950/95 dark:text-white"
+                  className={`fixed z-[70] max-h-80 w-60 overflow-y-auto rounded-xl border border-white/10 p-1 text-sm text-gray-900 shadow-2xl backdrop-blur-sm dark:text-white ${
+                    PANEL_DEPTH_CLASS[
+                      Math.min(depth, PANEL_DEPTH_CLASS.length - 1)
+                    ]
+                  }`}
                   style={{ left: panel.x, top: panel.y }}
                   onPointerEnter={() => cancelWorkbenchClose()}
                   onPointerLeave={() => scheduleWorkbenchClose()}
