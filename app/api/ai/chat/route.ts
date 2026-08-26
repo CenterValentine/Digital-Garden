@@ -1645,7 +1645,7 @@ export async function POST(request: Request) {
           const availabilityLine =
             enabledDataTools.length === 0
               ? "ALL database tools are DISABLED in the user's settings. Do not attempt to call any of them. If the user asks for database operations, tell them to enable the tools under Settings → AI → AI Tools → Databases."
-              : `Database tools available this turn: ${enabledDataTools.join(", ")}.${
+              : `Database tools available this turn: ${enabledDataTools.join(", ")}. For reading or changing ROWS AND CELLS, use these — never searchNotes/getCurrentNote, which see only notes and will mislead you about row data.${
                   disabledDataTools.length > 0
                     ? ` DISABLED in the user's settings (never call these; tell the user to enable them under Settings → AI → AI Tools → Databases if needed): ${disabledDataTools.join(", ")}.`
                     : " Disregard any earlier statements in this conversation that they were unavailable; verify current values with query_database instead of trusting prior turns."
