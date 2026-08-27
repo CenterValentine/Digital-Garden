@@ -32,12 +32,17 @@ has already been planned. There is no separate ledger file to drift out of sync.
 
 ```bash
 gh issue list --state open --limit 100 \
-  --search "label:bug -label:hard-bug" \
+  --search "label:bug -label:hard-bug -label:enhancement" \
   --json number,title,body,labels,createdAt,updatedAt,comments
 ```
 
-Scope is exactly this: **open issues carrying the `bug` label and not the `hard-bug`
-label**.
+Scope is exactly this: **open issues carrying the `bug` label and carrying neither
+`hard-bug` nor `enhancement`**.
+
+**`bug` + `enhancement` together is out of scope.** The pairing is the owner's signal
+that the item is a design change rather than a defect — the behaviour it describes is
+itself under revision, so planning a fix for it would be proposing to restore something
+that may not be wanted. Skip these exactly as you skip `hard-bug`.
 
 **`hard-bug` is an explicit opt-out.** It means the owner has already looked at that
 issue and decided it is not a candidate for an automated plan — too subtle, too
@@ -255,8 +260,9 @@ closed it. The owner verifies and closes; this document never closes anything it
 
 ## Notes for the human
 
-One line for anything excluded by the `hard-bug` label ("Skipped 2 as `hard-bug`: #70,
-#86") and one for anything dropped by the five-per-week cap — the document should never
+One line per exclusion reason — `hard-bug` ("Skipped 2 as `hard-bug`: #70, #86"),
+`bug`+`enhancement` ("Skipped 1 as design change: #69"), and anything dropped by the
+five-per-week cap — the document should never
 imply coverage it does not have. Then anything else: unlabeled issues that look like
 bugs, or two issues that appear to share a root cause.
 ```
