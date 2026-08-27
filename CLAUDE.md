@@ -645,6 +645,21 @@ pnpm test:e2e                  # Per-block Playwright visual regression (hard ga
 
 **After completing work:** Update STATUS.md frontmatter `last_updated`, move work items (⚪→🟡→✅), add to "Recent Completions" at top. Update BACKLOG.md when backlogging incomplete sprint items.
 
+### Bug-fixing PRs — the smoke marker
+
+A PR that fixes GitHub issues declares them in its **Pre-merge checklist**, one line per bug, with the issue number inside the marker:
+
+```markdown
+- [ ] **Smoke #83:** copy a checklist inside a column block → only the checklist pastes
+- [ ] **Smoke #85:** upload an image while viewing a folder → lands in that folder, not root
+```
+
+Ticking a line is a **per-bug verdict**: checked means smoke-verified, unchecked means deliberately not resolved. There is no third state.
+
+The Friday `/pr-closeout` routine closes exactly the issues whose lines are ticked — citing the PR, its merge commit SHA and date, and the smoke line verbatim — and reports the rest as held back. It never infers a fix from a bare `#N` reference, because PR bodies cite sprint numbers and sibling PRs identically; the marker is what removes that ambiguity. Write a concrete action and its expected result, never "verify it works": a vague line makes a bug uncloseable.
+
+`/bug-triage` emits these lines ready to paste in each bug's **Gates** section of the weekly plan doc.
+
 ## Documentation
 
 **Start here:** `docs/notes-feature/00-START-HERE.md`
