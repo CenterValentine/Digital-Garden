@@ -212,9 +212,17 @@ interactive session, not a finished design.
 **Approach.** The change you would make, and the one or two alternatives you
 considered and rejected — with the reason.
 
-**Gates.** Which of `typecheck` / `lint` / `build` / a named static gate / a browser
-smoke step this fix must clear. Name the specific smoke action, e.g. "paste a checklist
-inside a column block and confirm only the checklist is pasted."
+**Gates.** Which of `typecheck` / `lint` / `build` / a named static gate this fix must
+clear, then the browser smoke step as a **ready-to-paste checklist line** in exactly the
+form the fixing PR needs — one bug per line, the issue number in the marker:
+
+```markdown
+- [ ] **Smoke #83:** copy a checklist inside a column block → only the checklist pastes
+```
+
+Write a concrete action and its expected result, never "verify it works". That line is
+what the owner pastes into the fixing PR's Pre-merge checklist, and ticking it is what
+authorizes `/pr-closeout` to close the bug. A vague line makes a bug uncloseable.
 
 **Blocked on.** Anything that stops this from being planned confidently. Omit the
 heading entirely when nothing blocks it.
