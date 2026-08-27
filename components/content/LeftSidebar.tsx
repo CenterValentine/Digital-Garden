@@ -24,6 +24,7 @@ import { PEOPLE_VIEW_KEY } from "@/extensions/people/manifest";
 import { useLeftPanelCollapseStore } from "@/state/left-panel-collapse-store";
 import { useLeftPanelViewStore } from "@/state/left-panel-view-store";
 import { useExtensionLeftSidebarPanel } from "@/lib/extensions/client-registry";
+import { useWorkspaceStore } from "@/extensions/workplaces/state/workspace-store";
 import { clientLogger } from "@/lib/core/logger/client";
 import { DataRailPanel } from "./data/DataRailPanel";
 
@@ -71,6 +72,21 @@ export function LeftSidebar() {
   }, []);
   const [showFileUpload, setShowFileUpload] = useState(false);
   const [fileUploadParentId, setFileUploadParentId] = useState<string | null>(null);
+  // In a view-scoped workspace the view root's own row is gone — its children
+  // ARE the top level — so a header-initiated write aimed at "the top" must be
+  // remapped onto the view root, exactly as the tree does with
+  // `scopedRootParentId` (LeftSidebarContent.tsx:323). Returns null outside a
+  // view workspace, i.e. the real vault root.
+  //
+  // NOTE: the header `+` and the tree's context menu open two *different*
+  // FileUploadDialog instances (this one, and LeftSidebarContent's at :2426).
+  // That duplication is the root cause of this class of bug — the tree path was
+  // fixed in 7497020 and this one was missed. Collapsing the two dialogs onto
+  // one owner is the real fix; see the follow-up noted in BACKLOG.md.
+  const viewRootParentId = useWorkspaceStore((state) => {
+    const ws = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    return ws?.isView ? (ws.viewRootContentId ?? null) : null;
+  });
   const [draggedFiles, setDraggedFiles] = useState<File[] | null>(null);
   const [peopleMountParentId, setPeopleMountParentId] = useState<string | null | undefined>(undefined);
   // AI image-gen dialog state — open from "+ AI → Image Generation".
@@ -120,9 +136,14 @@ export function LeftSidebar() {
   }, []);
 
   const handleCreateFile = useCallback(() => {
-    setFileUploadParentId(null); // TODO: Get from current selection?
+    // Fall back to the view root so the upload lands inside the scope the user
+    // is looking at, not at the invisible vault root. Unlike the tree, this
+    // can't see the tree's ephemeral `scopeOverride`, so an upload started
+    // while the user has temporarily widened the scope to the whole tree still
+    // targets the workspace's own view root.
+    setFileUploadParentId(viewRootParentId);
     setShowFileUpload(true);
-  }, []);
+  }, [viewRootParentId]);
 
   // Trigger inline document creation (same pattern as folders/notes)
   const handleCreateDocument = useCallback(() => {
