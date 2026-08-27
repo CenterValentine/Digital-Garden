@@ -53,6 +53,7 @@ import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
+import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
 import { useContentStore } from "@/state/content-store";
 import { ArtifactContextMenu, openArtifactInSplitPane } from "./artifact-open";
 import { useSettingsStore } from "@/state/settings-store";
@@ -1841,6 +1842,11 @@ function formatDuration(ms: number): string {
   return `${m}m ${s.toString().padStart(2, "0")}s`;
 }
 
+/** Gap between the avatar and its detail card, on whichever side it lands. */
+const GAP = 6;
+/** Keep the card this far clear of every viewport edge. */
+const VIEWPORT_PADDING = 8;
+
 function AssistantAvatar({
   providerId,
   modelId,
@@ -1850,11 +1856,18 @@ function AssistantAvatar({
   modelId?: string | null;
   metadata?: Record<string, unknown>;
 }) {
+  // The avatar's own rect, captured on hover. This is the MEASURE-phase
+  // anchor: the tooltip first renders here hidden so it can be measured, then
+  // `tooltipPosition` takes over with a boundary-aware placement.
   const [tooltipAnchor, setTooltipAnchor] = useState<{
     top: number;
+    bottom: number;
     left: number;
   } | null>(null);
+  const [tooltipPosition, setTooltipPosition] =
+    useState<CalculatedPosition | null>(null);
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<HTMLDivElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [portalReady, setPortalReady] = useState(false);
 
@@ -1885,11 +1898,13 @@ function AssistantAvatar({
     timerRef.current = setTimeout(() => {
       const rect = anchorRef.current?.getBoundingClientRect();
       if (!rect) return;
-      // Anchor just below the avatar, aligned to its left — keeps the tooltip
-      // at the hover point instead of drifting off to the right in narrow
-      // surfaces like the browser side panel.
+      // Anchor to the avatar, aligned to its left — keeps the tooltip at the
+      // hover point instead of drifting off to the right in narrow surfaces
+      // like the browser side panel. Both vertical edges are kept so the
+      // positioning pass below can place the card above as well as below.
       setTooltipAnchor({
-        top: rect.bottom + 6,
+        top: rect.top,
+        bottom: rect.bottom,
         left: rect.left,
       });
     }, 1000);
@@ -1898,7 +1913,53 @@ function AssistantAvatar({
   const handleLeave = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     setTooltipAnchor(null);
+    setTooltipPosition(null);
   }, []);
+
+  // Two-phase measure-then-position, the same shape ContextMenu uses
+  // (components/content/context-menu/ContextMenu.tsx:503-526): the card renders
+  // hidden at the raw anchor for one tick, gets measured, then
+  // `calculateMenuPosition` places it with viewport-edge detection.
+  //
+  // Without this the card was anchored once at `rect.bottom + 6`, downward
+  // only. In a long chat the newest avatar sits near the bottom of the scroll
+  // container, so that landed below the viewport — and because the portal is
+  // `position: fixed`, nothing clipped it to reveal the problem; it was simply
+  // painted off-screen.
+  useEffect(() => {
+    if (!tooltipAnchor) return;
+    const timeoutId = setTimeout(() => {
+      const el = tooltipRef.current;
+      if (!el) return;
+      const { width, height } = el.getBoundingClientRect();
+
+      // Choose the side before delegating, so the 6px gap is preserved
+      // whichever way it goes: `calculateMenuPosition` anchors the card's top
+      // at the trigger point when placing below and its bottom at the trigger
+      // point when placing above, so each side needs its own trigger edge.
+      // Everything else — horizontal flip, edge shifting, the fallback when
+      // neither side fits — comes from the shared utility.
+      const fitsBelow =
+        tooltipAnchor.bottom + GAP + height + VIEWPORT_PADDING <=
+        window.innerHeight;
+
+      setTooltipPosition(
+        calculateMenuPosition({
+          triggerPosition: {
+            x: tooltipAnchor.left,
+            y: fitsBelow
+              ? tooltipAnchor.bottom + GAP
+              : tooltipAnchor.top - GAP,
+          },
+          menuDimensions: { width, height },
+          viewportPadding: VIEWPORT_PADDING,
+          preferredPlacementX: "right",
+          preferredPlacementY: fitsBelow ? "bottom" : "top",
+        }),
+      );
+    }, 0);
+    return () => clearTimeout(timeoutId);
+  }, [tooltipAnchor]);
 
   useEffect(() => {
     return () => {
@@ -1926,14 +1987,22 @@ function AssistantAvatar({
       {portalReady && tooltipAnchor &&
         createPortal(
           <div
+            ref={tooltipRef}
             role="tooltip"
             // Fixed positioning relative to the viewport — no ancestor
-            // overflow / transform can clip or reflow this.
+            // overflow / transform can clip or reflow this. Until the measure
+            // pass lands, render at the raw anchor but hidden, so the card is
+            // never briefly visible in the wrong place.
             style={{
               position: "fixed",
-              top: tooltipAnchor.top,
-              left: tooltipAnchor.left,
               zIndex: 9999,
+              ...(tooltipPosition
+                ? { top: tooltipPosition.y, left: tooltipPosition.x }
+                : {
+                    top: tooltipAnchor.bottom + GAP,
+                    left: tooltipAnchor.left,
+                    visibility: "hidden" as const,
+                  }),
             }}
             className="pointer-events-none whitespace-nowrap rounded-md border border-black/10 bg-white text-gray-700 dark:border-white/10 dark:bg-[#1a1a1a] dark:text-gray-200 px-2.5 py-1.5 text-[10px] shadow-xl"
           >
