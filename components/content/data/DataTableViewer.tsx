@@ -19,7 +19,10 @@
  */
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
-import { Plus, Trash2, Undo2, Redo2 } from "lucide-react";
+import { Plus, Trash2, Undo2, Redo2, Layers } from "lucide-react";
+import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
+import { FLASHCARDS_EXTENSION_ID } from "@/extensions/flashcards/manifest";
+import { useIsExtensionEnabled } from "@/lib/extensions/client-registry";
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
@@ -118,6 +121,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * produced the OnlyOfficeEditor iframe-reload bug (CLAUDE.md, Apr 2026).
    */
   const clientId = useId();
+
+  // Gates the "create flashcard deck" header button; hoisted above the
+  // loading/error early returns per rules-of-hooks.
+  const flashcardsEnabled = useIsExtensionEnabled(FLASHCARDS_EXTENSION_ID);
 
   /**
    * The poll callback reads the CURRENT view through this ref instead of
@@ -1143,6 +1150,20 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
         </span>
         <div className="ml-auto flex items-center gap-1">
+          {flashcardsEnabled && (
+            <button
+              type="button"
+              onClick={() =>
+                useDataFlashcardsDialogStore
+                  .getState()
+                  .openDialog({ contentId, title })
+              }
+              title="Create flashcard deck from this database"
+              className="rounded p-1.5 text-muted-foreground hover:bg-muted"
+            >
+              <Layers className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="button"
             onClick={handleUndo}
