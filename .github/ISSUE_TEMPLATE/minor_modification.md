@@ -2,7 +2,7 @@
 name: Minor modification
 about: Request a small, targeted change to an existing feature
 title: "[Modification]: "
-labels: ''
+labels: minor-modification
 assignees: ''
 
 ---
