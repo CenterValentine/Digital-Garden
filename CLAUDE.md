@@ -658,7 +658,7 @@ Ticking a line is a **per-bug verdict**: checked means smoke-verified, unchecked
 
 The Friday `/pr-closeout` routine closes exactly the issues whose lines are ticked — citing the PR, its merge commit SHA and date, and the smoke line verbatim — and reports the rest as held back. It never infers a fix from a bare `#N` reference, because PR bodies cite sprint numbers and sibling PRs identically; the marker is what removes that ambiguity. Write a concrete action and its expected result, never "verify it works": a vague line makes a bug uncloseable.
 
-`/bug-triage` emits these lines ready to paste in each bug's **Gates** section of the weekly plan doc.
+`/bug-triage` emits these lines ready to paste in each bug's **Gates** section of the weekly plan doc, and `/bug-fix` copies the line verbatim into every PR it opens. The three commands form one loop: Thursday 8am plans, Thursday noon attempts the high-confidence subset, Friday 6pm closes what you smoke-tested and ticked.
 
 ## Documentation
 
