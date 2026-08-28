@@ -89,7 +89,20 @@ export async function GET(request: NextRequest) {
 
       const redirectTo = safeRedirectPath(storedRedirect || searchParams.get('redirect'))
 
-      return NextResponse.redirect(new URL(redirectTo, request.url))
+      const response = NextResponse.redirect(new URL(redirectTo, request.url))
+
+      // Remember which Google account signed in so /api/auth/google can pass
+      // it as login_hint next time — Google then skips the account chooser.
+      // Set on the response directly (same reason as oauth_state above).
+      response.cookies.set('last_google_email', user.email, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 180, // 180 days
+        path: '/',
+      })
+
+      return response
     } catch (error) {
       logger.error({
         layer: 'auth',

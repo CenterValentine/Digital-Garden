@@ -11,6 +11,30 @@ function safeRedirectPath(value: string | null): string {
   return value
 }
 
+/**
+ * Decide whether to force Google's (two-screen) consent flow.
+ *
+ * `prompt=consent` is the only way Google mints a fresh refresh token for a
+ * returning user, so we force it exactly when that matters:
+ *  - `?reauth=1` — the stored refresh token is dead (`GoogleAuthError` code
+ *    "reauth_required"); the client's Reconnect toast points here.
+ *  - extension scopes — this request asks for more than the user's baseline
+ *    grant (e.g. Calendar), so they must see what changed, and the new grant
+ *    re-issues tokens for the widened scope set.
+ *
+ * Otherwise omit `prompt` entirely: Google silently passes a returning user
+ * through with zero interstitials, and the callback keeps the stored refresh
+ * token (findOrCreateOAuthUser falls back to the existing one).
+ */
+function resolvePrompt(input: {
+  reauthRequested: boolean
+  extensionScopeCount: number
+}): 'consent' | undefined {
+  if (input.reauthRequested) return 'consent'
+  if (input.extensionScopeCount > 0) return 'consent'
+  return undefined
+}
+
 export async function GET(request: NextRequest): Promise<NextResponse> {
   if (!GOOGLE_CLIENT_ID) {
     return NextResponse.json(
@@ -34,10 +58,14 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     GOOGLE_DRIVE_SCOPE,
   ])
 
+  // Track how many scopes extensions add beyond the baseline — a non-zero
+  // count means this is a scope upgrade and consent must be shown.
+  let extensionScopeCount = 0
   for (const scope of getGoogleOAuthScopesForRequest({
     redirectPath: redirectTo,
     requestedScopes,
   })) {
+    if (!scopes.has(scope)) extensionScopeCount += 1
     scopes.add(scope)
   }
 
@@ -56,8 +84,18 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     state,
     access_type: 'offline',
     include_granted_scopes: 'true',
-    prompt: 'consent',
   })
+
+  const prompt = resolvePrompt({
+    reauthRequested: request.nextUrl.searchParams.get('reauth') === '1',
+    extensionScopeCount,
+  })
+  if (prompt) params.set('prompt', prompt)
+
+  // Skip Google's account chooser for returning users on this browser.
+  // The cookie is set by the callback route after a successful sign-in.
+  const loginHint = request.cookies.get('last_google_email')?.value
+  if (loginHint) params.set('login_hint', loginHint)
 
   const authUrl = `${GOOGLE_AUTH_URL}?${params.toString()}`
 

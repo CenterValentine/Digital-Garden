@@ -10,7 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getSession, getValidGoogleAccessToken } from "@/lib/infrastructure/auth";
+import { getSession, getValidGoogleAccessToken, GoogleAuthError } from "@/lib/infrastructure/auth";
 import { prisma } from "@/lib/database/client";
 import { setGoogleDriveMetadata } from "@/lib/domain/content/metadata-types";
 import type { Prisma } from "@/lib/database/generated/prisma";
@@ -55,6 +55,14 @@ export async function POST(request: NextRequest) {
       try {
         accessToken = await getValidGoogleAccessToken(session.user.id);
       } catch (error) {
+        // `code` lets clients distinguish "Reconnect Google" from "try
+        // again" without string-matching the message (google-reauth-client).
+        if (error instanceof GoogleAuthError) {
+          return NextResponse.json(
+            { error: error.message, code: error.code },
+            { status: error.code === "transient" ? 503 : 403 }
+          );
+        }
         return NextResponse.json(
           {
             error:

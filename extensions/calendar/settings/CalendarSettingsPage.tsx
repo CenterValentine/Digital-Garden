@@ -9,6 +9,10 @@ import { Switch } from "@/components/client/ui/switch";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { CalendarConnectionDTO, CalendarSourceDTO } from "@/extensions/calendar/server/types";
 import { CALENDAR_SETTINGS_PATH } from "@/extensions/calendar/manifest";
+import {
+  googleReauthUrl,
+  toastGoogleReauth,
+} from "@/lib/infrastructure/auth/google-reauth-client";
 import type { UserSettings } from "@/lib/features/settings/validation";
 import { useSettingsStore } from "@/state/settings-store";
 
@@ -122,19 +126,45 @@ export default function CalendarSettingsPage() {
     )}&scope=calendar`;
   };
 
+  // Re-run Google consent to replace a dead refresh token (?reauth=1 forces
+  // the consent screen — the only way Google mints a new one).
+  const handleGoogleReconnect = () => {
+    window.location.href = googleReauthUrl({
+      redirect: CALENDAR_SETTINGS_PATH,
+      scope: "calendar",
+    });
+  };
+
   const handleGoogleSync = async (connectionId: string) => {
     const response = await fetch(`/api/calendar/connections/${connectionId}/sync`, {
       method: "POST",
     });
-    const result = await parseJsonResponse<{ success: boolean; error?: string }>(
-      response,
-      "Failed to sync Google calendar"
-    );
+    const result = await parseJsonResponse<{
+      success: boolean;
+      error?: string;
+      data?: CalendarConnectionDTO;
+    }>(response, "Failed to sync Google calendar");
     if (!response.ok || !result.success) {
       toast.error(result.error || "Failed to sync Google calendar");
       return;
     }
-    toast.success("Google calendar sync complete");
+    // The route reports success even when the sync itself failed — the
+    // failure is recorded on the returned connection. Read it before
+    // celebrating.
+    const synced = result.data;
+    if (synced?.syncStatus === "error") {
+      if (synced.status === "reconnect_required") {
+        toastGoogleReauth({
+          message: "Google Calendar needs to be reconnected",
+          redirect: CALENDAR_SETTINGS_PATH,
+          scope: "calendar",
+        });
+      } else {
+        toast.error(synced.lastSyncError || "Google calendar sync failed");
+      }
+    } else {
+      toast.success("Google calendar sync complete");
+    }
     await loadData();
   };
 
@@ -379,6 +409,14 @@ export default function CalendarSettingsPage() {
                 </p>
               </div>
               <div className="flex gap-2">
+                {connection.status === "reconnect_required" && (
+                  <Button
+                    className={primaryButtonClass}
+                    onClick={handleGoogleReconnect}
+                  >
+                    Reconnect
+                  </Button>
+                )}
                 <Button
                   variant="secondary"
                   className={secondaryButtonClass}

@@ -20,6 +20,10 @@ import { AlertCircle, Download, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/glass/button";
 import { toast } from "sonner";
 import { clientLogger } from "@/lib/core/logger/client";
+import {
+  isGoogleReauthCode,
+  toastGoogleReauth,
+} from "@/lib/infrastructure/auth/google-reauth-client";
 
 interface GoogleDriveEditorProps {
   contentId: string;
@@ -150,6 +154,15 @@ export function GoogleDriveEditor({
 
         if (!response.ok) {
           const errorData = await response.json();
+          // Dead refresh token → offer the fix (consent re-run) instead of
+          // the generic "try downloading" toast. `finally` clears the spinner.
+          if (isGoogleReauthCode(errorData.code)) {
+            toastGoogleReauth({
+              message: "Google Drive needs to be reconnected",
+            });
+            setError(errorData.error || "Google authentication required");
+            return;
+          }
           throw new Error(errorData.error || "Failed to upload to Google Drive");
         }
 
