@@ -166,7 +166,15 @@ export async function GET(request: NextRequest) {
       }
 
       if (typeParam && typeParam !== "all") {
+        // An explicit type filter is honoured verbatim — including "shortcut",
+        // so the rows remain reachable for anyone who deliberately asks.
         where.contentType = typeParam as ContentType;
+      } else {
+        // Shortcuts are pointers, not content: they carry their target's title
+        // but none of its body, so an unfiltered search would return the same
+        // note twice — once real, once as every shortcut aimed at it — with
+        // the duplicates ranking on title alone.
+        where.contentType = { not: "shortcut" };
       }
 
       const items = await withSpan(
