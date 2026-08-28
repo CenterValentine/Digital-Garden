@@ -127,6 +127,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
   const isOpen = node.isOpen;
+  /**
+   * Rows on the "row toggles, double-click opens" model.
+   *
+   * People mounts are served with `contentType: "folder"` (tree route) but are
+   * synthetic rows that select on single click and expand on double click —
+   * excluding them here keeps that behaviour, and keeps their chevron a real
+   * button (their only expand affordance).
+   */
+  const isRowToggleFolder = isFolder && !isPeopleNode;
 
   // Reference block membership. `isNestedReference` is set by FileTree's
   // expandReferences transform, never by the API — a referenced node rendered
@@ -373,11 +382,34 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   };
 
   // Get chevron for any node with children — folders, and notes whose
-  // references display as children (2026-07-16 model). Wrapped in its own
-  // button so clicks expand/collapse without selecting or bubbling.
+  // references display as children (2026-07-16 model).
+  //
+  // Two behaviours, deliberately different:
+  //  - Folders: the WHOLE ROW toggles (handleClick), so the chevron is a pure
+  //    state indicator with no isolated click zone — clicks fall through to the
+  //    row. Folders don't need to separate "expand" from "open"; single click
+  //    expands, double click opens.
+  //  - Everything else (notes whose references display as children, and people
+  //    mounts): the chevron keeps its own click zone so expanding is
+  //    independent of selecting the item itself.
   const getChevron = () => {
     if (!node.children || node.children.length === 0) {
       return <div className="h-4 w-4" />; // Empty space for alignment
+    }
+
+    const glyph = isOpen ? (
+      <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+    ) : (
+      <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+    );
+
+    if (isRowToggleFolder) {
+      // Indicator only — no handler, no stopPropagation. The row owns the toggle.
+      return (
+        <span aria-hidden="true" className="h-4 w-4 flex items-center justify-center">
+          {glyph}
+        </span>
+      );
     }
 
     return (
@@ -391,11 +423,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         tabIndex={-1}
         aria-label={isOpen ? "Collapse" : "Expand"}
       >
-        {isOpen ? (
-          <ChevronDown className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        ) : (
-          <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-        )}
+        {glyph}
       </button>
     );
   };
@@ -422,17 +450,30 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       return;
     }
 
-    // Files: select on single click (unchanged behaviour)
-    if (!isFolder || isPeopleNode) {
+    // Files and people mounts: select on single click (unchanged behaviour)
+    if (!isRowToggleFolder) {
       node.select();
+      return;
     }
-    // Folders: single click does nothing — double-click opens (see handleDoubleClick)
+
+    // Folders: single click expands/collapses the WHOLE ROW (the chevron is a
+    // pure indicator — see getChevron). Double click opens in the main panel.
+    //
+    // `e.detail > 1` is the second click of a double-click: React fires click
+    // twice before dblclick, so without this guard a double-click would toggle
+    // twice and land back where it started — the folder would appear to stay
+    // shut while its content opened.
+    if (e.detail > 1) return;
+    node.toggle();
   };
 
-  // Double-click on a folder: expand it AND navigate to it.
-  // We use explicit open/close instead of toggle() to avoid react-arborist's
-  // internal dblclick handler (which starts rename mode). stopPropagation()
-  // prevents the event from reaching tree-level handlers.
+  // Double-click on a folder: navigate to it (open in the main panel).
+  //
+  // Expansion is NOT touched here — single click owns expand/collapse, and
+  // handleClick's `e.detail > 1` guard has already let the first click of this
+  // double-click through, so the folder is left in whatever state that click
+  // produced. preventDefault + stopPropagation keep react-arborist's internal
+  // dblclick handler (which starts rename mode) and tree-level handlers out.
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (e.shiftKey) {
       e.preventDefault();
@@ -442,12 +483,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (isFolder) {
       e.preventDefault();
       e.stopPropagation();
-      if (isOpen) {
-        node.close();
-      } else {
-        node.open();
-      }
+      // People mounts keep the legacy model: double click is their expand
+      // gesture (they select on single click, so there is nothing to navigate
+      // to here).
       if (isPeopleNode) {
+        if (isOpen) {
+          node.close();
+        } else {
+          node.open();
+        }
         return;
       }
       node.select();
@@ -757,6 +801,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       // Row identity for pointer hit-testing during external file drags
       // (react-arborist's row wrapper carries no id attribute).
       data-tree-node-id={data.id}
+      // Folders toggle from the whole row, so the row (not the chevron)
+      // carries the expanded state. Non-folder rows keep it on their
+      // chevron button, which is what actually toggles there.
+      aria-expanded={isRowToggleFolder && (node.children?.length ?? 0) > 0 ? isOpen : undefined}
       // Native tooltip rather than a Radix one: this renders per row in a
       // virtualized tree, so a portal-backed tooltip per node would be a
       // real cost for a hover hint. Child badges keep their own `title`
