@@ -62,6 +62,7 @@ export async function POST(request: NextRequest) {
                 htmlPayload: true,
                 codePayload: true,
                 externalPayload: true,
+                shortcutPayload: true,
               },
             });
 
@@ -240,6 +241,17 @@ async function duplicateNode(
           },
         },
       }),
+
+      // Copy the POINTER, not the target. Duplicating a shortcut yields a
+      // second shortcut to the same content — duplicating what it points at
+      // would silently fork the real note.
+      ...(original.shortcutPayload && {
+        shortcutPayload: {
+          create: {
+            targetContentId: original.shortcutPayload.targetContentId,
+          },
+        },
+      }),
     } as never,
   });
 
@@ -253,6 +265,7 @@ async function duplicateNode(
         htmlPayload: true,
         codePayload: true,
         externalPayload: true,
+        shortcutPayload: true,
       },
     });
 

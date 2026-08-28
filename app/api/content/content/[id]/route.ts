@@ -521,9 +521,30 @@ export async function GET(
         };
       }
 
+      // Shortcut payload. The target summary is what the viewer needs to
+      // either redirect to the target or explain why it cannot.
+      if (content.shortcutPayload) {
+        const target = content.shortcutPayload.target;
+        response.shortcut = {
+          targetId: content.shortcutPayload.targetContentId,
+          targetTitle: target?.title ?? null,
+          targetContentType: target?.contentType ?? null,
+          targetDeleted:
+            content.shortcutPayload.targetContentId === null ||
+            target?.deletedAt != null,
+        };
+      }
+
       // Populate the cache for the next read. Soft-deleted content is
       // skipped inside setCachedContent so a delete+re-fetch always wins.
-      setCachedContent(id, response);
+      //
+      // Shortcuts are deliberately never cached: their brokenness is derived
+      // from ANOTHER row's deletedAt, which this cache has no way to observe.
+      // Trashing or restoring a target would leave every shortcut aimed at it
+      // serving a stale verdict until something else evicted the entry.
+      if (content.contentType !== "shortcut") {
+        setCachedContent(id, response);
+      }
 
       return NextResponse.json({
         success: true,

@@ -183,6 +183,17 @@ export const CONTENT_WITH_PAYLOADS = {
   hopePayload: true,
   workflowPayload: true,
 
+  // Shortcut: include the target's summary, not just the pointer. Brokenness
+  // is derived from the target's deletedAt, so the pointer alone cannot tell a
+  // live shortcut from a trashed one.
+  shortcutPayload: {
+    include: {
+      target: {
+        select: { id: true, title: true, contentType: true, deletedAt: true },
+      },
+    },
+  },
+
   // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when this
   // node IS a database row's page, carry enough to render the breadcrumb —
   // without it, a promoted row reached from search or a backlink reads as

@@ -193,6 +193,17 @@ export interface ContentDetailResponse {
     messages: StoredChatMessage[];
     metadata: ChatMetadata;
   };
+  /**
+   * Shortcut target. `targetId: null` means the target was purged (permanently
+   * broken); `targetDeleted` means it is in the trash and will heal if
+   * restored. Never cached — see the GET handler.
+   */
+  shortcut?: {
+    targetId: string | null;
+    targetTitle: string | null;
+    targetContentType: string | null;
+    targetDeleted: boolean;
+  };
 }
 
 // ============================================================
@@ -247,6 +258,16 @@ export interface CreateContentRequest {
   viewMode?: "list" | "gallery" | "kanban" | "dashboard" | "canvas";
   sortMode?: string | null;
   includeReferencedContent?: boolean;
+
+  /**
+   * Create a shortcut pointing at this ContentNode. Presence of this field is
+   * what selects the shortcut branch, matching how `url` selects external and
+   * `engine` selects visualization.
+   *
+   * If the id names a shortcut, the server dereferences to ITS target rather
+   * than chaining, so a shortcut always points at real content.
+   */
+  shortcutTargetId?: string;
 }
 
 export interface UpdateContentRequest {
@@ -386,4 +407,5 @@ export type CreatePayloadData =
   | { chatPayload: { create: Prisma.ChatPayloadCreateWithoutContentInput } }
   | { workflowPayload: { create: Prisma.WorkflowPayloadCreateWithoutContentInput } }
   | { dataPayload: { create: Prisma.DataPayloadCreateWithoutContentInput } }
+  | { shortcutPayload: { create: Prisma.ShortcutPayloadCreateWithoutContentInput } }
   | Record<string, never>; // Empty object for backward compatibility only
