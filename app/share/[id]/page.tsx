@@ -48,6 +48,14 @@ export default async function SharePage({ params }: { params: SharePageParams })
     notFound();
   }
 
+  // Shortcuts are pointers with no content of their own, so there is nothing
+  // to render here. Following one to its target would be worse than useless:
+  // it would publish whatever the target is, bypassing that target's own
+  // isPublished and access checks. Sharing is a property of real content.
+  if (content.contentType === "shortcut") {
+    notFound();
+  }
+
   const accessLevel =
     signedInAccess?.accessLevel === "owner" ||
     signedInAccess?.accessLevel === "edit" ||

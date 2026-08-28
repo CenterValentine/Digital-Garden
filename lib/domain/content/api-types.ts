@@ -7,6 +7,7 @@
 import type { Prisma } from "@/lib/database/generated/prisma";
 import type { JSONContent } from "@tiptap/core";
 import type { StoredChatMessage, ChatMetadata } from "@/lib/domain/ai/types";
+import type { ContentType } from "@/lib/domain/content/types";
 
 // ============================================================
 // CONTENT RESPONSE TYPES
@@ -28,20 +29,8 @@ export interface ContentListItem {
   deletedAt: Date | null;
   customIcon: string | null;
   iconColor: string | null;
-  contentType:
-    | "folder"
-    | "note"
-    | "file"
-    | "html"
-    | "template"
-    | "code"
-    | "external"
-    | "chat"
-    | "visualization"
-    | "data"
-    | "hope"
-    | "workflow";
-  
+  contentType: ContentType;
+
   // Optional payload summaries
   folder?: {
     viewMode: string;
@@ -104,19 +93,7 @@ export interface ContentDetailResponse {
   isPublished: boolean;
   customIcon: string | null;
   iconColor: string | null;
-  contentType:
-    | "folder"
-    | "note"
-    | "file"
-    | "html"
-    | "template"
-    | "code"
-    | "external"
-    | "chat"
-    | "visualization"
-    | "data"
-    | "hope"
-    | "workflow";
+  contentType: ContentType;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
