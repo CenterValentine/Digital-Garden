@@ -31,10 +31,26 @@ here would skip the liveness gate and the ranking policy entirely.
 
 A bug is eligible only when **every** condition holds:
 
-- its At-a-glance row says **Confidence: high**;
-- its estimate is **S** (small);
-- its section has **no "Blocked on"** heading;
+- its At-a-glance row says **Confidence: high** or **medium**;
+- its estimate is **S** or **S–M**;
+- its **Blocked on** heading, if present, survives the re-check below;
 - the fix touches none of the exclusions below.
+
+**Medium confidence is in scope on purpose.** The point of the run is to squash bugs,
+and the owner would rather receive a reviewable attempt that turns out wrong than an
+empty week. A medium-confidence attempt is still a real attempt: diagnose it properly,
+gate it properly, and say plainly in the PR body which part you are least sure of so
+the smoke test targets that. If the diagnosis collapses while you work, abandon the bug
+and report why — do not ship a guess dressed as a fix.
+
+**Re-check every "Blocked on" before you honour it.** That heading records what *one
+prior headless run* could not do, not a permanent property of the bug. It disqualifies
+the bug only when it names **a specific runtime observation** *and* reading the code
+cannot supply it. Spend a few minutes trying first: read the handler, the call sites on
+both sides of the boundary, and any sibling component doing the same job correctly. A
+blocker that dissolves on inspection was never a blocker — clear it, note in the PR body
+that you did, and proceed. (This is not hypothetical: #80 sat blocked on "which mismatch
+fired" while the answer was two `if` statements in the components it names.)
 
 **Hard exclusions — abandon the bug, do not attempt a partial fix:**
 
