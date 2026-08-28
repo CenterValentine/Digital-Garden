@@ -8,6 +8,47 @@ import { createPersonalTenantForUser } from "@/lib/domain/tenancy";
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
 
+/**
+ * Machine-readable Google auth failure classification.
+ * - "not_linked"      — user has never connected Google; fix is "Connect".
+ * - "reauth_required" — the stored refresh token is dead (revoked/expired);
+ *                       the ONLY fix is sending the user back through the
+ *                       consent screen (`/api/auth/google?reauth=1`).
+ * - "transient"       — network blip / Google 5xx; fix is "try again".
+ *                       Must NOT trigger a re-consent prompt.
+ *
+ * Client components must not import this module (it pulls Prisma); the
+ * client-side companion is ./google-reauth-client.ts, which matches these
+ * codes by string.
+ */
+export type GoogleAuthErrorCode = "not_linked" | "reauth_required" | "transient";
+
+export class GoogleAuthError extends Error {
+  readonly code: GoogleAuthErrorCode;
+
+  constructor(code: GoogleAuthErrorCode, message: string) {
+    super(message);
+    this.name = "GoogleAuthError";
+    this.code = code;
+  }
+}
+
+/**
+ * Strict classifier (owner decision, 2026-08): only Google's explicit
+ * `invalid_grant` response means the refresh token is dead. Everything else
+ * (DNS failure, Google 500, unexpected error shape) is transient — telling a
+ * user to re-consent over a network blip trains them to distrust the message.
+ * google-auth-library surfaces the OAuth error body as a GaxiosError at
+ * `error.response.data.error`.
+ */
+function isInvalidGrant(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const data = (error as { response?: { data?: { error?: unknown } } })
+    .response?.data;
+  if (typeof data !== "object" || data === null) return false;
+  return (data as { error?: unknown }).error === "invalid_grant";
+}
+
 if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
   // Module-load-time warning — emits with trace_id="no-trace" by design.
   logger.warn({
@@ -249,7 +290,16 @@ export async function refreshGoogleAccessToken(refreshToken: string): Promise<{
         : 3600, // Default to 1 hour
     };
   } catch (error) {
-    throw new Error(`Failed to refresh Google token: ${error}`);
+    if (isInvalidGrant(error)) {
+      throw new GoogleAuthError(
+        "reauth_required",
+        "Google access has expired. Reconnect Google to continue."
+      );
+    }
+    throw new GoogleAuthError(
+      "transient",
+      "Couldn't reach Google. Please try again."
+    );
   }
 }
 
@@ -268,7 +318,7 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string>
   });
 
   if (!account || !account.accessToken) {
-    throw new Error("No Google account linked");
+    throw new GoogleAuthError("not_linked", "No Google account linked");
   }
 
   // Check if token is still valid (with 5-minute buffer)
@@ -282,7 +332,10 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string>
 
   // Token is expired or about to expire, refresh it
   if (!account.refreshToken) {
-    throw new Error("No refresh token available. Please re-authenticate.");
+    throw new GoogleAuthError(
+      "reauth_required",
+      "Google connection needs to be renewed. Reconnect Google to continue."
+    );
   }
 
   try {
@@ -301,9 +354,15 @@ export async function getValidGoogleAccessToken(userId: string): Promise<string>
     });
 
     return accessToken;
-  } catch {
-    // Refresh failed, user needs to re-authenticate
-    throw new Error("Token refresh failed. Please re-authenticate with Google.");
+  } catch (error) {
+    // refreshGoogleAccessToken already classified dead-key vs transient;
+    // pass its verdict through. Anything else (e.g. the Prisma update
+    // failing) is transient — the key itself may be fine.
+    if (error instanceof GoogleAuthError) throw error;
+    throw new GoogleAuthError(
+      "transient",
+      "Couldn't reach Google. Please try again."
+    );
   }
 }
 

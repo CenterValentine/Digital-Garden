@@ -3,6 +3,7 @@ import {
   getGoogleAccount,
   getValidGoogleAccessToken,
   hasGoogleScope,
+  GoogleAuthError,
 } from "@/lib/infrastructure/auth";
 import type { Prisma } from "@/lib/database/generated/prisma";
 import { GOOGLE_CALENDAR_SCOPE } from "./types";
@@ -576,10 +577,20 @@ export async function syncGoogleConnection(userId: string, connectionId: string)
     return serializeConnection(updated);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Google sync failed";
+    // Typed check first: a dead refresh token (reauth_required) or a
+    // never-linked account means the fix is re-running Google consent, so
+    // the settings UI can offer a Reconnect button. A transient failure
+    // (network / Google 5xx) stays plain "error" — reconnecting won't help.
+    // The 403 string fallback still catches Google API permission failures
+    // that happen after a valid token was obtained.
+    const needsReconnect =
+      error instanceof GoogleAuthError
+        ? error.code !== "transient"
+        : message.includes("403");
     const updated = await prisma.calendarConnection.update({
       where: { id: connection.id },
       data: {
-        status: message.includes("403") ? "reconnect_required" : "error",
+        status: needsReconnect ? "reconnect_required" : "error",
         syncStatus: "error",
         lastSyncError: message,
       },

@@ -37,7 +37,9 @@ export {
 } from "./session";
 
 // OAuth providers
+export type { GoogleAuthErrorCode } from "./oauth";
 export {
+  GoogleAuthError,
   verifyGoogleToken,
   exchangeCodeForTokens,
   findOrCreateOAuthUser,
