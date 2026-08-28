@@ -6,6 +6,7 @@ import {
   FLASHCARD_SELECT,
   toFlashcardDto,
 } from "@/lib/domain/flashcards";
+import { syncStaleDataDecks } from "@/lib/domain/flashcards/from-data";
 
 // The card row shape returned by FLASHCARD_SELECT — used for the
 // empty-array fallback below so the type narrows correctly when one
@@ -68,6 +69,20 @@ export async function GET(request: NextRequest) {
         select: { id: true },
       });
       deckIdFilter = descendants.map((d) => d.id);
+    }
+
+    // Auto-sync database-derived decks in scope before building the
+    // queue, so a review session always sees the table's current rows
+    // (new rows → new cards, edited rows → updated fronts/backs).
+    // Staleness-gated per link; best-effort — a failing table must
+    // never block a review session.
+    try {
+      await syncStaleDataDecks(
+        ownerId,
+        deckIdFilter ? { deckIds: deckIdFilter } : {},
+      );
+    } catch {
+      // Review starts regardless.
     }
 
     const baseWhere: Prisma.FlashcardWhereInput = {

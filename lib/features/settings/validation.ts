@@ -285,6 +285,26 @@ const flashcardsSettingsSchema = z
     // last deck a card was added to, so the path input can prefill the
     // whole hierarchy (the 2-level category/subcategory pair can't).
     lastUsedDeckPath: z.string().max(600).optional(),
+    // Database→deck links (server-managed, no UI fieldset): the
+    // column→deck mappings behind "Create Flashcard Deck" on a database.
+    // Each link lets the review queue and the database viewer reconcile
+    // the deck against the table's current rows on open. Shape must stay
+    // structurally identical to DataDeckLink in
+    // lib/domain/flashcards/from-data.ts.
+    dataDeckLinks: z
+      .array(
+        z.object({
+          tableId: z.string().min(1).max(64),
+          deckId: z.string().min(1).max(64),
+          deckPath: z.string().max(600),
+          frontColumnId: z.string().min(1).max(64),
+          backColumnId: z.string().min(1).max(64),
+          tableMode: z.enum(["inline", "external", "query"]),
+          lastSyncedAt: z.string().max(64).optional(),
+        }),
+      )
+      .max(100)
+      .optional(),
     defaultFrontLabel: z.string().min(1).max(80).optional(),
     defaultBackLabel: z.string().min(1).max(80).optional(),
     defaultReviewMode: z

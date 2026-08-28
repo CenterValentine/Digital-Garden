@@ -126,6 +126,19 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   // loading/error early returns per rules-of-hooks.
   const flashcardsEnabled = useIsExtensionEnabled(FLASHCARDS_EXTENSION_ID);
 
+  // Auto-sync any flashcard decks derived from this table (links live in
+  // user settings; the server no-ops when none exist or nothing changed).
+  // Fire-and-forget — viewing a table never waits on deck reconciliation.
+  useEffect(() => {
+    if (!flashcardsEnabled) return;
+    void fetch("/api/flashcards/from-data/sync", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tableId: contentId }),
+    }).catch(() => {});
+  }, [contentId, flashcardsEnabled]);
+
   /**
    * The poll callback reads the CURRENT view through this ref instead of
    * closing over state.view — keeping the poll effect's dep array at its

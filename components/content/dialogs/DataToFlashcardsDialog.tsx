@@ -199,8 +199,9 @@ function Body({
             {title || "Untitled"}
           </p>
           <p className="text-xs text-gray-400">
-            One card per row. Re-running syncs changed rows into the same deck
-            without resetting review progress.
+            One card per row. The deck stays linked: opening it (or this
+            database) syncs new and edited rows in without resetting review
+            progress.
           </p>
         </div>
 
