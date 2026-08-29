@@ -158,20 +158,25 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   /**
    * Rows on the "row toggles, double-click or press-and-hold opens" model:
    * anything that nests other rows, whatever its content type — folders,
-   * databases, and notes carrying referenced content alike.
+   * databases, and notes whose references are on screen alike.
    *
-   * Keyed on whether the row CAN nest, not on whether it is currently
-   * expanded. Reading `node.children` alone would flip a note between the two
-   * models as its reference chip opened and closed, so the same click would
-   * mean different things minutes apart on the same row.
+   * THE CHEVRON IS THE CONTRACT. This condition is deliberately the same one
+   * getChevron renders on, so the gesture always matches what the row visibly
+   * offers: a chevron means the row toggles, no chevron means it opens. Keying
+   * this on a row's CAPACITY to nest instead would change what a click does
+   * based on something the user cannot see — a note with hidden references
+   * looks exactly like a leaf, so it must behave like one.
+   *
+   * It follows that a note joins this model when its reference chip is opened
+   * and leaves when it is closed. That is the intended reading, not drift: the
+   * chevron appears and disappears with it.
    *
    * People mounts are excluded. They are served with `contentType: "folder"`
    * (tree route) but are synthetic rows that select on single click and expand
    * on double click; they are also a surface this change was never scoped
    * against, so they keep their existing behaviour and a real chevron button.
    */
-  const nestsOtherRows = hasPrimaryChildren || referenceCount > 0;
-  const usesRowToggle = nestsOtherRows && !isPeopleNode;
+  const usesRowToggle = (node.children?.length ?? 0) > 0 && !isPeopleNode;
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
   const toggleReferencePosition = useTreeStateStore(
@@ -491,7 +496,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // twice and land back where it started — the row would appear to stay shut
     // while its content opened.
     if (e.detail > 1) return;
-    toggleRowNesting();
+    node.toggle();
   };
 
   // Double-click a nesting row: open it in the main panel, leaving expansion
@@ -532,7 +537,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     e.preventDefault();
     e.stopPropagation();
-    toggleRowNesting();
+    node.toggle();
     node.select();
   };
 
@@ -817,28 +822,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (willExpand) openRow();
   };
 
-  /**
-   * The row-click gesture for a nesting row: show or hide what it nests.
-   *
-   * Which mechanism that means depends on what the row actually nests. A row
-   * whose only nested content is a CLOSED reference block has no
-   * react-arborist children yet — the tree transform only splices references
-   * into `children` once the block is open — so `node.toggle()` there would be
-   * a silent no-op, leaving a row that neither expands nor opens on click.
-   * Routing that case through the reference block is what makes the gesture
-   * mean the same thing on a note with attachments as on a folder.
-   *
-   * Shared by the single click and by the double click that reverses it, so
-   * the two can never drift into toggling different things.
-   */
-  const toggleRowNesting = () => {
-    if (!hasPrimaryChildren && referenceCount > 0) {
-      toggleReferenceBlock();
-      return;
-    }
-    node.toggle();
-  };
-
   // Reference-block chrome. Separation here is deliberately VISUAL, not
   // structural: these are ordinary tree nodes (same selection, drag and
   // context menu), drawn on a wash with a rail so system-generated
@@ -890,13 +873,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       // Folders toggle from the whole row, so the row (not the chevron)
       // carries the expanded state. Non-folder rows keep it on their
       // chevron button, which is what actually toggles there.
-      aria-expanded={
-        usesRowToggle
-          ? hasPrimaryChildren
-            ? isOpen
-            : referencesExpanded
-          : undefined
-      }
+      aria-expanded={usesRowToggle ? isOpen : undefined}
       // Native tooltip rather than a Radix one: this renders per row in a
       // virtualized tree, so a portal-backed tooltip per node would be a
       // real cost for a hover hint. Child badges keep their own `title`
