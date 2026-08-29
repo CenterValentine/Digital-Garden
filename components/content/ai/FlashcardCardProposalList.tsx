@@ -345,27 +345,38 @@ export function FlashcardCardProposalList({
   // entry keeps its ROW INDEX so generated clips land on the right card (a
   // batch can mix audio and silent cards), and the spoken text = the text on
   // the chosen side.
+  // Pronunciation is offered for EVERY card with speakable text, not only the
+  // ones the model happened to tag with an `audio` directive. Whether a card
+  // can be spoken is a property of the card, not of how the proposal was
+  // phrased — and the affordance appearing on some proposals but not others
+  // read as a bug rather than as a feature that had not been requested.
+  //
+  // `directed` preserves the distinction where it actually matters, in
+  // applyAudioResults: a tagged card keeps its authored placement (a listening
+  // card can replace its front and hide the text), while an untagged card only
+  // ever gets a clip APPENDED to its front, so nothing already there — an
+  // identification image included — is overwritten.
   const audioPlan = useMemo(
     () =>
       payload.cards
-        .map((c, index) => ({
-          index,
-          side: c.audio?.side,
-          hideText: c.audio?.hideText ?? false,
-          term: c.audio?.side === "back" ? c.back : c.front,
-        }))
-        .filter(
-          (
-            p,
-          ): p is { index: number; side: "front" | "back"; hideText: boolean; term: string } =>
-            p.side === "front" || p.side === "back",
-        ),
+        .map((c, index) => {
+          const directed = c.audio?.side === "front" || c.audio?.side === "back";
+          const side: "front" | "back" = directed
+            ? (c.audio?.side as "front" | "back")
+            : "front";
+          return {
+            index,
+            side,
+            hideText: directed ? (c.audio?.hideText ?? false) : false,
+            term: ((side === "back" ? c.back : c.front) ?? "").trim(),
+            directed,
+          };
+        })
+        // Nothing to synthesize from an empty side.
+        .filter((p) => p.term.length > 0),
     [payload.cards],
   );
-  const needsAudioGen = Boolean(
-    payload.audioCards &&
-      audioPlan.some((p) => payload.cards[p.index].pendingAudioGen),
-  );
+  const needsAudioGen = audioPlan.length > 0;
   const audioDrafts = useMemo(
     () =>
       audioPlan.map((p) => ({
@@ -419,7 +430,9 @@ export function FlashcardCardProposalList({
             };
             return;
           }
-          if (p.side === "front") {
+          if (p.side === "front" && p.directed) {
+            // Authored front-audio: the clip IS the front (hideText → player
+            // only, for listening cards). Replacing is the intent here.
             next[p.index] = {
               ...row,
               frontContent: createAudioFrontDoc(
@@ -429,6 +442,23 @@ export function FlashcardCardProposalList({
                 { autoplayOnFlip: true },
               ),
               isFrontRichText: true,
+              isAudioCard: true,
+              audioError: undefined,
+            };
+          } else if (p.side === "front") {
+            // Opt-in pronunciation on an untagged card: append, never replace,
+            // so an existing front (text, or a generated identification image)
+            // survives with the clip added beneath it.
+            next[p.index] = {
+              ...row,
+              frontContent: appendAudioToDoc(
+                row.frontContent,
+                r.audioUrl,
+                r.audioContentId ?? null,
+                { autoplayOnFlip: true },
+              ),
+              isFrontRichText: true,
+              isAudioCard: true,
               audioError: undefined,
             };
           } else {
@@ -440,6 +470,7 @@ export function FlashcardCardProposalList({
                 r.audioContentId ?? null,
                 { autoplayOnFlip: true },
               ),
+              isAudioCard: true,
               audioError: undefined,
             };
           }
