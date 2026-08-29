@@ -383,6 +383,20 @@ export function FlashcardCardProposalList({
   // chat history would re-fire billable TTS on each load).
   const [audioGenStarted, setAudioGenStarted] = useState(false);
 
+  // Pronunciation is OPTIONAL, so it must not be a gate. Committing used to be
+  // blocked on `audioGenDone`, which starts false whenever audio is available —
+  // meaning the user had to answer a banner ("Skip" or "Generate") before the
+  // commit button would even light up. Two steps for what is one decision:
+  // "add these cards", with "…and speak them" as a refinement of it.
+  //
+  // Now the commit button is live from the start and only goes dark while a
+  // generation the user actually asked for is in flight. `audioGenDone` keeps
+  // its other job — driving the per-card speaker indicator — it just no longer
+  // decides whether the batch can be committed.
+  const audioGenInFlight = audioGenStarted && !audioGenDone;
+  // Offer generation only while it is still possible and not already running.
+  const canGenerateAudio = needsAudioGen && !audioGenDone && !audioGenStarted;
+
   // Apply generated audio onto the draft rows. Results align with audioPlan
   // (same order). Placement is per-card: front-side audio rebuilds the front as
   // the spoken clip (hideText → player only, for listening cards; otherwise the
@@ -530,12 +544,12 @@ export function FlashcardCardProposalList({
   //      either, pass parentDeckPath to the server and it cascades
   //      through missing levels atomically.
   const deckStatusLine = effectiveDeckExists
-    ? "existing deck"
+    ? "already exists — cards will be added to it"
     : effectiveParentResolved
-      ? "will be created"
+      ? "new deck"
       : effectiveParentPath
-        ? `will be created — parent "${effectiveParentPath}" too`
-        : "will be created";
+        ? `new deck — inside a new "${effectiveParentPath}"`
+        : "new deck";
 
   const handleSubmitSelected = useCallback(async () => {
     setBulkSubmitting(true);
@@ -828,7 +842,10 @@ export function FlashcardCardProposalList({
             <Sparkles className="h-3.5 w-3.5 shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
             <div className="min-w-0 flex-1">
               <span className="text-gray-700 dark:text-gray-300">
-                On commit, will create deck{" "}
+                {/* "On commit" is developer vocabulary — the reader is adding
+                    cards, not committing a transaction. Name the button they
+                    are about to press instead. */}
+                Adding these cards will also create the deck{" "}
                 <span className="font-mono text-emerald-700 dark:text-emerald-300">
                   {effectivePath}
                 </span>
@@ -896,48 +913,14 @@ export function FlashcardCardProposalList({
       )}
 
       {/*
-        Pronunciation cards (audio twin of the image gate above). Generation is
-        opt-in: a dormant prompt until the user clicks Generate (so chat history
-        never auto-spends on TTS), then the voice/provider window takes over.
-        User can also skip pronunciation entirely with the "Skip" button.
+        Pronunciation cards (audio twin of the image gate above). Generation
+        stays opt-in — chat history must never auto-spend on TTS — but the
+        opt-in now lives on a button beside "Create deck & add" rather than in a
+        banner that had to be dismissed first. Only the progress gate renders
+        here, and only while generation is actually running.
       */}
-      {needsAudioGen && !audioGenDone && (
-        audioGenStarted ? (
-          <AudioCardGenGate cards={audioDrafts} onComplete={applyAudioResults} />
-        ) : (
-          <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 shrink-0" />
-                <span>
-                  {audioDrafts.length} card
-                  {audioDrafts.length === 1 ? "" : "s"} can have a spoken
-                  pronunciation.
-                </span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setAudioGenDone(true)}
-                  className="rounded-md border border-amber-400/40 bg-amber-400/10 px-3 py-1.5 font-medium text-amber-700 transition-colors hover:bg-amber-400/15 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
-                >
-                  Skip
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAudioGenStarted(true)}
-                  className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
-                >
-                  Generate {audioDrafts.length} pronunciation
-                  {audioDrafts.length === 1 ? "" : "s"}
-                </button>
-              </div>
-            </div>
-            <p className="mt-1 text-[11px] opacity-70">
-              Generation uses your speech provider — pronunciation is optional.
-            </p>
-          </div>
-        )
+      {audioGenInFlight && (
+        <AudioCardGenGate cards={audioDrafts} onComplete={applyAudioResults} />
       )}
 
       {/*
@@ -1221,6 +1204,23 @@ export function FlashcardCardProposalList({
               <ArrowRight className="h-3 w-3" />
             </button>
           )}
+          {/*
+            Pronunciation as a peer of the commit action, not a prerequisite of
+            it. Sits immediately left of "Create deck & add" so the pair reads
+            as one choice: speak them first, or just add them.
+          */}
+          {canGenerateAudio && !allDone && (
+            <button
+              type="button"
+              onClick={() => setAudioGenStarted(true)}
+              title="Synthesize spoken pronunciation with your speech provider — optional"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Generate {audioDrafts.length} pronunciation
+              {audioDrafts.length === 1 ? "" : "s"}
+            </button>
+          )}
           <button
             type="button"
             onClick={handleSubmitSelected}
@@ -1230,13 +1230,13 @@ export function FlashcardCardProposalList({
               allDone ||
               !effectivePath ||
               !imageGenDone ||
-              !audioGenDone
+              audioGenInFlight
             }
             title={
               !imageGenDone
                 ? "Waiting for image generation…"
-                : !audioGenDone
-                  ? "Waiting for audio generation…"
+                : audioGenInFlight
+                  ? "Generating pronunciations…"
                   : !effectivePath
                     ? "Target deck path is empty — type a path or pick from the dropdown"
                     : undefined

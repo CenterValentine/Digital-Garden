@@ -32,7 +32,12 @@ async function fetchDeckPaths(): Promise<DeckPath[]> {
   // legacy DTO shape with `deckId` + `path` + `category` + `subcategory`.
   // We only need id, path, and a display name.
   try {
-    const res = await fetch("/api/flashcards/decks", {
+    // `includeEmpty=1` is load-bearing: this cache answers "does this deck
+    // already exist?", and the endpoint's default hides decks holding no
+    // cards. Without it a freshly-made empty deck is invisible here, the
+    // proposal cards conclude it needs creating, and the commit dies on the
+    // server's duplicate guard — the whole of #80.
+    const res = await fetch("/api/flashcards/decks?includeEmpty=1", {
       credentials: "include",
     });
     if (!res.ok) return [];
