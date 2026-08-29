@@ -127,15 +127,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const isFolder = data.contentType === "folder";
   const isPeopleNode = data.treeNodeKind === "peopleGroup" || data.treeNodeKind === "person";
   const isOpen = node.isOpen;
-  /**
-   * Rows on the "row toggles, double-click opens" model.
-   *
-   * People mounts are served with `contentType: "folder"` (tree route) but are
-   * synthetic rows that select on single click and expand on double click —
-   * excluding them here keeps that behaviour, and keeps their chevron a real
-   * button (their only expand affordance).
-   */
-  const isRowToggleFolder = isFolder && !isPeopleNode;
 
   // Reference block membership. `isNestedReference` is set by FileTree's
   // expandReferences transform, never by the API — a referenced node rendered
@@ -163,6 +154,24 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const hasPrimaryChildren = (data.children ?? []).some(
     (child) => !child.isNestedReference,
   );
+
+  /**
+   * Rows on the "row toggles, double-click or press-and-hold opens" model:
+   * anything that nests other rows, whatever its content type — folders,
+   * databases, and notes carrying referenced content alike.
+   *
+   * Keyed on whether the row CAN nest, not on whether it is currently
+   * expanded. Reading `node.children` alone would flip a note between the two
+   * models as its reference chip opened and closed, so the same click would
+   * mean different things minutes apart on the same row.
+   *
+   * People mounts are excluded. They are served with `contentType: "folder"`
+   * (tree route) but are synthetic rows that select on single click and expand
+   * on double click; they are also a surface this change was never scoped
+   * against, so they keep their existing behaviour and a real chevron button.
+   */
+  const nestsOtherRows = hasPrimaryChildren || referenceCount > 0;
+  const usesRowToggle = nestsOtherRows && !isPeopleNode;
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
   const toggleReferencePosition = useTreeStateStore(
@@ -381,17 +390,16 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
   };
 
-  // Get chevron for any node with children — folders, and notes whose
-  // references display as children (2026-07-16 model).
+  // Get chevron for any node with children — folders, databases, and notes
+  // whose references display as children (2026-07-16 model).
   //
   // Two behaviours, deliberately different:
-  //  - Folders: the WHOLE ROW toggles (handleClick), so the chevron is a pure
-  //    state indicator with no isolated click zone — clicks fall through to the
-  //    row. Folders don't need to separate "expand" from "open"; single click
-  //    expands, double click opens.
-  //  - Everything else (notes whose references display as children, and people
-  //    mounts): the chevron keeps its own click zone so expanding is
-  //    independent of selecting the item itself.
+  //  - Nesting rows (usesRowToggle): the WHOLE ROW toggles (handleClick), so
+  //    the chevron is a pure state indicator with no isolated click zone —
+  //    clicks fall through to the row. Nothing is lost by collapsing the two,
+  //    because these rows open on double-click or press-and-hold instead.
+  //  - People mounts: the chevron keeps its own click zone. They select on
+  //    single click, so the chevron is their only way to expand.
   const getChevron = () => {
     if (!node.children || node.children.length === 0) {
       return <div className="h-4 w-4" />; // Empty space for alignment
@@ -403,7 +411,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       <ChevronRight className="h-4 w-4 text-gray-600 dark:text-gray-400" />
     );
 
-    if (isRowToggleFolder) {
+    if (usesRowToggle) {
       // Indicator only — no handler, no stopPropagation. The row owns the toggle.
       return (
         <span aria-hidden="true" className="h-4 w-4 flex items-center justify-center">
@@ -450,16 +458,17 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       return;
     }
 
-    // Files and people mounts: select on single click (unchanged behaviour)
-    if (!isRowToggleFolder) {
+    // Leaf rows and people mounts: select on single click (unchanged behaviour)
+    if (!usesRowToggle) {
       node.select();
       return;
     }
 
-    // Folders: single click expands/collapses the WHOLE ROW (the chevron is a
-    // pure indicator — see getChevron). Double click and press-and-hold open.
+    // Nesting rows: single click expands/collapses the WHOLE ROW (the chevron
+    // is a pure indicator — see getChevron). Double click and press-and-hold
+    // open in the main panel.
     //
-    // stopPropagation is what actually stops a folder opening on one click.
+    // stopPropagation is what actually stops the row opening on one click.
     // react-arborist's DefaultRow wraps every node in
     // `<div onClick={node.handleClick}>`, and node.handleClick runs
     // `select(); activate();` unconditionally — that select fires the tree's
@@ -470,8 +479,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     e.stopPropagation();
 
     // The click that ends a press-and-hold must not toggle: the hold already
-    // opened the folder, and toggling on release would make the folder jump
-    // as the user lets go.
+    // opened the row, and toggling on release would make it jump as the user
+    // lets go.
     if (suppressNextToggleRef.current) {
       suppressNextToggleRef.current = false;
       return;
@@ -479,21 +488,21 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     // `e.detail > 1` is the second click of a double-click: React fires click
     // twice before dblclick, so without this guard a double-click would toggle
-    // twice and land back where it started — the folder would appear to stay
-    // shut while its content opened.
+    // twice and land back where it started — the row would appear to stay shut
+    // while its content opened.
     if (e.detail > 1) return;
-    node.toggle();
+    toggleRowNesting();
   };
 
-  // Double-click on a folder: open it in the main panel, leaving expansion
+  // Double-click a nesting row: open it in the main panel, leaving expansion
   // exactly as it was.
   //
   // The first click of this double-click already ran handleClick and toggled,
-  // so we toggle back. Without that, double-clicking an open folder would
-  // visibly collapse it on the way to opening — the folder snapping shut under
-  // the cursor reads as a glitch rather than a gesture. Reversing gives one
-  // rule that holds in both directions: click toggles, double-click opens and
-  // leaves expansion alone.
+  // so we toggle back. Without that, double-clicking an open row would visibly
+  // collapse it on the way to opening — snapping shut under the cursor reads
+  // as a glitch rather than a gesture. Reversing gives one rule that holds in
+  // both directions: click toggles, double-click opens and leaves expansion
+  // alone.
   //
   // preventDefault + stopPropagation keep react-arborist's internal dblclick
   // handler (which starts rename mode) and tree-level handlers out.
@@ -503,23 +512,28 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       e.stopPropagation();
       return;
     }
-    if (isFolder) {
+
+    // People mounts keep the legacy model: double click is their expand
+    // gesture (they select on single click, so there is nothing to navigate
+    // to here).
+    if (isPeopleNode && isFolder) {
       e.preventDefault();
       e.stopPropagation();
-      // People mounts keep the legacy model: double click is their expand
-      // gesture (they select on single click, so there is nothing to navigate
-      // to here).
-      if (isPeopleNode) {
-        if (isOpen) {
-          node.close();
-        } else {
-          node.open();
-        }
-        return;
+      if (isOpen) {
+        node.close();
+      } else {
+        node.open();
       }
-      node.toggle();
-      node.select();
+      return;
     }
+
+    // Leaf rows already opened on the first click — nothing to add.
+    if (!usesRowToggle) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+    toggleRowNesting();
+    node.select();
   };
 
   // Press and hold. One hook, two meanings, split by pointer type — a second
@@ -534,9 +548,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // one place. Pairs with `touch-callout-none` on the row so Apple's callout
   // doesn't cover our menu.
   //
-  // MOUSE/PEN on a folder → open in the main panel. Folders toggle on click,
-  // so holding is how you say "open" without a double-click's first click
-  // flipping the folder open or shut on the way. The release that ends the
+  // MOUSE/PEN on a nesting row → open in the main panel. Those rows toggle on
+  // click, so holding is how you say "open" without a double-click's first
+  // click flipping the row open or shut on the way. The release that ends the
   // hold must not toggle, hence suppressNextToggleRef.
   //
   // Deliberately no arming hint: the picker tried one and it flashed on every
@@ -547,8 +561,8 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const longPressHandlers = useLongPress(
     (x, y, pointerType) => {
       if (pointerType !== "touch") {
-        // Files already open on a single click — nothing to add.
-        if (!isRowToggleFolder) return;
+        // Leaf rows already open on a single click — nothing to add.
+        if (!usesRowToggle) return;
         suppressNextToggleRef.current = true;
         node.select();
         return;
@@ -803,6 +817,28 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     if (willExpand) openRow();
   };
 
+  /**
+   * The row-click gesture for a nesting row: show or hide what it nests.
+   *
+   * Which mechanism that means depends on what the row actually nests. A row
+   * whose only nested content is a CLOSED reference block has no
+   * react-arborist children yet — the tree transform only splices references
+   * into `children` once the block is open — so `node.toggle()` there would be
+   * a silent no-op, leaving a row that neither expands nor opens on click.
+   * Routing that case through the reference block is what makes the gesture
+   * mean the same thing on a note with attachments as on a folder.
+   *
+   * Shared by the single click and by the double click that reverses it, so
+   * the two can never drift into toggling different things.
+   */
+  const toggleRowNesting = () => {
+    if (!hasPrimaryChildren && referenceCount > 0) {
+      toggleReferenceBlock();
+      return;
+    }
+    node.toggle();
+  };
+
   // Reference-block chrome. Separation here is deliberately VISUAL, not
   // structural: these are ordinary tree nodes (same selection, drag and
   // context menu), drawn on a wash with a rail so system-generated
@@ -854,7 +890,13 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
       // Folders toggle from the whole row, so the row (not the chevron)
       // carries the expanded state. Non-folder rows keep it on their
       // chevron button, which is what actually toggles there.
-      aria-expanded={isRowToggleFolder && (node.children?.length ?? 0) > 0 ? isOpen : undefined}
+      aria-expanded={
+        usesRowToggle
+          ? hasPrimaryChildren
+            ? isOpen
+            : referencesExpanded
+          : undefined
+      }
       // Native tooltip rather than a Radix one: this renders per row in a
       // virtualized tree, so a portal-backed tooltip per node would be a
       // real cost for a hover hint. Child badges keep their own `title`
