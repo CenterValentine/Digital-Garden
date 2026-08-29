@@ -561,6 +561,22 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
 
     const editActions: ContextMenuAction[] = [
       {
+        // An explicit, discoverable "open" for every content type. Folders now
+        // toggle on click and open on double-click or press-and-hold, and on
+        // touch a long press already means "context menu" — so this is the one
+        // route to opening a folder that needs no gesture at all. Offered for
+        // all content, not just folders, so "open" is never a guess about
+        // which gesture this row happens to answer to.
+        id: "open",
+        label: "Open",
+        icon: <ExternalLink className="h-4 w-4" />,
+        onClick: () =>
+          useContentStore.getState().setSelectedContentId(clickedId, {
+            title: clickedNode.title,
+            contentType: clickedNode.contentType,
+          }),
+      },
+      {
         id: "open-in-pane",
         label: "Open In Pane",
         icon: <ExternalLink className="h-4 w-4" />,

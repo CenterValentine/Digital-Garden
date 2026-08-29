@@ -10,10 +10,16 @@ import { useCallback, useEffect, useRef } from "react";
  * tree's 33 context-menu actions — Rename, Move, Delete, Change Icon … — are
  * otherwise unreachable on a phone.
  *
- * Fires `onLongPress(x, y)` after `delayMs` of a stationary touch. Cancels on:
+ * Fires `onLongPress(x, y, pointerType)` after `delayMs` of a stationary press.
+ * Cancels on:
  *   • movement beyond `moveTolerancePx` (so list scrolling never triggers it)
  *   • pointer up / cancel before the timer fires
- *   • any non-touch pointer (mouse keeps using real `contextmenu`)
+ *   • any pointer type outside `pointerTypes`
+ *
+ * `pointerTypes` defaults to touch only, because that is the case that has no
+ * alternative. Widen it when a press-and-hold means something on a mouse too —
+ * the callback receives the pointer type so one hook can serve both without a
+ * second set of pointer handlers fighting for the same element.
  *
  * Returns props to spread on the target element. Pair with
  * `touch-callout-none` (app/globals.css) on the same element, or iOS will draw
@@ -24,8 +30,16 @@ import { useCallback, useEffect, useRef } from "react";
  *   return <div {...longPress}>…</div>;
  */
 export function useLongPress(
-  onLongPress: (x: number, y: number) => void,
-  { delayMs = 500, moveTolerancePx = 10 }: { delayMs?: number; moveTolerancePx?: number } = {},
+  onLongPress: (x: number, y: number, pointerType: string) => void,
+  {
+    delayMs = 500,
+    moveTolerancePx = 10,
+    pointerTypes = ["touch"],
+  }: {
+    delayMs?: number;
+    moveTolerancePx?: number;
+    pointerTypes?: readonly string[];
+  } = {},
 ) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -34,6 +48,14 @@ export function useLongPress(
   useEffect(() => {
     callbackRef.current = onLongPress;
   }, [onLongPress]);
+
+  // Same trick for the accepted pointer types: call sites pass an inline array
+  // literal, whose identity changes every render and would otherwise rebuild
+  // every handler each time.
+  const pointerTypesRef = useRef(pointerTypes);
+  useEffect(() => {
+    pointerTypesRef.current = pointerTypes;
+  }, [pointerTypes]);
 
   const clear = useCallback(() => {
     if (timerRef.current) {
@@ -49,15 +71,14 @@ export function useLongPress(
 
   const onPointerDown = useCallback(
     (e: React.PointerEvent) => {
-      // Mouse/pen keep the native contextmenu path.
-      if (e.pointerType !== "touch") return;
+      if (!pointerTypesRef.current.includes(e.pointerType)) return;
       clear();
-      const { clientX: x, clientY: y } = e;
+      const { clientX: x, clientY: y, pointerType } = e;
       originRef.current = { x, y };
       timerRef.current = setTimeout(() => {
         timerRef.current = null;
         // Re-check: a cancel may have landed in the same tick.
-        if (originRef.current) callbackRef.current(x, y);
+        if (originRef.current) callbackRef.current(x, y, pointerType);
       }, delayMs);
     },
     [clear, delayMs],
