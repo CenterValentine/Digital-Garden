@@ -35,7 +35,10 @@ interface DeckProposalPayload {
 type CreateState =
   | { status: "idle" }
   | { status: "creating" }
-  | { status: "created"; deckPath: string }
+  // `adopted` distinguishes "we created this deck" from "this deck was
+  // already there and we're routing cards into it". The confirmation copy
+  // must not claim a creation that never happened.
+  | { status: "created"; deckPath: string; adopted?: boolean }
   | { status: "error"; message: string; code?: string };
 
 export function FlashcardDeckProposalCard({
@@ -62,6 +65,7 @@ export function FlashcardDeckProposalCard({
     effectiveLeafName,
     effectiveParentPath,
     effectiveDeckExists,
+    effectiveDeckId,
     effectiveParentDeckId,
     effectiveParentResolved,
   } = useMemo(() => {
@@ -89,6 +93,11 @@ export function FlashcardDeckProposalCard({
       effectiveLeafName: leafName,
       effectiveParentPath: parentPath || null,
       effectiveDeckExists: !!matchingDeck,
+      // Identity of the already-existing deck at this path, so the commit
+      // can adopt it instead of failing against it. `FlashcardCardProposalList`
+      // has always carried this (`effectiveDeckId`); this card never did,
+      // which is why its only option was to refuse.
+      effectiveDeckId: matchingDeck?.id ?? null,
       effectiveParentDeckId: matchingParent?.id ?? null,
       effectiveParentResolved: !parentPath || !!matchingParent,
     };
@@ -101,8 +110,24 @@ export function FlashcardDeckProposalCard({
     : "(root)";
 
   const handleCreate = useCallback(async () => {
+    // An existing deck at this path is the *goal*, not a collision: asking for
+    // cards on "Machine Learning" when that deck already exists should route
+    // them into it. Adopt it and run the same completion path a fresh create
+    // would, so sibling FlashcardCardProposalLists resolve the same deck id.
+    //
+    // This mirrors `FlashcardCardProposalList` (:555), which has always
+    // branched `if (!effectiveDeckExists)` and posted cards straight to the
+    // existing deck. The two components disagreeing about what "already
+    // exists" means was the whole of #80 — the server's create-only route
+    // never even got reached from here.
     if (effectiveDeckExists) {
-      toast.error("This deck already exists.");
+      window.dispatchEvent(
+        new CustomEvent("flashcard-deck-created", {
+          detail: { deckPath: effectivePath, deckId: effectiveDeckId },
+        }),
+      );
+      setState({ status: "created", deckPath: effectivePath, adopted: true });
+      toast.success(`Using existing deck "${effectiveLeafName}"`);
       return;
     }
     setState({ status: "creating" });
@@ -159,6 +184,7 @@ export function FlashcardDeckProposalCard({
     }
   }, [
     effectiveDeckExists,
+    effectiveDeckId,
     effectiveLeafName,
     effectiveParentDeckId,
     effectiveParentPath,
@@ -170,7 +196,7 @@ export function FlashcardDeckProposalCard({
       <div className="inline-flex items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/[0.06] px-3 py-2 text-sm dark:border-emerald-400/30 dark:bg-emerald-500/[0.08]">
         <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
         <span className="text-gray-700 dark:text-gray-200">
-          Created deck{" "}
+          {state.adopted ? "Using existing deck" : "Created deck"}{" "}
           <span className="font-medium text-gray-900 dark:text-gray-100">
             {payload.name}
           </span>{" "}
@@ -271,6 +297,11 @@ export function FlashcardDeckProposalCard({
           </>
         ) : state.status === "error" ? (
           "Retry"
+        ) : effectiveDeckExists ? (
+          // Say so before the click, not after: the path field is editable, so
+          // the label doubles as feedback that what was typed resolves to a
+          // deck that is already there.
+          "Use existing deck"
         ) : (
           "Create deck"
         )}
