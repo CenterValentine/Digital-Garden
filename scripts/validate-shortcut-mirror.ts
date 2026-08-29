@@ -28,6 +28,7 @@ import {
   expandShortcutMirrors,
   buildTreeIndex,
   shortcutMirrorId,
+  resolveDropForwardTarget,
   SHORTCUT_MIRROR_PREFIX,
   MAX_MIRROR_DEPTH,
 } from "@/lib/features/content/shortcut-mirror";
@@ -274,11 +275,59 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// --- 6. Drop forwarding --------------------------------------------------
+//
+// "Nothing is ever stored under a shortcut" survives drag-and-drop only
+// because the destination is rewritten before the move is sent. A rule that
+// exists in the move route but not here would let the optimistic tree update
+// disagree with what the server does.
+{
+  const data = fixture();
+  const out = run(data, ["sc"]);
+
+  check(
+    "dropping on a folder-shortcut forwards to the real folder",
+    resolveDropForwardTarget(findRow(out, "sc")!) === "docs",
+  );
+  check(
+    "dropping on a mirrored folder forwards to that real folder",
+    resolveDropForwardTarget(
+      node("m", {
+        contentType: "folder",
+        isShortcutMirror: true,
+        mirrorOf: "sub",
+      }),
+    ) === "sub",
+  );
+  check(
+    "a broken shortcut forwards nowhere",
+    resolveDropForwardTarget(
+      shortcutTo("bad", "docs", { targetDeleted: true }),
+    ) === null,
+  );
+  check(
+    "a shortcut to a note forwards nowhere",
+    resolveDropForwardTarget(
+      shortcutTo("n", "note-x", { targetContentType: "note" }),
+    ) === null,
+  );
+  check(
+    "an ordinary folder forwards nowhere",
+    resolveDropForwardTarget(findRow(out, "docs")!) === null,
+  );
+  check(
+    "a mirrored NOTE forwards nowhere — only folders receive drops",
+    resolveDropForwardTarget(
+      node("m2", { isShortcutMirror: true, mirrorOf: "note-a" }),
+    ) === null,
+  );
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding)",
 );

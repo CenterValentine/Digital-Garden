@@ -24,6 +24,7 @@ import { expandReferences } from "@/lib/features/content/reference-group";
 import {
   expandShortcutMirrors,
   buildTreeIndex,
+  resolveDropForwardTarget,
 } from "@/lib/features/content/shortcut-mirror";
 
 interface FileTreeProps {
@@ -354,8 +355,34 @@ export function FileTree({
   const canDrop = (args: { dragNodes: NodeApi<TreeNode>[]; parentNode: NodeApi<TreeNode> | null }) => {
     const { dragNodes, parentNode } = args;
 
+    // A mirror row is a projection, not a place. Dragging one would offer to
+    // move content that does not live where it appears to.
+    if (dragNodes.some((dragNode) => dragNode.data.isShortcutMirror)) {
+      return false;
+    }
+
     // Always allow dropping at root level (parentNode is null)
     if (!parentNode) return true;
+
+    // Dropping onto a folder-shortcut (real or mirrored) means "put this in
+    // the folder it points at". handleMove rewrites the destination to the
+    // real folder id before the move is sent, so nothing is ever stored under
+    // a shortcut. A broken one has no folder to forward to.
+    const shortcutTarget = resolveDropForwardTarget(parentNode.data);
+    if (shortcutTarget) return true;
+
+    // Nothing may nest under a shortcut that is not a live folder pointer.
+    if (parentNode.data.contentType === "shortcut") return false;
+
+    // A shortcut may be stored anywhere, including under content that hosts
+    // nothing else — putting a pointer where the user already looks is the
+    // whole point of the feature.
+    if (
+      dragNodes.length > 0 &&
+      dragNodes.every((dragNode) => dragNode.data.contentType === "shortcut")
+    ) {
+      return true;
+    }
 
     // Only allow dropping into folders — with ONE exception: referenced
     // nodes may be dropped onto a NOTE (re-homing the reference under that

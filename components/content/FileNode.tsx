@@ -56,7 +56,8 @@ import { useTreeDragStore } from "@/state/tree-drag-store";
 import { referenceGroupKey } from "@/lib/features/content/reference-group";
 import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
-import type { TreeNode } from "@/lib/domain/content/types";
+import type { TreeNode, ContentType } from "@/lib/domain/content/types";
+import { getContentTypeIcon } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
 import { FileNameInput } from "@/components/common/FileNameInput";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -177,6 +178,24 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
    * against, so they keep their existing behaviour and a real chevron button.
    */
   const usesRowToggle = (node.children?.length ?? 0) > 0 && !isPeopleNode;
+
+  /**
+   * Shortcut identity. A shortcut row is a pointer: it shows the TARGET's icon
+   * (with a corner arrow) and opening it opens the target, so the row reads as
+   * "that thing, reachable from here" rather than as a file of its own.
+   *
+   * Broken splits two ways, and the row has to say which: a trashed target
+   * heals if restored, a purged one never will. Both are computed live from
+   * the target's row — nothing about brokenness is stored.
+   */
+  const shortcut = data.contentType === "shortcut" ? data.shortcut : undefined;
+  const isShortcut = shortcut !== undefined;
+  const shortcutBroken =
+    isShortcut && (!shortcut.targetId || shortcut.targetDeleted);
+  const shortcutPurged = isShortcut && !shortcut.targetId;
+
+  /** View-only projection inside an expanded folder-shortcut. */
+  const isMirrorRow = data.isShortcutMirror === true;
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
   const toggleReferencePosition = useTreeStateStore(
@@ -249,6 +268,27 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const getIcon = () => {
     const iconSize = "h-4 w-4";
     const iconColor = data.iconColor || "text-gray-600 dark:text-gray-400";
+
+    // A shortcut has no content of its own, so it borrows the target's icon —
+    // the corner arrow is what marks it as a pointer. A generic icon would
+    // make every shortcut look alike and say nothing about what opening it
+    // will produce.
+    if (isShortcut && !shortcutBroken && shortcut.targetContentType) {
+      const TargetIcon = (
+        LucideIcons as unknown as Record<
+          string,
+          React.ComponentType<{ className?: string }> | undefined
+        >
+      )[getContentTypeIcon(shortcut.targetContentType as ContentType)];
+      if (TargetIcon) return <TargetIcon className={`${iconSize} ${iconColor}`} />;
+    }
+    if (shortcutBroken) {
+      return (
+        <LucideIcons.Unlink
+          className={`${iconSize} text-gray-400 dark:text-gray-600`}
+        />
+      );
+    }
 
     // Render custom icon if set
     if (data.customIcon) {
@@ -827,7 +867,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // context menu), drawn on a wash with a rail so system-generated
   // attachments read apart from content the user authored.
   const referenceBlockClasses = () => {
-    if (!isNestedReference) return "";
+    // Shortcut mirrors borrow this chrome deliberately: the wash and rail
+    // already read as "this lives somewhere else", which is exactly what a
+    // mirrored row is. Reusing it means the two never drift apart visually.
+    if (!isNestedReference && !isMirrorRow) return "";
     const edge = data.referenceEdge;
     const corners =
       edge === "only"
@@ -936,17 +979,40 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         {/* Rail + half-step indent for reference-block rows. A half step (8px
             against the tree's 15px) separates the block without implying a
             parent row that doesn't exist. */}
-        {isNestedReference && (
+        {(isNestedReference || isMirrorRow) && (
           <span aria-hidden className="flex h-full w-2 flex-none justify-center">
             <span className="w-px self-stretch bg-black/10 dark:bg-white/15" />
           </span>
         )}
         {getChevron()}
         {/* Corner badges use the OS-alias idiom: a small glyph on the icon's
-            corner. Playbook takes precedence over the referenced marker — a
-            note that's both is more usefully surfaced as a playbook. Both share
-            the referenced badge's formatting; only the glyph differs (v3.6). */}
-        {data.note?.playbook ? (
+            corner. Order is precedence: shortcut first (it changes what the
+            row IS — a pointer, whose click opens something else), then
+            playbook over the referenced marker, since a note that's both is
+            more usefully surfaced as a playbook. All share one formatting;
+            only the glyph and colour differ. */}
+        {isShortcut || isMirrorRow ? (
+          <span data-file-icon className="relative inline-flex">
+            {getIcon()}
+            <span
+              aria-hidden
+              title={
+                shortcutPurged
+                  ? "Shortcut target no longer exists"
+                  : shortcutBroken
+                    ? "Shortcut target was deleted"
+                    : `Shortcut to ${shortcut?.targetTitle ?? "another item"}`
+              }
+              className={`absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:ring-white/15 ${
+                shortcutBroken
+                  ? "text-red-500 dark:text-red-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <LucideIcons.ArrowUpRight className="h-2 w-2" />
+            </span>
+          </span>
+        ) : data.note?.playbook ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
             <span

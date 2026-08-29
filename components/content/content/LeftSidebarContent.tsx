@@ -26,6 +26,7 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
+import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
@@ -856,12 +857,24 @@ export function LeftSidebarContent({
     parentId: string | null;
     index: number;
   }) => {
-    const { dragIds, parentId, index } = args;
+    const { dragIds, index } = args;
+    let { parentId } = args;
 
     // Store original tree state for rollback if any move fails
     const originalTree = treeData;
 
     if (!originalTree || dragIds.length === 0) return;
+
+    // Dropping onto a folder-shortcut — or onto a folder inside a shortcut's
+    // mirror — means "put this in the folder it points at". Rewriting the
+    // destination here, before anything optimistic or networked happens, is
+    // what keeps the rule "nothing is ever stored under a shortcut" true
+    // without the rest of the move path needing to know shortcuts exist.
+    if (parentId) {
+      const dropRow = findTreeNodeById(originalTree, parentId);
+      const forwardTo = dropRow ? resolveDropForwardTarget(dropRow) : null;
+      if (forwardTo) parentId = forwardTo;
+    }
 
     // Find each dragged node's current position. Computed up-front so
     // we don't re-traverse the tree N times in the loop, and so the
@@ -1133,6 +1146,37 @@ export function LeftSidebarContent({
     // via tab-close or the explicit root-node click, never via a tree deselect.
     const firstNode = nodes[0];
     if (!firstNode) return;
+
+    // A mirror row is a projection of content that lives elsewhere. Its own id
+    // is synthetic and path-scoped, so opening it means opening the REAL id —
+    // otherwise the tab would hold an id no fetch can resolve.
+    if (firstNode.isShortcutMirror && firstNode.mirrorOf) {
+      setSelectedContentId(firstNode.mirrorOf, {
+        title: firstNode.title,
+        contentType: firstNode.contentType,
+      });
+      return;
+    }
+
+    // A shortcut is a pointer: opening it opens what it points at, and the
+    // shortcut's own id never enters a workspace tab. A BROKEN one is the
+    // exception — there is nothing to open, so we select the shortcut itself
+    // and let the viewer explain (and offer to remove it).
+    if (firstNode.contentType === "shortcut") {
+      const target = firstNode.shortcut;
+      if (target?.targetId && !target.targetDeleted) {
+        setSelectedContentId(target.targetId, {
+          title: target.targetTitle ?? firstNode.title,
+          contentType: target.targetContentType ?? undefined,
+        });
+      } else {
+        setSelectedContentId(firstNode.id, {
+          title: firstNode.title,
+          contentType: "shortcut",
+        });
+      }
+      return;
+    }
 
     if (firstNode.treeNodeKind === "person") {
       setSelectedContentId(firstNode.id, {

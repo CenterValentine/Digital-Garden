@@ -196,3 +196,23 @@ export function expandShortcutMirrors(
 
   return changed ? next : nodes;
 }
+
+/**
+ * If a drop lands on this row, which real folder should receive it?
+ *
+ * A folder-shortcut and a mirrored folder both DISPLAY a folder that lives
+ * elsewhere. Dropping onto either means "put this in that folder", so the
+ * destination is rewritten to the real id before the move is sent — which is
+ * how "nothing is ever stored under a shortcut" survives contact with
+ * drag-and-drop.
+ *
+ * Returns null for rows that are not projections, and for broken shortcuts:
+ * there is no folder to forward to, so the drop is refused rather than
+ * silently landing somewhere else.
+ */
+export function resolveDropForwardTarget(node: TreeNode): string | null {
+  if (node.isShortcutMirror) {
+    return node.contentType === "folder" ? (node.mirrorOf ?? null) : null;
+  }
+  return mirrorableTargetId(node);
+}
