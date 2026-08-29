@@ -391,24 +391,33 @@ async function tableChangedSince(link: DataDeckLink): Promise<boolean> {
  */
 export async function syncStaleDataDecks(
   userId: string,
-  scope: { deckIds?: string[]; tableId?: string } = {},
-): Promise<{ checked: number; synced: number }> {
+  scope: { deckIds?: string[]; tableId?: string; force?: boolean } = {},
+): Promise<{
+  checked: number;
+  synced: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+}> {
   const links = await getDataDeckLinks(userId);
   const inScope = links.filter(
     (l) =>
       (scope.tableId ? l.tableId === scope.tableId : true) &&
       (scope.deckIds ? scope.deckIds.includes(l.deckId) : true),
   );
-  if (inScope.length === 0) return { checked: 0, synced: 0 };
+  const totals = { checked: inScope.length, synced: 0, created: 0, updated: 0, unchanged: 0 };
+  if (inScope.length === 0) return totals;
 
   const keyOf = (l: DataDeckLink) => `${l.tableId}::${l.deckId}`;
   const restamped = new Map<string, DataDeckLink>();
   const dropped = new Set<string>();
-  let synced = 0;
 
   for (const link of inScope) {
     try {
-      if (!(await tableChangedSince(link))) continue;
+      // `force` (the explicit sync button) bypasses the staleness gate —
+      // when a user asks for a sync, "nothing seems to have changed" is
+      // not an acceptable reason to skip it.
+      if (!scope.force && !(await tableChangedSince(link))) continue;
       // Stamp BEFORE reading: edits racing this sync land after the
       // stamp and get picked up next time instead of lost.
       const startedAt = new Date().toISOString();
@@ -420,7 +429,10 @@ export async function syncStaleDataDecks(
       });
       if (outcome.ok) {
         restamped.set(keyOf(link), { ...link, lastSyncedAt: startedAt });
-        synced += 1;
+        totals.synced += 1;
+        totals.created += outcome.result?.created ?? 0;
+        totals.updated += outcome.result?.updated ?? 0;
+        totals.unchanged += outcome.result?.unchanged ?? 0;
       } else if (outcome.code === "NO_CARDS") {
         // All rows blank on a linked column — benign; stamp so the
         // staleness gate doesn't re-load the table every open.
@@ -444,5 +456,5 @@ export async function syncStaleDataDecks(
       .map((l) => restamped.get(keyOf(l)) ?? l);
     await updateUserSettings(userId, { flashcards: { dataDeckLinks: next } });
   }
-  return { checked: inScope.length, synced };
+  return totals;
 }

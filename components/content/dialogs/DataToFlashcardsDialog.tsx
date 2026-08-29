@@ -26,6 +26,10 @@ import { Button } from "@/components/ui/glass/button";
 import { Layers, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
+import {
+  findTableLink,
+  useDataFlashcardsLinksStore,
+} from "@/state/data-flashcards-links-store";
 import { useExistingDeckPaths } from "@/components/content/ai/use-existing-deck-paths";
 import { FLASHCARD_CHANGED_EVENT } from "@/extensions/flashcards/events";
 
@@ -78,6 +82,7 @@ function Body({
   const [frontColumnId, setFrontColumnId] = useState("");
   const [backColumnId, setBackColumnId] = useState("");
   const [deckPath, setDeckPath] = useState(title || "Untitled");
+  const [linked, setLinked] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const deckListId = useId();
@@ -87,6 +92,16 @@ function Body({
     let mounted = true;
     (async () => {
       try {
+        // Load the link cache first so an already-converted table opens
+        // prefilled with its saved mapping — the dialog then reads as
+        // "Sync" rather than "Create".
+        const linksStore = useDataFlashcardsLinksStore.getState();
+        if (!linksStore.loaded) await linksStore.refresh();
+        const link = findTableLink(
+          useDataFlashcardsLinksStore.getState().links,
+          contentId,
+        );
+
         const res = await fetch(
           `/api/content/data/${encodeURIComponent(contentId)}`,
           { credentials: "include" },
@@ -105,12 +120,26 @@ function Body({
         );
         if (!mounted) return;
         setColumns(loaded);
-        // Default: primary column on the front, first other column on the
-        // back — the "term → definition" shape a two-column table implies.
-        const front = loaded.find((c) => c.isPrimary) ?? loaded[0];
-        const back = loaded.find((c) => c.id !== front?.id);
+        // Saved link wins (its columns may have been deleted — fall
+        // through to defaults then). Otherwise: primary column on the
+        // front, first other column on the back — the "term → definition"
+        // shape a two-column table implies.
+        const front =
+          (link && loaded.find((c) => c.id === link.frontColumnId)) ??
+          loaded.find((c) => c.isPrimary) ??
+          loaded[0];
+        const back =
+          (link &&
+            loaded.find(
+              (c) => c.id === link.backColumnId && c.id !== front?.id,
+            )) ??
+          loaded.find((c) => c.id !== front?.id);
         if (front) setFrontColumnId(front.id);
         if (back) setBackColumnId(back.id);
+        if (link) {
+          setLinked(true);
+          if (link.deckPath) setDeckPath(link.deckPath);
+        }
       } catch {
         if (mounted) {
           setColumns([]);
@@ -167,6 +196,9 @@ function Body({
       if (r.unchanged > 0) parts.push(`${r.unchanged} unchanged`);
       if (r.skipped > 0) parts.push(`${r.skipped} skipped (blank)`);
       toast.success(`Deck "${r.deckPath}" — ${parts.join(", ")}`);
+      // The link set changed server-side — refresh the cache that drives
+      // the Create/Sync labels and the deck-row sync button.
+      void useDataFlashcardsLinksStore.getState().refresh();
       window.dispatchEvent(new CustomEvent(FLASHCARD_CHANGED_EVENT));
       // Keeps the deck-path autocomplete cache warm (see use-existing-deck-paths).
       window.dispatchEvent(
@@ -186,7 +218,7 @@ function Body({
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-indigo-400" />
-          Create Flashcard Deck
+          {linked ? "Sync Flashcard Deck" : "Create Flashcard Deck"}
         </DialogTitle>
       </DialogHeader>
 
@@ -326,8 +358,10 @@ function Body({
             {busy ? (
               <>
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                Creating…
+                {linked ? "Syncing…" : "Creating…"}
               </>
+            ) : linked ? (
+              "Sync Deck"
             ) : (
               "Create Deck"
             )}

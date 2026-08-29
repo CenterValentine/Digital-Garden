@@ -23,16 +23,24 @@ export async function POST(request: NextRequest) {
     const session = await requireAuth();
     const body = (await request.json().catch(() => ({}))) as {
       tableId?: string;
+      deckId?: string;
+      force?: boolean;
     };
     const tableId =
       typeof body.tableId === "string" && body.tableId.trim()
         ? body.tableId.trim()
         : undefined;
+    const deckId =
+      typeof body.deckId === "string" && body.deckId.trim()
+        ? body.deckId.trim()
+        : undefined;
 
-    const result = await syncStaleDataDecks(
-      session.user.id,
-      tableId ? { tableId } : {},
-    );
+    const result = await syncStaleDataDecks(session.user.id, {
+      ...(tableId ? { tableId } : {}),
+      ...(deckId ? { deckIds: [deckId] } : {}),
+      // The deck-row button is an explicit user action — always reconcile.
+      ...(body.force === true ? { force: true } : {}),
+    });
     return NextResponse.json({ success: true, data: result });
   } catch (error) {
     const message =

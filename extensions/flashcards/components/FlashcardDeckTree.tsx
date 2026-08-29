@@ -8,9 +8,13 @@ import {
   Pencil,
   Play,
   Plus,
+  RefreshCw,
   Trash2,
 } from "lucide-react";
+import { toast } from "sonner";
 import type { FlashcardDeckRecordDto } from "@/lib/domain/flashcards";
+import { useDataFlashcardsLinksStore } from "@/state/data-flashcards-links-store";
+import { FLASHCARD_CHANGED_EVENT } from "../events";
 
 // ─── Tree model ──────────────────────────────────────────────────
 
@@ -180,6 +184,12 @@ export function FlashcardDeckTree({
     [],
   );
 
+  // Load the database→deck link cache so linked rows show their sync
+  // button without depending on another surface having fetched it first.
+  useEffect(() => {
+    useDataFlashcardsLinksStore.getState().ensureLoaded();
+  }, []);
+
   // Close context menu when clicking anywhere outside it.
   useEffect(() => {
     if (!contextMenu) return;
@@ -332,6 +342,50 @@ function DeckTreeRow({
   const { deck, children, subtreeCardCount } = node;
   const hasChildren = children.length > 0;
   const hasCards = (deck.cardCount ?? 0) > 0;
+
+  // Database-derived decks get an explicit sync affordance alongside
+  // Play — the same reconcile the automatic on-open sync runs, but
+  // force=true so "nothing changed since my stamp" can't skip it.
+  const deckLinked = useDataFlashcardsLinksStore((s) =>
+    s.links.some((l) => l.deckId === deck.id),
+  );
+  const [syncing, setSyncing] = useState(false);
+  const handleSync = async () => {
+    if (syncing) return;
+    setSyncing(true);
+    try {
+      const res = await fetch("/api/flashcards/from-data/sync", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ deckId: deck.id, force: true }),
+      });
+      const json = (await res.json()) as {
+        success?: boolean;
+        data?: { created?: number; updated?: number; unchanged?: number };
+      };
+      if (!res.ok || !json.success) {
+        throw new Error("sync failed");
+      }
+      const created = json.data?.created ?? 0;
+      const updated = json.data?.updated ?? 0;
+      const parts: string[] = [];
+      if (created > 0) parts.push(`${created} new`);
+      if (updated > 0) parts.push(`${updated} updated`);
+      toast.success(
+        parts.length > 0
+          ? `Synced from database — ${parts.join(", ")}`
+          : "Already up to date with its database",
+      );
+      window.dispatchEvent(new CustomEvent(FLASHCARD_CHANGED_EVENT));
+      // Sync can prune a link whose table/deck disappeared.
+      void useDataFlashcardsLinksStore.getState().refresh();
+    } catch {
+      toast.error("Couldn't sync this deck from its database");
+    } finally {
+      setSyncing(false);
+    }
+  };
   const isOpen = expanded.has(deck.id);
   const isSelected = selectedDeckId === deck.id;
   const isPlaying = playingDeckId === deck.id;
@@ -424,6 +478,18 @@ function DeckTreeRow({
               <Play className="h-4 w-4" />
             )}
           </button>
+          {deckLinked && (
+            <button
+              type="button"
+              onClick={() => void handleSync()}
+              disabled={syncing}
+              className="flex h-7 w-7 items-center justify-center rounded text-gray-600 dark:text-gray-300 hover:bg-gold-primary/10 hover:text-gold-primary disabled:cursor-not-allowed disabled:opacity-30"
+              title="Sync from database"
+              aria-label="Sync deck from its database"
+            >
+              <RefreshCw className={`h-4 w-4 ${syncing ? "animate-spin" : ""}`} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onRename(deck)}

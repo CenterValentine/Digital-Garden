@@ -27,6 +27,7 @@ import {
   resolveLegacyDeckId,
 } from "@/lib/domain/flashcards/legacy-compat";
 import { fileFlashcardMediaUnderDeck } from "@/lib/domain/flashcards/media-folder";
+import { syncStaleDataDecks } from "@/lib/domain/flashcards/from-data";
 
 // Sprint 6 changes:
 //  - POST: deckId is the source of truth. If the request only carries
@@ -127,14 +128,31 @@ export async function GET(request: NextRequest) {
     // when subtree mode is requested. resolveDescendantDeckIds returns
     // [] for a missing/foreign deck, which yields zero cards below.
     let deckClause: Prisma.FlashcardWhereInput = {};
+    let scopeDeckIds: string[] | null = null;
     if (deckIdFilter && includeDescendants) {
       const deckIds = await resolveDescendantDeckIds(
         session.user.id,
         deckIdFilter,
       );
       deckClause = { deckId: { in: deckIds } };
+      scopeDeckIds = deckIds;
     } else if (deckIdFilter) {
       deckClause = { deckId: deckIdFilter };
+      scopeDeckIds = [deckIdFilter];
+    }
+
+    // Auto-sync database-derived decks in scope BEFORE listing. This is
+    // the route the panel's browse list AND its Play button fetch from
+    // (Play pre-fetches cards here and hands them to the overlay — it
+    // never touches /queue), so without this hook a review session shows
+    // stale cards. Staleness-gated per link; best-effort.
+    try {
+      await syncStaleDataDecks(
+        session.user.id,
+        scopeDeckIds ? { deckIds: scopeDeckIds } : {},
+      );
+    } catch {
+      // Browsing must not block on sync.
     }
 
     const where: Prisma.FlashcardWhereInput = {

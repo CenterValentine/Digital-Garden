@@ -19,9 +19,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/lib/infrastructure/auth/middleware";
 import {
+  getDataDeckLinks,
   reconcileDataDeck,
   saveDataDeckLink,
 } from "@/lib/domain/flashcards/from-data";
+
+/**
+ * GET /api/flashcards/from-data — the caller's database→deck links.
+ * Powers the client-side link cache (state/data-deck-links-store.ts):
+ * dynamic "Create vs Sync" labels, the deck-row sync button, and the
+ * dialog's prefill.
+ */
+export async function GET() {
+  try {
+    const session = await requireAuth();
+    const links = await getDataDeckLinks(session.user.id);
+    return NextResponse.json({ success: true, data: links });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load deck links";
+    const status = message.includes("Authentication") ? 401 : 500;
+    return NextResponse.json(
+      {
+        success: false,
+        error: { code: status === 401 ? "UNAUTHORIZED" : "SERVER_ERROR", message },
+      },
+      { status },
+    );
+  }
+}
 
 interface FromDataBody {
   contentId?: string;
