@@ -457,8 +457,26 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     }
 
     // Folders: single click expands/collapses the WHOLE ROW (the chevron is a
-    // pure indicator — see getChevron). Double click opens in the main panel.
+    // pure indicator — see getChevron). Double click and press-and-hold open.
     //
+    // stopPropagation is what actually stops a folder opening on one click.
+    // react-arborist's DefaultRow wraps every node in
+    // `<div onClick={node.handleClick}>`, and node.handleClick runs
+    // `select(); activate();` unconditionally — that select fires the tree's
+    // onSelect, which is what opens content. This handler sits on a child div,
+    // so it runs first but the row's handler still fires unless we stop the
+    // event here. Omitting select() ourselves was never enough.
+    e.preventDefault();
+    e.stopPropagation();
+
+    // The click that ends a press-and-hold must not toggle: the hold already
+    // opened the folder, and toggling on release would make the folder jump
+    // as the user lets go.
+    if (suppressNextToggleRef.current) {
+      suppressNextToggleRef.current = false;
+      return;
+    }
+
     // `e.detail > 1` is the second click of a double-click: React fires click
     // twice before dblclick, so without this guard a double-click would toggle
     // twice and land back where it started — the folder would appear to stay
@@ -467,13 +485,18 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     node.toggle();
   };
 
-  // Double-click on a folder: navigate to it (open in the main panel).
+  // Double-click on a folder: open it in the main panel, leaving expansion
+  // exactly as it was.
   //
-  // Expansion is NOT touched here — single click owns expand/collapse, and
-  // handleClick's `e.detail > 1` guard has already let the first click of this
-  // double-click through, so the folder is left in whatever state that click
-  // produced. preventDefault + stopPropagation keep react-arborist's internal
-  // dblclick handler (which starts rename mode) and tree-level handlers out.
+  // The first click of this double-click already ran handleClick and toggled,
+  // so we toggle back. Without that, double-clicking an open folder would
+  // visibly collapse it on the way to opening — the folder snapping shut under
+  // the cursor reads as a glitch rather than a gesture. Reversing gives one
+  // rule that holds in both directions: click toggles, double-click opens and
+  // leaves expansion alone.
+  //
+  // preventDefault + stopPropagation keep react-arborist's internal dblclick
+  // handler (which starts rename mode) and tree-level handlers out.
   const handleDoubleClick = (e: React.MouseEvent) => {
     if (e.shiftKey) {
       e.preventDefault();
@@ -494,29 +517,56 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         }
         return;
       }
+      node.toggle();
       node.select();
     }
   };
 
-  // Handle context menu (right-click)
-  // Touch has no usable `contextmenu` event (iOS long-press raises the native
-  // callout instead), so a long press re-dispatches a synthetic contextmenu at
-  // the touch point — the same trick FileTree uses for its keyboard-driven
-  // create menu. It bubbles into handleContextMenu below, so the menu payload
-  // and all 33 actions stay in one place. Pairs with `touch-callout-none` on
-  // the row so Apple's callout doesn't cover our menu.
-  const longPressHandlers = useLongPress((x, y) => {
-    const target = document.elementFromPoint(x, y);
-    if (!target) return;
-    target.dispatchEvent(
-      new MouseEvent("contextmenu", {
-        bubbles: true,
-        cancelable: true,
-        clientX: x,
-        clientY: y,
-      }),
-    );
-  });
+  // Press and hold. One hook, two meanings, split by pointer type — a second
+  // useLongPress would mean two sets of pointer handlers competing for the
+  // same element, where the later spread silently wins.
+  //
+  // TOUCH → context menu. Touch has no usable `contextmenu` event (iOS
+  // long-press raises the native callout instead), so a long press
+  // re-dispatches a synthetic contextmenu at the touch point — the same trick
+  // FileTree uses for its keyboard-driven create menu. It bubbles into
+  // handleContextMenu below, so the menu payload and all 33 actions stay in
+  // one place. Pairs with `touch-callout-none` on the row so Apple's callout
+  // doesn't cover our menu.
+  //
+  // MOUSE/PEN on a folder → open in the main panel. Folders toggle on click,
+  // so holding is how you say "open" without a double-click's first click
+  // flipping the folder open or shut on the way. The release that ends the
+  // hold must not toggle, hence suppressNextToggleRef.
+  //
+  // Deliberately no arming hint: the picker tried one and it flashed on every
+  // ordinary folder click, which is why press-and-hold was pulled from there
+  // (2026-08-15). The gesture was never the problem; the affordance was.
+  const suppressNextToggleRef = useRef(false);
+
+  const longPressHandlers = useLongPress(
+    (x, y, pointerType) => {
+      if (pointerType !== "touch") {
+        // Files already open on a single click — nothing to add.
+        if (!isRowToggleFolder) return;
+        suppressNextToggleRef.current = true;
+        node.select();
+        return;
+      }
+
+      const target = document.elementFromPoint(x, y);
+      if (!target) return;
+      target.dispatchEvent(
+        new MouseEvent("contextmenu", {
+          bubbles: true,
+          cancelable: true,
+          clientX: x,
+          clientY: y,
+        }),
+      );
+    },
+    { pointerTypes: ["touch", "mouse", "pen"] },
+  );
 
   const handleContextMenu = (e: React.MouseEvent) => {
     // Modifier key = pass through to browser's native context menu
