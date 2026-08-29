@@ -19,10 +19,17 @@ import {
   resolveLegacyDeckId,
 } from "@/lib/domain/flashcards/legacy-compat";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const session = await requireAuth();
     const ownerId = session.user.id;
+    // This endpoint has always answered "what decks should I show?" — a deck
+    // browser question, where a deck holding no cards is noise. Callers asking
+    // the different question "does this deck already exist?" need the full
+    // list, because an invisible deck reads as a missing one. Opt-in so the
+    // browser's semantics are untouched. See the flatMap below. (#80)
+    const includeEmpty =
+      new URL(request.url).searchParams.get("includeEmpty") === "1";
 
     const [decks, totalCounts, newCounts, masteredHints] = await Promise.all([
       prisma.flashcardDeck.findMany({
@@ -86,8 +93,12 @@ export async function GET() {
     }
 
     const data: FlashcardDeckDto[] = decks.flatMap((deck) => {
-      const totals = totalByDeck.get(deck.id);
-      if (!totals || totals.count === 0) return [];
+      const totals = totalByDeck.get(deck.id) ?? {
+        count: 0,
+        reviewedCount: 0,
+        viewedCount: 0,
+      };
+      if (!includeEmpty && totals.count === 0) return [];
       const { category, subcategory } = deriveLegacyCategoryAndSubcategory({
         name: deck.name,
         parentDeckId: deck.parentDeckId,

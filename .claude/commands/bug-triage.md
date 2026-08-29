@@ -44,6 +44,14 @@ that the item is a design change rather than a defect — the behaviour it descr
 itself under revision, so planning a fix for it would be proposing to restore something
 that may not be wanted. Skip these exactly as you skip `hard-bug`.
 
+**If triage concludes a `bug`-only issue is actually working as designed, say so and
+recommend the `enhancement` label** rather than planning a fix or parking it behind a
+blocker. The tell is a deliberate policy in the code — a comment stating the behaviour
+is intentional, or the requested behaviour listed as an alternative the author
+considered. Such an issue will otherwise fail the eligibility gate every week forever,
+because no amount of re-checking turns a design decision into a defect. Put it under
+**Needs your close** with the citation, and let the owner relabel.
+
 **`hard-bug` is an explicit opt-out.** It means the owner has already looked at that
 issue and decided it is not a candidate for an automated plan — too subtle, too
 entangled, or something they intend to sit with themselves. Never plan one, and never
@@ -231,6 +239,16 @@ authorizes `/pr-closeout` to close the bug. A vague line makes a bug uncloseable
 
 **Blocked on.** Anything that stops this from being planned confidently. Omit the
 heading entirely when nothing blocks it.
+
+A blocker is a claim about the *bug*, not about your session, and `/bug-fix` re-checks
+it rather than taking it on faith. So it must name **the specific observation you are
+missing** and **why reading the code cannot supply it** — "needs a repro from the owner"
+alone is not enough; say what the repro would reveal that the source does not. Before
+writing one, read the handler, the call sites on both sides of the boundary, and any
+sibling component doing the same job correctly. If the answer is in the code, there is
+no blocker. Prefer a medium-confidence plan with a named uncertainty over a blocker:
+medium confidence is now attemptable, so a real blocker parks the bug for a week while a
+hedged plan still gets a reviewable PR.
 
 ## Owner-authorized actions
 
