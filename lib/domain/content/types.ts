@@ -158,6 +158,12 @@ export interface TreeNode {
    * every action that touches real content must route through this instead.
    */
   mirrorOf?: string;
+  /**
+   * Marks that same synthesized row as VIEW-ONLY. It cannot be a drag source,
+   * nothing may be stored under it, and a drop onto it forwards to the real
+   * folder — the projection never becomes a second home for content.
+   */
+  isShortcutMirror?: boolean;
 }
 
 // ============================================================

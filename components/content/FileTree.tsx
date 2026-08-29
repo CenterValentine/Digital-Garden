@@ -21,6 +21,10 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { clientLogger } from "@/lib/core/logger/client";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { expandReferences } from "@/lib/features/content/reference-group";
+import {
+  expandShortcutMirrors,
+  buildTreeIndex,
+} from "@/lib/features/content/shortcut-mirror";
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -271,10 +275,24 @@ export function FileTree({
   // Reference blocks are a DATA transform, not tree open-state: the chip
   // rewrites what `children` contains rather than asking react-arborist to
   // open anything, which is why references need no node of their own.
-  const treeData = useMemo(
-    () => expandReferences(data, expandedIds, referencesAtStartIds),
-    [data, expandedIds, referencesAtStartIds],
-  );
+  //
+  // Shortcut mirroring runs AFTER, over the result, for two reasons: the index
+  // it builds must see the same `children` react-arborist will, and a mirrored
+  // row then never has to reason about reference blocks. Both transforms
+  // preserve object identity when nothing changed — see their identity
+  // contracts — so this pair still re-renders no more rows than it must.
+  const treeData = useMemo(() => {
+    const withReferences = expandReferences(
+      data,
+      expandedIds,
+      referencesAtStartIds,
+    );
+    return expandShortcutMirrors(
+      withReferences,
+      expandedIds,
+      buildTreeIndex(withReferences),
+    );
+  }, [data, expandedIds, referencesAtStartIds]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {
