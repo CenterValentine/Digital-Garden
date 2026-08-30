@@ -38,6 +38,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLongPress } from "@/components/common/useLongPress";
 import { createPortal } from "react-dom";
 import {
   FileText,
@@ -923,10 +924,34 @@ function PickRow({
   const pick = () =>
     onPick({ id: row.id, title: row.title, contentType: row.contentType });
 
+  /**
+   * Press and hold to pick a container, matching the file tree's gesture.
+   *
+   * The tree teaches "hold to open" on exactly these rows; arriving in the
+   * picker and finding the gesture inert is the kind of inconsistency that
+   * makes a learned gesture feel unreliable everywhere. Here "open" means
+   * "pick", which is this surface's commit.
+   *
+   * All pointer types, unlike the tree: a long press there is already spoken
+   * for by the context menu on touch, and the picker has no context menu to
+   * compete with. No arming hint — a hint is what got press-and-hold pulled
+   * from this component in 2026-08-15, since it flashed on every ordinary
+   * folder click.
+   */
+  const suppressNextToggleRef = useRef(false);
+  const longPress = useLongPress(
+    () => {
+      if (disabled || !expandable) return;
+      suppressNextToggleRef.current = true;
+      pick();
+    },
+    { pointerTypes: ["touch", "mouse", "pen"] },
+  );
+
   const tooltip = disabled
     ? (disabledReason ?? "Not selectable here")
     : expandable
-      ? "Click to expand · Double-click to open"
+      ? "Click to expand · Double-click or hold to open"
       : "Click to open";
 
   return (
@@ -940,7 +965,15 @@ function PickRow({
       <button
         type="button"
         disabled={disabled}
+        {...longPress}
         onClick={() => {
+          // The click that ends a hold must not also toggle — the hold has
+          // already picked, and toggling on release makes the row move as the
+          // user lets go.
+          if (suppressNextToggleRef.current) {
+            suppressNextToggleRef.current = false;
+            return;
+          }
           if (expandable) {
             onToggle?.(row.id);
             return;
@@ -948,7 +981,13 @@ function PickRow({
           pick();
         }}
         onDoubleClick={() => {
-          if (expandable) pick();
+          // Reverse the first click's toggle, as the file tree does: without
+          // this a double-click expands the row on its way to picking it, so
+          // the list shifts under the cursor at the moment of commit.
+          if (expandable) {
+            onToggle?.(row.id);
+            pick();
+          }
         }}
         className={cn(
           "flex min-w-0 flex-1 items-center gap-2 text-left",
