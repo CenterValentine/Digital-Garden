@@ -44,6 +44,7 @@ import {
   ChevronRight as ChevronRightIcon,
   Sparkles,
   Volume2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -216,11 +217,22 @@ interface RowState {
   imageError?: string;
   /** This card carries (or will carry) a spoken clip. */
   isAudioCard?: boolean;
+  /**
+   * A clip is actually ATTACHED to this row. Distinct from `isAudioCard`,
+   * which only says the model tagged it: with per-card generation the two
+   * diverge constantly — one row can have audio while its neighbour does not —
+   * so the speaker indicator keys off this rather than off a batch-wide flag.
+   */
+  hasAudio?: boolean;
   /** Which side the clip sits on, and whether that side hides its text. */
   audioSide?: "front" | "back";
   audioHideText?: boolean;
   /** TTS generation failed for this card (still proposable as silent text). */
   audioError?: string;
+  /** Editable image prompt. Seeded from the model's suggestion. */
+  imagePromptDraft: string;
+  /** Caption/alt the image gate pairs with the generated picture. */
+  identifyLabel: string;
 }
 
 export function FlashcardCardProposalList({
@@ -270,8 +282,11 @@ export function FlashcardCardProposalList({
         frontImageUrl: card.frontImageUrl ?? null,
         imageError: card.imageError,
         isAudioCard: Boolean(card.audio),
+        hasAudio: false,
         audioSide: card.audio?.side,
         audioHideText: card.audio?.hideText,
+        imagePromptDraft: card.imagePrompt ?? "",
+        identifyLabel: card.identifyLabel ?? card.front,
         audioError: card.audioError,
       };
     });
@@ -280,59 +295,77 @@ export function FlashcardCardProposalList({
   const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // Image-card proposals arrive as DRAFTS (pendingImageGen) — images are
-  // generated client-side after the provider window (ImageCardGenGate). The
-  // gate is shown until generation completes; "Add selected" is gated on it.
-  const needsImageGen = Boolean(
-    payload.imageCards && payload.cards.some((c) => c.pendingImageGen),
+  // generated client-side after the provider window (ImageCardGenGate).
+  //
+  // Every card can carry an illustration, for the same reason every card can
+  // carry a pronunciation: it is a property of the card, not of how the
+  // proposal happened to be phrased. Which rows are still MISSING one is a
+  // question about live row state, so it is answered by batchImagePlan /
+  // batchAudioPlan below rather than by a flag computed from the payload.
+  // ── Generation requests ──────────────────────────────────────────────
+  // A request is the SUBSET of rows a generation is running for: the whole
+  // batch from the footer button, or a single row from its editor. Both gates
+  // already accept an arbitrary card list, so one shape serves both — and
+  // carrying the row `index` on every entry is what lets a single-card result
+  // land on the right row. The image path previously mapped results
+  // positionally over all rows, which is correct only when the collection IS
+  // every row; per-card generation is what turns that shortcut into a bug.
+  type AudioRequestEntry = {
+    index: number;
+    side: "front" | "back";
+    hideText: boolean;
+    term: string;
+    directed: boolean;
+  };
+  type ImageRequestEntry = {
+    index: number;
+    imagePrompt: string;
+    identifyLabel: string;
+  };
+  const [audioRequest, setAudioRequest] = useState<AudioRequestEntry[] | null>(
+    null,
   );
-  const imageDrafts = useMemo(
-    () =>
-      payload.cards.map((c) => ({
-        imagePrompt: c.imagePrompt ?? "",
-        identifyLabel: c.identifyLabel ?? c.front,
-      })),
-    [payload.cards],
-  );
-  // A proposal whose image cards were already committed (persisted added
-  // indices → every row starts "created") is done — don't offer to regenerate.
-  const allInitiallyCreated = useMemo(
-    () =>
-      initialRows.length > 0 &&
-      initialRows.every((r) => r.status.status === "created"),
-    [initialRows],
-  );
-  const [imageGenDone, setImageGenDone] = useState(
-    !needsImageGen || allInitiallyCreated,
+  const [imageRequest, setImageRequest] = useState<ImageRequestEntry[] | null>(
+    null,
   );
   // Image generation is EXPLICIT, never automatic. Generated images aren't
   // written back into the persisted chat payload, so without this gate every
   // ungenerated proposal in chat history would re-fire (billable) generation on
   // each page load. The gate (and its provider window) mounts only after the
   // user clicks "Generate" — on reload the button just sits dormant.
-  const [imageGenStarted, setImageGenStarted] = useState(false);
-
-  // Apply generated images onto the draft rows (by index). Failed cards get an
-  // imageError and are unchecked so the batch commits only the cards that have
-  // a real image front.
+  // Apply generated images onto the rows named by the request. Results align
+  // with the request's own order, and each entry carries its row index — so a
+  // one-card generation lands on that card and leaves every other row alone.
+  // A failed card keeps its text front and is unchecked, so the batch commits
+  // only cards that actually got an image.
   const applyImageResults = useCallback(
-    (results: ImageGenResult[]) => {
-      setRows((prev) =>
-        prev.map((row, i) => {
-          const r = results[i];
-          if (!r) return row;
+    (results: ImageGenResult[], plan: ImageRequestEntry[]) => {
+      setRows((prev) => {
+        const next = [...prev];
+        plan.forEach((p, k) => {
+          const r = results[k];
+          if (!r) return;
+          const row = next[p.index];
+          if (!row) return;
           if (r.error || !r.frontContent) {
-            return { ...row, checked: false, imageError: r.error ?? "No image returned" };
+            next[p.index] = {
+              ...row,
+              checked: false,
+              imageError: r.error ?? "No image returned",
+            };
+            return;
           }
-          return {
+          next[p.index] = {
             ...row,
             frontContent: r.frontContent as JSONContent,
             frontImageUrl: r.frontImageUrl ?? null,
             isFrontRichText: true,
             imageError: undefined,
           };
-        }),
-      );
-      setImageGenDone(true);
+        });
+        return next;
+      });
+      setImageRequest(null);
     },
     [],
   );
@@ -376,37 +409,60 @@ export function FlashcardCardProposalList({
         .filter((p) => p.term.length > 0),
     [payload.cards],
   );
-  const needsAudioGen = audioPlan.length > 0;
-  const audioDrafts = useMemo(
-    () =>
-      audioPlan.map((p) => ({
+  const audioDraftsForPlan = useCallback(
+    (plan: AudioRequestEntry[]) =>
+      plan.map((p) => ({
         term: p.term,
         language: undefined as string | undefined,
       })),
+    [],
+  );
+
+  // Generation is EXPLICIT, never automatic — generated media isn't written
+  // back into the persisted chat payload, so an automatic run would re-fire
+  // billable TTS/image generation every time chat history was replayed. A
+  // request only ever exists because someone clicked. That property is what
+  // the old `*GenStarted` booleans protected; the request state protects it
+  // the same way, while also recording WHICH rows were asked for.
+  //
+  // Neither medium gates committing any more. The commit button is live from
+  // the start and only goes dark while a generation is actually running.
+  const audioGenInFlight = audioRequest !== null;
+  const imageGenInFlight = imageRequest !== null;
+  const genInFlight = audioGenInFlight || imageGenInFlight;
+
+  // What the FOOTER buttons target: every row still missing that medium and
+  // not already committed. Derived from live row state rather than from the
+  // payload, so a batch run after some per-card runs only covers what is left
+  // — and the button count is an honest statement of what will be spent.
+  const batchAudioPlan = useMemo(
+    () =>
+      audioPlan.filter((p) => {
+        const row = rows[p.index];
+        return Boolean(row) && !row.hasAudio && row.status.status !== "created";
+      }),
+    [audioPlan, rows],
+  );
+  // Row index → its audio plan entry, for the per-card button in the editor.
+  const audioPlanByIndex = useMemo(
+    () => new Map(audioPlan.map((p) => [p.index, p])),
     [audioPlan],
   );
-  const [audioGenDone, setAudioGenDone] = useState(
-    !needsAudioGen || allInitiallyCreated,
+  const batchImagePlan = useMemo(
+    () =>
+      rows.flatMap((row, index) =>
+        row.frontImageUrl || row.status.status === "created"
+          ? []
+          : [
+              {
+                index,
+                imagePrompt: row.imagePromptDraft.trim() || row.identifyLabel,
+                identifyLabel: row.identifyLabel,
+              },
+            ],
+      ),
+    [rows],
   );
-  // TTS generation is EXPLICIT, never automatic — same reasoning as images:
-  // generated audio isn't written back into the persisted chat payload, so the
-  // gate must only mount after the user clicks "Generate" (otherwise replaying
-  // chat history would re-fire billable TTS on each load).
-  const [audioGenStarted, setAudioGenStarted] = useState(false);
-
-  // Pronunciation is OPTIONAL, so it must not be a gate. Committing used to be
-  // blocked on `audioGenDone`, which starts false whenever audio is available —
-  // meaning the user had to answer a banner ("Skip" or "Generate") before the
-  // commit button would even light up. Two steps for what is one decision:
-  // "add these cards", with "…and speak them" as a refinement of it.
-  //
-  // Now the commit button is live from the start and only goes dark while a
-  // generation the user actually asked for is in flight. `audioGenDone` keeps
-  // its other job — driving the per-card speaker indicator — it just no longer
-  // decides whether the batch can be committed.
-  const audioGenInFlight = audioGenStarted && !audioGenDone;
-  // Offer generation only while it is still possible and not already running.
-  const canGenerateAudio = needsAudioGen && !audioGenDone && !audioGenStarted;
 
   // Apply generated audio onto the draft rows. Results align with audioPlan
   // (same order). Placement is per-card: front-side audio rebuilds the front as
@@ -415,10 +471,10 @@ export function FlashcardCardProposalList({
   // Either way it autoplays when that side is shown. Failed cards get an
   // audioError and are unchecked so the batch commits only cards that got audio.
   const applyAudioResults = useCallback(
-    (results: AudioGenResult[]) => {
+    (results: AudioGenResult[], plan: AudioRequestEntry[]) => {
       setRows((prev) => {
         const next = [...prev];
-        audioPlan.forEach((p, k) => {
+        plan.forEach((p, k) => {
           const r = results[k];
           if (!r) return;
           const row = next[p.index];
@@ -426,6 +482,10 @@ export function FlashcardCardProposalList({
             next[p.index] = {
               ...row,
               checked: false,
+              // Mark it an audio card even on failure, otherwise the row's
+              // indicator block is skipped entirely and the error is invisible
+              // on a card the model never tagged.
+              isAudioCard: true,
               audioError: r.error ?? "No audio returned",
             };
             return;
@@ -443,6 +503,7 @@ export function FlashcardCardProposalList({
               ),
               isFrontRichText: true,
               isAudioCard: true,
+              hasAudio: true,
               audioError: undefined,
             };
           } else if (p.side === "front") {
@@ -459,6 +520,7 @@ export function FlashcardCardProposalList({
               ),
               isFrontRichText: true,
               isAudioCard: true,
+              hasAudio: true,
               audioError: undefined,
             };
           } else {
@@ -471,15 +533,16 @@ export function FlashcardCardProposalList({
                 { autoplayOnFlip: true },
               ),
               isAudioCard: true,
+              hasAudio: true,
               audioError: undefined,
             };
           }
         });
         return next;
       });
-      setAudioGenDone(true);
+      setAudioRequest(null);
     },
-    [audioPlan],
+    [],
   );
 
   // Editable deck path — Stage 4. The user can retarget the cards to
@@ -909,49 +972,29 @@ export function FlashcardCardProposalList({
       )}
 
       {/*
-        Identification-image cards. Generation is opt-in: a dormant prompt
-        until the user clicks Generate (so chat history never auto-spends on
-        image generation), then the provider window / countdown takes over.
+        Both media gates render only while a generation the user asked for is
+        running, and each is driven by its request — the subset of rows that
+        generation is for. The dormant "N cards need an image" banner is gone
+        for the same reason the audio one went: it announced work the user had
+        not asked for and blocked the commit until it was answered. The opt-in
+        now lives beside the commit button (whole batch) and inside each row's
+        editor (that card alone).
       */}
-      {needsImageGen && !imageGenDone && (
-        imageGenStarted ? (
-          <ImageCardGenGate cards={imageDrafts} onComplete={applyImageResults} />
-        ) : (
-          <div className="mx-1 mb-2 rounded-lg border border-amber-400/25 bg-amber-500/[0.06] px-3 py-2.5 text-[12px] text-amber-900 dark:text-amber-200">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 shrink-0" />
-                <span>
-                  {imageDrafts.length} card
-                  {imageDrafts.length === 1 ? "" : "s"} need an AI-generated
-                  front image.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setImageGenStarted(true)}
-                className="rounded-md bg-amber-600 px-3 py-1.5 font-medium text-white transition-colors hover:bg-amber-700 dark:bg-amber-500 dark:text-amber-950 dark:hover:bg-amber-400"
-              >
-                Generate {imageDrafts.length} image
-                {imageDrafts.length === 1 ? "" : "s"}
-              </button>
-            </div>
-            <p className="mt-1 text-[11px] opacity-70">
-              Uses your image provider — won&apos;t start until you click.
-            </p>
-          </div>
-        )
+      {imageRequest && (
+        <ImageCardGenGate
+          cards={imageRequest.map((p) => ({
+            imagePrompt: p.imagePrompt,
+            identifyLabel: p.identifyLabel,
+          }))}
+          onComplete={(results) => applyImageResults(results, imageRequest)}
+        />
       )}
 
-      {/*
-        Pronunciation cards (audio twin of the image gate above). Generation
-        stays opt-in — chat history must never auto-spend on TTS — but the
-        opt-in now lives on a button beside "Create deck & add" rather than in a
-        banner that had to be dismissed first. Only the progress gate renders
-        here, and only while generation is actually running.
-      */}
-      {audioGenInFlight && (
-        <AudioCardGenGate cards={audioDrafts} onComplete={applyAudioResults} />
+      {audioRequest && (
+        <AudioCardGenGate
+          cards={audioDraftsForPlan(audioRequest)}
+          onComplete={(results) => applyAudioResults(results, audioRequest)}
+        />
       )}
 
       {/*
@@ -1042,7 +1085,7 @@ export function FlashcardCardProposalList({
                     >
                       <AlertTriangle className="h-4 w-4" />
                     </span>
-                  ) : audioGenDone ? (
+                  ) : row.hasAudio ? (
                     <span
                       title="Pronunciation plays on flip"
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-amber-400/20 text-amber-600 dark:text-amber-400"
@@ -1186,6 +1229,68 @@ export function FlashcardCardProposalList({
                     ariaLabel={`Card ${i + 1} back`}
                     compact
                   />
+                  {/*
+                    Per-card media. The same two generators the footer runs,
+                    scoped to this row — both gates already accept an arbitrary
+                    card list, so a one-entry request is an ordinary call, not a
+                    special case. Hidden once the card is committed.
+                  */}
+                  {!isCreated && (
+                    <div className="space-y-1.5 rounded border border-amber-400/20 bg-amber-500/[0.03] p-1.5 dark:bg-amber-500/[0.05]">
+                      <div className="text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                        Image prompt
+                      </div>
+                      <input
+                        type="text"
+                        value={row.imagePromptDraft}
+                        onChange={(e) =>
+                          updateRow(i, { imagePromptDraft: e.target.value })
+                        }
+                        disabled={isCreating || genInFlight}
+                        placeholder={`Describe a picture for “${row.identifyLabel}”`}
+                        aria-label={`Card ${i + 1} image prompt`}
+                        className="w-full rounded border border-black/10 bg-white/70 px-2 py-1 text-[12px] outline-none focus:border-amber-500 disabled:opacity-60 dark:border-white/10 dark:bg-white/5"
+                      />
+                      <div className="flex flex-wrap gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setImageRequest([
+                              {
+                                index: i,
+                                imagePrompt:
+                                  row.imagePromptDraft.trim() ||
+                                  row.identifyLabel,
+                                identifyLabel: row.identifyLabel,
+                              },
+                            ])
+                          }
+                          disabled={isCreating || genInFlight}
+                          className="inline-flex items-center gap-1 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300"
+                        >
+                          <ImageIcon className="h-3 w-3" />
+                          {row.frontImageUrl
+                            ? "Regenerate image"
+                            : "Generate image"}
+                        </button>
+                        {audioPlanByIndex.has(i) && (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAudioRequest([audioPlanByIndex.get(i)!])
+                            }
+                            disabled={isCreating || genInFlight}
+                            className="inline-flex items-center gap-1 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300"
+                          >
+                            <Volume2 className="h-3 w-3" />
+                            {row.hasAudio
+                              ? "Regenerate pronunciation"
+                              : "Generate pronunciation"}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   {row.imageError && (
                     <div className="flex items-start gap-1.5 rounded bg-red-500/10 px-1.5 py-1 text-[11px] text-red-700 dark:text-red-300">
                       <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
@@ -1240,16 +1345,31 @@ export function FlashcardCardProposalList({
             it. Sits immediately left of "Create deck & add" so the pair reads
             as one choice: speak them first, or just add them.
           */}
-          {canGenerateAudio && !allDone && (
+          {/* Batch actions target every row still missing that medium. */}
+          {!allDone && batchAudioPlan.length > 0 && (
             <button
               type="button"
-              onClick={() => setAudioGenStarted(true)}
+              onClick={() => setAudioRequest(batchAudioPlan)}
+              disabled={genInFlight}
               title="Synthesize spoken pronunciation with your speech provider — optional"
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Generate {audioDrafts.length} pronunciation
-              {audioDrafts.length === 1 ? "" : "s"}
+              Generate {batchAudioPlan.length} pronunciation
+              {batchAudioPlan.length === 1 ? "" : "s"}
+            </button>
+          )}
+          {!allDone && batchImagePlan.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setImageRequest(batchImagePlan)}
+              disabled={genInFlight}
+              title="Generate a front image with your image provider — optional"
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+            >
+              <ImageIcon className="h-3.5 w-3.5" />
+              Generate {batchImagePlan.length} image
+              {batchImagePlan.length === 1 ? "" : "s"}
             </button>
           )}
           <button
@@ -1260,12 +1380,11 @@ export function FlashcardCardProposalList({
               bulkSubmitting ||
               allDone ||
               !effectivePath ||
-              !imageGenDone ||
-              audioGenInFlight
+              genInFlight
             }
             title={
-              !imageGenDone
-                ? "Waiting for image generation…"
+              imageGenInFlight
+                ? "Generating images…"
                 : audioGenInFlight
                   ? "Generating pronunciations…"
                   : !effectivePath
