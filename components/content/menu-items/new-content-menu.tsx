@@ -19,7 +19,7 @@ import {
   Code,
   Braces,
   ExternalLink,
-  Link2,
+  ArrowUpRight,
   MessagesSquare,
   BarChart3,
   Users,
@@ -247,11 +247,17 @@ export function getNewContentMenuItems(
 
   // Shortcut — sits next to External Link because both point at something
   // that lives elsewhere; one outside the garden, one inside it.
+  //
+  // Same glyph the tree draws on a shortcut row's corner badge, deliberately:
+  // one mark for "this is a pointer" means the menu entry and the row it
+  // produces teach each other. The bent arrow is the OS alias idiom (Finder's
+  // alias badge, Windows' shortcut overlay). Not a chain link — that already
+  // means External Link one item above, and referenced content in row badges.
   if (callbacks.onCreateShortcut) {
     items.push({
       id: "new-shortcut",
       label: "Shortcut…",
-      icon: <Link2 className="h-4 w-4" />,
+      icon: <ArrowUpRight className="h-4 w-4" />,
       title: "Graft a shortcut to content that lives elsewhere",
       onClick: () => callbacks.onCreateShortcut?.(normalizedParentId),
       disabled: !callbacks.onCreateShortcut,
