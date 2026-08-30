@@ -24,7 +24,7 @@ interface FileTreeWithDropZoneProps {
   }) => Promise<void>;
   onSelect?: (nodes: TreeNode[]) => void;
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
   onDownload?: (ids: string[]) => Promise<void>;

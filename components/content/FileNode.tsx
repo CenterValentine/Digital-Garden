@@ -99,7 +99,7 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (
     parentId: string | null,
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow"
   ) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
@@ -751,6 +751,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         } : undefined,
         onCreateExternal: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           await onCreate(parentId, "external");
+        } : undefined,
+        onCreateShortcut: onCreate && !isPeopleNode ? async (parentId: string | null) => {
+          await onCreate(parentId, "shortcut");
         } : undefined,
         // JSON was silently unreachable from the context menu: the shared
         // menu hides items whose callback is absent, and only the header

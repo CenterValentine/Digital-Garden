@@ -19,6 +19,7 @@ import {
   Code,
   Braces,
   ExternalLink,
+  Link2,
   MessagesSquare,
   BarChart3,
   Users,
@@ -36,6 +37,8 @@ export interface NewContentMenuItem {
   id: string;
   label: string;
   icon: ReactNode;
+  /** Hover tooltip. Rendered by the header menu; the context menu has no slot. */
+  title?: string;
   shortcut?: string;
   onClick?: () => void; // Optional when submenu is present
   disabled?: boolean;
@@ -72,6 +75,12 @@ export interface NewContentCallbacks {
   onCreateSpreadsheet?: (parentId: string | null) => void | Promise<void>;
   onCreateJson?: (parentId: string | null) => void | Promise<void>;
   onCreateExternal?: (parentId: string | null) => void | Promise<void>;
+  /**
+   * Opens the target picker. Creation happens on pick, not here — a shortcut
+   * needs something to point at before it can exist, so it takes the same
+   * dialog-first fork as External Link rather than the inline temp-node path.
+   */
+  onCreateShortcut?: (parentId: string | null) => void | Promise<void>;
   onCreateChat?: (parentId: string | null) => void | Promise<void>;
   onAddPeopleTarget?: (parentId: string | null) => void | Promise<void>;
   // NEW: Separate callbacks for each visualization engine
@@ -233,6 +242,19 @@ export function getNewContentMenuItems(
       icon: <ExternalLink className="h-4 w-4" />,
       onClick: () => callbacks.onCreateExternal?.(normalizedParentId),
       disabled: !callbacks.onCreateExternal,
+    });
+  }
+
+  // Shortcut — sits next to External Link because both point at something
+  // that lives elsewhere; one outside the garden, one inside it.
+  if (callbacks.onCreateShortcut) {
+    items.push({
+      id: "new-shortcut",
+      label: "Shortcut…",
+      icon: <Link2 className="h-4 w-4" />,
+      title: "Graft a shortcut to content that lives elsewhere",
+      onClick: () => callbacks.onCreateShortcut?.(normalizedParentId),
+      disabled: !callbacks.onCreateShortcut,
     });
   }
 

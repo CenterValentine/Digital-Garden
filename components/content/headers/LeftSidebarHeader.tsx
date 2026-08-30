@@ -29,6 +29,7 @@ interface LeftSidebarHeaderProps {
   onCreateHtml?: () => void;
   onCreateJson?: () => void;
   onCreateExternal?: () => void;
+  onCreateShortcut?: () => void;
   // Visualization engine-specific creators
   onCreateVisualizationMermaid?: () => void;
   onCreateVisualizationExcalidraw?: () => void;
@@ -56,6 +57,7 @@ export function LeftSidebarHeader({
   onCreateHtml,
   onCreateJson,
   onCreateExternal,
+  onCreateShortcut,
   onCreateVisualizationMermaid,
   onCreateVisualizationExcalidraw,
   onCreateVisualizationDiagramsNet,
@@ -374,6 +376,7 @@ export function LeftSidebarHeader({
             onCreateHtml={onCreateHtml ? () => onCreateHtml() : undefined}
             onCreateJson={onCreateJson ? () => onCreateJson() : undefined}
             onCreateExternal={onCreateExternal ? () => onCreateExternal() : undefined}
+            onCreateShortcut={onCreateShortcut ? () => onCreateShortcut() : undefined}
             onCreateVisualizationMermaid={onCreateVisualizationMermaid ? () => onCreateVisualizationMermaid() : undefined}
             onCreateVisualizationExcalidraw={onCreateVisualizationExcalidraw ? () => onCreateVisualizationExcalidraw() : undefined}
             onCreateVisualizationDiagramsNet={onCreateVisualizationDiagramsNet ? () => onCreateVisualizationDiagramsNet() : undefined}

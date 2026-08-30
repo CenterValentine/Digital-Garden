@@ -51,7 +51,7 @@ export function LeftSidebar() {
   const ExtensionPanel = useExtensionLeftSidebarPanel(activeView);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [createTrigger, setCreateTrigger] = useState<{
-    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
     dataMode?: "query"; // For data type — query databases (plan Phase 3)
@@ -169,6 +169,10 @@ export function LeftSidebar() {
 
   const handleCreateExternal = useCallback(() => {
     setCreateTrigger({ type: "external", timestamp: Date.now() });
+  }, []);
+
+  const handleCreateShortcut = useCallback(() => {
+    setCreateTrigger({ type: "shortcut", timestamp: Date.now() });
   }, []);
 
   // Phase 2: Visualization engine-specific handlers
@@ -313,6 +317,7 @@ export function LeftSidebar() {
           onCreateHtml={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateHtml}
           onCreateJson={activeView === PEOPLE_VIEW_KEY ? handleCreatePeopleJson : handleCreateJson}
           onCreateExternal={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateExternal}
+          onCreateShortcut={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateShortcut}
           onCreateVisualizationMermaid={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationMermaid}
           onCreateVisualizationExcalidraw={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationExcalidraw}
           onCreateVisualizationDiagramsNet={activeView === PEOPLE_VIEW_KEY ? undefined : handleCreateVisualizationDiagramsNet}
