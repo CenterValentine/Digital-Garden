@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   Edit,
   Trash2,
+  Unlink,
   Copy,
   Scissors,
   Star,
@@ -99,6 +100,16 @@ export interface FileTreeContext {
      * row holding nothing but references has nothing to reorder.
      */
     hasPrimaryChildren?: boolean;
+    /** This row is a shortcut (a pointer), not content of its own. */
+    isShortcut?: boolean;
+    /** This row is a view-only projection inside an expanded folder-shortcut. */
+    isShortcutMirror?: boolean;
+    /** For a mirror row, the real ContentNode id it stands for. */
+    mirrorOf?: string | null;
+    shortcutTargetId?: string | null;
+    shortcutTargetTitle?: string | null;
+    shortcutTargetContentType?: string | null;
+    shortcutBroken?: boolean;
     externalUrl?: string; // Phase 2: External link URL
     file?: { mimeType?: string } | null; // For supportsCustomIcon check
     isPlaybook?: boolean; // v3.6: note/folder already marked as a playbook
@@ -882,16 +893,28 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
   // Section 7: Destructive actions
   if (selectedIds.length > 0) {
     const itemLabel = isMultiSelection ? `${selectedIds.length} items` : "item";
+    // Removing a shortcut deletes a pointer, not content — the target is
+    // untouched. Saying "Delete" beside the target's own name reads as an
+    // offer to destroy that content, which is the opposite of what happens.
+    const removesOnlyAShortcut = !isMultiSelection && clickedNode?.isShortcut;
     sections.push({
       actions: [
         {
           id: "delete",
-          label: `Delete ${itemLabel}`,
-          icon: <Trash2 className="h-4 w-4" />,
+          label: removesOnlyAShortcut
+            ? "Remove Shortcut"
+            : `Delete ${itemLabel}`,
+          icon: removesOnlyAShortcut ? (
+            <Unlink className="h-4 w-4" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          ),
           shortcut: "D",
           onClick: async () => await onDelete?.(selectedIds),
           disabled: !onDelete,
-          destructive: true,
+          // Not destructive styling: nothing is lost, and the red treatment is
+          // what makes this read as dangerous when it is not.
+          destructive: !removesOnlyAShortcut,
         },
       ],
     });

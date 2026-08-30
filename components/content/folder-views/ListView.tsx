@@ -8,7 +8,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Folder, FileText, File as FileIcon, Code, FileCode, ExternalLink } from "lucide-react";
+import { Folder, FileText, File as FileIcon, Code, FileCode, ExternalLink, Table, MessageCircle, BarChart3, Target, GitBranch, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 import { getSurfaceStyles } from "@/lib/design/system";
 import type { FolderViewProps } from "./FolderViewContainer";
@@ -105,6 +105,18 @@ export function ListView({
         return <FileCode className="h-4 w-4" />;
       case "external":
         return <ExternalLink className="h-4 w-4" />;
+      case "data":
+        return <Table className="h-4 w-4" />;
+      case "chat":
+        return <MessageCircle className="h-4 w-4" />;
+      case "visualization":
+        return <BarChart3 className="h-4 w-4" />;
+      case "hope":
+        return <Target className="h-4 w-4" />;
+      case "workflow":
+        return <GitBranch className="h-4 w-4" />;
+      case "shortcut":
+        return <ArrowUpRight className="h-4 w-4" />;
       default:
         return <FileText className="h-4 w-4" />;
     }

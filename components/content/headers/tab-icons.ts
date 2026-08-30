@@ -1,12 +1,16 @@
 import {
+  ArrowUpRight,
+  BarChart3,
   ExternalLink,
   File,
   FileCode,
   FileText,
   Folder,
+  GitBranch,
   MessageCircle,
   MessagesSquare,
   Table,
+  Target,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -35,6 +39,14 @@ export function getTabIcon(contentType: string | null): LucideIcon {
       return MessagesSquare;
     case "data":
       return Table;
+    case "visualization":
+      return BarChart3;
+    case "hope":
+      return Target;
+    case "workflow":
+      return GitBranch;
+    case "shortcut":
+      return ArrowUpRight;
     default:
       return File;
   }

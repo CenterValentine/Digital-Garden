@@ -745,6 +745,15 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // Gates the placement entry the same way the chip's arrow is gated,
           // so the menu never offers a reorder the row can't show.
           hasPrimaryChildren,
+          // Shortcut/mirror shape, so the menu can offer removal rather than
+          // deletion, and can withhold destructive actions from projections.
+          isShortcut,
+          isShortcutMirror: isMirrorRow,
+          mirrorOf: data.mirrorOf ?? null,
+          shortcutTargetId: shortcut?.targetId ?? null,
+          shortcutTargetTitle: shortcut?.targetTitle ?? null,
+          shortcutTargetContentType: shortcut?.targetContentType ?? null,
+          shortcutBroken,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
           isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark

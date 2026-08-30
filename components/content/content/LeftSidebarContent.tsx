@@ -2187,6 +2187,22 @@ ${workbenchWarning}`
       }
     }
 
+    // Removing a shortcut destroys nothing: it is a pointer, its target is
+    // untouched, and neither delete cascade in the API can reach anything from
+    // it (both walk ownedByNoteId / ContentLink, which a shortcut never has).
+    // So a shortcut-only removal skips the dialog entirely — a "move to trash"
+    // warning naming the target folder actively misreports what will happen.
+    //
+    // A MIXED selection still confirms, with the shortcuts counted in the
+    // total: the real content in it is what the warning is for.
+    if (
+      nodesToDelete.length > 0 &&
+      nodesToDelete.every((node) => node.contentType === "shortcut")
+    ) {
+      await handleDeleteConfirmed(ids);
+      return;
+    }
+
     // Show confirmation dialog with appropriate message
     setDeleteConfirm({
       ids,
