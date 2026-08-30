@@ -43,6 +43,7 @@ import {
   type RowPageCursor,
   DEFAULT_ROW_PAGE_SIZE,
 } from "@/lib/domain/data";
+import { parseContentQuery } from "./query-mode";
 
 // ── Row shape returned to callers ────────────────────────────────────────
 
@@ -125,6 +126,12 @@ export async function loadTable(
     contentId: payload.contentId,
     title: payload.content.title,
     mode: payload.mode as DataTable["mode"],
+    // Honor the DataTable.query contract ("present when mode === 'query'").
+    // Consumers that branch on table.query (CSV export, flashcards
+    // from-data) silently saw zero rows for query tables without this.
+    ...(payload.mode === "query"
+      ? { query: parseContentQuery(payload.source) }
+      : {}),
     description: payload.description,
     defaultViewId: payload.defaultViewId,
     rowCount: payload.rowCount,

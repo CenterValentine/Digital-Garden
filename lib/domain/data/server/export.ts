@@ -53,7 +53,14 @@ function csvEscape(value: string): string {
   return value;
 }
 
-function cellCsvValue(row: DataRow, column: DataColumn): string {
+/**
+ * Display text for one cell, resolved through the hydrated read-model:
+ * relations/contentLinks/files as linked titles, person as display name,
+ * lookup/rollup as computed values, everything else via cellToText.
+ * Shared beyond CSV: POST /api/flashcards/from-data uses the same
+ * extraction to turn two columns into card fronts/backs.
+ */
+export function cellDisplayValue(row: DataRow, column: DataColumn): string {
   switch (column.type) {
     case "relation":
       return (row.links?.[column.id] ?? [])
@@ -119,7 +126,7 @@ export async function exportDatabaseCsv(
 
   const header = columns.map((c) => csvEscape(c.name)).join(",");
   const lines = rows.map((row) =>
-    columns.map((c) => csvEscape(cellCsvValue(row, c))).join(",")
+    columns.map((c) => csvEscape(cellDisplayValue(row, c))).join(",")
   );
   const csv = [header, ...lines].join("\r\n") + "\r\n";
 

@@ -126,8 +126,22 @@ export async function ensureDeckPath(
     currentPath = currentPath ? `${currentPath}/${segment}` : segment;
     let deck = await client.flashcardDeck.findUnique({
       where: { ownerId_path: { ownerId, path: currentPath } },
-      select: { id: true },
+      select: { id: true, deletedAt: true },
     });
+    if (deck?.deletedAt) {
+      // A soft-deleted deck still owns its (ownerId, path) unique slot.
+      // The caller is explicitly filing content at this path, so revive
+      // the tombstone — silently reusing it dead files cards into a deck
+      // no list shows (delete-deck-then-reconvert did exactly that).
+      // Cascade-deleted cards stay deleted; the deck comes back empty.
+      // Automatic paths never get here: sync looks decks up by id with
+      // deletedAt:null and prunes instead, so only an explicit path-
+      // addressed create resurrects.
+      await client.flashcardDeck.update({
+        where: { id: deck.id },
+        data: { deletedAt: null },
+      });
+    }
     if (!deck) {
       // Derive a display name from the slug. Kebab → space + title.
       const name = segment
@@ -135,7 +149,7 @@ export async function ensureDeckPath(
         .filter(Boolean)
         .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
         .join(" ");
-      deck = await client.flashcardDeck.create({
+      const created = await client.flashcardDeck.create({
         data: {
           ownerId,
           name,
@@ -145,6 +159,7 @@ export async function ensureDeckPath(
         },
         select: { id: true },
       });
+      deck = { id: created.id, deletedAt: null };
     }
     currentParentId = deck.id;
     currentDeckId = deck.id;

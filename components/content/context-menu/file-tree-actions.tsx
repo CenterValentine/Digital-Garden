@@ -39,10 +39,17 @@ import {
   BookUp,
   BookMarked,
   BookMinus,
+  Layers,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useImportSkillStore } from "@/state/import-skill-store";
 import { usePlaybookDialogStore } from "@/state/playbook-dialog-store";
+import { useDataFlashcardsDialogStore } from "@/state/data-flashcards-dialog-store";
+import {
+  findTableLink,
+  useDataFlashcardsLinksStore,
+} from "@/state/data-flashcards-links-store";
+import { FLASHCARDS_EXTENSION_ID } from "@/extensions/flashcards/manifest";
 import type { ContextMenuActionProvider, ContextMenuSection, ContextMenuAction } from "./types";
 import {
   getNewContentMenuItems,
@@ -407,6 +414,46 @@ export const fileTreeActionProvider: ContextMenuActionProvider = (ctx) => {
     if (playbookActions.length > 0) {
       sections.push({ title: "Playbook", actions: playbookActions });
     }
+  }
+
+  // --- Database → flashcards. First contentType === "data" branch in this
+  // menu: converts two columns into a deck (front/back picked in the dialog).
+  // Extension-gated via the activation store (manifest default on), same
+  // idiom as the studio action below — this provider is a pure function,
+  // so the hook form isn't available.
+  const flashcardsEnabled =
+    useExtensionActivationStore.getState().overrides[FLASHCARDS_EXTENSION_ID] ??
+    true;
+  if (
+    flashcardsEnabled &&
+    isSingleSelection &&
+    clickedId &&
+    clickedNode &&
+    clickedNode.contentType === "data"
+  ) {
+    const dataTitle = clickedNode.title;
+    const dataContentId = clickedId;
+    // Label tracks reality: a table already linked to a deck gets "Sync",
+    // a fresh one gets "Create". The link cache loads lazily — first-ever
+    // open may briefly show "Create" until the fetch lands.
+    const linksState = useDataFlashcardsLinksStore.getState();
+    linksState.ensureLoaded();
+    const tableLinked = Boolean(findTableLink(linksState.links, dataContentId));
+    sections.push({
+      title: "Database",
+      actions: [
+        {
+          id: "data-to-flashcards",
+          label: tableLinked ? "Sync Flashcard Deck…" : "Create Flashcard Deck…",
+          icon: <Layers className="h-4 w-4" />,
+          onClick: () =>
+            useDataFlashcardsDialogStore.getState().openDialog({
+              contentId: dataContentId,
+              title: dataTitle,
+            }),
+        },
+      ],
+    });
   }
 
   // Section 2a: Reference block. Any row that owns referenced children gets
