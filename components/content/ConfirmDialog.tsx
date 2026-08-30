@@ -127,7 +127,7 @@ export function ConfirmDialog({
           </div>
 
           {/* Description */}
-          <Dialog.Description className="text-sm text-gray-600 dark:text-gray-400 mb-6 ml-10 whitespace-pre-line">
+          <Dialog.Description className="text-sm text-gray-600 dark:text-gray-400 mb-6 ml-10 whitespace-pre-line break-words">
             {description}
           </Dialog.Description>
 

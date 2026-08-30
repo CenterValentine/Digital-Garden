@@ -90,6 +90,7 @@ export function FileTree({
   const {
     expandedIds,
     referencesAtStartIds,
+    hiddenNestedShortcutIds,
     setExpanded,
     selectedIds,
     setSelectedIds,
@@ -292,8 +293,9 @@ export function FileTree({
       withReferences,
       expandedIds,
       buildTreeIndex(withReferences),
+      hiddenNestedShortcutIds,
     );
-  }, [data, expandedIds, referencesAtStartIds]);
+  }, [data, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {

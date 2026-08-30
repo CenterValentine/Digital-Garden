@@ -2083,9 +2083,15 @@ export function LeftSidebarContent({
         confirmMessage = "";
       }
     } else if (nodesToDelete.length <= 5) {
-      // 2-5 items: show bulleted list with nested counts
+      // 2-5 items: show bulleted list with nested counts.
+      // Shortcuts are called out because the row carries the TARGET's title:
+      // "Workflows" in this list would otherwise read as the folder itself
+      // being trashed, when only a pointer to it is going.
       const itemList = nodesToDelete
         .map(n => {
+          if (n.contentType === "shortcut") {
+            return `• ${n.title} — shortcut only, the original stays`;
+          }
           const nestedCount = countNestedItems(n) - 1;
           if (nestedCount > 0) {
             return `• ${n.title} (${nestedCount + 1} items)`;

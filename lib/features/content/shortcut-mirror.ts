@@ -118,13 +118,20 @@ function mirrorChildrenOf(
   parentRowId: string,
   index: Map<string, TreeNode>,
   expandedIds: Set<string>,
+  hideNested: boolean,
   depth: number,
 ): TreeNode[] {
   if (depth > MAX_MIRROR_DEPTH) return [];
   const source = index.get(sourceId);
   if (!source) return [];
 
-  const sourceChildren = source.children ?? [];
+  // A mirrored folder shows whatever it contains, shortcuts included — so a
+  // shortcut can surface more shortcuts, each expanding into another mirror.
+  // Legitimate, but noisy, and it is the shape that puts a cycle one click
+  // away. Hiding them is per-shortcut and opt-in.
+  const sourceChildren = (source.children ?? []).filter(
+    (child) => !(hideNested && child.contentType === "shortcut"),
+  );
   return sourceChildren.map((child, i) => {
     const row = toMirrorRow(child, parentRowId, i, sourceChildren.length);
     // Only descend into levels the user has actually opened — this is what
@@ -135,6 +142,7 @@ function mirrorChildrenOf(
         row.id,
         index,
         expandedIds,
+        hideNested,
         depth + 1,
       );
     }
@@ -158,6 +166,7 @@ export function expandShortcutMirrors(
   nodes: TreeNode[],
   expandedIds: Set<string>,
   index: Map<string, TreeNode>,
+  hiddenNestedShortcutIds: Set<string> = new Set(),
   depth = 0,
 ): TreeNode[] {
   let changed = false;
@@ -172,6 +181,7 @@ export function expandShortcutMirrors(
       children,
       expandedIds,
       index,
+      hiddenNestedShortcutIds,
       depth + 1,
     );
 
@@ -186,6 +196,7 @@ export function expandShortcutMirrors(
       node.id,
       index,
       expandedIds,
+      hiddenNestedShortcutIds.has(node.id),
       depth + 1,
     );
     if (mirrored.length === 0 && nextChildren === children) return node;

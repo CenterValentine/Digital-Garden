@@ -220,6 +220,12 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
+  const nestedShortcutsHidden = useTreeStateStore((state) =>
+    state.hiddenNestedShortcutIds.has(data.id),
+  );
+  const toggleNestedShortcuts = useTreeStateStore(
+    (state) => state.toggleNestedShortcuts,
+  );
   const toggleReferencePosition = useTreeStateStore(
     (state) => state.toggleReferencePosition,
   );
@@ -754,6 +760,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           shortcutTargetTitle: shortcut?.targetTitle ?? null,
           shortcutTargetContentType: shortcut?.targetContentType ?? null,
           shortcutBroken,
+          nestedShortcutsHidden,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
           isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
@@ -860,6 +867,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onSetFolderView: onSetFolderView ? async (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => {
           await onSetFolderView(id, viewMode);
         } : undefined,
+        onToggleNestedShortcuts: () => toggleNestedShortcuts(data.id),
         onToggleReferences: (_id: string) => {
           // Same one-click reveal as the chip — the menu entry mirrors it
           // rather than reimplementing a half-open state. The id is always

@@ -93,11 +93,12 @@ function fixture(): TreeNode[] {
   ];
 }
 
-function run(nodes: TreeNode[], expanded: string[]) {
+function run(nodes: TreeNode[], expanded: string[], hidden: string[] = []) {
   return expandShortcutMirrors(
     nodes,
     new Set(expanded),
     buildTreeIndex(nodes),
+    new Set(hidden),
   );
 }
 
@@ -323,11 +324,49 @@ function findRow(nodes: TreeNode[], id: string): TreeNode | null {
   );
 }
 
+// --- 7. Hiding nested shortcuts ------------------------------------------
+//
+// A mirrored folder shows what it contains, shortcuts included — so one
+// shortcut can surface more, each expanding into another mirror. Per-shortcut,
+// opt-in, and it must hide ONLY shortcuts.
+{
+  const data: TreeNode[] = [
+    node("docs", {
+      contentType: "folder",
+      children: [node("note-a"), shortcutTo("inner", "docs")],
+    }),
+    shortcutTo("sc", "docs"),
+  ];
+
+  const shown = findRow(run(data, ["sc"]), "sc");
+  check(
+    "nested shortcuts appear by default",
+    shown?.children.length === 2,
+    `${shown?.children.length}`,
+  );
+
+  const hidden = findRow(run(data, ["sc"], ["sc"]), "sc");
+  check(
+    "hiding drops the nested shortcut",
+    hidden?.children.length === 1,
+    `${hidden?.children.length}`,
+  );
+  check(
+    "hiding keeps everything that is not a shortcut",
+    hidden?.children[0]?.mirrorOf === "note-a",
+    hidden?.children[0]?.mirrorOf ?? "none",
+  );
+  check(
+    "hiding is per shortcut, not global",
+    findRow(run(data, ["sc"], ["other"]), "sc")?.children.length === 2,
+  );
+}
+
 if (failures > 0) {
   console.error(`\nshortcut-mirror:check — ${failures} check(s) failed.\n`);
   process.exit(1);
 }
 
 console.log(
-  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding)",
+  "shortcut-mirror:check — OK (identity, mirroring, broken targets, laziness, cycles, drop forwarding, nested-shortcut hiding)",
 );

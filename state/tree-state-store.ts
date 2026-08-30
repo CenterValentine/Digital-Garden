@@ -22,6 +22,16 @@ interface TreeStateStore {
    * means the default — references render after primary content.
    */
   referencesAtStartIds: Set<string>;
+  /**
+   * Shortcut rows whose mirror should hide FURTHER shortcuts.
+   *
+   * A mirrored folder shows whatever that folder contains, shortcuts included
+   * — so a shortcut can surface more shortcuts, each of which expands into
+   * another mirror. That is legitimate but noisy, and it is the shape that
+   * makes a cycle reachable in one click. Absence means the default: nested
+   * shortcuts are shown.
+   */
+  hiddenNestedShortcutIds: Set<string>;
   /** Array of selected node IDs (for highlighting and active state) */
   selectedIds: string[];
   /** Virtualized tree scroll offset */
@@ -32,6 +42,8 @@ interface TreeStateStore {
   toggleExpanded: (id: string) => void;
   /** Flip this row's reference block between start and end of its children */
   toggleReferencePosition: (id: string) => void;
+  /** Show/hide shortcuts nested inside this shortcut's mirror */
+  toggleNestedShortcuts: (id: string) => void;
   /** Set expanded state */
   setExpanded: (id: string, expanded: boolean) => void;
   /** Expand multiple nodes */
@@ -53,6 +65,7 @@ interface TreeStateStore {
 export interface TreeStateSnapshot {
   expandedIds: string[];
   referencesAtStartIds: string[];
+  hiddenNestedShortcutIds: string[];
   selectedIds: string[];
   scrollOffset: number;
 }
@@ -62,6 +75,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
     (set, get) => ({
       expandedIds: new Set<string>(),
       referencesAtStartIds: new Set<string>(),
+      hiddenNestedShortcutIds: new Set<string>(),
       selectedIds: [],
       scrollOffset: 0,
       restoreVersion: 0,
@@ -87,6 +101,18 @@ export const useTreeStateStore = create<TreeStateStore>()(
             next.add(id);
           }
           return { referencesAtStartIds: next };
+        });
+      },
+
+      toggleNestedShortcuts: (id) => {
+        set((state) => {
+          const next = new Set(state.hiddenNestedShortcutIds);
+          if (next.has(id)) {
+            next.delete(id);
+          } else {
+            next.add(id);
+          }
+          return { hiddenNestedShortcutIds: next };
         });
       },
 
@@ -129,6 +155,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
       getSnapshot: () => ({
         expandedIds: Array.from(get().expandedIds),
         referencesAtStartIds: Array.from(get().referencesAtStartIds),
+        hiddenNestedShortcutIds: Array.from(get().hiddenNestedShortcutIds),
         selectedIds: get().selectedIds,
         scrollOffset: get().scrollOffset,
       }),
@@ -137,6 +164,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
         set((state) => ({
           expandedIds: new Set(snapshot?.expandedIds ?? []),
           referencesAtStartIds: new Set(snapshot?.referencesAtStartIds ?? []),
+          hiddenNestedShortcutIds: new Set(snapshot?.hiddenNestedShortcutIds ?? []),
           selectedIds: snapshot?.selectedIds ?? [],
           scrollOffset: snapshot?.scrollOffset ?? 0,
           restoreVersion: state.restoreVersion + 1,
@@ -145,7 +173,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
     }),
     {
       name: "tree-state-storage",
-      version: 3, // v3: referencesAtStartIds (reference block placement)
+      version: 4, // v4: hiddenNestedShortcutIds (nested-shortcut visibility)
       // Custom serialization for Set
       storage: {
         getItem: (name) => {
@@ -159,6 +187,8 @@ export const useTreeStateStore = create<TreeStateStore>()(
                 // Absent in v2 payloads — an empty set means "every reference
                 // block sits at the end", which is the pre-existing behaviour.
                 referencesAtStartIds: new Set(state.referencesAtStartIds || []),
+                // Absent in v3 payloads — empty means nested shortcuts show.
+                hiddenNestedShortcutIds: new Set(state.hiddenNestedShortcutIds || []),
                 selectedIds: state.selectedIds || [],
                 scrollOffset: state.scrollOffset || 0,
                 restoreVersion: state.restoreVersion || 0,
@@ -174,6 +204,7 @@ export const useTreeStateStore = create<TreeStateStore>()(
                 ...state,
                 expandedIds: Array.from(state.expandedIds),
                 referencesAtStartIds: Array.from(state.referencesAtStartIds),
+                hiddenNestedShortcutIds: Array.from(state.hiddenNestedShortcutIds),
                 selectedIds: state.selectedIds,
                 scrollOffset: state.scrollOffset,
               },
