@@ -40,6 +40,7 @@ import {
   FileType,
   Pencil,
   GitBranch,
+  Target,
   BarChart3,
   Table,
   MessageCircle,
@@ -56,7 +57,8 @@ import { useTreeDragStore } from "@/state/tree-drag-store";
 import { referenceGroupKey } from "@/lib/features/content/reference-group";
 import { useFileTreeEditStore } from "@/state/file-tree-edit-store";
 import { toast } from "sonner";
-import type { TreeNode } from "@/lib/domain/content/types";
+import type { TreeNode, ContentType } from "@/lib/domain/content/types";
+import { getContentTypeIcon } from "@/lib/domain/content/types";
 import { getDisplayExtension, splitFilenameForDisplay } from "@/lib/domain/content/file-extension-utils";
 import { FileNameInput } from "@/components/common/FileNameInput";
 import { clientLogger } from "@/lib/core/logger/client";
@@ -98,7 +100,7 @@ interface FileNodeProps extends NodeRendererProps<TreeNode> {
   onRename?: (id: string, name: string) => Promise<void>;
   onCreate?: (
     parentId: string | null,
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow"
   ) => Promise<void>;
   onDelete?: (id: string | string[]) => Promise<void>;
   onDuplicate?: (ids: string[]) => Promise<void>;
@@ -176,9 +178,54 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
    * on double click; they are also a surface this change was never scoped
    * against, so they keep their existing behaviour and a real chevron button.
    */
-  const usesRowToggle = (node.children?.length ?? 0) > 0 && !isPeopleNode;
+  /**
+   * Shortcut identity. A shortcut row is a pointer: it shows the TARGET's icon
+   * (with a corner arrow) and opening it opens the target, so the row reads as
+   * "that thing, reachable from here" rather than as a file of its own.
+   *
+   * Broken splits two ways, and the row has to say which: a trashed target
+   * heals if restored, a purged one never will. Both are computed live from
+   * the target's row — nothing about brokenness is stored.
+   */
+  const shortcut = data.contentType === "shortcut" ? data.shortcut : undefined;
+  const isShortcut = shortcut !== undefined;
+  const shortcutBroken =
+    isShortcut && (!shortcut.targetId || shortcut.targetDeleted);
+  const shortcutPurged = isShortcut && !shortcut.targetId;
+
+  /** View-only projection inside an expanded folder-shortcut. */
+  const isMirrorRow = data.isShortcutMirror === true;
+
+  /**
+   * Rows that PROJECT a folder: a healthy folder-shortcut, or a folder inside
+   * an expanded mirror.
+   *
+   * These have nested content to show but no `children` until they are
+   * expanded — the mirror transform only builds a level once its row is open.
+   * That is a chicken-and-egg: react-arborist shows no chevron for a childless
+   * row, and "no chevron means single click opens" would then open the target
+   * instead, so the mirror could never be reached. Declaring the capability
+   * here breaks the cycle; react-arborist's open() has no leaf guard, so the
+   * row opens, the transform runs, and the children exist on the next render.
+   */
+  const projectsAFolder =
+    (isShortcut &&
+      !shortcutBroken &&
+      shortcut.targetContentType === "folder") ||
+    (isMirrorRow && data.contentType === "folder");
+
+  const hasNestedContent = (node.children?.length ?? 0) > 0 || projectsAFolder;
+  const usesRowToggle = hasNestedContent && !isPeopleNode;
+
+
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
+  const nestedShortcutsHidden = useTreeStateStore((state) =>
+    state.hiddenNestedShortcutIds.has(data.id),
+  );
+  const toggleNestedShortcuts = useTreeStateStore(
+    (state) => state.toggleNestedShortcuts,
+  );
   const toggleReferencePosition = useTreeStateStore(
     (state) => state.toggleReferencePosition,
   );
@@ -249,6 +296,27 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   const getIcon = () => {
     const iconSize = "h-4 w-4";
     const iconColor = data.iconColor || "text-gray-600 dark:text-gray-400";
+
+    // A shortcut has no content of its own, so it borrows the target's icon —
+    // the corner arrow is what marks it as a pointer. A generic icon would
+    // make every shortcut look alike and say nothing about what opening it
+    // will produce.
+    if (isShortcut && !shortcutBroken && shortcut.targetContentType) {
+      const TargetIcon = (
+        LucideIcons as unknown as Record<
+          string,
+          React.ComponentType<{ className?: string }> | undefined
+        >
+      )[getContentTypeIcon(shortcut.targetContentType as ContentType)];
+      if (TargetIcon) return <TargetIcon className={`${iconSize} ${iconColor}`} />;
+    }
+    if (shortcutBroken) {
+      return (
+        <LucideIcons.Unlink
+          className={`${iconSize} text-gray-400 dark:text-gray-600`}
+        />
+      );
+    }
 
     // Render custom icon if set
     if (data.customIcon) {
@@ -377,6 +445,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         return <MessageCircle className={`${iconSize} ${iconColor}`} />;
       case "data":
         return <Table className={`${iconSize} ${iconColor}`} />;
+      // Workflows and goals had no case here at all, so every one of them
+      // rendered as a generic document — tree-wide, long before shortcuts.
+      // A folder-shortcut mirroring eight workflows is simply the first view
+      // that put enough of them side by side to notice.
+      case "workflow":
+        return <GitBranch className={`${iconSize} ${iconColor}`} />;
+      case "hope":
+        return <Target className={`${iconSize} ${iconColor}`} />;
       case "visualization":
         // Show engine-specific icon
         const engine = data.visualization?.engine;
@@ -406,7 +482,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   //  - People mounts: the chevron keeps its own click zone. They select on
   //    single click, so the chevron is their only way to expand.
   const getChevron = () => {
-    if (!node.children || node.children.length === 0) {
+    // projectsAFolder rows have nothing in `children` until they are opened,
+    // but they must still advertise that they open — see its comment.
+    if ((!node.children || node.children.length === 0) && !projectsAFolder) {
       return <div className="h-4 w-4" />; // Empty space for alignment
     }
 
@@ -496,8 +574,33 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // twice and land back where it started — the row would appear to stay shut
     // while its content opened.
     if (e.detail > 1) return;
-    node.toggle();
+    toggleNesting();
   };
+
+  /**
+   * Show or hide what this row nests. Shared by the single click and by the
+   * double click that reverses it, so the two can never toggle different
+   * things.
+   *
+   * A folder-projecting row has no children yet, so react-arborist may treat
+   * it as a leaf and toggle() can no-op. open()/close() have no leaf guard
+   * (the same reason toggleReferenceBlock relies on open()), and
+   * setNodeExpanded persists the id the mirror transform actually reads —
+   * belt-and-braces, and idempotent.
+   */
+  function toggleNesting() {
+    if (!projectsAFolder) {
+      node.toggle();
+      return;
+    }
+    if (isOpen) {
+      node.close();
+      setNodeExpanded(data.id, false);
+    } else {
+      node.open();
+      setNodeExpanded(data.id, true);
+    }
+  }
 
   // Double-click a nesting row: open it in the main panel, leaving expansion
   // exactly as it was.
@@ -537,7 +640,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     e.preventDefault();
     e.stopPropagation();
-    node.toggle();
+    toggleNesting();
     node.select();
   };
 
@@ -648,6 +751,16 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
           // Gates the placement entry the same way the chip's arrow is gated,
           // so the menu never offers a reorder the row can't show.
           hasPrimaryChildren,
+          // Shortcut/mirror shape, so the menu can offer removal rather than
+          // deletion, and can withhold destructive actions from projections.
+          isShortcut,
+          isShortcutMirror: isMirrorRow,
+          mirrorOf: data.mirrorOf ?? null,
+          shortcutTargetId: shortcut?.targetId ?? null,
+          shortcutTargetTitle: shortcut?.targetTitle ?? null,
+          shortcutTargetContentType: shortcut?.targetContentType ?? null,
+          shortcutBroken,
+          nestedShortcutsHidden,
           externalUrl: data.external?.url, // Phase 2: External link URL
           file: data.file || null, // For supportsCustomIcon check
           isPlaybook: data.note?.playbook === true, // v3.6: state-aware Mark/Unmark
@@ -712,6 +825,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onCreateExternal: onCreate && !isPeopleNode ? async (parentId: string | null) => {
           await onCreate(parentId, "external");
         } : undefined,
+        onCreateShortcut: onCreate && !isPeopleNode ? async (parentId: string | null) => {
+          await onCreate(parentId, "shortcut");
+        } : undefined,
         // JSON was silently unreachable from the context menu: the shared
         // menu hides items whose callback is absent, and only the header
         // ever supplied this one (audit, 2026-08-27).
@@ -751,6 +867,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         onSetFolderView: onSetFolderView ? async (id: string, viewMode: "list" | "gallery" | "kanban" | "dashboard" | "canvas") => {
           await onSetFolderView(id, viewMode);
         } : undefined,
+        onToggleNestedShortcuts: () => toggleNestedShortcuts(data.id),
         onToggleReferences: (_id: string) => {
           // Same one-click reveal as the chip — the menu entry mirrors it
           // rather than reimplementing a half-open state. The id is always
@@ -827,7 +944,10 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   // context menu), drawn on a wash with a rail so system-generated
   // attachments read apart from content the user authored.
   const referenceBlockClasses = () => {
-    if (!isNestedReference) return "";
+    // Shortcut mirrors borrow this chrome deliberately: the wash and rail
+    // already read as "this lives somewhere else", which is exactly what a
+    // mirrored row is. Reusing it means the two never drift apart visually.
+    if (!isNestedReference && !isMirrorRow) return "";
     const edge = data.referenceEdge;
     const corners =
       edge === "only"
@@ -936,17 +1056,40 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         {/* Rail + half-step indent for reference-block rows. A half step (8px
             against the tree's 15px) separates the block without implying a
             parent row that doesn't exist. */}
-        {isNestedReference && (
+        {(isNestedReference || isMirrorRow) && (
           <span aria-hidden className="flex h-full w-2 flex-none justify-center">
             <span className="w-px self-stretch bg-black/10 dark:bg-white/15" />
           </span>
         )}
         {getChevron()}
         {/* Corner badges use the OS-alias idiom: a small glyph on the icon's
-            corner. Playbook takes precedence over the referenced marker — a
-            note that's both is more usefully surfaced as a playbook. Both share
-            the referenced badge's formatting; only the glyph differs (v3.6). */}
-        {data.note?.playbook ? (
+            corner. Order is precedence: shortcut first (it changes what the
+            row IS — a pointer, whose click opens something else), then
+            playbook over the referenced marker, since a note that's both is
+            more usefully surfaced as a playbook. All share one formatting;
+            only the glyph and colour differ. */}
+        {isShortcut || isMirrorRow ? (
+          <span data-file-icon className="relative inline-flex">
+            {getIcon()}
+            <span
+              aria-hidden
+              title={
+                shortcutPurged
+                  ? "Shortcut target no longer exists"
+                  : shortcutBroken
+                    ? "Shortcut target was deleted"
+                    : `Shortcut to ${shortcut?.targetTitle ?? "another item"}`
+              }
+              className={`absolute -bottom-0.5 -right-1 flex h-3 w-3 items-center justify-center rounded-full bg-white shadow-sm ring-1 ring-black/10 dark:bg-gray-800 dark:ring-white/15 ${
+                shortcutBroken
+                  ? "text-red-500 dark:text-red-400"
+                  : "text-gray-500 dark:text-gray-400"
+              }`}
+            >
+              <LucideIcons.ArrowUpRight className="h-2 w-2" />
+            </span>
+          </span>
+        ) : data.note?.playbook ? (
           <span data-file-icon className="relative inline-flex">
             {getIcon()}
             <span

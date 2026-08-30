@@ -417,6 +417,7 @@ export async function POST(request: NextRequest) {
       chatMessages,
       chatMetadata,
       fromTemplateId,
+      shortcutTargetId,
     } = body;
 
     let title = rawTitle;
@@ -602,6 +603,24 @@ export async function POST(request: NextRequest) {
             error: {
               code: "VALIDATION_ERROR",
               message: "Cannot add content to deleted parent",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      // Nothing is ever STORED under a shortcut. A shortcut-folder does show
+      // its target's contents in the tree, but those rows are a client-side
+      // mirror of the real folder — parenting anything here would create a
+      // second, invisible home for it.
+      if (parent.contentType === "shortcut") {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message:
+                "Cannot create content inside a shortcut. Create it in the folder the shortcut points to.",
             },
           },
           { status: 400 }
@@ -907,6 +926,89 @@ export async function POST(request: NextRequest) {
           },
         },
       };
+    } else if (shortcutTargetId !== undefined) {
+      // A pointer at another ContentNode. The shortcut is its own row, so it
+      // carries its own title, parent, order and icon — renaming or moving it
+      // never touches the target.
+      if (!UUID_RE.test(shortcutTargetId)) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "VALIDATION_ERROR",
+              message: "shortcutTargetId must be a content id",
+            },
+          },
+          { status: 400 }
+        );
+      }
+
+      const target = await prisma.contentNode.findFirst({
+        where: {
+          id: shortcutTargetId,
+          ownerId: session.user.id,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          shortcutPayload: { select: { targetContentId: true } },
+        },
+      });
+
+      if (!target) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: {
+              code: "NOT_FOUND",
+              message: "Shortcut target not found",
+            },
+          },
+          { status: 404 }
+        );
+      }
+
+      // Shortcut-to-shortcut collapses to a single hop. Chains would multiply
+      // the ways a click can dead-end: every link is independently trashable,
+      // so an N-link chain has N chances to break instead of one.
+      let resolvedTargetId = target.id;
+      if (target.shortcutPayload) {
+        const innerTargetId = target.shortcutPayload.targetContentId;
+        const innerTarget = innerTargetId
+          ? await prisma.contentNode.findFirst({
+              where: {
+                id: innerTargetId,
+                ownerId: session.user.id,
+                deletedAt: null,
+              },
+              select: { id: true },
+            })
+          : null;
+
+        if (!innerTarget) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message:
+                  "That shortcut is broken, so a shortcut to it would be too.",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        resolvedTargetId = innerTarget.id;
+      }
+
+      contentType = "shortcut";
+      payloadData = {
+        shortcutPayload: {
+          create: {
+            target: { connect: { id: resolvedTargetId } },
+          },
+        },
+      };
     } else {
       return NextResponse.json(
         {
@@ -914,7 +1016,7 @@ export async function POST(request: NextRequest) {
           error: {
             code: "VALIDATION_ERROR",
             message:
-              "Must specify one of: isFolder, tiptapJson, markdown, html, code, url, engine, or contentType: 'chat'",
+              "Must specify one of: isFolder, tiptapJson, markdown, html, code, url, engine, shortcutTargetId, or contentType: 'chat'",
           },
         },
         { status: 400 }

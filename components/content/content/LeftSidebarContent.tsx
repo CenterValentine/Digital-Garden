@@ -26,6 +26,36 @@ import { useContextMenuStore } from "@/state/context-menu-store";
 import { usePageTemplateStore } from "@/state/page-template-store";
 import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
+import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
+import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
+
+/**
+ * What a shortcut may point at: every real content type.
+ *
+ * The picker's DEFAULT_ELIGIBLE_TYPES is tuned for "content that can be
+ * windowed", which leaves out databases, chats and the rest — reasonable
+ * there, wrong here, since a shortcut only has to REACH something, not render
+ * it inline. Databases were invisible to the picker because of that default.
+ *
+ * `shortcut` is deliberately absent: the server dereferences a
+ * shortcut-to-shortcut anyway, so offering one would promise a chain it will
+ * not build. `template` is absent because it is a authoring construct, not a
+ * place. Module scope so the Set identity is stable across renders.
+ */
+const SHORTCUT_ELIGIBLE_TYPES = new Set([
+  "note",
+  "folder",
+  "file",
+  "external",
+  "html",
+  "code",
+  "data",
+  "chat",
+  "visualization",
+  "hope",
+  "workflow",
+]);
+import type { PickerTarget } from "@/components/content/pickers/ContentTreePicker";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
 
@@ -49,7 +79,7 @@ interface TreeApiResponse {
 interface LeftSidebarContentProps {
   refreshTrigger: number;
   createTrigger?: {
-    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
+    type: "folder" | "note" | "docx" | "xlsx" | "json" | "code" | "html" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow" | "n8n-workflow";
     timestamp: number;
     engine?: "diagrams-net" | "excalidraw" | "mermaid"; // For visualization type
     dataMode?: "query"; // For data type — query databases
@@ -175,7 +205,7 @@ export function LeftSidebarContent({
   const [error, setError] = useState<string | null>(null);
   const [selectedCount, setSelectedCount] = useState(0);
   const [creatingItem, setCreatingItem] = useState<{
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow";
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow";
     parentId: string | null;
     tempId: string; // Temporary ID for the placeholder node
     fromTemplateId?: string;
@@ -198,6 +228,33 @@ export function LeftSidebarContent({
     /** Create destination. null = derive from tree selection at save time. */
     parentId: string | null;
   }>({ open: false, mode: "create", initialName: "", initialUrl: "https://", editingId: null, parentId: null });
+
+  /**
+   * Shortcut target picker. Like External Link, a shortcut cannot exist until
+   * the user has chosen what it points at, so it takes the dialog-first fork
+   * rather than the inline temp-node path — there is nothing to optimistically
+   * render.
+   *
+   * `anchorEl` comes from a fixed invisible element (shortcutAnchorRef) rather
+   * than the launching control, which has already unmounted by the time the
+   * picker renders. null parentId keeps the derive-from-selection behaviour.
+   */
+  const [shortcutPicker, setShortcutPicker] = useState<{
+    open: boolean;
+    parentId: string | null;
+    anchorEl: HTMLElement | null;
+  }>({ open: false, parentId: null, anchorEl: null });
+
+  /**
+   * A fixed, always-mounted anchor for the shortcut picker.
+   *
+   * ContentTreePicker positions against a real element, but neither entry
+   * point can supply one: the header + menu and the row context menu both
+   * unmount on click, and `handleCreate(parentId, type)` carries no element.
+   * A stable invisible anchor sidesteps that entirely, and gives both entry
+   * points the same predictable placement.
+   */
+  const shortcutAnchorRef = useRef<HTMLDivElement | null>(null);
 
   // Ref to temporarily store visualization engine when creating from context menu
   const pendingVisualizationEngine = useRef<"diagrams-net" | "excalidraw" | "mermaid" | null>(null);
@@ -856,12 +913,24 @@ export function LeftSidebarContent({
     parentId: string | null;
     index: number;
   }) => {
-    const { dragIds, parentId, index } = args;
+    const { dragIds, index } = args;
+    let { parentId } = args;
 
     // Store original tree state for rollback if any move fails
     const originalTree = treeData;
 
     if (!originalTree || dragIds.length === 0) return;
+
+    // Dropping onto a folder-shortcut — or onto a folder inside a shortcut's
+    // mirror — means "put this in the folder it points at". Rewriting the
+    // destination here, before anything optimistic or networked happens, is
+    // what keeps the rule "nothing is ever stored under a shortcut" true
+    // without the rest of the move path needing to know shortcuts exist.
+    if (parentId) {
+      const dropRow = findTreeNodeById(originalTree, parentId);
+      const forwardTo = dropRow ? resolveDropForwardTarget(dropRow) : null;
+      if (forwardTo) parentId = forwardTo;
+    }
 
     // Find each dragged node's current position. Computed up-front so
     // we don't re-traverse the tree N times in the loop, and so the
@@ -1134,6 +1203,37 @@ export function LeftSidebarContent({
     const firstNode = nodes[0];
     if (!firstNode) return;
 
+    // A mirror row is a projection of content that lives elsewhere. Its own id
+    // is synthetic and path-scoped, so opening it means opening the REAL id —
+    // otherwise the tab would hold an id no fetch can resolve.
+    if (firstNode.isShortcutMirror && firstNode.mirrorOf) {
+      setSelectedContentId(firstNode.mirrorOf, {
+        title: firstNode.title,
+        contentType: firstNode.contentType,
+      });
+      return;
+    }
+
+    // A shortcut is a pointer: opening it opens what it points at, and the
+    // shortcut's own id never enters a workspace tab. A BROKEN one is the
+    // exception — there is nothing to open, so we select the shortcut itself
+    // and let the viewer explain (and offer to remove it).
+    if (firstNode.contentType === "shortcut") {
+      const target = firstNode.shortcut;
+      if (target?.targetId && !target.targetDeleted) {
+        setSelectedContentId(target.targetId, {
+          title: target.targetTitle ?? firstNode.title,
+          contentType: target.targetContentType ?? undefined,
+        });
+      } else {
+        setSelectedContentId(firstNode.id, {
+          title: firstNode.title,
+          contentType: "shortcut",
+        });
+      }
+      return;
+    }
+
     if (firstNode.treeNodeKind === "person") {
       setSelectedContentId(firstNode.id, {
         title: firstNode.title,
@@ -1150,6 +1250,98 @@ export function LeftSidebarContent({
       title: firstNode.title,
       contentType: firstNode.contentType,
     });
+  };
+
+  /**
+   * Create a shortcut once the picker has supplied a target.
+   *
+   * Destination follows the External Link rules: context-menu creates carry an
+   * explicit parent, header creates derive one from the tree selection, and in
+   * a view-scoped tree an unselected create belongs to the view root rather
+   * than the vault root. One addition — if that lands on a shortcut, we use
+   * ITS parent, because nothing is ever stored under a shortcut.
+   *
+   * Opens the TARGET afterwards, not the new row: the user asked for a way to
+   * reach that content, so reaching it is the natural end of the gesture.
+   */
+  const handleShortcutCreate = async (
+    target: PickerTarget,
+    explicitParentId: string | null,
+  ) => {
+    let parentId: string | null = explicitParentId ?? scopedRootParentId;
+    const { selectedIds: treeSelectedIds } = useTreeStateStore.getState();
+
+    if (parentId === null && treeData && treeSelectedIds.length === 1) {
+      const selectedNode = findTreeNodeById(treeData, treeSelectedIds[0]);
+      if (selectedNode) {
+        parentId =
+          selectedNode.contentType === "folder"
+            ? selectedNode.id
+            : selectedNode.parentId;
+      }
+    }
+
+    if (parentId) {
+      const parentNode = findTreeNodeById(treeData ?? [], parentId);
+      if (parentNode?.contentType === "shortcut") {
+        parentId = parentNode.parentId;
+      } else if (!parentNode) {
+        // The derived parent is not in the tree, which means the selected row
+        // was orphan-promoted: deleting a folder does NOT delete its children,
+        // so a live node can keep a parentId naming a trashed folder, and the
+        // tree renders it at root instead. Writing to that id fails with
+        // "Cannot add content to deleted parent". Root is both what the server
+        // will accept and where the user actually sees the row.
+        parentId = null;
+      }
+    }
+
+    try {
+      const response = await fetch("/api/content/content", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: target.title,
+          parentId,
+          shortcutTargetId: target.id,
+        }),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        clientLogger.error({
+          layer: "ui",
+          event: "shortcut_create:failed",
+          summary: "shortcut create api rejected",
+          attrs: { error_code: result.error?.code ?? "unknown" },
+        });
+        setErrorDialog({
+          title: "Failed to create shortcut",
+          message:
+            result.error?.message || "Unknown error occurred. Please try again.",
+        });
+        return;
+      }
+
+      await fetchTree();
+      setSelectedContentId(target.id, {
+        title: target.title,
+        contentType: target.contentType,
+      });
+      toast.success(`Shortcut to "${target.title}" created`);
+    } catch (error) {
+      clientLogger.error({
+        layer: "ui",
+        event: "shortcut_create:caught",
+        summary: "shortcut create threw",
+        error,
+      });
+      setErrorDialog({
+        title: "Failed to create shortcut",
+        message: "Could not reach the server. Please try again.",
+      });
+    }
   };
 
   // Handler: Create or edit external link from dialog
@@ -1225,6 +1417,15 @@ export function LeftSidebarContent({
           if (selectedNode) {
             parentId = selectedNode.contentType === "folder" ? selectedNode.id : selectedNode.parentId;
           }
+        }
+
+        // Same orphan hazard as the shortcut path: deleting a folder leaves
+        // its children live, holding a parentId that names the tombstone, and
+        // the tree shows them at root. Deriving that id here made the create
+        // fail with "Cannot add content to deleted parent" — reproduced on a
+        // note whose folder was trashed in July.
+        if (parentId && !findTreeNodeById(treeData ?? [], parentId)) {
+          parentId = null;
         }
 
         // Create via API
@@ -1882,9 +2083,15 @@ export function LeftSidebarContent({
         confirmMessage = "";
       }
     } else if (nodesToDelete.length <= 5) {
-      // 2-5 items: show bulleted list with nested counts
+      // 2-5 items: show bulleted list with nested counts.
+      // Shortcuts are called out because the row carries the TARGET's title:
+      // "Workflows" in this list would otherwise read as the folder itself
+      // being trashed, when only a pointer to it is going.
       const itemList = nodesToDelete
         .map(n => {
+          if (n.contentType === "shortcut") {
+            return `• ${n.title} — shortcut only, the original stays`;
+          }
           const nestedCount = countNestedItems(n) - 1;
           if (nestedCount > 0) {
             return `• ${n.title} (${nestedCount + 1} items)`;
@@ -1984,6 +2191,22 @@ ${workbenchWarning}`
         });
         hasGoogleDriveFiles = false;
       }
+    }
+
+    // Removing a shortcut destroys nothing: it is a pointer, its target is
+    // untouched, and neither delete cascade in the API can reach anything from
+    // it (both walk ownedByNoteId / ContentLink, which a shortcut never has).
+    // So a shortcut-only removal skips the dialog entirely — a "move to trash"
+    // warning naming the target folder actively misreports what will happen.
+    //
+    // A MIXED selection still confirms, with the shortcuts counted in the
+    // total: the real content in it is what the warning is for.
+    if (
+      nodesToDelete.length > 0 &&
+      nodesToDelete.every((node) => node.contentType === "shortcut")
+    ) {
+      await handleDeleteConfirmed(ids);
+      return;
     }
 
     // Show confirmation dialog with appropriate message
@@ -2418,7 +2641,7 @@ ${workbenchWarning}`
   // This creates a temporary placeholder node in the tree for inline naming
   const handleCreate = async (
     requestedParentId: string | null,
-    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow"
+    type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow"
   ) => {
     // File upload requires special two-phase flow - open upload dialog
     if (type === "file") {
@@ -2441,6 +2664,17 @@ ${workbenchWarning}`
         initialUrl: "https://",
         editingId: null,
         parentId: requestedParentId,
+      });
+      return;
+    }
+
+    // Same reasoning as External Link above: a shortcut needs a target before
+    // it can be created, so it never takes the inline temp-node path.
+    if (type === "shortcut") {
+      setShortcutPicker({
+        open: true,
+        parentId: requestedParentId,
+        anchorEl: shortcutAnchorRef.current,
       });
       return;
     }
@@ -2769,6 +3003,36 @@ ${workbenchWarning}`
         initialUrl={externalLinkDialog.initialUrl}
         mode={externalLinkDialog.mode}
       />
+
+      {/* Anchor for the shortcut picker — see shortcutAnchorRef. */}
+      <div
+        ref={shortcutAnchorRef}
+        aria-hidden
+        className="pointer-events-none fixed left-4 top-28 h-0 w-0"
+      />
+
+      {/* Shortcut target picker. The canonical tree-browse picker, unmodified:
+          eligibleTypes excludes `shortcut` by default, so a shortcut can never
+          point at another shortcut from here. */}
+      {shortcutPicker.open && shortcutPicker.anchorEl && (
+        <ContentTreePicker
+          anchorEl={shortcutPicker.anchorEl}
+          onPick={(target) => {
+            setShortcutPicker({ open: false, parentId: null, anchorEl: null });
+            void handleShortcutCreate(target, shortcutPicker.parentId);
+          }}
+          onClose={() =>
+            setShortcutPicker({ open: false, parentId: null, anchorEl: null })
+          }
+          disabledIds={
+            shortcutPicker.parentId ? [shortcutPicker.parentId] : undefined
+          }
+          disabledReason="the folder you are adding to"
+          eligibleTypes={SHORTCUT_ELIGIBLE_TYPES}
+          searchPlaceholder="Select shortcut target…"
+          recentsLabel="Recent targets"
+        />
+      )}
 
       {/* Icon Selector */}
       <IconSelector

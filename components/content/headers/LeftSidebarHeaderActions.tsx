@@ -69,6 +69,7 @@ function MenuItem({
           }
         }}
         disabled={item.disabled && !hasSubmenu}
+        title={item.title}
         className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-sm text-left text-white hover:bg-white/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
           index === 0 ? "first:rounded-t-md" : "border-t border-white/5"
         } ${index === totalItems - 1 ? "last:rounded-b-md" : ""}`}

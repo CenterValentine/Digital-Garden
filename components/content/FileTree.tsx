@@ -21,6 +21,11 @@ import { useTreeStateStore } from "@/state/tree-state-store";
 import { clientLogger } from "@/lib/core/logger/client";
 import type { TreeNode } from "@/lib/domain/content/types";
 import { expandReferences } from "@/lib/features/content/reference-group";
+import {
+  expandShortcutMirrors,
+  buildTreeIndex,
+  resolveDropForwardTarget,
+} from "@/lib/features/content/shortcut-mirror";
 
 interface FileTreeProps {
   data: TreeNode[];
@@ -34,7 +39,7 @@ interface FileTreeProps {
     options?: { openContent: boolean },
   ) => void;
   onRename?: (id: string, name: string) => Promise<void>;
-  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
+  onCreate?: (parentId: string | null, type: "folder" | "note" | "file" | "code" | "html" | "docx" | "xlsx" | "json" | "external" | "shortcut" | "chat" | "visualization" | "data" | "hope" | "workflow") => Promise<void>;
   onDelete?: (ids: string | string[]) => Promise<void>; // Support both single ID and batch delete
   onDuplicate?: (ids: string[]) => Promise<void>; // Duplicate content node(s)
   onDownload?: (ids: string[]) => Promise<void>; // Download file(s)
@@ -85,6 +90,7 @@ export function FileTree({
   const {
     expandedIds,
     referencesAtStartIds,
+    hiddenNestedShortcutIds,
     setExpanded,
     selectedIds,
     setSelectedIds,
@@ -271,10 +277,25 @@ export function FileTree({
   // Reference blocks are a DATA transform, not tree open-state: the chip
   // rewrites what `children` contains rather than asking react-arborist to
   // open anything, which is why references need no node of their own.
-  const treeData = useMemo(
-    () => expandReferences(data, expandedIds, referencesAtStartIds),
-    [data, expandedIds, referencesAtStartIds],
-  );
+  //
+  // Shortcut mirroring runs AFTER, over the result, for two reasons: the index
+  // it builds must see the same `children` react-arborist will, and a mirrored
+  // row then never has to reason about reference blocks. Both transforms
+  // preserve object identity when nothing changed — see their identity
+  // contracts — so this pair still re-renders no more rows than it must.
+  const treeData = useMemo(() => {
+    const withReferences = expandReferences(
+      data,
+      expandedIds,
+      referencesAtStartIds,
+    );
+    return expandShortcutMirrors(
+      withReferences,
+      expandedIds,
+      buildTreeIndex(withReferences),
+      hiddenNestedShortcutIds,
+    );
+  }, [data, expandedIds, referencesAtStartIds, hiddenNestedShortcutIds]);
 
   // Get initial open state from persisted IDs
   const initialOpenState = useMemo(() => {
@@ -336,8 +357,34 @@ export function FileTree({
   const canDrop = (args: { dragNodes: NodeApi<TreeNode>[]; parentNode: NodeApi<TreeNode> | null }) => {
     const { dragNodes, parentNode } = args;
 
+    // A mirror row is a projection, not a place. Dragging one would offer to
+    // move content that does not live where it appears to.
+    if (dragNodes.some((dragNode) => dragNode.data.isShortcutMirror)) {
+      return false;
+    }
+
     // Always allow dropping at root level (parentNode is null)
     if (!parentNode) return true;
+
+    // Dropping onto a folder-shortcut (real or mirrored) means "put this in
+    // the folder it points at". handleMove rewrites the destination to the
+    // real folder id before the move is sent, so nothing is ever stored under
+    // a shortcut. A broken one has no folder to forward to.
+    const shortcutTarget = resolveDropForwardTarget(parentNode.data);
+    if (shortcutTarget) return true;
+
+    // Nothing may nest under a shortcut that is not a live folder pointer.
+    if (parentNode.data.contentType === "shortcut") return false;
+
+    // A shortcut may be stored anywhere, including under content that hosts
+    // nothing else — putting a pointer where the user already looks is the
+    // whole point of the feature.
+    if (
+      dragNodes.length > 0 &&
+      dragNodes.every((dragNode) => dragNode.data.contentType === "shortcut")
+    ) {
+      return true;
+    }
 
     // Only allow dropping into folders — with ONE exception: referenced
     // nodes may be dropped onto a NOTE (re-homing the reference under that

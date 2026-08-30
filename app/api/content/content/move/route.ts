@@ -53,6 +53,9 @@ export async function POST(request: NextRequest) {
               ownerId: true,
               parentId: true,
               role: true,
+              // Needed for the shortcut nesting rule: a shortcut may be stored
+              // under content that accepts nothing else.
+              contentType: true,
               ownedByNoteId: true,
               children: { select: { id: true } },
             },
@@ -136,10 +139,35 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Nothing is ever stored under a shortcut. A shortcut-folder does
+        // display its target's contents, but those rows are a client-side
+        // mirror of the real folder — the drop is forwarded to that folder's
+        // id before it reaches this route, so a shortcut id arriving here as a
+        // destination means something bypassed the mirror.
+        if (targetParent.contentType === "shortcut") {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message:
+                  "Cannot move content into a shortcut. Move it into the folder the shortcut points to.",
+              },
+            },
+            { status: 400 }
+          );
+        }
+
         if (targetParent.contentType !== "folder") {
           const isReferenceToNote =
             content.role === "referenced" &&
             targetParent.contentType === "note";
+          // A shortcut may live anywhere, including under content that hosts
+          // nothing else — the whole point is to put a pointer where the user
+          // already looks. It stores plainly under the target parent: no
+          // ownedByNoteId re-homing, because a shortcut is not referenced
+          // content and must not partition behind a reference chip.
+          const isShortcutNesting = content.contentType === "shortcut";
           // A promoted row page may return to ITS database (plan Phase 5:
           // rows are freely movable in both directions — promotion nested
           // it here server-side, so the tree must be able to put it back).
@@ -156,7 +184,7 @@ export async function POST(request: NextRequest) {
               },
               select: { id: true },
             }));
-          if (!isReferenceToNote && !isRowReturningHome) {
+          if (!isReferenceToNote && !isRowReturningHome && !isShortcutNesting) {
             return NextResponse.json(
               {
                 success: false,
@@ -168,7 +196,10 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          if (isRowReturningHome) {
+          if (isShortcutNesting) {
+            // Stores plainly under targetParent — no ownerNoteUpdate, no
+            // storage redirection. Deliberately falls through.
+          } else if (isRowReturningHome) {
             // Restore promotion's canonical ownership (ownedByNoteId = the
             // table) so a referenced row page partitions back behind the
             // database's reference chip instead of dangling.

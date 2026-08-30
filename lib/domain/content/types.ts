@@ -24,7 +24,8 @@ export type ContentType =
   | "visualization" // VisualizationPayload exists
   | "data" // DataPayload exists
   | "hope" // HopePayload exists
-  | "workflow"; // WorkflowPayload exists
+  | "workflow" // WorkflowPayload exists
+  | "shortcut"; // ShortcutPayload exists — pointer to another ContentNode
 
 export type PayloadType = Exclude<ContentType, "folder" | "template">;
 
@@ -131,6 +132,38 @@ export interface TreeNode {
   visualization?: {
     engine: string;
   };
+  /**
+   * Shortcut target summary. Present on `contentType: "shortcut"` rows.
+   *
+   * The row renders the TARGET's icon and opens the TARGET on click, so the
+   * summary carries enough to do both without a second fetch.
+   *
+   * Two distinct broken states, deliberately kept apart:
+   *  - `targetId === null` — the target was hard-deleted (trash purge) and the
+   *    FK was nulled. Permanently broken; nothing can restore it.
+   *  - `targetDeleted === true` — the target is in the trash. The pointer
+   *    survives, so restoring the target heals this shortcut with no repair
+   *    step. This is why brokenness is computed live rather than stored.
+   */
+  shortcut?: {
+    targetId: string | null;
+    targetContentType: string | null;
+    targetTitle: string | null;
+    targetDeleted: boolean;
+  };
+  /**
+   * Set by the client transform, not the API: the real ContentNode id this row
+   * mirrors, for rows synthesized inside an expanded shortcut-folder. Mirror
+   * rows carry a path-scoped synthetic `id` (see `shortcut-mirror.ts`), so
+   * every action that touches real content must route through this instead.
+   */
+  mirrorOf?: string;
+  /**
+   * Marks that same synthesized row as VIEW-ONLY. It cannot be a drag source,
+   * nothing may be stored under it, and a drop onto it forwards to the real
+   * folder — the projection never becomes a second home for content.
+   */
+  isShortcutMirror?: boolean;
 }
 
 // ============================================================
@@ -155,6 +188,17 @@ export const CONTENT_WITH_PAYLOADS = {
   dataPayload: true,
   hopePayload: true,
   workflowPayload: true,
+
+  // Shortcut: include the target's summary, not just the pointer. Brokenness
+  // is derived from the target's deletedAt, so the pointer alone cannot tell a
+  // live shortcut from a trashed one.
+  shortcutPayload: {
+    include: {
+      target: {
+        select: { id: true, title: true, contentType: true, deletedAt: true },
+      },
+    },
+  },
 
   // Promotion provenance (DATABASE-CONTENT-TYPE-PLAN Phase 5): when this
   // node IS a database row's page, carry enough to render the breadcrumb —
@@ -543,6 +587,7 @@ export function getContentTypeLabel(type: ContentType): string {
     data: "Data Table",
     hope: "Hope/Goal",
     workflow: "Workflow",
+    shortcut: "Shortcut",
   };
   return labels[type];
 }
@@ -565,6 +610,10 @@ export function getContentTypeIcon(type: ContentType): string {
     data: "Table",
     hope: "Target",
     workflow: "Workflow",
+    // Fallback only — a shortcut row renders its TARGET's icon plus a corner
+    // arrow badge (see FileNode.getIcon). This is what shows when the target
+    // type is unknown, i.e. the shortcut is broken.
+    shortcut: "ArrowUpRight",
   };
   return icons[type];
 }

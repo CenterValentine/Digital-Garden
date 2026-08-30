@@ -126,6 +126,18 @@ type ContentTreeNode = {
   visualization?: {
     engine: string;
   };
+  /**
+   * Shortcut target summary. `targetId: null` means the target was purged and
+   * the FK nulled (permanently broken); `targetDeleted` means it is merely in
+   * the trash, so restoring it heals this shortcut. Both are computed live —
+   * nothing about brokenness is stored.
+   */
+  shortcut?: {
+    targetId: string | null;
+    targetContentType: string | null;
+    targetTitle: string | null;
+    targetDeleted: boolean;
+  };
   peopleMount?: {
     mountId: string;
     groupId?: string;
@@ -253,6 +265,17 @@ export async function GET(request: NextRequest) {
                 },
               },
               visualizationPayload: { select: { engine: true } },
+              // Shortcut rows render the TARGET's icon and open the TARGET on
+              // click, so the target summary rides along here rather than
+              // costing a fetch per shortcut row.
+              shortcutPayload: {
+                select: {
+                  targetContentId: true,
+                  target: {
+                    select: { title: true, contentType: true, deletedAt: true },
+                  },
+                },
+              },
               // Publish history for the status dot. Indexed on contentNodeId;
               // soft-deleted publications don't count as history.
               publicItems: {
@@ -452,6 +475,20 @@ export async function GET(request: NextRequest) {
         }
         if (item.visualizationPayload) {
           node.visualization = { engine: item.visualizationPayload.engine };
+        }
+        if (item.shortcutPayload) {
+          const target = item.shortcutPayload.target;
+          node.shortcut = {
+            targetId: item.shortcutPayload.targetContentId,
+            targetContentType: target?.contentType ?? null,
+            targetTitle: target?.title ?? null,
+            // Broken either way, but for different reasons: a null pointer is
+            // a purged target (permanent), a deletedAt is a trashed one (heals
+            // on restore). The row needs to tell the user which.
+            targetDeleted:
+              item.shortcutPayload.targetContentId === null ||
+              target?.deletedAt != null,
+          };
         }
 
         nodeMap.set(item.id, node);

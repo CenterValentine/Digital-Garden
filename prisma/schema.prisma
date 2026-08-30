@@ -23,6 +23,7 @@ enum ContentType {
   data // DataPayload - structured data tables (stub)
   hope // HopePayload - goals/aspirations (stub)
   workflow // WorkflowPayload - automation workflows (stub, inert)
+  shortcut // ShortcutPayload - pointer to another ContentNode (alias/"graft")
 }
 
 enum ContentRole {
@@ -149,6 +150,10 @@ model ContentNode {
   promotedFromRow      DataRow?              @relation("PromotedDataRow")
   hopePayload          HopePayload?
   workflowPayload      WorkflowPayload?
+  shortcutPayload      ShortcutPayload?      @relation("ShortcutOwner")
+  // Shortcuts pointing AT this node. Not a payload: the inverse side of
+  // ShortcutPayload.target, which Prisma needs to resolve the named relation.
+  shortcutsToThis      ShortcutPayload[]     @relation("ShortcutTarget")
 
   history                      ContentHistory[]
   sourceLinks                  ContentLink[]             @relation("SourceContent")
@@ -2666,4 +2671,29 @@ model StudioContextSpend {
   owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@unique([ownerId, day])
+}
+
+// ============================================================
+// File Shortcuts
+// ============================================================
+
+/// A pointer to another ContentNode: one canonical node, N shortcuts aimed at
+/// it. The shortcut is its own ContentNode row, so it carries its own parent,
+/// display order, title and icon, and is soft-deleted independently.
+///
+/// targetContentId is nullable with onDelete: SetNull so the two broken states
+/// stay distinguishable. A HARD delete (trash purge) nulls the pointer, which
+/// is permanent. A SOFT delete leaves it intact, so "broken" is derived live
+/// from the target's deletedAt, and restoring the target heals every shortcut
+/// aimed at it with no cascade and no repair job.
+model ShortcutPayload {
+  contentId       String   @id @db.Uuid
+  targetContentId String?  @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @db.Timestamptz(6)
+
+  content ContentNode  @relation("ShortcutOwner", fields: [contentId], references: [id], onDelete: Cascade)
+  target  ContentNode? @relation("ShortcutTarget", fields: [targetContentId], references: [id], onDelete: SetNull)
+
+  @@index([targetContentId])
 }
