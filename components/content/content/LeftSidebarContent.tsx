@@ -28,6 +28,33 @@ import type { TreeNode, ContentType } from "@/lib/domain/content/types";
 import { findTreeNodeById } from "@/lib/domain/content/tree-drop-target";
 import { resolveDropForwardTarget } from "@/lib/features/content/shortcut-mirror";
 import { ContentTreePicker } from "@/components/content/pickers/ContentTreePicker";
+
+/**
+ * What a shortcut may point at: every real content type.
+ *
+ * The picker's DEFAULT_ELIGIBLE_TYPES is tuned for "content that can be
+ * windowed", which leaves out databases, chats and the rest — reasonable
+ * there, wrong here, since a shortcut only has to REACH something, not render
+ * it inline. Databases were invisible to the picker because of that default.
+ *
+ * `shortcut` is deliberately absent: the server dereferences a
+ * shortcut-to-shortcut anyway, so offering one would promise a chain it will
+ * not build. `template` is absent because it is a authoring construct, not a
+ * place. Module scope so the Set identity is stable across renders.
+ */
+const SHORTCUT_ELIGIBLE_TYPES = new Set([
+  "note",
+  "folder",
+  "file",
+  "external",
+  "html",
+  "code",
+  "data",
+  "chat",
+  "visualization",
+  "hope",
+  "workflow",
+]);
 import type { PickerTarget } from "@/components/content/pickers/ContentTreePicker";
 import { clientLogger } from "@/lib/core/logger/client";
 import { warmUpMobileKeyboard } from "@/lib/core/mobile-keyboard";
@@ -1258,6 +1285,14 @@ export function LeftSidebarContent({
       const parentNode = findTreeNodeById(treeData ?? [], parentId);
       if (parentNode?.contentType === "shortcut") {
         parentId = parentNode.parentId;
+      } else if (!parentNode) {
+        // The derived parent is not in the tree, which means the selected row
+        // was orphan-promoted: deleting a folder does NOT delete its children,
+        // so a live node can keep a parentId naming a trashed folder, and the
+        // tree renders it at root instead. Writing to that id fails with
+        // "Cannot add content to deleted parent". Root is both what the server
+        // will accept and where the user actually sees the row.
+        parentId = null;
       }
     }
 
@@ -1382,6 +1417,15 @@ export function LeftSidebarContent({
           if (selectedNode) {
             parentId = selectedNode.contentType === "folder" ? selectedNode.id : selectedNode.parentId;
           }
+        }
+
+        // Same orphan hazard as the shortcut path: deleting a folder leaves
+        // its children live, holding a parentId that names the tombstone, and
+        // the tree shows them at root. Deriving that id here made the create
+        // fail with "Cannot add content to deleted parent" — reproduced on a
+        // note whose folder was trashed in July.
+        if (parentId && !findTreeNodeById(treeData ?? [], parentId)) {
+          parentId = null;
         }
 
         // Create via API
@@ -2962,6 +3006,7 @@ ${workbenchWarning}`
             shortcutPicker.parentId ? [shortcutPicker.parentId] : undefined
           }
           disabledReason="the folder you are adding to"
+          eligibleTypes={SHORTCUT_ELIGIBLE_TYPES}
           searchPlaceholder="Select shortcut target…"
           recentsLabel="Recent targets"
         />
