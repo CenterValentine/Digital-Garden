@@ -1322,9 +1322,11 @@ export function FlashcardCardProposalList({
 
       <div className="flex items-center justify-between gap-2 pt-1">
         <div className="text-[11px] text-gray-500 dark:text-gray-400">
+          {/* "selected" is redundant beside a column of checkboxes, and the
+              status text was wrapping to two lines alongside the actions. */}
           {allDone
             ? `All ${createdCount} added`
-            : `${checkedCount} of ${proposedCount} selected${
+            : `${checkedCount} of ${proposedCount}${
                 createdCount > 0 ? ` · ${createdCount} added` : ""
               }`}
         </div>
@@ -1345,18 +1347,25 @@ export function FlashcardCardProposalList({
             it. Sits immediately left of "Create deck & add" so the pair reads
             as one choice: speak them first, or just add them.
           */}
-          {/* Batch actions target every row still missing that medium. */}
+          {/*
+            Batch actions target every row still missing that medium. They are
+            SECONDARY to committing, so they read as icon + count and carry
+            their full sentence in the tooltip: three buttons each spelling out
+            "Generate 15 …" wrapped the footer onto two lines and repeated the
+            same 15 three times. The count stays visible because it is the one
+            piece the user needs before clicking — it is what will be spent.
+          */}
           {!allDone && batchAudioPlan.length > 0 && (
             <button
               type="button"
               onClick={() => setAudioRequest(batchAudioPlan)}
               disabled={genInFlight}
-              title="Synthesize spoken pronunciation with your speech provider — optional"
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+              title={`Generate spoken pronunciation for ${batchAudioPlan.length} card${batchAudioPlan.length === 1 ? "" : "s"} — optional, uses your speech provider`}
+              aria-label={`Generate ${batchAudioPlan.length} pronunciations`}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300 dark:hover:bg-amber-400/20"
             >
-              <Sparkles className="h-3.5 w-3.5" />
-              Generate {batchAudioPlan.length} pronunciation
-              {batchAudioPlan.length === 1 ? "" : "s"}
+              <Volume2 className="h-3.5 w-3.5" />
+              {batchAudioPlan.length}
             </button>
           )}
           {!allDone && batchImagePlan.length > 0 && (
@@ -1364,12 +1373,12 @@ export function FlashcardCardProposalList({
               type="button"
               onClick={() => setImageRequest(batchImagePlan)}
               disabled={genInFlight}
-              title="Generate a front image with your image provider — optional"
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-400/40 bg-amber-400/10 px-2.5 py-1 text-xs font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-400/20"
+              title={`Generate a front image for ${batchImagePlan.length} card${batchImagePlan.length === 1 ? "" : "s"} — optional, uses your image provider`}
+              aria-label={`Generate ${batchImagePlan.length} images`}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300 dark:hover:bg-amber-400/20"
             >
               <ImageIcon className="h-3.5 w-3.5" />
-              Generate {batchImagePlan.length} image
-              {batchImagePlan.length === 1 ? "" : "s"}
+              {batchImagePlan.length}
             </button>
           )}
           <button
@@ -1399,9 +1408,11 @@ export function FlashcardCardProposalList({
                 {!effectiveDeckExists ? "Creating + adding…" : "Adding…"}
               </>
             ) : !effectiveDeckExists ? (
-              `Create deck & add${checkedCount > 0 ? ` (${checkedCount})` : ""}`
+              // "Create deck & add (15)" was the longest string in the row and
+              // the deck line directly above already says the deck is new.
+              `Create & add${checkedCount > 0 ? ` (${checkedCount})` : ""}`
             ) : (
-              `Add selected${checkedCount > 0 ? ` (${checkedCount})` : ""}`
+              `Add${checkedCount > 0 ? ` (${checkedCount})` : ""}`
             )}
           </button>
         </div>
