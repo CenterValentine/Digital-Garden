@@ -46,6 +46,11 @@ import {
   Globe,
   FileCode,
   File as FileIcon,
+  Table,
+  MessageCircle,
+  BarChart3,
+  Target,
+  GitBranch,
   Link as LinkIcon,
   Plus,
   History,
@@ -225,6 +230,20 @@ function TypeIcon({
       return <FileCode className={className} />;
     case "note":
       return <FileText className={className} />;
+    // Types the picker gained when callers started using it to address content
+    // rather than to window it. Without these a database, chat or diagram all
+    // rendered as the same generic file, which reads as "unknown thing" — the
+    // one thing a picker row must never say.
+    case "data":
+      return <Table className={className} />;
+    case "chat":
+      return <MessageCircle className={className} />;
+    case "visualization":
+      return <BarChart3 className={className} />;
+    case "hope":
+      return <Target className={className} />;
+    case "workflow":
+      return <GitBranch className={className} />;
     default:
       return <FileIcon className={className} />;
   }

@@ -177,8 +177,6 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
    * on double click; they are also a surface this change was never scoped
    * against, so they keep their existing behaviour and a real chevron button.
    */
-  const usesRowToggle = (node.children?.length ?? 0) > 0 && !isPeopleNode;
-
   /**
    * Shortcut identity. A shortcut row is a pointer: it shows the TARGET's icon
    * (with a corner arrow) and opening it opens the target, so the row reads as
@@ -196,6 +194,29 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
   /** View-only projection inside an expanded folder-shortcut. */
   const isMirrorRow = data.isShortcutMirror === true;
+
+  /**
+   * Rows that PROJECT a folder: a healthy folder-shortcut, or a folder inside
+   * an expanded mirror.
+   *
+   * These have nested content to show but no `children` until they are
+   * expanded — the mirror transform only builds a level once its row is open.
+   * That is a chicken-and-egg: react-arborist shows no chevron for a childless
+   * row, and "no chevron means single click opens" would then open the target
+   * instead, so the mirror could never be reached. Declaring the capability
+   * here breaks the cycle; react-arborist's open() has no leaf guard, so the
+   * row opens, the transform runs, and the children exist on the next render.
+   */
+  const projectsAFolder =
+    (isShortcut &&
+      !shortcutBroken &&
+      shortcut.targetContentType === "folder") ||
+    (isMirrorRow && data.contentType === "folder");
+
+  const hasNestedContent = (node.children?.length ?? 0) > 0 || projectsAFolder;
+  const usesRowToggle = hasNestedContent && !isPeopleNode;
+
+
   const toggleReferences = useTreeStateStore((state) => state.toggleExpanded);
   const setNodeExpanded = useTreeStateStore((state) => state.setExpanded);
   const toggleReferencePosition = useTreeStateStore(
@@ -446,7 +467,9 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
   //  - People mounts: the chevron keeps its own click zone. They select on
   //    single click, so the chevron is their only way to expand.
   const getChevron = () => {
-    if (!node.children || node.children.length === 0) {
+    // projectsAFolder rows have nothing in `children` until they are opened,
+    // but they must still advertise that they open — see its comment.
+    if ((!node.children || node.children.length === 0) && !projectsAFolder) {
       return <div className="h-4 w-4" />; // Empty space for alignment
     }
 
@@ -536,8 +559,33 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
     // twice and land back where it started — the row would appear to stay shut
     // while its content opened.
     if (e.detail > 1) return;
-    node.toggle();
+    toggleNesting();
   };
+
+  /**
+   * Show or hide what this row nests. Shared by the single click and by the
+   * double click that reverses it, so the two can never toggle different
+   * things.
+   *
+   * A folder-projecting row has no children yet, so react-arborist may treat
+   * it as a leaf and toggle() can no-op. open()/close() have no leaf guard
+   * (the same reason toggleReferenceBlock relies on open()), and
+   * setNodeExpanded persists the id the mirror transform actually reads —
+   * belt-and-braces, and idempotent.
+   */
+  function toggleNesting() {
+    if (!projectsAFolder) {
+      node.toggle();
+      return;
+    }
+    if (isOpen) {
+      node.close();
+      setNodeExpanded(data.id, false);
+    } else {
+      node.open();
+      setNodeExpanded(data.id, true);
+    }
+  }
 
   // Double-click a nesting row: open it in the main panel, leaving expansion
   // exactly as it was.
@@ -577,7 +625,7 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
 
     e.preventDefault();
     e.stopPropagation();
-    node.toggle();
+    toggleNesting();
     node.select();
   };
 
