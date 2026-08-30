@@ -40,6 +40,7 @@ import {
   FileType,
   Pencil,
   GitBranch,
+  Target,
   BarChart3,
   Table,
   MessageCircle,
@@ -438,6 +439,14 @@ export function FileNode({ node, style, dragHandle, onRename, onCreate, onDelete
         return <MessageCircle className={`${iconSize} ${iconColor}`} />;
       case "data":
         return <Table className={`${iconSize} ${iconColor}`} />;
+      // Workflows and goals had no case here at all, so every one of them
+      // rendered as a generic document — tree-wide, long before shortcuts.
+      // A folder-shortcut mirroring eight workflows is simply the first view
+      // that put enough of them side by side to notice.
+      case "workflow":
+        return <GitBranch className={`${iconSize} ${iconColor}`} />;
+      case "hope":
+        return <Target className={`${iconSize} ${iconColor}`} />;
       case "visualization":
         // Show engine-specific icon
         const engine = data.visualization?.engine;
