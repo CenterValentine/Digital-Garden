@@ -23,6 +23,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
+  cellToDisplayText,
   cellToText,
   sortStatusOptions,
   type DataColumn,
@@ -257,7 +258,7 @@ function BoardCard({
     : "Untitled";
 
   const context = cardColumns
-    .map((c) => ({ column: c, text: cellToText(c, row.data[c.key]) }))
+    .map((c) => ({ column: c, text: cellToDisplayText(c, row.data[c.key]) }))
     .filter((e) => e.text)
     .slice(0, 2);
 

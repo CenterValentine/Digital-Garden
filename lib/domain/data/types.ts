@@ -116,8 +116,16 @@ export interface DataColumnConfig {
   options?: SelectOption[];
   /** `number` — decimal places; 0 renders as an integer. */
   precision?: number;
-  /** `number` — rendering hint, not storage. */
+  /**
+   * `number` — rendering hint, not storage. Cells always store the raw
+   * number; `percent` appends "%" to the value as typed (50 → "50%"),
+   * never multiplies.
+   */
   numberFormat?: "plain" | "currency" | "percent";
+  /** `number` — ISO 4217 code when numberFormat is "currency". Default USD. */
+  currencyCode?: string;
+  /** `number` — thousands grouping for plain/percent (currency always groups). */
+  useGrouping?: boolean;
   /** `date` — whether the time component is meaningful. */
   includeTime?: boolean;
   /** `relation` — the DataPayload.contentId this column points at. */

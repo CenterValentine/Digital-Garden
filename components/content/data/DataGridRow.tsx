@@ -25,7 +25,7 @@ import { memo, useCallback, useState } from "react";
 import { Expand } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
-  cellToText,
+  cellToDisplayText,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -469,7 +469,8 @@ function DataCell({
     );
   }
 
-  const display = cellToText(column, value);
+  // Formatted for display; edits and ⌘C copy still use the raw value.
+  const display = cellToDisplayText(column, value);
 
   return (
     <div

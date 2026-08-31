@@ -318,6 +318,62 @@ export function cellToText(column: DataColumn, value: CellValue | undefined): st
   }
 }
 
+// ── Display formatting ───────────────────────────────────────────────────
+
+/**
+ * Render one number cell per the column's format config. DISPLAY-ONLY —
+ * `cellToText` above deliberately stays raw because it feeds search
+ * indexing, CSV export, filters, and the AI digest; a "$1,234.50" in any
+ * of those poisons numeric matching and re-import. Copy (⌘C) also copies
+ * raw: `encodeNumber` only strips `$£€,` so a formatted "CA$1,234" or
+ * "50%" would not re-parse on paste.
+ */
+export function formatNumberCell(column: DataColumn, value: number): string {
+  const { numberFormat, precision, currencyCode, useGrouping } = column.config;
+  const digits =
+    precision !== undefined && precision >= 0
+      ? Math.min(Math.floor(precision), 8)
+      : undefined;
+
+  try {
+    if (numberFormat === "currency") {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: currencyCode || "USD",
+        // Precision, when set, overrides the currency's own default
+        // (2 for USD, 0 for JPY); unset defers to Intl.
+        ...(digits !== undefined
+          ? { minimumFractionDigits: digits, maximumFractionDigits: digits }
+          : {}),
+      }).format(value);
+    }
+    const text = new Intl.NumberFormat(undefined, {
+      useGrouping: useGrouping === true,
+      ...(digits !== undefined
+        ? { minimumFractionDigits: digits, maximumFractionDigits: digits }
+        : { maximumFractionDigits: 12 }),
+    }).format(value);
+    return numberFormat === "percent" ? `${text}%` : text;
+  } catch {
+    // Unknown currency code (config is a Json bag) — degrade to raw.
+    return String(value);
+  }
+}
+
+/**
+ * `cellToText` with display formatting layered on top — what grid cells,
+ * cards, and field stacks SHOW. Never used for search/export/digest.
+ */
+export function cellToDisplayText(
+  column: DataColumn,
+  value: CellValue | undefined
+): string {
+  if (column.type === "number" && typeof value === "number") {
+    return formatNumberCell(column, value);
+  }
+  return cellToText(column, value);
+}
+
 /**
  * The row's contribution to search (plan B2). Text-ish columns only, so a
  * search for "kent" finds the row without a date or a rating matching by

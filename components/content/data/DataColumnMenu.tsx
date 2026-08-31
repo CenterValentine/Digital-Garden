@@ -22,6 +22,7 @@ import { Check, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { PanelPortal } from "./PanelPortal";
 import {
+  formatNumberCell,
   generateColumnKey,
   IMPLEMENTED_COLUMN_TYPES,
   ROLLUP_FNS,
@@ -59,6 +60,34 @@ const ROLLUP_LABEL: Record<RollupFn, string> = {
   max: "Max",
   join: "Join values",
 };
+
+/**
+ * Offered currency codes — a closed list rather than free text because a
+ * bad ISO code makes Intl.NumberFormat throw (the formatter degrades to
+ * raw, but the user would see their choice silently ignored).
+ */
+const CURRENCY_CODES: ReadonlyArray<{ code: string; label: string }> = [
+  { code: "USD", label: "USD — US Dollar ($)" },
+  { code: "EUR", label: "EUR — Euro (€)" },
+  { code: "GBP", label: "GBP — British Pound (£)" },
+  { code: "JPY", label: "JPY — Japanese Yen (¥)" },
+  { code: "CAD", label: "CAD — Canadian Dollar" },
+  { code: "AUD", label: "AUD — Australian Dollar" },
+  { code: "CHF", label: "CHF — Swiss Franc" },
+  { code: "CNY", label: "CNY — Chinese Yuan (¥)" },
+  { code: "INR", label: "INR — Indian Rupee (₹)" },
+  { code: "KRW", label: "KRW — South Korean Won (₩)" },
+  { code: "MXN", label: "MXN — Mexican Peso" },
+  { code: "BRL", label: "BRL — Brazilian Real" },
+  { code: "SEK", label: "SEK — Swedish Krona" },
+  { code: "NOK", label: "NOK — Norwegian Krone" },
+  { code: "DKK", label: "DKK — Danish Krone" },
+  { code: "PLN", label: "PLN — Polish Złoty" },
+  { code: "SGD", label: "SGD — Singapore Dollar" },
+  { code: "HKD", label: "HKD — Hong Kong Dollar" },
+  { code: "NZD", label: "NZD — New Zealand Dollar" },
+  { code: "ZAR", label: "ZAR — South African Rand" },
+];
 
 const fieldClass = cn(
   "w-full rounded-md border border-border bg-background px-2 py-1.5",
@@ -450,6 +479,42 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState("");
 
+  // Number formatting (display-only — cells keep raw numbers; precision
+  // additionally rounds future edits at encode time, as it always has).
+  const isNumber = column.type === "number";
+  const [numberFormat, setNumberFormat] = useState<
+    "plain" | "currency" | "percent"
+  >(column.config.numberFormat ?? "plain");
+  const [precisionText, setPrecisionText] = useState(
+    column.config.precision !== undefined ? String(column.config.precision) : ""
+  );
+  const [currencyCode, setCurrencyCode] = useState(
+    column.config.currencyCode ?? "USD"
+  );
+  const [useGrouping, setUseGrouping] = useState(
+    column.config.useGrouping === true
+  );
+
+  const parsedPrecision = (() => {
+    const trimmed = precisionText.trim();
+    if (trimmed === "") return undefined;
+    const n = Math.floor(Number(trimmed));
+    return Number.isFinite(n) ? Math.max(0, Math.min(8, n)) : undefined;
+  })();
+
+  const buildNumberConfig = useCallback((): DataColumnConfig => {
+    const next: DataColumnConfig = { ...column.config };
+    delete next.numberFormat;
+    delete next.currencyCode;
+    delete next.useGrouping;
+    delete next.precision;
+    if (numberFormat !== "plain") next.numberFormat = numberFormat;
+    if (numberFormat === "currency") next.currencyCode = currencyCode;
+    else if (useGrouping) next.useGrouping = true;
+    if (parsedPrecision !== undefined) next.precision = parsedPrecision;
+    return next;
+  }, [column.config, numberFormat, currencyCode, useGrouping, parsedPrecision]);
+
   const addBulk = useCallback(() => {
     // One label per line; commas work too. Dedupe case-insensitively
     // against existing options AND within the pasted list itself.
@@ -484,12 +549,24 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
         ...(isSelectLike
           ? { config: { ...column.config, options: cleaned } }
           : {}),
+        ...(isNumber ? { config: buildNumberConfig() } : {}),
       });
       onClose();
     } finally {
       setBusy(false);
     }
-  }, [name, description, options, isSelectLike, column.config, busy, onSave, onClose]);
+  }, [
+    name,
+    description,
+    options,
+    isSelectLike,
+    isNumber,
+    buildNumberConfig,
+    column.config,
+    busy,
+    onSave,
+    onClose,
+  ]);
 
   return (
     <PanelPortal open onDismiss={onClose}>
@@ -543,6 +620,82 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
           This relation&apos;s database is set once. To link somewhere else, add a
           new column — deleting this one keeps its links and can be undone.
         </p>
+      )}
+
+      {isNumber && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Format
+          </label>
+          <select
+            value={numberFormat}
+            onChange={(e) =>
+              setNumberFormat(e.target.value as "plain" | "currency" | "percent")
+            }
+            className={fieldClass}
+          >
+            <option value="plain">Plain number</option>
+            <option value="currency">Currency</option>
+            <option value="percent">Percent</option>
+          </select>
+
+          {numberFormat === "currency" && (
+            <>
+              <label className="mb-1 mt-2 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                Currency
+              </label>
+              <select
+                value={currencyCode}
+                onChange={(e) => setCurrencyCode(e.target.value)}
+                className={fieldClass}
+              >
+                {CURRENCY_CODES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
+
+          <label className="mb-1 mt-2 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Decimal places
+          </label>
+          <input
+            inputMode="numeric"
+            value={precisionText}
+            onChange={(e) =>
+              setPrecisionText(e.target.value.replace(/[^\d]/g, "").slice(0, 1))
+            }
+            placeholder={numberFormat === "currency" ? "Currency default" : "As typed"}
+            className={fieldClass}
+          />
+
+          {numberFormat !== "currency" && (
+            <label className="mt-2 flex items-center gap-2 text-xs">
+              <input
+                type="checkbox"
+                checked={useGrouping}
+                onChange={(e) => setUseGrouping(e.target.checked)}
+                className="h-3.5 w-3.5 accent-current"
+              />
+              Thousands separators
+            </label>
+          )}
+
+          <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-[10px] leading-snug text-muted-foreground">
+            Preview:{" "}
+            <span className="font-mono tabular-nums text-foreground">
+              {formatNumberCell(
+                { ...column, config: buildNumberConfig() },
+                1234.5
+              )}
+            </span>
+            {" · "}Cells keep the raw number — formatting is how it shows.
+            {parsedPrecision !== undefined &&
+              " Decimal places also round future edits."}
+          </p>
+        </>
       )}
 
       {isSelectLike && (
