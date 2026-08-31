@@ -1355,19 +1355,6 @@ export function FlashcardCardProposalList({
             same 15 three times. The count stays visible because it is the one
             piece the user needs before clicking — it is what will be spent.
           */}
-          {!allDone && batchAudioPlan.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setAudioRequest(batchAudioPlan)}
-              disabled={genInFlight}
-              title={`Generate spoken pronunciation for ${batchAudioPlan.length} card${batchAudioPlan.length === 1 ? "" : "s"} — optional, uses your speech provider`}
-              aria-label={`Generate ${batchAudioPlan.length} pronunciations`}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300 dark:hover:bg-amber-400/20"
-            >
-              <Volume2 className="h-3.5 w-3.5" />
-              {batchAudioPlan.length}
-            </button>
-          )}
           {!allDone && batchImagePlan.length > 0 && (
             <button
               type="button"
@@ -1379,6 +1366,19 @@ export function FlashcardCardProposalList({
             >
               <ImageIcon className="h-3.5 w-3.5" />
               {batchImagePlan.length}
+            </button>
+          )}
+          {!allDone && batchAudioPlan.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setAudioRequest(batchAudioPlan)}
+              disabled={genInFlight}
+              title={`Generate spoken pronunciation for ${batchAudioPlan.length} card${batchAudioPlan.length === 1 ? "" : "s"} — optional, uses your speech provider`}
+              aria-label={`Generate ${batchAudioPlan.length} pronunciations`}
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-[11px] font-medium text-amber-700 transition-colors hover:bg-amber-400/15 disabled:cursor-not-allowed disabled:opacity-60 dark:text-amber-300 dark:hover:bg-amber-400/20"
+            >
+              <Volume2 className="h-3.5 w-3.5" />
+              {batchAudioPlan.length}
             </button>
           )}
           <button
