@@ -14,7 +14,7 @@ import { cn } from "@/lib/core/utils";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
 /** Compact type marks. Mono glyphs read at 11px where an icon would not. */
-const TYPE_GLYPH: Partial<Record<DataColumnType, string>> = {
+export const TYPE_GLYPH: Partial<Record<DataColumnType, string>> = {
   text: "Aa",
   longText: "¶",
   number: "#",

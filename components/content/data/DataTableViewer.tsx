@@ -56,6 +56,11 @@ import {
 } from "@/lib/domain/data";
 import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
 import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import {
+  DATA_SCHEMA_CHANGED_EVENT,
+  dispatchDataSchemaChanged,
+  type DataSchemaChangedDetail,
+} from "./events";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
@@ -824,10 +829,24 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         return false;
       }
       await load(state.view?.id ?? null);
+      // Tell the context rail (right sidebar) the schema moved under it.
+      dispatchDataSchemaChanged(contentId, "grid");
       return true;
     },
     [contentId, load, state.view]
   );
+
+  // Rail-side schema edits → reload the grid. The rail tags its dispatches
+  // so the grid's own post-mutation reload is never doubled.
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<DataSchemaChangedDetail>).detail;
+      if (detail?.tableId !== contentId || detail.source !== "rail") return;
+      void load(viewRef.current?.id ?? null);
+    };
+    window.addEventListener(DATA_SCHEMA_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(DATA_SCHEMA_CHANGED_EVENT, onChanged);
+  }, [contentId, load]);
 
   const addColumn = useCallback(
     async (input: {

@@ -34,7 +34,7 @@ import {
   type StatusGroup,
 } from "@/lib/domain/data";
 
-const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
+export const TYPE_LABEL: Partial<Record<DataColumnType, string>> = {
   text: "Text",
   longText: "Long text",
   number: "Number",
@@ -449,7 +449,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
 
 // ── Edit ─────────────────────────────────────────────────────────────────
 
-interface ColumnMenuProps {
+interface ColumnEditFormProps {
   column: DataColumn;
   onSave: (patch: {
     name: string;
@@ -457,10 +457,56 @@ interface ColumnMenuProps {
     config?: DataColumnConfig;
   }) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** Called after a successful save — dismiss the popover / collapse the row. */
   onClose: () => void;
+  /** The popover autofocuses; the rail's inline form must not steal focus. */
+  autoFocus?: boolean;
 }
 
-export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProps) {
+/** The header-menu popover: PanelPortal chrome around the shared form. */
+export function ColumnMenu({
+  column,
+  onSave,
+  onDelete,
+  onClose,
+}: ColumnEditFormProps) {
+  return (
+    <PanelPortal open onDismiss={onClose}>
+      <div className="mb-2 flex items-center justify-between">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+          {TYPE_LABEL[column.type] ?? column.type}
+        </span>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-muted-foreground hover:text-foreground"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      </div>
+      <ColumnEditForm
+        column={column}
+        onSave={onSave}
+        onDelete={onDelete}
+        onClose={onClose}
+      />
+    </PanelPortal>
+  );
+}
+
+/**
+ * Shared column editor — name, description, and per-type config (options
+ * for select-likes, formatting for numbers). Rendered by BOTH the header
+ * popover above and the context rail (DataSchemaRail), so the two editing
+ * surfaces cannot drift.
+ */
+export function ColumnEditForm({
+  column,
+  onSave,
+  onDelete,
+  onClose,
+  autoFocus = true,
+}: ColumnEditFormProps) {
   const [name, setName] = useState(column.name);
   const [description, setDescription] = useState(column.description ?? "");
   const [busy, setBusy] = useState(false);
@@ -569,25 +615,12 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
   ]);
 
   return (
-    <PanelPortal open onDismiss={onClose}>
-      <div className="mb-2 flex items-center justify-between">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {TYPE_LABEL[column.type] ?? column.type}
-        </span>
-        <button
-          type="button"
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
-        >
-          <X className="h-3 w-3" />
-        </button>
-      </div>
-
+    <>
       <label className="mb-1 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
         Name
       </label>
       <input
-        autoFocus
+        autoFocus={autoFocus}
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={(e) => {
@@ -851,6 +884,6 @@ export function ColumnMenu({ column, onSave, onDelete, onClose }: ColumnMenuProp
           Save
         </button>
       </div>
-    </PanelPortal>
+    </>
   );
 }

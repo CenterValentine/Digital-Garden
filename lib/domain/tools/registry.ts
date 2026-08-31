@@ -185,6 +185,18 @@ const TOOL_REGISTRY: ToolDefinition[] = [
     order: 10,
     tabKey: "outline",
   },
+  // Database context rail — column list + inline schema editing
+  // (components/content/data/DataSchemaRail.tsx). Leads the rail for data
+  // nodes: schema is what you reach for the sidebar for on a table.
+  {
+    id: "database-tab",
+    label: "Database",
+    iconName: "Table",
+    surfaces: ["sidebar-tab"],
+    contentTypes: ["data"],
+    order: 15,
+    tabKey: "database",
+  },
   {
     id: "chat-tab",
     label: "AI Chat",
