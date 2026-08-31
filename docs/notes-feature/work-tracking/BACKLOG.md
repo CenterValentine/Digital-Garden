@@ -1,5 +1,5 @@
 ---
-last_updated: 2026-08-18
+last_updated: 2026-08-29
 ---
 
 # Sprint Backlog
@@ -9,6 +9,44 @@ last_updated: 2026-08-18
 **Sprint Execution Protocol**: Before commencing any sprint, always ask the user for input before planning and executing — there may be additions or modifications.
 
 ---
+
+## Deferred batch execution for row-driven AI runs (2026-08-29; plan: EXTRACTION-TO-DATABASE-PLAN.md §3.3/§6, decision D4)
+
+Stage-2 lead investigation (research a captured lead, tailor resume/CL) is
+being built **live-but-batch-shaped**: the unit of work is `(tableId, rowId,
+playbook)` with results stamped back as cell writes — independent,
+restartable, order-free. That unit is exactly what vendor batch APIs consume.
+Deliberately NOT built now: the repo has **zero deferred-AI infrastructure**
+(every model call lives inside a request; the only offline-AI precedent is the
+`studio-context-sweep` cron), and the discount halves a weekly number that is
+currently small. Build when row volume or model tier makes the number real.
+
+- [ ] **Deferred batch runner.** Submit → poll → reconcile substrate (cron or
+  queue) consuming row-work units; results land via the same validate-all
+  upsert helper as live capture. Requires direct-vendor BYOK keys — gateway
+  routing does not broker batch jobs.
+- [ ] **Model the discounts in `pricing.ts`** — batch/flex tiers are
+  explicitly listed as unmodeled today (pricing.ts header); the turn
+  accumulator prices per-request and would misprice batch results without a
+  tier flag.
+
+**Savings survey (list prices as of 2026-08; re-verify before building):**
+
+| Vendor | Offering | Discount | Turnaround |
+|---|---|---|---|
+| Anthropic | Message Batches API | **50%** input+output; stacks with prompt caching | most <1h, ≤24h guaranteed |
+| OpenAI | Batch API | **50%** | ≤24h window, separate quota pool |
+| Google | Gemini batch mode | **50%** | ≤24h |
+| Mistral | Batch API | **50%** | ≤24h |
+| Groq | Batch processing | **~25%** | ≤24h |
+| DeepSeek | No batch API — automatic off-peak windows (UTC 16:30–00:30) | up to **50–75%** off-peak | immediate (just schedule into the window) |
+| xAI | No public batch API at time of writing | — | — |
+
+The DeepSeek row matters for a cheap runner: a scheduler that simply *fires
+during the off-peak window* gets batch-class savings with the ordinary
+synchronous API — potentially the lowest-effort first increment (a cron that
+runs queued row-work at night through the existing live path), ahead of any
+true async-batch substrate.
 
 ## Workspace Workbenches — follow-ups (2026-08-26, branch `feat/workbenches`; plan: WORKBENCHES-PLAN.md)
 
