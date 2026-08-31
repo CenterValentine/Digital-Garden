@@ -25,6 +25,7 @@ import { memo, useCallback, useState } from "react";
 import {
   Check,
   Expand,
+  ExternalLink,
   Flag,
   Heart,
   Star,
@@ -640,6 +641,8 @@ function DataCell({
           )}
           // Dates get the native picker — the calendar affordance — with
           // datetime-local when the column's time component is meaningful.
+          // URLs stay type=text: the encoder upgrades bare domains to
+          // https://, and type=url's browser validation would fight that.
           type={
             column.type === "number"
               ? "number"
@@ -647,8 +650,11 @@ function DataCell({
                 ? column.config.includeTime
                   ? "datetime-local"
                   : "date"
-                : "text"
+                : column.type === "email"
+                  ? "email"
+                  : "text"
           }
+          inputMode={column.type === "url" ? "url" : undefined}
         />
       </div>
     );
@@ -706,6 +712,25 @@ function DataCell({
           >
             ¶
           </span>
+        )}
+      {/* URL cells get an open affordance — click still selects/edits, ↗
+          opens. Scheme-guarded: only encoder-normalized values (http/https)
+          render a link; a legacy bare "example.com" would resolve as a
+          RELATIVE path. */}
+      {column.type === "url" &&
+        typeof value === "string" &&
+        /^https?:\/\//i.test(value) && (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`Open ${value}`}
+            aria-label={`Open ${value}`}
+            className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </a>
         )}
     </div>
   );

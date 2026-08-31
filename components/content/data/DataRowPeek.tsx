@@ -40,6 +40,13 @@ interface DataRowPeekProps {
   total: number;
   /** Auto-open this column's link picker on mount (the grid's relation +). */
   focusColumnId?: string | null;
+  /** Bumped per grid-"+" click so auto-open re-fires on an open peek. */
+  focusToken?: number;
+  /** Owner-only: create a select/status option from a row editor. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
   /** Open a linked ContentNode in a workspace tab. */
   onOpenContent: (ref: ContentRef) => void;
   /** Promote this row to a page and open it (plan Phase 5). */
@@ -61,6 +68,8 @@ export function DataRowPeek({
   index,
   total,
   focusColumnId,
+  focusToken,
+  onCreateOption,
   onOpenContent,
   onOpenAsPage,
   onCommitCell,
@@ -156,6 +165,8 @@ export function DataRowPeek({
           columns={columns}
           editable={editable}
           focusColumnId={focusColumnId}
+          focusToken={focusToken}
+          onCreateOption={onCreateOption}
           onOpenContent={onOpenContent}
           onCommitCell={onCommitCell}
           onRefresh={onRefresh}

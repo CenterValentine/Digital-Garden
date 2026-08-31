@@ -39,6 +39,7 @@ import {
   diffRow,
   keyForMove,
   pushOp,
+  generateColumnKey,
   redo as redoStack,
   undo as undoStack,
   type CellEdit,
@@ -91,6 +92,9 @@ interface LoadState {
   rows: DataRow[];
   serverTime: string | null;
   canWrite: boolean;
+  /** Owner-only affordances (option creation) key off this, matching the
+   * server's canAlterSchema — strictly stronger than canWrite. */
+  canAlterSchema: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -102,6 +106,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     rows: [],
     serverTime: null,
     canWrite: false,
+    canAlterSchema: false,
     loading: true,
     error: null,
   });
@@ -122,6 +127,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   } | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
+  /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
+   * when the peek (and the target column's focus) is already in place —
+   * an initializer-only read misses that case entirely. */
+  const [peekFocusToken, setPeekFocusToken] = useState(0);
   const [dropTarget, setDropTarget] = useState<{
     columnId: string;
     side: "left" | "right";
@@ -349,6 +358,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         serverTime: json.data.serverTime,
         canWrite:
           json.data.accessLevel === "write" || json.data.accessLevel === "owner",
+        canAlterSchema: json.data.accessLevel === "owner",
         loading: false,
         error: null,
       });
@@ -1081,6 +1091,38 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   /**
+   * Create one select/status/multiSelect option from a ROW editor — the
+   * "just type it" path, so adding a category doesn't mean a detour
+   * through the column menu. Dedupes case-insensitively (returns the
+   * existing option rather than minting a twin); goes through the same
+   * columns PATCH as the menu, so the rail hears about it too.
+   */
+  const createOption = useCallback(
+    async (column: DataColumn, label: string) => {
+      const trimmed = label.trim().slice(0, 120);
+      if (!trimmed) return null;
+      const existing = (column.config.options ?? []).find(
+        (o) => o.label.trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) return existing;
+      const option = {
+        id: generateColumnKey(),
+        label: trimmed,
+        ...(column.type === "status" ? { group: "todo" as const } : {}),
+      };
+      const done = await columnRequest("PATCH", {
+        columnId: column.id,
+        config: {
+          ...column.config,
+          options: [...(column.config.options ?? []), option],
+        },
+      });
+      return done ? option : null;
+    },
+    [columnRequest]
+  );
+
+  /**
    * Check/uncheck every loaded row in ONE batch — one PATCH (the route
    * takes up to 1000 writes; a page is ≤100), one optimistic pass, one
    * setCells undo entry so ⌘Z reverts the whole sweep.
@@ -1326,6 +1368,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       setPeekRowId(rowId);
       setPeekFocusColumnId(focusColumnId ?? null);
+      if (focusColumnId) setPeekFocusToken((t) => t + 1);
       setEditTarget(null);
     },
     [isQuery, state.rows, selectNode, clearRowParam]
@@ -1564,6 +1607,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 index={peekIndex}
                 total={state.rows.length}
                 focusColumnId={peekFocusColumnId}
+                focusToken={peekFocusToken}
+                onCreateOption={state.canAlterSchema ? createOption : undefined}
                 onOpenContent={openContent}
                 onOpenAsPage={openAsPage}
                 onCommitCell={commitCell}
@@ -1702,6 +1747,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           index={peekIndex}
           total={state.rows.length}
           focusColumnId={peekFocusColumnId}
+          focusToken={peekFocusToken}
+          onCreateOption={state.canAlterSchema ? createOption : undefined}
           onOpenContent={openContent}
           onOpenAsPage={openAsPage}
           onCommitCell={commitCell}

@@ -45,10 +45,38 @@ interface DataRowFieldsProps {
   editable: boolean;
   /** Auto-open this column's link picker on mount (the grid's +). */
   focusColumnId?: string | null;
+  /** Bumped per grid-"+" click so auto-open re-fires on an open peek. */
+  focusToken?: number;
+  /** Owner-only: create a select/status/multiSelect option inline. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
   onOpenContent: (ref: ContentRef) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
+}
+
+/**
+ * Auto-open that responds to every grid-"+" click, not just to mount: the
+ * peek may ALREADY be open on this row with focus already naming this
+ * column, where an initializer-only read does nothing — the reported
+ * "clicked + and had to click the + in the peek again" failure. React's
+ * sanctioned adjust-state-while-rendering pattern; no effect, and the
+ * extra render happens before paint.
+ */
+function useAutoOpenOnToken(
+  autoOpen: boolean,
+  token: number | undefined,
+  enabled: boolean,
+  open: () => void
+) {
+  const [consumed, setConsumed] = useState<number | undefined>(undefined);
+  if (autoOpen && enabled && token !== undefined && consumed !== token) {
+    setConsumed(token);
+    open();
+  }
 }
 
 export function DataRowFields({
@@ -57,6 +85,8 @@ export function DataRowFields({
   columns,
   editable,
   focusColumnId,
+  focusToken,
+  onCreateOption,
   onOpenContent,
   onCommitCell,
   onRefresh,
@@ -71,6 +101,7 @@ export function DataRowFields({
             personRef={row.personRefs?.[column.id]}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
         ) : column.type === "contentLink" || column.type === "file" ? (
@@ -81,6 +112,7 @@ export function DataRowFields({
             value={row.data[column.key]}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onOpenContent={onOpenContent}
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
@@ -112,6 +144,7 @@ export function DataRowFields({
             links={row.links?.[column.id] ?? []}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onRefresh={onRefresh}
           />
         ) : (
@@ -120,6 +153,9 @@ export function DataRowFields({
             column={column}
             value={row.data[column.key]}
             editable={editable}
+            onCreateOption={
+              onCreateOption ? (label) => onCreateOption(column, label) : undefined
+            }
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
         )
@@ -135,10 +171,12 @@ interface PeekFieldProps {
   column: DataColumn;
   value: CellValue | undefined;
   editable: boolean;
+  /** Column-bound option creation (owner-only; absent = affordance hidden). */
+  onCreateOption?: (label: string) => Promise<{ id: string; label: string } | null>;
   onCommit: (value: unknown) => void;
 }
 
-function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
+function PeekField({ column, value, editable, onCreateOption, onCommit }: PeekFieldProps) {
   return (
     <div className="border-b border-border/40 py-2.5 last:border-b-0">
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
@@ -147,6 +185,7 @@ function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
       <FieldInput
         column={column}
         value={value}
+        onCreateOption={onCreateOption}
         editable={editable}
         onCommit={onCommit}
       />
@@ -160,10 +199,31 @@ function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
   );
 }
 
-function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
+function FieldInput({
+  column,
+  value,
+  editable,
+  onCreateOption,
+  onCommit,
+}: PeekFieldProps) {
   // Same seeding the grid uses — datetime cells convert UTC ISO to the
   // local string a datetime-local input understands.
   const asText = editDraftFor(column, value);
+
+  // Inline option creation (select/multiSelect/status): type it where you
+  // needed it, instead of a detour through the column menu. Hooks live
+  // above the switch per rules-of-hooks.
+  const [addingOption, setAddingOption] = useState(false);
+  const [newOptionLabel, setNewOptionLabel] = useState("");
+  const submitNewOption = async (commitWith: (id: string) => void) => {
+    if (!onCreateOption) return;
+    const label = newOptionLabel.trim();
+    if (!label) return;
+    const created = await onCreateOption(label);
+    if (created) commitWith(created.id);
+    setNewOptionLabel("");
+    setAddingOption(false);
+  };
 
   const textCommit = (raw: string) => {
     const next = raw.trim() === "" ? undefined : raw;
@@ -190,11 +250,50 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
         column.type === "status"
           ? sortStatusOptions(column.config.options ?? [])
           : (column.config.options ?? []);
+      const canCreate = editable && Boolean(onCreateOption);
+      if (addingOption && canCreate) {
+        return (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={newOptionLabel}
+              onChange={(e) => setNewOptionLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  // New single-select option is also the cell's new value —
+                  // you typed it because you wanted it picked.
+                  void submitNewOption((id) => onCommit(id));
+                } else if (e.key === "Escape") {
+                  setAddingOption(false);
+                  setNewOptionLabel("");
+                }
+              }}
+              placeholder="New option label"
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={() => void submitNewOption((id) => onCommit(id))}
+              disabled={!newOptionLabel.trim()}
+              className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        );
+      }
       return (
         <select
           value={typeof value === "string" ? value : ""}
           disabled={!editable}
-          onChange={(e) => onCommit(e.target.value || undefined)}
+          onChange={(e) => {
+            if (e.target.value === "__create__") {
+              setAddingOption(true);
+              return;
+            }
+            onCommit(e.target.value || undefined);
+          }}
           className={fieldClass}
         >
           <option value="">—</option>
@@ -203,6 +302,7 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
               {o.label}
             </option>
           ))}
+          {canCreate && <option value="__create__">+ New option…</option>}
         </select>
       );
     }
@@ -210,7 +310,8 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
     case "multiSelect": {
       const chosen = new Set(Array.isArray(value) ? value : []);
       const options = column.config.options ?? [];
-      if (options.length === 0) {
+      const canCreate = editable && Boolean(onCreateOption);
+      if (options.length === 0 && !canCreate) {
         return <p className="text-xs text-muted-foreground">No options yet — add them from the column&apos;s header menu.</p>;
       }
       return (
@@ -236,6 +337,55 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
               {o.label}
             </label>
           ))}
+          {canCreate &&
+            (addingOption ? (
+              <div className="mt-0.5 flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={newOptionLabel}
+                  onChange={(e) => setNewOptionLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      // A freshly created option starts SELECTED — you
+                      // typed it here because this row wears it.
+                      void submitNewOption((id) =>
+                        onCommit([
+                          ...(Array.isArray(value) ? value : []),
+                          id,
+                        ])
+                      );
+                    } else if (e.key === "Escape") {
+                      setAddingOption(false);
+                      setNewOptionLabel("");
+                    }
+                  }}
+                  placeholder="New option label"
+                  className={fieldClass}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    void submitNewOption((id) =>
+                      onCommit([...(Array.isArray(value) ? value : []), id])
+                    )
+                  }
+                  disabled={!newOptionLabel.trim()}
+                  className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingOption(true)}
+                className="mt-0.5 flex items-center gap-1 self-start rounded px-1 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" />
+                New option
+              </button>
+            ))}
         </div>
       );
     }
@@ -267,8 +417,11 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
                 ? column.config.includeTime
                   ? "datetime-local"
                   : "date"
-                : "text"
+                : column.type === "email"
+                  ? "email"
+                  : "text"
           }
+          inputMode={column.type === "url" ? "url" : undefined}
           maxLength={
             column.type === "text" ? column.config.maxLength : undefined
           }
@@ -307,6 +460,8 @@ interface RelationFieldProps {
   editable: boolean;
   /** Open the picker immediately — the grid's + landed here on purpose. */
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onRefresh: () => void;
 }
 
@@ -323,9 +478,11 @@ function RelationField({
   links,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onRefresh,
 }: RelationFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
   const [candidates, setCandidates] = useState<
     Array<{ id: string; title: string }> | null
   >(null);
@@ -527,6 +684,8 @@ interface ContentLinkFieldProps {
   value: CellValue | undefined;
   editable: boolean;
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onOpenContent: (ref: ContentRef) => void;
   onCommit: (value: unknown) => void;
 }
@@ -544,10 +703,12 @@ function ContentLinkField({
   value,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onOpenContent,
   onCommit,
 }: ContentLinkFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
   // The anchor ELEMENT lives in state, not a ref: it is read during render
   // (the picker needs it as a prop), and the React Compiler correctly
   // rejects ref reads in render. A callback ref keeps it current.
@@ -664,6 +825,8 @@ interface PersonFieldProps {
   personRef?: PersonRef;
   editable: boolean;
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onCommit: (value: unknown) => void;
 }
 
@@ -680,11 +843,13 @@ function PersonField({
   personRef,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onCommit,
 }: PersonFieldProps) {
   const source = column.config.personSource ?? "person";
   const canPick = editable && source === "person";
   const [picking, setPicking] = useState(autoOpen && canPick);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, canPick, () => setPicking(true));
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<
     Array<{ id: string; name: string }> | null
