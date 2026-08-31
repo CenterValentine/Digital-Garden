@@ -89,6 +89,26 @@ function useAutoOpenOnToken(
   }
 }
 
+/**
+ * The other half of the grid-"+" handoff: scroll the TARGET field into
+ * view. Without this, a + aimed at a field below the peek's fold opened
+ * its picker against an off-screen anchor — portal-positioned outside the
+ * viewport, reading as "nothing happened" (owner, 2026-08-31). The
+ * pickers reposition on scroll, so scrolling after mount is enough; the
+ * token re-fires it per click, like auto-open itself.
+ */
+function useScrollIntoViewOnFocus(
+  active: boolean,
+  token: number | undefined
+) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    ref.current?.scrollIntoView({ block: "center" });
+  }, [active, token]);
+  return ref;
+}
+
 export function DataRowFields({
   tableId,
   row,
@@ -494,6 +514,7 @@ function RelationField({
 }: RelationFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
   useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
   const [candidates, setCandidates] = useState<
     Array<{ id: string; title: string }> | null
   >(null);
@@ -602,7 +623,10 @@ function RelationField({
   );
 
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className="border-b border-border/40 py-2.5 last:border-b-0"
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>
@@ -723,6 +747,7 @@ function ContentLinkField({
 }: ContentLinkFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
   useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
 
   // File columns: the + UPLOADS (what a File cell's + should mean); a
   // secondary 🔗 links something already in the tree. contentLink keeps
@@ -803,7 +828,10 @@ function ContentLinkField({
   );
 
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className="border-b border-border/40 py-2.5 last:border-b-0"
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>
@@ -950,6 +978,7 @@ function PersonField({
   const canPick = editable && source === "person";
   const [picking, setPicking] = useState(autoOpen && canPick);
   useAutoOpenOnToken(autoOpen, autoOpenToken, canPick, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<
     Array<{ id: string; name: string }> | null
@@ -989,7 +1018,10 @@ function PersonField({
   }, [picking, query]);
 
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className="border-b border-border/40 py-2.5 last:border-b-0"
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>
