@@ -13,8 +13,8 @@
  * hazard the grid cells dodge, dodged the same way.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link2, Loader2, Plus, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { editDraftFor } from "./DataGridRow";
 import {
@@ -107,6 +107,7 @@ export function DataRowFields({
         ) : column.type === "contentLink" || column.type === "file" ? (
           <ContentLinkField
             key={`${row.id}:${column.id}`}
+            tableId={tableId}
             column={column}
             refs={row.contentRefs?.[column.id] ?? []}
             value={row.data[column.key]}
@@ -679,6 +680,8 @@ function RelationField({
 // ── Content link field ───────────────────────────────────────────────────
 
 interface ContentLinkFieldProps {
+  /** The table's contentId — uploaded attachments nest under it. */
+  tableId: string;
   column: DataColumn;
   refs: ContentRef[];
   value: CellValue | undefined;
@@ -698,6 +701,7 @@ interface ContentLinkFieldProps {
  * the ContentLink backlinks dual-write server-side.
  */
 function ContentLinkField({
+  tableId,
   column,
   refs,
   value,
@@ -709,6 +713,14 @@ function ContentLinkField({
 }: ContentLinkFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
   useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
+
+  // File columns: the + UPLOADS (what a File cell's + should mean); a
+  // secondary 🔗 links something already in the tree. contentLink keeps
+  // its single + → picker. Uploads land as real file nodes UNDER the
+  // database node — deliberate placement, never root litter.
+  const isFile = column.type === "file";
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   // The anchor ELEMENT lives in state, not a ref: it is read during render
   // (the picker needs it as a prop), and the React Compiler correctly
   // rejects ref reads in render. A callback ref keeps it current.
@@ -738,6 +750,38 @@ function ContentLinkField({
       onCommit(next.length > 0 ? next : undefined);
     },
     [ids, onCommit]
+  );
+
+  const uploadFiles = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      setUploading(true);
+      try {
+        const added: string[] = [];
+        for (const file of Array.from(files)) {
+          const fd = new FormData();
+          fd.append("file", file);
+          fd.append("parentId", tableId);
+          const res = await fetch("/api/content/content/upload/simple", {
+            method: "POST",
+            credentials: "include",
+            body: fd,
+          });
+          const json = await res.json().catch(() => null);
+          const id = json?.data?.contentId as string | undefined;
+          if (res.ok && id && !ids.includes(id) && !added.includes(id)) {
+            added.push(id);
+          }
+        }
+        if (added.length > 0) {
+          onCommit([...ids, ...added]);
+          window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    [ids, onCommit, tableId]
   );
 
   return (
@@ -781,16 +825,49 @@ function ContentLinkField({
             )}
           </span>
         ))}
+        {editable && isFile && (
+          <>
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                void uploadFiles(e.target.files);
+                // Same file re-selectable next time.
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Upload files"
+              title="Upload files"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              ) : (
+                <Plus className="h-2.5 w-2.5" />
+              )}
+            </button>
+          </>
+        )}
         {editable && (
           <button
             ref={setAnchorEl}
             type="button"
-            aria-label="Link content"
-            title="Link content"
+            aria-label={isFile ? "Link an existing file" : "Link content"}
+            title={isFile ? "Link an existing file" : "Link content"}
             onClick={() => setPicking((p) => !p)}
             className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
-            <Plus className="h-2.5 w-2.5" />
+            {isFile ? (
+              <Link2 className="h-2.5 w-2.5" />
+            ) : (
+              <Plus className="h-2.5 w-2.5" />
+            )}
           </button>
         )}
       </div>

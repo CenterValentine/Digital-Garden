@@ -131,6 +131,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * when the peek (and the target column's focus) is already in place —
    * an initializer-only read misses that case entirely. */
   const [peekFocusToken, setPeekFocusToken] = useState(0);
+  /** Title rename: null = viewing. The override shows the committed rename
+   * until the prop refreshes through the content-updated event round trip. */
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     columnId: string;
     side: "left" | "right";
@@ -1090,6 +1094,37 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [contentId, columns, state.view, sendWrites, load, clientId]
   );
 
+  const effectiveTitle = titleOverride ?? title;
+
+  /**
+   * Rename the database from its own header — double-click, like a note's
+   * title. The PATCH renames the ContentNode; the content-updated event is
+   * the same hook every other rename travels on, so the file tree label
+   * and any open tab follow without bespoke wiring.
+   */
+  const commitTitle = useCallback(async () => {
+    const draft = titleDraft?.trim();
+    setTitleDraft(null);
+    if (!draft || draft === effectiveTitle) return;
+    const res = await fetch(`/api/content/content/${contentId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: draft }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || json?.success === false) {
+      setNotice(json?.error?.message ?? "Could not rename the database");
+      return;
+    }
+    setTitleOverride(draft);
+    window.dispatchEvent(
+      new CustomEvent("content-updated", {
+        detail: { contentId, updates: { title: draft } },
+      })
+    );
+  }, [titleDraft, effectiveTitle, contentId]);
+
   /**
    * Create one select/status/multiSelect option from a ROW editor — the
    * "just type it" path, so adding a category doesn't mean a detour
@@ -1251,7 +1286,15 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         setSelectedCell({ rowId: nextRow.id, columnKey: columns[nci].key });
       } else if (e.key === "Enter") {
         const column = columns.find((c) => c.key === selectedCell.columnKey);
-        if (column && INLINE_EDITABLE_TYPES.has(column.type)) {
+        // Select-likes open their option picker through the same forced-
+        // edit remount the text editors use.
+        if (
+          column &&
+          (INLINE_EDITABLE_TYPES.has(column.type) ||
+            column.type === "select" ||
+            column.type === "status" ||
+            column.type === "multiSelect")
+        ) {
           e.preventDefault();
           setEditTarget(selectedCell);
         }
@@ -1426,7 +1469,40 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
-            <h2 className="truncate text-sm font-semibold">{title}</h2>
+            {titleDraft !== null ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => void commitTitle()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitTitle();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setTitleDraft(null);
+                  }
+                }}
+                aria-label="Database title"
+                className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
+              />
+            ) : (
+              <h2
+                className={cn(
+                  "truncate text-sm font-semibold",
+                  state.canWrite && "cursor-text"
+                )}
+                title={state.canWrite ? "Double-click to rename" : undefined}
+                onDoubleClick={
+                  state.canWrite
+                    ? () => setTitleDraft(effectiveTitle)
+                    : undefined
+                }
+              >
+                {effectiveTitle}
+              </h2>
+            )}
             <span className="shrink-0 font-mono text-xs text-muted-foreground">
               {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
             </span>
@@ -1435,7 +1511,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               title — crumbs mirror a real file-tree selection. */}
           <ContentPathBreadcrumb
             contentId={contentId}
-            currentTitle={title}
+            currentTitle={effectiveTitle}
             currentContentType="data"
           />
         </div>
@@ -1536,7 +1612,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       {notice && (
         <div
           role="status"
-          className="border-b border-border bg-muted/50 px-4 py-1.5 text-xs text-muted-foreground"
+          // Amber, the repo's most neutral yellow (the template-warning
+          // family) — a save that didn't land deserves warning weight, not
+          // the muted grey that reads as a status line.
+          className="border-b border-amber-300/60 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
         >
           {notice}
           <button
@@ -1698,6 +1777,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   row={row}
                   columns={columns}
                   widths={columnWidths}
+                  onCreateOption={state.canAlterSchema ? createOption : undefined}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={canEditData}

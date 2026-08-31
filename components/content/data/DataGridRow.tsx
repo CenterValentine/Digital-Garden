@@ -28,6 +28,8 @@ import {
   ExternalLink,
   Flag,
   Heart,
+  Plus,
+  Square,
   Star,
   ThumbsUp,
   type LucideIcon,
@@ -35,6 +37,7 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
+  sortStatusOptions,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -45,9 +48,16 @@ import {
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 import { PanelPortal } from "./PanelPortal";
 
-/** Checkbox display variants (config.checkDisplay). Filled when checked. */
-const CHECK_ICONS: Record<string, { icon: LucideIcon; fillable: boolean }> = {
-  check: { icon: Check, fillable: false },
+/** Checkbox display variants (config.checkDisplay). Filled when checked.
+ * The ✓ variant's UNCHECKED state is an empty box, not a faded check —
+ * a ghost checkmark reads as "checked but disabled" (owner, 2026-08-31);
+ * the shaped variants (star/heart/…) keep their own faded outline, where
+ * the silhouette itself says what clicking will do. */
+const CHECK_ICONS: Record<
+  string,
+  { icon: LucideIcon; uncheckedIcon?: LucideIcon; fillable: boolean }
+> = {
+  check: { icon: Check, uncheckedIcon: Square, fillable: false },
   star: { icon: Star, fillable: true },
   heart: { icon: Heart, fillable: true },
   flag: { icon: Flag, fillable: true },
@@ -105,6 +115,11 @@ interface DataGridRowProps {
   /** Effective column widths keyed by column id (view prefs + live drag).
    * Memoized by the parent so this memo()'d row only re-renders on change. */
   widths?: Record<string, number>;
+  /** Owner-only: create a select/status option from the cell picker. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
   height: number;
   selected: boolean;
   editable: boolean;
@@ -130,6 +145,7 @@ function DataGridRowImpl({
   row,
   columns,
   widths,
+  onCreateOption,
   height,
   selected,
   editable,
@@ -185,6 +201,7 @@ function DataGridRowImpl({
             key={`${column.id}:${forceEdit ? "e" : "v"}`}
             column={column}
             width={widths?.[column.id] ?? DEFAULT_COLUMN_WIDTH}
+            onCreateOption={onCreateOption}
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
@@ -214,6 +231,11 @@ export const DataGridRow = memo(DataGridRowImpl);
 interface DataCellProps {
   column: DataColumn;
   width: number;
+  /** Owner-only: create a select/status option from the cell picker. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
   rowId: string;
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
@@ -238,6 +260,7 @@ interface DataCellProps {
 function DataCell({
   column,
   width,
+  onCreateOption,
   rowId,
   value,
   links,
@@ -267,6 +290,18 @@ function DataCell({
     forceEdit && canInlineEdit ? editDraftFor(column, value) : null
   );
   const editing = draft !== null;
+
+  // Select-like cells edit through an anchored option picker instead of a
+  // text draft. Seeded from forceEdit the same way (keyed remount), so
+  // Enter-on-selected opens it too.
+  const [optionsOpen, setOptionsOpen] = useState(
+    () =>
+      forceEdit &&
+      editable &&
+      (column.type === "select" ||
+        column.type === "status" ||
+        column.type === "multiSelect")
+  );
 
   const beginEdit = useCallback(() => {
     setDraft(editDraftFor(column, value));
@@ -337,15 +372,22 @@ function DataCell({
             aria-label={column.name}
             className={cn("rounded p-0.5", editable && "hover:bg-muted")}
           >
-            <iconEntry.icon
-              className={cn(
-                "h-3.5 w-3.5",
-                checked ? colorClass : "text-muted-foreground/40"
-              )}
-              fill={
-                checked && iconEntry.fillable ? "currentColor" : "none"
-              }
-            />
+            {(() => {
+              const Icon = checked
+                ? iconEntry.icon
+                : (iconEntry.uncheckedIcon ?? iconEntry.icon);
+              return (
+                <Icon
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    checked ? colorClass : "text-muted-foreground/40"
+                  )}
+                  fill={
+                    checked && iconEntry.fillable ? "currentColor" : "none"
+                  }
+                />
+              );
+            })()}
           </button>
         ) : (
           <input
@@ -544,6 +586,64 @@ function DataCell({
     column.type === "status" ||
     column.type === "multiSelect";
 
+  // Select-like cells: pill display + a dashed "+" (same affordance the
+  // relation cells teach) opening an anchored option picker — pick, clear,
+  // and (owners) create options without leaving the grid. Was: no editor
+  // at all, which read as "these cells are dead" (owner, 2026-08-31).
+  if (isSelectLike) {
+    const display = cellToDisplayText(column, value);
+    const close = () => {
+      setOptionsOpen(false);
+      onEditEnd();
+    };
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
+          editable && "cursor-pointer",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width }}
+        onClick={() => onSelect(rowId, column.key)}
+        onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
+        title={display || (editable ? "Double-click to choose" : undefined)}
+      >
+        {display ? (
+          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]">
+            {display}
+          </span>
+        ) : null}
+        {editable && (
+          <button
+            type="button"
+            aria-label={`Choose ${column.name}`}
+            title="Choose options"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              setOptionsOpen(true);
+            }}
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            +
+          </button>
+        )}
+        {optionsOpen && editable && (
+          <PanelPortal open onDismiss={close}>
+            <SelectOptionsPanel
+              column={column}
+              value={value}
+              rowId={rowId}
+              onCommit={onCommit}
+              onCreateOption={onCreateOption}
+              onClose={close}
+            />
+          </PanelPortal>
+        )}
+      </div>
+    );
+  }
+
   // Long text edits in an anchored popover, not the 36px inline input —
   // Enter makes a NEWLINE here (⌘Enter/click-away saves, Esc cancels),
   // which is the felt difference between the two text types. PanelPortal's
@@ -717,6 +817,7 @@ function DataCell({
           opens. Scheme-guarded: only encoder-normalized values (http/https)
           render a link; a legacy bare "example.com" would resolve as a
           RELATIVE path. */}
+      {/* (select-like cells return earlier via SelectOptionsPanel) */}
       {column.type === "url" &&
         typeof value === "string" &&
         /^https?:\/\//i.test(value) && (
@@ -732,6 +833,171 @@ function DataCell({
             <ExternalLink className="h-3 w-3" />
           </a>
         )}
+    </div>
+  );
+}
+
+// ── Select-like option picker ────────────────────────────────────────────
+
+interface SelectOptionsPanelProps {
+  column: DataColumn;
+  value: CellValue | undefined;
+  rowId: string;
+  onCommit: (rowId: string, columnKey: string, value: unknown) => void;
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  onClose: () => void;
+}
+
+/**
+ * The grid cell's option picker. Single select commits and closes; multi
+ * toggles live and closes on dismiss. "+ New option" (owners only, via
+ * onCreateOption) creates AND applies — you typed it in this cell because
+ * this row wears it. Mirrors the peek's inline creation, different chrome.
+ */
+function SelectOptionsPanel({
+  column,
+  value,
+  rowId,
+  onCommit,
+  onCreateOption,
+  onClose,
+}: SelectOptionsPanelProps) {
+  const multi = column.type === "multiSelect";
+  const options =
+    column.type === "status"
+      ? sortStatusOptions(column.config.options ?? [])
+      : (column.config.options ?? []);
+  const chosen = new Set(
+    multi
+      ? Array.isArray(value)
+        ? value
+        : []
+      : typeof value === "string"
+        ? [value]
+        : []
+  );
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState("");
+
+  const commitSingle = (id: string) => {
+    // Re-picking the current option clears it — the one-click "unset".
+    onCommit(rowId, column.key, chosen.has(id) ? undefined : id);
+    onClose();
+  };
+
+  const toggleMulti = (id: string) => {
+    const next = new Set(chosen);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    // Option-definition order — cell arrays are order-significant (B8c).
+    const ordered = options.filter((o) => next.has(o.id)).map((o) => o.id);
+    onCommit(rowId, column.key, ordered.length > 0 ? ordered : undefined);
+  };
+
+  const submitNew = async () => {
+    if (!onCreateOption) return;
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const created = await onCreateOption(column, trimmed);
+    if (created) {
+      if (multi) {
+        const current = Array.isArray(value) ? value : [];
+        if (!current.includes(created.id)) {
+          onCommit(rowId, column.key, [...current, created.id]);
+        }
+      } else {
+        onCommit(rowId, column.key, created.id);
+      }
+    }
+    setLabel("");
+    setAdding(false);
+    if (!multi) onClose();
+  };
+
+  return (
+    <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+      {options.length === 0 && (
+        <p className="px-1 py-0.5 text-[11px] italic text-muted-foreground">
+          No options yet.
+        </p>
+      )}
+      {options.map((o) =>
+        multi ? (
+          <label
+            key={o.id}
+            className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+          >
+            <input
+              type="checkbox"
+              checked={chosen.has(o.id)}
+              onChange={() => toggleMulti(o.id)}
+              className="h-3.5 w-3.5 accent-current"
+            />
+            <span className="truncate">{o.label}</span>
+          </label>
+        ) : (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => commitSingle(o.id)}
+            className={cn(
+              "flex items-center gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-muted/60",
+              chosen.has(o.id) && "bg-muted/40"
+            )}
+          >
+            <Check
+              className={cn(
+                "h-3 w-3 shrink-0",
+                chosen.has(o.id) ? "opacity-100" : "opacity-0"
+              )}
+            />
+            <span className="truncate">{o.label}</span>
+          </button>
+        )
+      )}
+
+      {onCreateOption &&
+        (adding ? (
+          <div className="mt-1 flex items-center gap-1">
+            <input
+              autoFocus
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitNew();
+                } else if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setAdding(false);
+                  setLabel("");
+                }
+              }}
+              placeholder="New option label"
+              className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="button"
+              onClick={() => void submitNew()}
+              disabled={!label.trim()}
+              className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-1 flex items-center gap-1 rounded px-1.5 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" />
+            New option
+          </button>
+        ))}
     </div>
   );
 }
