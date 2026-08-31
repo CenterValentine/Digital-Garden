@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link2, Loader2, Plus, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { editDraftFor } from "./DataGridRow";
 import {
@@ -36,6 +37,15 @@ const fieldClass = cn(
   "w-full rounded-md border border-border bg-background px-2 py-1.5",
   "text-xs outline-none focus:ring-2 focus:ring-primary"
 );
+
+/** File-column link picker: folders + notes are for NAVIGATING (editor
+ * attachments live under notes), files are what's pickable — the `add`
+ * guard turns a folder/note pick into a teaching toast. */
+const FILE_LINK_ELIGIBLE_TYPES: ReadonlySet<string> = new Set([
+  "folder",
+  "note",
+  "file",
+]);
 
 interface DataRowFieldsProps {
   /** The table's contentId — relation link writes go through its API. */
@@ -736,12 +746,20 @@ function ContentLinkField({
   );
 
   const add = useCallback(
-    (target: { id: string }) => {
+    (target: { id: string; contentType?: string }) => {
+      // File cells hold uploaded attachments — the server rejects non-file
+      // ids (writeCells), so teach at pick time instead of failing after.
+      if (isFile && target.contentType !== "file") {
+        toast.info(
+          "File cells hold uploaded files — pick a file, or upload with +"
+        );
+        return;
+      }
       setPicking(false);
       if (ids.includes(target.id)) return;
       onCommit([...ids, target.id]);
     },
-    [ids, onCommit]
+    [ids, onCommit, isFile]
   );
 
   const remove = useCallback(
@@ -879,9 +897,14 @@ function ContentLinkField({
           onClose={() => setPicking(false)}
           disabledIds={ids}
           disabledReason="already linked"
-          searchPlaceholder="Link notes, files, folders…"
+          searchPlaceholder={
+            isFile ? "Link a file already in the app…" : "Link notes, files, folders…"
+          }
           views={views}
           defaultViewId={defaultViewId}
+          // File columns browse a narrowed tree: folders + notes for
+          // navigation (attachments live under notes), files to pick.
+          eligibleTypes={isFile ? FILE_LINK_ELIGIBLE_TYPES : undefined}
         />
       )}
 

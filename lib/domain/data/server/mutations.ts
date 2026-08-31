@@ -136,6 +136,46 @@ export async function writeCells(
       );
     }
 
+    // File cells hold UPLOADED ATTACHMENTS — every id must be a file node
+    // (owner clarification, 2026-08-31: File = external content brought in;
+    // Content Link = references to app content). Enforced HERE so every
+    // write path — grid, peek, AI update_row/insert_rows — agrees. Note
+    // ids created by AI file tools pass (they ARE file nodes); a note or
+    // folder id is a category error. Legacy cells keep displaying; only
+    // new writes are held to the contract.
+    const fileIdsToCheck = new Set<string>();
+    for (const write of writes) {
+      if (byKey.get(write.columnKey)?.type !== "file") continue;
+      if (!Array.isArray(write.value)) continue;
+      for (const id of write.value) {
+        if (typeof id === "string") fileIdsToCheck.add(id);
+      }
+    }
+    if (fileIdsToCheck.size > 0) {
+      const nodes = await tx.contentNode.findMany({
+        where: { id: { in: [...fileIdsToCheck] }, deletedAt: null },
+        select: { id: true, contentType: true, title: true },
+      });
+      const nodeById = new Map(nodes.map((n) => [n.id, n]));
+      for (const write of writes) {
+        if (byKey.get(write.columnKey)?.type !== "file") continue;
+        if (!Array.isArray(write.value)) continue;
+        const bad = write.value.find(
+          (id) =>
+            typeof id === "string" && nodeById.get(id)?.contentType !== "file"
+        );
+        if (bad === undefined) continue;
+        const node = nodeById.get(bad as string);
+        results.push({
+          status: "error",
+          rowId: write.rowId,
+          message: node
+            ? `"${node.title}" is a ${node.contentType}, not an uploaded file — File cells hold uploaded attachments; use a Content Link column for other content`
+            : "File cells hold uploaded attachments — one of the ids is not a file in this garden",
+        });
+      }
+    }
+
     const failed = results.some((r) => r.status !== "applied");
     if (failed) {
       // Abandon the whole batch. Returning without writing is the point.

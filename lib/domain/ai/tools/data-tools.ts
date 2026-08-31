@@ -641,7 +641,7 @@ export function createDataTools(ctx: ToolExecuteContext) {
 
     update_row: tool({
       description:
-        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows.",
+        "Update cells in ONE existing row. Only the columns you pass change — when the user under-specifies, OMIT everything they didn't mention, never guess a value. Pass null to CLEAR a cell, and only when the user asked for it to be blank. Get the rowId from query_database (each result line starts with [rowId]); pass expect with the current values from that same read — a stale expect fails safe instead of overwriting someone's edit, and the result tells you to re-query. All-or-nothing: if any cell is stale or invalid, no cell changes. Cannot touch relations (links) or computed columns, and cannot create or delete rows. File cells accept ONLY ids of file nodes (uploaded attachments, or files you created with a file tool) — other content belongs in a contentLink cell; to attach something from the user's disk, ask them to upload via the cell's + first.",
       inputSchema: z.object({
         databaseId: z
           .string()
