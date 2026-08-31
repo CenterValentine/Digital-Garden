@@ -20,7 +20,7 @@
  */
 
 import { useEffect } from "react";
-import { ChevronDown, ChevronUp, X } from "lucide-react";
+import { ChevronDown, ChevronUp, NotebookPen, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
@@ -110,8 +110,25 @@ export function DataRowPeek({
       <header className="flex items-center gap-1 border-b border-border/60 px-3 py-2">
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
           Row {index + 1} of {total}
-          {!row.contentId && " · not a page"}
         </span>
+        {/* The note affordance lives HERE, not in a paragraph at the bottom
+            of the field stack — it was the peek's most buried feature
+            (owner, 2026-08-31). Long copy demoted to the tooltip. */}
+        {(row.contentId || editable) && (
+          <button
+            type="button"
+            onClick={() => onOpenAsPage(row.id)}
+            title={
+              row.contentId
+                ? "Open this row's note"
+                : "A note gives this row a body, tags, and backlinks — it stays a row of this database either way"
+            }
+            className="ml-1.5 flex items-center gap-1 rounded border border-border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <NotebookPen className="h-3 w-3" />
+            {row.contentId ? "Open note" : "Add note"}
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-0.5">
           <button
             type="button"
@@ -172,22 +189,9 @@ export function DataRowPeek({
           onRefresh={onRefresh}
         />
 
-        <div className="mt-4 rounded-md border border-dashed border-border p-2.5">
-          <p className="text-[11px] leading-snug text-muted-foreground">
-            {row.contentId
-              ? "This row is a note nested under this database — its body, tags, and backlinks live there."
-              : "Open this row as a page to give it a note body, tags, and backlinks. It stays a row of this database either way."}
-          </p>
-          {editable && (
-            <button
-              type="button"
-              onClick={() => onOpenAsPage(row.id)}
-              className="mt-2 rounded bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground"
-            >
-              {row.contentId ? "Open page" : "Open as page"}
-            </button>
-          )}
-        </div>
+        {/* The note affordance moved to the header (Add note / Open note) —
+            the dashed explainer box it replaced was paragraph-shaped UI for
+            a button-shaped feature. */}
       </div>
     </aside>
   );
