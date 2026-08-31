@@ -26,6 +26,7 @@ import { z } from "zod/v4";
 import { prisma } from "@/lib/database/client";
 import { logger } from "@/lib/core/logger";
 import {
+  canAlterSchema,
   canRead,
   canWrite,
   resolveDataTableAccess,
@@ -765,6 +766,170 @@ export function createDataTools(ctx: ToolExecuteContext) {
             error,
           });
           return "Updating the row failed with an internal error — nothing may have been written; tell the user.";
+        }
+      },
+    }),
+
+    // ─── propose_column_options ─────────────────────────────
+    // Proposal, not a write: the sentinel renders as an interactive card
+    // (ColumnOptionsProposalCard) and the USER's Apply click does the
+    // columns PATCH — same contract as the flashcards propose_* tools.
+    // Validation still happens here so the card never renders something
+    // that would fail on apply.
+    propose_column_options: tool({
+      description:
+        "Propose a set of options (categories) for a select, multi-select, or status column in an associated database. Renders a review card — NOTHING is written until the user clicks Apply, so never claim the options were added. Use when a column has no options yet or the user asks for category suggestions; consider query_database first so proposals reflect the values actually in the table. Once you call this, stop — the card in the chat is the confirmation.",
+      inputSchema: z.object({
+        databaseId: z
+          .string()
+          .optional()
+          .describe(
+            "The database's id or exact name; omit in a chat open on the database"
+          ),
+        column: z
+          .string()
+          .describe(
+            "The target column — its name (case-insensitive) or id. Must be a select, multiSelect, or status column."
+          ),
+        options: z
+          .array(
+            z.object({
+              label: z.string().describe("The option's display label"),
+              color: z
+                .string()
+                .optional()
+                .describe(
+                  "Optional color intent name (e.g. blue, green, amber, red)"
+                ),
+              group: z
+                .enum(["todo", "active", "done"])
+                .optional()
+                .describe("Status columns only: which board group"),
+            })
+          )
+          .describe("The proposed options, in display order (at most 50)"),
+        replace: z
+          .boolean()
+          .optional()
+          .describe(
+            "true = propose REPLACING the existing options (removed options blank their cells without erasing data); default adds to them"
+          ),
+        rationale: z
+          .string()
+          .optional()
+          .describe("One sentence on why these options fit — shown on the card"),
+      }),
+      execute: async (input) => {
+        try {
+          const dbRef = await resolveDatabaseRef(ctx, input.databaseId);
+          if ("refusal" in dbRef) return dbRef.refusal;
+          const gate = await resolveJurisdiction(ctx, dbRef.id);
+          if ("refusal" in gate) return gate.refusal;
+          const { table, level } = gate;
+          if (table.mode === "query") {
+            return "Query databases synthesize their columns — there are no options to configure.";
+          }
+          // Schema access is stricter than cell writes (plan Phase 6); the
+          // Apply PATCH would 403, so teach that now instead of rendering a
+          // dead card.
+          if (!canAlterSchema(level)) {
+            return "Only this database's owner can change column options — tell the user, and suggest they ask the owner.";
+          }
+
+          const live = table.columns.filter((c) => !c.deletedAt);
+          const column = findColumn(live, input.column);
+          if (!column) {
+            return `No column named "${input.column}". Columns here: ${live.map((c) => c.name).join(", ")}.`;
+          }
+          if (
+            column.type !== "select" &&
+            column.type !== "multiSelect" &&
+            column.type !== "status"
+          ) {
+            const selectLikes = live.filter(
+              (c) =>
+                c.type === "select" ||
+                c.type === "multiSelect" ||
+                c.type === "status"
+            );
+            return `"${column.name}" is a ${column.type} column — options belong to select, multi-select, and status columns${
+              selectLikes.length > 0
+                ? ` (here: ${selectLikes.map((c) => c.name).join(", ")})`
+                : " (this table has none)"
+            }.`;
+          }
+
+          if (input.options.length === 0) {
+            return "No options given — propose at least one.";
+          }
+          if (input.options.length > 50) {
+            return "At most 50 options per proposal — a longer vocabulary than that is usually a sign the column wants free text instead.";
+          }
+
+          const existing = column.config.options ?? [];
+          const existingLower = new Set(
+            existing.map((o) => o.label.trim().toLowerCase())
+          );
+          const replace = input.replace === true;
+          const seen = new Set<string>();
+          const cleaned: Array<{
+            label: string;
+            color?: string;
+            group?: "todo" | "active" | "done";
+          }> = [];
+          const skippedExisting: string[] = [];
+          for (const raw of input.options) {
+            const label = raw.label.trim().slice(0, 120);
+            if (!label) continue;
+            const lower = label.toLowerCase();
+            if (seen.has(lower)) continue;
+            seen.add(lower);
+            // Add-mode duplicates are reported, not silently dropped by the
+            // card — the model should learn the vocabulary already exists.
+            if (!replace && existingLower.has(lower)) {
+              skippedExisting.push(label);
+              continue;
+            }
+            cleaned.push({
+              label,
+              // Color intents are free-form tokens for the renderer; keep
+              // only slug-shaped values so junk never reaches config.
+              ...(raw.color && /^[a-z][a-z0-9-]{0,23}$/.test(raw.color)
+                ? { color: raw.color }
+                : {}),
+              ...(column.type === "status"
+                ? { group: raw.group ?? "todo" }
+                : {}),
+            });
+          }
+
+          if (cleaned.length === 0) {
+            return skippedExisting.length > 0
+              ? `Every proposed option already exists on "${column.name}" (${skippedExisting.join(", ")}) — nothing to propose.`
+              : "No usable options after cleaning (blank labels) — propose real labels.";
+          }
+
+          return JSON.stringify({
+            __columnOptionsProposal: true,
+            databaseId: dbRef.id,
+            databaseTitle: table.title,
+            columnId: column.id,
+            columnName: column.name,
+            columnType: column.type,
+            replace,
+            rationale: input.rationale?.trim() || null,
+            options: cleaned,
+            existingLabels: existing.map((o) => o.label),
+            skippedExisting,
+          });
+        } catch (error) {
+          logger.warn({
+            layer: "ai",
+            event: "data_tools:propose_options_caught",
+            summary: "propose_column_options failed",
+            error,
+          });
+          return "Proposing options failed with an internal error — nothing was changed; tell the user.";
         }
       },
     }),

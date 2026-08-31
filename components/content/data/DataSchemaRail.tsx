@@ -89,8 +89,8 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
     void load();
   }, [load]);
 
-  // Grid-side schema changes → refetch. Own echoes are skipped: the rail
-  // already reloads after its own mutations.
+  // Schema changes from other surfaces (grid, AI proposal card) → refetch.
+  // Own echoes are skipped: the rail already reloads after its mutations.
   useEffect(() => {
     const onChanged = (e: Event) => {
       const detail = (e as CustomEvent<DataSchemaChangedDetail>).detail;

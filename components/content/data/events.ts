@@ -13,7 +13,8 @@ export const DATA_SCHEMA_CHANGED_EVENT = "dg:data-schema-changed";
 
 export interface DataSchemaChangedDetail {
   tableId: string;
-  source: "grid" | "rail";
+  /** Who made the change — listeners skip their OWN tag, reload on others. */
+  source: "grid" | "rail" | "chat";
 }
 
 export function dispatchDataSchemaChanged(

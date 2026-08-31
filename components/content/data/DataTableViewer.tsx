@@ -836,12 +836,13 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [contentId, load, state.view]
   );
 
-  // Rail-side schema edits → reload the grid. The rail tags its dispatches
-  // so the grid's own post-mutation reload is never doubled.
+  // Schema edits from OTHER surfaces (the context rail, an AI proposal
+  // card) → reload the grid. Own dispatches are skipped — the grid already
+  // reloads after its own mutations.
   useEffect(() => {
     const onChanged = (e: Event) => {
       const detail = (e as CustomEvent<DataSchemaChangedDetail>).detail;
-      if (detail?.tableId !== contentId || detail.source !== "rail") return;
+      if (detail?.tableId !== contentId || detail.source === "grid") return;
       void load(viewRef.current?.id ?? null);
     };
     window.addEventListener(DATA_SCHEMA_CHANGED_EVENT, onChanged);
