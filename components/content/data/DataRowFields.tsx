@@ -18,6 +18,7 @@ import { Link2, Loader2, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { editDraftFor } from "./DataGridRow";
+import { dragHasFiles, uploadFilesToTable } from "./file-upload";
 import {
   cellToText,
   sortStatusOptions,
@@ -795,31 +796,18 @@ function ContentLinkField({
     [ids, onCommit]
   );
 
+  const [dragActive, setDragActive] = useState(false);
   const uploadFiles = useCallback(
-    async (files: FileList | null) => {
+    async (files: FileList | File[] | null) => {
       if (!files || files.length === 0) return;
       setUploading(true);
       try {
-        const added: string[] = [];
-        for (const file of Array.from(files)) {
-          const fd = new FormData();
-          fd.append("file", file);
-          fd.append("parentId", tableId);
-          const res = await fetch("/api/content/content/upload/simple", {
-            method: "POST",
-            credentials: "include",
-            body: fd,
-          });
-          const json = await res.json().catch(() => null);
-          const id = json?.data?.contentId as string | undefined;
-          if (res.ok && id && !ids.includes(id) && !added.includes(id)) {
-            added.push(id);
-          }
-        }
-        if (added.length > 0) {
-          onCommit([...ids, ...added]);
-          window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-        }
+        // Shared path with the grid's drop/paste targets — one placement
+        // rule (under the database node) for every upload entry point.
+        const added = (await uploadFilesToTable(tableId, files)).filter(
+          (id) => !ids.includes(id)
+        );
+        if (added.length > 0) onCommit([...ids, ...added]);
       } finally {
         setUploading(false);
       }
@@ -830,7 +818,41 @@ function ContentLinkField({
   return (
     <div
       ref={fieldRef}
-      className="border-b border-border/40 py-2.5 last:border-b-0"
+      className={cn(
+        "border-b border-border/40 py-2.5 last:border-b-0",
+        dragActive && "rounded-md bg-primary/5 ring-2 ring-inset ring-primary/50"
+      )}
+      // File fields are drop targets — OS-file drags only (dragHasFiles),
+      // so the app's own row/column drags never trigger the affordance.
+      onDragOver={
+        isFile && editable
+          ? (e) => {
+              if (!dragHasFiles(e)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDragActive(true);
+            }
+          : undefined
+      }
+      onDragLeave={
+        isFile && editable
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragActive(false);
+              }
+            }
+          : undefined
+      }
+      onDrop={
+        isFile && editable
+          ? (e) => {
+              if (!dragHasFiles(e)) return;
+              e.preventDefault();
+              setDragActive(false);
+              void uploadFiles(e.dataTransfer.files);
+            }
+          : undefined
+      }
     >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
@@ -927,6 +949,17 @@ function ContentLinkField({
           disabledReason="already linked"
           searchPlaceholder={
             isFile ? "Link a file already in the app…" : "Link notes, files, folders…"
+          }
+          headerAction={
+            isFile
+              ? {
+                  label: "Upload from device…",
+                  onClick: () => {
+                    setPicking(false);
+                    fileInputRef.current?.click();
+                  },
+                }
+              : undefined
           }
           views={views}
           defaultViewId={defaultViewId}

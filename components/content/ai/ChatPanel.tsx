@@ -15,7 +15,7 @@
 
 import { useRef, useEffect, useCallback, useState, useMemo } from "react";
 import { usePathname } from "next/navigation";
-import { Trash2, Bot, Pencil, Maximize2, ChevronDown } from "lucide-react";
+import { Trash2, Bot, Pencil, Maximize2, ChevronDown, Link2 } from "lucide-react";
 import { PROVIDER_CATALOG } from "@/lib/domain/ai/providers/catalog";
 import { getProviderTheme } from "@/lib/design/system/ai-providers";
 import { useResolvedTheme } from "@/lib/features/theme/useResolvedTheme";
@@ -922,6 +922,31 @@ export function ChatPanel({
     }
   }, [conversationId]);
 
+  // Copy a durable link to this chat: ensure the backing content node
+  // exists (same endpoint the full-view button uses), then copy its
+  // ?content= URL — WITHOUT navigating. The link reopens the chat in the
+  // full-page viewer.
+  const handleCopyChatLink = useCallback(async () => {
+    if (!conversationId) return;
+    try {
+      const res = await fetch(
+        `/api/conversations/${encodeURIComponent(conversationId)}/open-in-page`,
+        { method: "POST", credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Could not create the chat link");
+      const body = await res.json();
+      const nodeId: string | undefined = body?.data?.contentNodeId;
+      if (!nodeId) throw new Error("Could not create the chat link");
+      const link = `${window.location.origin}/content?content=${encodeURIComponent(nodeId)}`;
+      await navigator.clipboard.writeText(link);
+      toast.success("Chat link copied");
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : "Could not copy the chat link",
+      );
+    }
+  }, [conversationId]);
+
   const hasMessages = messages.length > 0;
 
   // Model-switch dividers (AI 3.4): derived from the server's per-turn route
@@ -983,6 +1008,15 @@ export function ChatPanel({
           />
         </div>
         <div className="ml-auto flex items-center gap-1">
+          {conversationId && (
+            <button
+              onClick={() => void handleCopyChatLink()}
+              title="Copy link to this chat"
+              className="rounded p-1.5 text-gray-600 dark:text-gray-400 hover:bg-black/[0.05] dark:hover:bg-white/10 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
+            >
+              <Link2 className="h-3.5 w-3.5" />
+            </button>
+          )}
           {conversationId && (
             <button
               onClick={() => void handleOpenInPage()}

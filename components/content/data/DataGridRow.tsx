@@ -47,6 +47,7 @@ import {
 } from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 import { PanelPortal } from "./PanelPortal";
+import { dragHasFiles } from "./file-upload";
 
 /** Checkbox display variants (config.checkDisplay). Filled when checked.
  * The ✓ variant's UNCHECKED state is an empty box, not a faded check —
@@ -120,6 +121,12 @@ interface DataGridRowProps {
     column: DataColumn,
     label: string
   ) => Promise<{ id: string; label: string } | null>;
+  /** Writers: upload dropped/pasted OS files into a File cell. */
+  onUploadFiles?: (
+    rowId: string,
+    column: DataColumn,
+    files: FileList
+  ) => void | Promise<void>;
   height: number;
   selected: boolean;
   editable: boolean;
@@ -146,6 +153,7 @@ function DataGridRowImpl({
   columns,
   widths,
   onCreateOption,
+  onUploadFiles,
   height,
   selected,
   editable,
@@ -202,6 +210,7 @@ function DataGridRowImpl({
             column={column}
             width={widths?.[column.id] ?? DEFAULT_COLUMN_WIDTH}
             onCreateOption={onCreateOption}
+            onUploadFiles={onUploadFiles}
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
@@ -236,6 +245,12 @@ interface DataCellProps {
     column: DataColumn,
     label: string
   ) => Promise<{ id: string; label: string } | null>;
+  /** Writers: upload dropped OS files into a File cell. */
+  onUploadFiles?: (
+    rowId: string,
+    column: DataColumn,
+    files: FileList
+  ) => void | Promise<void>;
   rowId: string;
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
@@ -261,6 +276,7 @@ function DataCell({
   column,
   width,
   onCreateOption,
+  onUploadFiles,
   rowId,
   value,
   links,
@@ -302,6 +318,9 @@ function DataCell({
         column.type === "status" ||
         column.type === "multiSelect")
   );
+
+  /** File cells double as drop targets for OS files. */
+  const [fileDragOver, setFileDragOver] = useState(false);
 
   const beginEdit = useCallback(() => {
     setDraft(editDraftFor(column, value));
@@ -465,14 +484,51 @@ function DataCell({
   // peek's picker. Restricted/dangling targets show a redacted pill that
   // opens nothing (plan V1-3/G12).
   if (column.type === "contentLink" || column.type === "file") {
+    const fileDroppable =
+      column.type === "file" && editable && Boolean(onUploadFiles);
     return (
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          fileDragOver && "bg-primary/10 ring-2 ring-inset ring-primary/60"
         )}
         style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
+        // OS-file drags only (dragHasFiles) — the app's own column/board
+        // drags carry text data and never light this up.
+        onDragOver={
+          fileDroppable
+            ? (e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "copy";
+                setFileDragOver(true);
+              }
+            : undefined
+        }
+        onDragLeave={
+          fileDroppable
+            ? (e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setFileDragOver(false);
+                }
+              }
+            : undefined
+        }
+        onDrop={
+          fileDroppable
+            ? (e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setFileDragOver(false);
+                onSelect(rowId, column.key);
+                void onUploadFiles?.(rowId, column, e.dataTransfer.files);
+              }
+            : undefined
+        }
       >
         {(contentRefs ?? []).map((ref) =>
           ref.restricted ? (

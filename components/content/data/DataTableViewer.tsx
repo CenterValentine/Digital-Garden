@@ -63,6 +63,7 @@ import {
   dispatchDataSchemaChanged,
   type DataSchemaChangedDetail,
 } from "./events";
+import { uploadFilesToTable } from "./file-upload";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
@@ -638,7 +639,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       // the refs; without it the picker's choice looks like it never landed
       // (owner report, 2026-08-26).
       const column = state.table?.columns.find((c) => c.key === columnKey);
-      if (column && (column.type === "person" || column.type === "contentLink")) {
+      if (
+        column &&
+        (column.type === "person" ||
+          column.type === "contentLink" ||
+          column.type === "file")
+      ) {
         void load(viewRef.current?.id ?? null);
       }
 
@@ -1158,6 +1164,62 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     },
     [columnRequest]
   );
+
+  /**
+   * Upload OS files straight into a File cell — the grid's drop target
+   * and paste both land here, sharing the peek's upload path (files
+   * become nodes under the database, then link into the cell).
+   */
+  const uploadIntoFileCell = useCallback(
+    async (rowId: string, column: DataColumn, files: FileList | File[]) => {
+      if (!canEditData) return;
+      setNotice(
+        `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`
+      );
+      const uploaded = await uploadFilesToTable(contentId, files);
+      if (uploaded.length === 0) {
+        setNotice("Upload failed — nothing was attached");
+        return;
+      }
+      const row = state.rows.find((r) => r.id === rowId);
+      const current = Array.isArray(row?.data[column.key])
+        ? (row.data[column.key] as string[])
+        : [];
+      const merged = [
+        ...current,
+        ...uploaded.filter((id) => !current.includes(id)),
+      ];
+      await commitCell(rowId, column.key, merged);
+      setNotice(null);
+    },
+    [canEditData, contentId, state.rows, commitCell]
+  );
+
+  // Paste into a SELECTED File cell — the keyboard's drop. Skipped while
+  // typing in any input so ordinary pasting is never hijacked (same guard
+  // as ⌘C above).
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!selectedCell || !canEditData) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      const column = columns.find((c) => c.key === selectedCell.columnKey);
+      if (column?.type !== "file") return;
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+      e.preventDefault();
+      void uploadIntoFileCell(selectedCell.rowId, column, files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [selectedCell, canEditData, columns, uploadIntoFileCell]);
 
   /**
    * Check/uncheck every loaded row in ONE batch — one PATCH (the route
@@ -1807,6 +1869,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   columns={columns}
                   widths={columnWidths}
                   onCreateOption={state.canAlterSchema ? createOption : undefined}
+                  onUploadFiles={canEditData ? uploadIntoFileCell : undefined}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={canEditData}

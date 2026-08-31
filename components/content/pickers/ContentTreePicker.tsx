@@ -59,6 +59,7 @@ import {
   ChevronDown,
   Home,
   Layers,
+  Upload,
 } from "lucide-react";
 
 import { cn } from "@/lib/core/utils";
@@ -285,6 +286,12 @@ export interface ContentTreePickerProps {
   defaultViewId?: string | null;
   eligibleTypes?: ReadonlySet<string>;
   searchPlaceholder?: string;
+  /**
+   * Optional action row pinned under the search box — for a consumer's
+   * out-of-tree alternative (e.g. the File cell's "Upload from device").
+   * The picker stays a picker; the action's behavior is the caller's.
+   */
+  headerAction?: { label: string; onClick: () => void };
 }
 
 async function createContent(
@@ -341,6 +348,7 @@ export function ContentTreePicker({
   defaultViewId = null,
   eligibleTypes = DEFAULT_ELIGIBLE_TYPES,
   searchPlaceholder = "Search… or browse below",
+  headerAction,
 }: ContentTreePickerProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [tree, setTree] = useState<FlatRow[] | null>(null);
@@ -647,6 +655,17 @@ export function ContentTreePicker({
         autoFocus
         className="w-full bg-transparent px-3 py-2 text-xs outline-none placeholder:text-gray-500 border-b border-black/5 dark:border-white/5"
       />
+
+      {headerAction ? (
+        <button
+          type="button"
+          onClick={headerAction.onClick}
+          className="flex w-full items-center gap-2 border-b border-black/5 px-3 py-1.5 text-left text-xs text-emerald-700 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-emerald-300 dark:hover:bg-white/5"
+        >
+          <Upload className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {headerAction.label}
+        </button>
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {createError ? (
