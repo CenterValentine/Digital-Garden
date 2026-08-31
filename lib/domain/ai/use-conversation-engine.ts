@@ -563,8 +563,10 @@ export interface UseConversationEngineResult {
   // ── suggested follow-ups (Session 7) ──
   /** 2-3 chip suggestions generated after the last assistant turn. */
   followUps: string[];
-  /** Clear the chips (parent calls on new send or explicit dismiss). */
+  /** Clear the chips for the current turn (parent calls on new send). */
   clearFollowUps: () => void;
+  /** Dismiss = quiet for the REST of this chat session (owner, 2026-08-31). */
+  dismissFollowUps: () => void;
 
   // ── scroll ──
   /** RefObject for reads (e.g. scroll-to-message). Attach via `setScrollEl`. */
@@ -1687,6 +1689,20 @@ export function useConversationEngine({
   }, []);
 
   /**
+   * One explicit dismissal silences suggestions for the REST of this chat
+   * session (owner, 2026-08-31) — keyed per conversation, so switching
+   * chats in the same panel starts fresh. A ref: dismissing re-renders
+   * nothing beyond the strip clearing.
+   */
+  const followUpsDismissedForRef = useRef<Set<string>>(new Set());
+  const dismissFollowUps = useCallback(() => {
+    followUpsDismissedForRef.current.add(
+      conversationIdRef.current ?? "__unbound__",
+    );
+    clearFollowUps();
+  }, [clearFollowUps]);
+
+  /**
    * Extract the text content of the latest user + assistant messages and
    * call /api/ai/follow-ups. The endpoint soft-fails to an empty list,
    * so we never need a UI error state for this.
@@ -1697,11 +1713,47 @@ export function useConversationEngine({
       // mechanical run has no reader for them, and each fetch is a separate
       // model invocation billed outside the chat turn.
       if (deriveActiveItemIteration(finalMessages)) return;
+      // Dismissed once = quiet for the rest of this chat session.
+      if (
+        followUpsDismissedForRef.current.has(
+          conversationIdRef.current ?? "__unbound__",
+        )
+      ) {
+        return;
+      }
       const requestVersion = followUpRequestVersionRef.current + 1;
       followUpRequestVersionRef.current = requestVersion;
       const lastAssistant = [...finalMessages]
         .reverse()
         .find((m) => m.role === "assistant");
+      // Quiet zone (owner, 2026-08-31): a turn that ended in a PROPOSAL
+      // card or an approval request is waiting on the user's decision —
+      // chips beside a pending Apply both distract and invite abandoning
+      // it. Sentinel convention: every proposal tool returns a
+      // `"__…Proposal"` payload; approval requests ride tool parts
+      // carrying an approvalId. Skipping is also a spend saving — each
+      // suggestion fetch is a separate model invocation.
+      const awaitingUserDecision = (lastAssistant?.parts ?? []).some((p) => {
+        const part = p as {
+          type?: string;
+          output?: unknown;
+          approvalId?: string;
+        };
+        const isTool =
+          typeof part.type === "string" &&
+          (part.type.startsWith("tool-") || part.type === "dynamic-tool");
+        if (!isTool) return false;
+        if (part.approvalId) return true;
+        const out = part.output;
+        const str =
+          typeof out === "string"
+            ? out
+            : out === undefined
+              ? ""
+              : JSON.stringify(out);
+        return /"__\w*Proposal"/.test(str);
+      });
+      if (awaitingUserDecision) return;
       const lastUser = [...finalMessages]
         .reverse()
         .find((m) => m.role === "user");
@@ -3221,6 +3273,7 @@ export function useConversationEngine({
     promoteOutputTarget,
     followUps,
     clearFollowUps,
+    dismissFollowUps,
     scrollRef,
     setScrollEl,
     showJumpToLatest,

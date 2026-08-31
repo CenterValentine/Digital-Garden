@@ -227,7 +227,7 @@ export function ChatPanel({
     setOutputTarget,
     promoteOutputTarget,
     followUps,
-    clearFollowUps,
+    dismissFollowUps,
     setScrollEl,
     showJumpToLatest,
     scrollToBottom,
@@ -1090,7 +1090,9 @@ export function ChatPanel({
       <FollowUpsStrip
         followUps={followUps}
         onPick={(text) => setInput(text)}
-        onDismiss={clearFollowUps}
+        // Dismiss is a session verdict, not a turn clear: one × silences
+        // suggestions for the rest of this chat session (owner, 2026-08-31).
+        onDismiss={dismissFollowUps}
       />
 
       {/* Input — make/model picker lives inside the input frame footer.
