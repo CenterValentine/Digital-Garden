@@ -31,6 +31,8 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
+  COLUMN_WIDTH_MAX,
+  COLUMN_WIDTH_MIN,
   createUndoStack,
   deriveRowTitle,
   describeOp,
@@ -40,6 +42,7 @@ import {
   redo as redoStack,
   undo as undoStack,
   type CellEdit,
+  type ColumnPref,
   type DataColumn,
   type DataColumnConfig,
   type DataRow,
@@ -52,7 +55,7 @@ import {
   type UndoStackState,
 } from "@/lib/domain/data";
 import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
-import { DataColumnHeader } from "./DataColumnHeader";
+import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { DataBoardView } from "./DataBoardView";
@@ -117,6 +120,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     columnId: string;
     side: "left" | "right";
   } | null>(null);
+  /** Live widths during/after a resize drag, keyed by column id. Cleared on
+   * view switch so each view shows its own stored prefs. */
+  const [widthOverrides, setWidthOverrides] = useState<Record<string, number>>(
+    {}
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
   /**
@@ -175,6 +183,111 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const columns = useMemo(
     () => state.table?.columns.filter((c) => !c.deletedAt) ?? [],
     [state.table]
+  );
+
+  // Effective widths: the view's stored prefs overlaid with live drag
+  // values. One memoized map, so the memo()'d rows only re-render when a
+  // width actually changes.
+  const columnWidths = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const column of columns) {
+      map[column.id] =
+        widthOverrides[column.id] ??
+        state.view?.columnPrefs?.[column.id]?.width ??
+        DEFAULT_COLUMN_WIDTH;
+    }
+    return map;
+  }, [columns, state.view, widthOverrides]);
+
+  // Each view keeps its own widths — switching views drops the overrides
+  // (they equal the stored prefs after a successful persist anyway).
+  const activeViewIdForWidths = state.view?.id ?? null;
+  useEffect(() => {
+    setWidthOverrides({});
+  }, [activeViewIdForWidths]);
+
+  /** Geometry of an in-flight resize drag. A ref, not state — pointermove
+   * only re-renders through the width it changes. */
+  const resizeRef = useRef<{
+    columnId: string;
+    startX: number;
+    startWidth: number;
+    latest: number;
+  } | null>(null);
+
+  const persistColumnWidth = useCallback(
+    async (columnId: string, width: number) => {
+      const view = viewRef.current;
+      if (!view) return;
+      // Replaced wholesale server-side (like `config`), so spread the
+      // loaded map and overlay this column's width.
+      const merged: Record<string, ColumnPref> = {
+        ...view.columnPrefs,
+        [columnId]: { ...view.columnPrefs?.[columnId], width },
+      };
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId: view.id, columnPrefs: merged }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        // Fold into local view state instead of reloading — the override
+        // already shows it; future merges start from the stored map.
+        setState((cur) =>
+          cur.view && cur.view.id === view.id
+            ? { ...cur, view: { ...cur.view, columnPrefs: merged } }
+            : cur
+        );
+      } else {
+        // Locked view, lost access, network — revert to the stored width.
+        setWidthOverrides((cur) => {
+          const next = { ...cur };
+          delete next[columnId];
+          return next;
+        });
+        setNotice(json?.error?.message ?? "Could not save the column width");
+      }
+    },
+    [contentId]
+  );
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent, columnId: string) => {
+      const startWidth = columnWidths[columnId] ?? DEFAULT_COLUMN_WIDTH;
+      resizeRef.current = {
+        columnId,
+        startX: e.clientX,
+        startWidth,
+        latest: startWidth,
+      };
+      const onMove = (ev: PointerEvent) => {
+        const r = resizeRef.current;
+        if (!r) return;
+        const width = Math.round(
+          Math.max(
+            COLUMN_WIDTH_MIN,
+            Math.min(COLUMN_WIDTH_MAX, r.startWidth + (ev.clientX - r.startX))
+          )
+        );
+        if (width === r.latest) return;
+        r.latest = width;
+        setWidthOverrides((cur) => ({ ...cur, [r.columnId]: width }));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        const r = resizeRef.current;
+        resizeRef.current = null;
+        if (r && r.latest !== r.startWidth) {
+          void persistColumnWidth(r.columnId, r.latest);
+        }
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [columnWidths, persistColumnWidth]
   );
 
   /**
@@ -1379,6 +1492,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
               <DataColumnHeader
                 key={column.id}
                 column={column}
+                width={columnWidths[column.id]}
                 editable={canEditData}
                 menuOpen={openColumnId === column.id}
                 onToggleMenu={(columnId) =>
@@ -1394,6 +1508,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 onColumnDragOver={handleColumnDragOver}
                 onColumnDrop={handleColumnDrop}
                 onColumnDragEnd={handleColumnDragEnd}
+                // Widths persist through the views PATCH (canWrite-gated);
+                // query tables keep it too — views are the table's own
+                // objects even when the data is a read-only projection.
+                onResizeStart={state.canWrite ? handleResizeStart : undefined}
               >
                 {openColumnId === column.id && (
                   <ColumnMenu
@@ -1429,6 +1547,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   key={row.id}
                   row={row}
                   columns={columns}
+                  widths={columnWidths}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={canEditData}

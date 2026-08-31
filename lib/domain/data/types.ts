@@ -354,6 +354,14 @@ export interface ColumnPref {
   position?: string;
 }
 
+/**
+ * Column width bounds — shared by the resize grip (clamps while dragging)
+ * and the views PATCH route (clamps what it stores), so a hand-crafted
+ * request cannot persist a width the UI could never produce.
+ */
+export const COLUMN_WIDTH_MIN = 60;
+export const COLUMN_WIDTH_MAX = 1200;
+
 /** Per-field overrides for a form view (plan O15) — view-scoped, not column. */
 export interface FormFieldConfig {
   label?: string;

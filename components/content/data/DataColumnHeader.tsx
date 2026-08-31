@@ -51,6 +51,8 @@ interface DataColumnHeaderProps {
   onColumnDragOver?: (e: React.DragEvent, columnId: string) => void;
   onColumnDrop?: (e: React.DragEvent, columnId: string) => void;
   onColumnDragEnd?: () => void;
+  /** Present = a resize grip renders on the right edge. */
+  onResizeStart?: (e: React.PointerEvent, columnId: string) => void;
   /** Rendered by the parent so the popover is not clipped by this cell. */
   children?: React.ReactNode;
 }
@@ -67,6 +69,7 @@ export function DataColumnHeader({
   onColumnDragOver,
   onColumnDrop,
   onColumnDragEnd,
+  onResizeStart,
   children,
 }: DataColumnHeaderProps) {
   const glyph = column.config?.isBacklink
@@ -127,6 +130,33 @@ export function DataColumnHeader({
       )}
       {column.isPrimary && <span className="sr-only">(primary column)</span>}
       {children}
+      {/* Resize grip. The header cell is itself `draggable` for reorder, so
+          the grip is ALSO draggable with a cancelled dragstart — a draggable
+          child claims drag initiation before the parent can, and cancelling
+          it leaves only the pointer-based resize. stopPropagation on click
+          keeps the menu toggle from firing when a resize ends in place. */}
+      {onResizeStart && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${column.name} column`}
+          draggable
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onResizeStart(e, column.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize",
+            "hover:bg-primary/50 active:bg-primary"
+          )}
+        />
+      )}
     </div>
   );
 }

@@ -49,6 +49,9 @@ export const INLINE_EDITABLE_TYPES: ReadonlySet<string> = new Set([
 interface DataGridRowProps {
   row: DataRow;
   columns: DataColumn[];
+  /** Effective column widths keyed by column id (view prefs + live drag).
+   * Memoized by the parent so this memo()'d row only re-renders on change. */
+  widths?: Record<string, number>;
   height: number;
   selected: boolean;
   editable: boolean;
@@ -73,6 +76,7 @@ interface DataGridRowProps {
 function DataGridRowImpl({
   row,
   columns,
+  widths,
   height,
   selected,
   editable,
@@ -127,6 +131,7 @@ function DataGridRowImpl({
             // the draft seeds in the initializer instead of an effect.
             key={`${column.id}:${forceEdit ? "e" : "v"}`}
             column={column}
+            width={widths?.[column.id] ?? DEFAULT_COLUMN_WIDTH}
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
@@ -155,6 +160,7 @@ export const DataGridRow = memo(DataGridRowImpl);
 
 interface DataCellProps {
   column: DataColumn;
+  width: number;
   rowId: string;
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
@@ -178,6 +184,7 @@ interface DataCellProps {
 
 function DataCell({
   column,
+  width,
   rowId,
   value,
   links,
@@ -233,7 +240,7 @@ function DataCell({
           "flex shrink-0 items-center border-r border-border/40 px-3",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
       >
         <input
@@ -262,7 +269,7 @@ function DataCell({
           cellSelected && "ring-1 ring-inset ring-primary",
           editable && "cursor-pointer"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
@@ -316,7 +323,7 @@ function DataCell({
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
       >
         {(contentRefs ?? []).map((ref) =>
@@ -371,7 +378,7 @@ function DataCell({
           "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-2 text-xs",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         onDoubleClick={editable ? () => onOpenRow(rowId, column.id) : undefined}
         title={editable ? "Double-click to assign" : undefined}
@@ -417,7 +424,7 @@ function DataCell({
           column.type === "rollup" && "justify-end font-mono tabular-nums",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         title={text || undefined}
       >
@@ -435,7 +442,7 @@ function DataCell({
     return (
       <div
         className="shrink-0 border-r border-border/40"
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
       >
         <input
           autoFocus
@@ -480,7 +487,7 @@ function DataCell({
         column.type === "number" && "justify-end font-mono tabular-nums",
         cellSelected && "ring-1 ring-inset ring-primary"
       )}
-      style={{ width: DEFAULT_COLUMN_WIDTH }}
+      style={{ width }}
       onClick={() => {
         onSelect(rowId, column.key);
         // First click on an EMPTY editable cell goes straight to editing —

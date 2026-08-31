@@ -59,6 +59,8 @@ export interface ViewPatch {
   config?: import("@/lib/domain/data").DataViewConfig;
   filters?: import("@/lib/domain/data").FilterNode;
   sorts?: import("@/lib/domain/data").DataSort[];
+  /** Replaced wholesale, like `config` — send the full merged map. */
+  columnPrefs?: Record<string, import("@/lib/domain/data").ColumnPref>;
 }
 
 interface DataViewBarProps {
