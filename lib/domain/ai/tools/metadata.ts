@@ -33,6 +33,7 @@ export const BASE_TOOL_IDS = [
   "read_page",
   "phase_checkpoint",
   "create_folder",
+  "create_shortcut",
   "read_folder_context",
   "create_docx",
   "searchNotes",
@@ -85,6 +86,11 @@ export const BASE_TOOL_METADATA: Record<BaseToolId, BaseToolMeta> = {
     name: "Create Folder",
     description:
       "Find or create a folder (playbook destinations like job-search/{Company})",
+  },
+  create_shortcut: {
+    name: "Create Shortcut",
+    description:
+      "Mirror existing content into a second location via a shortcut — one canonical home plus pointers, never duplicates; deleting a shortcut never touches its target",
   },
   read_folder_context: {
     name: "Read Folder Context",
