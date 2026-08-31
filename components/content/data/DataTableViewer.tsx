@@ -56,6 +56,7 @@ import {
 } from "@/lib/domain/data";
 import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
 import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { ContentPathBreadcrumb } from "../content/ContentPathBreadcrumb";
 import {
   DATA_SCHEMA_CHANGED_EVENT,
   dispatchDataSchemaChanged,
@@ -1312,11 +1313,22 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   return (
     <div className="relative flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="font-mono text-xs text-muted-foreground">
-          {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            <h2 className="truncate text-sm font-semibold">{title}</h2>
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">
+              {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
+            </span>
+          </div>
+          {/* Same folder-path breadcrumb the note editor renders under its
+              title — crumbs mirror a real file-tree selection. */}
+          <ContentPathBreadcrumb
+            contentId={contentId}
+            currentTitle={title}
+            currentContentType="data"
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           {flashcardsEnabled && (
             <button
               type="button"
