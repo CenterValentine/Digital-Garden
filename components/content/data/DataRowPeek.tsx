@@ -99,6 +99,9 @@ export function DataRowPeek({
 
   return (
     <aside
+      // The viewer's click-away dismissal finds the peek by this marker —
+      // an aria-label selector would couple dismissal to copy.
+      data-row-peek=""
       className={cn(
         "flex flex-col bg-background",
         variant === "overlay"

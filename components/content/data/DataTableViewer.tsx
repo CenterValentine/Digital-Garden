@@ -146,6 +146,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** The viewer's own root — the click-away scope for the overlay peek. */
+  const rootRef = useRef<HTMLDivElement>(null);
   /**
    * Stable per-mount id, so undo entries can be attributed to this client
    * when a durable log lands later. `useId()` rather than `crypto.randomUUID()`
@@ -1417,6 +1419,31 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [isQuery, state.rows, selectNode, clearRowParam]
   );
 
+  /**
+   * Click-away dismissal for the OVERLAY peek — reaching for the ✕ every
+   * time was friction (owner, 2026-08-31). Scoped to this viewer's root:
+   * clicks in other panels/sidebars leave the peek open, and the peek's
+   * portaled pickers live in document.body (outside the root), so
+   * interacting with them never counts as "away". mousedown, so the
+   * click's own action (cell select, +) still lands after the close.
+   * The split variant is a pane, not an overlay — it never dismisses.
+   */
+  const overlayPeekOpen =
+    peekRowId !== null && state.view?.mode !== "split" && !isQuery;
+  useEffect(() => {
+    if (!overlayPeekOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const root = rootRef.current;
+      if (!target || !root || !root.contains(target)) return;
+      if (target.closest("[data-row-peek]")) return;
+      setPeekRowId(null);
+      setPeekFocusColumnId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [overlayPeekOpen]);
+
   const navigatePeek = useCallback(
     (dir: 1 | -1) => {
       setPeekRowId((cur) => {
@@ -1465,7 +1492,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     : -1;
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div ref={rootRef} className="relative flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3">
