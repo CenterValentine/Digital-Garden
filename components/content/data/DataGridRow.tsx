@@ -608,7 +608,22 @@ function DataCell({
         onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
         title={display || (editable ? "Double-click to choose" : undefined)}
       >
-        {display ? (
+        {column.type === "multiSelect" && Array.isArray(value) ? (
+          // One pill per chosen option, like relation chips — a single
+          // joined pill read as one value (owner, 2026-08-31). Removed
+          // options render nothing (their ids stay in the cell, plan D3).
+          value.map((id) => {
+            const opt = column.config.options?.find((o) => o.id === id);
+            return opt ? (
+              <span
+                key={id}
+                className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
+              >
+                {opt.label}
+              </span>
+            ) : null;
+          })
+        ) : display ? (
           <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]">
             {display}
           </span>

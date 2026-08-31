@@ -47,16 +47,34 @@ type ApplyState =
   | { status: "applied"; count: number }
   | { status: "error"; message: string };
 
-const storageKey = (proposalId: string) =>
-  `dg:data-options-proposal:${proposalId}`;
+/**
+ * The applied flag is keyed by WHAT was proposed — database + column +
+ * option set — never by message id: a streamed message's id changes once
+ * the conversation is persisted, so an id-keyed flag silently vanished on
+ * the first reload (observed 2026-08-31: Apply reappeared, a second press
+ * applied 0, and only THAT wrote a flag under the stable id).
+ */
+function storageKey(payload: ColumnOptionsProposalPayload): string {
+  const sig = [
+    payload.replace ? "replace" : "add",
+    ...payload.options.map((o) => o.label.trim().toLowerCase()),
+  ].join("");
+  // djb2 — collision-tolerant: a colliding proposal would be the same
+  // options on the same column, where "already applied" is the truth.
+  let hash = 5381;
+  for (let i = 0; i < sig.length; i++) {
+    hash = ((hash << 5) + hash + sig.charCodeAt(i)) | 0;
+  }
+  return `dg:data-options-proposal:${payload.databaseId}:${payload.columnId}:${(hash >>> 0).toString(36)}`;
+}
 
 /** Module-scope so the compiler's purity analysis stays happy (CLAUDE.md
  * React Compiler notes) — same pattern as loadAddedIndices in the
  * flashcards proposal list. */
-function loadAppliedState(proposalId: string): ApplyState {
+function loadAppliedState(payload: ColumnOptionsProposalPayload): ApplyState {
   if (typeof window === "undefined") return { status: "idle" };
   try {
-    const saved = window.localStorage.getItem(storageKey(proposalId));
+    const saved = window.localStorage.getItem(storageKey(payload));
     if (saved) return { status: "applied", count: Number(saved) || 0 };
   } catch {
     /* storage unavailable — Apply stays enabled */
@@ -66,13 +84,11 @@ function loadAppliedState(proposalId: string): ApplyState {
 
 export function ColumnOptionsProposalCard({
   payload,
-  proposalId,
 }: {
   payload: ColumnOptionsProposalPayload;
-  proposalId: string;
 }) {
   const [state, setState] = useState<ApplyState>(() =>
-    loadAppliedState(proposalId)
+    loadAppliedState(payload)
   );
   const [labels, setLabels] = useState<string[]>(() =>
     payload.options.map((o) => o.label)
@@ -136,6 +152,20 @@ export function ColumnOptionsProposalCard({
         });
       });
 
+      // Add-mode with nothing new: every checked option already exists on
+      // the column. That's "applied", not an error — record it WITHOUT a
+      // wholesale-replace PATCH that would only churn updatedAt.
+      if (!payload.replace && fresh.length === 0) {
+        try {
+          localStorage.setItem(storageKey(payload), "0");
+        } catch {
+          /* best-effort persistence */
+        }
+        setState({ status: "applied", count: 0 });
+        toast.info(`Those options are already on "${payload.columnName}"`);
+        return;
+      }
+
       const merged = payload.replace ? fresh : [...existing, ...fresh];
       if (merged.length === 0) {
         throw new Error("Nothing selected to apply.");
@@ -161,7 +191,7 @@ export function ColumnOptionsProposalCard({
       }
 
       try {
-        localStorage.setItem(storageKey(proposalId), String(fresh.length));
+        localStorage.setItem(storageKey(payload), String(fresh.length));
       } catch {
         /* best-effort persistence */
       }
@@ -179,7 +209,7 @@ export function ColumnOptionsProposalCard({
       setState({ status: "error", message });
       toast.error(message);
     }
-  }, [payload, proposalId, labels, checked]);
+  }, [payload, labels, checked]);
 
   if (state.status === "applied") {
     return (
@@ -226,7 +256,7 @@ export function ColumnOptionsProposalCard({
       <div className="max-h-56 space-y-1 overflow-y-auto">
         {payload.options.map((opt, i) => (
           <label
-            key={`${proposalId}-${i}`}
+            key={`${payload.columnId}-${i}`}
             className="flex items-center gap-2 rounded-md px-1 py-0.5 hover:bg-indigo-500/[0.06]"
           >
             <input

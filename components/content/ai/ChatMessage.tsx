@@ -1118,12 +1118,13 @@ export const ChatMessage = memo(function ChatMessage({
         ))}
 
         {/* Column-options proposals — Apply merges into the column's live
-            config; proposalId keys the localStorage already-applied flag. */}
+            config. The already-applied flag is keyed by proposal CONTENT
+            inside the card: message ids change when a streamed conversation
+            persists, so they cannot key anything durable. */}
         {columnOptionsProposals.map((payload, i) => (
           <ColumnOptionsProposalCard
             key={`column-options-${i}`}
             payload={payload}
-            proposalId={`${message.id}-column-options-${i}`}
           />
         ))}
 

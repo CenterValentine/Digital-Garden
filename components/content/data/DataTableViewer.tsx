@@ -1485,7 +1485,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   }
                 }}
                 aria-label="Database title"
-                className="min-w-0 flex-1 rounded border border-border bg-background px-1.5 py-0.5 text-sm font-semibold outline-none focus:ring-2 focus:ring-primary"
+                // Same edit chrome as the note title: transparent with a
+                // subtle bottom border, never a boxed input.
+                className="min-w-0 flex-1 border-b border-primary/40 bg-transparent text-sm font-semibold text-foreground focus:border-primary focus:outline-none"
               />
             ) : (
               <h2
