@@ -22,7 +22,15 @@
  */
 
 import { memo, useCallback, useState } from "react";
-import { Expand } from "lucide-react";
+import {
+  Check,
+  Expand,
+  Flag,
+  Heart,
+  Star,
+  ThumbsUp,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
   cellToDisplayText,
@@ -34,6 +42,50 @@ import {
   type RelationLinkRef,
 } from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { PanelPortal } from "./PanelPortal";
+
+/** Checkbox display variants (config.checkDisplay). Filled when checked. */
+const CHECK_ICONS: Record<string, { icon: LucideIcon; fillable: boolean }> = {
+  check: { icon: Check, fillable: false },
+  star: { icon: Star, fillable: true },
+  heart: { icon: Heart, fillable: true },
+  flag: { icon: Flag, fillable: true },
+  thumbsUp: { icon: ThumbsUp, fillable: false },
+};
+
+const CHECK_COLOR_CLASS: Record<string, string> = {
+  default: "text-foreground",
+  blue: "text-blue-500",
+  green: "text-emerald-500",
+  amber: "text-amber-500",
+  red: "text-red-500",
+  purple: "text-purple-500",
+};
+
+/**
+ * What the edit draft seeds from. Stored datetimes are UTC ISO; a
+ * `datetime-local` input needs local "YYYY-MM-DDTHH:mm" (the encoder
+ * parses that back as local time on commit). Shared with DataRowFields
+ * so the grid and the peek seed identically.
+ */
+export function editDraftFor(
+  column: DataColumn,
+  value: CellValue | undefined
+): string {
+  if (value === undefined) return "";
+  if (
+    column.type === "date" &&
+    column.config.includeTime &&
+    typeof value === "string"
+  ) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  return String(value);
+}
 
 /** Types whose cells open a text input in place. Everything else edits in peek. */
 export const INLINE_EDITABLE_TYPES: ReadonlySet<string> = new Set([
@@ -211,29 +263,38 @@ function DataCell({
    * lands mid-typing.
    */
   const [draft, setDraft] = useState<string | null>(() =>
-    forceEdit && canInlineEdit ? (value === undefined ? "" : String(value)) : null
+    forceEdit && canInlineEdit ? editDraftFor(column, value) : null
   );
   const editing = draft !== null;
 
-  const asText = value === undefined ? "" : String(value);
-
   const beginEdit = useCallback(() => {
-    setDraft(value === undefined ? "" : String(value));
-  }, [value]);
+    setDraft(editDraftFor(column, value));
+  }, [column, value]);
 
   const commit = useCallback(() => {
     if (draft === null) return;
     const next = draft;
     setDraft(null);
-    if (next === asText) return;
+    // Compare against the same representation the draft was seeded from —
+    // for datetime-local that's the LOCAL string, not the stored UTC ISO,
+    // so an untouched editor never fires a spurious write.
+    if (next === editDraftFor(column, value)) return;
     onCommit(rowId, column.key, next === "" ? undefined : next);
-  }, [draft, asText, onCommit, rowId, column.key]);
+  }, [draft, column, value, onCommit, rowId]);
 
   const cancel = useCallback(() => setDraft(null), []);
 
   // Checkboxes have no edit mode — a click IS the commit. The wrapper click
-  // still selects, so ⌘C works on them too.
+  // still selects, so ⌘C works on them too. Display variants (icon, t/f
+  // text) are cosmetic: every mode stores the same boolean, so filters and
+  // sorts never notice which one is configured.
   if (column.type === "checkbox") {
+    const checked = value === true;
+    const displayMode = column.config.checkDisplay ?? "checkbox";
+    const colorClass =
+      CHECK_COLOR_CLASS[column.config.checkColor ?? "default"] ??
+      CHECK_COLOR_CLASS.default;
+    const iconEntry = CHECK_ICONS[displayMode];
     return (
       <div
         className={cn(
@@ -243,14 +304,58 @@ function DataCell({
         style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
       >
-        <input
-          type="checkbox"
-          checked={value === true}
-          disabled={!editable}
-          onChange={(e) => onCommit(rowId, column.key, e.target.checked)}
-          aria-label={column.name}
-          className="h-3.5 w-3.5 accent-current"
-        />
+        {displayMode === "text" ? (
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              if (editable) onCommit(rowId, column.key, !checked);
+            }}
+            aria-pressed={checked}
+            aria-label={column.name}
+            className={cn(
+              "rounded px-1 font-mono text-xs tabular-nums",
+              checked ? colorClass : "text-muted-foreground/60",
+              editable && "hover:bg-muted"
+            )}
+          >
+            {checked ? "true" : "false"}
+          </button>
+        ) : iconEntry ? (
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              if (editable) onCommit(rowId, column.key, !checked);
+            }}
+            aria-pressed={checked}
+            aria-label={column.name}
+            className={cn("rounded p-0.5", editable && "hover:bg-muted")}
+          >
+            <iconEntry.icon
+              className={cn(
+                "h-3.5 w-3.5",
+                checked ? colorClass : "text-muted-foreground/40"
+              )}
+              fill={
+                checked && iconEntry.fillable ? "currentColor" : "none"
+              }
+            />
+          </button>
+        ) : (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={!editable}
+            onChange={(e) => onCommit(rowId, column.key, e.target.checked)}
+            aria-label={column.name}
+            className={cn("h-3.5 w-3.5 accent-current", colorClass)}
+          />
+        )}
       </div>
     );
   }
@@ -438,6 +543,68 @@ function DataCell({
     column.type === "status" ||
     column.type === "multiSelect";
 
+  // Long text edits in an anchored popover, not the 36px inline input —
+  // Enter makes a NEWLINE here (⌘Enter/click-away saves, Esc cancels),
+  // which is the felt difference between the two text types. PanelPortal's
+  // outside-click dismiss doubles as blur-commit.
+  if (editing && canInlineEdit && column.type === "longText") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs",
+          "ring-2 ring-inset ring-primary"
+        )}
+        style={{ width }}
+      >
+        <span className="truncate text-muted-foreground">{draft ?? ""}</span>
+        <PanelPortal
+          open
+          onDismiss={() => {
+            commit();
+            onEditEnd();
+          }}
+          className="w-80"
+        >
+          <textarea
+            autoFocus
+            value={draft ?? ""}
+            maxLength={column.config.maxLength}
+            rows={6}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                commit();
+                onEditEnd();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancel();
+                onEditEnd();
+              } else if (e.key === "Tab") {
+                e.preventDefault();
+                commit();
+                onAdvance(rowId, column.key, e.shiftKey ? -1 : 1);
+              }
+            }}
+            className={cn(
+              "w-full resize-y rounded-md border border-border bg-background px-2 py-1.5",
+              "text-xs outline-none focus:ring-2 focus:ring-primary"
+            )}
+            aria-label={column.name}
+          />
+          <p className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Enter = new line · ⌘Enter saves · Esc cancels</span>
+            {column.config.maxLength ? (
+              <span className="font-mono tabular-nums">
+                {(draft ?? "").length}/{column.config.maxLength}
+              </span>
+            ) : null}
+          </p>
+        </PanelPortal>
+      </div>
+    );
+  }
+
   if (editing && canInlineEdit) {
     return (
       <div
@@ -447,6 +614,7 @@ function DataCell({
         <input
           autoFocus
           value={draft ?? ""}
+          maxLength={column.type === "text" ? column.config.maxLength : undefined}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -470,7 +638,17 @@ function DataCell({
             "h-full w-full bg-background px-3 text-xs outline-none",
             "ring-2 ring-inset ring-primary"
           )}
-          type={column.type === "number" ? "number" : "text"}
+          // Dates get the native picker — the calendar affordance — with
+          // datetime-local when the column's time component is meaningful.
+          type={
+            column.type === "number"
+              ? "number"
+              : column.type === "date"
+                ? column.config.includeTime
+                  ? "datetime-local"
+                  : "date"
+                : "text"
+          }
         />
       </div>
     );
@@ -517,6 +695,18 @@ function DataCell({
       ) : (
         <span className="truncate">{display}</span>
       )}
+      {/* Multi-line marker: the 36px row shows one line (fixed-height
+          windowing); the ¶ says there's more behind the truncation. */}
+      {column.type === "longText" &&
+        typeof value === "string" &&
+        value.includes("\n") && (
+          <span
+            aria-hidden="true"
+            className="ml-1 shrink-0 text-[10px] text-muted-foreground/70"
+          >
+            ¶
+          </span>
+        )}
     </div>
   );
 }

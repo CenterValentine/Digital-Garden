@@ -461,6 +461,12 @@ interface ColumnEditFormProps {
   onClose: () => void;
   /** The popover autofocuses; the rail's inline form must not steal focus. */
   autoFocus?: boolean;
+  /**
+   * Checkbox columns only: check/uncheck every loaded row in one batch
+   * (one undo entry). Provided by the grid, which owns the rows — the
+   * context rail omits it and the buttons simply don't render.
+   */
+  onBulkSet?: (value: boolean) => void;
 }
 
 /** The header-menu popover: PanelPortal chrome around the shared form. */
@@ -469,6 +475,7 @@ export function ColumnMenu({
   onSave,
   onDelete,
   onClose,
+  onBulkSet,
 }: ColumnEditFormProps) {
   return (
     <PanelPortal open onDismiss={onClose}>
@@ -489,6 +496,7 @@ export function ColumnMenu({
         onSave={onSave}
         onDelete={onDelete}
         onClose={onClose}
+        onBulkSet={onBulkSet}
       />
     </PanelPortal>
   );
@@ -506,6 +514,7 @@ export function ColumnEditForm({
   onDelete,
   onClose,
   autoFocus = true,
+  onBulkSet,
 }: ColumnEditFormProps) {
   const [name, setName] = useState(column.name);
   const [description, setDescription] = useState(column.description ?? "");
@@ -547,6 +556,60 @@ export function ColumnEditForm({
     const n = Math.floor(Number(trimmed));
     return Number.isFinite(n) ? Math.max(0, Math.min(8, n)) : undefined;
   })();
+
+  // Text: character limit (encoder rejects past it — never truncates).
+  const isTextLike = column.type === "text" || column.type === "longText";
+  const [maxLengthText, setMaxLengthText] = useState(
+    column.config.maxLength !== undefined ? String(column.config.maxLength) : ""
+  );
+
+  // Date: whether the time component is meaningful (config.includeTime).
+  const isDate = column.type === "date";
+  const [includeTime, setIncludeTime] = useState(
+    column.config.includeTime === true
+  );
+
+  // Checkbox: display variant, color, and new-row default. Display is
+  // cosmetic — cells store booleans in every mode.
+  const isCheckbox = column.type === "checkbox";
+  const [checkDisplay, setCheckDisplay] = useState<
+    NonNullable<DataColumnConfig["checkDisplay"]>
+  >(column.config.checkDisplay ?? "checkbox");
+  const [checkColor, setCheckColor] = useState<
+    NonNullable<DataColumnConfig["checkColor"]>
+  >(column.config.checkColor ?? "default");
+  const [defaultChecked, setDefaultChecked] = useState(
+    column.config.defaultChecked === true
+  );
+
+  const buildTextConfig = useCallback((): DataColumnConfig => {
+    const next: DataColumnConfig = { ...column.config };
+    delete next.maxLength;
+    const trimmed = maxLengthText.trim();
+    if (trimmed !== "") {
+      const n = Math.floor(Number(trimmed));
+      if (Number.isFinite(n) && n > 0) next.maxLength = Math.min(n, 100000);
+    }
+    return next;
+  }, [column.config, maxLengthText]);
+
+  const buildDateConfig = useCallback((): DataColumnConfig => {
+    const next: DataColumnConfig = { ...column.config };
+    delete next.includeTime;
+    if (includeTime) next.includeTime = true;
+    return next;
+  }, [column.config, includeTime]);
+
+  const buildCheckboxConfig = useCallback((): DataColumnConfig => {
+    const next: DataColumnConfig = { ...column.config };
+    delete next.checkDisplay;
+    delete next.checkColor;
+    delete next.defaultChecked;
+    if (checkDisplay !== "checkbox") next.checkDisplay = checkDisplay;
+    if (checkColor !== "default") next.checkColor = checkColor;
+    if (defaultChecked) next.defaultChecked = true;
+    return next;
+  }, [column.config, checkDisplay, checkColor, defaultChecked]);
 
   const buildNumberConfig = useCallback((): DataColumnConfig => {
     const next: DataColumnConfig = { ...column.config };
@@ -596,6 +659,9 @@ export function ColumnEditForm({
           ? { config: { ...column.config, options: cleaned } }
           : {}),
         ...(isNumber ? { config: buildNumberConfig() } : {}),
+        ...(isTextLike ? { config: buildTextConfig() } : {}),
+        ...(isDate ? { config: buildDateConfig() } : {}),
+        ...(isCheckbox ? { config: buildCheckboxConfig() } : {}),
       });
       onClose();
     } finally {
@@ -608,6 +674,12 @@ export function ColumnEditForm({
     isSelectLike,
     isNumber,
     buildNumberConfig,
+    isTextLike,
+    buildTextConfig,
+    isDate,
+    buildDateConfig,
+    isCheckbox,
+    buildCheckboxConfig,
     column.config,
     busy,
     onSave,
@@ -728,6 +800,129 @@ export function ColumnEditForm({
             {parsedPrecision !== undefined &&
               " Decimal places also round future edits."}
           </p>
+        </>
+      )}
+
+      {isTextLike && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Character limit
+          </label>
+          <input
+            inputMode="numeric"
+            value={maxLengthText}
+            onChange={(e) =>
+              setMaxLengthText(e.target.value.replace(/[^\d]/g, "").slice(0, 6))
+            }
+            placeholder="No limit"
+            className={fieldClass}
+          />
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            New edits past the limit are rejected, never cut short. Existing
+            longer values stay until touched.
+          </p>
+        </>
+      )}
+
+      {isDate && (
+        <>
+          <label className="mt-3 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={includeTime}
+              onChange={(e) => setIncludeTime(e.target.checked)}
+              className="h-3.5 w-3.5 accent-current"
+            />
+            Include time
+          </label>
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            Cells open a date picker — with time, a date-and-time picker.
+            Existing values keep what they stored.
+          </p>
+        </>
+      )}
+
+      {isCheckbox && (
+        <>
+          <label className="mb-1 mt-3 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Display as
+          </label>
+          <select
+            value={checkDisplay}
+            onChange={(e) =>
+              setCheckDisplay(
+                e.target.value as NonNullable<DataColumnConfig["checkDisplay"]>
+              )
+            }
+            className={fieldClass}
+          >
+            <option value="checkbox">Checkbox</option>
+            <option value="check">✓ Check</option>
+            <option value="star">★ Star</option>
+            <option value="heart">♥ Heart</option>
+            <option value="flag">⚑ Flag</option>
+            <option value="thumbsUp">👍 Thumbs up</option>
+            <option value="text">true / false text</option>
+          </select>
+
+          <label className="mb-1 mt-2 block text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+            Color
+          </label>
+          <select
+            value={checkColor}
+            onChange={(e) =>
+              setCheckColor(
+                e.target.value as NonNullable<DataColumnConfig["checkColor"]>
+              )
+            }
+            className={fieldClass}
+          >
+            <option value="default">Default</option>
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+            <option value="amber">Amber</option>
+            <option value="red">Red</option>
+            <option value="purple">Purple</option>
+          </select>
+
+          <label className="mt-2 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={defaultChecked}
+              onChange={(e) => setDefaultChecked(e.target.checked)}
+              className="h-3.5 w-3.5 accent-current"
+            />
+            New rows start checked
+          </label>
+          <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
+            Display is cosmetic — cells store true/false in every mode, so
+            filters keep working unchanged.
+          </p>
+
+          {onBulkSet && (
+            <div className="mt-2 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onBulkSet(true);
+                  onClose();
+                }}
+                className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                Check all rows
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onBulkSet(false);
+                  onClose();
+                }}
+                className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                Uncheck all
+              </button>
+            </div>
+          )}
         </>
       )}
 

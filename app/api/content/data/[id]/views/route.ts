@@ -257,21 +257,23 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         }
       }
 
-      // A board groups by a single-value option column. Validating the
-      // TYPE here keeps the renderer's assumption ("options exist, cells
-      // hold one id") true by construction.
+      // A board groups by a single-value column: an option column (cells
+      // hold one option id) or a checkbox (two synthetic groups). The TYPE
+      // check keeps the renderer's assumptions true by construction.
       if (body.groupByColumnId != null) {
         const column = await prisma.dataColumn.findFirst({
           where: {
             id: body.groupByColumnId,
             tableId: id,
             deletedAt: null,
-            type: { in: ["status", "select"] },
+            type: { in: ["status", "select", "checkbox"] },
           },
           select: { id: true },
         });
         if (!column) {
-          return badRequest("Boards group by a Status or Select column");
+          return badRequest(
+            "Boards group by a Status, Select, or Checkbox column"
+          );
         }
       }
 

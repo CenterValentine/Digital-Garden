@@ -34,6 +34,11 @@ import {
 
 /** The synthetic group for rows whose group cell is absent. */
 const UNGROUPED = "__ungrouped__";
+/** Checkbox grouping: two synthetic groups. Absent counts as unchecked —
+ * same two-state doctrine as the checkbox filter. Exported so the
+ * viewer's addRowInGroup can translate the group id to a boolean stamp. */
+export const CHECKED_GROUP = "__checked__";
+export const UNCHECKED_GROUP = "__unchecked__";
 
 interface DataBoardViewProps {
   view: DataView;
@@ -64,10 +69,12 @@ export function DataBoardView({
       columns.find(
         (c) =>
           c.id === view.groupByColumnId &&
-          (c.type === "status" || c.type === "select")
+          (c.type === "status" || c.type === "select" || c.type === "checkbox")
       ) ??
       // Sensible default: the first status column, then the first select —
       // so switching a view to board mode works before groupBy is chosen.
+      // Checkbox grouping is explicit-only: a two-column board is rarely
+      // what someone meant by "board" unless they asked for it.
       columns.find((c) => c.type === "status") ??
       columns.find((c) => c.type === "select") ??
       null,
@@ -90,6 +97,31 @@ export function DataBoardView({
 
   const groups = useMemo(() => {
     if (!groupColumn) return [];
+
+    // Checkbox: two fixed synthetic groups rendered through the same
+    // pseudo-option shape, so the header/drop/add chrome below needs no
+    // per-type branches. Unchecked is a REAL group (it invites dropping
+    // and gets a "+ New"), unlike the absent-cell UNGROUPED synthetic.
+    if (groupColumn.type === "checkbox") {
+      const checked: DataRow[] = [];
+      const unchecked: DataRow[] = [];
+      for (const row of rows) {
+        (row.data[groupColumn.key] === true ? checked : unchecked).push(row);
+      }
+      return [
+        {
+          id: CHECKED_GROUP,
+          option: { id: CHECKED_GROUP, label: "Checked" } as SelectOption,
+          rows: checked,
+        },
+        {
+          id: UNCHECKED_GROUP,
+          option: { id: UNCHECKED_GROUP, label: "Unchecked" } as SelectOption,
+          rows: unchecked,
+        },
+      ];
+    }
+
     const options =
       groupColumn.type === "status"
         ? sortStatusOptions(groupColumn.config.options ?? [])
@@ -134,7 +166,13 @@ export function DataBoardView({
       if (!rowId || !groupColumn) return;
       const row = rows.find((r) => r.id === rowId);
       const current = row?.data[groupColumn.key];
-      const next = groupId === UNGROUPED ? undefined : groupId;
+      // Checkbox groups translate to booleans; option groups carry the id.
+      const next =
+        groupColumn.type === "checkbox"
+          ? groupId === CHECKED_GROUP
+          : groupId === UNGROUPED
+            ? undefined
+            : groupId;
       if (current === next) return;
       // A card move IS a cell edit — same optimistic write, same undo entry.
       onCommitCell(rowId, groupColumn.key, next);
@@ -145,7 +183,7 @@ export function DataBoardView({
   if (!groupColumn) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-sm text-muted-foreground">
-        Boards group rows by a Status or Select column.
+        Boards group rows by a Status, Select, or Checkbox column.
         <br />
         Add one to this database to use the board.
       </div>

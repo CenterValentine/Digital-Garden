@@ -258,6 +258,20 @@ export async function createRows(
 ): Promise<string[]> {
   if (count <= 0) return [];
 
+  // Column defaults stamped at creation — HERE, so every creation path
+  // (grid add-row, board "+ New", forms, AI insert_rows) agrees. A caller
+  // that then writes its own value simply overwrites the stamp.
+  const defaults: Record<string, boolean> = {};
+  for (const column of columns) {
+    if (
+      !column.deletedAt &&
+      column.type === "checkbox" &&
+      column.config?.defaultChecked === true
+    ) {
+      defaults[column.key] = true;
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const last = afterSortKey
       ? { sortKey: afterSortKey }
@@ -278,8 +292,8 @@ export async function createRows(
         data: {
           tableId,
           sortKey,
-          data: {} as unknown as Prisma.InputJsonValue,
-          searchText: deriveRowSearchText(columns, {}),
+          data: defaults as unknown as Prisma.InputJsonValue,
+          searchText: deriveRowSearchText(columns, defaults),
           createdBy,
         },
         select: { id: true },

@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Plus, X } from "lucide-react";
 import { cn } from "@/lib/core/utils";
+import { editDraftFor } from "./DataGridRow";
 import {
   cellToText,
   sortStatusOptions,
@@ -160,7 +161,9 @@ function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
 }
 
 function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
-  const asText = value === undefined ? "" : String(value);
+  // Same seeding the grid uses — datetime cells convert UTC ISO to the
+  // local string a datetime-local input understands.
+  const asText = editDraftFor(column, value);
 
   const textCommit = (raw: string) => {
     const next = raw.trim() === "" ? undefined : raw;
@@ -243,6 +246,7 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
           defaultValue={asText}
           disabled={!editable}
           rows={3}
+          maxLength={column.config.maxLength}
           onBlur={(e) => textCommit(e.target.value)}
           className={cn(fieldClass, "resize-none")}
         />
@@ -260,8 +264,13 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
             column.type === "number"
               ? "number"
               : column.type === "date"
-                ? "date"
+                ? column.config.includeTime
+                  ? "datetime-local"
+                  : "date"
                 : "text"
+          }
+          maxLength={
+            column.type === "text" ? column.config.maxLength : undefined
           }
           defaultValue={asText}
           disabled={!editable}

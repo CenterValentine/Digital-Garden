@@ -85,6 +85,37 @@ function encodeDate(raw: unknown, includeTime: boolean): EncodeResult {
   );
 }
 
+// ── Text handling ────────────────────────────────────────────────────────
+
+/**
+ * The felt difference between the two text types lives here:
+ *  - `text` is single-line BY INVARIANT — pasted newlines collapse to
+ *    spaces (normalize, don't reject: a multi-line paste into a name
+ *    column is an unambiguous near-miss). Invisible `\n`s in a "single
+ *    line" column poison sorts, filters, and CSV in ways nobody can see.
+ *  - `longText` keeps newlines, normalized to `\n` (`\r\n` and bare `\r`
+ *    are transport artifacts, not content).
+ * `maxLength`, when configured, rejects rather than truncates — silent
+ * truncation is data loss with a green checkmark.
+ */
+function encodeText(
+  raw: unknown,
+  type: "text" | "longText",
+  maxLength: number | undefined
+): EncodeResult {
+  if (typeof raw !== "string") return fail("Expected text");
+  const normalized =
+    type === "text"
+      ? raw.replace(/\s*\r?\n\s*|\r/g, " ")
+      : raw.replace(/\r\n?/g, "\n");
+  if (maxLength !== undefined && maxLength > 0 && normalized.length > maxLength) {
+    return fail(
+      `Too long — this column is limited to ${maxLength} characters (got ${normalized.length})`
+    );
+  }
+  return ok(normalized);
+}
+
 // ── Number handling ──────────────────────────────────────────────────────
 
 function encodeNumber(raw: unknown, precision?: number): EncodeResult {
@@ -197,7 +228,7 @@ export function encodeCell(column: DataColumn, raw: unknown): EncodeResult {
   switch (column.type) {
     case "text":
     case "longText":
-      return typeof raw === "string" ? ok(raw) : fail("Expected text");
+      return encodeText(raw, column.type, column.config.maxLength);
 
     case "number":
       return encodeNumber(raw, column.config.precision);

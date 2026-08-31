@@ -64,7 +64,7 @@ import {
 } from "./events";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
-import { DataBoardView } from "./DataBoardView";
+import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
 import { DataFormView } from "./DataFormView";
 import { DataGalleryView } from "./DataGalleryView";
@@ -1063,14 +1063,68 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         ?? columns.find((c) => c.type === "status")
         ?? columns.find((c) => c.type === "select");
       if (optionId && groupCol && rowIds[0]) {
+        // Checkbox boards pass synthetic group ids — stamp the boolean.
+        // Explicit false matters: a defaultChecked column would otherwise
+        // bounce a row added under "Unchecked" into the Checked group.
+        const after =
+          groupCol.type === "checkbox"
+            ? optionId === CHECKED_GROUP
+            : optionId;
         await sendWrites(
-          [{ rowId: rowIds[0], columnKey: groupCol.key, before: undefined, after: optionId }],
+          [{ rowId: rowIds[0], columnKey: groupCol.key, before: undefined, after }],
           false
         );
       }
       await load(state.view?.id ?? null);
     },
     [contentId, columns, state.view, sendWrites, load, clientId]
+  );
+
+  /**
+   * Check/uncheck every loaded row in ONE batch — one PATCH (the route
+   * takes up to 1000 writes; a page is ≤100), one optimistic pass, one
+   * setCells undo entry so ⌘Z reverts the whole sweep.
+   */
+  const bulkSetCheckbox = useCallback(
+    async (column: DataColumn, value: boolean) => {
+      const edits: CellEdit[] = [];
+      for (const row of state.rows) {
+        if ((row.data[column.key] === true) === value) continue;
+        edits.push({
+          rowId: row.id,
+          columnKey: column.key,
+          before: row.data[column.key],
+          after: value,
+        });
+      }
+      if (edits.length === 0) {
+        setNotice(value ? "Every row is already checked" : "No rows are checked");
+        return;
+      }
+      const editIds = new Set(edits.map((e) => e.rowId));
+      setState((s) => ({
+        ...s,
+        rows: s.rows.map((r) =>
+          editIds.has(r.id)
+            ? { ...r, data: { ...r.data, [column.key]: value } }
+            : r
+        ),
+      }));
+      const result = await sendWrites(edits, false);
+      if (!result.ok) {
+        await load(viewRef.current?.id ?? null);
+        setNotice(`Could not update — ${result.message}`);
+        return;
+      }
+      const op: UndoOp = { kind: "setCells", edits, label: "" };
+      setStack((s) =>
+        pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
+      );
+      setNotice(
+        `${value ? "Checked" : "Unchecked"} ${edits.length} row${edits.length === 1 ? "" : "s"}`
+      );
+    },
+    [state.rows, sendWrites, load, clientId]
   );
 
   // ── Cell keyboard model (owner friction, 2026-08-24) ───────────────────
@@ -1159,13 +1213,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           e.preventDefault();
           setEditTarget(selectedCell);
         }
+      } else if (e.key === " ") {
+        // Space toggles a selected checkbox cell — the keyboard's click.
+        const column = columns.find((c) => c.key === selectedCell.columnKey);
+        if (column?.type === "checkbox" && canEditData) {
+          e.preventDefault();
+          const row = state.rows.find((r) => r.id === selectedCell.rowId);
+          if (row) {
+            void commitCell(
+              row.id,
+              column.key,
+              !(row.data[column.key] === true)
+            );
+          }
+        }
       } else if (e.key === "Escape") {
         setSelectedCell(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, editTarget, columns, state.rows]);
+  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell]);
 
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real
@@ -1551,6 +1619,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                     onSave={(patch) => saveColumn(column.id, patch)}
                     onDelete={() => deleteColumn(column.id)}
                     onClose={() => setOpenColumnId(null)}
+                    onBulkSet={
+                      column.type === "checkbox" && canEditData
+                        ? (v) => void bulkSetCheckbox(column, v)
+                        : undefined
+                    }
                   />
                 )}
               </DataColumnHeader>

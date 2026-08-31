@@ -356,7 +356,12 @@ function ViewMenu({
           >
             <option value="">Auto (first Status column)</option>
             {columns
-              .filter((c) => c.type === "status" || c.type === "select")
+              .filter(
+                (c) =>
+                  c.type === "status" ||
+                  c.type === "select" ||
+                  c.type === "checkbox"
+              )
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}

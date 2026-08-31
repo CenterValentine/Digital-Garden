@@ -128,6 +128,31 @@ export interface DataColumnConfig {
   useGrouping?: boolean;
   /** `date` — whether the time component is meaningful. */
   includeTime?: boolean;
+  /**
+   * `text` · `longText` — maximum characters the encoder accepts.
+   * Enforced at write time (reject, never truncate); display counters
+   * are a UI courtesy.
+   */
+  maxLength?: number;
+  /**
+   * `checkbox` — how the cell renders. Default native checkbox; the icon
+   * variants toggle on click like the checkbox does; "text" renders
+   * true/false as words. DISPLAY-ONLY — cells store booleans in every
+   * mode, so filters and sorts never notice the difference.
+   */
+  checkDisplay?:
+    | "checkbox"
+    | "check"
+    | "star"
+    | "heart"
+    | "flag"
+    | "thumbsUp"
+    | "text";
+  /** `checkbox` — accent for the checked glyph. Default follows the theme. */
+  checkColor?: "default" | "blue" | "green" | "amber" | "red" | "purple";
+  /** `checkbox` — new rows start checked (stamped in createRows, so every
+   * creation path — grid, board, forms, AI inserts — agrees). */
+  defaultChecked?: boolean;
   /** `relation` — the DataPayload.contentId this column points at. */
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
