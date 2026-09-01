@@ -1116,18 +1116,16 @@ export function ChatPanel({
           <ChevronDown className="h-3 w-3" /> Jump to latest
         </button>
       )}
-      </div>
-
-      {/* Suggested follow-ups (Session 7) — appears between the
-          messages list and the composer when the engine returns
-          chips for the latest assistant turn. */}
+      {/* Suggested follow-ups ✨ — anchored inside THIS relative container
+          (same proven positioning as Jump-to-latest above); the popover
+          portals viewport-clamped via useAnchoredMenu. Dismiss is a session
+          verdict: one × silences the rest of this chat session. */}
       <FollowUpsStrip
         followUps={followUps}
         onPick={(text) => setInput(text)}
-        // Dismiss is a session verdict, not a turn clear: one × silences
-        // suggestions for the rest of this chat session (owner, 2026-08-31).
         onDismiss={dismissFollowUps}
       />
+      </div>
 
       {/* Input — make/model picker lives inside the input frame footer.
           Disabled while initial messages are loading so typed input
