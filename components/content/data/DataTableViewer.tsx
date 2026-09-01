@@ -1192,12 +1192,25 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   const uploadIntoFileCell = useCallback(
     async (rowId: string, column: DataColumn, files: FileList | File[]) => {
       if (!canEditData) return;
+      // Images columns accept images only — filtered here so a mixed drop
+      // degrades to "images attached, N skipped" instead of a rejection.
+      let list = Array.from(files);
+      let skippedNonImages = 0;
+      if (column.config.imageOnly) {
+        const images = list.filter((f) => f.type.startsWith("image/"));
+        skippedNonImages = list.length - images.length;
+        list = images;
+        if (list.length === 0) {
+          setNotice("This column accepts images only");
+          return;
+        }
+      }
       setNotice(
-        `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`
+        `Uploading ${list.length} file${list.length === 1 ? "" : "s"}…`
       );
       const { ids: uploaded, errors } = await uploadFilesToTable(
         contentId,
-        files
+        list
       );
       if (uploaded.length === 0) {
         setNotice(`Upload failed — ${errors[0] ?? "nothing was attached"}`);
@@ -1215,7 +1228,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       setNotice(
         errors.length > 0
           ? `Attached ${uploaded.length}, ${errors.length} failed — ${errors[0]}`
-          : `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}`
+          : `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}${
+              skippedNonImages > 0
+                ? ` (${skippedNonImages} non-image skipped)`
+                : ""
+            }`
       );
     },
     [canEditData, contentId, state.rows, commitCell]

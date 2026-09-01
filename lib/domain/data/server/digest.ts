@@ -92,7 +92,9 @@ export async function buildDataSchemaDigest(
     // this, models reasoned "same id arrays, same thing".
     const intent =
       column.type === "file"
-        ? " [uploaded attachments — cell ids must be FILE nodes; the user uploads via the cell's +, or attach a file you created]"
+        ? config.imageOnly
+          ? " [uploaded IMAGE attachments — cell ids must be image file nodes; the user uploads via the cell's +]"
+          : " [uploaded attachments — cell ids must be FILE nodes; the user uploads via the cell's +, or attach a file you created]"
         : column.type === "contentLink"
           ? " [references to existing app content — notes, folders, any node]"
           : "";

@@ -124,6 +124,14 @@ export interface DataColumnConfig {
   numberFormat?: "plain" | "currency" | "percent";
   /** `number` — ISO 4217 code when numberFormat is "currency". Default USD. */
   currencyCode?: string;
+  /**
+   * `file` — the "Images" column type: accepts only image files and
+   * renders thumbnails with a click-to-zoom lightbox. A config
+   * specialization rather than a new enum member (plan D11 doctrine —
+   * same pattern as currency on number), so it inherits every file-cell
+   * path: upload, drop, paste, link, backlinks, AI validation.
+   */
+  imageOnly?: boolean;
   /** `number` — thousands grouping for plain/percent (currency always groups). */
   useGrouping?: boolean;
   /** `date` — whether the time component is meaningful. */

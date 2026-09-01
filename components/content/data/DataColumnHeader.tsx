@@ -83,7 +83,9 @@ export function DataColumnHeader({
 }: DataColumnHeaderProps) {
   const glyph = column.config?.isBacklink
     ? "⇠"
-    : (TYPE_GLYPH[column.type] ?? "·");
+    : column.type === "file" && column.config?.imageOnly
+      ? "▣"
+      : (TYPE_GLYPH[column.type] ?? "·");
 
   return (
     <div

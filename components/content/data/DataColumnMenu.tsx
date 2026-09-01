@@ -110,10 +110,19 @@ interface AddColumnButtonProps {
   }) => Promise<void>;
 }
 
+/** Picker-only pseudo-type: creates a `file` column with imageOnly set. */
+const IMAGES_KIND = "__images__";
+
+/** Display label — "Images" for the imageOnly file specialization. */
+export function columnTypeLabel(column: DataColumn): string {
+  if (column.type === "file" && column.config?.imageOnly) return "Images";
+  return TYPE_LABEL[column.type] ?? column.type;
+}
+
 export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProps) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
-  const [type, setType] = useState<DataColumnType>("text");
+  const [type, setType] = useState<DataColumnType | typeof IMAGES_KIND>("text");
   const [busy, setBusy] = useState(false);
   const [targetDbId, setTargetDbId] = useState("");
   const [withBacklink, setWithBacklink] = useState(true);
@@ -210,7 +219,8 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     setBusy(true);
     try {
       let config: DataColumnConfig | undefined;
-      if (type === "relation") config = { relationTableId: targetDbId };
+      if (type === IMAGES_KIND) config = { imageOnly: true };
+      else if (type === "relation") config = { relationTableId: targetDbId };
       else if (type === "lookup")
         config = {
           relationColumnId: throughRelationId,
@@ -227,7 +237,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
         config = { defaultChecked: true };
       await onAdd({
         name: trimmed,
-        type,
+        type: type === IMAGES_KIND ? "file" : type,
         config,
         createBacklink: type === "relation" ? withBacklink : undefined,
       });
@@ -283,7 +293,9 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
         </label>
         <select
           value={type}
-          onChange={(e) => setType(e.target.value as DataColumnType)}
+          onChange={(e) =>
+            setType(e.target.value as DataColumnType | typeof IMAGES_KIND)
+          }
           className={fieldClass}
         >
           {IMPLEMENTED_COLUMN_TYPES.map((t) => (
@@ -291,6 +303,9 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
               {TYPE_LABEL[t] ?? t}
             </option>
           ))}
+          {/* File specialization, not an enum member (plan D11): image-only
+              accept + thumbnail cells with a lightbox. */}
+          <option value={IMAGES_KIND}>Images</option>
         </select>
         <p className="mt-1.5 text-[10px] leading-snug text-muted-foreground">
           Type is set once. To change it later, add a new column and move the
@@ -493,7 +508,7 @@ export function ColumnMenu({
     <PanelPortal open onDismiss={onClose}>
       <div className="mb-2 flex items-center justify-between">
         <span className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-          {TYPE_LABEL[column.type] ?? column.type}
+          {columnTypeLabel(column)}
         </span>
         <button
           type="button"

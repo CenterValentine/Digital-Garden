@@ -154,25 +154,44 @@ export async function writeCells(
     if (fileIdsToCheck.size > 0) {
       const nodes = await tx.contentNode.findMany({
         where: { id: { in: [...fileIdsToCheck] }, deletedAt: null },
-        select: { id: true, contentType: true, title: true },
+        select: {
+          id: true,
+          contentType: true,
+          title: true,
+          filePayload: { select: { mimeType: true } },
+        },
       });
       const nodeById = new Map(nodes.map((n) => [n.id, n]));
       for (const write of writes) {
-        if (byKey.get(write.columnKey)?.type !== "file") continue;
+        const column = byKey.get(write.columnKey);
+        if (column?.type !== "file") continue;
         if (!Array.isArray(write.value)) continue;
-        const bad = write.value.find(
-          (id) =>
-            typeof id === "string" && nodeById.get(id)?.contentType !== "file"
-        );
-        if (bad === undefined) continue;
-        const node = nodeById.get(bad as string);
-        results.push({
-          status: "error",
-          rowId: write.rowId,
-          message: node
-            ? `"${node.title}" is a ${node.contentType}, not an uploaded file — File cells hold uploaded attachments; use a Content Link column for other content`
-            : "File cells hold uploaded attachments — one of the ids is not a file in this garden",
-        });
+        for (const id of write.value) {
+          if (typeof id !== "string") continue;
+          const node = nodeById.get(id);
+          if (!node || node.contentType !== "file") {
+            results.push({
+              status: "error",
+              rowId: write.rowId,
+              message: node
+                ? `"${node.title}" is a ${node.contentType}, not an uploaded file — File cells hold uploaded attachments; use a Content Link column for other content`
+                : "File cells hold uploaded attachments — one of the ids is not a file in this garden",
+            });
+            break;
+          }
+          // Images columns (config.imageOnly): image mime types only.
+          if (
+            column.config?.imageOnly &&
+            !node.filePayload?.mimeType?.startsWith("image/")
+          ) {
+            results.push({
+              status: "error",
+              rowId: write.rowId,
+              message: `"${node.title}" is not an image — this Images column accepts image files only`,
+            });
+            break;
+          }
+        }
       }
     }
 

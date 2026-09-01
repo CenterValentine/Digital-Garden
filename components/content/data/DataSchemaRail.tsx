@@ -23,7 +23,11 @@ import { ChevronDown, ChevronRight, Info } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumnType, DataTable } from "@/lib/domain/data";
 import { TYPE_GLYPH } from "./DataColumnHeader";
-import { AddColumnButton, ColumnEditForm, TYPE_LABEL } from "./DataColumnMenu";
+import {
+  AddColumnButton,
+  ColumnEditForm,
+  columnTypeLabel,
+} from "./DataColumnMenu";
 import {
   DATA_SCHEMA_CHANGED_EVENT,
   dispatchDataSchemaChanged,
@@ -190,7 +194,9 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
                 >
                   {column.config?.isBacklink
                     ? "⇠"
-                    : (TYPE_GLYPH[column.type as DataColumnType] ?? "·")}
+                    : column.type === "file" && column.config?.imageOnly
+                      ? "▣"
+                      : (TYPE_GLYPH[column.type as DataColumnType] ?? "·")}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-medium text-foreground/90">
                   {column.name}
@@ -202,7 +208,7 @@ export function DataSchemaRail({ contentId }: DataSchemaRailProps) {
                   />
                 )}
                 <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-                  {TYPE_LABEL[column.type] ?? column.type}
+                  {columnTypeLabel(column)}
                 </span>
               </button>
 

@@ -48,6 +48,7 @@ import {
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
 import { PanelPortal } from "./PanelPortal";
 import { dragHasFiles } from "./file-upload";
+import { ImageLightbox, imageDownloadUrl } from "./ImageLightbox";
 
 /** Checkbox display variants (config.checkDisplay). Filled when checked.
  * The ✓ variant's UNCHECKED state is an empty box, not a faded check —
@@ -321,6 +322,8 @@ function DataCell({
 
   /** File cells double as drop targets for OS files. */
   const [fileDragOver, setFileDragOver] = useState(false);
+  /** Images columns: the thumbnail currently zoomed, if any. */
+  const [lightbox, setLightbox] = useState<ContentRef | null>(null);
 
   const beginEdit = useCallback(() => {
     setDraft(editDraftFor(column, value));
@@ -539,6 +542,26 @@ function DataCell({
             >
               Restricted
             </span>
+          ) : column.config.imageOnly ? (
+            // Images column: thumbnail, click to zoom. Hydration's
+            // thumbnail when processed, else the full image streams.
+            <button
+              key={ref.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightbox(ref);
+              }}
+              title={`View "${ref.title}"`}
+              className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+              <img
+                src={ref.file?.thumbnailUrl ?? imageDownloadUrl(ref.id)}
+                alt={ref.title}
+                className="h-7 w-7 object-cover"
+              />
+            </button>
           ) : (
             <button
               key={ref.id}
@@ -567,6 +590,13 @@ function DataCell({
           >
             +
           </button>
+        )}
+        {lightbox && (
+          <ImageLightbox
+            contentId={lightbox.id}
+            title={lightbox.title}
+            onClose={() => setLightbox(null)}
+          />
         )}
       </div>
     );

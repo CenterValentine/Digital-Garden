@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { editDraftFor } from "./DataGridRow";
 import { dragHasFiles, uploadFilesToTable } from "./file-upload";
+import { ImageLightbox, imageDownloadUrl } from "./ImageLightbox";
 import {
   cellToText,
   sortStatusOptions,
@@ -755,8 +756,11 @@ function ContentLinkField({
   // its single + → picker. Uploads land as real file nodes UNDER the
   // database node — deliberate placement, never root litter.
   const isFile = column.type === "file";
+  const isImage = isFile && column.config.imageOnly === true;
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Images columns: the thumbnail currently zoomed, if any. */
+  const [lightbox, setLightbox] = useState<ContentRef | null>(null);
   // The anchor ELEMENT lives in state, not a ref: it is read during render
   // (the picker needs it as a prop), and the React Compiler correctly
   // rejects ref reads in render. A callback ref keeps it current.
@@ -802,9 +806,21 @@ function ContentLinkField({
       if (!files || files.length === 0) return;
       setUploading(true);
       try {
+        // Images columns accept images only.
+        let list = Array.from(files);
+        if (isImage) {
+          const images = list.filter((f) => f.type.startsWith("image/"));
+          if (images.length < list.length) {
+            toast.info(
+              `Images only — skipped ${list.length - images.length} non-image file${list.length - images.length === 1 ? "" : "s"}`
+            );
+          }
+          list = images;
+          if (list.length === 0) return;
+        }
         // Shared path with the grid's drop/paste targets — one placement
         // rule (under the database node) for every upload entry point.
-        const result = await uploadFilesToTable(tableId, files);
+        const result = await uploadFilesToTable(tableId, list);
         const added = result.ids.filter((id) => !ids.includes(id));
         if (added.length > 0) {
           onCommit([...ids, ...added]);
@@ -821,7 +837,7 @@ function ContentLinkField({
         setUploading(false);
       }
     },
-    [ids, onCommit, tableId]
+    [ids, onCommit, tableId, isImage]
   );
 
   return (
@@ -868,7 +884,35 @@ function ContentLinkField({
       </label>
 
       <div className="flex flex-wrap items-center gap-1">
-        {refs.map((ref) => (
+        {refs.map((ref) =>
+          isImage && !ref.restricted ? (
+            // Images column: thumbnail with a hover ×, click to zoom.
+            <span key={ref.id} className="relative">
+              <button
+                type="button"
+                onClick={() => setLightbox(ref)}
+                title={`View "${ref.title}"`}
+                className="block overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+                <img
+                  src={ref.file?.thumbnailUrl ?? imageDownloadUrl(ref.id)}
+                  alt={ref.title}
+                  className="h-14 w-14 object-cover"
+                />
+              </button>
+              {editable && (
+                <button
+                  type="button"
+                  onClick={() => remove(ref.id)}
+                  aria-label={`Remove ${ref.title}`}
+                  className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-destructive"
+                >
+                  <X className="h-2.5 w-2.5" />
+                </button>
+              )}
+            </span>
+          ) : (
           <span
             key={ref.id}
             className={cn(
@@ -901,13 +945,15 @@ function ContentLinkField({
               </button>
             )}
           </span>
-        ))}
+          )
+        )}
         {editable && isFile && (
           <>
             <input
               ref={fileInputRef}
               type="file"
               multiple
+              accept={isImage ? "image/*" : undefined}
               className="hidden"
               onChange={(e) => {
                 void uploadFiles(e.target.files);
@@ -975,6 +1021,14 @@ function ContentLinkField({
           // File columns browse a narrowed tree: folders + notes for
           // navigation (attachments live under notes), files to pick.
           eligibleTypes={isFile ? FILE_LINK_ELIGIBLE_TYPES : undefined}
+        />
+      )}
+
+      {lightbox && (
+        <ImageLightbox
+          contentId={lightbox.id}
+          title={lightbox.title}
+          onClose={() => setLightbox(null)}
         />
       )}
 
