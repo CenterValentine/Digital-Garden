@@ -9,7 +9,7 @@
  * point of having descriptions at all.
  */
 
-import { Check, Info, Square } from "lucide-react";
+import { Info } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
@@ -55,8 +55,10 @@ interface DataColumnHeaderProps {
   onResizeStart?: (e: React.PointerEvent, columnId: string) => void;
   /** Checkbox columns: one-click check/uncheck of every loaded row. */
   onBulkToggle?: () => void;
-  /** Every loaded row checked — flips the toggle's icon and meaning. */
+  /** Every loaded row checked — flips the toggle's state and meaning. */
   allChecked?: boolean;
+  /** At least one row checked — drives the indeterminate (dash) state. */
+  someChecked?: boolean;
   /** Rendered by the parent so the popover is not clipped by this cell. */
   children?: React.ReactNode;
 }
@@ -76,6 +78,7 @@ export function DataColumnHeader({
   onResizeStart,
   onBulkToggle,
   allChecked = false,
+  someChecked = false,
   children,
 }: DataColumnHeaderProps) {
   const glyph = column.config?.isBacklink
@@ -114,43 +117,46 @@ export function DataColumnHeader({
           )}
         />
       )}
-      <span
-        aria-hidden="true"
-        className="font-mono text-[10px] leading-none opacity-60"
-      >
-        {glyph}
-      </span>
-      <span className="truncate text-foreground/80" title={column.name}>
-        {column.name}
-      </span>
-      {/* Checkbox columns: check-all toggle, same iconography as the cells
-          (empty box = not all checked). Replaces the menu's wordy buttons
-          (owner, 2026-08-31). Draggable-child trick so grabbing it never
-          starts a column reorder; stopPropagation so it never opens the
-          menu. */}
-      {onBulkToggle && (
-        <button
-          type="button"
+      {/* Checkbox columns: a REAL checkbox that applies to every loaded
+          row, LEADING the header so it lines up with the column of cell
+          checkboxes beneath it (owner, 2026-08-31 — the right-aligned
+          subtle icon read as decoration). Tri-state: dash when only some
+          rows are checked. The draggable wrapper cancels drag initiation
+          so grabbing it never reorders the column; stopPropagation keeps
+          the menu closed. */}
+      {onBulkToggle ? (
+        <span
           draggable
           onDragStart={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
-          onClick={(e) => {
-            e.stopPropagation();
-            onBulkToggle();
-          }}
-          title={allChecked ? "Uncheck all rows" : "Check all rows"}
-          aria-label={allChecked ? "Uncheck all rows" : "Check all rows"}
-          className="ml-auto shrink-0 rounded p-0.5 hover:bg-muted"
+          onClick={(e) => e.stopPropagation()}
+          className="flex shrink-0 items-center"
         >
-          {allChecked ? (
-            <Check className="h-3 w-3 text-foreground" />
-          ) : (
-            <Square className="h-3 w-3 text-muted-foreground/50" />
-          )}
-        </button>
+          <input
+            type="checkbox"
+            checked={allChecked}
+            ref={(el) => {
+              if (el) el.indeterminate = !allChecked && someChecked;
+            }}
+            onChange={() => onBulkToggle()}
+            title={allChecked ? "Uncheck all rows" : "Check all rows"}
+            aria-label={allChecked ? "Uncheck all rows" : "Check all rows"}
+            className="h-3.5 w-3.5 cursor-pointer accent-current"
+          />
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="font-mono text-[10px] leading-none opacity-60"
+        >
+          {glyph}
+        </span>
       )}
+      <span className="truncate text-foreground/80" title={column.name}>
+        {column.name}
+      </span>
       {/* Only on columns that HAVE a description — showing it always would
           train people to ignore it, defeating the point (plan D9). */}
       {column.description && (

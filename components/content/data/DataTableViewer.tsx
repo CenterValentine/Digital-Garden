@@ -1810,6 +1810,9 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 column.type === "checkbox" &&
                 state.rows.length > 0 &&
                 state.rows.every((r) => r.data[column.key] === true);
+              const someChecked =
+                column.type === "checkbox" &&
+                state.rows.some((r) => r.data[column.key] === true);
               return (
               <DataColumnHeader
                 key={column.id}
@@ -1842,6 +1845,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                     : undefined
                 }
                 allChecked={allChecked}
+                someChecked={someChecked}
               >
                 {openColumnId === column.id && (
                   <ColumnMenu
