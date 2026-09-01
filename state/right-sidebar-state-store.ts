@@ -17,6 +17,7 @@ export type RightSidebarTab =
   | "publish"
   | "studio"
   | "context"
+  | "database"
   | "extension";
 
 // Outline leads the rail (2026-07-16); "backlinks"/"tags" remain in the union

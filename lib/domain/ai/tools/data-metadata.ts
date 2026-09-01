@@ -11,6 +11,7 @@ export const DATA_TOOL_IDS = [
   "describe_database",
   "insert_rows",
   "update_row",
+  "propose_column_options",
 ] as const;
 
 export type DataToolId = (typeof DATA_TOOL_IDS)[number];
@@ -38,5 +39,10 @@ export const DATA_TOOL_METADATA: Record<
     name: "Update Database Row",
     description:
       "Change cells in ONE existing row — only the columns the user named, all-or-nothing, with compare-and-set protection against overwriting concurrent edits; cannot create or delete rows",
+  },
+  propose_column_options: {
+    name: "Propose Column Options",
+    description:
+      "Suggest category options for a select, multi-select, or status column as a review card — nothing is written until you click Apply on the card",
   },
 };

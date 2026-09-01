@@ -22,10 +22,22 @@
  */
 
 import { memo, useCallback, useState } from "react";
-import { Expand } from "lucide-react";
+import {
+  Check,
+  Expand,
+  ExternalLink,
+  Flag,
+  Heart,
+  Plus,
+  Square,
+  Star,
+  ThumbsUp,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import {
-  cellToText,
+  cellToDisplayText,
+  sortStatusOptions,
   type CellValue,
   type ContentRef,
   type DataColumn,
@@ -34,6 +46,59 @@ import {
   type RelationLinkRef,
 } from "@/lib/domain/data";
 import { DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { PanelPortal } from "./PanelPortal";
+import { dragHasFiles } from "./file-upload";
+import { ImageLightbox, imageDownloadUrl } from "./ImageLightbox";
+
+/** Checkbox display variants (config.checkDisplay). Filled when checked.
+ * The ✓ variant's UNCHECKED state is an empty box, not a faded check —
+ * a ghost checkmark reads as "checked but disabled" (owner, 2026-08-31);
+ * the shaped variants (star/heart/…) keep their own faded outline, where
+ * the silhouette itself says what clicking will do. */
+const CHECK_ICONS: Record<
+  string,
+  { icon: LucideIcon; uncheckedIcon?: LucideIcon; fillable: boolean }
+> = {
+  check: { icon: Check, uncheckedIcon: Square, fillable: false },
+  star: { icon: Star, fillable: true },
+  heart: { icon: Heart, fillable: true },
+  flag: { icon: Flag, fillable: true },
+  thumbsUp: { icon: ThumbsUp, fillable: false },
+};
+
+const CHECK_COLOR_CLASS: Record<string, string> = {
+  default: "text-foreground",
+  blue: "text-blue-500",
+  green: "text-emerald-500",
+  amber: "text-amber-500",
+  red: "text-red-500",
+  purple: "text-purple-500",
+};
+
+/**
+ * What the edit draft seeds from. Stored datetimes are UTC ISO; a
+ * `datetime-local` input needs local "YYYY-MM-DDTHH:mm" (the encoder
+ * parses that back as local time on commit). Shared with DataRowFields
+ * so the grid and the peek seed identically.
+ */
+export function editDraftFor(
+  column: DataColumn,
+  value: CellValue | undefined
+): string {
+  if (value === undefined) return "";
+  if (
+    column.type === "date" &&
+    column.config.includeTime &&
+    typeof value === "string"
+  ) {
+    const d = new Date(value);
+    if (!Number.isNaN(d.getTime())) {
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+  }
+  return String(value);
+}
 
 /** Types whose cells open a text input in place. Everything else edits in peek. */
 export const INLINE_EDITABLE_TYPES: ReadonlySet<string> = new Set([
@@ -49,6 +114,22 @@ export const INLINE_EDITABLE_TYPES: ReadonlySet<string> = new Set([
 interface DataGridRowProps {
   row: DataRow;
   columns: DataColumn[];
+  /** Effective column widths keyed by column id (view prefs + live drag).
+   * Memoized by the parent so this memo()'d row only re-renders on change. */
+  widths?: Record<string, number>;
+  /** Owner-only: create a select/status option from the cell picker. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  /** Writers: upload dropped/pasted OS files into a File cell. */
+  onUploadFiles?: (
+    rowId: string,
+    column: DataColumn,
+    files: FileList
+  ) => void | Promise<void>;
+  /** Cache-bust token for image streams after an in-place overwrite. */
+  imageVersion?: number;
   height: number;
   selected: boolean;
   editable: boolean;
@@ -73,6 +154,10 @@ interface DataGridRowProps {
 function DataGridRowImpl({
   row,
   columns,
+  widths,
+  onCreateOption,
+  onUploadFiles,
+  imageVersion,
   height,
   selected,
   editable,
@@ -127,6 +212,10 @@ function DataGridRowImpl({
             // the draft seeds in the initializer instead of an effect.
             key={`${column.id}:${forceEdit ? "e" : "v"}`}
             column={column}
+            width={widths?.[column.id] ?? DEFAULT_COLUMN_WIDTH}
+            onCreateOption={onCreateOption}
+            onUploadFiles={onUploadFiles}
+            imageVersion={imageVersion}
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
@@ -155,6 +244,20 @@ export const DataGridRow = memo(DataGridRowImpl);
 
 interface DataCellProps {
   column: DataColumn;
+  width: number;
+  /** Owner-only: create a select/status option from the cell picker. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  /** Writers: upload dropped OS files into a File cell. */
+  onUploadFiles?: (
+    rowId: string,
+    column: DataColumn,
+    files: FileList
+  ) => void | Promise<void>;
+  /** Cache-bust token for image streams after an in-place overwrite. */
+  imageVersion?: number;
   rowId: string;
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
@@ -178,6 +281,10 @@ interface DataCellProps {
 
 function DataCell({
   column,
+  width,
+  onCreateOption,
+  onUploadFiles,
+  imageVersion,
   rowId,
   value,
   links,
@@ -204,46 +311,123 @@ function DataCell({
    * lands mid-typing.
    */
   const [draft, setDraft] = useState<string | null>(() =>
-    forceEdit && canInlineEdit ? (value === undefined ? "" : String(value)) : null
+    forceEdit && canInlineEdit ? editDraftFor(column, value) : null
   );
   const editing = draft !== null;
 
-  const asText = value === undefined ? "" : String(value);
+  // Select-like cells edit through an anchored option picker instead of a
+  // text draft. Seeded from forceEdit the same way (keyed remount), so
+  // Enter-on-selected opens it too.
+  const [optionsOpen, setOptionsOpen] = useState(
+    () =>
+      forceEdit &&
+      editable &&
+      (column.type === "select" ||
+        column.type === "status" ||
+        column.type === "multiSelect")
+  );
+
+  /** File cells double as drop targets for OS files. */
+  const [fileDragOver, setFileDragOver] = useState(false);
+  /** Images columns: the thumbnail currently zoomed, if any. */
+  const [lightbox, setLightbox] = useState<ContentRef | null>(null);
 
   const beginEdit = useCallback(() => {
-    setDraft(value === undefined ? "" : String(value));
-  }, [value]);
+    setDraft(editDraftFor(column, value));
+  }, [column, value]);
 
   const commit = useCallback(() => {
     if (draft === null) return;
     const next = draft;
     setDraft(null);
-    if (next === asText) return;
+    // Compare against the same representation the draft was seeded from —
+    // for datetime-local that's the LOCAL string, not the stored UTC ISO,
+    // so an untouched editor never fires a spurious write.
+    if (next === editDraftFor(column, value)) return;
     onCommit(rowId, column.key, next === "" ? undefined : next);
-  }, [draft, asText, onCommit, rowId, column.key]);
+  }, [draft, column, value, onCommit, rowId]);
 
   const cancel = useCallback(() => setDraft(null), []);
 
   // Checkboxes have no edit mode — a click IS the commit. The wrapper click
-  // still selects, so ⌘C works on them too.
+  // still selects, so ⌘C works on them too. Display variants (icon, t/f
+  // text) are cosmetic: every mode stores the same boolean, so filters and
+  // sorts never notice which one is configured.
   if (column.type === "checkbox") {
+    const checked = value === true;
+    const displayMode = column.config.checkDisplay ?? "checkbox";
+    const colorClass =
+      CHECK_COLOR_CLASS[column.config.checkColor ?? "default"] ??
+      CHECK_COLOR_CLASS.default;
+    const iconEntry = CHECK_ICONS[displayMode];
     return (
       <div
         className={cn(
           "flex shrink-0 items-center border-r border-border/40 px-3",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
       >
-        <input
-          type="checkbox"
-          checked={value === true}
-          disabled={!editable}
-          onChange={(e) => onCommit(rowId, column.key, e.target.checked)}
-          aria-label={column.name}
-          className="h-3.5 w-3.5 accent-current"
-        />
+        {displayMode === "text" ? (
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              if (editable) onCommit(rowId, column.key, !checked);
+            }}
+            aria-pressed={checked}
+            aria-label={column.name}
+            className={cn(
+              "rounded px-1 font-mono text-xs tabular-nums",
+              checked ? colorClass : "text-muted-foreground/60",
+              editable && "hover:bg-muted"
+            )}
+          >
+            {checked ? "true" : "false"}
+          </button>
+        ) : iconEntry ? (
+          <button
+            type="button"
+            disabled={!editable}
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              if (editable) onCommit(rowId, column.key, !checked);
+            }}
+            aria-pressed={checked}
+            aria-label={column.name}
+            className={cn("rounded p-0.5", editable && "hover:bg-muted")}
+          >
+            {(() => {
+              const Icon = checked
+                ? iconEntry.icon
+                : (iconEntry.uncheckedIcon ?? iconEntry.icon);
+              return (
+                <Icon
+                  className={cn(
+                    "h-3.5 w-3.5",
+                    checked ? colorClass : "text-muted-foreground/40"
+                  )}
+                  fill={
+                    checked && iconEntry.fillable ? "currentColor" : "none"
+                  }
+                />
+              );
+            })()}
+          </button>
+        ) : (
+          <input
+            type="checkbox"
+            checked={checked}
+            disabled={!editable}
+            onChange={(e) => onCommit(rowId, column.key, e.target.checked)}
+            aria-label={column.name}
+            className={cn("h-3.5 w-3.5 accent-current", colorClass)}
+          />
+        )}
       </div>
     );
   }
@@ -262,7 +446,7 @@ function DataCell({
           cellSelected && "ring-1 ring-inset ring-primary",
           editable && "cursor-pointer"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         onDoubleClick={editable ? () => onOpenRow(rowId) : undefined}
         title={editable ? "Double-click to link rows" : undefined}
@@ -310,14 +494,51 @@ function DataCell({
   // peek's picker. Restricted/dangling targets show a redacted pill that
   // opens nothing (plan V1-3/G12).
   if (column.type === "contentLink" || column.type === "file") {
+    const fileDroppable =
+      column.type === "file" && editable && Boolean(onUploadFiles);
     return (
       <div
         className={cn(
           "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
-          cellSelected && "ring-1 ring-inset ring-primary"
+          cellSelected && "ring-1 ring-inset ring-primary",
+          fileDragOver && "bg-primary/10 ring-2 ring-inset ring-primary/60"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
+        // OS-file drags only (dragHasFiles) — the app's own column/board
+        // drags carry text data and never light this up.
+        onDragOver={
+          fileDroppable
+            ? (e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                e.dataTransfer.dropEffect = "copy";
+                setFileDragOver(true);
+              }
+            : undefined
+        }
+        onDragLeave={
+          fileDroppable
+            ? (e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setFileDragOver(false);
+                }
+              }
+            : undefined
+        }
+        onDrop={
+          fileDroppable
+            ? (e) => {
+                if (!dragHasFiles(e)) return;
+                e.preventDefault();
+                e.stopPropagation();
+                setFileDragOver(false);
+                onSelect(rowId, column.key);
+                void onUploadFiles?.(rowId, column, e.dataTransfer.files);
+              }
+            : undefined
+        }
       >
         {(contentRefs ?? []).map((ref) =>
           ref.restricted ? (
@@ -328,6 +549,29 @@ function DataCell({
             >
               Restricted
             </span>
+          ) : column.config.imageOnly ? (
+            // Images column: thumbnail, click to zoom. Hydration's
+            // thumbnail when processed, else the full image streams.
+            <button
+              key={ref.id}
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setLightbox(ref);
+              }}
+              title={`View "${ref.title}"`}
+              className="shrink-0 overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+              <img
+                src={
+                  ref.file?.thumbnailUrl ??
+                  imageDownloadUrl(ref.id, imageVersion)
+                }
+                alt={ref.title}
+                className="h-7 w-7 object-cover"
+              />
+            </button>
           ) : (
             <button
               key={ref.id}
@@ -357,6 +601,14 @@ function DataCell({
             +
           </button>
         )}
+        {lightbox && (
+          <ImageLightbox
+            contentId={lightbox.id}
+            title={lightbox.title}
+            version={imageVersion}
+            onClose={() => setLightbox(null)}
+          />
+        )}
       </div>
     );
   }
@@ -371,7 +623,7 @@ function DataCell({
           "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-2 text-xs",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         onDoubleClick={editable ? () => onOpenRow(rowId, column.id) : undefined}
         title={editable ? "Double-click to assign" : undefined}
@@ -417,7 +669,7 @@ function DataCell({
           column.type === "rollup" && "justify-end font-mono tabular-nums",
           cellSelected && "ring-1 ring-inset ring-primary"
         )}
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
         onClick={() => onSelect(rowId, column.key)}
         title={text || undefined}
       >
@@ -431,15 +683,151 @@ function DataCell({
     column.type === "status" ||
     column.type === "multiSelect";
 
+  // Select-like cells: pill display + a dashed "+" (same affordance the
+  // relation cells teach) opening an anchored option picker — pick, clear,
+  // and (owners) create options without leaving the grid. Was: no editor
+  // at all, which read as "these cells are dead" (owner, 2026-08-31).
+  if (isSelectLike) {
+    const display = cellToDisplayText(column, value);
+    const close = () => {
+      setOptionsOpen(false);
+      onEditEnd();
+    };
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center gap-1 overflow-hidden border-r border-border/40 px-2 text-xs",
+          editable && "cursor-pointer",
+          cellSelected && "ring-1 ring-inset ring-primary"
+        )}
+        style={{ width }}
+        onClick={() => onSelect(rowId, column.key)}
+        onDoubleClick={editable ? () => setOptionsOpen(true) : undefined}
+        title={display || (editable ? "Double-click to choose" : undefined)}
+      >
+        {column.type === "multiSelect" && Array.isArray(value) ? (
+          // One pill per chosen option, like relation chips — a single
+          // joined pill read as one value (owner, 2026-08-31). Removed
+          // options render nothing (their ids stay in the cell, plan D3).
+          value.map((id) => {
+            const opt = column.config.options?.find((o) => o.id === id);
+            return opt ? (
+              <span
+                key={id}
+                className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]"
+              >
+                {opt.label}
+              </span>
+            ) : null;
+          })
+        ) : display ? (
+          <span className="truncate rounded-full bg-muted px-2 py-0.5 text-[11px]">
+            {display}
+          </span>
+        ) : null}
+        {editable && (
+          <button
+            type="button"
+            aria-label={`Choose ${column.name}`}
+            title="Choose options"
+            onClick={(e) => {
+              e.stopPropagation();
+              onSelect(rowId, column.key);
+              setOptionsOpen(true);
+            }}
+            className="shrink-0 rounded-full border border-dashed border-border px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground hover:border-primary/50 hover:text-foreground"
+          >
+            +
+          </button>
+        )}
+        {optionsOpen && editable && (
+          <PanelPortal open onDismiss={close}>
+            <SelectOptionsPanel
+              column={column}
+              value={value}
+              rowId={rowId}
+              onCommit={onCommit}
+              onCreateOption={onCreateOption}
+              onClose={close}
+            />
+          </PanelPortal>
+        )}
+      </div>
+    );
+  }
+
+  // Long text edits in an anchored popover, not the 36px inline input —
+  // Enter makes a NEWLINE here (⌘Enter/click-away saves, Esc cancels),
+  // which is the felt difference between the two text types. PanelPortal's
+  // outside-click dismiss doubles as blur-commit.
+  if (editing && canInlineEdit && column.type === "longText") {
+    return (
+      <div
+        className={cn(
+          "flex shrink-0 items-center overflow-hidden border-r border-border/40 px-3 text-xs",
+          "ring-2 ring-inset ring-primary"
+        )}
+        style={{ width }}
+      >
+        <span className="truncate text-muted-foreground">{draft ?? ""}</span>
+        <PanelPortal
+          open
+          onDismiss={() => {
+            commit();
+            onEditEnd();
+          }}
+          className="w-80"
+        >
+          <textarea
+            autoFocus
+            value={draft ?? ""}
+            maxLength={column.config.maxLength}
+            rows={6}
+            onChange={(e) => setDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.preventDefault();
+                commit();
+                onEditEnd();
+              } else if (e.key === "Escape") {
+                e.preventDefault();
+                cancel();
+                onEditEnd();
+              } else if (e.key === "Tab") {
+                e.preventDefault();
+                commit();
+                onAdvance(rowId, column.key, e.shiftKey ? -1 : 1);
+              }
+            }}
+            className={cn(
+              "w-full resize-y rounded-md border border-border bg-background px-2 py-1.5",
+              "text-xs outline-none focus:ring-2 focus:ring-primary"
+            )}
+            aria-label={column.name}
+          />
+          <p className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground">
+            <span>Enter = new line · ⌘Enter saves · Esc cancels</span>
+            {column.config.maxLength ? (
+              <span className="font-mono tabular-nums">
+                {(draft ?? "").length}/{column.config.maxLength}
+              </span>
+            ) : null}
+          </p>
+        </PanelPortal>
+      </div>
+    );
+  }
+
   if (editing && canInlineEdit) {
     return (
       <div
         className="shrink-0 border-r border-border/40"
-        style={{ width: DEFAULT_COLUMN_WIDTH }}
+        style={{ width }}
       >
         <input
           autoFocus
           value={draft ?? ""}
+          maxLength={column.type === "text" ? column.config.maxLength : undefined}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
           onKeyDown={(e) => {
@@ -463,13 +851,29 @@ function DataCell({
             "h-full w-full bg-background px-3 text-xs outline-none",
             "ring-2 ring-inset ring-primary"
           )}
-          type={column.type === "number" ? "number" : "text"}
+          // Dates get the native picker — the calendar affordance — with
+          // datetime-local when the column's time component is meaningful.
+          // URLs stay type=text: the encoder upgrades bare domains to
+          // https://, and type=url's browser validation would fight that.
+          type={
+            column.type === "number"
+              ? "number"
+              : column.type === "date"
+                ? column.config.includeTime
+                  ? "datetime-local"
+                  : "date"
+                : column.type === "email"
+                  ? "email"
+                  : "text"
+          }
+          inputMode={column.type === "url" ? "url" : undefined}
         />
       </div>
     );
   }
 
-  const display = cellToText(column, value);
+  // Formatted for display; edits and ⌘C copy still use the raw value.
+  const display = cellToDisplayText(column, value);
 
   return (
     <div
@@ -479,7 +883,7 @@ function DataCell({
         column.type === "number" && "justify-end font-mono tabular-nums",
         cellSelected && "ring-1 ring-inset ring-primary"
       )}
-      style={{ width: DEFAULT_COLUMN_WIDTH }}
+      style={{ width }}
       onClick={() => {
         onSelect(rowId, column.key);
         // First click on an EMPTY editable cell goes straight to editing —
@@ -509,6 +913,203 @@ function DataCell({
       ) : (
         <span className="truncate">{display}</span>
       )}
+      {/* Multi-line marker: the 36px row shows one line (fixed-height
+          windowing); the ¶ says there's more behind the truncation. */}
+      {column.type === "longText" &&
+        typeof value === "string" &&
+        value.includes("\n") && (
+          <span
+            aria-hidden="true"
+            className="ml-1 shrink-0 text-[10px] text-muted-foreground/70"
+          >
+            ¶
+          </span>
+        )}
+      {/* URL cells get an open affordance — click still selects/edits, ↗
+          opens. Scheme-guarded: only encoder-normalized values (http/https)
+          render a link; a legacy bare "example.com" would resolve as a
+          RELATIVE path. */}
+      {/* (select-like cells return earlier via SelectOptionsPanel) */}
+      {column.type === "url" &&
+        typeof value === "string" &&
+        /^https?:\/\//i.test(value) && (
+          <a
+            href={value}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            title={`Open ${value}`}
+            aria-label={`Open ${value}`}
+            className="ml-1 shrink-0 rounded p-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        )}
+    </div>
+  );
+}
+
+// ── Select-like option picker ────────────────────────────────────────────
+
+interface SelectOptionsPanelProps {
+  column: DataColumn;
+  value: CellValue | undefined;
+  rowId: string;
+  onCommit: (rowId: string, columnKey: string, value: unknown) => void;
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
+  onClose: () => void;
+}
+
+/**
+ * The grid cell's option picker. Single select commits and closes; multi
+ * toggles live and closes on dismiss. "+ New option" (owners only, via
+ * onCreateOption) creates AND applies — you typed it in this cell because
+ * this row wears it. Mirrors the peek's inline creation, different chrome.
+ */
+function SelectOptionsPanel({
+  column,
+  value,
+  rowId,
+  onCommit,
+  onCreateOption,
+  onClose,
+}: SelectOptionsPanelProps) {
+  const multi = column.type === "multiSelect";
+  const options =
+    column.type === "status"
+      ? sortStatusOptions(column.config.options ?? [])
+      : (column.config.options ?? []);
+  const chosen = new Set(
+    multi
+      ? Array.isArray(value)
+        ? value
+        : []
+      : typeof value === "string"
+        ? [value]
+        : []
+  );
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState("");
+
+  const commitSingle = (id: string) => {
+    // Re-picking the current option clears it — the one-click "unset".
+    onCommit(rowId, column.key, chosen.has(id) ? undefined : id);
+    onClose();
+  };
+
+  const toggleMulti = (id: string) => {
+    const next = new Set(chosen);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    // Option-definition order — cell arrays are order-significant (B8c).
+    const ordered = options.filter((o) => next.has(o.id)).map((o) => o.id);
+    onCommit(rowId, column.key, ordered.length > 0 ? ordered : undefined);
+  };
+
+  const submitNew = async () => {
+    if (!onCreateOption) return;
+    const trimmed = label.trim();
+    if (!trimmed) return;
+    const created = await onCreateOption(column, trimmed);
+    if (created) {
+      if (multi) {
+        const current = Array.isArray(value) ? value : [];
+        if (!current.includes(created.id)) {
+          onCommit(rowId, column.key, [...current, created.id]);
+        }
+      } else {
+        onCommit(rowId, column.key, created.id);
+      }
+    }
+    setLabel("");
+    setAdding(false);
+    if (!multi) onClose();
+  };
+
+  return (
+    <div className="flex max-h-72 flex-col gap-0.5 overflow-y-auto">
+      {options.length === 0 && (
+        <p className="px-1 py-0.5 text-[11px] italic text-muted-foreground">
+          No options yet.
+        </p>
+      )}
+      {options.map((o) =>
+        multi ? (
+          <label
+            key={o.id}
+            className="flex items-center gap-2 rounded px-1.5 py-1 text-xs hover:bg-muted/60"
+          >
+            <input
+              type="checkbox"
+              checked={chosen.has(o.id)}
+              onChange={() => toggleMulti(o.id)}
+              className="h-3.5 w-3.5 accent-current"
+            />
+            <span className="truncate">{o.label}</span>
+          </label>
+        ) : (
+          <button
+            key={o.id}
+            type="button"
+            onClick={() => commitSingle(o.id)}
+            className={cn(
+              "flex items-center gap-2 rounded px-1.5 py-1 text-left text-xs hover:bg-muted/60",
+              chosen.has(o.id) && "bg-muted/40"
+            )}
+          >
+            <Check
+              className={cn(
+                "h-3 w-3 shrink-0",
+                chosen.has(o.id) ? "opacity-100" : "opacity-0"
+              )}
+            />
+            <span className="truncate">{o.label}</span>
+          </button>
+        )
+      )}
+
+      {onCreateOption &&
+        (adding ? (
+          <div className="mt-1 flex items-center gap-1">
+            <input
+              autoFocus
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void submitNew();
+                } else if (e.key === "Escape") {
+                  e.stopPropagation();
+                  setAdding(false);
+                  setLabel("");
+                }
+              }}
+              placeholder="New option label"
+              className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              type="button"
+              onClick={() => void submitNew()}
+              disabled={!label.trim()}
+              className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setAdding(true)}
+            className="mt-1 flex items-center gap-1 rounded px-1.5 py-1 text-left text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <Plus className="h-3 w-3" />
+            New option
+          </button>
+        ))}
     </div>
   );
 }

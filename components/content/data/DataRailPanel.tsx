@@ -12,8 +12,10 @@
  * the already-loaded list (plan B8): databases are few and views per
  * database are single digits, and views are virtual — a server content
  * search could never find them. Promoted-page titles join the same box when
- * promotion lands (Phase 5); quick-add via ContentTreePicker is a later
- * slice (it needs the shared picker to grow a create-kind param).
+ * promotion lands (Phase 5). Quick-add goes through ContentTreePicker in
+ * create-targeting mode (quickCreate kind "data" — the create-kind param
+ * the picker grew 2026-08-30), so a new database is always deliberately
+ * placed, never dropped at root.
  *
  * Opening a view sets `?view=` BEFORE selecting the node (a fresh viewer
  * mount reads the URL), then dispatches `dg:data-open-view` (an already-
@@ -33,6 +35,16 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import { useContentStore } from "@/state/content-store";
+import {
+  ContentTreePicker,
+  useWorkspaceViewOptions,
+  type PickerTarget,
+} from "@/components/content/pickers/ContentTreePicker";
+
+/** The new-database picker browses FOLDERS only: a database's home is a
+ * deliberate spot in the tree, and offering leaves would just re-open the
+ * "where does this actually go" ambiguity the picker exists to close. */
+const FOLDER_ONLY_TYPES = new Set(["folder"]);
 
 interface RailView {
   id: string;
@@ -100,45 +112,40 @@ export function DataRailPanel() {
     [setSelectedContentId]
   );
 
-  // Rail quick-add (plan Phase 2 leftover, built 2026-08-27): the rail is
-  // where databases live, so creating one shouldn't require the tree's +
-  // menu. Server seeds the Name column and default view; we open it ready
-  // to rename.
-  const createDatabase = useCallback(async () => {
-    try {
-      const res = await fetch("/api/content/content", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: "Untitled database",
-          parentId: null,
-          contentType: "data",
-        }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json?.success) return;
-      const created = json.data as { id: string; title: string };
+  // Rail quick-add, second pass (2026-08-30): the first version POSTed
+  // straight to root — a database landing orphaned at the top of the tree
+  // with no say in where. Now the + opens ContentTreePicker (the canonical
+  // tree-browse picker, same as the pane tab "+" and shortcuts) in
+  // create-targeting mode: browse folders, and every commit — picking a
+  // folder, its "+" button, an insertion gap, the scope row — creates the
+  // database exactly there. The picker owns the POST (quickCreate kind
+  // "data"; server seeds the Name column and default view).
+  const { views, defaultViewId } = useWorkspaceViewOptions();
+  // Anchor captured from the click event at open time — render-time ref
+  // reads are forbidden; non-null doubles as the open flag (the
+  // PaneTabAddButton pattern).
+  const [pickerAnchor, setPickerAnchor] = useState<HTMLElement | null>(null);
+
+  const handleCreated = useCallback(
+    (target: PickerTarget) => {
+      setPickerAnchor(null);
       setDatabases((prev) => [
         {
-          id: created.id,
-          title: created.title,
+          id: target.id,
+          title: target.title,
           rowCount: 0,
           defaultViewId: null,
           views: [],
         },
         ...prev,
       ]);
-      window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-      setSelectedContentId(created.id, {
+      setSelectedContentId(target.id, {
         contentType: "data",
-        title: created.title,
+        title: target.title,
       });
-    } catch {
-      // Quick-add failing silently is wrong — but the + menu path still
-      // works, and the rail has no toast surface; log-free no-op for v1.
-    }
-  }, [setSelectedContentId]);
+    },
+    [setSelectedContentId]
+  );
 
   const toggle = useCallback((dbId: string) => {
     setExpanded((prev) => {
@@ -181,8 +188,11 @@ export function DataRailPanel() {
           </div>
           <button
             type="button"
-            onClick={() => void createDatabase()}
-            title="New database"
+            onClick={(e) => {
+              const el = e.currentTarget;
+              setPickerAnchor((current) => (current ? null : el));
+            }}
+            title="New database — pick where it goes"
             aria-label="New database"
             className="shrink-0 rounded-md border border-border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
@@ -190,6 +200,27 @@ export function DataRailPanel() {
           </button>
         </div>
       </div>
+
+      {pickerAnchor ? (
+        <ContentTreePicker
+          anchorEl={pickerAnchor}
+          // pickCreatesInside routes every pick through quickCreate — this
+          // never fires, but the prop is required for ordinary consumers.
+          onPick={() => setPickerAnchor(null)}
+          onClose={() => setPickerAnchor(null)}
+          quickCreate={{
+            defaultTitle: "Untitled database",
+            kind: "data",
+            noun: "Database",
+            pickCreatesInside: true,
+            onCreated: handleCreated,
+          }}
+          views={views}
+          defaultViewId={defaultViewId}
+          eligibleTypes={FOLDER_ONLY_TYPES}
+          searchPlaceholder="Pick a folder for the new database"
+        />
+      ) : null}
 
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {loading && (

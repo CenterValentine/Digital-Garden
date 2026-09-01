@@ -14,7 +14,7 @@
 
 import { cn } from "@/lib/core/utils";
 import {
-  cellToText,
+  cellToDisplayText,
   deriveRowTitle,
   type DataColumn,
   type DataRow,
@@ -64,7 +64,7 @@ export function DataListView({ rows, columns, onOpenRow }: DataListViewProps) {
             </span>
             <span className="flex min-w-0 gap-3 text-[11px] text-muted-foreground">
               {secondary.map((col) => {
-                const text = cellToText(col, row.data[col.key]);
+                const text = cellToDisplayText(col, row.data[col.key]);
                 return text ? (
                   <span key={col.id} className="truncate" title={col.name}>
                     {text}

@@ -14,7 +14,7 @@
 
 import { cn } from "@/lib/core/utils";
 import {
-  cellToText,
+  cellToDisplayText,
   deriveRowTitle,
   type DataColumn,
   type DataRow,
@@ -161,7 +161,7 @@ export function DataGalleryView({
                 {title}
               </p>
               {secondary.map((col) => {
-                const text = cellToText(col, row.data[col.key]);
+                const text = cellToDisplayText(col, row.data[col.key]);
                 return text ? (
                   <p
                     key={col.id}

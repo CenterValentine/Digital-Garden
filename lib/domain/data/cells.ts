@@ -85,6 +85,37 @@ function encodeDate(raw: unknown, includeTime: boolean): EncodeResult {
   );
 }
 
+// ── Text handling ────────────────────────────────────────────────────────
+
+/**
+ * The felt difference between the two text types lives here:
+ *  - `text` is single-line BY INVARIANT — pasted newlines collapse to
+ *    spaces (normalize, don't reject: a multi-line paste into a name
+ *    column is an unambiguous near-miss). Invisible `\n`s in a "single
+ *    line" column poison sorts, filters, and CSV in ways nobody can see.
+ *  - `longText` keeps newlines, normalized to `\n` (`\r\n` and bare `\r`
+ *    are transport artifacts, not content).
+ * `maxLength`, when configured, rejects rather than truncates — silent
+ * truncation is data loss with a green checkmark.
+ */
+function encodeText(
+  raw: unknown,
+  type: "text" | "longText",
+  maxLength: number | undefined
+): EncodeResult {
+  if (typeof raw !== "string") return fail("Expected text");
+  const normalized =
+    type === "text"
+      ? raw.replace(/\s*\r?\n\s*|\r/g, " ")
+      : raw.replace(/\r\n?/g, "\n");
+  if (maxLength !== undefined && maxLength > 0 && normalized.length > maxLength) {
+    return fail(
+      `Too long — this column is limited to ${maxLength} characters (got ${normalized.length})`
+    );
+  }
+  return ok(normalized);
+}
+
 // ── Number handling ──────────────────────────────────────────────────────
 
 function encodeNumber(raw: unknown, precision?: number): EncodeResult {
@@ -197,7 +228,7 @@ export function encodeCell(column: DataColumn, raw: unknown): EncodeResult {
   switch (column.type) {
     case "text":
     case "longText":
-      return typeof raw === "string" ? ok(raw) : fail("Expected text");
+      return encodeText(raw, column.type, column.config.maxLength);
 
     case "number":
       return encodeNumber(raw, column.config.precision);
@@ -316,6 +347,62 @@ export function cellToText(column: DataColumn, value: CellValue | undefined): st
     default:
       return Array.isArray(value) ? value.join(" ") : String(value);
   }
+}
+
+// ── Display formatting ───────────────────────────────────────────────────
+
+/**
+ * Render one number cell per the column's format config. DISPLAY-ONLY —
+ * `cellToText` above deliberately stays raw because it feeds search
+ * indexing, CSV export, filters, and the AI digest; a "$1,234.50" in any
+ * of those poisons numeric matching and re-import. Copy (⌘C) also copies
+ * raw: `encodeNumber` only strips `$£€,` so a formatted "CA$1,234" or
+ * "50%" would not re-parse on paste.
+ */
+export function formatNumberCell(column: DataColumn, value: number): string {
+  const { numberFormat, precision, currencyCode, useGrouping } = column.config;
+  const digits =
+    precision !== undefined && precision >= 0
+      ? Math.min(Math.floor(precision), 8)
+      : undefined;
+
+  try {
+    if (numberFormat === "currency") {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency: currencyCode || "USD",
+        // Precision, when set, overrides the currency's own default
+        // (2 for USD, 0 for JPY); unset defers to Intl.
+        ...(digits !== undefined
+          ? { minimumFractionDigits: digits, maximumFractionDigits: digits }
+          : {}),
+      }).format(value);
+    }
+    const text = new Intl.NumberFormat(undefined, {
+      useGrouping: useGrouping === true,
+      ...(digits !== undefined
+        ? { minimumFractionDigits: digits, maximumFractionDigits: digits }
+        : { maximumFractionDigits: 12 }),
+    }).format(value);
+    return numberFormat === "percent" ? `${text}%` : text;
+  } catch {
+    // Unknown currency code (config is a Json bag) — degrade to raw.
+    return String(value);
+  }
+}
+
+/**
+ * `cellToText` with display formatting layered on top — what grid cells,
+ * cards, and field stacks SHOW. Never used for search/export/digest.
+ */
+export function cellToDisplayText(
+  column: DataColumn,
+  value: CellValue | undefined
+): string {
+  if (column.type === "number" && typeof value === "number") {
+    return formatNumberCell(column, value);
+  }
+  return cellToText(column, value);
 }
 
 /**

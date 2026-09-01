@@ -77,12 +77,129 @@ export async function findOrCreateFolder(
   return { contentNodeId: folder.id, created: true };
 }
 
+/**
+ * Find-or-create a SHORTCUT to existing content (owner confirmation,
+ * 2026-08-31): the pointer that lets content keep ONE canonical home while
+ * staying visible elsewhere — the AI's alternative to ever duplicating.
+ *
+ * Semantics mirror the content route's: chains collapse to a single hop
+ * (a shortcut to a shortcut points at the final target; a broken chain is
+ * refused), nothing is ever stored UNDER a shortcut, and find is scoped to
+ * (parent, owner-content, resolved target) so a retried tool call reuses
+ * the mirror instead of stacking twins.
+ *
+ * Flat result shape — this tsconfig doesn't narrow discriminated unions.
+ */
+export async function findOrCreateShortcut(
+  ownerId: string,
+  targetContentId: string,
+  parentId: string | null,
+  options: { title?: string; ownerContentId?: string } = {},
+): Promise<{
+  contentNodeId?: string;
+  created?: boolean;
+  title?: string;
+  error?: string;
+}> {
+  const target = await prisma.contentNode.findFirst({
+    where: { id: targetContentId, ownerId, deletedAt: null },
+    select: {
+      id: true,
+      title: true,
+      shortcutPayload: { select: { targetContentId: true } },
+    },
+  });
+  if (!target) return { error: "Shortcut target not found." };
+
+  // Collapse shortcut→shortcut to one hop (same rule as the content route).
+  let resolvedTargetId = target.id;
+  let resolvedTitle = target.title;
+  if (target.shortcutPayload) {
+    const innerId = target.shortcutPayload.targetContentId;
+    const inner = innerId
+      ? await prisma.contentNode.findFirst({
+          where: { id: innerId, ownerId, deletedAt: null },
+          select: { id: true, title: true },
+        })
+      : null;
+    if (!inner) {
+      return {
+        error: "That shortcut is broken, so a shortcut to it would be too.",
+      };
+    }
+    resolvedTargetId = inner.id;
+    resolvedTitle = inner.title;
+  }
+
+  if (parentId) {
+    const parent = await prisma.contentNode.findFirst({
+      where: { id: parentId, ownerId, deletedAt: null },
+      select: { contentType: true },
+    });
+    if (!parent) return { error: "Destination folder not found." };
+    if (parent.contentType === "shortcut") {
+      return {
+        error:
+          "Nothing is stored under a shortcut — target the real folder it points to.",
+      };
+    }
+  }
+
+  const existing = await prisma.contentNode.findFirst({
+    where: {
+      ownerId,
+      parentId,
+      ownedByNoteId: options.ownerContentId ?? null,
+      contentType: "shortcut",
+      deletedAt: null,
+      shortcutPayload: { targetContentId: resolvedTargetId },
+    },
+    select: { id: true, title: true },
+  });
+  if (existing) {
+    return { contentNodeId: existing.id, created: false, title: existing.title };
+  }
+
+  const title = (options.title?.trim() || resolvedTitle).slice(0, 255);
+  const slug = await generateUniqueSlug(title, ownerId);
+  const shortcut = await prisma.contentNode.create({
+    data: {
+      ownerId,
+      title,
+      slug,
+      contentType: "shortcut",
+      parentId,
+      displayOrder: 0,
+      ...(options.ownerContentId
+        ? { role: "referenced" as const, ownedByNoteId: options.ownerContentId }
+        : {}),
+      shortcutPayload: {
+        create: { target: { connect: { id: resolvedTargetId } } },
+      },
+    },
+    select: { id: true },
+  });
+  logger.info({
+    layer: "ai",
+    event: "ai_documents:shortcut_created",
+    summary: `shortcut "${title}" → ${resolvedTargetId}`,
+    attrs: { shortcutId: shortcut.id, parentId, targetId: resolvedTargetId },
+  });
+  return { contentNodeId: shortcut.id, created: true, title };
+}
+
 export interface CreateDocxInput {
   title: string;
   /** Markdown body — converted via the app's markdown→TipTap pipeline. */
   markdown: string;
-  /** Destination folder — required; callers resolve from the target. */
-  parentFolderId: string;
+  /** Destination folder — required for CREATE; ignored for overwrite. */
+  parentFolderId?: string;
+  /**
+   * Overwrite mode (owner approval, 2026-08-31): replace THIS existing
+   * file node's bytes in place instead of creating a new node — same id,
+   * so every File cell / shortcut referencing it sees the new version.
+   */
+  overwriteContentId?: string;
   /**
    * Output ownership (Chat Outputs & References plan, WS3): when set, the
    * document is created as `role: "referenced"`, nested under this owner
@@ -111,6 +228,38 @@ export async function createDocxDocument(
     ? file.content
     : Buffer.from(file.content);
 
+  const safeTitle =
+    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
+  const fileName = `${safeTitle}.docx`;
+
+  // Overwrite mode: same node id, new bytes — the shared helper enforces
+  // the invariants (fresh storage key, image guard, metadata reset).
+  if (input.overwriteContentId) {
+    const { overwriteFileNode } = await import(
+      "@/lib/features/content/overwrite-file"
+    );
+    const result = await overwriteFileNode(ownerId, input.overwriteContentId, {
+      buffer,
+      fileName,
+      mimeType: DOCX_MIME,
+      searchText: extractSearchTextFromTipTap(tiptap),
+    });
+    if (!result.contentNodeId) {
+      throw new Error(result.error ?? "Could not overwrite the document.");
+    }
+    logger.info({
+      layer: "ai",
+      event: "ai_documents:docx_overwritten",
+      summary: `docx "${fileName}" overwritten in place`,
+      attrs: { contentNodeId: result.contentNodeId, bytes: buffer.length },
+    });
+    return { contentNodeId: result.contentNodeId, fileName };
+  }
+
+  if (!input.parentFolderId) {
+    throw new Error("A destination folder is required to create a new document.");
+  }
+
   const { getUserStorageProvider } = await import(
     "@/lib/infrastructure/storage"
   );
@@ -119,9 +268,6 @@ export async function createDocxDocument(
   const storageKey = `uploads/${ownerId}/ai-doc-${Date.now()}-${randomBytes(6).toString("hex")}.docx`;
   await storageProvider.uploadFile(storageKey, buffer, DOCX_MIME);
 
-  const safeTitle =
-    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
-  const fileName = `${safeTitle}.docx`;
   const slug = await generateUniqueSlug(fileName, ownerId);
 
   const content = await prisma.contentNode.create({

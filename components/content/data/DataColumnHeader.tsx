@@ -14,7 +14,7 @@ import { cn } from "@/lib/core/utils";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
 /** Compact type marks. Mono glyphs read at 11px where an icon would not. */
-const TYPE_GLYPH: Partial<Record<DataColumnType, string>> = {
+export const TYPE_GLYPH: Partial<Record<DataColumnType, string>> = {
   text: "Aa",
   longText: "¶",
   number: "#",
@@ -51,6 +51,14 @@ interface DataColumnHeaderProps {
   onColumnDragOver?: (e: React.DragEvent, columnId: string) => void;
   onColumnDrop?: (e: React.DragEvent, columnId: string) => void;
   onColumnDragEnd?: () => void;
+  /** Present = a resize grip renders on the right edge. */
+  onResizeStart?: (e: React.PointerEvent, columnId: string) => void;
+  /** Checkbox columns: one-click check/uncheck of every loaded row. */
+  onBulkToggle?: () => void;
+  /** Every loaded row checked — flips the toggle's state and meaning. */
+  allChecked?: boolean;
+  /** At least one row checked — drives the indeterminate (dash) state. */
+  someChecked?: boolean;
   /** Rendered by the parent so the popover is not clipped by this cell. */
   children?: React.ReactNode;
 }
@@ -67,11 +75,17 @@ export function DataColumnHeader({
   onColumnDragOver,
   onColumnDrop,
   onColumnDragEnd,
+  onResizeStart,
+  onBulkToggle,
+  allChecked = false,
+  someChecked = false,
   children,
 }: DataColumnHeaderProps) {
   const glyph = column.config?.isBacklink
     ? "⇠"
-    : (TYPE_GLYPH[column.type] ?? "·");
+    : column.type === "file" && column.config?.imageOnly
+      ? "▣"
+      : (TYPE_GLYPH[column.type] ?? "·");
 
   return (
     <div
@@ -105,12 +119,43 @@ export function DataColumnHeader({
           )}
         />
       )}
-      <span
-        aria-hidden="true"
-        className="font-mono text-[10px] leading-none opacity-60"
-      >
-        {glyph}
-      </span>
+      {/* Checkbox columns: a REAL checkbox that applies to every loaded
+          row, LEADING the header so it lines up with the column of cell
+          checkboxes beneath it (owner, 2026-08-31 — the right-aligned
+          subtle icon read as decoration). Tri-state: dash when only some
+          rows are checked. The draggable wrapper cancels drag initiation
+          so grabbing it never reorders the column; stopPropagation keeps
+          the menu closed. */}
+      {onBulkToggle ? (
+        <span
+          draggable
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className="flex shrink-0 items-center"
+        >
+          <input
+            type="checkbox"
+            checked={allChecked}
+            ref={(el) => {
+              if (el) el.indeterminate = !allChecked && someChecked;
+            }}
+            onChange={() => onBulkToggle()}
+            title={allChecked ? "Uncheck all rows" : "Check all rows"}
+            aria-label={allChecked ? "Uncheck all rows" : "Check all rows"}
+            className="h-3.5 w-3.5 cursor-pointer accent-current"
+          />
+        </span>
+      ) : (
+        <span
+          aria-hidden="true"
+          className="font-mono text-[10px] leading-none opacity-60"
+        >
+          {glyph}
+        </span>
+      )}
       <span className="truncate text-foreground/80" title={column.name}>
         {column.name}
       </span>
@@ -127,6 +172,33 @@ export function DataColumnHeader({
       )}
       {column.isPrimary && <span className="sr-only">(primary column)</span>}
       {children}
+      {/* Resize grip. The header cell is itself `draggable` for reorder, so
+          the grip is ALSO draggable with a cancelled dragstart — a draggable
+          child claims drag initiation before the parent can, and cancelling
+          it leaves only the pointer-based resize. stopPropagation on click
+          keeps the menu toggle from firing when a resize ends in place. */}
+      {onResizeStart && (
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${column.name} column`}
+          draggable
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            onResizeStart(e, column.id);
+          }}
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            "absolute inset-y-0 -right-[3px] z-10 w-1.5 cursor-col-resize",
+            "hover:bg-primary/50 active:bg-primary"
+          )}
+        />
+      )}
     </div>
   );
 }

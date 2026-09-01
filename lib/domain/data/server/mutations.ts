@@ -136,6 +136,65 @@ export async function writeCells(
       );
     }
 
+    // File cells hold UPLOADED ATTACHMENTS — every id must be a file node
+    // (owner clarification, 2026-08-31: File = external content brought in;
+    // Content Link = references to app content). Enforced HERE so every
+    // write path — grid, peek, AI update_row/insert_rows — agrees. Note
+    // ids created by AI file tools pass (they ARE file nodes); a note or
+    // folder id is a category error. Legacy cells keep displaying; only
+    // new writes are held to the contract.
+    const fileIdsToCheck = new Set<string>();
+    for (const write of writes) {
+      if (byKey.get(write.columnKey)?.type !== "file") continue;
+      if (!Array.isArray(write.value)) continue;
+      for (const id of write.value) {
+        if (typeof id === "string") fileIdsToCheck.add(id);
+      }
+    }
+    if (fileIdsToCheck.size > 0) {
+      const nodes = await tx.contentNode.findMany({
+        where: { id: { in: [...fileIdsToCheck] }, deletedAt: null },
+        select: {
+          id: true,
+          contentType: true,
+          title: true,
+          filePayload: { select: { mimeType: true } },
+        },
+      });
+      const nodeById = new Map(nodes.map((n) => [n.id, n]));
+      for (const write of writes) {
+        const column = byKey.get(write.columnKey);
+        if (column?.type !== "file") continue;
+        if (!Array.isArray(write.value)) continue;
+        for (const id of write.value) {
+          if (typeof id !== "string") continue;
+          const node = nodeById.get(id);
+          if (!node || node.contentType !== "file") {
+            results.push({
+              status: "error",
+              rowId: write.rowId,
+              message: node
+                ? `"${node.title}" is a ${node.contentType}, not an uploaded file — File cells hold uploaded attachments; use a Content Link column for other content`
+                : "File cells hold uploaded attachments — one of the ids is not a file in this garden",
+            });
+            break;
+          }
+          // Images columns (config.imageOnly): image mime types only.
+          if (
+            column.config?.imageOnly &&
+            !node.filePayload?.mimeType?.startsWith("image/")
+          ) {
+            results.push({
+              status: "error",
+              rowId: write.rowId,
+              message: `"${node.title}" is not an image — this Images column accepts image files only`,
+            });
+            break;
+          }
+        }
+      }
+    }
+
     const failed = results.some((r) => r.status !== "applied");
     if (failed) {
       // Abandon the whole batch. Returning without writing is the point.
@@ -258,6 +317,20 @@ export async function createRows(
 ): Promise<string[]> {
   if (count <= 0) return [];
 
+  // Column defaults stamped at creation — HERE, so every creation path
+  // (grid add-row, board "+ New", forms, AI insert_rows) agrees. A caller
+  // that then writes its own value simply overwrites the stamp.
+  const defaults: Record<string, boolean> = {};
+  for (const column of columns) {
+    if (
+      !column.deletedAt &&
+      column.type === "checkbox" &&
+      column.config?.defaultChecked === true
+    ) {
+      defaults[column.key] = true;
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     const last = afterSortKey
       ? { sortKey: afterSortKey }
@@ -278,8 +351,8 @@ export async function createRows(
         data: {
           tableId,
           sortKey,
-          data: {} as unknown as Prisma.InputJsonValue,
-          searchText: deriveRowSearchText(columns, {}),
+          data: defaults as unknown as Prisma.InputJsonValue,
+          searchText: deriveRowSearchText(columns, defaults),
           createdBy,
         },
         select: { id: true },

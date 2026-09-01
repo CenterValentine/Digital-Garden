@@ -24,6 +24,7 @@ import { addAutoAssociation } from "@/lib/features/conversations";
 import {
   createDocxDocument,
   findOrCreateFolder,
+  findOrCreateShortcut,
 } from "@/lib/domain/ai/documents";
 import { upsertRunLedger } from "@/lib/domain/ai/run-ledger";
 import { computeTurnCost } from "@/lib/features/ai-connections/usage/pricing";
@@ -1137,6 +1138,61 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         }
       },
     }),
+    create_shortcut: tool({
+      // No approval gate (owner call, 2026-08-31): a shortcut is
+      // folder-weight — non-destructive, one click to remove, and the
+      // write receipt shows every one created.
+      description:
+        "Create a shortcut — a pointer that makes EXISTING content visible in a second place without moving or copying it. Content keeps ONE canonical home (a database attachment lives under its database or row page; a note lives where the user filed it); when the user wants it trackable elsewhere — a project folder, job-search/{Company} — shortcut it there. NEVER create a duplicate file or note to put something in two places; this tool is the mechanism. The shortcut carries its own name and placement, and deleting it never touches the target. Find-or-create: an existing shortcut to the same target under the same parent is reused. Chains collapse — a shortcut to a shortcut points at the final target.",
+      inputSchema: z.object({
+        targetContentId: z
+          .string()
+          .describe(
+            "Id of the REAL content to mirror — from a search result, a write receipt, a mention capsule, or a database cell",
+          ),
+        parentId: z
+          .string()
+          .optional()
+          .describe(
+            "Destination folder id. Omit to use the conversation's target folder.",
+          ),
+        title: z
+          .string()
+          .max(255)
+          .optional()
+          .describe("Shortcut's display name; defaults to the target's title"),
+      }),
+      execute: async ({ targetContentId, parentId, title }) => {
+        const placement = resolveToolOutputPlacement(ctx, parentId);
+        try {
+          const result = await findOrCreateShortcut(
+            ctx.userId,
+            targetContentId,
+            placement.parentId,
+            { title, ownerContentId: placement.ownedByNoteId },
+          );
+          if (!result.contentNodeId) {
+            return `Could not create the shortcut: ${result.error ?? "unknown error"}`;
+          }
+          return {
+            shortcutId: result.contentNodeId,
+            title: result.title,
+            targetContentId,
+            reused: result.created !== true,
+            ...(result.created
+              ? await getContentWriteReceiptEnvelope(
+                  ctx.userId,
+                  result.contentNodeId,
+                  "created",
+                  "shortcut",
+                )
+              : {}),
+          };
+        } catch (error) {
+          return `Could not create the shortcut: ${error instanceof Error ? error.message : "unknown error"}.`;
+        }
+      },
+    }),
     create_docx: tool({
       // Document creation is a mutating action — same HITL gate as
       // createNote (AI v3 core S4b / A4).
@@ -1163,14 +1219,60 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Per-document relative destination. Pass when the user or active playbook explicitly routes this document differently from the configured preset; otherwise omit.",
           ),
+        alsoShortcutTo: z
+          .string()
+          .optional()
+          .describe(
+            "Folder id to ALSO mirror the new document into, via a shortcut — one canonical home plus a pointer, never a duplicate. Use when the user wants the document visible in a second place.",
+          ),
+        overwriteContentId: z
+          .string()
+          .optional()
+          .describe(
+            "Id of an EXISTING file to overwrite in place with this document — same id, so every File cell and shortcut referencing it sees the new version. Use when the user asks to update/regenerate an attached or existing document; NEVER create a second copy for that. Placement fields are ignored in overwrite mode.",
+          ),
       }),
-      execute: async ({ title, markdown, parentId, outputLocation }) => {
+      execute: async ({
+        title,
+        markdown,
+        parentId,
+        outputLocation,
+        alsoShortcutTo,
+        overwriteContentId,
+      }) => {
         const effectiveOutputLocation =
           (outputLocation as ToolOutputLocation | undefined) ??
           resolvePlaybookOutputLocation(
             ctx.playbookOutputDirectives,
             title,
           );
+        // Overwrite mode: replace an existing document's bytes at the same
+        // id — no placement resolution (the node already lives somewhere),
+        // and no cell write needed afterward (references are ids).
+        if (overwriteContentId) {
+          try {
+            const result = await createDocxDocument(ctx.userId, {
+              title,
+              markdown,
+              overwriteContentId,
+            });
+            return {
+              __docPayload: true,
+              contentNodeId: result.contentNodeId,
+              fileName: result.fileName,
+              overwritten: true,
+              ...(await getContentWriteReceiptEnvelope(
+                ctx.userId,
+                result.contentNodeId,
+                "updated",
+                "Word document",
+              )),
+            };
+          } catch (error) {
+            return `Could not overwrite the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+          }
+        }
+
         const placement = resolveToolOutputPlacement(
           ctx,
           parentId,
@@ -1213,11 +1315,26 @@ export function createBaseTools(ctx: ToolExecuteContext) {
               "tool-call",
             ).catch(() => null);
           }
+          // Creation-time mirror (owner, 2026-08-31): the document keeps
+          // its one home; the shortcut makes it visible elsewhere. A mirror
+          // failure never fails the create — the document exists either way.
+          let mirror: Record<string, unknown> = {};
+          if (alsoShortcutTo) {
+            const s = await findOrCreateShortcut(
+              ctx.userId,
+              result.contentNodeId,
+              alsoShortcutTo,
+            );
+            mirror = s.contentNodeId
+              ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
+              : { shortcutError: s.error ?? "could not create the shortcut" };
+          }
           return {
             __docPayload: true,
             contentNodeId: result.contentNodeId,
             fileName: result.fileName,
             parentFolderId: destination,
+            ...mirror,
             ...(await getContentWriteReceiptEnvelope(
               ctx.userId,
               result.contentNodeId,
@@ -1480,6 +1597,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Per-note relative destination. Pass when the user or active playbook explicitly routes this note differently from the configured preset; otherwise omit.",
           ),
+        alsoShortcutTo: z
+          .string()
+          .optional()
+          .describe(
+            "Folder id to ALSO mirror the new note into, via a shortcut — one canonical home plus a pointer, never a duplicate. Use when the user wants the note visible in a second place.",
+          ),
       }),
       execute: async ({
         title,
@@ -1487,6 +1610,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         content = "",
         parentId,
         outputLocation,
+        alsoShortcutTo,
       }) => {
         // Resolve the parent folder. Priority:
         //   1. AI-supplied parentId (validated to exist + belong to user)
@@ -1586,6 +1710,20 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           },
         });
 
+        // Creation-time mirror (owner, 2026-08-31): one home + a pointer.
+        // A mirror failure never fails the create.
+        let mirror: Record<string, unknown> = {};
+        if (alsoShortcutTo) {
+          const s = await findOrCreateShortcut(
+            ctx.userId,
+            node.id,
+            alsoShortcutTo,
+          );
+          mirror = s.contentNodeId
+            ? { shortcutId: s.contentNodeId, shortcutParentId: alsoShortcutTo }
+            : { shortcutError: s.error ?? "could not create the shortcut" };
+        }
+
         // Structured payload so ChatMessage renders a clickable link to the
         // new note + a signal the client uses to refresh the file tree
         // without a full page reload. Mirrors the __imagePayload pattern.
@@ -1596,6 +1734,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           title,
           parentId: resolvedParentId,
           wordCount,
+          ...mirror,
           ...(await getContentWriteReceiptEnvelope(
             ctx.userId,
             node.id,

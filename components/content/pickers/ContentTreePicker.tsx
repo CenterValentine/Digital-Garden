@@ -59,6 +59,7 @@ import {
   ChevronDown,
   Home,
   Layers,
+  Upload,
 } from "lucide-react";
 
 import { cn } from "@/lib/core/utils";
@@ -251,10 +252,21 @@ function TypeIcon({
 }
 
 export interface QuickCreateConfig {
-  /** Title given to the blank note (user renames later via existing affordances). */
+  /** Title given to the blank item (user renames later via existing affordances). */
   defaultTitle: string;
-  /** Fires after the note is created and placed. */
+  /** Fires after the item is created and placed. */
   onCreated: (target: PickerTarget) => void;
+  /** What the create affordances make. Default "note". */
+  kind?: "note" | "data";
+  /** Noun for labels/tooltips ("Note", "Database"). Default "Note". */
+  noun?: string;
+  /**
+   * Create-targeting mode (the databases rail): PICKING a row creates
+   * inside it instead of returning it, so every create — pick, folder "+",
+   * insertion gap, scope row — flows through the same placement code.
+   * Pair with a containers-only eligibleTypes so leaf picks don't exist.
+   */
+  pickCreatesInside?: boolean;
 }
 
 export interface ContentTreePickerProps {
@@ -274,18 +286,32 @@ export interface ContentTreePickerProps {
   defaultViewId?: string | null;
   eligibleTypes?: ReadonlySet<string>;
   searchPlaceholder?: string;
+  /**
+   * Optional action row pinned under the search box — for a consumer's
+   * out-of-tree alternative (e.g. the File cell's "Upload from device").
+   * The picker stays a picker; the action's behavior is the caller's.
+   */
+  headerAction?: { label: string; onClick: () => void };
 }
 
-async function createNote(
+async function createContent(
+  kind: "note" | "data",
   title: string,
   parentId: string | null,
   newDisplayOrder: number,
 ): Promise<PickerTarget | null> {
+  // Notes seed an empty doc; databases send contentType and let the server
+  // seed the Name column + default view (the same POST the databases rail
+  // used before its quick-add moved here).
   const res = await fetch("/api/content/content", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, parentId, tiptapJson: EMPTY_DOC }),
+    body: JSON.stringify(
+      kind === "data"
+        ? { title, parentId, contentType: "data" }
+        : { title, parentId, tiptapJson: EMPTY_DOC },
+    ),
   });
   const body = (await res.json().catch(() => null)) as {
     success?: boolean;
@@ -306,7 +332,7 @@ async function createNote(
     }),
   }).catch(() => {});
   window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
-  return { id: newId, title, contentType: "note" };
+  return { id: newId, title, contentType: kind };
 }
 
 export function ContentTreePicker({
@@ -322,6 +348,7 @@ export function ContentTreePicker({
   defaultViewId = null,
   eligibleTypes = DEFAULT_ELIGIBLE_TYPES,
   searchPlaceholder = "Search… or browse below",
+  headerAction,
 }: ContentTreePickerProps) {
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [tree, setTree] = useState<FlatRow[] | null>(null);
@@ -507,23 +534,27 @@ export function ContentTreePicker({
     setTree(null);
   }, []);
 
-  // "Inside" — top of a folder, or top of the current scope (row null).
+  const createKind = quickCreate?.kind ?? "note";
+  const createNoun = quickCreate?.noun ?? "Note";
+
+  // "Inside" — top of a container (by id), or top of the current scope (null).
   const quickCreateInside = useCallback(
-    async (row: FlatRow | null) => {
+    async (parentContentId: string | null) => {
       if (!quickCreate) return;
       setCreateError(null);
-      const created = await createNote(
+      const created = await createContent(
+        createKind,
         quickCreate.defaultTitle,
-        row ? row.id : scopeRootParentId,
+        parentContentId ?? scopeRootParentId,
         0,
       );
       if (!created) {
-        setCreateError("Couldn't create the note.");
+        setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
         return;
       }
       quickCreate.onCreated(created);
     },
-    [quickCreate, scopeRootParentId],
+    [quickCreate, createKind, createNoun, scopeRootParentId],
   );
 
   // "Between" — the insertion gap under a row: sibling slot right after it.
@@ -531,18 +562,19 @@ export function ContentTreePicker({
     async (row: FlatRow) => {
       if (!quickCreate) return;
       setCreateError(null);
-      const created = await createNote(
+      const created = await createContent(
+        createKind,
         quickCreate.defaultTitle,
         row.parentId,
         row.siblingIndex + 1,
       );
       if (!created) {
-        setCreateError("Couldn't create the note.");
+        setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
         return;
       }
       quickCreate.onCreated(created);
     },
-    [quickCreate],
+    [quickCreate, createKind, createNoun],
   );
 
   // "Beginning" — the leading gap above a sibling group's first row:
@@ -552,15 +584,39 @@ export function ContentTreePicker({
     async (row: FlatRow) => {
       if (!quickCreate) return;
       setCreateError(null);
-      const created = await createNote(quickCreate.defaultTitle, row.parentId, 0);
+      const created = await createContent(
+        createKind,
+        quickCreate.defaultTitle,
+        row.parentId,
+        0,
+      );
       if (!created) {
-        setCreateError("Couldn't create the note.");
+        setCreateError(`Couldn't create the ${createNoun.toLowerCase()}.`);
         return;
       }
       quickCreate.onCreated(created);
     },
-    [quickCreate],
+    [quickCreate, createKind, createNoun],
   );
+
+  // Create-targeting mode: a pick IS "create inside the picked container",
+  // flowing through the same placement code as the "+" affordances — one
+  // code path for every create.
+  const effectiveOnPick = useCallback(
+    (target: PickerTarget) => {
+      if (quickCreate?.pickCreatesInside) {
+        void quickCreateInside(target.id);
+        return;
+      }
+      onPick(target);
+    },
+    [quickCreate, quickCreateInside, onPick],
+  );
+
+  // What committing a row DOES, for the row tooltips.
+  const pickCommitLabel = quickCreate?.pickCreatesInside
+    ? `create a ${createNoun.toLowerCase()} here`
+    : "open";
 
   // Collapse filter: a row renders only when every ancestor is expanded.
   const visibleRows = useMemo(() => {
@@ -600,6 +656,17 @@ export function ContentTreePicker({
         className="w-full bg-transparent px-3 py-2 text-xs outline-none placeholder:text-gray-500 border-b border-black/5 dark:border-white/5"
       />
 
+      {headerAction ? (
+        <button
+          type="button"
+          onClick={headerAction.onClick}
+          className="flex w-full items-center gap-2 border-b border-black/5 px-3 py-1.5 text-left text-xs text-emerald-700 transition-colors hover:bg-black/[0.04] dark:border-white/5 dark:text-emerald-300 dark:hover:bg-white/5"
+        >
+          <Upload className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          {headerAction.label}
+        </button>
+      ) : null}
+
       <div className="min-h-0 flex-1 overflow-y-auto py-1">
         {createError ? (
           <div className="px-3 py-1 text-[11px] text-red-500">{createError}</div>
@@ -627,7 +694,8 @@ export function ContentTreePicker({
                 }}
                 disabled={disabledSet.has(item.id)}
                 disabledReason={disabledReason}
-                onPick={onPick}
+                onPick={effectiveOnPick}
+                commitLabel={pickCommitLabel}
                 // Placement math needs tree context — quick create is
                 // browse-only; search rows open on click like recents.
               />
@@ -656,7 +724,8 @@ export function ContentTreePicker({
                     }}
                     disabled={disabledSet.has(r.id)}
                     disabledReason={disabledReason}
-                    onPick={onPick}
+                    onPick={effectiveOnPick}
+                    commitLabel={pickCommitLabel}
                   />
                 ))}
                 <div className="mx-2 my-1 border-t border-black/5 dark:border-white/5" />
@@ -713,7 +782,10 @@ export function ContentTreePicker({
                 </span>
               </button>
               {quickCreate ? (
-                <QuickCreateButton onClick={() => void quickCreateInside(null)} />
+                <QuickCreateButton
+                  noun={createNoun}
+                  onClick={() => void quickCreateInside(null)}
+                />
               ) : null}
             </div>
 
@@ -759,6 +831,7 @@ export function ContentTreePicker({
                     {leadingGapEligible ? (
                       <InsertGap
                         depth={row.depth}
+                        noun={createNoun}
                         onClick={() => void quickCreateAtStart(row)}
                       />
                     ) : null}
@@ -768,16 +841,19 @@ export function ContentTreePicker({
                       disabledReason={disabledReason}
                       isExpanded={expandedIds.has(row.id)}
                       onToggle={toggleExpanded}
-                      onPick={onPick}
+                      onPick={effectiveOnPick}
+                      commitLabel={pickCommitLabel}
+                      createNoun={createNoun}
                       onQuickCreateInside={
                         quickCreate && row.contentType === "folder"
-                          ? (r) => void quickCreateInside(r)
+                          ? (r) => void quickCreateInside(r.id)
                           : undefined
                       }
                     />
                     {gapEligible ? (
                       <InsertGap
                         depth={row.depth}
+                        noun={createNoun}
                         onClick={() => void quickCreateAfter(row)}
                       />
                     ) : null}
@@ -861,9 +937,11 @@ function ScopeMenu({
  */
 function InsertGap({
   depth,
+  noun,
   onClick,
 }: {
   depth: number;
+  noun: string;
   onClick: () => void;
 }) {
   return (
@@ -874,8 +952,8 @@ function InsertGap({
       <button
         type="button"
         onClick={onClick}
-        aria-label="New note here"
-        title="+ New Note (here)"
+        aria-label={`New ${noun.toLowerCase()} here`}
+        title={`+ New ${noun} (here)`}
         className="absolute inset-x-0 top-1/2 z-10 flex h-4 -translate-y-1/2 items-center opacity-0 transition-opacity group-hover/gap:opacity-100 focus-visible:opacity-100 [@media(hover:none)]:opacity-40"
       >
         <span className="h-px flex-1 bg-emerald-500/70" />
@@ -888,14 +966,20 @@ function InsertGap({
   );
 }
 
-/** The "+ New Note" button — folders and the scope row only ("inside" semantics). */
-function QuickCreateButton({ onClick }: { onClick: () => void }) {
+/** The "+ New <noun>" button — folders and the scope row only ("inside" semantics). */
+function QuickCreateButton({
+  noun,
+  onClick,
+}: {
+  noun: string;
+  onClick: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="New note"
-      title="+ New Note"
+      aria-label={`New ${noun.toLowerCase()}`}
+      title={`+ New ${noun}`}
       className="ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-gray-400 transition-colors hover:bg-black/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
     >
       <Plus className="h-3 w-3" aria-hidden="true" />
@@ -910,6 +994,8 @@ function PickRow({
   isExpanded = false,
   onToggle,
   onPick,
+  commitLabel = "open",
+  createNoun = "Note",
   onQuickCreateInside,
 }: {
   row: FlatRow;
@@ -918,6 +1004,9 @@ function PickRow({
   isExpanded?: boolean;
   onToggle?: (id: string) => void;
   onPick: (target: PickerTarget) => void;
+  /** What committing this row does, for tooltips ("open" / "create a database here"). */
+  commitLabel?: string;
+  createNoun?: string;
   onQuickCreateInside?: (row: FlatRow) => void;
 }) {
   const expandable = Boolean(row.hasChildren && onToggle);
@@ -951,8 +1040,8 @@ function PickRow({
   const tooltip = disabled
     ? (disabledReason ?? "Not selectable here")
     : expandable
-      ? "Click to expand · Double-click or hold to open"
-      : "Click to open";
+      ? `Click to expand · Double-click or hold to ${commitLabel}`
+      : `Click to ${commitLabel}`;
 
   return (
     <div
@@ -1054,8 +1143,11 @@ function PickRow({
         />
       </button>
       {onQuickCreateInside && !disabled ? (
-        <span title="+ New Note (inside this folder)">
-          <QuickCreateButton onClick={() => onQuickCreateInside(row)} />
+        <span title={`+ New ${createNoun} (inside this folder)`}>
+          <QuickCreateButton
+            noun={createNoun}
+            onClick={() => onQuickCreateInside(row)}
+          />
         </span>
       ) : null}
     </div>

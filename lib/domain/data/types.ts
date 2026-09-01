@@ -116,10 +116,51 @@ export interface DataColumnConfig {
   options?: SelectOption[];
   /** `number` — decimal places; 0 renders as an integer. */
   precision?: number;
-  /** `number` — rendering hint, not storage. */
+  /**
+   * `number` — rendering hint, not storage. Cells always store the raw
+   * number; `percent` appends "%" to the value as typed (50 → "50%"),
+   * never multiplies.
+   */
   numberFormat?: "plain" | "currency" | "percent";
+  /** `number` — ISO 4217 code when numberFormat is "currency". Default USD. */
+  currencyCode?: string;
+  /**
+   * `file` — the "Images" column type: accepts only image files and
+   * renders thumbnails with a click-to-zoom lightbox. A config
+   * specialization rather than a new enum member (plan D11 doctrine —
+   * same pattern as currency on number), so it inherits every file-cell
+   * path: upload, drop, paste, link, backlinks, AI validation.
+   */
+  imageOnly?: boolean;
+  /** `number` — thousands grouping for plain/percent (currency always groups). */
+  useGrouping?: boolean;
   /** `date` — whether the time component is meaningful. */
   includeTime?: boolean;
+  /**
+   * `text` · `longText` — maximum characters the encoder accepts.
+   * Enforced at write time (reject, never truncate); display counters
+   * are a UI courtesy.
+   */
+  maxLength?: number;
+  /**
+   * `checkbox` — how the cell renders. Default native checkbox; the icon
+   * variants toggle on click like the checkbox does; "text" renders
+   * true/false as words. DISPLAY-ONLY — cells store booleans in every
+   * mode, so filters and sorts never notice the difference.
+   */
+  checkDisplay?:
+    | "checkbox"
+    | "check"
+    | "star"
+    | "heart"
+    | "flag"
+    | "thumbsUp"
+    | "text";
+  /** `checkbox` — accent for the checked glyph. Default follows the theme. */
+  checkColor?: "default" | "blue" | "green" | "amber" | "red" | "purple";
+  /** `checkbox` — new rows start checked (stamped in createRows, so every
+   * creation path — grid, board, forms, AI inserts — agrees). */
+  defaultChecked?: boolean;
   /** `relation` — the DataPayload.contentId this column points at. */
   relationTableId?: string;
   /** `relation` — the column id on the far side that mirrors this one. */
@@ -345,6 +386,14 @@ export interface ColumnPref {
   /** Overrides the column's own position within this view only. */
   position?: string;
 }
+
+/**
+ * Column width bounds — shared by the resize grip (clamps while dragging)
+ * and the views PATCH route (clamps what it stores), so a hand-crafted
+ * request cannot persist a width the UI could never produce.
+ */
+export const COLUMN_WIDTH_MIN = 60;
+export const COLUMN_WIDTH_MAX = 1200;
 
 /** Per-field overrides for a form view (plan O15) — view-scoped, not column. */
 export interface FormFieldConfig {

@@ -13,9 +13,17 @@
  * hazard the grid cells dodge, dodged the same way.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Plus, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link2, Loader2, Plus, RefreshCw, X } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
+import { editDraftFor } from "./DataGridRow";
+import {
+  dragHasFiles,
+  overwriteFileViaUpload,
+  uploadFilesToTable,
+} from "./file-upload";
+import { ImageLightbox, imageDownloadUrl } from "./ImageLightbox";
 import {
   cellToText,
   sortStatusOptions,
@@ -36,6 +44,15 @@ const fieldClass = cn(
   "text-xs outline-none focus:ring-2 focus:ring-primary"
 );
 
+/** File-column link picker: folders + notes are for NAVIGATING (editor
+ * attachments live under notes), files are what's pickable — the `add`
+ * guard turns a folder/note pick into a teaching toast. */
+const FILE_LINK_ELIGIBLE_TYPES: ReadonlySet<string> = new Set([
+  "folder",
+  "note",
+  "file",
+]);
+
 interface DataRowFieldsProps {
   /** The table's contentId — relation link writes go through its API. */
   tableId: string;
@@ -44,10 +61,58 @@ interface DataRowFieldsProps {
   editable: boolean;
   /** Auto-open this column's link picker on mount (the grid's +). */
   focusColumnId?: string | null;
+  /** Bumped per grid-"+" click so auto-open re-fires on an open peek. */
+  focusToken?: number;
+  /** Owner-only: create a select/status/multiSelect option inline. */
+  onCreateOption?: (
+    column: DataColumn,
+    label: string
+  ) => Promise<{ id: string; label: string } | null>;
   onOpenContent: (ref: ContentRef) => void;
   onCommitCell: (rowId: string, columnKey: string, value: unknown) => void;
   /** Link/unlink happened — the parent reloads so hydration refreshes. */
   onRefresh: () => void;
+}
+
+/**
+ * Auto-open that responds to every grid-"+" click, not just to mount: the
+ * peek may ALREADY be open on this row with focus already naming this
+ * column, where an initializer-only read does nothing — the reported
+ * "clicked + and had to click the + in the peek again" failure. React's
+ * sanctioned adjust-state-while-rendering pattern; no effect, and the
+ * extra render happens before paint.
+ */
+function useAutoOpenOnToken(
+  autoOpen: boolean,
+  token: number | undefined,
+  enabled: boolean,
+  open: () => void
+) {
+  const [consumed, setConsumed] = useState<number | undefined>(undefined);
+  if (autoOpen && enabled && token !== undefined && consumed !== token) {
+    setConsumed(token);
+    open();
+  }
+}
+
+/**
+ * The other half of the grid-"+" handoff: scroll the TARGET field into
+ * view. Without this, a + aimed at a field below the peek's fold opened
+ * its picker against an off-screen anchor — portal-positioned outside the
+ * viewport, reading as "nothing happened" (owner, 2026-08-31). The
+ * pickers reposition on scroll, so scrolling after mount is enough; the
+ * token re-fires it per click, like auto-open itself.
+ */
+function useScrollIntoViewOnFocus(
+  active: boolean,
+  token: number | undefined
+) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!active) return;
+    ref.current?.scrollIntoView({ block: "center" });
+  }, [active, token]);
+  return ref;
 }
 
 export function DataRowFields({
@@ -56,6 +121,8 @@ export function DataRowFields({
   columns,
   editable,
   focusColumnId,
+  focusToken,
+  onCreateOption,
   onOpenContent,
   onCommitCell,
   onRefresh,
@@ -70,16 +137,19 @@ export function DataRowFields({
             personRef={row.personRefs?.[column.id]}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
         ) : column.type === "contentLink" || column.type === "file" ? (
           <ContentLinkField
             key={`${row.id}:${column.id}`}
+            tableId={tableId}
             column={column}
             refs={row.contentRefs?.[column.id] ?? []}
             value={row.data[column.key]}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onOpenContent={onOpenContent}
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
@@ -111,6 +181,7 @@ export function DataRowFields({
             links={row.links?.[column.id] ?? []}
             editable={editable}
             autoOpen={focusColumnId === column.id}
+            autoOpenToken={focusToken}
             onRefresh={onRefresh}
           />
         ) : (
@@ -119,6 +190,9 @@ export function DataRowFields({
             column={column}
             value={row.data[column.key]}
             editable={editable}
+            onCreateOption={
+              onCreateOption ? (label) => onCreateOption(column, label) : undefined
+            }
             onCommit={(v) => onCommitCell(row.id, column.key, v)}
           />
         )
@@ -134,10 +208,12 @@ interface PeekFieldProps {
   column: DataColumn;
   value: CellValue | undefined;
   editable: boolean;
+  /** Column-bound option creation (owner-only; absent = affordance hidden). */
+  onCreateOption?: (label: string) => Promise<{ id: string; label: string } | null>;
   onCommit: (value: unknown) => void;
 }
 
-function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
+function PeekField({ column, value, editable, onCreateOption, onCommit }: PeekFieldProps) {
   return (
     <div className="border-b border-border/40 py-2.5 last:border-b-0">
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
@@ -146,6 +222,7 @@ function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
       <FieldInput
         column={column}
         value={value}
+        onCreateOption={onCreateOption}
         editable={editable}
         onCommit={onCommit}
       />
@@ -159,8 +236,31 @@ function PeekField({ column, value, editable, onCommit }: PeekFieldProps) {
   );
 }
 
-function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
-  const asText = value === undefined ? "" : String(value);
+function FieldInput({
+  column,
+  value,
+  editable,
+  onCreateOption,
+  onCommit,
+}: PeekFieldProps) {
+  // Same seeding the grid uses — datetime cells convert UTC ISO to the
+  // local string a datetime-local input understands.
+  const asText = editDraftFor(column, value);
+
+  // Inline option creation (select/multiSelect/status): type it where you
+  // needed it, instead of a detour through the column menu. Hooks live
+  // above the switch per rules-of-hooks.
+  const [addingOption, setAddingOption] = useState(false);
+  const [newOptionLabel, setNewOptionLabel] = useState("");
+  const submitNewOption = async (commitWith: (id: string) => void) => {
+    if (!onCreateOption) return;
+    const label = newOptionLabel.trim();
+    if (!label) return;
+    const created = await onCreateOption(label);
+    if (created) commitWith(created.id);
+    setNewOptionLabel("");
+    setAddingOption(false);
+  };
 
   const textCommit = (raw: string) => {
     const next = raw.trim() === "" ? undefined : raw;
@@ -187,11 +287,50 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
         column.type === "status"
           ? sortStatusOptions(column.config.options ?? [])
           : (column.config.options ?? []);
+      const canCreate = editable && Boolean(onCreateOption);
+      if (addingOption && canCreate) {
+        return (
+          <div className="flex items-center gap-1">
+            <input
+              autoFocus
+              value={newOptionLabel}
+              onChange={(e) => setNewOptionLabel(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  // New single-select option is also the cell's new value —
+                  // you typed it because you wanted it picked.
+                  void submitNewOption((id) => onCommit(id));
+                } else if (e.key === "Escape") {
+                  setAddingOption(false);
+                  setNewOptionLabel("");
+                }
+              }}
+              placeholder="New option label"
+              className={fieldClass}
+            />
+            <button
+              type="button"
+              onClick={() => void submitNewOption((id) => onCommit(id))}
+              disabled={!newOptionLabel.trim()}
+              className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        );
+      }
       return (
         <select
           value={typeof value === "string" ? value : ""}
           disabled={!editable}
-          onChange={(e) => onCommit(e.target.value || undefined)}
+          onChange={(e) => {
+            if (e.target.value === "__create__") {
+              setAddingOption(true);
+              return;
+            }
+            onCommit(e.target.value || undefined);
+          }}
           className={fieldClass}
         >
           <option value="">—</option>
@@ -200,6 +339,7 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
               {o.label}
             </option>
           ))}
+          {canCreate && <option value="__create__">+ New option…</option>}
         </select>
       );
     }
@@ -207,7 +347,8 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
     case "multiSelect": {
       const chosen = new Set(Array.isArray(value) ? value : []);
       const options = column.config.options ?? [];
-      if (options.length === 0) {
+      const canCreate = editable && Boolean(onCreateOption);
+      if (options.length === 0 && !canCreate) {
         return <p className="text-xs text-muted-foreground">No options yet — add them from the column&apos;s header menu.</p>;
       }
       return (
@@ -233,6 +374,55 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
               {o.label}
             </label>
           ))}
+          {canCreate &&
+            (addingOption ? (
+              <div className="mt-0.5 flex items-center gap-1">
+                <input
+                  autoFocus
+                  value={newOptionLabel}
+                  onChange={(e) => setNewOptionLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      // A freshly created option starts SELECTED — you
+                      // typed it here because this row wears it.
+                      void submitNewOption((id) =>
+                        onCommit([
+                          ...(Array.isArray(value) ? value : []),
+                          id,
+                        ])
+                      );
+                    } else if (e.key === "Escape") {
+                      setAddingOption(false);
+                      setNewOptionLabel("");
+                    }
+                  }}
+                  placeholder="New option label"
+                  className={fieldClass}
+                />
+                <button
+                  type="button"
+                  onClick={() =>
+                    void submitNewOption((id) =>
+                      onCommit([...(Array.isArray(value) ? value : []), id])
+                    )
+                  }
+                  disabled={!newOptionLabel.trim()}
+                  className="shrink-0 rounded bg-primary px-2 py-1 text-[11px] font-medium text-primary-foreground disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setAddingOption(true)}
+                className="mt-0.5 flex items-center gap-1 self-start rounded px-1 py-0.5 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <Plus className="h-3 w-3" />
+                New option
+              </button>
+            ))}
         </div>
       );
     }
@@ -243,6 +433,7 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
           defaultValue={asText}
           disabled={!editable}
           rows={3}
+          maxLength={column.config.maxLength}
           onBlur={(e) => textCommit(e.target.value)}
           className={cn(fieldClass, "resize-none")}
         />
@@ -260,8 +451,16 @@ function FieldInput({ column, value, editable, onCommit }: PeekFieldProps) {
             column.type === "number"
               ? "number"
               : column.type === "date"
-                ? "date"
-                : "text"
+                ? column.config.includeTime
+                  ? "datetime-local"
+                  : "date"
+                : column.type === "email"
+                  ? "email"
+                  : "text"
+          }
+          inputMode={column.type === "url" ? "url" : undefined}
+          maxLength={
+            column.type === "text" ? column.config.maxLength : undefined
           }
           defaultValue={asText}
           disabled={!editable}
@@ -298,6 +497,8 @@ interface RelationFieldProps {
   editable: boolean;
   /** Open the picker immediately — the grid's + landed here on purpose. */
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onRefresh: () => void;
 }
 
@@ -314,9 +515,12 @@ function RelationField({
   links,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onRefresh,
 }: RelationFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
   const [candidates, setCandidates] = useState<
     Array<{ id: string; title: string }> | null
   >(null);
@@ -425,7 +629,10 @@ function RelationField({
   );
 
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className="border-b border-border/40 py-2.5 last:border-b-0"
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>
@@ -513,11 +720,15 @@ function RelationField({
 // ── Content link field ───────────────────────────────────────────────────
 
 interface ContentLinkFieldProps {
+  /** The table's contentId — uploaded attachments nest under it. */
+  tableId: string;
   column: DataColumn;
   refs: ContentRef[];
   value: CellValue | undefined;
   editable: boolean;
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onOpenContent: (ref: ContentRef) => void;
   onCommit: (value: unknown) => void;
 }
@@ -530,15 +741,58 @@ interface ContentLinkFieldProps {
  * the ContentLink backlinks dual-write server-side.
  */
 function ContentLinkField({
+  tableId,
   column,
   refs,
   value,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onOpenContent,
   onCommit,
 }: ContentLinkFieldProps) {
   const [picking, setPicking] = useState(autoOpen && editable);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, editable, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
+
+  // File columns: the + UPLOADS (what a File cell's + should mean); a
+  // secondary 🔗 links something already in the tree. contentLink keeps
+  // its single + → picker. Uploads land as real file nodes UNDER the
+  // database node — deliberate placement, never root litter.
+  const isFile = column.type === "file";
+  const isImage = isFile && column.config.imageOnly === true;
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  /** Images columns: the thumbnail currently zoomed, if any. */
+  const [lightbox, setLightbox] = useState<ContentRef | null>(null);
+  /** Per-chip Replace: pending overwrite target + its own hidden input. */
+  const replaceInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceTargetRef = useRef<string | null>(null);
+  /** Cache-bust after an overwrite — the image stream carries an hour of
+   * private cache, so the OLD image would otherwise survive replacement. */
+  const [imgVersion, setImgVersion] = useState(0);
+
+  const overwriteRef = useCallback(
+    async (targetId: string, file: File) => {
+      if (isImage && !file.type.startsWith("image/")) {
+        toast.error("Images only — pick an image to replace with");
+        return;
+      }
+      setUploading(true);
+      try {
+        const res = await overwriteFileViaUpload(targetId, file);
+        if (res.error) {
+          toast.error(`Overwrite failed — ${res.error}`);
+          return;
+        }
+        setImgVersion(Date.now());
+        toast.success(`Replaced with "${file.name}"`);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [isImage]
+  );
   // The anchor ELEMENT lives in state, not a ref: it is read during render
   // (the picker needs it as a prop), and the React Compiler correctly
   // rejects ref reads in render. A callback ref keeps it current.
@@ -554,12 +808,20 @@ function ContentLinkField({
   );
 
   const add = useCallback(
-    (target: { id: string }) => {
+    (target: { id: string; contentType?: string }) => {
+      // File cells hold uploaded attachments — the server rejects non-file
+      // ids (writeCells), so teach at pick time instead of failing after.
+      if (isFile && target.contentType !== "file") {
+        toast.info(
+          "File cells hold uploaded files — pick a file, or upload with +"
+        );
+        return;
+      }
       setPicking(false);
       if (ids.includes(target.id)) return;
       onCommit([...ids, target.id]);
     },
-    [ids, onCommit]
+    [ids, onCommit, isFile]
   );
 
   const remove = useCallback(
@@ -570,14 +832,160 @@ function ContentLinkField({
     [ids, onCommit]
   );
 
+  const [dragActive, setDragActive] = useState(false);
+  const uploadFiles = useCallback(
+    async (files: FileList | File[] | null) => {
+      if (!files || files.length === 0) return;
+      setUploading(true);
+      try {
+        // Images columns accept images only.
+        let list = Array.from(files);
+        if (isImage) {
+          const images = list.filter((f) => f.type.startsWith("image/"));
+          if (images.length < list.length) {
+            toast.info(
+              `Images only — skipped ${list.length - images.length} non-image file${list.length - images.length === 1 ? "" : "s"}`
+            );
+          }
+          list = images;
+          if (list.length === 0) return;
+        }
+        // Collision prompt: a same-named attachment offers overwrite-in-
+        // place (same node id — every referencer sees the new version)
+        // instead of stacking "name (1)" twins.
+        const toCreate: File[] = [];
+        for (const f of list) {
+          const match = refs.find((r) => !r.restricted && r.title === f.name);
+          if (
+            match &&
+            window.confirm(
+              `"${f.name}" is already attached — overwrite it?\n\nOK replaces the file everywhere it's referenced. Cancel keeps both.`
+            )
+          ) {
+            const res = await overwriteFileViaUpload(match.id, f);
+            if (res.error) {
+              toast.error(`Overwrite failed — ${res.error}`);
+              return;
+            }
+            setImgVersion(Date.now());
+            toast.success(`Overwrote "${f.name}"`);
+          } else {
+            toCreate.push(f);
+          }
+        }
+        if (toCreate.length === 0) return;
+        // Shared path with the grid's drop/paste targets — one placement
+        // rule (under the database node) for every upload entry point.
+        const result = await uploadFilesToTable(tableId, toCreate);
+        const added = result.ids.filter((id) => !ids.includes(id));
+        if (added.length > 0) {
+          onCommit([...ids, ...added]);
+          toast.success(
+            `Attached ${added.length} file${added.length === 1 ? "" : "s"}`
+          );
+        }
+        // Failures are never silent — a broken upload looked like a
+        // missing feature (owner report, 2026-08-31).
+        if (result.errors.length > 0) {
+          toast.error(result.errors[0]);
+        }
+      } finally {
+        setUploading(false);
+      }
+    },
+    [ids, onCommit, tableId, isImage, refs]
+  );
+
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className={cn(
+        "border-b border-border/40 py-2.5 last:border-b-0",
+        dragActive && "rounded-md bg-primary/5 ring-2 ring-inset ring-primary/50"
+      )}
+      // File fields are drop targets — OS-file drags only (dragHasFiles),
+      // so the app's own row/column drags never trigger the affordance.
+      onDragOver={
+        isFile && editable
+          ? (e) => {
+              if (!dragHasFiles(e)) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "copy";
+              setDragActive(true);
+            }
+          : undefined
+      }
+      onDragLeave={
+        isFile && editable
+          ? (e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                setDragActive(false);
+              }
+            }
+          : undefined
+      }
+      onDrop={
+        isFile && editable
+          ? (e) => {
+              if (!dragHasFiles(e)) return;
+              e.preventDefault();
+              setDragActive(false);
+              void uploadFiles(e.dataTransfer.files);
+            }
+          : undefined
+      }
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>
 
       <div className="flex flex-wrap items-center gap-1">
-        {refs.map((ref) => (
+        {refs.map((ref) =>
+          isImage && !ref.restricted ? (
+            // Images column: thumbnail with a hover ×, click to zoom.
+            <span key={ref.id} className="relative">
+              <button
+                type="button"
+                onClick={() => setLightbox(ref)}
+                title={`View "${ref.title}"`}
+                className="block overflow-hidden rounded border border-border/60 hover:ring-2 hover:ring-primary/50"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
+                <img
+                  src={
+                    ref.file?.thumbnailUrl ??
+                    imageDownloadUrl(ref.id, imgVersion)
+                  }
+                  alt={ref.title}
+                  className="h-14 w-14 object-cover"
+                />
+              </button>
+              {editable && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => remove(ref.id)}
+                    aria-label={`Remove ${ref.title}`}
+                    className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-destructive"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      replaceTargetRef.current = ref.id;
+                      replaceInputRef.current?.click();
+                    }}
+                    title="Replace file (updates it everywhere it's referenced)"
+                    aria-label={`Replace ${ref.title}`}
+                    className="absolute -bottom-1 -right-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-foreground"
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                  </button>
+                </>
+              )}
+            </span>
+          ) : (
           <span
             key={ref.id}
             className={cn(
@@ -599,6 +1007,20 @@ function ContentLinkField({
                 {ref.title}
               </button>
             )}
+            {editable && !ref.restricted && isFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  replaceTargetRef.current = ref.id;
+                  replaceInputRef.current?.click();
+                }}
+                title="Replace file (updates it everywhere it's referenced)"
+                aria-label={`Replace ${ref.title}`}
+                className="rounded-full hover:bg-primary/20"
+              >
+                <RefreshCw className="h-2.5 w-2.5" />
+              </button>
+            )}
             {editable && !ref.restricted && (
               <button
                 type="button"
@@ -610,17 +1032,65 @@ function ContentLinkField({
               </button>
             )}
           </span>
-        ))}
+          )
+        )}
+        {editable && isFile && (
+          <>
+            <input
+              ref={replaceInputRef}
+              type="file"
+              accept={isImage ? "image/*" : undefined}
+              className="hidden"
+              onChange={(e) => {
+                const target = replaceTargetRef.current;
+                const file = e.target.files?.[0];
+                replaceTargetRef.current = null;
+                e.target.value = "";
+                if (target && file) void overwriteRef(target, file);
+              }}
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept={isImage ? "image/*" : undefined}
+              className="hidden"
+              onChange={(e) => {
+                void uploadFiles(e.target.files);
+                // Same file re-selectable next time.
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              aria-label="Upload files"
+              title="Upload files"
+              disabled={uploading}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground disabled:opacity-50"
+            >
+              {uploading ? (
+                <Loader2 className="h-2.5 w-2.5 animate-spin" />
+              ) : (
+                <Plus className="h-2.5 w-2.5" />
+              )}
+            </button>
+          </>
+        )}
         {editable && (
           <button
             ref={setAnchorEl}
             type="button"
-            aria-label="Link content"
-            title="Link content"
+            aria-label={isFile ? "Link an existing file" : "Link content"}
+            title={isFile ? "Link an existing file" : "Link content"}
             onClick={() => setPicking((p) => !p)}
             className="flex items-center rounded-full border border-dashed border-border px-1.5 py-0.5 text-muted-foreground hover:border-primary/50 hover:text-foreground"
           >
-            <Plus className="h-2.5 w-2.5" />
+            {isFile ? (
+              <Link2 className="h-2.5 w-2.5" />
+            ) : (
+              <Plus className="h-2.5 w-2.5" />
+            )}
           </button>
         )}
       </div>
@@ -632,9 +1102,34 @@ function ContentLinkField({
           onClose={() => setPicking(false)}
           disabledIds={ids}
           disabledReason="already linked"
-          searchPlaceholder="Link notes, files, folders…"
+          searchPlaceholder={
+            isFile ? "Link a file already in the app…" : "Link notes, files, folders…"
+          }
+          headerAction={
+            isFile
+              ? {
+                  label: "Upload from device…",
+                  onClick: () => {
+                    setPicking(false);
+                    fileInputRef.current?.click();
+                  },
+                }
+              : undefined
+          }
           views={views}
           defaultViewId={defaultViewId}
+          // File columns browse a narrowed tree: folders + notes for
+          // navigation (attachments live under notes), files to pick.
+          eligibleTypes={isFile ? FILE_LINK_ELIGIBLE_TYPES : undefined}
+        />
+      )}
+
+      {lightbox && (
+        <ImageLightbox
+          contentId={lightbox.id}
+          title={lightbox.title}
+          version={imgVersion}
+          onClose={() => setLightbox(null)}
         />
       )}
 
@@ -655,6 +1150,8 @@ interface PersonFieldProps {
   personRef?: PersonRef;
   editable: boolean;
   autoOpen?: boolean;
+  /** Changes per grid-"+" click; re-opens the picker on an open peek. */
+  autoOpenToken?: number;
   onCommit: (value: unknown) => void;
 }
 
@@ -671,11 +1168,14 @@ function PersonField({
   personRef,
   editable,
   autoOpen = false,
+  autoOpenToken,
   onCommit,
 }: PersonFieldProps) {
   const source = column.config.personSource ?? "person";
   const canPick = editable && source === "person";
   const [picking, setPicking] = useState(autoOpen && canPick);
+  useAutoOpenOnToken(autoOpen, autoOpenToken, canPick, () => setPicking(true));
+  const fieldRef = useScrollIntoViewOnFocus(autoOpen, autoOpenToken);
   const [query, setQuery] = useState("");
   const [options, setOptions] = useState<
     Array<{ id: string; name: string }> | null
@@ -715,7 +1215,10 @@ function PersonField({
   }, [picking, query]);
 
   return (
-    <div className="border-b border-border/40 py-2.5 last:border-b-0">
+    <div
+      ref={fieldRef}
+      className="border-b border-border/40 py-2.5 last:border-b-0"
+    >
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">
         {column.name}
       </label>

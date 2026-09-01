@@ -31,15 +31,21 @@ import {
 import { cn } from "@/lib/core/utils";
 import {
   cellToText,
+  COLUMN_WIDTH_MAX,
+  COLUMN_WIDTH_MIN,
   createUndoStack,
+  encodeCell,
+  isEncodeError,
   deriveRowTitle,
   describeOp,
   diffRow,
   keyForMove,
   pushOp,
+  generateColumnKey,
   redo as redoStack,
   undo as undoStack,
   type CellEdit,
+  type ColumnPref,
   type DataColumn,
   type DataColumnConfig,
   type DataRow,
@@ -52,10 +58,17 @@ import {
   type UndoStackState,
 } from "@/lib/domain/data";
 import { DataGridRow, INLINE_EDITABLE_TYPES } from "./DataGridRow";
-import { DataColumnHeader } from "./DataColumnHeader";
+import { DataColumnHeader, DEFAULT_COLUMN_WIDTH } from "./DataColumnHeader";
+import { ContentPathBreadcrumb } from "../content/ContentPathBreadcrumb";
+import {
+  DATA_SCHEMA_CHANGED_EVENT,
+  dispatchDataSchemaChanged,
+  type DataSchemaChangedDetail,
+} from "./events";
+import { overwriteFileViaUpload, uploadFilesToTable } from "./file-upload";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
-import { DataBoardView } from "./DataBoardView";
+import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
 import { DataListView } from "./DataListView";
 import { DataFormView } from "./DataFormView";
 import { DataGalleryView } from "./DataGalleryView";
@@ -82,6 +95,9 @@ interface LoadState {
   rows: DataRow[];
   serverTime: string | null;
   canWrite: boolean;
+  /** Owner-only affordances (option creation) key off this, matching the
+   * server's canAlterSchema — strictly stronger than canWrite. */
+  canAlterSchema: boolean;
   loading: boolean;
   error: string | null;
 }
@@ -93,6 +109,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     rows: [],
     serverTime: null,
     canWrite: false,
+    canAlterSchema: false,
     loading: true,
     error: null,
   });
@@ -113,12 +130,27 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
   } | null>(null);
   const [peekRowId, setPeekRowId] = useState<string | null>(null);
   const [peekFocusColumnId, setPeekFocusColumnId] = useState<string | null>(null);
+  /** Bumped on every grid-"+" click so a field's auto-open can re-fire even
+   * when the peek (and the target column's focus) is already in place —
+   * an initializer-only read misses that case entirely. */
+  const [peekFocusToken, setPeekFocusToken] = useState(0);
+  /** Title rename: null = viewing. The override shows the committed rename
+   * until the prop refreshes through the content-updated event round trip. */
+  const [titleDraft, setTitleDraft] = useState<string | null>(null);
+  const [titleOverride, setTitleOverride] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{
     columnId: string;
     side: "left" | "right";
   } | null>(null);
+  /** Live widths during/after a resize drag, keyed by column id. Cleared on
+   * view switch so each view shows its own stored prefs. */
+  const [widthOverrides, setWidthOverrides] = useState<Record<string, number>>(
+    {}
+  );
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  /** The viewer's own root — the click-away scope for the overlay peek. */
+  const rootRef = useRef<HTMLDivElement>(null);
   /**
    * Stable per-mount id, so undo entries can be attributed to this client
    * when a durable log lands later. `useId()` rather than `crypto.randomUUID()`
@@ -177,6 +209,111 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     [state.table]
   );
 
+  // Effective widths: the view's stored prefs overlaid with live drag
+  // values. One memoized map, so the memo()'d rows only re-render when a
+  // width actually changes.
+  const columnWidths = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const column of columns) {
+      map[column.id] =
+        widthOverrides[column.id] ??
+        state.view?.columnPrefs?.[column.id]?.width ??
+        DEFAULT_COLUMN_WIDTH;
+    }
+    return map;
+  }, [columns, state.view, widthOverrides]);
+
+  // Each view keeps its own widths — switching views drops the overrides
+  // (they equal the stored prefs after a successful persist anyway).
+  const activeViewIdForWidths = state.view?.id ?? null;
+  useEffect(() => {
+    setWidthOverrides({});
+  }, [activeViewIdForWidths]);
+
+  /** Geometry of an in-flight resize drag. A ref, not state — pointermove
+   * only re-renders through the width it changes. */
+  const resizeRef = useRef<{
+    columnId: string;
+    startX: number;
+    startWidth: number;
+    latest: number;
+  } | null>(null);
+
+  const persistColumnWidth = useCallback(
+    async (columnId: string, width: number) => {
+      const view = viewRef.current;
+      if (!view) return;
+      // Replaced wholesale server-side (like `config`), so spread the
+      // loaded map and overlay this column's width.
+      const merged: Record<string, ColumnPref> = {
+        ...view.columnPrefs,
+        [columnId]: { ...view.columnPrefs?.[columnId], width },
+      };
+      const res = await fetch(`/api/content/data/${contentId}/views`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ viewId: view.id, columnPrefs: merged }),
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.success) {
+        // Fold into local view state instead of reloading — the override
+        // already shows it; future merges start from the stored map.
+        setState((cur) =>
+          cur.view && cur.view.id === view.id
+            ? { ...cur, view: { ...cur.view, columnPrefs: merged } }
+            : cur
+        );
+      } else {
+        // Locked view, lost access, network — revert to the stored width.
+        setWidthOverrides((cur) => {
+          const next = { ...cur };
+          delete next[columnId];
+          return next;
+        });
+        setNotice(json?.error?.message ?? "Could not save the column width");
+      }
+    },
+    [contentId]
+  );
+
+  const handleResizeStart = useCallback(
+    (e: React.PointerEvent, columnId: string) => {
+      const startWidth = columnWidths[columnId] ?? DEFAULT_COLUMN_WIDTH;
+      resizeRef.current = {
+        columnId,
+        startX: e.clientX,
+        startWidth,
+        latest: startWidth,
+      };
+      const onMove = (ev: PointerEvent) => {
+        const r = resizeRef.current;
+        if (!r) return;
+        const width = Math.round(
+          Math.max(
+            COLUMN_WIDTH_MIN,
+            Math.min(COLUMN_WIDTH_MAX, r.startWidth + (ev.clientX - r.startX))
+          )
+        );
+        if (width === r.latest) return;
+        r.latest = width;
+        setWidthOverrides((cur) => ({ ...cur, [r.columnId]: width }));
+      };
+      const onUp = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onUp);
+        const r = resizeRef.current;
+        resizeRef.current = null;
+        if (r && r.latest !== r.startWidth) {
+          void persistColumnWidth(r.columnId, r.latest);
+        }
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onUp);
+    },
+    [columnWidths, persistColumnWidth]
+  );
+
   /**
    * Query tables are read-only projections (plan Phase 3): rows ARE
    * ContentNodes, so nothing here may edit cells, columns, or rows — the
@@ -230,6 +367,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         serverTime: json.data.serverTime,
         canWrite:
           json.data.accessLevel === "write" || json.data.accessLevel === "owner",
+        canAlterSchema: json.data.accessLevel === "owner",
         loading: false,
         error: null,
       });
@@ -455,13 +593,31 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     async (rowId: string, columnKey: string, value: unknown) => {
       const row = state.rows.find((r) => r.id === rowId);
       if (!row) return;
+      const column = state.table?.columns.find((c) => c.key === columnKey);
+
+      // Encode client-side with the SAME pure encoder the server runs
+      // (cells.ts is client-safe by design): the optimistic cell shows the
+      // normalized value — https://-upgraded URLs, ISO dates, rounded
+      // numbers — immediately instead of after the next 10s poll (owner
+      // report, 2026-08-31), and a validation failure rejects instantly
+      // with the server's exact wording, no round trip. The server still
+      // re-encodes; the encoders are idempotent on their own output.
+      let outbound = value;
+      if (column) {
+        const encoded = encodeCell(column, value);
+        if (isEncodeError(encoded)) {
+          setNotice(`Could not save — ${encoded.error}`);
+          return;
+        }
+        outbound = encoded.value;
+      }
 
       const before: RowData = row.data;
       const optimistic: RowData = { ...before };
-      if (value === undefined || value === null || value === "") {
+      if (outbound === undefined || outbound === null || outbound === "") {
         delete optimistic[columnKey];
       } else {
-        optimistic[columnKey] = value as RowData[string];
+        optimistic[columnKey] = outbound as RowData[string];
       }
 
       const edits = diffRow(rowId, before, optimistic);
@@ -502,8 +658,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       // show the raw id, which these renderers ignore. One reload fetches
       // the refs; without it the picker's choice looks like it never landed
       // (owner report, 2026-08-26).
-      const column = state.table?.columns.find((c) => c.key === columnKey);
-      if (column && (column.type === "person" || column.type === "contentLink")) {
+      if (
+        column &&
+        (column.type === "person" ||
+          column.type === "contentLink" ||
+          column.type === "file")
+      ) {
         void load(viewRef.current?.id ?? null);
       }
 
@@ -711,10 +871,25 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         return false;
       }
       await load(state.view?.id ?? null);
+      // Tell the context rail (right sidebar) the schema moved under it.
+      dispatchDataSchemaChanged(contentId, "grid");
       return true;
     },
     [contentId, load, state.view]
   );
+
+  // Schema edits from OTHER surfaces (the context rail, an AI proposal
+  // card) → reload the grid. Own dispatches are skipped — the grid already
+  // reloads after its own mutations.
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const detail = (e as CustomEvent<DataSchemaChangedDetail>).detail;
+      if (detail?.tableId !== contentId || detail.source === "grid") return;
+      void load(viewRef.current?.id ?? null);
+    };
+    window.addEventListener(DATA_SCHEMA_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(DATA_SCHEMA_CHANGED_EVENT, onChanged);
+  }, [contentId, load]);
 
   const addColumn = useCallback(
     async (input: {
@@ -929,14 +1104,257 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         ?? columns.find((c) => c.type === "status")
         ?? columns.find((c) => c.type === "select");
       if (optionId && groupCol && rowIds[0]) {
+        // Checkbox boards pass synthetic group ids — stamp the boolean.
+        // Explicit false matters: a defaultChecked column would otherwise
+        // bounce a row added under "Unchecked" into the Checked group.
+        const after =
+          groupCol.type === "checkbox"
+            ? optionId === CHECKED_GROUP
+            : optionId;
         await sendWrites(
-          [{ rowId: rowIds[0], columnKey: groupCol.key, before: undefined, after: optionId }],
+          [{ rowId: rowIds[0], columnKey: groupCol.key, before: undefined, after }],
           false
         );
       }
       await load(state.view?.id ?? null);
     },
     [contentId, columns, state.view, sendWrites, load, clientId]
+  );
+
+  const effectiveTitle = titleOverride ?? title;
+
+  /**
+   * Rename the database from its own header — double-click, like a note's
+   * title. The PATCH renames the ContentNode; the content-updated event is
+   * the same hook every other rename travels on, so the file tree label
+   * and any open tab follow without bespoke wiring.
+   */
+  const commitTitle = useCallback(async () => {
+    const draft = titleDraft?.trim();
+    setTitleDraft(null);
+    if (!draft || draft === effectiveTitle) return;
+    const res = await fetch(`/api/content/content/${contentId}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: draft }),
+    });
+    const json = await res.json().catch(() => null);
+    if (!res.ok || json?.success === false) {
+      setNotice(json?.error?.message ?? "Could not rename the database");
+      return;
+    }
+    setTitleOverride(draft);
+    window.dispatchEvent(
+      new CustomEvent("content-updated", {
+        detail: { contentId, updates: { title: draft } },
+      })
+    );
+  }, [titleDraft, effectiveTitle, contentId]);
+
+  /**
+   * Create one select/status/multiSelect option from a ROW editor — the
+   * "just type it" path, so adding a category doesn't mean a detour
+   * through the column menu. Dedupes case-insensitively (returns the
+   * existing option rather than minting a twin); goes through the same
+   * columns PATCH as the menu, so the rail hears about it too.
+   */
+  const createOption = useCallback(
+    async (column: DataColumn, label: string) => {
+      const trimmed = label.trim().slice(0, 120);
+      if (!trimmed) return null;
+      const existing = (column.config.options ?? []).find(
+        (o) => o.label.trim().toLowerCase() === trimmed.toLowerCase()
+      );
+      if (existing) return existing;
+      const option = {
+        id: generateColumnKey(),
+        label: trimmed,
+        ...(column.type === "status" ? { group: "todo" as const } : {}),
+      };
+      const done = await columnRequest("PATCH", {
+        columnId: column.id,
+        config: {
+          ...column.config,
+          options: [...(column.config.options ?? []), option],
+        },
+      });
+      return done ? option : null;
+    },
+    [columnRequest]
+  );
+
+  /**
+   * Upload OS files straight into a File cell — the grid's drop target
+   * and paste both land here, sharing the peek's upload path (files
+   * become nodes under the database, then link into the cell).
+   */
+  /** Bumped after an in-place overwrite so cached image streams re-fetch
+   * (the download stream carries an hour of private cache). */
+  const [imageVersion, setImageVersion] = useState(0);
+
+  const uploadIntoFileCell = useCallback(
+    async (rowId: string, column: DataColumn, files: FileList | File[]) => {
+      if (!canEditData) return;
+      // Images columns accept images only — filtered here so a mixed drop
+      // degrades to "images attached, N skipped" instead of a rejection.
+      let list = Array.from(files);
+      let skippedNonImages = 0;
+      if (column.config.imageOnly) {
+        const images = list.filter((f) => f.type.startsWith("image/"));
+        skippedNonImages = list.length - images.length;
+        list = images;
+        if (list.length === 0) {
+          setNotice("This column accepts images only");
+          return;
+        }
+      }
+
+      // Collision prompt (owner approval, 2026-08-31): a dropped file whose
+      // name matches an attached one offers overwrite-in-place — same node
+      // id, every referencer sees the new version — instead of silently
+      // stacking "name (1)" twins.
+      const row = state.rows.find((r) => r.id === rowId);
+      const refs = row?.contentRefs?.[column.id] ?? [];
+      const toCreate: File[] = [];
+      let overwritten = 0;
+      for (const f of list) {
+        const match = refs.find((r) => !r.restricted && r.title === f.name);
+        if (
+          match &&
+          window.confirm(
+            `"${f.name}" is already attached — overwrite it?\n\nOK replaces the file everywhere it's referenced. Cancel keeps both.`
+          )
+        ) {
+          setNotice(`Overwriting ${f.name}…`);
+          const res = await overwriteFileViaUpload(match.id, f);
+          if (res.error) {
+            setNotice(`Overwrite failed — ${res.error}`);
+            return;
+          }
+          overwritten++;
+        } else {
+          toCreate.push(f);
+        }
+      }
+
+      let uploaded: string[] = [];
+      let errors: string[] = [];
+      if (toCreate.length > 0) {
+        setNotice(
+          `Uploading ${toCreate.length} file${toCreate.length === 1 ? "" : "s"}…`
+        );
+        ({ ids: uploaded, errors } = await uploadFilesToTable(
+          contentId,
+          toCreate
+        ));
+        if (uploaded.length === 0 && overwritten === 0) {
+          setNotice(`Upload failed — ${errors[0] ?? "nothing was attached"}`);
+          return;
+        }
+        if (uploaded.length > 0) {
+          const current = Array.isArray(row?.data[column.key])
+            ? (row.data[column.key] as string[])
+            : [];
+          const merged = [
+            ...current,
+            ...uploaded.filter((id) => !current.includes(id)),
+          ];
+          await commitCell(rowId, column.key, merged);
+        }
+      }
+      if (overwritten > 0) {
+        setImageVersion(Date.now());
+        void load(viewRef.current?.id ?? null);
+      }
+
+      const parts: string[] = [];
+      if (uploaded.length > 0) {
+        parts.push(
+          `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}`
+        );
+      }
+      if (overwritten > 0) {
+        parts.push(`overwrote ${overwritten}`);
+      }
+      if (skippedNonImages > 0) parts.push(`${skippedNonImages} non-image skipped`);
+      if (errors.length > 0) parts.push(`${errors.length} failed — ${errors[0]}`);
+      setNotice(parts.join(" · ") || null);
+    },
+    [canEditData, contentId, state.rows, commitCell, load]
+  );
+
+  // Paste into a SELECTED File cell — the keyboard's drop. Skipped while
+  // typing in any input so ordinary pasting is never hijacked (same guard
+  // as ⌘C above).
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      if (!selectedCell || !canEditData) return;
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      const column = columns.find((c) => c.key === selectedCell.columnKey);
+      if (column?.type !== "file") return;
+      const files = e.clipboardData?.files;
+      if (!files || files.length === 0) return;
+      e.preventDefault();
+      void uploadIntoFileCell(selectedCell.rowId, column, files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [selectedCell, canEditData, columns, uploadIntoFileCell]);
+
+  /**
+   * Check/uncheck every loaded row in ONE batch — one PATCH (the route
+   * takes up to 1000 writes; a page is ≤100), one optimistic pass, one
+   * setCells undo entry so ⌘Z reverts the whole sweep.
+   */
+  const bulkSetCheckbox = useCallback(
+    async (column: DataColumn, value: boolean) => {
+      const edits: CellEdit[] = [];
+      for (const row of state.rows) {
+        if ((row.data[column.key] === true) === value) continue;
+        edits.push({
+          rowId: row.id,
+          columnKey: column.key,
+          before: row.data[column.key],
+          after: value,
+        });
+      }
+      if (edits.length === 0) {
+        setNotice(value ? "Every row is already checked" : "No rows are checked");
+        return;
+      }
+      const editIds = new Set(edits.map((e) => e.rowId));
+      setState((s) => ({
+        ...s,
+        rows: s.rows.map((r) =>
+          editIds.has(r.id)
+            ? { ...r, data: { ...r.data, [column.key]: value } }
+            : r
+        ),
+      }));
+      const result = await sendWrites(edits, false);
+      if (!result.ok) {
+        await load(viewRef.current?.id ?? null);
+        setNotice(`Could not update — ${result.message}`);
+        return;
+      }
+      const op: UndoOp = { kind: "setCells", edits, label: "" };
+      setStack((s) =>
+        pushOp(s, { ...op, label: describeOp(op) }, clientId, Date.now())
+      );
+      setNotice(
+        `${value ? "Checked" : "Unchecked"} ${edits.length} row${edits.length === 1 ? "" : "s"}`
+      );
+    },
+    [state.rows, sendWrites, load, clientId]
   );
 
   // ── Cell keyboard model (owner friction, 2026-08-24) ───────────────────
@@ -1021,9 +1439,31 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         setSelectedCell({ rowId: nextRow.id, columnKey: columns[nci].key });
       } else if (e.key === "Enter") {
         const column = columns.find((c) => c.key === selectedCell.columnKey);
-        if (column && INLINE_EDITABLE_TYPES.has(column.type)) {
+        // Select-likes open their option picker through the same forced-
+        // edit remount the text editors use.
+        if (
+          column &&
+          (INLINE_EDITABLE_TYPES.has(column.type) ||
+            column.type === "select" ||
+            column.type === "status" ||
+            column.type === "multiSelect")
+        ) {
           e.preventDefault();
           setEditTarget(selectedCell);
+        }
+      } else if (e.key === " ") {
+        // Space toggles a selected checkbox cell — the keyboard's click.
+        const column = columns.find((c) => c.key === selectedCell.columnKey);
+        if (column?.type === "checkbox" && canEditData) {
+          e.preventDefault();
+          const row = state.rows.find((r) => r.id === selectedCell.rowId);
+          if (row) {
+            void commitCell(
+              row.id,
+              column.key,
+              !(row.data[column.key] === true)
+            );
+          }
         }
       } else if (e.key === "Escape") {
         setSelectedCell(null);
@@ -1031,7 +1471,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [selectedCell, editTarget, columns, state.rows]);
+  }, [selectedCell, editTarget, columns, state.rows, canEditData, commitCell]);
 
   // ⌘C on a selected cell copies its display text — labels for selects,
   // never option ids. Skipped inside inputs and when the browser has a real
@@ -1124,10 +1564,36 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       }
       setPeekRowId(rowId);
       setPeekFocusColumnId(focusColumnId ?? null);
+      if (focusColumnId) setPeekFocusToken((t) => t + 1);
       setEditTarget(null);
     },
     [isQuery, state.rows, selectNode, clearRowParam]
   );
+
+  /**
+   * Click-away dismissal for the OVERLAY peek — reaching for the ✕ every
+   * time was friction (owner, 2026-08-31). Scoped to this viewer's root:
+   * clicks in other panels/sidebars leave the peek open, and the peek's
+   * portaled pickers live in document.body (outside the root), so
+   * interacting with them never counts as "away". mousedown, so the
+   * click's own action (cell select, +) still lands after the close.
+   * The split variant is a pane, not an overlay — it never dismisses.
+   */
+  const overlayPeekOpen =
+    peekRowId !== null && state.view?.mode !== "split" && !isQuery;
+  useEffect(() => {
+    if (!overlayPeekOpen) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as Element | null;
+      const root = rootRef.current;
+      if (!target || !root || !root.contains(target)) return;
+      if (target.closest("[data-row-peek]")) return;
+      setPeekRowId(null);
+      setPeekFocusColumnId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [overlayPeekOpen]);
 
   const navigatePeek = useCallback(
     (dir: 1 | -1) => {
@@ -1177,13 +1643,59 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     : -1;
 
   return (
-    <div className="relative flex h-full flex-col">
+    <div ref={rootRef} className="relative flex h-full flex-col">
       <header className="flex items-center gap-3 border-b border-border px-4 py-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
-        <span className="font-mono text-xs text-muted-foreground">
-          {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
-        </span>
-        <div className="ml-auto flex items-center gap-1">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3">
+            {titleDraft !== null ? (
+              <input
+                autoFocus
+                value={titleDraft}
+                onChange={(e) => setTitleDraft(e.target.value)}
+                onBlur={() => void commitTitle()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void commitTitle();
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    setTitleDraft(null);
+                  }
+                }}
+                aria-label="Database title"
+                // Same edit chrome as the note title: transparent with a
+                // subtle bottom border, never a boxed input.
+                className="min-w-0 flex-1 border-b border-primary/40 bg-transparent text-sm font-semibold text-foreground focus:border-primary focus:outline-none"
+              />
+            ) : (
+              <h2
+                className={cn(
+                  "truncate text-sm font-semibold",
+                  state.canWrite && "cursor-text"
+                )}
+                title={state.canWrite ? "Double-click to rename" : undefined}
+                onDoubleClick={
+                  state.canWrite
+                    ? () => setTitleDraft(effectiveTitle)
+                    : undefined
+                }
+              >
+                {effectiveTitle}
+              </h2>
+            )}
+            <span className="shrink-0 font-mono text-xs text-muted-foreground">
+              {state.rows.length} {state.rows.length === 1 ? "row" : "rows"}
+            </span>
+          </div>
+          {/* Same folder-path breadcrumb the note editor renders under its
+              title — crumbs mirror a real file-tree selection. */}
+          <ContentPathBreadcrumb
+            contentId={contentId}
+            currentTitle={effectiveTitle}
+            currentContentType="data"
+          />
+        </div>
+        <div className="flex shrink-0 items-center gap-1">
           {flashcardsEnabled && (
             <button
               type="button"
@@ -1280,7 +1792,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       {notice && (
         <div
           role="status"
-          className="border-b border-border bg-muted/50 px-4 py-1.5 text-xs text-muted-foreground"
+          // Amber, the repo's most neutral yellow (the template-warning
+          // family) — a save that didn't land deserves warning weight, not
+          // the muted grey that reads as a status line.
+          className="border-b border-amber-300/60 bg-amber-500/10 px-4 py-1.5 text-xs text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200"
         >
           {notice}
           <button
@@ -1351,6 +1866,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 index={peekIndex}
                 total={state.rows.length}
                 focusColumnId={peekFocusColumnId}
+                focusToken={peekFocusToken}
+                onCreateOption={state.canAlterSchema ? createOption : undefined}
                 onOpenContent={openContent}
                 onOpenAsPage={openAsPage}
                 onCommitCell={commitCell}
@@ -1375,10 +1892,21 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           <div className="sticky top-0 z-10 flex border-b border-border bg-muted/60 backdrop-blur">
             <div className="w-9 shrink-0 border-r border-border/60" />
             <div className="w-6 shrink-0" />
-            {columns.map((column) => (
+            {columns.map((column) => {
+              // Checkbox header toggle: absent counts as unchecked, the
+              // same two-state doctrine as the filter and the board.
+              const allChecked =
+                column.type === "checkbox" &&
+                state.rows.length > 0 &&
+                state.rows.every((r) => r.data[column.key] === true);
+              const someChecked =
+                column.type === "checkbox" &&
+                state.rows.some((r) => r.data[column.key] === true);
+              return (
               <DataColumnHeader
                 key={column.id}
                 column={column}
+                width={columnWidths[column.id]}
                 editable={canEditData}
                 menuOpen={openColumnId === column.id}
                 onToggleMenu={(columnId) =>
@@ -1394,6 +1922,19 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 onColumnDragOver={handleColumnDragOver}
                 onColumnDrop={handleColumnDrop}
                 onColumnDragEnd={handleColumnDragEnd}
+                // Widths persist through the views PATCH (canWrite-gated);
+                // query tables keep it too — views are the table's own
+                // objects even when the data is a read-only projection.
+                onResizeStart={state.canWrite ? handleResizeStart : undefined}
+                onBulkToggle={
+                  column.type === "checkbox" &&
+                  canEditData &&
+                  state.rows.length > 0
+                    ? () => void bulkSetCheckbox(column, !allChecked)
+                    : undefined
+                }
+                allChecked={allChecked}
+                someChecked={someChecked}
               >
                 {openColumnId === column.id && (
                   <ColumnMenu
@@ -1404,7 +1945,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   />
                 )}
               </DataColumnHeader>
-            ))}
+              );
+            })}
             {canEditData && (
               <AddColumnButton
                 tableId={contentId}
@@ -1429,6 +1971,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   key={row.id}
                   row={row}
                   columns={columns}
+                  widths={columnWidths}
+                  onCreateOption={state.canAlterSchema ? createOption : undefined}
+                  onUploadFiles={canEditData ? uploadIntoFileCell : undefined}
+                  imageVersion={imageVersion}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={canEditData}
@@ -1478,6 +2024,8 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           index={peekIndex}
           total={state.rows.length}
           focusColumnId={peekFocusColumnId}
+          focusToken={peekFocusToken}
+          onCreateOption={state.canAlterSchema ? createOption : undefined}
           onOpenContent={openContent}
           onOpenAsPage={openAsPage}
           onCommitCell={commitCell}

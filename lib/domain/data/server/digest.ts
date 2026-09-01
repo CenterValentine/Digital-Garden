@@ -86,8 +86,20 @@ export async function buildDataSchemaDigest(
   for (const column of payload.columns) {
     const config = (column.config ?? {}) as unknown as DataColumnConfig;
     const desc = column.description ? ` — ${column.description}` : "";
+    // The intent split the type names alone don't teach (owner
+    // clarification 2026-08-31): file = external content brought INTO the
+    // app; contentLink = references to content already in it. Without
+    // this, models reasoned "same id arrays, same thing".
+    const intent =
+      column.type === "file"
+        ? config.imageOnly
+          ? " [uploaded IMAGE attachments — cell ids must be image file nodes; the user uploads via the cell's +]"
+          : " [uploaded attachments — cell ids must be FILE nodes; the user uploads via the cell's +, or attach a file you created]"
+        : column.type === "contentLink"
+          ? " [references to existing app content — notes, folders, any node]"
+          : "";
     lines.push(
-      `- ${column.name} (${column.type})${desc}${describeOptions(config.options)}`
+      `- ${column.name} (${column.type})${intent}${desc}${describeOptions(config.options)}`
     );
   }
 

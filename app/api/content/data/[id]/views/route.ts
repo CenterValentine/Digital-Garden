@@ -27,8 +27,11 @@ import {
   resolveDataTableAccess,
 } from "@/lib/domain/data/server/access";
 import {
+  COLUMN_WIDTH_MAX,
+  COLUMN_WIDTH_MIN,
   keyAtEnd,
   validateFilter,
+  type ColumnPref,
   type DataColumnConfig,
   type DataViewConfig,
   type DataSort,
@@ -144,6 +147,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         config?: DataViewConfig;
         filters?: FilterNode;
         sorts?: DataSort[];
+        columnPrefs?: Record<string, ColumnPref>;
       };
       if (!body.viewId) return badRequest("`viewId` is required");
       if (body.name !== undefined && !body.name.trim()) {
@@ -202,21 +206,74 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
         }
       }
 
-      // A board groups by a single-value option column. Validating the
-      // TYPE here keeps the renderer's assumption ("options exist, cells
-      // hold one id") true by construction.
+      // Column prefs are replaced wholesale (like `config`) — the client
+      // spreads the loaded map. Values are clamped, unknown keys stripped;
+      // a pref for a since-deleted column is harmless (ignored on read).
+      let sanitizedPrefs: Record<string, ColumnPref> | undefined;
+      if (body.columnPrefs !== undefined) {
+        if (
+          typeof body.columnPrefs !== "object" ||
+          body.columnPrefs === null ||
+          Array.isArray(body.columnPrefs)
+        ) {
+          return badRequest("`columnPrefs` must be a map of column ids");
+        }
+        const entries = Object.entries(body.columnPrefs);
+        if (entries.length > 200) {
+          return badRequest("Too many column preferences");
+        }
+        sanitizedPrefs = {};
+        for (const [columnId, pref] of entries) {
+          if (typeof pref !== "object" || pref === null) continue;
+          const out: ColumnPref = {};
+          const width = (pref as ColumnPref).width;
+          if (width !== undefined) {
+            if (typeof width !== "number" || !Number.isFinite(width)) {
+              return badRequest("Column width must be a number");
+            }
+            out.width = Math.round(
+              Math.max(COLUMN_WIDTH_MIN, Math.min(COLUMN_WIDTH_MAX, width))
+            );
+          }
+          const hidden = (pref as ColumnPref).hidden;
+          if (hidden !== undefined) {
+            if (typeof hidden !== "boolean") {
+              return badRequest("Column hidden must be true or false");
+            }
+            out.hidden = hidden;
+          }
+          const position = (pref as ColumnPref).position;
+          if (position !== undefined) {
+            if (
+              typeof position !== "string" ||
+              position.length === 0 ||
+              position.length > 64
+            ) {
+              return badRequest("Column position must be a fractional key");
+            }
+            out.position = position;
+          }
+          if (Object.keys(out).length > 0) sanitizedPrefs[columnId] = out;
+        }
+      }
+
+      // A board groups by a single-value column: an option column (cells
+      // hold one option id) or a checkbox (two synthetic groups). The TYPE
+      // check keeps the renderer's assumptions true by construction.
       if (body.groupByColumnId != null) {
         const column = await prisma.dataColumn.findFirst({
           where: {
             id: body.groupByColumnId,
             tableId: id,
             deletedAt: null,
-            type: { in: ["status", "select"] },
+            type: { in: ["status", "select", "checkbox"] },
           },
           select: { id: true },
         });
         if (!column) {
-          return badRequest("Boards group by a Status or Select column");
+          return badRequest(
+            "Boards group by a Status, Select, or Checkbox column"
+          );
         }
       }
 
@@ -246,6 +303,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
           body.filters === undefined &&
           body.sorts === undefined &&
           body.config === undefined &&
+          body.columnPrefs === undefined &&
           !body.makeDefault;
         if (!accessOnly || !(isViewOwner || isTableOwner)) {
           return forbidden("This view is locked — unlock it first");
@@ -272,6 +330,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Params }
               : {}),
             ...(body.config !== undefined
               ? { config: body.config as unknown as Prisma.InputJsonValue }
+              : {}),
+            ...(sanitizedPrefs !== undefined
+              ? {
+                  columnPrefs:
+                    sanitizedPrefs as unknown as Prisma.InputJsonValue,
+                }
               : {}),
           },
         });

@@ -59,6 +59,8 @@ export interface ViewPatch {
   config?: import("@/lib/domain/data").DataViewConfig;
   filters?: import("@/lib/domain/data").FilterNode;
   sorts?: import("@/lib/domain/data").DataSort[];
+  /** Replaced wholesale, like `config` — send the full merged map. */
+  columnPrefs?: Record<string, import("@/lib/domain/data").ColumnPref>;
 }
 
 interface DataViewBarProps {
@@ -354,7 +356,12 @@ function ViewMenu({
           >
             <option value="">Auto (first Status column)</option>
             {columns
-              .filter((c) => c.type === "status" || c.type === "select")
+              .filter(
+                (c) =>
+                  c.type === "status" ||
+                  c.type === "select" ||
+                  c.type === "checkbox"
+              )
               .map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}

@@ -51,6 +51,10 @@ import {
 import { MediaInjectFlyout, type InjectMedia } from "./MediaInjectFlyout";
 import { AnomalySurfaces, deriveMessageAnomalies } from "./AnomalyChips";
 import { FlashcardDeckProposalCard } from "./FlashcardDeckProposalCard";
+import {
+  ColumnOptionsProposalCard,
+  type ColumnOptionsProposalPayload,
+} from "./ColumnOptionsProposalCard";
 import { FlashcardCardProposalList } from "./FlashcardCardProposalList";
 import { cn } from "@/lib/core/utils";
 import { calculateMenuPosition, type CalculatedPosition } from "@/lib/core/menu-positioning";
@@ -515,6 +519,7 @@ export const ChatMessage = memo(function ChatMessage({
     writeReceipts,
     deckProposals,
     deckWithCardsProposals,
+    columnOptionsProposals,
     hasRunningTools,
   } = useMemo(() => {
     const images: ImagePayload[] = [];
@@ -526,6 +531,7 @@ export const ChatMessage = memo(function ChatMessage({
     }> = [];
     const deckProps: DeckProposalPayload[] = [];
     const deckWithCardsProps: DeckWithCardsProposalPayload[] = [];
+    const columnOptionsProps: ColumnOptionsProposalPayload[] = [];
     let running = false;
     const seenImageIds = new Set<string>();
     const seenAudioIds = new Set<string>();
@@ -574,6 +580,11 @@ export const ChatMessage = memo(function ChatMessage({
         const cards = parseDeckWithCardsProposal(tp.output);
         if (cards) {
           deckWithCardsProps.push(cards);
+          continue;
+        }
+        const columnOptions = parseColumnOptionsProposal(tp.output);
+        if (columnOptions) {
+          columnOptionsProps.push(columnOptions);
         }
       }
     }
@@ -585,6 +596,7 @@ export const ChatMessage = memo(function ChatMessage({
       writeReceipts: writes,
       deckProposals: deckProps,
       deckWithCardsProposals: deckWithCardsProps,
+      columnOptionsProposals: columnOptionsProps,
       hasRunningTools: running,
     };
   }, [message.parts]);
@@ -1019,6 +1031,7 @@ export const ChatMessage = memo(function ChatMessage({
               if (parseNotePayload(toolPart.output) !== null) return null;
               if (parseDeckProposal(toolPart.output) !== null) return null;
               if (parseDeckWithCardsProposal(toolPart.output) !== null) return null;
+              if (parseColumnOptionsProposal(toolPart.output) !== null) return null;
             }
 
             return (
@@ -1101,6 +1114,17 @@ export const ChatMessage = memo(function ChatMessage({
             key={`cards-${i}`}
             payload={payload}
             proposalId={`${message.id}-cards-${i}`}
+          />
+        ))}
+
+        {/* Column-options proposals — Apply merges into the column's live
+            config. The already-applied flag is keyed by proposal CONTENT
+            inside the card: message ids change when a streamed conversation
+            persists, so they cannot key anything durable. */}
+        {columnOptionsProposals.map((payload, i) => (
+          <ColumnOptionsProposalCard
+            key={`column-options-${i}`}
+            payload={payload}
           />
         ))}
 
@@ -2143,6 +2167,24 @@ function parseNotePayload(result: unknown): NotePayload | null {
   try {
     const parsed = JSON.parse(str);
     if (parsed.__notePayload) return parsed as NotePayload;
+  } catch {
+    /* not valid JSON */
+  }
+  return null;
+}
+
+/** Parse a column-options proposal from a propose_column_options result. */
+function parseColumnOptionsProposal(
+  result: unknown
+): ColumnOptionsProposalPayload | null {
+  if (result === undefined) return null;
+  const str = typeof result === "string" ? result : JSON.stringify(result);
+  if (!str.includes('"__columnOptionsProposal"')) return null;
+  try {
+    const parsed = JSON.parse(str);
+    if (parsed.__columnOptionsProposal) {
+      return parsed as ColumnOptionsProposalPayload;
+    }
   } catch {
     /* not valid JSON */
   }

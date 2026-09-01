@@ -212,10 +212,17 @@ function evaluateCondition(
 
   switch (condition.operator) {
     case "is":
-      if (column.type === "checkbox") return cell === condition.value;
+      // Checkbox: a never-touched cell (absent key) IS unchecked — storage
+      // has three states (absent/true/false) but the product has two, and
+      // "is unchecked" silently missing untouched rows was a filter trap.
+      if (column.type === "checkbox") {
+        return (cell === true) === (condition.value === true);
+      }
       return String(cell) === String(condition.value);
     case "isNot":
-      if (column.type === "checkbox") return cell !== condition.value;
+      if (column.type === "checkbox") {
+        return (cell === true) !== (condition.value === true);
+      }
       return String(cell) !== String(condition.value);
 
     case "contains":

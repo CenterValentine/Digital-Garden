@@ -44,6 +44,9 @@ const TAB_SVG_PATHS: Record<string, string> = {
     "M14 5l-3 3l2 7l8-8l-7-2Z M14 5l-3 3l-3-3l3-3l3 3Z M9.5 6.5L4 12l3 6 M3 22v-2c0-1.1.9-2 2-2h10a2 2 0 0 1 2 2v2H3Z",
   context:
     "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  // Table (lucide Table) — the database context rail's schema identity.
+  database:
+    "M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5z M3 10h18 M10 3v18",
 };
 
 /** Tab titles keyed by tabKey */
@@ -57,6 +60,7 @@ const TAB_TITLES: Record<string, string> = {
   publish: "Publish",
   studio: "Studio",
   context: "Context",
+  database: "Database",
 };
 
 interface RightSidebarHeaderProps {
