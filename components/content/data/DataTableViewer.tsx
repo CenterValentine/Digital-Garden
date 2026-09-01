@@ -1803,7 +1803,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           <div className="sticky top-0 z-10 flex border-b border-border bg-muted/60 backdrop-blur">
             <div className="w-9 shrink-0 border-r border-border/60" />
             <div className="w-6 shrink-0" />
-            {columns.map((column) => (
+            {columns.map((column) => {
+              // Checkbox header toggle: absent counts as unchecked, the
+              // same two-state doctrine as the filter and the board.
+              const allChecked =
+                column.type === "checkbox" &&
+                state.rows.length > 0 &&
+                state.rows.every((r) => r.data[column.key] === true);
+              return (
               <DataColumnHeader
                 key={column.id}
                 column={column}
@@ -1827,6 +1834,14 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                 // query tables keep it too — views are the table's own
                 // objects even when the data is a read-only projection.
                 onResizeStart={state.canWrite ? handleResizeStart : undefined}
+                onBulkToggle={
+                  column.type === "checkbox" &&
+                  canEditData &&
+                  state.rows.length > 0
+                    ? () => void bulkSetCheckbox(column, !allChecked)
+                    : undefined
+                }
+                allChecked={allChecked}
               >
                 {openColumnId === column.id && (
                   <ColumnMenu
@@ -1834,15 +1849,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                     onSave={(patch) => saveColumn(column.id, patch)}
                     onDelete={() => deleteColumn(column.id)}
                     onClose={() => setOpenColumnId(null)}
-                    onBulkSet={
-                      column.type === "checkbox" && canEditData
-                        ? (v) => void bulkSetCheckbox(column, v)
-                        : undefined
-                    }
                   />
                 )}
               </DataColumnHeader>
-            ))}
+              );
+            })}
             {canEditData && (
               <AddColumnButton
                 tableId={contentId}

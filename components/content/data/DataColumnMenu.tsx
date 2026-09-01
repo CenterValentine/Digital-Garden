@@ -125,6 +125,9 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
   const [rollupFn, setRollupFn] = useState<RollupFn>("count");
   const [personSource, setPersonSource] = useState<"person" | "user">("person");
   const [targetColumns, setTargetColumns] = useState<DataColumn[] | null>(null);
+  // Checkbox: creation-time default (owner, 2026-08-31 — the setting only
+  // living in the edit menu meant a checklist couldn't START checked).
+  const [defaultChecked, setDefaultChecked] = useState(false);
 
   const relationColumns = columns.filter(
     (c) => c.type === "relation" && !c.deletedAt
@@ -195,6 +198,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     setRollupFn("count");
     setPersonSource("person");
     setTargetColumns(null);
+    setDefaultChecked(false);
   }, []);
 
   const submit = useCallback(async () => {
@@ -219,6 +223,8 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
           ...(rollupFn !== "count" ? { rollupColumnId: targetColumnId } : {}),
         };
       else if (type === "person") config = { personSource };
+      else if (type === "checkbox" && defaultChecked)
+        config = { defaultChecked: true };
       await onAdd({
         name: trimmed,
         type,
@@ -240,6 +246,7 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
     targetColumnId,
     rollupFn,
     personSource,
+    defaultChecked,
     busy,
     onAdd,
     close,
@@ -317,6 +324,18 @@ export function AddColumnButton({ tableId, columns, onAdd }: AddColumnButtonProp
               Also add the linked column over there
             </label>
           </>
+        )}
+
+        {type === "checkbox" && (
+          <label className="mt-3 flex items-center gap-2 text-xs">
+            <input
+              type="checkbox"
+              checked={defaultChecked}
+              onChange={(e) => setDefaultChecked(e.target.checked)}
+              className="h-3.5 w-3.5 accent-current"
+            />
+            New rows start checked
+          </label>
         )}
 
         {type === "person" && (
@@ -461,12 +480,6 @@ interface ColumnEditFormProps {
   onClose: () => void;
   /** The popover autofocuses; the rail's inline form must not steal focus. */
   autoFocus?: boolean;
-  /**
-   * Checkbox columns only: check/uncheck every loaded row in one batch
-   * (one undo entry). Provided by the grid, which owns the rows — the
-   * context rail omits it and the buttons simply don't render.
-   */
-  onBulkSet?: (value: boolean) => void;
 }
 
 /** The header-menu popover: PanelPortal chrome around the shared form. */
@@ -475,7 +488,6 @@ export function ColumnMenu({
   onSave,
   onDelete,
   onClose,
-  onBulkSet,
 }: ColumnEditFormProps) {
   return (
     <PanelPortal open onDismiss={onClose}>
@@ -496,7 +508,6 @@ export function ColumnMenu({
         onSave={onSave}
         onDelete={onDelete}
         onClose={onClose}
-        onBulkSet={onBulkSet}
       />
     </PanelPortal>
   );
@@ -514,7 +525,6 @@ export function ColumnEditForm({
   onDelete,
   onClose,
   autoFocus = true,
-  onBulkSet,
 }: ColumnEditFormProps) {
   const [name, setName] = useState(column.name);
   const [description, setDescription] = useState(column.description ?? "");
@@ -895,34 +905,8 @@ export function ColumnEditForm({
             New rows start checked
           </label>
           <p className="mt-1 text-[10px] leading-snug text-muted-foreground">
-            Display is cosmetic — cells store true/false in every mode, so
-            filters keep working unchanged.
+            Display-only — cells store true/false either way.
           </p>
-
-          {onBulkSet && (
-            <div className="mt-2 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onBulkSet(true);
-                  onClose();
-                }}
-                className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Check all rows
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onBulkSet(false);
-                  onClose();
-                }}
-                className="rounded border border-border px-2 py-1 text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Uncheck all
-              </button>
-            </div>
-          )}
         </>
       )}
 

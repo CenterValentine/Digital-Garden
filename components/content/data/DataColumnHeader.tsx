@@ -9,7 +9,7 @@
  * point of having descriptions at all.
  */
 
-import { Info } from "lucide-react";
+import { Check, Info, Square } from "lucide-react";
 import { cn } from "@/lib/core/utils";
 import type { DataColumn, DataColumnType } from "@/lib/domain/data";
 
@@ -53,6 +53,10 @@ interface DataColumnHeaderProps {
   onColumnDragEnd?: () => void;
   /** Present = a resize grip renders on the right edge. */
   onResizeStart?: (e: React.PointerEvent, columnId: string) => void;
+  /** Checkbox columns: one-click check/uncheck of every loaded row. */
+  onBulkToggle?: () => void;
+  /** Every loaded row checked — flips the toggle's icon and meaning. */
+  allChecked?: boolean;
   /** Rendered by the parent so the popover is not clipped by this cell. */
   children?: React.ReactNode;
 }
@@ -70,6 +74,8 @@ export function DataColumnHeader({
   onColumnDrop,
   onColumnDragEnd,
   onResizeStart,
+  onBulkToggle,
+  allChecked = false,
   children,
 }: DataColumnHeaderProps) {
   const glyph = column.config?.isBacklink
@@ -117,6 +123,34 @@ export function DataColumnHeader({
       <span className="truncate text-foreground/80" title={column.name}>
         {column.name}
       </span>
+      {/* Checkbox columns: check-all toggle, same iconography as the cells
+          (empty box = not all checked). Replaces the menu's wordy buttons
+          (owner, 2026-08-31). Draggable-child trick so grabbing it never
+          starts a column reorder; stopPropagation so it never opens the
+          menu. */}
+      {onBulkToggle && (
+        <button
+          type="button"
+          draggable
+          onDragStart={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onBulkToggle();
+          }}
+          title={allChecked ? "Uncheck all rows" : "Check all rows"}
+          aria-label={allChecked ? "Uncheck all rows" : "Check all rows"}
+          className="ml-auto shrink-0 rounded p-0.5 hover:bg-muted"
+        >
+          {allChecked ? (
+            <Check className="h-3 w-3 text-foreground" />
+          ) : (
+            <Square className="h-3 w-3 text-muted-foreground/50" />
+          )}
+        </button>
+      )}
       {/* Only on columns that HAVE a description — showing it always would
           train people to ignore it, defeating the point (plan D9). */}
       {column.description && (
