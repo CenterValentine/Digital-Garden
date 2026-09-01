@@ -804,10 +804,19 @@ function ContentLinkField({
       try {
         // Shared path with the grid's drop/paste targets — one placement
         // rule (under the database node) for every upload entry point.
-        const added = (await uploadFilesToTable(tableId, files)).filter(
-          (id) => !ids.includes(id)
-        );
-        if (added.length > 0) onCommit([...ids, ...added]);
+        const result = await uploadFilesToTable(tableId, files);
+        const added = result.ids.filter((id) => !ids.includes(id));
+        if (added.length > 0) {
+          onCommit([...ids, ...added]);
+          toast.success(
+            `Attached ${added.length} file${added.length === 1 ? "" : "s"}`
+          );
+        }
+        // Failures are never silent — a broken upload looked like a
+        // missing feature (owner report, 2026-08-31).
+        if (result.errors.length > 0) {
+          toast.error(result.errors[0]);
+        }
       } finally {
         setUploading(false);
       }

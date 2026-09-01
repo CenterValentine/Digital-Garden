@@ -34,6 +34,8 @@ import {
   COLUMN_WIDTH_MAX,
   COLUMN_WIDTH_MIN,
   createUndoStack,
+  encodeCell,
+  isEncodeError,
   deriveRowTitle,
   describeOp,
   diffRow,
@@ -591,13 +593,31 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
     async (rowId: string, columnKey: string, value: unknown) => {
       const row = state.rows.find((r) => r.id === rowId);
       if (!row) return;
+      const column = state.table?.columns.find((c) => c.key === columnKey);
+
+      // Encode client-side with the SAME pure encoder the server runs
+      // (cells.ts is client-safe by design): the optimistic cell shows the
+      // normalized value — https://-upgraded URLs, ISO dates, rounded
+      // numbers — immediately instead of after the next 10s poll (owner
+      // report, 2026-08-31), and a validation failure rejects instantly
+      // with the server's exact wording, no round trip. The server still
+      // re-encodes; the encoders are idempotent on their own output.
+      let outbound = value;
+      if (column) {
+        const encoded = encodeCell(column, value);
+        if (isEncodeError(encoded)) {
+          setNotice(`Could not save — ${encoded.error}`);
+          return;
+        }
+        outbound = encoded.value;
+      }
 
       const before: RowData = row.data;
       const optimistic: RowData = { ...before };
-      if (value === undefined || value === null || value === "") {
+      if (outbound === undefined || outbound === null || outbound === "") {
         delete optimistic[columnKey];
       } else {
-        optimistic[columnKey] = value as RowData[string];
+        optimistic[columnKey] = outbound as RowData[string];
       }
 
       const edits = diffRow(rowId, before, optimistic);
@@ -638,7 +658,6 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       // show the raw id, which these renderers ignore. One reload fetches
       // the refs; without it the picker's choice looks like it never landed
       // (owner report, 2026-08-26).
-      const column = state.table?.columns.find((c) => c.key === columnKey);
       if (
         column &&
         (column.type === "person" ||
@@ -1176,9 +1195,12 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
       setNotice(
         `Uploading ${files.length} file${files.length === 1 ? "" : "s"}…`
       );
-      const uploaded = await uploadFilesToTable(contentId, files);
+      const { ids: uploaded, errors } = await uploadFilesToTable(
+        contentId,
+        files
+      );
       if (uploaded.length === 0) {
-        setNotice("Upload failed — nothing was attached");
+        setNotice(`Upload failed — ${errors[0] ?? "nothing was attached"}`);
         return;
       }
       const row = state.rows.find((r) => r.id === rowId);
@@ -1190,7 +1212,11 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
         ...uploaded.filter((id) => !current.includes(id)),
       ];
       await commitCell(rowId, column.key, merged);
-      setNotice(null);
+      setNotice(
+        errors.length > 0
+          ? `Attached ${uploaded.length}, ${errors.length} failed — ${errors[0]}`
+          : `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}`
+      );
     },
     [canEditData, contentId, state.rows, commitCell]
   );

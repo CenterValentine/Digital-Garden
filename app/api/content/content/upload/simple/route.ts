@@ -139,13 +139,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        if (parent.contentType !== "folder") {
+        // Folders are the normal home; `data` joined 2026-08-31 — File-cell
+        // uploads nest attachments under the database node (owner decision:
+        // File columns = external content brought in), and this folder-only
+        // check was silently 400ing every one of them.
+        if (parent.contentType !== "folder" && parent.contentType !== "data") {
           return NextResponse.json(
             {
               success: false,
               error: {
                 code: "VALIDATION_ERROR",
-                message: "Parent must be a folder",
+                message: "Parent must be a folder or a database",
               },
             },
             { status: 400 }
