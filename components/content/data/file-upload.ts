@@ -62,3 +62,43 @@ export async function uploadFilesToTable(
 export function dragHasFiles(e: { dataTransfer: DataTransfer | null }): boolean {
   return Boolean(e.dataTransfer?.types.includes("Files"));
 }
+
+/**
+ * Overwrite an existing file node's bytes in place — same id, so every
+ * cell/shortcut referencing it sees the new version (owner approval,
+ * 2026-08-31). Broadcasts the rename hook so tree/tabs follow the new
+ * file name.
+ */
+export async function overwriteFileViaUpload(
+  contentId: string,
+  file: File
+): Promise<{ contentId?: string; fileName?: string; error?: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("overwriteContentId", contentId);
+  try {
+    const res = await fetch("/api/content/content/upload/simple", {
+      method: "POST",
+      credentials: "include",
+      body: fd,
+    });
+    const json = (await res.json().catch(() => null)) as {
+      data?: { contentId?: string; fileName?: string };
+      error?: { message?: string };
+    } | null;
+    if (!res.ok || !json?.data?.contentId) {
+      return { error: json?.error?.message ?? `overwrite failed (${res.status})` };
+    }
+    window.dispatchEvent(new CustomEvent("dg:tree-refresh"));
+    if (json.data.fileName) {
+      window.dispatchEvent(
+        new CustomEvent("content-updated", {
+          detail: { contentId, updates: { title: json.data.fileName } },
+        })
+      );
+    }
+    return { contentId: json.data.contentId, fileName: json.data.fileName };
+  } catch {
+    return { error: "network error" };
+  }
+}

@@ -11,21 +11,28 @@ import { useEffect } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
-export function imageDownloadUrl(contentId: string): string {
+export function imageDownloadUrl(contentId: string, version?: number): string {
   // ?stream=true is load-bearing: the route's DEFAULT response is a JSON
   // presigned-URL envelope (what FileViewer fetches client-side); only the
   // stream mode returns bytes with an inline disposition an <img> can eat.
-  // Served with Cache-Control: private, max-age=3600.
-  return `/api/content/content/${contentId}/download?stream=true`;
+  // Served with Cache-Control: private, max-age=3600 — `version` busts that
+  // hour after an in-place overwrite, else the OLD image survives its own
+  // replacement in every open view.
+  return `/api/content/content/${contentId}/download?stream=true${
+    version ? `&v=${version}` : ""
+  }`;
 }
 
 export function ImageLightbox({
   contentId,
   title,
+  version,
   onClose,
 }: {
   contentId: string;
   title: string;
+  /** Cache-bust token after an in-place overwrite. */
+  version?: number;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -61,7 +68,7 @@ export function ImageLightbox({
       </button>
       {/* eslint-disable-next-line @next/next/no-img-element -- arbitrary-size user upload streamed from the authed download route; next/image adds nothing here */}
       <img
-        src={imageDownloadUrl(contentId)}
+        src={imageDownloadUrl(contentId, version)}
         alt={title}
         className="max-h-[90vh] max-w-[90vw] rounded-md object-contain shadow-2xl"
         onClick={(e) => e.stopPropagation()}

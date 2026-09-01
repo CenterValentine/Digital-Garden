@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
 
       const file = formData.get("file") as File;
       const parentId = formData.get("parentId") as string | null;
+      const overwriteContentId = formData.get("overwriteContentId") as
+        | string
+        | null;
       const peopleGroupId = formData.get("peopleGroupId") as string | null;
       const personId = formData.get("personId") as string | null;
       const provider = formData.get("provider") as "r2" | "s3" | "vercel" | null;
@@ -180,6 +183,66 @@ export async function POST(request: NextRequest) {
 
       const arrayBuffer = await file.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+
+      // Overwrite mode (owner approval, 2026-08-31): replace an existing
+      // file node's bytes IN PLACE — same id, so every referencer (File
+      // cells, shortcuts) sees the new version and no "(1)" duplicates
+      // accumulate. Parent/duplicate logic below is create-path only.
+      if (overwriteContentId) {
+        const { overwriteFileNode } = await import(
+          "@/lib/features/content/overwrite-file"
+        );
+        const result = await overwriteFileNode(
+          session.user.id,
+          overwriteContentId,
+          {
+            buffer,
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+          }
+        );
+        if (!result.contentNodeId) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: {
+                code: "VALIDATION_ERROR",
+                message: result.error ?? "Could not overwrite the file",
+              },
+            },
+            { status: 400 }
+          );
+        }
+        // Search text off the fresh bytes — best-effort, never fails the
+        // overwrite itself.
+        try {
+          const storage = await getUserStorageProvider(
+            session.user.id,
+            (result.storageProvider as "r2" | "s3" | "vercel") || undefined
+          );
+          const { DocumentExtractor } = await import(
+            "@/lib/infrastructure/media/document-extractor"
+          );
+          const text = await new DocumentExtractor(storage, enableOCR).extractText(
+            result.storageKey!,
+            file.type
+          );
+          await prisma.filePayload.update({
+            where: { contentId: result.contentNodeId },
+            data: { searchText: text },
+          });
+        } catch {
+          /* extraction is enrichment; the new bytes are already live */
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            contentId: result.contentNodeId,
+            fileName: result.fileName,
+            overwritten: true,
+          },
+        });
+      }
 
       const checksum = crypto.createHash("sha256").update(buffer).digest("hex");
 

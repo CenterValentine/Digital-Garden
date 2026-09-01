@@ -1225,6 +1225,12 @@ export function createBaseTools(ctx: ToolExecuteContext) {
           .describe(
             "Folder id to ALSO mirror the new document into, via a shortcut — one canonical home plus a pointer, never a duplicate. Use when the user wants the document visible in a second place.",
           ),
+        overwriteContentId: z
+          .string()
+          .optional()
+          .describe(
+            "Id of an EXISTING file to overwrite in place with this document — same id, so every File cell and shortcut referencing it sees the new version. Use when the user asks to update/regenerate an attached or existing document; NEVER create a second copy for that. Placement fields are ignored in overwrite mode.",
+          ),
       }),
       execute: async ({
         title,
@@ -1232,6 +1238,7 @@ export function createBaseTools(ctx: ToolExecuteContext) {
         parentId,
         outputLocation,
         alsoShortcutTo,
+        overwriteContentId,
       }) => {
         const effectiveOutputLocation =
           (outputLocation as ToolOutputLocation | undefined) ??
@@ -1239,6 +1246,33 @@ export function createBaseTools(ctx: ToolExecuteContext) {
             ctx.playbookOutputDirectives,
             title,
           );
+        // Overwrite mode: replace an existing document's bytes at the same
+        // id — no placement resolution (the node already lives somewhere),
+        // and no cell write needed afterward (references are ids).
+        if (overwriteContentId) {
+          try {
+            const result = await createDocxDocument(ctx.userId, {
+              title,
+              markdown,
+              overwriteContentId,
+            });
+            return {
+              __docPayload: true,
+              contentNodeId: result.contentNodeId,
+              fileName: result.fileName,
+              overwritten: true,
+              ...(await getContentWriteReceiptEnvelope(
+                ctx.userId,
+                result.contentNodeId,
+                "updated",
+                "Word document",
+              )),
+            };
+          } catch (error) {
+            return `Could not overwrite the document: ${error instanceof Error ? error.message : "unknown error"}.`;
+          }
+        }
+
         const placement = resolveToolOutputPlacement(
           ctx,
           parentId,

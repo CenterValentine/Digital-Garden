@@ -14,11 +14,15 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link2, Loader2, Plus, X } from "lucide-react";
+import { Link2, Loader2, Plus, RefreshCw, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/core/utils";
 import { editDraftFor } from "./DataGridRow";
-import { dragHasFiles, uploadFilesToTable } from "./file-upload";
+import {
+  dragHasFiles,
+  overwriteFileViaUpload,
+  uploadFilesToTable,
+} from "./file-upload";
 import { ImageLightbox, imageDownloadUrl } from "./ImageLightbox";
 import {
   cellToText,
@@ -761,6 +765,34 @@ function ContentLinkField({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   /** Images columns: the thumbnail currently zoomed, if any. */
   const [lightbox, setLightbox] = useState<ContentRef | null>(null);
+  /** Per-chip Replace: pending overwrite target + its own hidden input. */
+  const replaceInputRef = useRef<HTMLInputElement | null>(null);
+  const replaceTargetRef = useRef<string | null>(null);
+  /** Cache-bust after an overwrite — the image stream carries an hour of
+   * private cache, so the OLD image would otherwise survive replacement. */
+  const [imgVersion, setImgVersion] = useState(0);
+
+  const overwriteRef = useCallback(
+    async (targetId: string, file: File) => {
+      if (isImage && !file.type.startsWith("image/")) {
+        toast.error("Images only — pick an image to replace with");
+        return;
+      }
+      setUploading(true);
+      try {
+        const res = await overwriteFileViaUpload(targetId, file);
+        if (res.error) {
+          toast.error(`Overwrite failed — ${res.error}`);
+          return;
+        }
+        setImgVersion(Date.now());
+        toast.success(`Replaced with "${file.name}"`);
+      } finally {
+        setUploading(false);
+      }
+    },
+    [isImage]
+  );
   // The anchor ELEMENT lives in state, not a ref: it is read during render
   // (the picker needs it as a prop), and the React Compiler correctly
   // rejects ref reads in render. A callback ref keeps it current.
@@ -818,9 +850,33 @@ function ContentLinkField({
           list = images;
           if (list.length === 0) return;
         }
+        // Collision prompt: a same-named attachment offers overwrite-in-
+        // place (same node id — every referencer sees the new version)
+        // instead of stacking "name (1)" twins.
+        const toCreate: File[] = [];
+        for (const f of list) {
+          const match = refs.find((r) => !r.restricted && r.title === f.name);
+          if (
+            match &&
+            window.confirm(
+              `"${f.name}" is already attached — overwrite it?\n\nOK replaces the file everywhere it's referenced. Cancel keeps both.`
+            )
+          ) {
+            const res = await overwriteFileViaUpload(match.id, f);
+            if (res.error) {
+              toast.error(`Overwrite failed — ${res.error}`);
+              return;
+            }
+            setImgVersion(Date.now());
+            toast.success(`Overwrote "${f.name}"`);
+          } else {
+            toCreate.push(f);
+          }
+        }
+        if (toCreate.length === 0) return;
         // Shared path with the grid's drop/paste targets — one placement
         // rule (under the database node) for every upload entry point.
-        const result = await uploadFilesToTable(tableId, list);
+        const result = await uploadFilesToTable(tableId, toCreate);
         const added = result.ids.filter((id) => !ids.includes(id));
         if (added.length > 0) {
           onCommit([...ids, ...added]);
@@ -837,7 +893,7 @@ function ContentLinkField({
         setUploading(false);
       }
     },
-    [ids, onCommit, tableId, isImage]
+    [ids, onCommit, tableId, isImage, refs]
   );
 
   return (
@@ -896,20 +952,37 @@ function ContentLinkField({
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
                 <img
-                  src={ref.file?.thumbnailUrl ?? imageDownloadUrl(ref.id)}
+                  src={
+                    ref.file?.thumbnailUrl ??
+                    imageDownloadUrl(ref.id, imgVersion)
+                  }
                   alt={ref.title}
                   className="h-14 w-14 object-cover"
                 />
               </button>
               {editable && (
-                <button
-                  type="button"
-                  onClick={() => remove(ref.id)}
-                  aria-label={`Remove ${ref.title}`}
-                  className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-destructive"
-                >
-                  <X className="h-2.5 w-2.5" />
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => remove(ref.id)}
+                    aria-label={`Remove ${ref.title}`}
+                    className="absolute -right-1 -top-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-destructive"
+                  >
+                    <X className="h-2.5 w-2.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      replaceTargetRef.current = ref.id;
+                      replaceInputRef.current?.click();
+                    }}
+                    title="Replace file (updates it everywhere it's referenced)"
+                    aria-label={`Replace ${ref.title}`}
+                    className="absolute -bottom-1 -right-1 rounded-full border border-border bg-background p-0.5 text-muted-foreground shadow-sm hover:text-foreground"
+                  >
+                    <RefreshCw className="h-2.5 w-2.5" />
+                  </button>
+                </>
               )}
             </span>
           ) : (
@@ -934,6 +1007,20 @@ function ContentLinkField({
                 {ref.title}
               </button>
             )}
+            {editable && !ref.restricted && isFile && (
+              <button
+                type="button"
+                onClick={() => {
+                  replaceTargetRef.current = ref.id;
+                  replaceInputRef.current?.click();
+                }}
+                title="Replace file (updates it everywhere it's referenced)"
+                aria-label={`Replace ${ref.title}`}
+                className="rounded-full hover:bg-primary/20"
+              >
+                <RefreshCw className="h-2.5 w-2.5" />
+              </button>
+            )}
             {editable && !ref.restricted && (
               <button
                 type="button"
@@ -949,6 +1036,19 @@ function ContentLinkField({
         )}
         {editable && isFile && (
           <>
+            <input
+              ref={replaceInputRef}
+              type="file"
+              accept={isImage ? "image/*" : undefined}
+              className="hidden"
+              onChange={(e) => {
+                const target = replaceTargetRef.current;
+                const file = e.target.files?.[0];
+                replaceTargetRef.current = null;
+                e.target.value = "";
+                if (target && file) void overwriteRef(target, file);
+              }}
+            />
             <input
               ref={fileInputRef}
               type="file"
@@ -1028,6 +1128,7 @@ function ContentLinkField({
         <ImageLightbox
           contentId={lightbox.id}
           title={lightbox.title}
+          version={imgVersion}
           onClose={() => setLightbox(null)}
         />
       )}

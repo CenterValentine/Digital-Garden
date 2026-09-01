@@ -65,7 +65,7 @@ import {
   dispatchDataSchemaChanged,
   type DataSchemaChangedDetail,
 } from "./events";
-import { uploadFilesToTable } from "./file-upload";
+import { overwriteFileViaUpload, uploadFilesToTable } from "./file-upload";
 import { AddColumnButton, ColumnMenu } from "./DataColumnMenu";
 import { DataViewBar, type ViewPatch } from "./DataViewBar";
 import { CHECKED_GROUP, DataBoardView } from "./DataBoardView";
@@ -1189,6 +1189,10 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
    * and paste both land here, sharing the peek's upload path (files
    * become nodes under the database, then link into the cell).
    */
+  /** Bumped after an in-place overwrite so cached image streams re-fetch
+   * (the download stream carries an hour of private cache). */
+  const [imageVersion, setImageVersion] = useState(0);
+
   const uploadIntoFileCell = useCallback(
     async (rowId: string, column: DataColumn, files: FileList | File[]) => {
       if (!canEditData) return;
@@ -1205,37 +1209,79 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
           return;
         }
       }
-      setNotice(
-        `Uploading ${list.length} file${list.length === 1 ? "" : "s"}…`
-      );
-      const { ids: uploaded, errors } = await uploadFilesToTable(
-        contentId,
-        list
-      );
-      if (uploaded.length === 0) {
-        setNotice(`Upload failed — ${errors[0] ?? "nothing was attached"}`);
-        return;
-      }
+
+      // Collision prompt (owner approval, 2026-08-31): a dropped file whose
+      // name matches an attached one offers overwrite-in-place — same node
+      // id, every referencer sees the new version — instead of silently
+      // stacking "name (1)" twins.
       const row = state.rows.find((r) => r.id === rowId);
-      const current = Array.isArray(row?.data[column.key])
-        ? (row.data[column.key] as string[])
-        : [];
-      const merged = [
-        ...current,
-        ...uploaded.filter((id) => !current.includes(id)),
-      ];
-      await commitCell(rowId, column.key, merged);
-      setNotice(
-        errors.length > 0
-          ? `Attached ${uploaded.length}, ${errors.length} failed — ${errors[0]}`
-          : `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}${
-              skippedNonImages > 0
-                ? ` (${skippedNonImages} non-image skipped)`
-                : ""
-            }`
-      );
+      const refs = row?.contentRefs?.[column.id] ?? [];
+      const toCreate: File[] = [];
+      let overwritten = 0;
+      for (const f of list) {
+        const match = refs.find((r) => !r.restricted && r.title === f.name);
+        if (
+          match &&
+          window.confirm(
+            `"${f.name}" is already attached — overwrite it?\n\nOK replaces the file everywhere it's referenced. Cancel keeps both.`
+          )
+        ) {
+          setNotice(`Overwriting ${f.name}…`);
+          const res = await overwriteFileViaUpload(match.id, f);
+          if (res.error) {
+            setNotice(`Overwrite failed — ${res.error}`);
+            return;
+          }
+          overwritten++;
+        } else {
+          toCreate.push(f);
+        }
+      }
+
+      let uploaded: string[] = [];
+      let errors: string[] = [];
+      if (toCreate.length > 0) {
+        setNotice(
+          `Uploading ${toCreate.length} file${toCreate.length === 1 ? "" : "s"}…`
+        );
+        ({ ids: uploaded, errors } = await uploadFilesToTable(
+          contentId,
+          toCreate
+        ));
+        if (uploaded.length === 0 && overwritten === 0) {
+          setNotice(`Upload failed — ${errors[0] ?? "nothing was attached"}`);
+          return;
+        }
+        if (uploaded.length > 0) {
+          const current = Array.isArray(row?.data[column.key])
+            ? (row.data[column.key] as string[])
+            : [];
+          const merged = [
+            ...current,
+            ...uploaded.filter((id) => !current.includes(id)),
+          ];
+          await commitCell(rowId, column.key, merged);
+        }
+      }
+      if (overwritten > 0) {
+        setImageVersion(Date.now());
+        void load(viewRef.current?.id ?? null);
+      }
+
+      const parts: string[] = [];
+      if (uploaded.length > 0) {
+        parts.push(
+          `Attached ${uploaded.length} file${uploaded.length === 1 ? "" : "s"}`
+        );
+      }
+      if (overwritten > 0) {
+        parts.push(`overwrote ${overwritten}`);
+      }
+      if (skippedNonImages > 0) parts.push(`${skippedNonImages} non-image skipped`);
+      if (errors.length > 0) parts.push(`${errors.length} failed — ${errors[0]}`);
+      setNotice(parts.join(" · ") || null);
     },
-    [canEditData, contentId, state.rows, commitCell]
+    [canEditData, contentId, state.rows, commitCell, load]
   );
 
   // Paste into a SELECTED File cell — the keyboard's drop. Skipped while
@@ -1928,6 +1974,7 @@ export function DataTableViewer({ contentId, title }: DataTableViewerProps) {
                   widths={columnWidths}
                   onCreateOption={state.canAlterSchema ? createOption : undefined}
                   onUploadFiles={canEditData ? uploadIntoFileCell : undefined}
+                  imageVersion={imageVersion}
                   height={ROW_HEIGHT}
                   selected={selectedRows.has(row.id)}
                   editable={canEditData}

@@ -192,8 +192,14 @@ export interface CreateDocxInput {
   title: string;
   /** Markdown body — converted via the app's markdown→TipTap pipeline. */
   markdown: string;
-  /** Destination folder — required; callers resolve from the target. */
-  parentFolderId: string;
+  /** Destination folder — required for CREATE; ignored for overwrite. */
+  parentFolderId?: string;
+  /**
+   * Overwrite mode (owner approval, 2026-08-31): replace THIS existing
+   * file node's bytes in place instead of creating a new node — same id,
+   * so every File cell / shortcut referencing it sees the new version.
+   */
+  overwriteContentId?: string;
   /**
    * Output ownership (Chat Outputs & References plan, WS3): when set, the
    * document is created as `role: "referenced"`, nested under this owner
@@ -222,6 +228,38 @@ export async function createDocxDocument(
     ? file.content
     : Buffer.from(file.content);
 
+  const safeTitle =
+    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
+  const fileName = `${safeTitle}.docx`;
+
+  // Overwrite mode: same node id, new bytes — the shared helper enforces
+  // the invariants (fresh storage key, image guard, metadata reset).
+  if (input.overwriteContentId) {
+    const { overwriteFileNode } = await import(
+      "@/lib/features/content/overwrite-file"
+    );
+    const result = await overwriteFileNode(ownerId, input.overwriteContentId, {
+      buffer,
+      fileName,
+      mimeType: DOCX_MIME,
+      searchText: extractSearchTextFromTipTap(tiptap),
+    });
+    if (!result.contentNodeId) {
+      throw new Error(result.error ?? "Could not overwrite the document.");
+    }
+    logger.info({
+      layer: "ai",
+      event: "ai_documents:docx_overwritten",
+      summary: `docx "${fileName}" overwritten in place`,
+      attrs: { contentNodeId: result.contentNodeId, bytes: buffer.length },
+    });
+    return { contentNodeId: result.contentNodeId, fileName };
+  }
+
+  if (!input.parentFolderId) {
+    throw new Error("A destination folder is required to create a new document.");
+  }
+
   const { getUserStorageProvider } = await import(
     "@/lib/infrastructure/storage"
   );
@@ -230,9 +268,6 @@ export async function createDocxDocument(
   const storageKey = `uploads/${ownerId}/ai-doc-${Date.now()}-${randomBytes(6).toString("hex")}.docx`;
   await storageProvider.uploadFile(storageKey, buffer, DOCX_MIME);
 
-  const safeTitle =
-    input.title.replace(/[^a-zA-Z0-9\s-]/g, "").trim() || "Document";
-  const fileName = `${safeTitle}.docx`;
   const slug = await generateUniqueSlug(fileName, ownerId);
 
   const content = await prisma.contentNode.create({

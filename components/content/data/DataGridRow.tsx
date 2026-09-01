@@ -128,6 +128,8 @@ interface DataGridRowProps {
     column: DataColumn,
     files: FileList
   ) => void | Promise<void>;
+  /** Cache-bust token for image streams after an in-place overwrite. */
+  imageVersion?: number;
   height: number;
   selected: boolean;
   editable: boolean;
@@ -155,6 +157,7 @@ function DataGridRowImpl({
   widths,
   onCreateOption,
   onUploadFiles,
+  imageVersion,
   height,
   selected,
   editable,
@@ -212,6 +215,7 @@ function DataGridRowImpl({
             width={widths?.[column.id] ?? DEFAULT_COLUMN_WIDTH}
             onCreateOption={onCreateOption}
             onUploadFiles={onUploadFiles}
+            imageVersion={imageVersion}
             rowId={row.id}
             value={row.data[column.key]}
             links={row.links?.[column.id]}
@@ -252,6 +256,8 @@ interface DataCellProps {
     column: DataColumn,
     files: FileList
   ) => void | Promise<void>;
+  /** Cache-bust token for image streams after an in-place overwrite. */
+  imageVersion?: number;
   rowId: string;
   value: CellValue | undefined;
   /** Hydrated relation targets, when this is a relation column. */
@@ -278,6 +284,7 @@ function DataCell({
   width,
   onCreateOption,
   onUploadFiles,
+  imageVersion,
   rowId,
   value,
   links,
@@ -557,7 +564,10 @@ function DataCell({
             >
               {/* eslint-disable-next-line @next/next/no-img-element -- tiny authed thumbnail; next/image adds nothing */}
               <img
-                src={ref.file?.thumbnailUrl ?? imageDownloadUrl(ref.id)}
+                src={
+                  ref.file?.thumbnailUrl ??
+                  imageDownloadUrl(ref.id, imageVersion)
+                }
                 alt={ref.title}
                 className="h-7 w-7 object-cover"
               />
@@ -595,6 +605,7 @@ function DataCell({
           <ImageLightbox
             contentId={lightbox.id}
             title={lightbox.title}
+            version={imageVersion}
             onClose={() => setLightbox(null)}
           />
         )}
