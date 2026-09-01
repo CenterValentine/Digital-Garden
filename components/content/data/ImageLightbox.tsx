@@ -12,7 +12,11 @@ import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function imageDownloadUrl(contentId: string): string {
-  return `/api/content/content/${contentId}/download`;
+  // ?stream=true is load-bearing: the route's DEFAULT response is a JSON
+  // presigned-URL envelope (what FileViewer fetches client-side); only the
+  // stream mode returns bytes with an inline disposition an <img> can eat.
+  // Served with Cache-Control: private, max-age=3600.
+  return `/api/content/content/${contentId}/download?stream=true`;
 }
 
 export function ImageLightbox({
